@@ -25,6 +25,7 @@ from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
 from six import binary_type, string_types
+from frozendict import frozendict
 
 from datalad import cfg
 from datalad.auto import AutomagicIO
@@ -556,6 +557,13 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
     return o
 
 
+def _json_safe(val):
+    if isinstance(val, frozendict):
+        return dict(val)
+    else:
+        return val
+
+
 def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                   paths=None):
     """Make a direct query of a dataset to extract its metadata.
@@ -684,22 +692,21 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
         for k, v in cm.items():
             # TODO instead of a set, it could be a set with counts
             vset = unique_cm.get(k, set())
-            # prevent nested structures in unique prop list
-            vset.add(', '.join(str(i)
-                               # force-convert any non-string item
-                               if not isinstance(i, string_types) else i
-                               for i in v)
-                     # any plain sequence
-                     if isinstance(v, (tuple, list))
-                     else v
-                     # keep anything that can live in JSON natively
-                     if isinstance(v, (int, float, bool) + string_types)
-                     # force string-convert anything else
-                     else str(v))
+            try:
+                vset.add(v)
+            except TypeError:
+                if isinstance(v, dict):
+                    vset.add(frozendict(v))
+                elif isinstance(v, list):
+                    vset.add(tuple(v))
+                else:
+                    # no idea
+                    raise
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {
-            k: sorted(v) if len(v) > 1 else list(v)[0]
+            # TODO bring back sorting, maybe with a custom subclass of frozendict that has __gt__()
+            k: [_json_safe(i) for i in v] if len(v) > 1 else _json_safe(list(v)[0])
             for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
