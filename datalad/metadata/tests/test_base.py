@@ -34,6 +34,7 @@ from datalad.tests.utils import skip_direct_mode
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from ..parsers.tests.test_bids import bids_template
 
 from nose.tools import assert_true, assert_equal, assert_raises
 
@@ -202,3 +203,33 @@ def test_ignore_nondatasets(path):
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
         n_subm += 1
+
+
+@with_tree(tree=bids_template)
+def test_nested_metadata(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ds.aggregate_metadata()
+    # BIDS returns participant info as a nested dict for each file in the
+    # content metadata. On the dataset-level this should automatically
+    # yield a sequence of participant info dicts, without any further action
+    # or BIDS-specific configuration
+    meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
+    assert_equal(
+        meta['unique_content_properties']['bids:participant'],
+        [
+            {
+                "bids:age(years)": "20-25",
+                "bids:participant_id": "03",
+                "gender": "female",
+                "handedness": "r",
+                "hearing_problems_current": "n"
+            },
+            {
+                "bids:age(years)": "30-35",
+                "bids:participant_id": "01",
+                "gender": "male",
+                "handedness": "r",
+                "hearing_problems_current": "n"
+            }
+        ])
