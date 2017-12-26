@@ -24,6 +24,7 @@ from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
 from six import binary_type, string_types
+from frozendict import frozendict
 
 from datalad import cfg
 from datalad.auto import AutomagicIO
@@ -479,25 +480,27 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             for k, v in meta.items():
                 # TODO instead of a set, it could be a set with counts
                 vset = unique_cm.get(k, set())
-                # prevent nested structures in unique prop list
-                vset.add(', '.join(str(i)
-                                   # force-convert any non-string item
-                                   if not isinstance(i, string_types) else i
-                                   for i in v)
-                         # any plain sequence
-                         if isinstance(v, (tuple, list))
-                         else v
-                         # keep anything that can live in JSON natively
-                         if isinstance(v, (int, float, bool) + string_types)
-                         # force string-convert anything else
-                         else str(v))
+                try:
+                    vset.add(v)
+                except TypeError:
+                    if isinstance(v, dict):
+                        vset.add(frozendict(v))
+                    elif isinstance(v, list):
+                        vset.add(tuple(v))
+                    else:
+                        # no idea
+                        raise
                 unique_cm[k] = vset
 
         if unique_cm:
             # per source storage here too
             ucp = dsmeta.get('unique_content_properties', {})
             ucp[mtype_key] = {
-                k: sorted(v) if len(v) > 1 else list(v)[0]
+                    k: [dict(i) if isinstance(i, frozendict) else i
+                        for i in sorted(
+                            v,
+                            key=lambda x: hash(x))]
+                        if len(v) > 1 else list(v)[0]
                 for k, v in unique_cm.items()}
             dsmeta['unique_content_properties'] = ucp
 
