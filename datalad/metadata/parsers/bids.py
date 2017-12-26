@@ -118,7 +118,7 @@ class MetadataParser(BaseMetadataParser):
         if exists(participants_fname):
             try:
                 for rx, info in yield_participant_info(participants_fname):
-                    path_props[rx] = info
+                    path_props[rx] = {'bids:participant': info}
             except Exception as exc:
                 lgr.warning(
                     "Failed to load participants info due to: %s. Skipping the rest of file",
@@ -178,11 +178,9 @@ def yield_participant_info(fname):
             for k in row:
                 # take away some ambiguity
                 normk = k.lower()
-                hk = content_metakey_map.get(normk, None)
+                hk = content_metakey_map.get(normk, normk)
                 val = row[k]
-                if hk is None:
-                    hk = 'comment<participant#{}>'.format(normk)
-                if hk in ('comment<participant#sex>', 'comment<participant#gender>'):
+                if hk in ('sex', 'gender'):
                     val = sex_label_map.get(row[k].lower(), row[k].lower())
                 if val:
                     props[hk] = val
