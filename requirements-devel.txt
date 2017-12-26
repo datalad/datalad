@@ -5,4 +5,6 @@
 # we should use fresh version allowing to disable extensions
 wrapt>=1.10.11
 -e .[devel]
+# TODO remove again in favor of a released pybids in setup.py
+git+https://github.com/INCF/pybids.git
 

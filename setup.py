@@ -100,7 +100,9 @@ requires = {
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'pydicom',  # DICOM metadata
-        'pybids',  # BIDS metadata
+        # ATM we need an unreleased version of pybids, added to requirements-devel.txt
+        # TODO revert
+        #'pybids',  # BIDS metadata
         'Pillow',  # generic image metadata
         'nibabel',  # NIfTI metadata
         'pandas',  # bids2scidata export
