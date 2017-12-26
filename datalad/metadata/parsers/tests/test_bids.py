@@ -17,7 +17,10 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_in
 
 
-@with_tree(tree={'dataset_description.json': """
+bids_template = {
+    '.datalad': {
+        'config': '[datalad "metadata"]\n  nativetype = bids',},
+    'dataset_description.json': """
 {
     "Name": "studyforrest_phase2",
     "BIDSVersion": "1.0.0-rc3",
@@ -38,9 +41,12 @@ participant_id\tgender\tage\thandedness\thearing_problems_current
 sub-01\tm\t30-35\tr\tn
 sub-03\tf\t20-25\tr\tn
 """,
-    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}}})
-def test_get_metadata(path):
+    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}},
+    'sub-03': {'func': {'sub-03_task-other_bold.nii.gz': ''}}}
 
+
+@with_tree(tree=bids_template)
+def test_get_metadata(path):
     ds = Dataset(path).create(force=True)
     meta = MetadataParser(ds, []).get_metadata(True, False)[0]
     del meta['@context']
@@ -78,7 +84,7 @@ def test_get_metadata(path):
     assert_equal(fmeta['task'], 'some')
     assert_equal(fmeta['modality'], 'func')
     # the fact that there is participant vs subject is already hotly debated in Tal's brain
-    assert_in('comment<participant#handedness>', fmeta)
+    assert_in('handedness', fmeta['bids:participant'])
 
 
 @with_tree(tree={'dataset_description.json': """
