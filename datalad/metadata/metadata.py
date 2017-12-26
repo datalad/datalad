@@ -705,8 +705,9 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
             unique_cm[k] = vset
     if unique_cm:
         dsmeta['unique_content_properties'] = {
-            # TODO bring back sorting, maybe with a custom subclass of frozendict that has __gt__()
-            k: [_json_safe(i) for i in v] if len(v) > 1 else _json_safe(list(v)[0])
+            k: sorted([_json_safe(i) for i in v],
+                      key=lambda x: list(x.items()) if isinstance(x, dict) else x)
+            if len(v) > 1 else _json_safe(list(v)[0])
             for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
