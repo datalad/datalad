@@ -26,7 +26,7 @@ which is not set up automatically by using the pip method.
 Advanced users can chose from several installation schemes (e.g.
 ``publish``, ``metadata``, ``tests`` or ``crawl``)::
 
-  pip install datalad [SCHEME]
+  pip install datalad[SCHEME]
   
 where ``SCHEME`` could be
 
