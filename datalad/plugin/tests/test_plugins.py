@@ -10,19 +10,23 @@
 """Test plugin interface mechanics"""
 
 
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
+import os
 import logging
 from os.path import join as opj
 from os.path import exists
 from mock import patch
 
-from datalad.config import ConfigManager
 from datalad.api import plugin
 from datalad.api import create
+from datalad.api import Dataset
+from datalad import cfg
 
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_raises
@@ -36,7 +40,7 @@ broken_plugin = """garbage"""
 
 nodocs_plugin = """\
 def dlplugin():
-    pass
+    yield
 """
 
 # functioning plugin dummy
@@ -86,10 +90,10 @@ def test_plugin_call(path, dspath):
                     fake_dummy_spec['nodocs']['file']))
         with swallow_outputs() as cmo:
             plugin(['dummy'], showpluginhelp=True)
-            eq_(cmo.out.rstrip(), "mydocstring")
+            eq_(cmo.out.rstrip(), "Usage: dummy(dataset, noval, withval='test')\n\nmydocstring")
         with swallow_outputs() as cmo:
             plugin(['nodocs'], showpluginhelp=True)
-            eq_(cmo.out.rstrip(), "This plugin has no documentation")
+            eq_(cmo.out.rstrip(), "Usage: nodocs()\n\nThis plugin has no documentation")
         # loading fails, no docs
         assert_raises(ValueError, plugin, ['broken'], showpluginhelp=True)
 
@@ -110,7 +114,7 @@ def test_plugin_call(path, dspath):
             res = list(plugin(['dummy', 'noval=one', 'obscure=some']))
             assert_status('ok', res)
             cml.assert_logged(
-                msg=".*ignoring plugin argument\\(s\\).*obscure.*, not supported by plugin.*",
+                msg=".*Ignoring plugin argument\\(s\\).*obscure.*, not supported by plugin.*",
                 regex=True, level='WARNING')
         # fails on missing positional arg
         assert_raises(TypeError, plugin, ['dummy'])
@@ -156,39 +160,32 @@ def test_plugin_call(path, dspath):
                       dataset='rubbish')
 
 
-# MIH: I failed to replace our config manager instance for this test run
-# in order to be able to configure a set of plugins to run prior and after
-# create. A test should not alter a users config, hence I am disabling this
-# for now, and hope somebody can fix it up
-#@with_tempfile(mkdir=True)
-#def test_plugin_config(path):
-#    with patch.dict('os.environ',
-#                    {'HOME': path, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
-#        with patch('datalad.cfg', ConfigManager()) as cfg:
-#            global_gitconfig = opj(path, '.gitconfig')
-#            assert(not exists(global_gitconfig))
-#            # swap out the actual config for this test
-#            assert_in('datalad.sneaky.addition', cfg)
-#            # now we configure a plugin to run before and twice after `create`
-#            cfg.add('datalad.create.run-before',
-#                    'add_readme filename=before.txt',
-#                    where='global')
-#            cfg.add('datalad.create.run-after',
-#                    'add_readme filename=after1.txt',
-#                    where='global')
-#            cfg.add('datalad.create.run-after',
-#                    'add_readme filename=after2.txt',
-#                    where='global')
-#            # force reload to pick up newly populated .gitconfig
-#            cfg.reload(force=True)
-#            assert_in('datalad.create.run-before', cfg)
-#            # and now we create a dataset and expect the two readme files
-#            # to be part of it
-#            ds = create(dataset=opj(path, 'ds'))
-#            ok_clean_git(ds.path)
-#            assert(exists(opj(ds.path, 'before.txt')))
-#            assert(exists(opj(ds.path, 'after1.txt')))
-#            assert(exists(opj(ds.path, 'after2.txt')))
+@with_tempfile(mkdir=True)
+def test_plugin_config(path):
+    # baseline behavior, empty datasets on create
+    ds = create(dataset=opj(path, 'ds1'))
+    eq_(sorted(os.listdir(ds.path)), ['.datalad', '.git', '.gitattributes'])
+    # now we configure a plugin to run twice after `create`
+    cfg.add('datalad.create.run-after',
+            'add_readme filename=after1.txt',
+            where='global')
+    cfg.add('datalad.create.run-after',
+            'add_readme filename=after2.txt',
+            where='global')
+    # force reload to pick up newly populated .gitconfig
+    cfg.reload(force=True)
+    assert_in('datalad.create.run-after', cfg)
+    # and now we create a dataset and expect the two readme files
+    # to be part of it
+    ds = create(dataset=opj(path, 'ds'))
+    ok_clean_git(ds.path)
+    assert(exists(opj(ds.path, 'after1.txt')))
+    assert(exists(opj(ds.path, 'after2.txt')))
+    # cleanup
+    cfg.unset(
+        'datalad.create.run-after',
+        where='global')
+    assert_not_in('datalad.create.run-after', cfg)
 
 
 @with_tempfile(mkdir=True)
@@ -213,7 +210,7 @@ def test_wtf(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_no_annex(path):
     ds = create(path)
     ok_clean_git(ds.path)
@@ -231,3 +228,60 @@ def test_no_annex(path):
     # importantly, also .gitattribute is not annexed
     eq_([opj('code', 'inannex')],
         ds.repo.get_annexed_files())
+
+
+_bids_template = {
+    '.datalad': {
+        'config': '''\
+[datalad "metadata"]
+        nativetype = bids
+'''},
+    'dataset_description.json': '''\
+{
+    "Name": "demo_ds",
+    "BIDSVersion": "1.0.0",
+    "Description": "this is for play",
+    "License": "PDDL",
+    "Authors": [
+        "Betty",
+        "Tom"
+    ]
+}
+'''}
+
+
+@with_tree(_bids_template)
+def test_add_readme(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ds.aggregate_metadata()
+    ok_clean_git(ds.path)
+    assert_status('ok', ds.plugin('add_readme'))
+    # should use default name
+    eq_(
+        open(opj(path, 'README.md')).read(),
+        """\
+# Dataset "demo_ds"
+
+this is for play
+
+### Authors
+
+- Betty
+- Tom
+
+### License
+
+PDDL
+
+## General information
+
+This is a DataLad dataset (id: {id}).
+
+For more information on DataLad and on how to work with its datasets,
+see the DataLad documentation at: http://docs.datalad.org
+""".format(
+    id=ds.id))
+
+    # should skip on re-run
+    assert_status('notneeded', ds.plugin('add_readme'))

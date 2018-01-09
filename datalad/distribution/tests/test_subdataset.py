@@ -7,7 +7,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test subdataset command"""
 
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
 import os
 from os.path import join as opj
 from os.path import relpath
@@ -18,13 +19,13 @@ from datalad.api import subdatasets
 
 from nose.tools import eq_
 from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
-@skip_direct_mode  #FIXME
 def test_get_subdatasets(path):
     ds = Dataset(path)
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
@@ -32,9 +33,9 @@ def test_get_subdatasets(path):
     ])
     ds.get('sub dataset1')
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/subm 2',
     ])
     # obtain key subdataset, so all leave subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
@@ -43,19 +44,19 @@ def test_get_subdatasets(path):
         [(path, opj(path, 'sub dataset1'))])
     eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
         'sub dataset1',
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
+        'sub dataset1/sub sub dataset1/2',
         'sub dataset1/sub sub dataset1/subm 1',
-        'sub dataset1/sub sub dataset1/subm 2',
         'sub dataset1/subm 1',
-        'sub dataset1/subm 2',
     ])
     # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
+        'sub dataset1/2',
+        'sub dataset1/sub sub dataset1/2',
         'sub dataset1/sub sub dataset1/subm 1',
-        'sub dataset1/sub sub dataset1/subm 2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/subm 2',
         'sub dataset1',
     ])
     eq_(subdatasets(ds, recursive=True, fulfilled=True, result_xfm='relpaths'), [
@@ -65,11 +66,11 @@ def test_get_subdatasets(path):
     eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
         (os.curdir, 'sub dataset1'),
+        ('sub dataset1', 'sub dataset1/2'),
         ('sub dataset1', 'sub dataset1/sub sub dataset1'),
+        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/2'),
         ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
-        ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 2'),
         ('sub dataset1', 'sub dataset1/subm 1'),
-        ('sub dataset1', 'sub dataset1/subm 2'),
     ])
     # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, recursion_limit=0),
@@ -81,9 +82,9 @@ def test_get_subdatasets(path):
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
         'sub dataset1',
+        'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
-        'sub dataset1/subm 2',
     ])
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
@@ -164,3 +165,13 @@ def test_get_subdatasets(path):
                        result_xfm='paths'),
         [])
 
+
+@known_failure_direct_mode  #FIXME
+@with_tempfile
+def test_get_subdatasets_types(path):
+    from datalad.api import create
+    ds = create(path)
+    ds.create('1')
+    ds.create('true')
+    # no types casting should happen
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])

@@ -8,8 +8,9 @@ run "cd demo"
 run "datalad run dd if=/dev/urandom of=big.dat bs=1M count=1"
 
 say "Next we configure box.com as a remote storage location, using a git-annex command."
-say "Git-annex requires the login credentials to be given as environment variables. This demo uses a script that hides the real credentials and give some fake output to illustrate the basic idea"
+say "Git-annex requires the login credentials to be given as environment variables WEBDAV_USERNAME and WEBDAV_PASSWORD. This demo uses a script that hides the real credentials"
 run ". ~/box.com_work.sh"
+
 say "Now for the actual box.com configuration."
 say "Key argument is the access URL: 'team/project_one' is where the data will be stored in the box.com account."
 run "git annex initremote box.com type=webdav url=https://dav.box.com/dav/team/project_one chunk=50mb encryption=none"

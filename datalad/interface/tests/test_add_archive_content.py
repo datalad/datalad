@@ -12,8 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+
+
 import logging
 import os
 from os import unlink
@@ -73,8 +74,6 @@ treeargs = dict(
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     chpwd(repo_path)
@@ -162,12 +161,12 @@ tree4uargs = dict(
 )
 
 
+@known_failure_v6   # FIXME
+#  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_content(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -303,10 +302,6 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -330,14 +325,16 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     repo = AnnexRepo(repo_path, create=True, direct=direct)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
+        # check it gives informative error if archive is not already added
+        with assert_raises(RuntimeError), swallow_outputs() as cm:
+            add_archive_content(archive_path)
+            assert_in("You should run datalad add", cm.err)
         with swallow_outputs():
             repo.add(archive_path)
         repo.commit("added 1.tar.gz")

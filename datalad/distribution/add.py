@@ -415,10 +415,14 @@ class Add(Interface):
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
+            is_annex = isinstance(ds.repo, AnnexRepo)
+            add_kw = {'jobs': jobs} if is_annex and jobs else {}
             added = ds.repo.add(
                 list(torepoadd.keys()),
-                git=to_git if isinstance(ds.repo, AnnexRepo) else True,
-                commit=False)
+                git=to_git if is_annex else True,
+                commit=False,
+                **add_kw
+            )
             for a in added:
                 res = annexjson2result(a, ds, type='file', **common_report)
                 success = success_status_map[res['status']]

@@ -7,8 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from glob import glob
 from os.path import join as opj
@@ -32,7 +34,7 @@ from ....utils import chpwd
 from ....utils import find_files
 from ....utils import swallow_logs
 from ....tests.utils import integration
-from ....tests.utils import with_tree
+from ....tests.utils import (with_tree, File)
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
 from ....tests.utils import assert_in, assert_not_in
@@ -43,6 +45,7 @@ from ....tests.utils import skip_if_no_network
 from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
+from ....tests.utils import ok_clean_git
 
 from .. import openfmri
 from ..openfmri import pipeline as ofpipeline
@@ -186,6 +189,46 @@ _versioned_files = """
 @integration
 @with_tree(tree={
     'ds666': {
+        'ds666_R1.0.0.tar.gz':     {'ds666': {
+            'dataset_description.json': "{}"}},
+        'ds666_R2.0.0.tar.gz':     {'ds666': {
+            # There was a problem leading to this json being added to annex instead of git
+            File('dataset_description.json', executable=True): "{}",
+            'sub-1': {'anat': {File('sub-1_T1w.dat', executable=True): "mighty load 2.0.0"}}}},
+    }},
+    archives_leading_dir=False
+)
+@serve_path_via_http
+@with_tempfile
+@with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_openfmri_addperms(ind, topurl, outd, clonedir):
+    index_html = opj(ind, 'ds666', 'index.html')
+
+    list(initiate_dataset(
+        template="openfmri",
+        dataset_name='dataladtest-ds666',
+        path=outd,
+        data_fields=['dataset'])({'dataset': 'ds666'}))
+
+    ok_clean_git(outd)
+    with chpwd(outd):
+        pipeline = ofpipeline(
+            'ds666', versioned_urls=False, topurl=topurl,
+            s3_prefix=False  # so  we do not invoke s3 subpipeline
+        )
+        ok_clean_git(outd)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    ok_clean_git(outd)
+    ok_file_under_git(outd, 'dataset_description.json', annexed=False)
+
+
+@integration
+@with_tree(tree={
+    'ds666': {
         # there could also be a case of a file with "unique" name without versioned counterpart
         # e.g. ds666_models.tar.gz  which seems to be not treated correctly (not placed into any
         # version in case of ds000017)
@@ -206,8 +249,8 @@ _versioned_files = """
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     index_html = opj(ind, 'ds666', 'index.html')
 
@@ -269,14 +312,21 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     eq_(len(commits_l['incoming']), 3)
     eq_(len(commits['incoming-processed']), 6)
     eq_(len(commits_l['incoming-processed']), 4)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 13)  # all commits out there -- dataset init, crawler init + 3*(incoming, processed, meta data aggregation, merge)
-    eq_(len(commits_l['master']), 7)
+    # all commits out there:
+    # backend set, dataset init, crawler init
+    # + 3*(incoming, processed, merge)
+    # + 3*aggregate-metadata update + 2*remove of obsolete metadata object files
+    eq_(len(commits['master']), 17)
+    eq_(len(commits_l['master']), 11)
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
     # +1 because original "release" was assumed to be 1.0.0
     repo_tags = repo.get_tags()
     eq_(repo.get_tags(output='name'), ['1.0.0', '1.0.0+1', '1.0.1'])
+
+    # Ben: The tagged ones currently are the ones with the message
+    # '[DATALAD] dataset aggregate metadata update\n':
     eq_(repo_tags[0]['hexsha'], commits_l['master'][-5].hexsha)  # next to the last one
     eq_(repo_tags[-1]['hexsha'], commits_l['master'][0].hexsha)  # the last one
 
@@ -288,10 +338,14 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
                                                              commits_l['incoming'][0].hexsha))
     eq_(hexsha(commits_l['incoming-processed'][2].parents), (commits_l['incoming'][2].hexsha,))
 
-    eq_(hexsha(commits_l['master'][0].parents), (commits_l['master'][1].hexsha,
+    # ben: The following two comparisons are targeting these commits:
+    # commit "Merge branch 'incoming-processed'\n" in commits_l['master'],
+    # parents are:
+    # commit "[DATALAD] dataset aggregate metadata update\n" in commits_l['master'] and
+    # commit "[DATALAD] Added files from extracted archives\n\nFiles processed: 6\n renamed: 2\n +annex: 3\nBranches merged: incoming->incoming-processed\n" in commits_l['incoming-processed']
+    eq_(hexsha(commits_l['master'][2].parents), (commits_l['master'][3].hexsha,
                                                  commits_l['incoming-processed'][0].hexsha))
-
-    eq_(hexsha(commits_l['master'][1].parents), (commits_l['master'][2].hexsha,
+    eq_(hexsha(commits_l['master'][5].parents), (commits_l['master'][6].hexsha,
                                                  commits_l['incoming-processed'][1].hexsha))
 
     with chpwd(outd):
@@ -303,15 +357,17 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
     ok_file_under_git(t1w_fpath, annexed=True)
 
+    from datalad.metadata.metadata import agginfo_relpath
     target_files = {
         './.datalad/config',
-        './.datalad/meta/meta.json',
         './.datalad/crawl/crawl.cfg',
         # no more!
         # './.datalad/config.ttl', './.datalad/datalad.ttl',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/crawl/versions/incoming.json',
-        './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
+        './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv',
+        './' + agginfo_relpath,
+    }
     target_incoming_files = {
         '.gitattributes',  # we marked default backend right in the incoming
         'changelog.txt',
@@ -320,7 +376,9 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         '.datalad/crawl/statuses/incoming.json',
         '.datalad/crawl/versions/incoming.json'
     }
-    eq_(set(all_files), target_files)
+    # Ben: metadata object files may differ in their names containing some checksum-ish shit ...
+    # TODO: Check how those names are constructed and may be at least count the number of created object files in addition to that comparison
+    eq_(set([f for f in all_files if not f.startswith('./.datalad/metadata/objects/')]), target_files)
 
     # check that -beh was committed in 2nd commit in incoming, not the first one
     assert_not_in('ds666-beh_R1.0.1.tar.gz', repo.get_files(commits_l['incoming'][-1]))
@@ -351,7 +409,10 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     assert_not_equal(out[0]['datalad_stats'].get_total(), ActivityStats())
     # there is no overlays ATM, so behav would be gone since no 2.0.0 for it!
     target_files.remove('./sub-1/beh/responses.tsv')
-    eq_(set(all_files_updated), target_files)
+
+    # Ben: metadata object files may differ in their names containing some checksum-ish shit ...
+    # TODO: Check how those names are constructed and may be at least count the number of created object files in addition to that comparison
+    eq_(set([f for f in all_files_updated if not f.startswith('./.datalad/metadata/objects/')]), target_files)
 
     # new instance so it re-reads git stuff etc
     # repo = AnnexRepo(outd, create=False)  # to be used in the checks
@@ -437,8 +498,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 )
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 
@@ -475,8 +536,13 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(len(commits['incoming-processed']), 2)
     eq_(len(commits_l['incoming-processed']), 2)  # because original merge has only 1 parent - incoming
     # to avoid 'dataset init' commit create() needs save=False
-    eq_(len(commits['master']), 7)  # all commits out there, backend, dataset init, crawler, init, incoming, incoming-processed, meta data aggregation, merge
-    eq_(len(commits_l['master']), 5)  # backend, dataset init, init, meta data aggregation, merge
+
+    # all commits out there:
+    # backend set, dataset init, crawler, init, incoming, incoming-processed,
+    # merge, aggregate metadata:
+    eq_(len(commits['master']), 7)
+    # backend set, dataset init, init, merge, aggregate metadata:
+    eq_(len(commits_l['master']), 5)
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):

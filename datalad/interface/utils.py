@@ -287,8 +287,8 @@ def eval_results(func):
                 [i for i in mod.__dict__
                  if type(mod.__dict__[i]) == type and
                  issubclass(mod.__dict__[i], Interface) and
-                 i.lower() == wrapped.__module__.split('.')[-1].replace('_', '')]
-            assert(len(command_class_names) == 1)
+                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('_', ''))]
+            assert len(command_class_names) == 1, (command_class_names, mod.__name__)
             command_class_name = command_class_names[0]
         else:
             command_class_name = wrapped.__qualname__.split('.')[-2]
@@ -516,7 +516,11 @@ def _process_results(
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **kwargs)
         elif hasattr(result_renderer, '__call__'):
-            result_renderer(res, **kwargs)
+            try:
+                result_renderer(res, **kwargs)
+            except Exception as e:
+                lgr.warn('Result rendering failed for: %s [%s]',
+                         res, exc_str(e))
         if result_xfm:
             res = result_xfm(res)
             if res is None:

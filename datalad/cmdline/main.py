@@ -32,6 +32,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import setup_exceptionhook, chpwd
+from ..utils import assure_unicode
 from ..dochelpers import exc_str
 
 
@@ -111,16 +112,21 @@ def setup_parser(
     parser.add_argument(
         '--output-format', dest='common_output_format',
         default='default',
+        type=assure_unicode,
         metavar="{default,json,json_pp,tailored,'<template>'",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
-        'json' renders a JSON object with all properties for each result (one per 
+        'json' renders a JSON object with all properties for each result (one per
         line); 'json_pp' pretty-prints JSON spanning multiple lines; 'tailored'
         enables a command-specific rendering style that is typically
         tailored to human consumption (no result output otherwise),
         '<template>' reports any value(s) of any result properties in any format
-        indicated by the template (e.g. '{path}', compare with JSON
-        output for all key-value choices).""")
+        indicated by the template (e.g. '{path}'; compare with JSON
+        output for all key-value choices). The template syntax follows the Python
+        "format() language". It is possible to report individual
+        dictionary values, e.g. '{metadata[name]}'. If a 2nd-level key contains
+        a colon, e.g. 'music:Genre', ':' must be substituted by '#' in the template,
+        like so: '{metadata[music#Genre]}'.""")
     parser.add_argument(
         '--report-status', dest='common_report_status',
         choices=['success', 'failure', 'ok', 'notneeded', 'impossible', 'error'],
@@ -199,7 +205,12 @@ def setup_parser(
         for _intfspec in _interfaces:
             # turn the interface spec into an instance
             lgr.log(5, "Importing module %s " % _intfspec[0])
-            _mod = import_module(_intfspec[0], package='datalad')
+            try:
+                _mod = import_module(_intfspec[0], package='datalad')
+            except Exception as e:
+                lgr.error("Internal error, cannot import interface '%s': %s",
+                          _intfspec[0], exc_str(e))
+                continue
             _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
             # deal with optional parser args
@@ -216,15 +227,8 @@ def setup_parser(
                     intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
-            # all subparser can report the version
-            helpers.parser_add_common_opt(
-                subparser, 'version',
-                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                                 _license_info()))
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
-            helpers.parser_add_common_opt(subparser, 'log_level')
-            helpers.parser_add_common_opt(subparser, 'pbs_runner')
             # let module configure the parser
             _intf.setup_parser(subparser)
             # logger for command
@@ -373,13 +377,9 @@ def main(args=None):
                 if exc.msg:
                     os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
-                    os.write(1, exc.stdout.encode()) \
-                        if hasattr(exc.stdout, 'encode')  \
-                        else os.write(1, exc.stdout)
+                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr.encode()) \
-                        if hasattr(exc.stderr, 'encode')  \
-                        else os.write(2, exc.stderr)
+                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, text_type) else exc.stderr)
                 # We must not exit with 0 code if any exception got here but
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)

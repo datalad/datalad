@@ -8,63 +8,52 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parser base class"""
 
-from os.path import exists, join as opj
-from datalad.metadata import _get_base_dataset_metadata
-
 
 class BaseMetadataParser(object):
-    # subclass can use this to provide a simple list of candidate files
-    # to check
-    _core_metadata_filenames = []
-
-    def __init__(self, ds):
+    def __init__(self, ds, paths):
         """
         Parameters
         ----------
         ds : dataset instance
           Dataset to extract metadata from.
+        paths : list
+          Paths to investigate when extracting content metadata
         """
 
         self.ds = ds
+        self.paths = paths
 
-    def has_metadata(self):
-        """Returns whether a dataset provides this kind meta data"""
-        # default implementation, override with more efficient, if possible
-        return len(self.get_core_metadata_filenames()) > 0
+    def get_metadata(self, dataset=True, content=True):
+        """
+        Returns
+        -------
+        dict or None, dict or None
+          Dataset metadata dict, dictionary of filepath regexes with metadata,
+          dicts, each return value could be None if there is no such metadata
+        """
+        # default implementation
+        return \
+            self._get_dataset_metadata() if dataset else None, \
+            ((k, v) for k, v in self._get_content_metadata()) if content else None
 
-    def get_core_metadata_filenames(self):
-        """List of absolute filenames making up the core meta data source"""
-        # default implementation, override if _core_metadata_filenames is not
-        # used
-        dspath = self.ds.path
-        fnames = [opj(dspath, f) for f in self._core_metadata_filenames]
-        return [f for f in fnames if exists(f)]
-
-    def get_metadata_filenames(self):
-        """List of absolute filenames making up the full meta data source"""
-        # default implementation: core == full
-        return self.get_core_metadata_filenames()
-
-    def get_metadata(self, dsid=None, full=False):
-        """Returns JSON-LD compliant meta data structure
-
-        Parameter
-        ---------
-        full : bool
-          If True, all intelligible meta data is return. Otherwise only
-          meta data deemed essential by the author is returned.
-
+    def _get_dataset_metadata(self):
+        """
         Returns
         -------
         dict
-          JSON-LD compliant
+          keys are homogenized datalad metadata keys, values are arbitrary
         """
-        if dsid is None:
-            dsid = self.ds.id
-        meta = _get_base_dataset_metadata(dsid)
-        if self.has_metadata():
-            meta = self._get_metadata(dsid, meta, full)
-        return meta
-
-    def _get_metadata(self, dsid, basemeta, full):
         raise NotImplementedError
+
+    def _get_content_metadata(self):
+        """Get ALL metadata for all dataset content.
+
+        Returns
+        -------
+        generator((location, metadata_dict))
+        """
+        raise NotImplementedError
+
+    def get_homogenized_key(self, key):
+        # TODO decide on how to error
+        return self._key2stdkey.get(key)

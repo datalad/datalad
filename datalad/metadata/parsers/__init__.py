@@ -8,9 +8,27 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata parsers"""
 
-# the following imports are only needed for knowing which meta data types
-# we can try to guess
-from . import bids
-from . import frictionless_datapackage
-from . import datalad_rfc822
-from . import datacite
+import logging as __logging
+__lgr = __logging.getLogger('datalad.metadata.parsers')
+
+from importlib import import_module as __impmod
+
+for __modname in (
+        'audio',
+        'bids',
+        'datacite',
+        'datalad_core',
+        'datalad_rfc822',
+        'dicom',
+        'exif',
+        'frictionless_datapackage',
+        'image',
+        'nifti1',
+        'xmp'):
+    try:
+        globals()[__modname] = __impmod(
+            '.{}'.format(__modname),
+            'datalad.metadata.parsers')
+    except Exception as _e:
+        from datalad.dochelpers import exc_str as _exc_str
+        __lgr.debug('Metadata parser %s unusable: %s', __modname, _exc_str(_e))

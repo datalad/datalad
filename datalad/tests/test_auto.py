@@ -9,6 +9,7 @@
 """Test proxying of core IO operations
 """
 
+import io
 import os
 from os.path import join as opj, dirname
 
@@ -25,6 +26,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from datalad.support.json_py import LZMAFile
 
 try:
     import h5py
@@ -41,7 +43,7 @@ except ImportError:
 # some additional testing, e.g. non-context manager style of invocation
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
-    TEST_CONTENT = "123\n"
+    TEST_CONTENT = "content to be annex-addurl'd"
     fname = 'test-annex.dat'
     fpath = opj(repo, fname)
     assert_raises(IOError, open, fpath)
@@ -133,6 +135,20 @@ def _test_proxying_open(generate_load, verify_load, repo):
         assert_false(annex2.file_has_content(fpath2_2))
         verify_load(fpath2_2)
         assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_true(os.path.isfile(fpath2_2))
+
+    # In check_once mode, if we drop it, it wouldn't be considered again
+    annex2.drop(fpath2_2)
+    assert_false(annex2.file_has_content(fpath2_2))
+    with AutomagicIO(check_once=True):
+        verify_load(fpath2_2)
+        assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(os.path.isfile(fpath2_2))
+
 
     # if we override stdout with something not supporting fileno, like tornado
     # does which ruins using get under IPython
@@ -172,8 +188,39 @@ def test_proxying_open_regular():
             f.write("123")
 
     def verify_dat(f, mode="r"):
-        with open(f, "r") as f:
+        with open(f, mode) as f:
             eq_(f.read(), "123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+def test_proxying_io_open_regular():
+
+    def generate_dat(f):
+        with io.open(f, "w", encoding='utf-8') as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        with io.open(f, mode, encoding='utf-8') as f:
+            eq_(f.read(), u"123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+from datalad.tests.utils import skip_if_no_module
+
+
+def test_proxying_lzma_LZMAFile():
+    skip_if_no_module('lzma')
+    import lzma
+
+    def generate_dat(f):
+        with LZMAFile(f, "w") as f:
+            f.write("123".encode('utf-8'))
+
+    def verify_dat(f, mode="r"):
+        with LZMAFile(f, mode) as f:
+            eq_(f.read().decode('utf-8'), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat
 

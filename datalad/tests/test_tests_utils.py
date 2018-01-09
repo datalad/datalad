@@ -584,3 +584,11 @@ def test_testsui():
         assert_false(ui.is_interactive)
         return x*3
     eq_(func3(2), 6)
+
+
+def test_setup():
+    # just verify that we monkey patched consts correctly
+    from datalad.consts import DATASETS_TOPURL
+    eq_(DATASETS_TOPURL, 'http://datasets-tests.datalad.org/')
+    from datalad.tests.utils import get_datasets_topdir
+    eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')

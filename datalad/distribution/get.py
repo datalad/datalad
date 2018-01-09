@@ -74,32 +74,55 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     parent's module tracking branch remote.
     """
     clone_urls = []
+
+    # should be our first candidate
+    tracking_remote, tracking_branch = ds.repo.get_tracking_branch()
+    candidate_remotes = [tracking_remote] if tracking_remote else []
+
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
-    remote_name, remote_url = _get_tracking_source(ds)
+    try:
+        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
+        # ideally should also give preference to the remotes which have
+        # the same branch checked out I guess
+        candidate_remotes += list(ds.repo._get_remotes_having_commit(last_commit))
+    except StopIteration:
+        # no commit for it known yet, ... oh well
+        pass
 
-    # Directly on parent's ds url
-    if remote_url:
-        # attempt: submodule checkout at parent remote URL
-        # We might need to quote sm_path portion, e.g. for spaces etc
-        if isinstance(RI(remote_url), URL):
-            sm_path_url = urlquote(sm_path)
-        else:
-            sm_path_url = sm_path
+    for remote in unique(candidate_remotes):
+        remote_url = ds.repo.get_remote_url(remote, push=False)
 
-        clone_urls.extend(
-            _get_flexible_source_candidates(
-                # alternate suffixes are tested by `clone` anyways
-                sm_path_url, remote_url, alternate_suffix=False))
+        # Directly on parent's ds url
+        if remote_url:
+            # attempt: submodule checkout at parent remote URL
+            # We might need to quote sm_path portion, e.g. for spaces etc
+            if isinstance(RI(remote_url), URL):
+                sm_path_url = urlquote(sm_path)
+            else:
+                sm_path_url = sm_path
 
-    # attempt: provided (configured?) submodule URL
-    # TODO: consider supporting DataLadRI here?  or would confuse
-    #  git and we wouldn't want that (i.e. not allow pure git clone
-    #  --recursive)
+            clone_urls.extend(
+                _get_flexible_source_candidates(
+                    # alternate suffixes are tested by `clone` anyways
+                    sm_path_url, remote_url, alternate_suffix=False))
+
+            # attempt: provided (configured?) submodule URL
+            # TODO: consider supporting DataLadRI here?  or would confuse
+            #  git and we wouldn't want that (i.e. not allow pure git clone
+            #  --recursive)
+            if sm_url:
+                clone_urls += _get_flexible_source_candidates(
+                    sm_url,
+                    remote_url,
+                    alternate_suffix=False
+                )
+
+    # Do based on the ds.path as the last resort
     if sm_url:
         clone_urls += _get_flexible_source_candidates(
             sm_url,
-            remote_url if remote_url else ds.path,
+            ds.path,
             alternate_suffix=False)
 
     return unique(clone_urls)
@@ -119,6 +142,11 @@ def _install_subds_from_flexible_source(
     # prevent inevitable exception from `clone`
     dest_path = opj(ds.path, sm_path)
     clone_urls = [src for src in clone_urls if src != dest_path]
+
+    if not clone_urls:
+        raise InstallFailedError(
+            msg="Have got no candidates to install subdataset {} from".format(
+                sm_path))
 
     # now loop over all candidates and try to clone
     subds = None
@@ -143,6 +171,9 @@ def _install_subds_from_flexible_source(
     except IncompleteResultsError:
         # details of the failure are logged already by common code
         pass
+    except Exception as exc:
+        lgr.warning("Something went wrong while installing %s: %s",
+                    sm_path, exc_str(exc))
     if subds is None:
         raise InstallFailedError(
             msg="Failed to install dataset from{}: {}".format(

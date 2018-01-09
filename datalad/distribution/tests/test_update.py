@@ -9,8 +9,10 @@
 
 """
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from os.path import join as opj, exists
 from ..dataset import Dataset
@@ -36,8 +38,8 @@ from datalad.tests.utils import assert_in_results
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -96,16 +98,16 @@ def test_update_simple(origin, src_path, dst_path):
         status='ok', type='dataset')
 
     # and now test recursive update with merging in differences
-    create_tree(opj(source.path, 'subm 2'), {'load.dat': 'heavy'})
-    source.add(opj('subm 2', 'load.dat'),
+    create_tree(opj(source.path, '2'), {'load.dat': 'heavy'})
+    source.add(opj('2', 'load.dat'),
                message="saving changes within subm2",
                recursive=True)
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
         status='ok', type='dataset')
     # and now we can get new file
-    dest.get('subm 2/load.dat')
-    ok_file_has_content(opj(dest.path, 'subm 2', 'load.dat'), 'heavy')
+    dest.get('2/load.dat')
+    ok_file_has_content(opj(dest.path, '2', 'load.dat'), 'heavy')
 
 
 @with_tempfile
@@ -127,7 +129,7 @@ def test_update_git_smoke(src_path, dst_path):
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_update_fetch_all(src, remote_1, remote_2):
     rmt1 = AnnexRepo.clone(src, remote_1)
     rmt2 = AnnexRepo.clone(src, remote_2)
@@ -186,7 +188,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_newthings_coming_down(originpath, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
@@ -243,7 +245,7 @@ def test_newthings_coming_down(originpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_update_volatile_subds(originpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
@@ -292,7 +294,7 @@ def test_update_volatile_subds(originpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_reobtain_data(originpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(

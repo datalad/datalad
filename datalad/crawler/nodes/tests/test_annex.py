@@ -7,8 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from os import listdir
 from os.path import join as opj, exists, lexists, basename
 from collections import OrderedDict
@@ -51,7 +53,7 @@ def test_annexificator_no_git_if_dirty(outdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_initiate_dataset(path, path2):
     dataset_path = opj(path, 'test')
     datas = list(initiate_dataset('template', 'testdataset', path=dataset_path)())
@@ -169,11 +171,12 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     assert_equal(output[0]['datalad_stats'], ActivityStats(files=1, add_git=1))
 
 
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
-        yield _test_annex_file, mode
+        if mode in ('full', 'fast'):
+            yield known_failure_direct_mode(known_failure_v6(_test_annex_file)), mode  #FIXME
+        else:
+            yield known_failure_v6(_test_annex_file), mode  #FIXME
 
 
 @assert_cwd_unchanged()  # we are passing annex, not chpwd
@@ -218,18 +221,19 @@ def _test_add_archive_content_tar(direct, repo_path):
         assert_false(annex.repo.dirty)
 
 
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_content_tar():
+    #FIXME: This doesn't really make sense:
+    # 1. We have a dedicated direct mode test build
+    # 2. On a FS where direct mode is enforced, we can't switch
     for direct in (True, False):
-        yield _test_add_archive_content_tar, direct
+        yield known_failure_v6(_test_add_archive_content_tar), direct  #FIXME: the usual thing: in V6 the repo is dirty in the end, since there are files in git falsely marked 'modified'
 
 
 @assert_cwd_unchanged()
 @with_tempfile(mkdir=True)
 @with_tree(tree={'file': 'load'})
 @serve_path_via_http
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_add_dir_file(repo_path, p, topurl):
     # test whenever file becomes a directory and then back a file.  Should all work!
     annex = Annexificator(path=repo_path, auto_finalize=False)

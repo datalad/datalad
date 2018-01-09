@@ -6,6 +6,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import sys
 import platform
 from os.path import dirname
 from os.path import join as opj
@@ -16,6 +17,7 @@ from setuptools import findall
 from setuptools import setup, find_packages
 
 from setup_support import BuildConfigInfo
+from setup_support import BuildSchema
 from setup_support import BuildManPage, setup_entry_points
 from setup_support import BuildRSTExamplesFromScripts
 from setup_support import get_version
@@ -50,10 +52,14 @@ dist = platform.dist()
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
 
+# lzma is included in python since 3.3
+req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
+
+
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.1.0',
+        'GitPython>=2.1.8',
         'iso8601',
         'humanize',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
@@ -84,11 +90,20 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        'duecredit',
         'simplejson',
-        'pyld',
-    ],
+        'whoosh',
+    ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
+        'mutagen',  # audio metadata
+        'exifread',  # EXIF metadata
+        'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
+        'pydicom',  # DICOM metadata
+        'pybids',  # BIDS metadata
+        'Pillow',  # generic image metadata
+        'nibabel',  # NIfTI metadata
+        'pandas',  # bids2scidata export
     ]
 }
 
@@ -133,6 +148,7 @@ cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
+    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 

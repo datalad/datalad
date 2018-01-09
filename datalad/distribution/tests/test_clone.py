@@ -10,8 +10,12 @@
 """
 
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import (
+    known_failure_v6,
+    get_datasets_topdir
+)
+
+
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -100,7 +104,7 @@ def test_clone_datasets_root(tdir):
     with chpwd(tdir):
         ds = clone("///", result_xfm='datasets', return_type='item-or-list')
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         res = clone("///", on_failure='ignore')
@@ -120,9 +124,9 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
 def test_clone_simple_local(src, path):
     origin = Dataset(path)
 
@@ -163,9 +167,9 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-@skip_v6  #FIXME
 def test_clone_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = clone(url, result_xfm='datasets', return_type='item-or-list')
@@ -190,7 +194,7 @@ def test_clone_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl):
+    with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     ok_clean_git(path, annex=False)
@@ -208,7 +212,7 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
     assert_result_count(subdss, len(subdss), state='absent')
     # this also means, subdatasets to be listed as not fulfilled:
     eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
-        {'subm 1', 'subm 2'})
+        {'subm 1', '2'})
 
 
 @with_testrepos(flavors=['local'])
@@ -217,7 +221,6 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-@skip_direct_mode  #FIXME
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)
@@ -280,7 +283,7 @@ def test_notclone_known_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_failed_clone(dspath):
     ds = create(dspath)
-    res = ds.clone("http://nonexistingreallyanything.somewhere/bla", "sub",
+    res = ds.clone("http://nonexistingreallyanything.datalad.org/bla", "sub",
                    on_failure='ignore')
     assert_status('error', res)
     assert_message('Failed to clone data from any candidate source URL: %s',
@@ -336,4 +339,6 @@ def test_clone_report_permission_issue(tdir):
         assert_status('error', res)
         assert_result_count(
             res, 1, status='error',
-            message="could not create work tree dir '%s/datasets.datalad.org': Permission denied" % pdir)
+            message="could not create work tree dir '%s/%s': Permission denied"
+                    % (pdir, get_datasets_topdir())
+        )

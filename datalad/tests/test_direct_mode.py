@@ -11,7 +11,7 @@
 """
 
 
-from datalad.tests.utils import skip_v6
+
 import logging
 
 # Please do ignore possible unused marking.
@@ -38,7 +38,7 @@ if on_windows:
                    "if direct mode is forced by OS anyway.")
 
 repo_version = cfg.get("datalad.repo.version", None)
-if repo_version is not None and int(repo_version) >= 6:
+if repo_version and int(repo_version) >= 6:
     raise SkipTest("Can't test direct mode switch, "
                    "if repository version 6 or later is enforced.")
 

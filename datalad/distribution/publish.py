@@ -98,12 +98,20 @@ def has_diff(ds, refspec, remote, paths):
               remote_branch_name, remote)
     current_commit = ds.repo.get_hexsha()
     within_ds_paths = [p for p in paths if p['path'] != ds.path]
-    if within_ds_paths:
+    commit_differ = current_commit != ds.repo.get_hexsha(remote_ref)
+    # yoh: not sure what "logic" was intended here for comparing only
+    # some files.  By now we get a list of files, if any were changed,
+    # from the commit on remote, and somehow diff says below that they didn't differ...
+    # but if commit is different -- there must be differences and we
+    # should publish. otherwise now skips publishing root dataset
+    # although its master is behind by 1 commit.  Moreover there could
+    # be an empty commit -- shouldn't we publish then???
+    if not commit_differ and within_ds_paths:
         # only if any paths is different from just the parentds root
         # in which case we can do the same muuuch cheaper (see below)
         # if there were custom paths, we will look at the diff
         lgr.debug("Since paths provided, looking at diff")
-        return len(ds.diff(
+        return any(ds.diff(
             path=within_ds_paths,
             revision=remote_ref,
             # only commited changes in this dataset
@@ -113,7 +121,7 @@ def has_diff(ds, refspec, remote, paths):
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
-        return current_commit != ds.repo.get_hexsha(remote_ref)
+        return commit_differ
 
 
 def _publish_data(ds, remote, paths, annex_copy_options, force, transfer_data, **kwargs):
@@ -453,6 +461,10 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
     """Returns None if desired info was obtained, or a tuple (status, message)
     if not"""
     ds = Dataset(ds_path)
+    if ds.repo is None:
+        # There is no repository, nothing could be done
+        return ('impossible',
+                'No repository found for %s' % ds)
     if to is None:
         # we need an upstream remote, if there's none given. We could
         # wait for git push to complain, but we need to explicitly
@@ -489,7 +501,7 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
         if missing == 'skip':
             ds_remote_info[ds_path] = None
             return ('notneeded',
-                    ("Unkown target sibling '%s', skipping publication", to))
+                    ("Unknown target sibling '%s', skipping publication", to))
         elif missing == 'inherit':
             superds = ds.get_superdataset()
             if not superds:
@@ -601,9 +613,8 @@ class Publish(Interface):
             doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
             from which to look for changes
             to decide either updated publishing is necessary for this and which children.
-            If empty argument is provided, then we will always run publish command.
-            By default, would take from the previously published to that remote/sibling
-            state (for the current branch)"""),
+            If empty argument is provided, then we would take from the previously 
+            published to that remote/sibling state (for the current branch)"""),
         # since: commit => .gitmodules diff to head => submodules to publish
         missing=missing_sibling_opt,
         path=Parameter(
@@ -670,13 +681,27 @@ class Publish(Interface):
                 'Modification detection (--since) without a base dataset '
                 'is not supported')
 
-        if dataset and to and since == '':
-            # default behavior - only updated since last update
-            # so we figure out what was the last update
-            # XXX here we assume one to one mapping of names from local branches
-            # to the remote
+        if dataset and since == '':
+            # only update since last update so we figure out what was the last update
             active_branch = dataset.repo.get_active_branch()
-            since = '%s/%s' % (to, active_branch)
+            if to:
+                # XXX here we assume one to one mapping of names from local branches
+                # to the remote
+                since = '%s/%s' % (to, active_branch)
+            else:
+                # take tracking remote for the active branch
+                tracked_remote, tracked_refspec = dataset.repo.get_tracking_branch()
+                if tracked_remote:
+                    if tracked_refspec.startswith('refs/heads/'):
+                        tracked_refspec = tracked_refspec[len('refs/heads/'):]
+                    #to = tracked_remote
+                    since = '%s/%s' % (tracked_remote, tracked_refspec)
+                else:
+                    lgr.info(
+                        "No tracked remote for %s. since option is of no effect",
+                        active_branch
+                    )
+                    since = None
 
         # here is the plan
         # 1. figure out remote to publish to
@@ -701,13 +726,16 @@ class Publish(Interface):
                 nondataset_path_status='error',
                 modified=since,
                 return_type='generator',
-                on_failure='ignore'):
+                on_failure='ignore',
+                force_no_revision_change_discovery=False, # we cannot publish what was not committed
+                force_untracked_discovery=False  # we cannot publish untracked
+        ):
             if ap.get('status', None):
                 # this is done
                 yield ap
                 continue
             remote_info_result = None
-            if ap.get('type', 'dataset') != 'dataset':
+            if ap.get('type', ap.get('type_src', 'dataset')) != 'dataset':
                 # for everything that is not a dataset get the remote info
                 # for the parent
                 parentds = ap.get('parentds', None)

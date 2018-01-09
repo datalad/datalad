@@ -30,6 +30,8 @@ from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import save_message_opt
 from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -83,6 +85,8 @@ class Remove(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         check=check_argument,
+        save=nosave_opt,
+        message=save_message_opt,
         if_dirty=if_dirty_opt,
     )
 
@@ -94,6 +98,8 @@ class Remove(Interface):
             dataset=None,
             recursive=False,
             check=True,
+            save=True,
+            message=None,
             if_dirty='save-before'):
         res_kwargs = dict(action='remove', logger=lgr)
         if not dataset and not path:
@@ -167,11 +173,11 @@ class Remove(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            to_reporemove = []
+            to_reporemove = dict()
             # PLAN any dataset that was not raw_input, uninstall (passing recursive flag)
             # if dataset itself is in paths, skip any nondataset
             # sort reverse so we get subdatasets first
-            for ap in sorted(paths, key=lambda x: x ['path'], reverse=True):
+            for ap in sorted(paths, key=lambda x: x['path'], reverse=True):
                 if ap.get('type', None) == 'dataset':
                     # entire dataset needs to go, uninstall if present, pass recursive!
                     uninstall_failed = False
@@ -252,33 +258,52 @@ class Remove(Interface):
                         os.rmdir(ap['path'])
                 else:
                     # anything that is not a dataset can simply be passed on
-                    to_reporemove.append(ap['path'])
+                    to_reporemove[ap['path']] = ap
             # avoid unnecessary git calls when there is nothing to do
             if to_reporemove:
                 if check and hasattr(ds.repo, 'drop'):
-                    for r in _drop_files(ds, to_reporemove, check=True):
+                    for r in _drop_files(ds, [p for p in to_reporemove],
+                                         check=True):
+                        if r['status'] == 'error':
+                            # if drop errored on that path, we can't remove it
+                            to_reporemove.pop(r['path'], 'avoidKeyError')
                         yield r
-                for r in ds.repo.remove(to_reporemove, r=True):
-                    # these were removed, but we still need to save the removal
-                    ap['unavailable_path_status'] = ''
-                    to_save.append(ap)
-                    yield get_status_dict(
-                        status='ok',
-                        path=r,
-                        **res_kwargs)
+
+                if to_reporemove:
+                    for r in ds.repo.remove([p for p in to_reporemove], r=True):
+                        # these were removed, but we still need to save the
+                        # removal
+
+                        r_abs = opj(ds.path, r)
+                        if r_abs in to_reporemove:
+                            ap = to_reporemove[r_abs]
+                        else:
+                            ap = {'path': r_abs,
+                                  'parentds': ds.path,
+                                  'refds': refds_path
+                                  }
+                        ap['unavailable_path_status'] = ''
+                        to_save.append(ap)
+                        yield get_status_dict(
+                            status='ok',
+                            path=r,
+                            **res_kwargs)
 
         if not to_save:
             # nothing left to do, potentially all errored before
+            return
+        if not save:
+            lgr.debug('Not calling `save` as instructed')
             return
 
         for res in Save.__call__(
                 # TODO compose hand-selected annotated paths
                 path=to_save,
                 # we might have removed the reference dataset by now, recheck
-                dataset=refds_path if GitRepo.is_valid_repo(refds_path) else None,
-                # TODO allow for custom message
-                #message=message if message else '[DATALAD] removed content',
-                message='[DATALAD] removed content',
+                dataset=refds_path
+                        if (refds_path and GitRepo.is_valid_repo(refds_path))
+                        else None,
+                message=message if message else '[DATALAD] removed content',
                 return_type='generator',
                 result_xfm=None,
                 result_filter=None,

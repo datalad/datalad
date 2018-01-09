@@ -9,8 +9,10 @@
 
 """
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import logging
 import os
 
@@ -23,10 +25,12 @@ from os.path import dirname
 
 from mock import patch
 
+from datalad.utils import getpwd
+
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad.consts import DATASETS_TOPURL
+from datalad import consts
 from datalad.utils import chpwd
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
@@ -63,6 +67,7 @@ from datalad.tests.utils import put_file_under_git
 from datalad.tests.utils import integration
 from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
+from datalad.tests.utils import get_datasets_topdir
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -90,7 +95,7 @@ def test_installationpath_from_url():
 def test_get_git_url_from_source():
 
     # resolves datalad RIs:
-    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
+    eq_(_get_git_url_from_source('///subds'), consts.DATASETS_TOPURL + 'subds')
     assert_raises(NotImplementedError, _get_git_url_from_source,
                   '//custom/subds')
 
@@ -205,7 +210,7 @@ def test_install_datasets_root(tdir):
     with chpwd(tdir):
         ds = install("///")
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         result = install("///", result_xfm=None, return_type='list')
@@ -221,9 +226,9 @@ def test_install_datasets_root(tdir):
             assert_in("already exists and not empty", str(cme))
 
 
+@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
 def test_install_simple_local(src, path):
     origin = Dataset(path)
 
@@ -261,9 +266,9 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
-@skip_v6  #FIXME
 def test_install_dataset_from_just_source(url, path):
     with chpwd(path, mkdir=True):
         ds = install(source=url)
@@ -275,9 +280,9 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
 def test_install_dataset_from_instance(src, dst):
     origin = Dataset(src)
     clone = install(source=origin, path=dst)
@@ -292,8 +297,7 @@ def test_install_dataset_from_instance(src, dst):
 
 @with_testrepos(flavors=['network'])
 @with_tempfile
-@skip_v6  #FIXME
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_install_dataset_from_just_source_via_path(url, path):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
@@ -322,7 +326,7 @@ def test_install_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl), \
+    with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
         ds = install(path, source='///ds')
     eq_(ds.path, path)
@@ -333,7 +337,6 @@ def test_install_dataladri(src, topurl, path):
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
 def test_install_recursive(src, path_nr, path_r):
     # first install non-recursive:
     ds = install(path_nr, source=src, recursive=False)
@@ -343,7 +346,7 @@ def test_install_recursive(src, path_nr, path_r):
             "Unintentionally installed: %s" % (sub,))
     # this also means, subdatasets to be listed as not fulfilled:
     eq_(set(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths')),
-        {'subm 1', 'subm 2'})
+        {'subm 1', '2'})
 
     # now recursively:
     # don't filter implicit results so we can inspect them
@@ -361,7 +364,7 @@ def test_install_recursive(src, path_nr, path_r):
     # (Note: Until we provide proper (singleton) instances for Datasets,
     # need to check for their paths)
     assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
-    assert_in(opj(top_ds.path, 'subm 2'), [i.path for i in ds_list])
+    assert_in(opj(top_ds.path, '2'), [i.path for i in ds_list])
 
     eq_(len(top_ds.subdatasets(recursive=True)), 2)
 
@@ -377,8 +380,6 @@ def test_install_recursive(src, path_nr, path_r):
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
-@skip_v6  #FIXME
 def test_install_recursive_with_data(src, path):
 
     # now again; with data:
@@ -402,14 +403,18 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
+# @known_failure_direct_mode  #FIXME:
+# If we use all testrepos, we get a mixed hierarchy. Therefore ok_clean_git
+# fails if we are in direct mode and run into a plain git beneath an annex, due
+# to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
+
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
-@with_testrepos(flavors=['local'])
+@with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
 # .git/config show a submodule url "file:///aaa/bbb%20b/..."
 # this is delivered by with_testrepos as the url to clone
 @with_tempfile
-@skip_direct_mode  #FIXME
 def test_install_into_dataset(source, top_path):
 
     ds = create(top_path)
@@ -451,7 +456,7 @@ def test_install_into_dataset(source, top_path):
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
 
@@ -477,7 +482,6 @@ def test_failed_install_multiple(top_path):
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
 def test_install_known_subdataset(src, path):
 
     # get the superdataset:
@@ -510,7 +514,7 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_implicit_install(src, dst):
 
     origin_top = create(src)
@@ -578,7 +582,7 @@ def test_failed_install(dspath):
     assert_raises(IncompleteResultsError,
                   ds.install,
                   "sub",
-                  source="http://nonexistingreallyanything.somewhere/bla")
+                  source="http://nonexistingreallyanything.datalad.org/bla")
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -591,22 +595,22 @@ def test_install_list(path, top_path):
     assert_not_in('annex.hardlink', ds.config)
     ok_(ds.is_installed())
     sub1 = Dataset(opj(top_path, 'subm 1'))
-    sub2 = Dataset(opj(top_path, 'subm 2'))
+    sub2 = Dataset(opj(top_path, '2'))
     ok_(not sub1.is_installed())
     ok_(not sub2.is_installed())
 
     # fails, when `source` is passed:
     assert_raises(ValueError, ds.install,
-                  path=['subm 1', 'subm 2'],
+                  path=['subm 1', '2'],
                   source='something')
 
     # now should work:
-    result = ds.install(path=['subm 1', 'subm 2'], result_xfm='paths')
+    result = ds.install(path=['subm 1', '2'], result_xfm='paths')
     ok_(sub1.is_installed())
     ok_(sub2.is_installed())
     eq_(set(result), {sub1.path, sub2.path})
     # and if we request it again via get, result should be empty
-    get_result = ds.get(path=['subm 1', 'subm 2'], get_data=False)
+    get_result = ds.get(path=['subm 1', '2'], get_data=False)
     assert_status('notneeded', get_result)
 
 
@@ -627,8 +631,7 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_install_recursive_repeat(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
@@ -674,7 +677,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
 
     # install a list with valid and invalid items:
     result = ds.install(
-        path=['subm 1', 'not_existing', path_outside, 'subm 2'],
+        path=['subm 1', 'not_existing', path_outside, '2'],
         get_data=False,
         on_failure='ignore', result_xfm=None, return_type='list')
     # good and bad results together
@@ -686,7 +689,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
                          (path_outside, "path not associated with any dataset")]:
         assert_result_count(
             result, 1, status='impossible', message=msg, path=skipped)
-    for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, 'subm 2'))]:
+    for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, '2'))]:
         assert_result_count(
             result, 1, status='ok',
             message=('Installed subdataset in order to get %s', sub.path))
@@ -708,7 +711,7 @@ def test_install_skip_failed_recursive(src, path):
     # install top level:
     ds = install(path, source=src)
     sub1 = Dataset(opj(path, 'subm 1'))
-    sub2 = Dataset(opj(path, 'subm 2'))
+    sub2 = Dataset(opj(path, '2'))
     # sabotage recursive installation of 'subm 1' by polluting the target:
     with open(opj(path, 'subm 1', 'blocking.txt'), "w") as f:
         f.write("sdfdsf")
@@ -720,7 +723,8 @@ def test_install_skip_failed_recursive(src, path):
         # toplevel dataset was in the house already
         assert_result_count(
             result, 0, path=ds.path, type='dataset')
-        assert_status('error', [result[0]])
+        # subm 1 should fail to install. [1] since comes after '2' submodule
+        assert_in_results(result, status='error', path=sub1.path)
         assert_in_results(result, status='ok', path=sub2.path)
 
         cml.assert_logged(
@@ -742,7 +746,6 @@ def test_install_skip_failed_recursive(src, path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
 def test_install_noautoget_data(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
@@ -773,7 +776,7 @@ def test_install_source_relpath(src, dest):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_install_consistent_state(src, dest, dest2, dest3):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
@@ -843,3 +846,30 @@ def test_install_subds_with_space(opath, tpath):
     # do via ssh!
     install(tpath, source="localhost:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
+@skip_ssh
+@usecase
+@with_tempfile(mkdir=True)
+def test_install_subds_from_another_remote(topdir):
+    # https://github.com/datalad/datalad/issues/1905
+    with chpwd(topdir):
+        origin_ = 'origin'
+        clone1_ = 'clone1'
+        clone2_ = 'clone2'
+
+        origin = create(origin_, no_annex=True)
+        clone1 = install(source=origin, path=clone1_)
+        # print("Initial clone")
+        clone1.create_sibling('ssh://localhost%s/%s' % (getpwd(), clone2_), name=clone2_)
+
+        # print("Creating clone2")
+        clone1.publish(to=clone2_)
+        clone2 = Dataset(clone2_)
+        # print("Initiating subdataset")
+        clone2.create('subds1')
+
+        # print("Updating")
+        clone1.update(merge=True, sibling=clone2_)
+        # print("Installing within updated dataset -- should be able to install from clone2")
+        clone1.install('subds1')

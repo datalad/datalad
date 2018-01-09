@@ -372,6 +372,27 @@ def encode_filename(filename):
     else:
         return filename
 
+
+def decode_input(s):
+    """Given input string/bytes, decode according to stdin codepage (or UTF-8)
+    if not defined
+
+    If fails -- issue warning and decode allowing for errors
+    being replaced
+    """
+    if isinstance(s, text_type):
+        return s
+    else:
+        encoding = sys.stdin.encoding or 'UTF-8'
+        try:
+            return s.decode(encoding)
+        except UnicodeDecodeError as exc:
+            lgr.warning(
+                "Failed to decode input string using %s encoding. "
+                "Decoding allowing for errors", encoding)
+            return s.decode(encoding, errors='replace')
+
+
 if on_windows:
     def lmtime(filepath, mtime):
         """Set mtime for files.  On Windows a merely adapter to os.utime
@@ -482,6 +503,7 @@ def assure_dict_from_str(s, **kwargs):
 def assure_unicode(s, encoding='utf-8'):
     """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
     return s.decode(encoding) if isinstance(s, binary_type) else s
+
 
 def assure_bool(s):
     """Convert value into boolean following convention for strings
@@ -868,6 +890,40 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         adapter.cleanup()
 
 
+# TODO: May be melt in with swallow_logs at some point:
+@contextmanager
+def disable_logger(logger=None):
+    """context manager to temporarily disable logging
+
+    This is to provide one of swallow_logs' purposes without unnecessarily
+    creating temp files (see gh-1865)
+
+    Parameters
+    ----------
+    logger: Logger
+        Logger whose handlers will be ordered to not log anything.
+        Default: datalad's topmost Logger ('datalad')
+    """
+
+    class NullFilter(logging.Filter):
+        """Filter class to reject all records
+        """
+        def filter(self, record):
+            return 0
+
+    if logger is None:
+        # default: all of datalad's logging:
+        logger = logging.getLogger('datalad')
+
+    filter_ = NullFilter(logger.name)
+    [h.addFilter(filter_) for h in logger.handlers]
+
+    try:
+        yield logger
+    finally:
+        [h.removeFilter(filter_) for h in logger.handlers]
+
+
 #
 # Additional handlers
 #
@@ -1199,13 +1255,13 @@ def get_dataset_root(path):
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
     """
-    suffix = os.sep + opj('.git', 'objects')
+    suffix = '.git'
     if not isdir(path):
         path = dirname(path)
     apath = abspath(path)
     # while we can still go up
     while psplit(apath)[1]:
-        if exists(path + suffix):
+        if exists(opj(path, suffix)):
             return path
         # new test path in the format we got it
         path = normpath(opj(path, os.pardir))
@@ -1256,6 +1312,25 @@ def safe_print(s):
         s = s.encode(getattr(sys.stdout, 'encoding', 'ascii') or 'ascii', errors='ignore') \
             if hasattr(s, 'encode') else s
         print_f(s.decode())
+
+
+def open_r_encdetect(fname):
+    """Return a file object in read mode with auto-detected encoding
+
+    This is helpful when dealing with files of unknown encoding.
+    """
+    from chardet import detect
+    import io
+    # read some bytes from the file
+    kbyte = open(fname, 'rb').read(1000)
+    enc = detect(kbyte)
+    denc = enc.get('encoding', None)
+    lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
+              denc,
+              fname,
+              enc.get('confidence', 'unkown'))
+    return io.open(fname, encoding=denc)
+
 
 lgr.log(5, "Done importing datalad.utils")
 

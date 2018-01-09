@@ -398,6 +398,19 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     clone.pull()
     assert_true(exists(opj(clone_path, filename)))
 
+    # While at it, let's test _get_remotes_having_commit a bit
+    clone.add_remote("very_origin", test_path)
+    clone.fetch("very_origin")
+    assert_equal(
+        clone._get_remotes_having_commit(clone.get_hexsha()),
+        ['origin']
+    )
+    prev_commit = clone.get_hexsha('HEAD^')
+    assert_equal(
+        set(clone._get_remotes_having_commit(prev_commit)),
+        {'origin', 'very_origin'}
+    )
+
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
@@ -419,7 +432,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([u'origin/' + clone.get_active_branch(), u'origin/new_branch'],
         [commit.name for commit in fetched])
 
-    ok_clean_git(clone.path)
+    ok_clean_git(clone.path, annex=False)
     assert_in("origin/new_branch", clone.get_remote_branches())
     assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
@@ -657,6 +670,45 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
+@with_tree(tree={
+    'd1': {'f1': 'content1',
+           'f2': 'content2'},
+    'file': 'content3',
+    'd2': {'f1': 'content1',
+           'f2': 'content2'},
+    'file2': 'content3'
+
+    })
+def test_GitRepo__get_files_history(path):
+
+    gr = GitRepo(path, create=True)
+    gr.add('d1')
+    gr.commit("commit d1")
+    #import pdb; pdb.set_trace()
+
+    gr.add(['d2', 'file'])
+    gr.commit("commit d2")
+
+    # commit containing files of d1
+    d1_commit = next(gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd1', 'f1')]))
+    assert_equal(str(d1_commit.message), 'commit d1\n')
+
+    # commit containing files of d2
+    d2_commit_gen = gr._get_files_history([opj(path, 'd2', 'f1'), opj(path, 'd2', 'f1')])
+    assert_equal(str(next(d2_commit_gen).message), 'commit d2\n')
+    assert_raises(StopIteration, next, d2_commit_gen)  # no more commits with files of d2
+
+    # union of commits containing passed objects
+    commits_union = gr._get_files_history([opj(path, 'd1', 'f1'), opj(path, 'd2', 'f1'), opj(path, 'file')])
+    assert_equal(str(next(commits_union).message), 'commit d2\n')
+    assert_equal(str(next(commits_union).message), 'commit d1\n')
+    assert_raises(StopIteration, next, commits_union)
+
+    # file2 not commited, so shouldn't exist in commit history
+    no_such_commits = gr._get_files_history([opj(path, 'file2')])
+    assert_raises(StopIteration, next, no_such_commits)
+
+
 @with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -874,20 +926,26 @@ def test_get_tracking_branch(o_path, c_path):
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_submodule_deinit(path):
 
-    top_repo = GitRepo(path, create=False)
-    eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
+    top_repo = AnnexRepo(path, create=False)
+    eq_({'subm 1', '2'}, {s.name for s in top_repo.get_submodules()})
     # note: here init=True is ok, since we are using it just for testing
     with swallow_logs(new_level=logging.WARN) as cml:
         top_repo.update_submodule('subm 1', init=True)
         assert_in('Do not use update_submodule with init=True', cml.out)
-    top_repo.update_submodule('subm 2', init=True)
-    ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+    top_repo.update_submodule('2', init=True)
+
+    # ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+    # TODO: old assertion above if non-bare? (can't use "direct mode" in test_gitrepo)
+    # Alternatively: New testrepo (plain git submodules) and have a dedicated
+    # test for annexes in addition
+    ok_(all([GitRepo.is_valid_repo(opj(top_repo.path, s.path))
+             for s in top_repo.get_submodules()]))
 
     # modify submodule:
     with open(opj(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
         f.write("some content")
 
-    assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
+    assert_raises(CommandError, top_repo.deinit_submodule, 'sub1')
 
     # using force should work:
     top_repo.deinit_submodule('subm 1', force=True)
@@ -1158,3 +1216,16 @@ def test_get_git_attributes(path):
     # ATM we do not do any translation of values, so if it is just a tag, it
     # would be what git returns -- "set"
     eq_(gr.get_git_attributes(), {'tag': 'set', 'sec.key': 'val'})
+
+
+@with_tempfile(mkdir=True)
+def test_check_git_configured(newhome):
+    try:
+        old = GitRepo._config_checked
+        GitRepo._config_checked = False
+        with patch.dict('os.environ', {'HOME': newhome}):
+            # clear clear home
+            assert_raises(RuntimeError, GitRepo, newhome, create=True)
+        # But then if we
+    finally:
+        GitRepo._config_checked = old

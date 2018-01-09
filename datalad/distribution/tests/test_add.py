@@ -9,7 +9,8 @@
 
 """
 
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+
 import logging
 from os.path import join as opj
 
@@ -117,7 +118,7 @@ def test_add_files(path):
 
 
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_add_recursive(path):
     # make simple hierarchy
     parent = Dataset(path).create()
@@ -149,7 +150,7 @@ def test_add_recursive(path):
 
 
 @with_tree(**tree_arg)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_add_dirty_tree(path):
     ds = Dataset(path)
     ds.create(force=True, save=False)
@@ -306,7 +307,7 @@ def test_add_source(path, url, ds_dir):
 
 @with_tree(**tree_arg)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_add_subdataset(path, other):
     subds = create(opj(path, 'dir'), force=True)
     ds = create(path, force=True)
@@ -343,7 +344,7 @@ def test_add_subdataset(path, other):
     'file2.txt': 'some text to go to annex',
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_add_mimetypes(path):
     # XXX apparently there is symlinks dereferencing going on while deducing repo
     #    type there!!!! so can't use following invocation  -- TODO separately

@@ -9,8 +9,10 @@
 
 """
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import logging
 import os
 from os.path import join as opj
@@ -101,8 +103,8 @@ def test_smth_about_not_supported(p1, p2):
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -227,8 +229,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
     # we will be publishing back to origin, so to not alter testrepo
@@ -237,12 +239,12 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # prepare src
     source = install(src_path, source=origin.path, recursive=True)
     # we will be trying to push into this later on, need to give permissions...
-    origin_sub2 = Dataset(opj(origin_path, 'subm 2'))
+    origin_sub2 = Dataset(opj(origin_path, '2'))
     origin_sub2.config.set(
         'receive.denyCurrentBranch', 'updateInstead', where='local')
     ## TODO this manual fixup is needed due to gh-1548 -- needs proper solution
     #os.remove(opj(origin_sub2.path, '.git'))
-    #os.rename(opj(origin_path, '.git', 'modules', 'subm 2'), opj(origin_sub2.path, '.git'))
+    #os.rename(opj(origin_path, '.git', 'modules', '2'), opj(origin_sub2.path, '.git'))
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -265,7 +267,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # we will be testing presence of the file content, so let's make it progress
     sub2_target.config.set('receive.denyCurrentBranch', 'updateInstead', where='local')
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
+    sub2 = GitRepo(opj(src_path, '2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -352,7 +354,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # since published to origin -- destination should not get that file
     nok_(lexists(opj(sub2_target.path, 'file.dat')))
     res_ = publish(dataset=source, to='target', recursive=True)
-    assert_status(('ok', 'notneeded'), res)
+    assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 1, status='ok', path=sub2.path, type='dataset')
     assert_result_count(res_, 0, path=opj(sub2.path, 'file.dat'), type='file')
 
@@ -375,6 +377,19 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_result_count(
         res_, 1, status='ok', path=opj(sub2.path, 'file.dat'))
 
+    # Let's save those present changes and publish while implying "since last
+    # merge point"
+    source.save(message="Changes in subm2")
+    # and test if it could deduce the remote/branch to push to
+    source.config.set('branch.master.remote', 'target', where='local')
+    with chpwd(source.path):
+        res_ = publish(since='', recursive=True)
+    # TODO: somehow test that there were no even attempt to diff within "subm 1"
+    # since if `--since=''` worked correctly, nothing has changed there and it
+    # should have not been even touched
+    assert_status(('ok', 'notneeded'), res_)
+    assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
+
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
@@ -382,8 +397,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
@@ -403,7 +418,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     sub2_target = AnnexRepo(sub2_pub, create=True)
     sub2_target.checkout("TMP", ["-b"])
     sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
+    sub2 = GitRepo(opj(src_path, '2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -476,8 +491,8 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 @with_tempfile()
 @with_tempfile()
 @with_tempfile()
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_depends(
         origin,
         src_path,
@@ -557,7 +572,7 @@ def test_publish_depends(
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_gh1426(origin_path, target_path):
     # set up a pair of repos, one the published copy of the other
     origin = create(origin_path)
@@ -586,7 +601,7 @@ def test_gh1426(origin_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@skip_v6  #FIXME
+@known_failure_v6  #FIXME
 def test_publish_gh1691(origin, src_path, dst_path):
 
     # prepare src; no subdatasets installed, but mount points present
@@ -618,7 +633,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
@@ -635,7 +650,7 @@ def test_publish_target_url(src, desttop, desturl):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 def test_gh1763(src, target1, target2):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763

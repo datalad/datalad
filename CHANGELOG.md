@@ -9,9 +9,37 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.9.0 (??? ??, 2017) -- will be better than ever
+## 0.9.2 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+- `export_tarball` plugin has been generalized to `export_archive` and can now also
+  generate ZIP archives.
+
+
+# 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
+
+Minor bugfix release
+
+### Fixes
+
+- Should work correctly with subdatasets named as numbers of bool
+  values (requires also GitPython >= 2.1.6)
+- Custom special remotes should work without crashing with 
+  git-annex >= 6.20170924
+
+
+## 0.9.0 (Sep 19, 2017) -- isn't it a lucky day even though not a Friday?
 
 ### Major refactoring and deprecations
 
@@ -31,12 +59,27 @@ bet we will fix some bugs and make a world even a better place.
 - [install] will no longer report nothing when a Dataset instance was
   given as a source argument, but rather perform as expected
 - [remove] doesn't remove when some files of a dataset could not be dropped
-- [publish] no longer hides error during a repository push
+- [publish] 
+  - no longer hides error during a repository push
+  - publish behaves "correctly" for `--since=` in considering only the
+    differences the last "pushed" state
+  - data transfer handling while publishing with dependencies, to github
 - improved robustness with broken Git configuration
+- [search] should search for unicode strings correctly and not crash
+- robustify git-annex special remotes protocol handling to allow for spaces in
+  the last argument
+- UI credentials interface should now allow to Ctrl-C the entry
+- should not fail while operating on submodules named with
+  numerics only or by bool (true/false) names
+- [crawl] templates should not now override settings for `largefiles` if 
+  specified in `.gitattributes`
 
 
 ### Enhancements and new features
 
+- **Exciting new feature** [run] command to protocol execution of an external 
+  command and rerun computation if desired. 
+  See [screencast](http://datalad.org/features.html#reproducible-science)
 - [save] now uses Git for detecting with sundatasets need to be inspected for
   potential changes, instead of performing a complete traversal of a dataset tree
 - [add] looks for changes relative to the last commited state of a dataset
@@ -48,7 +91,10 @@ bet we will fix some bugs and make a world even a better place.
   installation (`datalad-recursiveinstall` submodule configuration property)
 - precrafted pipelines of [crawl] now will not override `annex.largefiles`
   setting if any was set within `.gitattribues` (e.g. by `datalad create --text-no-annex`)
-
+- framework for screencasts: `tools/cast*` tools and sample cast scripts under
+  `doc/casts` which are published at [datalad.org/features.html](http://datalad.org/features.html)
+- new [project YouTube channel](https://www.youtube.com/channel/UCB8-Zf7D0DSzAsREoIt0Bvw) 
+- tests failing in direct and/or v6 modes marked explicitly
 
 ## 0.8.1 (Aug 13, 2017) -- the best birthday gift
 
@@ -425,7 +471,7 @@ publishing
 
 [Configuration documentation]: http://docs.datalad.org/config.html
 
-[Dataset]: http://docs.datalad.org/en/latest/generated/datalad.api.html#dataset
+[Dataset]: http://docs.datalad.org/en/latest/generated/datalad.api.Dataset.html
 [Sibling]: http://docs.datalad.org/en/latest/glossary.html
 
 [rfc822-compliant metadata]: http://docs.datalad.org/en/latest/metadata.html#rfc822-compliant-meta-data
@@ -437,6 +483,7 @@ publishing
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
+[copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
@@ -450,6 +497,7 @@ publishing
 [plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
+[run]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [siblings]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html
