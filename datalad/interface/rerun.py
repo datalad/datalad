@@ -22,7 +22,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
 from datalad.interface.common_opts import save_message_opt
 
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.param import Parameter
 
 from datalad.distribution.dataset import require_dataset
@@ -34,14 +34,21 @@ lgr = logging.getLogger('datalad.interface.run')
 
 @build_doc
 class Rerun(Interface):
-    """Re-execute the previous `datalad run` command.
+    """Re-execute a previous `datalad run` command.
 
     This will unlock any dataset content that is on record to have
-    been modified by the previous command run. It will then re-execute
-    the command in the recorded path (if it was inside the
-    dataset). Afterwards, all modifications will be saved.
+    been modified by the command in the specified revision.  It will
+    then re-execute the command in the recorded path (if it was inside
+    the dataset). Afterwards, all modifications will be saved.
     """
     _params_ = dict(
+        revision=Parameter(
+            args=("revision",),
+            metavar="<commit-ish>",
+            nargs="?",
+            doc="re-run command in this revision",
+            default="HEAD",
+            constraints=EnsureStr()),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset from which to rerun a recorded command.
@@ -61,6 +68,7 @@ class Rerun(Interface):
     @datasetmethod(name='rerun')
     @eval_results
     def __call__(
+            revision="HEAD",
             dataset=None,
             message=None):
 
@@ -89,9 +97,9 @@ class Rerun(Interface):
                 message='cannot re-run command, nothing recorded')
             return
 
-        # pull run info out of the last commit message
+        # pull run info out of the revision's commit message
         try:
-            rec_msg, runinfo = get_commit_runinfo(ds.repo)
+            rec_msg, runinfo = get_commit_runinfo(ds.repo, revision)
         except ValueError as exc:
             yield dict(
                 err_info, status='error',
@@ -108,7 +116,7 @@ class Rerun(Interface):
         # now we have to find out what was modified during the last run, and enable re-modification
         # ideally, we would bring back the entire state of the tree with #1424, but we limit ourself
         # to file addition/not-in-place-modification for now
-        for r in ds.unlock(new_or_modified(ds),
+        for r in ds.unlock(new_or_modified(ds, revision),
                            return_type='generator', result_xfm=None):
             yield r
 
@@ -117,17 +125,16 @@ class Rerun(Interface):
             yield r
 
 
-def get_commit_runinfo(repo, commit=None):
+def get_commit_runinfo(repo, commit="HEAD"):
     """Return message and run record from a commit message
 
     If none found - returns None, None; if anything goes wrong - throws
     ValueError with the message describing the issue
     """
-    assert commit is None, "TODO: implement for anything but the last commit"
-    last_commit_msg = repo.repo.head.commit.message
+    commit_msg = repo.repo.git.show(commit, "--format=%s%n%n%b", "--no-patch")
     cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
-    runinfo = re.match(cmdrun_regex, last_commit_msg,
+    runinfo = re.match(cmdrun_regex, commit_msg,
                        re.MULTILINE | re.DOTALL)
     if not runinfo:
         return None, None

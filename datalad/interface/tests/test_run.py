@@ -115,6 +115,33 @@ def test_rerun(path, nodspath):
     ok_clean_git(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
+    # Make a non-run commit.
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
+    # Now rerun the buried command.
+    ds.rerun(revision="HEAD~")
+    eq_('xxx\n', open(probe_path).read())
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_outofdate_tree(path):
+    ds = Dataset(path).create()
+    input_file = opj(path, "foo")
+    output_file = opj(path, "out")
+    with open(input_file, "w") as f:
+        f.write("abc\ndef")
+    ds.add("foo", to_git=True)
+    # Create inital run.
+    ds.run('grep def foo > out')
+    eq_('def\n', open(output_file).read())
+    # Change tree so that it is no longer compatible.
+    ds.remove("foo")
+    # Now rerunning should fail because foo no longer exists.
+    assert_raises(CommandError, ds.rerun, revision="HEAD~")
 
 
 @ignore_nose_capturing_stdout
