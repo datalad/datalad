@@ -19,7 +19,7 @@ from datalad.tests.utils import (
 
 import logging
 from os.path import join as opj
-from os import mkdir
+from os import mkdir, remove
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
@@ -131,6 +131,38 @@ def test_rerun(path, nodspath):
         cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
     ok_clean_git(ds.path)
     eq_('xxx\n', open(probe_path).read())
+    # Make a non-run commit.
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
+    # Now rerun the buried command.
+    with chpwd(path), swallow_outputs():
+        ds.run(rerun=True, revision="HEAD~")
+    eq_('xxxx\n', open(probe_path).read())
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_outofdate_tree(path, nodspath):
+    ds = Dataset(path).create()
+    input_file = opj(path, "foo")
+    output_file = opj(path, "out")
+    with open(input_file, "w") as f:
+        f.write("abc\ndef")
+    ds.add("foo", to_git=True)
+    # Create inital run.
+    with chpwd(path), swallow_outputs():
+        ds.run('grep def foo > out')
+    eq_('def\n', open(output_file).read())
+    # Change tree so that it is no longer compatible.
+    ds.remove("foo")
+    # Now rerunning should fail because foo no longer exists.
+    with chpwd(path), swallow_outputs():
+        assert_raises(CommandError,
+                      ds.run, rerun=True, revision="HEAD~")
 
 
 @ignore_nose_capturing_stdout

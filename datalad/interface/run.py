@@ -27,7 +27,7 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 
@@ -52,9 +52,9 @@ class Run(Interface):
 
     Commands can be re-executed using the --rerun flag. This will unlock
     any dataset content that is on record to have been modified by the
-    previous command run. It will then re-execute the command in the recorded
-    path (if it was inside the dataset). Afterwards, all modifications will be
-    saved.
+    command in the previous commit (or the revision specified by --revision).
+    It will then re-execute the command in the recorded path (if it was inside
+    the dataset). Afterwards, all modifications will be saved.
 
     If the executed command did not alter the dataset in any way, no record of
     the command execution is made.
@@ -85,6 +85,11 @@ class Run(Interface):
             This will ignore any command given as an argument, and execute the
             recorded command call in the recorded working directory. The recorded
             changeset will be replaced by the outcome of the command re-run."""),
+        revision=Parameter(
+            args=("--revision",),
+            doc="re-run command in this revision",
+            default="HEAD",
+            constraints=EnsureStr()),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -102,7 +107,9 @@ class Run(Interface):
             cmd=None,
             dataset=None,
             message=None,
-            rerun=False):
+            rerun=False,
+            revision="HEAD"):
+
         if rerun and cmd:
             lgr.warning('Ignoring provided command in --rerun mode')
             cmd = None
@@ -149,7 +156,7 @@ class Run(Interface):
             return
 
         if rerun:
-            # pull run info out of the last commit message
+            # pull run info out of the revision's commit message
             err_info = get_status_dict('run', ds=ds)
             if not ds.repo.get_hexsha():
                 yield dict(
@@ -157,7 +164,7 @@ class Run(Interface):
                     message='cannot re-run command, nothing recorded')
                 return
             try:
-                rec_msg, runinfo = get_commit_runinfo(ds.repo)
+                rec_msg, runinfo = get_commit_runinfo(ds.repo, revision)
             except ValueError as exc:
                 yield dict(
                     err_info, status='error',
@@ -188,7 +195,7 @@ class Run(Interface):
             to_unlock = []
             for r in ds.diff(
                     recursive=True,
-                    revision='HEAD~1...HEAD',
+                    revision="{r}^..{r}".format(r=revision),
                     return_type='generator',
                     result_renderer=None):
                 if r.get('type', None) == 'file' and \
@@ -277,17 +284,16 @@ class Run(Interface):
         #    raise CommandError(code=cmd_exitcode)
 
 
-def get_commit_runinfo(repo, commit=None):
+def get_commit_runinfo(repo, commit="HEAD"):
     """Return message and run record from a commit message
 
     If none found - returns None, None; if anything goes wrong - throws
     ValueError with the message describing the issue
     """
-    assert commit is None, "TODO: implement for anything but the last commit"
-    last_commit_msg = repo.repo.head.commit.message
+    commit_msg = repo.repo.git.show(commit, "--format=%s%n%n%b", "--no-patch")
     cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
-    runinfo = re.match(cmdrun_regex, last_commit_msg,
+    runinfo = re.match(cmdrun_regex, commit_msg,
                        re.MULTILINE | re.DOTALL)
     if not runinfo:
         return None, None
