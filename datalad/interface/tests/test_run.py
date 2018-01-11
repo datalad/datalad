@@ -122,6 +122,9 @@ def test_rerun(path, nodspath):
     # Now rerun the buried command.
     ds.rerun(revision="HEAD~")
     eq_('xxx\n', open(probe_path).read())
+    # Or a range of commits, skipping non-run commits.
+    ds.rerun(revision="HEAD~3..")
+    eq_('xxxxx\n', open(probe_path).read())
 
 
 @ignore_nose_capturing_stdout

@@ -23,6 +23,7 @@ from datalad.interface.run import run_command
 from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.constraints import EnsureNone, EnsureStr
+from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
 
 from datalad.distribution.dataset import require_dataset
@@ -34,7 +35,7 @@ lgr = logging.getLogger('datalad.interface.run')
 
 @build_doc
 class Rerun(Interface):
-    """Re-execute a previous `datalad run` command.
+    """Re-execute previous `datalad run` commands.
 
     This will unlock any dataset content that is on record to have
     been modified by the command in the specified revision.  It will
@@ -44,9 +45,13 @@ class Rerun(Interface):
     _params_ = dict(
         revision=Parameter(
             args=("revision",),
-            metavar="<commit-ish>",
+            metavar="<revision or range>",
             nargs="?",
-            doc="re-run command in this revision",
+            doc="""re-run command(s) in this revision or range.  This can be a
+            commit-ish that resolves to a single commit whose command
+            should be re-run. Otherwise, it is taken as a revision
+            range, and all the commands that would be shown by `git
+            log <range>` are re-executed.""",
             default="HEAD",
             constraints=EnsureStr()),
         dataset=Parameter(
@@ -97,32 +102,48 @@ class Rerun(Interface):
                 message='cannot re-run command, nothing recorded')
             return
 
-        # pull run info out of the revision's commit message
         try:
-            rec_msg, runinfo = get_commit_runinfo(ds.repo, revision)
-        except ValueError as exc:
-            yield dict(
-                err_info, status='error',
-                message=str(exc)
-            )
-            return
-        if not runinfo:
-            yield dict(
-                err_info, status='impossible',
-                message=('cannot re-run command, last saved state does not '
-                         'look like a recorded command run'))
-            return
+            # Transform a single-commit revision into a range.  Don't
+            # rely on `".." in` for the range check because it's
+            # fragile (e.g., REV^- is a range).
+            ds.repo.repo.git.rev_parse("--verify", "--quiet",
+                                       revision + "^{commit}")
+            revision = "{r}^..{r}".format(r=revision)
+        except GitCommandError:
+            # It's not a single commit.  Assume it's a range.
+            pass
 
-        # now we have to find out what was modified during the last run, and enable re-modification
-        # ideally, we would bring back the entire state of the tree with #1424, but we limit ourself
-        # to file addition/not-in-place-modification for now
-        for r in ds.unlock(new_or_modified(ds, revision),
-                           return_type='generator', result_xfm=None):
-            yield r
+        revs = ds.repo.repo.git.rev_list("--reverse", revision).split()
+        for rev in revs:
+            # pull run info out of the revision's commit message
+            try:
+                rec_msg, runinfo = get_commit_runinfo(ds.repo, rev)
+            except ValueError as exc:
+                yield dict(
+                    err_info, status='error',
+                    message=str(exc)
+                )
+                return
+            if not runinfo:
+                shortrev = ds.repo.repo.git.rev_parse("--short", rev)
+                yield dict(
+                    err_info, status='ok',
+                    message=("no command for {} found; "
+                             "skipping".format(shortrev)))
+                continue
 
-        for r in run_command(runinfo['cmd'], ds, rec_msg or message,
-                             rerun_info=runinfo):
-            yield r
+            # now we have to find out what was modified during the
+            # last run, and enable re-modification ideally, we would
+            # bring back the entire state of the tree with #1424, but
+            # we limit ourself to file addition/not-in-place-modification
+            # for now
+            for r in ds.unlock(new_or_modified(ds, rev),
+                               return_type='generator', result_xfm=None):
+                yield r
+
+            for r in run_command(runinfo['cmd'], ds, rec_msg or message,
+                                 rerun_info=runinfo):
+                yield r
 
 
 def get_commit_runinfo(repo, commit="HEAD"):
