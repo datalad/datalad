@@ -93,6 +93,10 @@ class Run(Interface):
             Otherwise, it is taken as a revision range.""",
             default="HEAD",
             constraints=EnsureStr()),
+        branch=Parameter(
+            args=("-b", "--branch",),
+            doc="create and checkout this branch before rerunning the commands.",
+            constraints=EnsureStr() | EnsureNone()),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -111,7 +115,8 @@ class Run(Interface):
             dataset=None,
             message=None,
             rerun=False,
-            revision="HEAD"):
+            revision="HEAD",
+            branch=None):
 
         if rerun and cmd:
             lgr.warning('Ignoring provided command in --rerun mode')
@@ -170,6 +175,17 @@ class Run(Interface):
             pass
 
         revs = ds.repo.repo.git.rev_list("--reverse", revision).split()
+
+        if rerun and branch:
+            if branch in ds.repo.get_branches():
+                yield get_status_dict(
+                    'run',
+                    ds=ds,
+                    status='error',
+                    message="branch '{}' already exists".format(branch))
+                return
+            ds.repo.checkout(revs[0], ["-b", branch])
+
         rec_msg = None
         for rev in revs:
             if rerun:
@@ -189,9 +205,20 @@ class Run(Interface):
                     )
                     return
                 if not runinfo:
-                    yield dict(
-                        err_info, status='impossible',
-                        message='cannot re-run command, last saved state does not look like a recorded command run')
+                    if branch:
+                        shortrev = ds.repo.repo.git.rev_parse("--short", rev)
+                        yield dict(
+                            err_info,
+                            status='ok',
+                            message=("no command for {} found; "
+                                     "cherry picking".format(shortrev)))
+                        ds.repo.repo.git.cherry_pick(rev)
+                    else:
+                        yield dict(
+                            err_info,
+                            status='impossible',
+                            message=('cannot re-run command, last saved state '
+                                     'does not look like a recorded command run'))
                     continue
                 cmd = runinfo['cmd']
                 rec_exitcode = runinfo.get('exit', 0)
