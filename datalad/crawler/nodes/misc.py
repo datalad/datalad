@@ -589,3 +589,39 @@ class debug(object):
             lgr.info("Ran node %s which yielded %d times", node, n)
             pdb.set_trace()
 
+from datalad.utils import assure_tuple_or_list
+from datalad.support.network import RI, PathRI, URL, get_local_file_url
+
+
+@auto_repr
+class BuildRIs(object):
+    """converts a list of URLs (including simple local paths)
+    into datalad RIs and yields them.
+
+    Note
+    ----
+    This aims to help unifying handling and analyzing of all kinds of URLs
+    across datalad's code base. To be able to make actual use of the RIs there's
+    more RF'ing to do within crawler.
+    """
+
+    def __init__(self, uris):
+        self.uris = [RI(u) for u in assure_tuple_or_list(uris)]
+
+    def __call__(self, data={}):
+        for ri in self.uris:
+            # TODO: here we add 'uri' instead of 'url', since the latter is
+            # dealt with in several nodes, which expect a string. Once all nodes
+            # can deal with RI instances (or its subclasses) we can merge those
+            # two fields.
+            data['uri'] = ri
+
+            # TODO: To be compatible with other nodes, fill in 'url' field
+            # as well; see 'TODO' above
+            if isinstance(ri, URL):
+                data['url'] = ri.as_str()
+                if ri.scheme == 'file':
+                    data['filename'] = os.path.basename(ri.localpath)
+            elif isinstance(ri, PathRI) and isabs(ri.localpath):
+                data['url'] = get_local_file_url(ri.localpath)
+            yield data

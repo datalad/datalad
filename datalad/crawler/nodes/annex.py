@@ -394,6 +394,35 @@ class Annexificator(object):
             return downloader.get_status(url)
 
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
+
+        # RF note: In case of local files provides as PathRI, adapt data dict to
+        # meet the expectations of the rest of the code, which was written
+        # unaware of datalad RIs. Particularly, it couldn't deal with absolute
+        # paths.
+        uri = data.get('uri')
+        from datalad.support.network import PathRI
+        if isinstance(uri, PathRI):
+            if not isabs(uri.localpath):
+                # we got a local path inside the repo;
+                # this should lead to simply add it
+                data['path'] = uri.localpath
+                data['url'] = None
+            elif realpath(uri.localpath).startswith(self.repo.path):
+                # we got a local path inside the repo;
+                # this should lead to simply add it;
+                # => build relative path:
+                data['path'] = relpath(uri.localpath, self.repo.path)
+                data['url'] = None
+            else:
+                # path is absolute and outside repo;
+                # => should be passed to annex-addurl as an URL
+                # => However, since addurl is used with --file herein, we need
+                # to provide a target filename:
+                data['filename'] = os.path.basename(uri.localpath)
+                # TODO: figure out, whether logic needs us to provide a
+                # url_status in that case (and do it or change logic, since
+                # annex can deal with it on its own)!
+
         # some checks
         assert (self.mode is not None)
         stats = data.get('datalad_stats', ActivityStats())
@@ -403,8 +432,12 @@ class Annexificator(object):
             stats.urls += 1
 
         fpath = self._get_fpath(data, stats, return_None=True)
+
+        # url_status is needed to determine, whether remote sources provide a
+        # new version. Therefore it's unnecessary to create a status for local
+        # files:
         url_status = None
-        if url:
+        if url and not url.startswith('file:'):
             try:
                 url_status = self._get_url_status(data, url)
             except Exception:
@@ -443,7 +476,7 @@ class Annexificator(object):
                 self._statusdb = self.statusdb
 
         statusdb = self._statusdb
-        if url:
+        if url and not url.startswith('file:'):
             if lexists(filepath):
                 # check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
