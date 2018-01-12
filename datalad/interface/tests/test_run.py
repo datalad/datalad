@@ -18,17 +18,19 @@ from datalad.tests.utils import (
 )
 
 from os.path import join as opj
+from os.path import relpath
 from os import mkdir
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
-from datalad.tests.utils import ok_
+from datalad.tests.utils import ok_, assert_false
 from datalad.api import run
-from datalad.interface.rerun import get_commit_runinfo
+from datalad.interface.rerun import get_commit_runinfo, new_or_modified
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import create_tree
@@ -147,3 +149,45 @@ def test_rerun_subdir(path):
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
         ds.rerun()
+
+
+@with_tree(tree={"d": {"to_modify": "content1"},
+                 "to_remove": "content2",
+                 "to_modify": "content3",
+                 "unchanged": "content4"})
+def test_new_or_modified(path):
+    def apfiles(aps):
+        for ap in aps:
+            yield relpath(ap["path"], path)
+
+    ds = Dataset(path).create(force=True, no_annex=True)
+    ds.repo.add(".", commit=True)
+    assert_false(ds.repo.dirty)
+
+    # New files are detected, deletions are not.
+    ds.repo.remove(["to_remove"])
+    ok_(ds.repo.dirty)
+
+    with open(opj(path, "to_add"), "w") as f:
+        f.write("content5")
+    ds.repo.add(["to_add"], commit=True)
+    ds.repo.commit("add one, remove another")
+
+    eq_(list(apfiles(new_or_modified(ds, "HEAD"))),
+        ["to_add"])
+
+    # Modifications are detected.
+    with open(opj(path, "to_modify"), "w") as f:
+        f.write("updated 1")
+    with open(opj(path, "d/to_modify"), "w") as f:
+        f.write("updated 2")
+    ds.repo.add(["to_modify", "d/to_modify"], commit=True)
+
+    eq_(set(apfiles(new_or_modified(ds, "HEAD"))),
+        {"to_modify", "d/to_modify"})
+
+    # Non-HEAD revisions work.
+    ds.repo.commit("empty", options=["--allow-empty"])
+    assert_false(list(apfiles(new_or_modified(ds, "HEAD"))))
+    eq_(set(apfiles(new_or_modified(ds, "HEAD~"))),
+        {"to_modify", "d/to_modify"})

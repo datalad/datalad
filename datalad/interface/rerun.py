@@ -108,23 +108,13 @@ class Rerun(Interface):
         # now we have to find out what was modified during the last run, and enable re-modification
         # ideally, we would bring back the entire state of the tree with #1424, but we limit ourself
         # to file addition/not-in-place-modification for now
-        to_unlock = []
-        for r in ds.diff(
-                recursive=True,
-                revision='HEAD~1...HEAD',
-                return_type='generator',
-                result_renderer=None):
-            if r.get('type') == 'file' and \
-                    r.get('state') in ('added', 'modified'):
-                r.pop('status')
-                to_unlock.append(r)
-        if to_unlock:
-            for r in ds.unlock(to_unlock, return_type='generator', result_xfm=None):
-                yield r
+        for r in ds.unlock(new_or_modified(ds),
+                           return_type='generator', result_xfm=None):
+            yield r
 
-            for r in run_command(runinfo['cmd'], ds, rec_msg or message,
-                                 rerun_info=runinfo):
-                yield r
+        for r in run_command(runinfo['cmd'], ds, rec_msg or message,
+                             rerun_info=runinfo):
+            yield r
 
 
 def get_commit_runinfo(repo, commit=None):
@@ -157,3 +147,25 @@ def get_commit_runinfo(repo, commit=None):
             'recorded state'
         )
     return rec_msg, runinfo
+
+
+def new_or_modified(dataset, revision="HEAD"):
+    """Yield files that have been added or modified in `revision`.
+
+    Parameters
+    ----------
+    dataset : Dataset
+    revision : string, optional
+        Commit-ish of interest.
+
+    Returns
+    -------
+    Generator that yields AnnotatePaths instances
+    """
+    diff = dataset.diff(recursive=True,
+                        revision="{rev}^..{rev}".format(rev=revision),
+                        return_type='generator', result_renderer=None)
+    for r in diff:
+        if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
+            r.pop('status', None)
+            yield r
