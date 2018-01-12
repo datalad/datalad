@@ -174,7 +174,7 @@ class Run(Interface):
                 message = rec_msg
             cmd = runinfo['cmd']
             rec_exitcode = runinfo.get('exit', 0)
-            rel_pwd = runinfo.get('pwd', None)
+            rel_pwd = runinfo.get('pwd')
             if rel_pwd:
                 # recording is relative to the dataset
                 pwd = normpath(opj(ds.path, rel_pwd))
@@ -191,9 +191,9 @@ class Run(Interface):
                     revision='HEAD~1...HEAD',
                     return_type='generator',
                     result_renderer=None):
-                if r.get('type', None) == 'file' and \
-                        r.get('state', None) in ('added', 'modified'):
-                    r.pop('status', None)
+                if r.get('type') == 'file' and \
+                        r.get('state') in ('added', 'modified'):
+                    r.pop('status')
                     to_unlock.append(r)
             if to_unlock:
                 for r in ds.unlock(to_unlock, return_type='generator', result_xfm=None):
