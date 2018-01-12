@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""test command datalad run
+"""test command datalad {re,}run
 
 """
 
@@ -17,7 +17,6 @@ from datalad.tests.utils import (
     known_failure_v6,
 )
 
-import logging
 from os.path import join as opj
 from os import mkdir
 from datalad.utils import chpwd
@@ -27,7 +26,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.tests.utils import ok_
 from datalad.api import run
-from datalad.interface.run import get_commit_runinfo
+from datalad.interface.rerun import get_commit_runinfo
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
@@ -37,7 +36,6 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
-from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 
@@ -62,9 +60,6 @@ def test_basics(path, nodspath):
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
     with chpwd(path):
-        # runs nothing, does nothing
-        assert_result_count(ds.run(), 0)
-        eq_(last_state, ds.repo.get_hexsha())
         # provoke command failure
         with assert_raises(CommandError) as cme:
             ds.run('7i3amhmuch9invalid')
@@ -114,17 +109,10 @@ def test_rerun(path, nodspath):
     # moreover, rerun must figure out which bits to unlock, even in
     # subdatasets
     with chpwd(nodspath):
-        ds.run(rerun=True)
+        ds.rerun()
     ok_clean_git(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
-    # if I give another command, it will be ignored
-    with chpwd(nodspath):
-        with swallow_logs(new_level=logging.WARNING) as cml:
-            ds.run('30BANG3934', rerun=True)
-            cml.assert_logged("Ignoring provided command in --rerun mode", level="WARNING")
-    ok_clean_git(ds.path)
-    eq_('xxx\n', open(probe_path).read())
 
 
 @ignore_nose_capturing_stdout
@@ -143,7 +131,7 @@ def test_rerun_subdir(path):
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
-        ds.run(rerun=True)
+        ds.rerun()
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
     # and not on top
@@ -158,4 +146,4 @@ def test_rerun_subdir(path):
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
-        ds.run(rerun=True)
+        ds.rerun()
