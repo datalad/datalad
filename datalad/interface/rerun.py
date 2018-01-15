@@ -138,11 +138,20 @@ class Rerun(Interface):
                 )
                 return
             if not runinfo:
+                pick = False
+                try:
+                    ds.repo.repo.git.merge_base("--is-ancestor", rev, "HEAD")
+                except GitCommandError:  # Revision is NOT an ancestor of HEAD.
+                    pick = True
+
                 shortrev = ds.repo.repo.git.rev_parse("--short", rev)
-                yield dict(
-                    err_info, status='ok',
-                    message=("no command for {} found; "
-                             "skipping".format(shortrev)))
+                err_msg = "no command for {} found; {}".format(
+                    shortrev,
+                    "cherry picking" if pick else "skipping")
+                yield dict(err_info, status='ok', message=err_msg)
+
+                if pick:
+                    ds.repo.repo.git.cherry_pick(rev)
                 continue
 
             # now we have to find out what was modified during the

@@ -38,6 +38,7 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 
@@ -134,7 +135,6 @@ def test_rerun(path, nodspath):
 def test_rerun_onto(path):
     ds = Dataset(path).create()
 
-    static_file = opj(path, "static")
     grow_file = opj(path, "grows")
 
     ds.run('echo static-content > static')
@@ -169,6 +169,25 @@ def test_rerun_onto(path):
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("master"))
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_cherry_pick(path):
+    ds = Dataset(path).create()
+
+    ds.repo.repo.git.tag("prerun")
+    ds.run('echo abc > runfile')
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
+
+    for onto, text in [("HEAD", "skipping"), ("prerun", "cherry picking")]:
+        results = ds.rerun(revision="prerun..", onto=onto)
+        assert_in_results(results, status='ok', path=ds.path)
+        assert any(r.get("message", "").endswith(text) for r in results)
 
 
 @ignore_nose_capturing_stdout
