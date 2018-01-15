@@ -63,6 +63,14 @@ class Rerun(Interface):
             dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
+        onto=Parameter(
+            metavar="base",
+            args=("--onto",),
+            doc="""start point for rerunning the commands.  If not specified, commands
+            are executed at HEAD.  This option can be used to specify
+            an alternative start point, which will be checked out in a
+            detached state.""",
+            constraints=EnsureStr() | EnsureNone()),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -75,7 +83,8 @@ class Rerun(Interface):
     def __call__(
             revision="HEAD",
             dataset=None,
-            message=None):
+            message=None,
+            onto=None):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -114,6 +123,10 @@ class Rerun(Interface):
             pass
 
         revs = ds.repo.repo.git.rev_list("--reverse", revision).split()
+
+        if onto:
+            ds.repo.checkout(onto, options=["--detach"])
+
         for rev in revs:
             # pull run info out of the revision's commit message
             try:

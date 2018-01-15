@@ -25,7 +25,7 @@ from datalad.utils import chpwd
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
-from datalad.tests.utils import ok_, assert_false
+from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
 from datalad.interface.rerun import get_commit_runinfo, new_or_modified
 from datalad.tests.utils import assert_raises
@@ -125,6 +125,50 @@ def test_rerun(path, nodspath):
     # Or a range of commits, skipping non-run commits.
     ds.rerun(revision="HEAD~3..")
     eq_('xxxxx\n', open(probe_path).read())
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_onto(path):
+    ds = Dataset(path).create()
+
+    static_file = opj(path, "static")
+    grow_file = opj(path, "grows")
+
+    ds.run('echo static-content > static')
+    ds.repo.repo.git.tag("static")
+    ds.run('echo x$(cat grows) > grows')
+    ds.rerun()
+    eq_('xx\n', open(grow_file).read())
+
+    # If we run the "static" change on top of itself, we end up in the
+    # same (but detached) place.
+    ds.rerun(revision="static", onto="static")
+    ok_(ds.repo.get_active_branch() is None)
+    eq_(ds.repo.repo.git.rev_parse("HEAD"),
+        ds.repo.repo.git.rev_parse("static"))
+
+    # If we run the "static" change from the same "base", we end up
+    # with a new commit.
+    ds.repo.checkout("master")
+    ds.rerun(revision="static", onto="static^")
+    ok_(ds.repo.get_active_branch() is None)
+    neq_(ds.repo.repo.git.rev_parse("HEAD"),
+         ds.repo.repo.git.rev_parse("static"))
+    assert_result_count(ds.diff(revision="HEAD..static"), 0)
+    for revrange in ["..static", "static.."]:
+        assert_result_count(ds.repo.repo.git.rev_list(revrange).splitlines(),
+                            1)
+
+    # Unlike the static change, if we run the ever-growing change on
+    # top of itself, we end up with a new commit.
+    ds.repo.checkout("master")
+    ds.rerun(revision="HEAD", onto="HEAD")
+    ok_(ds.repo.get_active_branch() is None)
+    neq_(ds.repo.repo.git.rev_parse("HEAD"),
+         ds.repo.repo.git.rev_parse("master"))
 
 
 @ignore_nose_capturing_stdout
