@@ -77,6 +77,14 @@ class Rerun(Interface):
             the branch name specified with --branch or in a detached
             state otherwise.""",
             constraints=EnsureStr() | EnsureNone()),
+        root=Parameter(
+            args=("--root",),
+            action="store_true",
+            doc="""rerun commands from all commits reachable from revision rather than
+            running only the command from the revision.  This flag is
+            incompatible with using a range for the revision the
+            argument. In other words, run all the commands that would
+            be shown by `git log <revision>`."""),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -91,7 +99,8 @@ class Rerun(Interface):
             dataset=None,
             branch=None,
             message=None,
-            onto=None):
+            onto=None,
+            root=False):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -124,10 +133,15 @@ class Rerun(Interface):
             # fragile (e.g., REV^- is a range).
             ds.repo.repo.git.rev_parse("--verify", "--quiet",
                                        revision + "^{commit}")
-            revision = "{r}^..{r}".format(r=revision)
+            if not root:
+                revision = "{r}^..{r}".format(r=revision)
         except GitCommandError:
             # It's not a single commit.  Assume it's a range.
-            pass
+            if root:
+                yield dict(
+                    err_info, status="error",
+                    message="--root is incompatible with revision range")
+                return
 
         revs = ds.repo.repo.git.rev_list("--reverse", revision).split()
 
