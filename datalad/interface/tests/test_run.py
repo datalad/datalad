@@ -25,6 +25,7 @@ from datalad.utils import chpwd
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
 from datalad.interface.rerun import get_commit_runinfo, new_or_modified
@@ -169,6 +170,55 @@ def test_rerun_onto(path):
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("master"))
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_branch(path):
+    ds = Dataset(path).create()
+
+    ds.repo.repo.git.tag("prerun")
+
+    outfile = opj(path, "run-file")
+
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
+
+    ds.run('echo x$(cat run-file) > run-file')
+    ds.rerun()
+    eq_('xx\n', open(outfile).read())
+
+    # Rerun the commands on a new branch that starts at the parent
+    # commit of the first run.
+    ds.rerun(revision="prerun..", onto="prerun", branch="rerun")
+
+    eq_(ds.repo.get_active_branch(), "rerun")
+    eq_('xx\n', open(outfile).read())
+
+    for revrange in ["rerun..master", "master..rerun"]:
+        assert_result_count(
+            ds.repo.repo.git.rev_list(revrange).splitlines(), 3)
+    eq_(ds.repo.get_merge_base(["master", "rerun"]),
+        ds.repo.repo.git.rev_parse("prerun"))
+
+    # Start rerun branch at tip of current branch.
+    ds.repo.checkout("master")
+    ds.rerun(revision="prerun..", branch="rerun2")
+    eq_(ds.repo.get_active_branch(), "rerun2")
+    eq_('xxxx\n', open(outfile).read())
+
+    assert_result_count(
+        ds.repo.repo.git.rev_list("master..rerun2").splitlines(), 2)
+    assert_result_count(
+        ds.repo.repo.git.rev_list("rerun2..master").splitlines(), 0)
+
+    # Using an existing branch name fails.
+    ds.repo.checkout("master")
+    assert_raises(IncompleteResultsError,
+                  ds.rerun, revision="prerun..", branch="rerun2")
 
 
 @ignore_nose_capturing_stdout

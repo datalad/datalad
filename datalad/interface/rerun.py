@@ -63,13 +63,19 @@ class Rerun(Interface):
             dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
+        branch=Parameter(
+            metavar="NAME",
+            args=("-b", "--branch",),
+            doc="create and checkout this branch before rerunning the commands.",
+            constraints=EnsureStr() | EnsureNone()),
         onto=Parameter(
             metavar="base",
             args=("--onto",),
             doc="""start point for rerunning the commands.  If not specified, commands
             are executed at HEAD.  This option can be used to specify
-            an alternative start point, which will be checked out in a
-            detached state.""",
+            an alternative start point, which will be checked out with
+            the branch name specified with --branch or in a detached
+            state otherwise.""",
             constraints=EnsureStr() | EnsureNone()),
         # TODO
         # --list-commands
@@ -83,6 +89,7 @@ class Rerun(Interface):
     def __call__(
             revision="HEAD",
             dataset=None,
+            branch=None,
             message=None,
             onto=None):
 
@@ -126,6 +133,14 @@ class Rerun(Interface):
 
         if onto:
             ds.repo.checkout(onto, options=["--detach"])
+        if branch:
+            if branch in ds.repo.get_branches():
+                yield get_status_dict("run",
+                    ds=ds,
+                    status="error",
+                    message="branch '{}' already exists".format(branch))
+                return
+            ds.repo.checkout("HEAD", ["-b", branch])
 
         for rev in revs:
             # pull run info out of the revision's commit message
