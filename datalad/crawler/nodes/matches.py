@@ -17,6 +17,7 @@ from six import PY3
 
 from ...utils import updated
 from ...support.network import dlurljoin
+from ...support.exceptions import MissingExternalDependency
 from ...utils import auto_repr
 
 from logging import getLogger
@@ -61,6 +62,12 @@ class ExtractorMatch(object):
     def __call__(self, data):
         input = data.pop(self._input) if self._pop_input else data[self._input]
 
+        if not Response:
+            # we have no scrapy
+            raise MissingExternalDependency(
+                "scrapy",
+                msg="It is needed for this type of crawling"
+            )
         if isinstance(input, Response):
             selector = Selector(response=input)
             if hasattr(input, 'url') and input.url and ('url' not in data):
