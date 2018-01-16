@@ -47,10 +47,14 @@ class Rerun(Interface):
             args=("revision",),
             metavar="<revision or range>",
             nargs="?",
-            doc="""re-run command(s) in this revision or range.  This can be a
-            commit-ish that resolves to a single commit whose command
-            should be re-run. Otherwise, it is taken as a revision
-            range, and all the commands that would be shown by `git
+            doc="""re-run command(s) in this revision or range.
+            This argument can take one of two forms. The first is a
+            commit-ish that resolves to a single commit.  By default,
+            the command from this commit will be executed, but, if
+            --root is given, the commands from all commits that are
+            reachable from that commit (including itself) will be
+            executed. The second acceptable form is a revision range,
+            in which case all the commands that would be shown by `git
             log <range>` are re-executed.""",
             default="HEAD",
             constraints=EnsureStr()),
