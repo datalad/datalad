@@ -142,6 +142,23 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         if cmo.err:
             lgr.debug("patool gave stderr:\n%s" % cmo.err)
 
+    # Note: (ben) Experienced issue, where extracted tarball
+    # lacked execution bit of directories, leading to not being
+    # able to delete them while having write permission.
+    # Can't imagine a situation, where we would want to fail on
+    # that kind of mess. So, to be sure set it.
+
+    if not on_windows:
+        os.chmod(dir_,
+                 os.stat(dir_).st_mode |
+                 os.path.stat.S_IEXEC)
+        for root, dirs, files in os.walk(dir_, followlinks=False):
+            for d in dirs:
+                subdir = opj(root, d)
+                os.chmod(subdir,
+                         os.stat(subdir).st_mode |
+                         os.path.stat.S_IEXEC)
+
     if leading_directories == 'strip':
         _, dirs, files = next(os.walk(dir_))
         if not len(files) and len(dirs) == 1:
