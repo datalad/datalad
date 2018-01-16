@@ -127,6 +127,12 @@ class Rerun(Interface):
                 message='cannot re-run command, nothing recorded')
             return
 
+        if branch and branch in ds.repo.get_branches():
+            yield get_status_dict(
+                "run", ds=ds, status="error",
+                message="branch '{}' already exists".format(branch))
+            return
+
         try:
             # Transform a single-commit revision into a range.  Don't
             # rely on `".." in` for the range check because it's
@@ -148,12 +154,6 @@ class Rerun(Interface):
         if onto:
             ds.repo.checkout(onto, options=["--detach"])
         if branch:
-            if branch in ds.repo.get_branches():
-                yield get_status_dict("run",
-                    ds=ds,
-                    status="error",
-                    message="branch '{}' already exists".format(branch))
-                return
             ds.repo.checkout("HEAD", ["-b", branch])
 
         for rev in revs:
