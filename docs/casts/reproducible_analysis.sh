@@ -59,7 +59,7 @@ run "git show --stat"
 say "DataLad has enough information stored to be able to re-run a command."
 say "On command exit, it will inspect the results and save them again, but only if they are different."
 say "In our case, the re-run yields bit-identical results, hence nothing new is saved."
-run "datalad run --rerun"
+run "datalad rerun"
 
 say "Now that we are done, and have checked that we can reproduce the results ourselves, we can clean up"
 say "DataLad can easily verify if any part of our input dataset was modified since we configured our analysis"
@@ -78,7 +78,7 @@ run "ls inputs/*"
 say "Only the remaining data (our code and the results) need to be kept and require a backup for long term archival. Everything else can be re-obtained as needed, when needed."
 
 say "As DataLad knows everything needed about the inputs, including where to get the right version, we can re-run the analysis with a single command. Watch how DataLad re-obtains all required data, re-runs the code, and checks that none of the results changed and need saving"
-run "datalad run --rerun"
+run "datalad rerun"
 
 say "Reproduced!"
 
