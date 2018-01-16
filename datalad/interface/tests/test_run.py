@@ -26,6 +26,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.gitrepo import GitCommandError
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
 from datalad.interface.rerun import get_commit_runinfo, new_or_modified
@@ -177,6 +178,25 @@ def test_rerun_onto(path):
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("master"))
+
+    ## An empty `onto` means use the parent of the first revision.
+    ds.repo.checkout("master")
+    ds.rerun(revision="static^..", onto="")
+    ok_(ds.repo.get_active_branch() is None)
+    for revrange in ["..master", "master.."]:
+        assert_result_count(
+            ds.repo.repo.git.rev_list(revrange).split(), 3)
+
+    ## An empty `onto` means use the parent of the first revision.
+    ds.repo.checkout("master")
+    ds.rerun(revision="static", root=True, onto="", branch="orph")
+    eq_(ds.repo.get_active_branch(), "orph")
+    assert_result_count(ds.diff(revision="static..orph"), 0)
+    assert_false(ds.repo.get_merge_base(["static", "orph"]))
+    ## But it fails when no branch is given.
+    ds.repo.checkout("master")
+    assert_raises(IncompleteResultsError,
+                  ds.rerun, revision="static", root=True, onto="")
 
 
 @ignore_nose_capturing_stdout

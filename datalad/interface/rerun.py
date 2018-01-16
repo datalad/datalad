@@ -75,7 +75,10 @@ class Rerun(Interface):
             are executed at HEAD.  This option can be used to specify
             an alternative start point, which will be checked out with
             the branch name specified with --branch or in a detached
-            state otherwise.""",
+            state otherwise.  As a special case, an empty value for
+            this option means to use the parent of the first commit
+            (e.g., 'a' for the range 'a..b' or 'a^' for the revision
+            'a') as the starting point.""",
             constraints=EnsureStr() | EnsureNone()),
         root=Parameter(
             args=("--root",),
@@ -151,9 +154,33 @@ class Rerun(Interface):
 
         revs = ds.repo.repo.git.rev_list("--reverse", revision, "--").split()
 
-        if onto:
-            ds.repo.checkout(onto, options=["--detach"])
-        if branch:
+        do_checkout = branch
+        if onto is not None:
+            if onto.strip() == "":
+                ## An empty argument means go to the parent of the
+                ## first revision, but that doesn't exist for --root.
+                ## Instead check out an orphan branch.
+                if root and branch:
+                    ds.repo.checkout(branch, options=["--orphan"])
+                    # Make sure we are actually on an orphan branch
+                    # before doing a hard reset.
+                    if ds.repo.get_hexsha():
+                        yield dict(
+                            err_info, status="error",
+                            message="failed to create orphan branch")
+                        return
+                    ds.repo.repo.git.reset("--hard")
+                    do_checkout = False
+                elif root:
+                    yield dict(
+                        err_info, status="error",
+                        message="branch name is required for orphan")
+                    return
+                else:
+                    ds.repo.checkout(revs[0] + "^", options=["--detach"])
+            else:
+                ds.repo.checkout(onto, options=["--detach"])
+        if do_checkout:
             ds.repo.checkout("HEAD", ["-b", branch])
 
         for rev in revs:
