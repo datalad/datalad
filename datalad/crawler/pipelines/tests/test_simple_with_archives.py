@@ -7,38 +7,33 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import known_failure_direct_mode
-
-
+from logging import getLogger
 from os.path import join as opj
 
+from datalad.api import crawl, crawl_init
+from datalad.api import create
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
+from datalad.tests.utils import known_failure_direct_mode
+from ..simple_with_archives import pipeline
 from ...nodes.annex import initiate_dataset
-from ....utils import chpwd
-from ....utils import _path_
-from ....tests.utils import with_tree
-from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
-from ....tests.utils import with_tempfile
-from ....tests.utils import serve_path_via_http
+from ....tests.utils import eq_
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git, ok_clean_git
+from ....tests.utils import serve_path_via_http
 from ....tests.utils import usecase
-from ..simple_with_archives import pipeline
-from datalad.api import create
-
-from datalad.api import crawl, crawl_init
-
-from logging import getLogger
+from ....tests.utils import with_tempfile
+from ....tests.utils import with_tree
+from ....utils import _path_
+from ....utils import chpwd
+from .test_balsa import TEST_TREE1
 lgr = getLogger('datalad.crawl.tests')
 
 
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, ["random_url"]
 
-from .test_balsa import TEST_TREE1
 
 # A little integration test
-
 @with_tree(tree=TEST_TREE1, archives_leading_dir=False)
 @serve_path_via_http
 @with_tempfile

@@ -81,7 +81,6 @@ def pipeline(url=None,
         # no URL -- nothing to crawl -- but then should have been provided
         assert incoming_pipeline
 
-
     # TODO: we could just extract archives processing setup into a separate pipeline template
     return [
         annex.switch_branch('incoming', parent='master'),
