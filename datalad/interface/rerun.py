@@ -41,6 +41,30 @@ class Rerun(Interface):
     been modified by the command in the specified revision.  It will
     then re-execute the command in the recorded path (if it was inside
     the dataset). Afterwards, all modifications will be saved.
+
+    Examples:
+
+        Re-execute the command from the previous commit.
+
+        $ datalad rerun
+
+        Re-execute any commands in the last five commits.
+
+        $ datalad rerun HEAD~5..
+
+        Do the same as above, but re-execute the commands on top of
+        HEAD~5 in a detached state.
+
+        $ datalad rerun --onto= HEAD~5..
+
+        Re-execute all previous commands and compare the old and new
+        results.
+
+        $ # on master branch
+        $ datalad rerun --root --branch=verify
+        $ # now on verify branch
+        $ datalad diff --revision=master..
+        $ git log --oneline --left-right --cherry-pick master...
     """
     _params_ = dict(
         revision=Parameter(
