@@ -167,8 +167,8 @@ def test_rerun_onto(path):
          ds.repo.repo.git.rev_parse("static"))
     assert_result_count(ds.diff(revision="HEAD..static"), 0)
     for revrange in ["..static", "static.."]:
-        assert_result_count(ds.repo.repo.git.rev_list(revrange).splitlines(),
-                            1)
+        assert_result_count(
+            ds.repo.repo.git.rev_list(revrange).split(), 1)
 
     # Unlike the static change, if we run the ever-growing change on
     # top of itself, we end up with a new commit.
@@ -207,7 +207,7 @@ def test_rerun_branch(path):
 
     for revrange in ["rerun..master", "master..rerun"]:
         assert_result_count(
-            ds.repo.repo.git.rev_list(revrange).splitlines(), 3)
+            ds.repo.repo.git.rev_list(revrange).split(), 3)
     eq_(ds.repo.get_merge_base(["master", "rerun"]),
         ds.repo.repo.git.rev_parse("prerun"))
 
@@ -218,9 +218,9 @@ def test_rerun_branch(path):
     eq_('xxxx\n', open(outfile).read())
 
     assert_result_count(
-        ds.repo.repo.git.rev_list("master..rerun2").splitlines(), 2)
+        ds.repo.repo.git.rev_list("master..rerun2").split(), 2)
     assert_result_count(
-        ds.repo.repo.git.rev_list("rerun2..master").splitlines(), 0)
+        ds.repo.repo.git.rev_list("rerun2..master").split(), 0)
 
     # Using an existing branch name fails.
     ds.repo.checkout("master")
