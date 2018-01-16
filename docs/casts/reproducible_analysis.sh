@@ -57,7 +57,7 @@ say "The analysis step is done, all generated results were saved in the dataset.
 run "git show --stat"
 
 say "DataLad has enough information stored to be able to re-run a command."
-say "On command exit, it will inspect the results and save them gain, but only if they are different."
+say "On command exit, it will inspect the results and save them again, but only if they are different."
 say "In our case, the re-run yields bit-identical results, hence nothing new is saved."
 run "datalad run --rerun"
 
