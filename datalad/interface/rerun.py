@@ -30,7 +30,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
-lgr = logging.getLogger('datalad.interface.run')
+lgr = logging.getLogger('datalad.interface.rerun')
 
 
 @build_doc
