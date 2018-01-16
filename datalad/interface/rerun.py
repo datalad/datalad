@@ -149,7 +149,7 @@ class Rerun(Interface):
                     message="--root is incompatible with revision range")
                 return
 
-        revs = ds.repo.repo.git.rev_list("--reverse", revision).split()
+        revs = ds.repo.repo.git.rev_list("--reverse", revision, "--").split()
 
         if onto:
             ds.repo.checkout(onto, options=["--detach"])

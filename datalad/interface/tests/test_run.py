@@ -268,6 +268,20 @@ def test_rerun_outofdate_tree(path):
 
 
 @ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_ambiguous_revision_file(path):
+    ds = Dataset(path).create()
+    ds.run('echo ambig > ambig')
+    ds.repo.repo.git.tag("ambig")
+    ## Don't fail when "ambig" refers to both a file and revision.
+    ds.rerun(revision="ambig", root=True, branch="orph")
+    eq_(len(ds.repo.repo.git.rev_list("orph").split()),
+        len(ds.repo.repo.git.rev_list("ambig", "--").split()))
+
+
+@ignore_nose_capturing_stdout
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
