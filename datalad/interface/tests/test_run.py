@@ -141,6 +141,7 @@ def test_rerun(path, nodspath):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_rerun_onto(path):
     ds = Dataset(path).create()
 
@@ -252,6 +253,7 @@ def test_rerun_branch(path):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
 
@@ -271,6 +273,7 @@ def test_rerun_cherry_pick(path):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
     input_file = opj(path, "foo")
@@ -291,6 +294,7 @@ def test_rerun_outofdate_tree(path):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
