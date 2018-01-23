@@ -417,6 +417,8 @@ Refer datalad/config.py for information on how to add these environment variable
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+- *DATALAD_USE_DEFAULT_GIT*:
+  Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 
 
 # Changelog section
