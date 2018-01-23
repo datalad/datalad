@@ -71,7 +71,7 @@ class Rerun(Interface):
             args=("revision",),
             metavar="REVISION",
             nargs="?",
-            doc="""re-run command(s) in REVISION.  By default, the
+            doc="""rerun command(s) in REVISION.  By default, the
             command from this commit will be executed, but the --since
             option can be used to construct a revision range.""",
             default="HEAD",
@@ -150,7 +150,7 @@ class Rerun(Interface):
         if not ds.repo.get_hexsha():
             yield dict(
                 err_info, status='impossible',
-                message='cannot re-run command, nothing recorded')
+                message='cannot rerun command, nothing recorded')
             return
 
         if branch and branch in ds.repo.get_branches():
@@ -260,12 +260,12 @@ def get_commit_runinfo(repo, commit="HEAD"):
         runinfo = json.loads(runinfo)
     except Exception as e:
         raise ValueError(
-            'cannot re-run command, command specification is not valid JSON: '
+            'cannot rerun command, command specification is not valid JSON: '
             '%s' % str(e)
         )
     if 'cmd' not in runinfo:
         raise ValueError(
-            'cannot re-run command, command specification missing in '
+            'cannot rerun command, command specification missing in '
             'recorded state'
         )
     return rec_msg, runinfo
