@@ -71,7 +71,7 @@ class Rerun(Interface):
             args=("revision",),
             metavar="REVISION",
             nargs="?",
-            doc="""rerun command(s) in REVISION.  By default, the
+            doc="""rerun command(s) in REVISION. By default, the
             command from this commit will be executed, but the --since
             option can be used to construct a revision range.""",
             default="HEAD",
@@ -79,21 +79,21 @@ class Rerun(Interface):
         since=Parameter(
             args=("--since",),
             nargs="?",
-            doc="""If SINCE is commit-ish, the commands from all
+            doc="""If SINCE is a commit-ish, the commands from all
             commits that are reachable from REVISION but not SINCE
-            will be re-executed.  In other words, the commands shown
-            in `git log SINCE..REVISION` are re-executed.  If SINCE is
-            an empty string, commands from all commits that are
-            reachable from REVISION are re-executed (i.e., the
-            commands in `git log REVISION`).""",
+            will be re-executed (in other words, the commands in `git
+            log SINCE..REVISION`). If SINCE is an empty string,
+            commands from all commits that are reachable from REVISION
+            are re-executed (i.e., the commands in `git log
+            REVISION`).""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset from which to rerun a recorded command.
-            If no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory. If a dataset is given,
-            the command will be executed in the root directory of this
-            dataset.""",
+            doc="""specify the dataset from which to rerun a recorded
+            command. If no dataset is given, an attempt is made to
+            identify the dataset based on the current working
+            directory. If a dataset is given, the command will be
+            executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
         branch=Parameter(
@@ -104,12 +104,13 @@ class Rerun(Interface):
         onto=Parameter(
             metavar="base",
             args=("--onto",),
-            doc="""start point for rerunning the commands.  If not specified, commands
-            are executed at HEAD.  This option can be used to specify
-            an alternative start point, which will be checked out with
-            the branch name specified with --branch or in a detached
-            state otherwise.  As a special case, an empty value for
-            this option means to use the commit specified by --since.""",
+            doc="""start point for rerunning the commands. If not
+            specified, commands are executed at HEAD. This option can
+            be used to specify an alternative start point, which will
+            be checked out with the branch name specified by --branch
+            or in a detached state otherwise. As a special case, an
+            empty value for this option means to use the commit
+            specified by --since.""",
             constraints=EnsureStr() | EnsureNone()),
         # TODO
         # --list-commands
