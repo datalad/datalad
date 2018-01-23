@@ -129,7 +129,6 @@ def test_rerun(path, nodspath):
     ds.rerun(revision="HEAD~3..")
     eq_('xxxxx\n', open(probe_path).read())
     # Or --root and a revision to run all reachable commits.
-    # Or a range of commits, skipping non-run commits.
     ds.rerun(revision="HEAD", root=True)
     eq_('xxxxxxxxxx\n', open(probe_path).read())
     # But a revision range with --root will fail.
