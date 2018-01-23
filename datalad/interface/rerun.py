@@ -67,26 +67,26 @@ class Rerun(Interface):
         $ git log --oneline --left-right --cherry-pick master...
     """
     _params_ = dict(
-        since=Parameter(
-            args=("--since",),
-            metavar="<commit-ish>",
+        revision=Parameter(
+            args=("revision",),
+            metavar="REVISION",
             nargs="?",
-            doc="""re-execute commands from commits after this revision that are
-            reachable from the commit specified by --until.  When not
-            given, only the command from the commit specified by
-            --until is re-executed.  When set to an empty string,
-            commands from commits that are reachable by --until's
-            commit are re-executed.""",
-            constraints=EnsureStr() | EnsureNone()),
-        until=Parameter(
-            args=("--until",),
-            metavar="<commit-ish>",
-            nargs="?",
-            doc="""search up to this commit for commands to re-execute.  If
-            --since is an empty string, re-execute the command from
-            this single commit.""",
+            doc="""re-run command(s) in REVISION.  By default, the
+            command from this commit will be executed, but the --since
+            option can be used to construct a revision range.""",
             default="HEAD",
             constraints=EnsureStr()),
+        since=Parameter(
+            args=("--since",),
+            nargs="?",
+            doc="""If SINCE is commit-ish, the commands from all
+            commits that are reachable from REVISION but not SINCE
+            will be re-executed.  In other words, the commands shown
+            in `git log SINCE..REVISION` are re-executed.  If SINCE is
+            an empty string, commands from all commits that are
+            reachable from REVISION are re-executed (i.e., the
+            commands in `git log REVISION`).""",
+            constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset from which to rerun a recorded command.
@@ -121,8 +121,8 @@ class Rerun(Interface):
     @datasetmethod(name='rerun')
     @eval_results
     def __call__(
+            revision="HEAD",
             since=None,
-            until="HEAD",
             dataset=None,
             branch=None,
             message=None,
@@ -161,12 +161,12 @@ class Rerun(Interface):
 
         root = False
         if since is None:
-            revrange = "{}^..{}".format(until, until)
+            revrange = "{}^..{}".format(revision, revision)
         elif since.strip() == "":
-            revrange = until
+            revrange = revision
             root = True
         else:
-            revrange = "{}..{}".format(since, until)
+            revrange = "{}..{}".format(since, revision)
 
         revs = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
 

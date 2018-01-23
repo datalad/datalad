@@ -123,7 +123,7 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.add("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(until="HEAD~")
+    ds.rerun(revision="HEAD~")
     eq_('xxx\n', open(probe_path).read())
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
@@ -151,7 +151,7 @@ def test_rerun_onto(path):
 
     # If we run the "static" change on top of itself, we end up in the
     # same (but detached) place.
-    ds.rerun(until="static", onto="static")
+    ds.rerun(revision="static", onto="static")
     ok_(ds.repo.get_active_branch() is None)
     eq_(ds.repo.repo.git.rev_parse("HEAD"),
         ds.repo.repo.git.rev_parse("static"))
@@ -159,7 +159,7 @@ def test_rerun_onto(path):
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
     ds.repo.checkout("master")
-    ds.rerun(until="static", onto="static^")
+    ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("static"))
@@ -186,14 +186,14 @@ def test_rerun_onto(path):
 
     ## An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
-    ds.rerun(since="", until="static", onto="", branch="orph")
+    ds.rerun(since="", revision="static", onto="", branch="orph")
     eq_(ds.repo.get_active_branch(), "orph")
     assert_result_count(ds.diff(revision="static..orph"), 0)
     assert_false(ds.repo.get_merge_base(["static", "orph"]))
     ## But it fails when no branch is given.
     ds.repo.checkout("master")
     assert_raises(IncompleteResultsError,
-                  ds.rerun, until="static", since="", onto="")
+                  ds.rerun, revision="static", since="", onto="")
 
 
 @ignore_nose_capturing_stdout
@@ -283,7 +283,7 @@ def test_rerun_outofdate_tree(path):
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
-    assert_raises(CommandError, ds.rerun, until="HEAD~")
+    assert_raises(CommandError, ds.rerun, revision="HEAD~")
 
 
 @ignore_nose_capturing_stdout
@@ -296,7 +296,7 @@ def test_rerun_ambiguous_revision_file(path):
     ds.run('echo ambig > ambig')
     ds.repo.repo.git.tag("ambig")
     ## Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(since="", until="ambig", branch="orph")
+    ds.rerun(since="", revision="ambig", branch="orph")
     eq_(len(ds.repo.repo.git.rev_list("orph").split()),
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
