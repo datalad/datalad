@@ -10,8 +10,10 @@
 """
 
 
-from datalad.tests.utils import known_failure_v6
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import (
+    known_failure_v6,
+    get_datasets_topdir
+)
 
 
 from os.path import join as opj
@@ -102,7 +104,7 @@ def test_clone_datasets_root(tdir):
     with chpwd(tdir):
         ds = clone("///", result_xfm='datasets', return_type='item-or-list')
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         res = clone("///", on_failure='ignore')
@@ -192,7 +194,7 @@ def test_clone_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl):
+    with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     ok_clean_git(path, annex=False)
@@ -337,4 +339,6 @@ def test_clone_report_permission_issue(tdir):
         assert_status('error', res)
         assert_result_count(
             res, 1, status='error',
-            message="could not create work tree dir '%s/datasets.datalad.org': Permission denied" % pdir)
+            message="could not create work tree dir '%s/%s': Permission denied"
+                    % (pdir, get_datasets_topdir())
+        )

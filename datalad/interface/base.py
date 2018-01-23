@@ -312,6 +312,11 @@ def build_doc(cls, **kwargs):
 class Interface(object):
     """Base class for interface implementations"""
 
+    # exit code to return if user-interrupted
+    # if None, would just reraise the Exception, so if in --dbg
+    # mode would fall into the debugger
+    _interrupted_exit_code = 1
+
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -428,7 +433,10 @@ class Interface(object):
             return ret
         except KeyboardInterrupt as exc:
             ui.error("\nInterrupted by user while doing magic: %s" % exc_str(exc))
-            sys.exit(1)
+            if cls._interrupted_exit_code is not None:
+                sys.exit(cls._interrupted_exit_code)
+            else:
+                raise
 
     @classmethod
     def get_refds_path(cls, dataset):

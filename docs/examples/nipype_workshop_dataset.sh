@@ -171,7 +171,7 @@ git annex whereis derivatives
 cd $SUPERDATASET
 # since in demo we do not have anything there, let's clone our superdataset
 datalad install ///
-cd datasets.datalad.org
+cd datasets*.datalad.org
 
 # -redone because now datasets.datalad.org already has workshops dataset
 # and datalad should refuse to create a new one (without removing old one first)

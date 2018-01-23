@@ -338,6 +338,8 @@ def main(args=None):
         if cmdlineargs.common_debug or cmdlineargs.common_idebug:
             # so we could see/stop clearly at the point of failure
             setup_exceptionhook(ipython=cmdlineargs.common_idebug)
+            from datalad.interface.base import Interface
+            Interface._interrupted_exit_code = None
             ret = cmdlineargs.func(cmdlineargs)
         else:
             # otherwise - guard and only log the summary. Postmortem is not
