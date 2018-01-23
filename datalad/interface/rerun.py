@@ -85,7 +85,8 @@ class Rerun(Interface):
             log SINCE..REVISION`). If SINCE is an empty string,
             commands from all commits that are reachable from REVISION
             are re-executed (i.e., the commands in `git log
-            REVISION`).""",
+            REVISION`). Currently, the range cannot include merge
+            commits.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -169,6 +170,11 @@ class Rerun(Interface):
         else:
             revrange = "{}..{}".format(since, revision)
 
+        if ds.repo.repo.git.rev_list("--merges", revrange, "--"):
+            yield get_status_dict(
+                "run", ds=ds, status="error",
+                message="cannot rerun history with merge commits")
+            return
         revs = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
 
         do_checkout = branch

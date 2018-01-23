@@ -131,6 +131,15 @@ def test_rerun(path, nodspath):
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
     eq_('xxxxxxxxxx\n', open(probe_path).read())
+    # If the history to rerun has a merge commit, we abort.
+    ds.repo.checkout("HEAD~3", options=["-b", "topic"])
+    with open(opj(path, "topic-file"), "w") as f:
+        f.write("topic")
+    ds.add("topic-file")
+    ds.repo.checkout("master")
+    ds.repo.merge("topic")
+    ok_clean_git(ds.path)
+    assert_raises(IncompleteResultsError, ds.rerun)
 
 
 @ignore_nose_capturing_stdout
