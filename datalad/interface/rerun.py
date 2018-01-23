@@ -50,36 +50,41 @@ class Rerun(Interface):
 
         Re-execute any commands in the last five commits.
 
-        $ datalad rerun HEAD~5..
+        $ datalad rerun --since=HEAD~5
 
         Do the same as above, but re-execute the commands on top of
         HEAD~5 in a detached state.
 
-        $ datalad rerun --onto= HEAD~5..
+        $ datalad rerun --onto= --since=HEAD~5
 
         Re-execute all previous commands and compare the old and new
         results.
 
         $ # on master branch
-        $ datalad rerun --root --branch=verify
+        $ datalad rerun --branch=verify --since=
         $ # now on verify branch
         $ datalad diff --revision=master..
         $ git log --oneline --left-right --cherry-pick master...
     """
     _params_ = dict(
-        revision=Parameter(
-            args=("revision",),
-            metavar="<revision or range>",
+        since=Parameter(
+            args=("--since",),
+            metavar="<commit-ish>",
             nargs="?",
-            doc="""re-run command(s) in this revision or range.
-            This argument can take one of two forms. The first is a
-            commit-ish that resolves to a single commit.  By default,
-            the command from this commit will be executed, but, if
-            --root is given, the commands from all commits that are
-            reachable from that commit (including itself) will be
-            executed. The second acceptable form is a revision range,
-            in which case all the commands that would be shown by `git
-            log <range>` are re-executed.""",
+            doc="""re-execute commands from commits after this revision that are
+            reachable from the commit specified by --until.  When not
+            given, only the command from the commit specified by
+            --until is re-executed.  When set to an empty string,
+            commands from commits that are reachable by --until's
+            commit are re-executed.""",
+            constraints=EnsureStr() | EnsureNone()),
+        until=Parameter(
+            args=("--until",),
+            metavar="<commit-ish>",
+            nargs="?",
+            doc="""search up to this commit for commands to re-execute.  If
+            --since is an empty string, re-execute the command from
+            this single commit.""",
             default="HEAD",
             constraints=EnsureStr()),
         dataset=Parameter(
@@ -104,18 +109,8 @@ class Rerun(Interface):
             an alternative start point, which will be checked out with
             the branch name specified with --branch or in a detached
             state otherwise.  As a special case, an empty value for
-            this option means to use the parent of the first commit
-            (e.g., 'a' for the range 'a..b' or 'a^' for the revision
-            'a') as the starting point.""",
+            this option means to use the commit specified by --since.""",
             constraints=EnsureStr() | EnsureNone()),
-        root=Parameter(
-            args=("--root",),
-            action="store_true",
-            doc="""rerun commands from all commits reachable from revision rather than
-            running only the command from the revision.  This flag is
-            incompatible with using a range for the revision the
-            argument. In other words, run all the commands that would
-            be shown by `git log <revision>`."""),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
@@ -126,12 +121,12 @@ class Rerun(Interface):
     @datasetmethod(name='rerun')
     @eval_results
     def __call__(
-            revision="HEAD",
+            since=None,
+            until="HEAD",
             dataset=None,
             branch=None,
             message=None,
-            onto=None,
-            root=False):
+            onto=None):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -164,30 +159,23 @@ class Rerun(Interface):
                 message="branch '{}' already exists".format(branch))
             return
 
-        try:
-            # Transform a single-commit revision into a range.  Don't
-            # rely on `".." in` for the range check because it's
-            # fragile (e.g., REV^- is a range).
-            ds.repo.repo.git.rev_parse("--verify", "--quiet",
-                                       revision + "^{commit}")
-            if not root:
-                revision = "{r}^..{r}".format(r=revision)
-        except GitCommandError:
-            # It's not a single commit.  Assume it's a range.
-            if root:
-                yield dict(
-                    err_info, status="error",
-                    message="--root is incompatible with revision range")
-                return
+        root = False
+        if since is None:
+            revrange = "{}^..{}".format(until, until)
+        elif since.strip() == "":
+            revrange = until
+            root = True
+        else:
+            revrange = "{}..{}".format(since, until)
 
-        revs = ds.repo.repo.git.rev_list("--reverse", revision, "--").split()
+        revs = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
 
         do_checkout = branch
         if onto is not None:
             if onto.strip() == "":
                 ## An empty argument means go to the parent of the
-                ## first revision, but that doesn't exist for --root.
-                ## Instead check out an orphan branch.
+                ## first revision, but that doesn't exist for
+                ## --since=.  Instead check out an orphan branch.
                 if root and branch:
                     ds.repo.checkout(branch, options=["--orphan"])
                     # Make sure we are actually on an orphan branch

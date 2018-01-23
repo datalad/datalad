@@ -123,17 +123,14 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.add("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(revision="HEAD~")
+    ds.rerun(until="HEAD~")
     eq_('xxx\n', open(probe_path).read())
     # Or a range of commits, skipping non-run commits.
-    ds.rerun(revision="HEAD~3..")
+    ds.rerun(since="HEAD~3")
     eq_('xxxxx\n', open(probe_path).read())
-    # Or --root and a revision to run all reachable commits.
-    ds.rerun(revision="HEAD", root=True)
+    # Or --since= to run all reachable commits.
+    ds.rerun(since="")
     eq_('xxxxxxxxxx\n', open(probe_path).read())
-    # But a revision range with --root will fail.
-    assert_raises(IncompleteResultsError,
-                  ds.rerun, revision="HEAD~3..", root=True)
 
 
 @ignore_nose_capturing_stdout
@@ -154,7 +151,7 @@ def test_rerun_onto(path):
 
     # If we run the "static" change on top of itself, we end up in the
     # same (but detached) place.
-    ds.rerun(revision="static", onto="static")
+    ds.rerun(until="static", onto="static")
     ok_(ds.repo.get_active_branch() is None)
     eq_(ds.repo.repo.git.rev_parse("HEAD"),
         ds.repo.repo.git.rev_parse("static"))
@@ -162,7 +159,7 @@ def test_rerun_onto(path):
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
     ds.repo.checkout("master")
-    ds.rerun(revision="static", onto="static^")
+    ds.rerun(until="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("static"))
@@ -174,14 +171,14 @@ def test_rerun_onto(path):
     # Unlike the static change, if we run the ever-growing change on
     # top of itself, we end up with a new commit.
     ds.repo.checkout("master")
-    ds.rerun(revision="HEAD", onto="HEAD")
+    ds.rerun(onto="HEAD")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.repo.git.rev_parse("HEAD"),
          ds.repo.repo.git.rev_parse("master"))
 
     ## An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
-    ds.rerun(revision="static^..", onto="")
+    ds.rerun(since="static^", onto="")
     ok_(ds.repo.get_active_branch() is None)
     for revrange in ["..master", "master.."]:
         assert_result_count(
@@ -189,14 +186,14 @@ def test_rerun_onto(path):
 
     ## An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
-    ds.rerun(revision="static", root=True, onto="", branch="orph")
+    ds.rerun(since="", until="static", onto="", branch="orph")
     eq_(ds.repo.get_active_branch(), "orph")
     assert_result_count(ds.diff(revision="static..orph"), 0)
     assert_false(ds.repo.get_merge_base(["static", "orph"]))
     ## But it fails when no branch is given.
     ds.repo.checkout("master")
     assert_raises(IncompleteResultsError,
-                  ds.rerun, revision="static", root=True, onto="")
+                  ds.rerun, until="static", since="", onto="")
 
 
 @ignore_nose_capturing_stdout
@@ -220,7 +217,7 @@ def test_rerun_branch(path):
 
     # Rerun the commands on a new branch that starts at the parent
     # commit of the first run.
-    ds.rerun(revision="prerun..", onto="prerun", branch="rerun")
+    ds.rerun(since="prerun", onto="prerun", branch="rerun")
 
     eq_(ds.repo.get_active_branch(), "rerun")
     eq_('xx\n', open(outfile).read())
@@ -233,7 +230,7 @@ def test_rerun_branch(path):
 
     # Start rerun branch at tip of current branch.
     ds.repo.checkout("master")
-    ds.rerun(revision="prerun..", branch="rerun2")
+    ds.rerun(since="prerun", branch="rerun2")
     eq_(ds.repo.get_active_branch(), "rerun2")
     eq_('xxxx\n', open(outfile).read())
 
@@ -245,7 +242,7 @@ def test_rerun_branch(path):
     # Using an existing branch name fails.
     ds.repo.checkout("master")
     assert_raises(IncompleteResultsError,
-                  ds.rerun, revision="prerun..", branch="rerun2")
+                  ds.rerun, since="prerun", branch="rerun2")
 
 
 @ignore_nose_capturing_stdout
@@ -263,7 +260,7 @@ def test_rerun_cherry_pick(path):
     ds.add("nonrun-file")
 
     for onto, text in [("HEAD", "skipping"), ("prerun", "cherry picking")]:
-        results = ds.rerun(revision="prerun..", onto=onto)
+        results = ds.rerun(since="prerun", onto=onto)
         assert_in_results(results, status='ok', path=ds.path)
         assert any(r.get("message", "").endswith(text) for r in results)
 
@@ -286,7 +283,7 @@ def test_rerun_outofdate_tree(path):
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
-    assert_raises(CommandError, ds.rerun, revision="HEAD~")
+    assert_raises(CommandError, ds.rerun, until="HEAD~")
 
 
 @ignore_nose_capturing_stdout
@@ -299,7 +296,7 @@ def test_rerun_ambiguous_revision_file(path):
     ds.run('echo ambig > ambig')
     ds.repo.repo.git.tag("ambig")
     ## Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(revision="ambig", root=True, branch="orph")
+    ds.rerun(since="", until="ambig", branch="orph")
     eq_(len(ds.repo.repo.git.rev_list("orph").split()),
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
