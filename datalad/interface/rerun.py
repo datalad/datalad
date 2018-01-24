@@ -303,3 +303,11 @@ def new_or_modified(dataset, revision="HEAD"):
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r
+
+
+def commit_exists(dataset, commit):
+    try:
+        dataset.repo.repo.git.rev_parse("--verify", commit + "^{commit}")
+    except:
+        return False
+    return True
