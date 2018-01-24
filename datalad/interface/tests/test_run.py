@@ -384,3 +384,46 @@ def test_new_or_modified(path):
     assert_false(list(apfiles(new_or_modified(ds, "HEAD"))))
     eq_(set(apfiles(new_or_modified(ds, "HEAD~"))),
         {"to_modify", "d/to_modify"})
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_commit_message_check(path):
+    ds = Dataset(path).create()
+    ds.repo.commit(options=["--allow-empty"], msg="""\
+[DATALAD RUNCMD] no command
+
+=== Do not change lines below ===
+{
+ "pwd": ".",
+ "exit": 0
+}
+^^^ Do not change lines above ^^^""")
+
+    ds.repo.commit(options=["--allow-empty"], msg="""\
+[DATALAD RUNCMD] junk json
+
+=== Do not change lines below ===
+{
+ "pwd": ".,
+ "cmd": "echo ok >okfile",
+ "exit": 0
+}
+^^^ Do not change lines above ^^^""")
+
+    ds.repo.commit(options=["--allow-empty"], msg="""\
+[DATALAD RUNCMD] fine
+
+=== Do not change lines below ===
+{
+ "pwd": ".",
+ "cmd": "echo ok >okfile",
+ "exit": 0
+}
+^^^ Do not change lines above ^^^""")
+
+    assert_raises(ValueError,
+                  get_commit_runinfo, ds.repo, "HEAD~2")
+    assert_raises(ValueError,
+                  get_commit_runinfo, ds.repo, "HEAD~")
+
+    get_commit_runinfo(ds.repo, "HEAD")
