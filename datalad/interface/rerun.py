@@ -167,8 +167,12 @@ class Rerun(Interface):
                 message="branch '{}' already exists".format(branch))
             return
 
-        if since is None:
-            revrange = "{}^..{}".format(revision, revision)
+        if not commit_exists(ds, revision + "^"):
+            # Only a single commit is reachable from `revision`.  In
+            # this case, --since has no effect on the range construction.
+            revrange = revision
+        elif since is None:
+            revrange = "{rev}^..{rev}".format(rev=revision)
         elif since.strip() == "":
             revrange = revision
         else:

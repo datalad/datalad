@@ -234,6 +234,29 @@ def test_rerun_chain(path):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_rerun_just_one_commit(path):
+    ds = Dataset(path).create()
+
+    # Check out an orphan branch so that we can test the "one commit
+    # in a repo" case.
+    ds.repo.checkout("orph", options=["--orphan"])
+    ds.repo.repo.git.reset("--hard")
+
+    ds.run('echo static-content > static')
+    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+
+    # Rerunning with just one commit doesn't raise an error ...
+    ds.rerun()
+    # ... but we're still at one commit because the content didn't
+    # change.
+    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_rerun_branch(path):
     ds = Dataset(path).create()
 
