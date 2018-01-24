@@ -135,7 +135,10 @@ class AutomagicIO(object):
                         lgr.debug("No name/file was given, avoiding proxying")
                         raise _EarlyExit
                     file = kwargs.get(filearg)
-
+                if isinstance(file, int):
+                    lgr.debug(
+                        "Skipping operation on %i, already a file descriptor", file)
+                    raise _EarlyExit
                 mode = 'r'
                 if len(args) > 1:
                     mode = args[1]
@@ -178,7 +181,7 @@ class AutomagicIO(object):
         # For now, as long as it is a symlink pointing to under .git/annex
         if exists(path):
             return True
-        return lexists(path) and 'annex/objects' in realpath(path)
+        return lexists(path) and 'annex/objects' in str(realpath(path))
 
     def _proxy_isfile(self, path):
         return self._proxy_open_name_mode(
@@ -221,11 +224,14 @@ class AutomagicIO(object):
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
-            lgr.info("File %s has no content -- retrieving", filepath)
+            lgr.info("AutomagicIO: retrieving file content of %s", filepath)
             annex.get(filepath)
 
     def activate(self):
-        lgr.info("Activating DataLad's AutoMagicIO")
+        # we should stay below info for this message. With PR #1630 we
+        # start to use this functionality internally, and this will show
+        # up frequently even in cases where it does nothing at all
+        lgr.debug("Activating DataLad's AutoMagicIO")
         # Some beasts (e.g. tornado used by IPython) override outputs, and
         # provide fileno which throws exception.  In such cases we should not log online
         self._log_online = hasattr(sys.stdout, 'fileno') and hasattr(sys.stderr, 'fileno')
@@ -236,7 +242,11 @@ class AutomagicIO(object):
         except:  # MIH: IOError?
             self._log_online = False
         if self.active:
-            lgr.warning("%s already active. No action taken" % self)
+            # this is not a warning, because there is nothing going
+            # wrong or being undesired. Nested invokation could happen
+            # caused by independent pieces of code, e.g. user code
+            # that invokes our own metadata handling.
+            lgr.debug("%s already active. No action taken" % self)
             return
         # overloads
         __builtin__.open = self._proxy_open
@@ -250,7 +260,8 @@ class AutomagicIO(object):
         self._active = True
 
     def deactivate(self):
-        lgr.info("Deactivating DataLad's AutoMagicIO")
+        # just debug level -- see activate()
+        lgr.debug("Deactivating DataLad's AutoMagicIO")
         if not self.active:
             lgr.warning("%s is not active, can't deactivate" % self)
             return
