@@ -272,9 +272,8 @@ def get_commit_runinfo(repo, commit="HEAD"):
         )
     if 'cmd' not in runinfo:
         raise ValueError(
-            'cannot rerun command, command specification missing in '
-            'recorded state'
-        )
+            "{} looks like a run commit but does not have a command".format(
+                repo.repo.git.rev_parse("--short", commit)))
     return rec_msg, runinfo
 
 
