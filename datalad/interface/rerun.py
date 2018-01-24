@@ -21,7 +21,6 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
-from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
@@ -104,7 +103,13 @@ class Rerun(Interface):
             empty value for this option means to use the commit
             specified by --since.""",
             constraints=EnsureStr() | EnsureNone()),
-        message=save_message_opt,
+        message=Parameter(
+            args=("-m", "--message",),
+            metavar="MESSAGE",
+            doc="""use MESSAGE for the reran commit rather than the
+            recorded commit message.  In the case of a multi-commit
+            rerun, all the reran commits will have this message.""",
+            constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset from which to rerun a recorded
