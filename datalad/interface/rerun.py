@@ -210,6 +210,15 @@ class Rerun(Interface):
             # --since is specified, the effective value for --since is
             # the parent of the first revision.
             onto = revs[0].id + "^"
+            if not commit_exists(ds, onto):
+                # This is unlikely to happen in the wild because it
+                # means that the first commit is a datalad run commit.
+                # Just abort rather than trying to checkout on orphan
+                # branch or something like that.
+                yield get_status_dict(
+                    "run", ds=ds, status="error",
+                    message="Commit for --onto does not exist.")
+                return
 
         if branch or onto:
             start_point = onto or "HEAD"

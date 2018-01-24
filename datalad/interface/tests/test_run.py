@@ -252,6 +252,12 @@ def test_rerun_just_one_commit(path):
     # change.
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
 
+    # We abort rather than trying to do anything when --onto='' and
+    # --since='' are given together and the first commit contains a
+    # run command.
+    ds.repo.commit(msg="empty", options=["--allow-empty"])
+    assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
+
 
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
