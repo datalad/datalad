@@ -296,8 +296,16 @@ def new_or_modified(dataset, revision="HEAD"):
     -------
     Generator that yields AnnotatePaths instances
     """
+    if commit_exists(dataset, revision + "^"):
+        revrange = "{rev}^..{rev}".format(rev=revision)
+    else:
+        # No other commits are reachable from this revision.  Diff
+        # with an empty tree instead.
+        #             git hash-object -t tree /dev/null
+        empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+        revrange = "{}..{}".format(empty_tree, revision)
     diff = dataset.diff(recursive=True,
-                        revision="{rev}^..{rev}".format(rev=revision),
+                        revision=revrange,
                         return_type='generator', result_renderer=None)
     for r in diff:
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:

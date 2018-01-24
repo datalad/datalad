@@ -379,8 +379,15 @@ def test_new_or_modified(path):
             yield relpath(ap["path"], path)
 
     ds = Dataset(path).create(force=True, no_annex=True)
+
+    # Check out an orphan branch so that we can test the "one commit
+    # in a repo" case.
+    ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.add(".", commit=True)
     assert_false(ds.repo.dirty)
+    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+    # Diffing doesn't fail when the branch contains a single commit.
+    assert_in("to_modify", apfiles(new_or_modified(ds, "HEAD")))
 
     # New files are detected, deletions are not.
     ds.repo.remove(["to_remove"])
