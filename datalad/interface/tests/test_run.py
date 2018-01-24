@@ -209,6 +209,30 @@ def test_rerun_onto(path):
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_rerun_chain(path):
+    ds = Dataset(path).create()
+    commits = []
+
+    grow_file = opj(path, "grows")
+    ds.run('echo x$(cat grows) > grows')
+    ds.repo.repo.git.tag("first-run")
+
+    for _ in range(3):
+        commits.append(ds.repo.get_hexsha())
+        ds.rerun()
+        _, info = get_commit_runinfo(ds.repo, "HEAD")
+        assert info["chain"] == commits
+
+    ds.rerun(revision="first-run")
+    _, info = get_commit_runinfo(ds.repo, "HEAD")
+    assert info["chain"] == commits[:1]
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_rerun_branch(path):
     ds = Dataset(path).create()
 

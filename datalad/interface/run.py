@@ -180,6 +180,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
     run_info = {
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
+        'chain': rerun_info["chain"] if rerun_info else [],
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information

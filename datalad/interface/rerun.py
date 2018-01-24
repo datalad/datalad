@@ -233,6 +233,12 @@ class Rerun(Interface):
                     ds.repo.repo.git.cherry_pick(rev)
                 continue
 
+            # Keep a "rerun" trail.
+            if "chain" in runinfo:
+                runinfo["chain"].append(rev)
+            else:
+                runinfo["chain"] = [rev]
+
             # now we have to find out what was modified during the
             # last run, and enable re-modification ideally, we would
             # bring back the entire state of the tree with #1424, but
