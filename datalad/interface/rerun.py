@@ -15,6 +15,7 @@ import logging
 import json
 import re
 
+from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -267,7 +268,7 @@ def get_commit_runinfo(repo, commit="HEAD"):
     except Exception as e:
         raise ValueError(
             'cannot rerun command, command specification is not valid JSON: '
-            '%s' % str(e)
+            '%s' % exc_str(e)
         )
     if 'cmd' not in runinfo:
         raise ValueError(
