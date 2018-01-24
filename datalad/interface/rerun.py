@@ -78,7 +78,6 @@ class Rerun(Interface):
             constraints=EnsureStr()),
         since=Parameter(
             args=("--since",),
-            nargs="?",
             doc="""If SINCE is a commit-ish, the commands from all
             commits that are reachable from REVISION but not SINCE
             will be re-executed (in other words, the commands in `git
