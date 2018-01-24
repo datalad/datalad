@@ -87,15 +87,6 @@ class Rerun(Interface):
             REVISION`). Currently, the range cannot include merge
             commits.""",
             constraints=EnsureStr() | EnsureNone()),
-        dataset=Parameter(
-            args=("-d", "--dataset"),
-            doc="""specify the dataset from which to rerun a recorded
-            command. If no dataset is given, an attempt is made to
-            identify the dataset based on the current working
-            directory. If a dataset is given, the command will be
-            executed in the root directory of this dataset.""",
-            constraints=EnsureDataset() | EnsureNone()),
-        message=save_message_opt,
         branch=Parameter(
             metavar="NAME",
             args=("-b", "--branch",),
@@ -112,6 +103,15 @@ class Rerun(Interface):
             empty value for this option means to use the commit
             specified by --since.""",
             constraints=EnsureStr() | EnsureNone()),
+        message=save_message_opt,
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc="""specify the dataset from which to rerun a recorded
+            command. If no dataset is given, an attempt is made to
+            identify the dataset based on the current working
+            directory. If a dataset is given, the command will be
+            executed in the root directory of this dataset.""",
+            constraints=EnsureDataset() | EnsureNone()),
         # TODO
         # --list-commands
         #   go through the history and report any recorded command. this info
