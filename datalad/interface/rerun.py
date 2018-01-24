@@ -12,7 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from functools import partial
+from collections import namedtuple
 from itertools import dropwhile
 import json
 import re
@@ -180,10 +180,16 @@ class Rerun(Interface):
                 message="cannot rerun history with merge commits")
             return
 
-        revs = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
-        info_fn = partial(get_commit_runinfo, ds.repo)
+        Revision = namedtuple("Revision", ["id", "message", "info"])
+
+        def revision_with_info(rev):
+            msg, info = get_commit_runinfo(ds.repo, rev)
+            return Revision(rev, msg, info)
+
+        ids = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+
         try:
-            rev_infos = list(zip(revs, map(info_fn, revs)))
+            revs = list(map(revision_with_info, ids))
         except ValueError as exc:
             yield dict(err_info, status='error', message=exc_str(exc))
             return
@@ -191,7 +197,7 @@ class Rerun(Interface):
         if since is not None and since.strip() == "":
             # For --since='', drop any leading commits that don't have
             # a run command.
-            rev_infos = list(dropwhile(lambda x: x[1][1] is None, rev_infos))
+            revs = list(dropwhile(lambda r: r.info is None, revs))
 
         if onto is not None and onto.strip() == "":
             # Special case: --onto='' is the value of --since.
@@ -199,7 +205,7 @@ class Rerun(Interface):
             # contains merges, we know that, regardless of if and how
             # --since is specified, the effective value for --since is
             # the parent of the first revision.
-            onto = rev_infos[0][0] + "^"
+            onto = revs[0].id + "^"
 
         if branch or onto:
             start_point = onto or "HEAD"
@@ -209,41 +215,41 @@ class Rerun(Interface):
                 checkout_options = ["--detach"]
             ds.repo.checkout(start_point, options=checkout_options)
 
-        for rev, (rec_msg, runinfo) in rev_infos:
-            if not runinfo:
+        for rev in revs:
+            if not rev.info:
                 pick = False
                 try:
-                    ds.repo.repo.git.merge_base("--is-ancestor", rev, "HEAD")
+                    ds.repo.repo.git.merge_base("--is-ancestor", rev.id, "HEAD")
                 except GitCommandError:  # Revision is NOT an ancestor of HEAD.
                     pick = True
 
-                shortrev = ds.repo.repo.git.rev_parse("--short", rev)
+                shortrev = ds.repo.repo.git.rev_parse("--short", rev.id)
                 err_msg = "no command for {} found; {}".format(
                     shortrev,
                     "cherry picking" if pick else "skipping")
                 yield dict(err_info, status='ok', message=err_msg)
 
                 if pick:
-                    ds.repo.repo.git.cherry_pick(rev)
+                    ds.repo.repo.git.cherry_pick(rev.id)
                 continue
 
             # Keep a "rerun" trail.
-            if "chain" in runinfo:
-                runinfo["chain"].append(rev)
+            if "chain" in rev.info:
+                rev.info["chain"].append(rev.id)
             else:
-                runinfo["chain"] = [rev]
+                rev.info["chain"] = [rev.id]
 
             # now we have to find out what was modified during the
             # last run, and enable re-modification ideally, we would
             # bring back the entire state of the tree with #1424, but
             # we limit ourself to file addition/not-in-place-modification
             # for now
-            for r in ds.unlock(new_or_modified(ds, rev),
+            for r in ds.unlock(new_or_modified(ds, rev.id),
                                return_type='generator', result_xfm=None):
                 yield r
 
-            for r in run_command(runinfo['cmd'], ds, message or rec_msg,
-                                 rerun_info=runinfo):
+            for r in run_command(rev.info['cmd'], ds, message or rev.message,
+                                 rerun_info=rev.info):
                 yield r
 
 
