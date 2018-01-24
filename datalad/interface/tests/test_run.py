@@ -123,8 +123,11 @@ def test_rerun(path, nodspath):
         f.write("foo")
     ds.add("nonrun-file")
     # Now rerun the buried command.
-    ds.rerun(revision="HEAD~")
+    ds.rerun(revision="HEAD~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
+    # Also check that the messasge override worked.
+    eq_(ds.repo.repo.head.commit.message.splitlines()[0],
+        "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
     eq_('xxxxx\n', open(probe_path).read())

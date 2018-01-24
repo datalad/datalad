@@ -248,7 +248,7 @@ class Rerun(Interface):
                                return_type='generator', result_xfm=None):
                 yield r
 
-            for r in run_command(runinfo['cmd'], ds, rec_msg or message,
+            for r in run_command(runinfo['cmd'], ds, message or rec_msg,
                                  rerun_info=runinfo):
                 yield r
 
