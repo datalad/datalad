@@ -180,9 +180,9 @@ class Rerun(Interface):
         do_checkout = branch
         if onto is not None:
             if onto.strip() == "":
-                ## An empty argument means go to the parent of the
-                ## first revision, but that doesn't exist for
-                ## --since=.  Instead check out an orphan branch.
+                # An empty argument means go to the parent of the
+                # first revision, but that doesn't exist for --since=.
+                # Instead check out an orphan branch.
                 if root and branch:
                     ds.repo.checkout(branch, options=["--orphan"])
                     # Make sure we are actually on an orphan branch
