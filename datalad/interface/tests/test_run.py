@@ -196,16 +196,14 @@ def test_rerun_onto(path):
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 3)
 
-    # An empty `onto` means use the parent of the first revision.
+    # An empty `onto` means use the parent of the first revision that
+    # has a run command.
     ds.repo.checkout("master")
-    ds.rerun(since="", revision="static", onto="", branch="orph")
-    eq_(ds.repo.get_active_branch(), "orph")
-    assert_result_count(ds.diff(revision="static..orph"), 0)
-    assert_false(ds.repo.get_merge_base(["static", "orph"]))
-    # But it fails when no branch is given.
-    ds.repo.checkout("master")
-    assert_raises(IncompleteResultsError,
-                  ds.rerun, revision="static", since="", onto="")
+    ds.rerun(since="", onto="", branch="from-base")
+    eq_(ds.repo.get_active_branch(), "from-base")
+    assert_result_count(ds.diff(revision="master..from-base"), 0)
+    eq_(ds.repo.get_merge_base(["static", "from-base"]),
+        ds.repo.repo.git.rev_parse("static^"))
 
 
 @ignore_nose_capturing_stdout
@@ -332,8 +330,8 @@ def test_rerun_ambiguous_revision_file(path):
     ds.run('echo ambig > ambig')
     ds.repo.repo.git.tag("ambig")
     # Don't fail when "ambig" refers to both a file and revision.
-    ds.rerun(since="", revision="ambig", branch="orph")
-    eq_(len(ds.repo.repo.git.rev_list("orph").split()),
+    ds.rerun(since="", revision="ambig", branch="rerun")
+    eq_(len(ds.repo.repo.git.rev_list("rerun").split()),
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
 

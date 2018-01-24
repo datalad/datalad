@@ -12,6 +12,8 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+from functools import partial
+from itertools import dropwhile
 import json
 import re
 
@@ -81,11 +83,10 @@ class Rerun(Interface):
             doc="""If SINCE is a commit-ish, the commands from all
             commits that are reachable from REVISION but not SINCE
             will be re-executed (in other words, the commands in `git
-            log SINCE..REVISION`). If SINCE is an empty string,
-            commands from all commits that are reachable from REVISION
-            are re-executed (i.e., the commands in `git log
-            REVISION`). Currently, the range cannot include merge
-            commits.""",
+            log SINCE..REVISION`). If SINCE is an empty string, it is
+            set to the parent of the first commit that contains a
+            recorded command (i.e., all commands in `git log REVISION`
+            will be re-executed).""",
             constraints=EnsureStr() | EnsureNone()),
         branch=Parameter(
             metavar="NAME",
@@ -166,12 +167,10 @@ class Rerun(Interface):
                 message="branch '{}' already exists".format(branch))
             return
 
-        root = False
         if since is None:
             revrange = "{}^..{}".format(revision, revision)
         elif since.strip() == "":
             revrange = revision
-            root = True
         else:
             revrange = "{}..{}".format(since, revision)
 
@@ -180,47 +179,37 @@ class Rerun(Interface):
                 "run", ds=ds, status="error",
                 message="cannot rerun history with merge commits")
             return
+
         revs = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+        info_fn = partial(get_commit_runinfo, ds.repo)
+        try:
+            rev_infos = list(zip(revs, map(info_fn, revs)))
+        except ValueError as exc:
+            yield dict(err_info, status='error', message=exc_str(exc))
+            return
 
-        do_checkout = branch
-        if onto is not None:
-            if onto.strip() == "":
-                # An empty argument means go to the parent of the
-                # first revision, but that doesn't exist for --since=.
-                # Instead check out an orphan branch.
-                if root and branch:
-                    ds.repo.checkout(branch, options=["--orphan"])
-                    # Make sure we are actually on an orphan branch
-                    # before doing a hard reset.
-                    if ds.repo.get_hexsha():
-                        yield dict(
-                            err_info, status="error",
-                            message="failed to create orphan branch")
-                        return
-                    ds.repo.repo.git.reset("--hard")
-                    do_checkout = False
-                elif root:
-                    yield dict(
-                        err_info, status="error",
-                        message="branch name is required for orphan")
-                    return
-                else:
-                    ds.repo.checkout(revs[0] + "^", options=["--detach"])
+        if since is not None and since.strip() == "":
+            # For --since='', drop any leading commits that don't have
+            # a run command.
+            rev_infos = list(dropwhile(lambda x: x[1][1] is None, rev_infos))
+
+        if onto is not None and onto.strip() == "":
+            # Special case: --onto='' is the value of --since.
+            # Because we're currently aborting if the revision list
+            # contains merges, we know that, regardless of if and how
+            # --since is specified, the effective value for --since is
+            # the parent of the first revision.
+            onto = rev_infos[0][0] + "^"
+
+        if branch or onto:
+            start_point = onto or "HEAD"
+            if branch:
+                checkout_options = ["-b", branch]
             else:
-                ds.repo.checkout(onto, options=["--detach"])
-        if do_checkout:
-            ds.repo.checkout("HEAD", ["-b", branch])
+                checkout_options = ["--detach"]
+            ds.repo.checkout(start_point, options=checkout_options)
 
-        for rev in revs:
-            # pull run info out of the revision's commit message
-            try:
-                rec_msg, runinfo = get_commit_runinfo(ds.repo, rev)
-            except ValueError as exc:
-                yield dict(
-                    err_info, status='error',
-                    message=str(exc)
-                )
-                return
+        for rev, (rec_msg, runinfo) in rev_infos:
             if not runinfo:
                 pick = False
                 try:
