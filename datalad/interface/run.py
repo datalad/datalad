@@ -73,7 +73,7 @@ class Run(Interface):
             args=('--rerun',),
             action='store_true',
             doc="""re-run the command recorded in the last saved change (if any).
-            Note: This option is deprecated since version 0.10 and
+            Note: This option is deprecated since version 0.9.2 and
             will be removed in a later release. Use `datalad rerun`
             instead."""),
     )
@@ -89,7 +89,7 @@ class Run(Interface):
         if rerun:
             if cmd:
                 lgr.warning("Ignoring provided command in --rerun mode")
-            lgr.warning("The --rerun option is deprecated since version 0.10. "
+            lgr.warning("The --rerun option is deprecated since version 0.9.2. "
                         "Use `datalad rerun` instead.")
             from datalad.interface.rerun import Rerun
             for r in Rerun.__call__(dataset=dataset, message=message):
