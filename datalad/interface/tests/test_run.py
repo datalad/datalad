@@ -242,6 +242,23 @@ def test_rerun_chain(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
+def test_rerun_old_flag_compatibility(path):
+    ds = Dataset(path).create()
+    ds.run("echo x$(cat grows) > grows")
+    # Deprecated `datalad --rerun` still runs the last commit's
+    # command.
+    ds.run(rerun=True)
+    eq_("xx\n", open(opj(path, "grows")).read())
+    # Running with --rerun and a command ignores the command.
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run(rerun=True, cmd="ignored")
+        assert_in("Ignoring provided command in --rerun mode", cml.out)
+        eq_("xxx\n", open(opj(path, "grows")).read())
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
