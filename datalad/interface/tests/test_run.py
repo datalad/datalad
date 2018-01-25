@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+
 from datalad.tests.utils import (
     known_failure_direct_mode,
     known_failure_v6,
@@ -43,6 +45,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import swallow_logs
 
 
 @with_tempfile(mkdir=True)
@@ -93,6 +96,12 @@ def test_basics(path, nodspath):
         res = ds.run(['touch', 'empty2'], message='TEST')
         assert_status('ok', res)
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
+
+    # running without a command is a noop
+    with chpwd(path):
+        with swallow_logs(new_level=logging.WARN) as cml:
+            ds.run()
+            assert_in("No command given", cml.out)
 
 
 @ignore_nose_capturing_stdout

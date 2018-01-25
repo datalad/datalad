@@ -75,11 +75,14 @@ class Run(Interface):
     @datasetmethod(name='run')
     @eval_results
     def __call__(
-            cmd,
+            cmd=None,
             dataset=None,
             message=None):
-        for r in run_command(cmd, dataset, message):
-            yield r
+        if cmd:
+            for r in run_command(cmd, dataset, message):
+                yield r
+        else:
+            lgr.warning("No command given")
 
 
 # This helper function is used to add the rerun_info argument.
