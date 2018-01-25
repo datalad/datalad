@@ -543,6 +543,17 @@ class GitRunner(Runner):
         """
         if GitRunner._GIT_PATH is None:
             from distutils.spawn import find_executable
+            # with all the nesting of config and this runner, cannot use our
+            # cfg here, so will resort to dark magic of environment options
+            if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
+                    in ('1', 'on', 'true', 'yes')):
+                git_fpath = find_executable("git")
+                if git_fpath:
+                    GitRunner._GIT_PATH = ''
+                    lgr.log(9, "Will use default git %s", git_fpath)
+                    return  # we are done - there is a default git avail.
+                # if not -- we will look for a bundled one
+
             annex_fpath = find_executable("git-annex")
             if not annex_fpath:
                 # not sure how to live further anyways! ;)

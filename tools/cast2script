@@ -21,17 +21,17 @@ function execute () {
 function say()
 {
 	printf "\n"
-	printf "# $1\n" | fmt -w 72 --prefix '# '
+	printf "# %s\n" "$1" | fmt -w 72 --prefix '# '
 }
 function show () {
 	# same as say
-	printf "# $1\n" | fmt -w 72 --prefix '# '
+	printf "# %s\n" "$1" | fmt -w 72 --prefix '# '
 }
 function run () {
-	printf "$1\n"
+        printf "%s\n" "$1"
 }
 function run_expfail () {
-	printf "$1 || true\n"
+	printf "%s || true\n" "$1"
 }
 
 
