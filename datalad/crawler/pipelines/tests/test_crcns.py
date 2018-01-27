@@ -15,7 +15,7 @@ from ..crcns import get_metadata
 
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import ok_startswith
-from datalad.support.exceptions import AccessFailedError
+from datalad.support.exceptions import AccessFailedError, AccessDeniedError
 
 
 def test_smoke_pipelines():
@@ -42,3 +42,5 @@ def test_get_metadata():
         if str(e).startswith('Access to https://search.datacite.org') and \
                 str(e).endswith('has failed: status code 502'):
             raise SkipTest("Probably datacite.org blocked us once again")
+    except AccessDeniedError:
+        raise SkipTest("datacite denied us and we asked, but waiting for an answer")
