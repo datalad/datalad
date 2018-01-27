@@ -370,10 +370,26 @@ def query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
                 to_query.extend(matching_subds)
 
             for qds, qpath in to_query:
+                # info about the dataset that contains the query path
+                dsinfo = agginfos.get(qds, dict(id=ds.id))
+                res_tmpl = get_status_dict()
+                for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
+                    if s in dsinfo:
+                        res_tmpl[d] = dsinfo[s]
+
+                # pull up dataset metadata, always needed if only for the context
+                dsmeta = {}
+                dsobjloc = dsinfo.get('dataset_info', None)
+                if dsobjloc is not None:
+                    dsmeta = _load_json_object(
+                        opj(agg_base_path, dsobjloc),
+                        cache=cache['objcache'])
+
                 for r in _query_aggregated_metadata_singlepath(
                         ds, agginfos, agg_base_path, qpath, qds, reporton,
-                        cache, merge_mode):
-                    r.update(kwargs)
+                        cache, dsmeta,
+                        dsinfo.get('content_info', None)):
+                    r.update(res_tmpl, **kwargs)
                     # if we are coming from `search` we want to record why this is being
                     # reported
                     if 'query_matched' in ap:
@@ -385,48 +401,21 @@ def query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
 
 
 def _query_aggregated_metadata_singlepath(
-        ds, agginfos, agg_base_path, rpath, containing_ds, reporton, cache, merge_mode):
+        ds, agginfos, agg_base_path, rpath, containing_ds, reporton, cache, dsmeta,
+        contentinfo_objloc):
     """This is the workhorse of query_aggregated_metadata() for querying for a
     single path"""
-    # info about the dataset that contains the query path
-    dsinfo = agginfos.get(containing_ds, dict(id=ds.id))
-
-    metadata = MetadataDict()
-
     if (rpath == curdir or rpath == containing_ds) and reporton in ('datasets', 'all'):
         # this is a direct match for a dataset (we only have agginfos for
         # datasets) -> prep result
         res = get_status_dict(
+            status='ok',
+            metadata=dsmeta,
             # normpath to avoid trailing dot
             path=normpath(opj(ds.path, rpath)),
-            type='dataset',
-            metadata=metadata)
-        for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
-            if s in dsinfo:
-                res[d] = dsinfo[s]
-        # and now blend with any previously aggregated metadata
-        objloc = dsinfo.get('dataset_info', None)
-        if objloc is not None:
-            obj_path = opj(agg_base_path, objloc)
-            # TODO get annexed obj file
-            #ds.get(path=[obj_path], result_renderer=None)
-            obj = _load_json_object(
-                obj_path,
-                cache=cache['objcache'])
-            # must pull out old context before the merge to avoid
-            # dtype mangling of the context dict
-            context = metadata.get('@context', {})
-            getattr(metadata, 'merge_{}'.format(merge_mode))(obj)
-            _merge_context(ds, context, obj.get('@context', {}))
-            if context:
-                metadata['@context'] = context
-
+            type='dataset')
         # all info on the dataset is gathered -> eject
-        res['status'] = 'ok'
         yield res
-        if reporton == 'datasets':
-            # we had a direct match on a dataset for this path, we are done
-            return
 
     if reporton not in ('files', 'all'):
         return
@@ -434,13 +423,9 @@ def _query_aggregated_metadata_singlepath(
     #
     # everything that follows is about content metadata
     #
-    contentinfo_objloc = dsinfo.get('content_info', None)
-
     # content info dicts have metadata stored under paths that are relative
     # to the dataset they were aggregated from
     rparentpath = relpath(rpath, start=containing_ds)
-
-    annex_meta = {}
 
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_xz_json_stream(
@@ -452,8 +437,19 @@ def _query_aggregated_metadata_singlepath(
                   f == rparentpath or
                   f.startswith(_with_sep(rparentpath))]:
         # we might be onto something here, prepare result
-        # start with the current annex metadata for this path, if anything
-        metadata = MetadataDict(annex_meta.get(fpath, {}))
+        metadata = MetadataDict(contentmeta.get(fpath, {}))
+
+        # we have to pull out the context for each subparser from the dataset
+        # metadata
+        for tlk in metadata:
+            if tlk.startswith('@'):
+                continue
+            context = dsmeta.get(tlk, {}).get('@context', None)
+            if context is None:
+                continue
+            metadata[tlk]['@context'] = context
+        if '@context' in dsmeta:
+            metadata['@context'] = dsmeta['@context']
 
         res = get_status_dict(
             status='ok',
@@ -463,14 +459,6 @@ def _query_aggregated_metadata_singlepath(
             # we can only match files
             type='file',
             metadata=metadata)
-        for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
-            if s in dsinfo:
-                res[d] = dsinfo[s]
-
-        # merge records for any matching path
-        # TODO previous `merge_add` is broken for multi-item values
-        metadata.merge_init(contentmeta.get(fpath, {}))
-
         yield res
 
 
