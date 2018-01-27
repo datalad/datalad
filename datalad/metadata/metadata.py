@@ -332,7 +332,7 @@ def query_aggregated_metadata(reporton, ds, aps, merge_mode, recursive=False,
 
         # cache once loaded metadata objects for additional lookups
         # TODO possibly supply this cache from outside, if objects could
-        # be needed again -- there filename does not change in a superdataset
+        # be needed again -- their filename does not change in a superdataset
         # if done, cache under relpath, not abspath key
         cache = {
             'objcache': {},
@@ -537,14 +537,22 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
         paths = [p for p, c, a in content_info if not a or c]
         nocontent = len(fullpathlist) - len(paths)
         if nocontent:
+            # TODO better fail, or support incremental and label this file as no present
             lgr.warn(
                 '{} files have no content present, skipped metadata extraction for {}'.format(
                     nocontent,
                     'them' if nocontent > 10 else [p for p, c, a in content_info if not c and a]))
 
+    # pull out potential metadata field blacklist config settings
+    blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
+        'datalad.metadata.aggregate-ignore-fields',
+        default=[]))]
+    # enforce size limits
+    max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some parsers might pull in
     from . import parsers
     for mtype in types:
+        mtype_key = mtype
         try:
             pmod = import_module('.{}'.format(mtype),
                                  package=parsers.__package__)
@@ -588,12 +596,13 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                     mtype, ds, repr(dsmeta_t))
                 errored = True
             elif dsmeta_t:
-                getattr(dsmeta, 'merge_{}'.format(merge_mode))(dsmeta_t)
-                # treat @context info dsmeta_t separately
-                # keys in their should not conflict and we want to union of the
-                # vocabulary in any case
-                _merge_context(ds, context, dsmeta_t.get('@context', {}))
+                dsmeta_t = _filter_metadata_fields(
+                    dsmeta_t,
+                    maxsize=max_fieldsize,
+                    blacklist=blacklist)
+                dsmeta[mtype_key] = dsmeta_t
 
+        unique_cm = {}
         for loc, meta in contentmeta_t or {}:
             if not isinstance(meta, dict):
                 lgr.error(
@@ -603,65 +612,57 @@ def _get_metadata(ds, types, merge_mode, global_meta=None, content_meta=None,
                     "This type of native metadata will be ignored. Got: %s",
                     mtype, ds, loc, repr(meta))
                 errored = True
-            elif meta:
-                if loc in contentmeta:
-                    # we already have this on record -> merge
-                    getattr(contentmeta[loc], 'merge_{}'.format(merge_mode))(meta)
-                else:
-                    # no prior record, wrap an helper and store
-                    contentmeta[loc] = MetadataDict(meta)
+            elif not meta:
+                continue
 
-    # pull out potential metadata field blacklist config settings
-    blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
-        'datalad.metadata.aggregate-ignore-fields',
-        default=[]))]
-    # enforce size limits
-    max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-    dsmeta = _filter_metadata_fields(
-        dsmeta,
-        maxsize=max_fieldsize,
-        blacklist=blacklist)
-    contentmeta = {
-        k: _filter_metadata_fields(
-            contentmeta[k],
-            maxsize=max_fieldsize,
-            blacklist=blacklist)
-        for k in contentmeta}
-    # go through content metadata and inject report of unique keys
-    # and values into `dsmeta`
-    unique_cm = {}
-    for cm in contentmeta.values():
-        for k, v in cm.items():
-            # TODO instead of a set, it could be a set with counts
-            vset = unique_cm.get(k, set())
-            # prevent nested structures in unique prop list
-            vset.add(', '.join(str(i)
-                               # force-convert any non-string item
-                               if not isinstance(i, string_types) else i
-                               for i in v)
-                     # any plain sequence
-                     if isinstance(v, (tuple, list))
-                     else v
-                     # keep anything that can live in JSON natively
-                     if isinstance(v, (int, float, bool) + string_types)
-                     # force string-convert anything else
-                     else str(v))
-            unique_cm[k] = vset
-    if unique_cm:
-        dsmeta['unique_content_properties'] = {
-            k: sorted(v) if len(v) > 1 else list(v)[0]
-            for k, v in unique_cm.items()}
+            meta = MetadataDict(meta)
+            # apply filters
+            meta = _filter_metadata_fields(
+                meta,
+                maxsize=max_fieldsize,
+                blacklist=blacklist)
+
+            # assign
+            # only ask each metadata parser once, hence no conflict possible
+            loc_dict = contentmeta.get(loc, {})
+            loc_dict[mtype_key] = meta
+            contentmeta[loc] = loc_dict
+
+            # go through content metadata and inject report of unique keys
+            # and values into `dsmeta`
+            for k, v in meta.items():
+                # TODO instead of a set, it could be a set with counts
+                vset = unique_cm.get(k, set())
+                # prevent nested structures in unique prop list
+                vset.add(', '.join(str(i)
+                                   # force-convert any non-string item
+                                   if not isinstance(i, string_types) else i
+                                   for i in v)
+                         # any plain sequence
+                         if isinstance(v, (tuple, list))
+                         else v
+                         # keep anything that can live in JSON natively
+                         if isinstance(v, (int, float, bool) + string_types)
+                         # force string-convert anything else
+                         else str(v))
+                unique_cm[k] = vset
+
+        if unique_cm:
+            dsmeta['unique_content_properties'] = {
+                k: sorted(v) if len(v) > 1 else list(v)[0]
+                for k, v in unique_cm.items()}
 
     # always identify the effective vocabulary - JSON-LD style
     if context:
         dsmeta['@context'] = context
 
-    if fullpathlist:
-        # make sure that there is an entry for each path, this takes the place
-        # of a dedicated file list
-        for p in fullpathlist:
-            if p not in contentmeta:
-                contentmeta[p] = {}
+    # TODO now that metadata is structured separately per source, we need a different strategy
+    #if fullpathlist:
+    #    # make sure that there is an entry for each path, this takes the place
+    #    # of a dedicated file list
+    #    for p in fullpathlist:
+    #        if p not in contentmeta:
+    #            contentmeta[p] = {}
 
     return dsmeta, contentmeta, errored
 
