@@ -11,6 +11,7 @@
 
 
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import known_failure_v6
 
 import os
 from os.path import join as opj
@@ -43,6 +44,8 @@ def _assert_metadata_empty(meta):
             {k: meta[k] for k in meta if k not in ignore})
 
 
+@known_failure_v6  #FIXME
+@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_basic_filemeta(path):
     with chpwd(path):
