@@ -76,7 +76,7 @@ class MetadataParser(BaseMetadataParser):
         for term in self._key2stdkey:
             if term not in spec:
                 continue
-            hkey = self.get_homogenized_key(term)
+            hkey = self._key2stdkey[term]
             content = spec[term]
             if term == 'description':
                 short, long = _beautify_multiline_field(content)
