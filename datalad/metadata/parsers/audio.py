@@ -41,7 +41,7 @@ class MetadataParser(BaseMetadataParser):
             info = audiofile(opj(self.ds.path, f), easy=True)
             if info is None:
                 continue
-            meta = {vocab_map.get(k, 'comment<{}>'.format(k)): info[k][0]
+            meta = {vocab_map.get(k, k): info[k][0]
                     if isinstance(info[k], list) and len(info[k]) == 1 else info[k]
                     for k in info}
             if hasattr(info, 'mime') and len(info.mime):
@@ -52,7 +52,7 @@ class MetadataParser(BaseMetadataParser):
                     if k == 'length':
                         # duration comes in seconds, cap at millisecond level
                         val = round(val, 3)
-                    meta[vocab_map.get(k, 'comment<{}>'.format(k))] = val
+                    meta[vocab_map.get(k, k)] = val
             contentmeta.append((f, meta))
 
         return {

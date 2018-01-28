@@ -62,7 +62,7 @@ class MetadataParser(BaseMetadataParser):
 
         for term in self._key2stdkey:
             if term in foreign:
-                meta[self.get_homogenized_key(term)] = foreign[term]
+                meta[self._key2stdkey[term]] = foreign[term]
         if 'author' in foreign:
             meta['author'] = _compact_author(foreign['author'])
         if 'contributors' in foreign:

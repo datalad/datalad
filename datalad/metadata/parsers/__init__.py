@@ -23,6 +23,7 @@ for __modname in (
         'exif',
         'frictionless_datapackage',
         'image',
+        'nidm',
         'nifti1',
         'xmp'):
     try:
