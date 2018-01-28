@@ -404,26 +404,6 @@ def _query_aggregated_metadata_singlepath(
         for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
             if s in dsinfo:
                 res[d] = dsinfo[s]
-        if rpath == curdir:
-            # we are querying this dataset itself, which we know to be present
-            # rerun datalad_core parser to reflect potential local
-            # modifications since the last aggregation
-            # (if there even was any ever)
-            dsmeta, _, errored = _get_metadata(
-                ds,
-                ['datalad_core'],
-                'init',
-                # we acknowledge the dataset configuration for global metadata
-                global_meta=None,
-                # but we force-stop the content metadata query via git-annex
-                content_meta=False)
-            if errored:
-                res['status'] = 'error'
-                res['message'] = errored
-                yield res
-                return
-            # merge current dsmeta
-            metadata.update(dsmeta)
         # and now blend with any previously aggregated metadata
         objloc = dsinfo.get('dataset_info', None)
         if objloc is not None:
@@ -461,43 +441,13 @@ def _query_aggregated_metadata_singlepath(
     rparentpath = relpath(rpath, start=containing_ds)
 
     annex_meta = {}
-    # TODO this condition is inadequate once we query something in an aggregated subdataset
-    # but through the dataset at curdir
-    files = None
-    if containing_ds == curdir and ds.config.obtain(
-            # TODO this is actuall about requerying present datasets
-            # and is a major slow-down on datasets with many files...
-            # dedicated switch?
-            'datalad.metadata.aggregate-content-datalad-core',
-            default=True,
-            valtype=EnsureBool()):
-        if cache['subds_relpaths'] is None:
-            subds_relpaths = ds.subdatasets(
-                fulfilled=None,
-                result_xfm='relpaths',
-                return_type='list',
-                result_renderer=None)
-            cache['subds_relpaths'] = subds_relpaths
-        # we pull out ALL files at once, not just those matching the query paths
-        # because this will be much faster than doing it multiple times for
-        # multiple queries within the same dataset
-        files = list(_get_metadatarelevant_paths(ds, cache['subds_relpaths']))
-        # we are querying this dataset itself, which we know to be present
-        # get uptodate file metadata from git-annex to reflect potential local
-        # modifications since the last aggregation
-        # (if there even was any ever)
-        from datalad.metadata.parsers.datalad_core import MetadataParser as DLCP
-        # TODO this could be further limited to particular paths (now []), but we would
-        # need to get the list of metadata-relevant paths all the way down here
-        # without having to recompute
-        annex_meta.update(DLCP(ds, [])._get_content_metadata(files))
 
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_xz_json_stream(
         opj(agg_base_path, contentinfo_objloc),
         cache=cache['objcache']) if contentinfo_objloc else {}
 
-    for fpath in [f for f in files or contentmeta.keys()
+    for fpath in [f for f in contentmeta.keys()
                   if rparentpath == curdir or
                   f == rparentpath or
                   f.startswith(_with_sep(rparentpath))]:
