@@ -22,6 +22,17 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import eq_
+from datalad.tests.utils import assert_in
+
+
+target = {
+    "dcterms:SizeOrDuration": [4, 3],
+    "color_mode": "3x8-bit pixels, true color",
+    "type": "dctype:Image",
+    "spatial_resolution(dpi)": [72, 72],
+    "format": "JPEG (ISO 10918)"
+}
 
 
 @with_tempfile(mkdir=True)
@@ -37,12 +48,10 @@ def test_image(path):
     assert_status('ok', res)
     res = ds.metadata('exif.jpg')
     assert_result_count(res, 1)
-    assert_result_count(
-        res, 1,
-        metadata={
-            "dcterms:SizeOrDuration": [4, 3],
-            "color_mode": "3x8-bit pixels, true color",
-            "type": "dctype:Image",
-            "spatial_resolution(dpi)": [72, 72],
-            "format": "JPEG (ISO 10918)"
-        })
+
+    # from this parser
+    meta = res[0]['metadata']['image']
+    for k, v in target.items():
+        eq_(meta[k], v)
+
+    assert_in('@context', meta)

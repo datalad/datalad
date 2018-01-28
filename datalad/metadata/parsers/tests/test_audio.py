@@ -22,6 +22,22 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import eq_
+from datalad.tests.utils import assert_in
+
+
+target = {
+    "format": "mime:audio/mp3",
+    "duration(s)": 1.0,
+    "name": "dltracktitle",
+    "music:album": "dlalbumtitle",
+    "music:artist": "dlartist",
+    "music:channels": 1,
+    "music:sample_rate": 44100,
+    "music:Genre": "dlgenre",
+    "date": "",
+    "tracknumber": "dltracknumber",
+}
 
 
 @with_tempfile(mkdir=True)
@@ -37,21 +53,10 @@ def test_audio(path):
     assert_status('ok', res)
     res = ds.metadata('audio.mp3')
     assert_result_count(res, 1)
-    # compare full expected metadata set to catch any change of mind on the
-    # side of the mutagen package
-    # but not the bitrate, to variable estimate across decoders
-    res[0]['metadata'].pop("comment<bitrate>", None)
-    assert_result_count(
-        res, 1,
-        metadata={
-           "format": "mime:audio/mp3",
-           "duration(s)": 1.0,
-           "name": "dltracktitle",
-           "music:album": "dlalbumtitle",
-           "music:artist": "dlartist",
-           "music:channels": 1,
-           "music:sample_rate": 44100,
-           "music:Genre": "dlgenre",
-           "comment<date>": "",
-           "comment<tracknumber>": "dltracknumber",
-        })
+
+    # from this parser
+    meta = res[0]['metadata']['audio']
+    for k, v in target.items():
+        eq_(meta[k], v)
+
+    assert_in('@context', meta)

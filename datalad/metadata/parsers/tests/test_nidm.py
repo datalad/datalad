@@ -34,7 +34,7 @@ def test_nidm(path):
     res = ds.aggregate_metadata()
     # aggregation done without whining
     assert_status('ok', res)
-    res = ds.metadata(reporton='all')
+    res = ds.metadata(reporton='datasets')
     # ATM we do not forsee file-based metadata to come back from NIDM
     assert_result_count(res, 1)
     # show full structure of the assembled metadata from demo content
