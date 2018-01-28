@@ -50,6 +50,11 @@ class MetadataParser(BaseMetadataParser):
         -------
         generator((location, metadata_dict))
         """
+        if not isinstance(self.ds.repo, AnnexRepo):
+            for p in self.paths:
+                yield (p, dict())
+            return
+
         for file, meta in self.ds.repo.get_metadata(self.paths if self.paths else '.'):
             if file.startswith('.datalad'):
                 # do not report on our own internal annexed files (e.g. metadata blobs)
