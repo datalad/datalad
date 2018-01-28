@@ -453,8 +453,13 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     "This type of native metadata will be ignored. Got: %s",
                     mtype, ds, loc, repr(meta))
                 errored = True
-            elif not meta:
-                continue
+            # we also want to store info that there was no metadata(e.g. to get a list of
+            # files that have no metadata)
+            # if there is an issue that a parser needlessly produces empty records, the
+            # parser should be fixed and not a general switch. For example the datalad_core
+            # issues empty records to document the presence of a file
+            #elif not meta:
+            #    continue
 
             meta = MetadataDict(meta)
             # apply filters
@@ -496,14 +501,6 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # always identify the effective vocabulary - JSON-LD style
     if context:
         dsmeta['@context'] = context
-
-    # TODO now that metadata is structured separately per source, we need a different strategy
-    #if fullpathlist:
-    #    # make sure that there is an entry for each path, this takes the place
-    #    # of a dedicated file list
-    #    for p in fullpathlist:
-    #        if p not in contentmeta:
-    #            contentmeta[p] = {}
 
     return dsmeta, contentmeta, errored
 
