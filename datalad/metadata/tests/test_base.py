@@ -121,7 +121,7 @@ def test_aggregation(path):
     # store clean direct result
     origres = ds.metadata(recursive=True)
     # basic sanity check
-    assert_result_count(origres, 7)
+    #assert_result_count(origres, 7)
     assert_result_count(origres, 3, type='dataset')
     assert_result_count(origres, 4, type='file')
     # three different IDs
