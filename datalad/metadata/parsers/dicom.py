@@ -77,7 +77,6 @@ class MetadataParser(BaseMetadataParser):
                     'description': 'DICOM vocabulary (seemingly incomplete)',
                     'type': vocabulary_id}}},
             # yield the corresponding series description for each file
-            ((f,
-              {'dicom:{}'.format(k): v for k, v in info.items()})
+            ((f, info)
              for info, files in imgseries.values() for f in files)
         )
