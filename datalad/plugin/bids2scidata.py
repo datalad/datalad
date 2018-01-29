@@ -62,29 +62,29 @@ ontology_map = {
 # case 2: we take the value as-is and define a unit for it
 # (datalad_term, isatab_term, isatab_unitvalue, isatab_unitdef
 recognized_assay_props = (
-    ('bids:participant_id', "Sample Name"),
+    (('bids', 'participant_id'), "Sample Name"),
     (None, "Protocol REF"),
     # BIDS repetition time by default, but override with info from
     # file if possible
-    ("bids:RepetitionTime", "Parameter Value[4d spacing]"),
-    ("temporal_spacing(s)", 'Parameter Value[4d spacing]'),
-    ("spatial_resolution(mm)", "Parameter Value[resolution]"),
-    ("bids:EchoTime", "Parameter Value[echo time]", "second", 'UO:0000010'),
-    ("bids:FlipAngle", "Parameter Value[flip angle]", "degree", 'UO:0000185'),
+    (("bids", "RepetitionTime"), "Parameter Value[4d spacing]"),
+    (("nifti1", "temporal_spacing(s)"), 'Parameter Value[4d spacing]'),
+    (("nifti1", "spatial_resolution(mm)"), "Parameter Value[resolution]"),
+    (("bids", "EchoTime"), "Parameter Value[echo time]", "second", 'UO:0000010'),
+    (("bids", "FlipAngle"), "Parameter Value[flip angle]", "degree", 'UO:0000185'),
     ('', "Parameter Value[modality]"),
-    ("bids:Manufacturer", "Parameter Value[instrument manufacturer]"),
-    ("bids:ManufacturerModelName", 'Parameter Value[instrument name]'),
-    ("bids:HardcopyDeviceSoftwareVersion", 'Parameter Value[instrument software version]'),
-    ("bids:MagneticFieldStrength", 'Parameter Value[magnetic field strength]', 'tesla', 'UO:0000228'),
-    ("bids:ReceiveCoilName", "Parameter Value[coil type]"),
-    ("bids:PulseSequenceType", "Parameter Value[sequence]"),
-    ("bids:ParallelAcquisitionTechnique", "Parameter Value[parallel acquisition technique]"),
+    (("bids", "Manufacturer"), "Parameter Value[instrument manufacturer]"),
+    (("bids", "ManufacturerModelName"), 'Parameter Value[instrument name]'),
+    (("bids", "HardcopyDeviceSoftwareVersion"), 'Parameter Value[instrument software version]'),
+    (("bids", "MagneticFieldStrength"), 'Parameter Value[magnetic field strength]', 'tesla', 'UO:0000228'),
+    (("bids", "ReceiveCoilName"), "Parameter Value[coil type]"),
+    (("bids", "PulseSequenceType"), "Parameter Value[sequence]"),
+    (("bids", "ParallelAcquisitionTechnique"), "Parameter Value[parallel acquisition technique]"),
     ('', "Assay Name"),
     ('', "Raw Data File"),
     (None, "Comment[Data Repository]"),
     (None, "Comment[Data Record Accession]"),
     (None, "Comment[Data Record URI]"),
-    ("bids:TaskName", "Factor Value[task]", "bids:CogAtlasID"),
+    (("bids", "TaskName"), "Factor Value[task]", "bids:CogAtlasID"),
 )
 
 # functors to send a sequence of stringified sequence elements to
@@ -218,14 +218,16 @@ def _describe_file(fpath, db):
     # form for ISATAB table
     for prop in recognized_assay_props:
         src, dst = prop[:2]
+        # expand src specfification
+        namespace, src = src if src else None, src
         if src is None:
             # special case, not handled here
             continue
-        if src in fmeta:
+        if src in fmeta.get(namespace, {}):
             # pull out the value from datalad metadata directly,
             # unless we have a definition URL in another field,
             # in which case put it into a 2-tuple also
-            val = fmeta[src]
+            val = fmeta[namespace][src]
             if dst in repr_props and isinstance(val, (list, tuple)):
                 val = repr_props[dst](str(i) for i in val)
             info[dst] = val
@@ -241,6 +243,8 @@ def _describe_file(fpath, db):
                 # this plugin has no vocabulary info for this field
                 # we need to look into the dataset context to see if we know
                 # anything
+                # FIXME TODO the next line should look into the local context
+                # of the 'bids' metadata source
                 termdef = db['.'].get('@context', {}).get(src, {})
                 term_source, term_accession = split_term_source_accession(
                     termdef.get('unit' if 'unit' in termdef else '@id', None))
@@ -399,8 +403,7 @@ def extract(
         for r in query_aggregated_metadata(
             'all',
             ds,
-            [dict(path=ds.path, type='dataset')],
-            'init')
+            [dict(path=ds.path, type='dataset')])
     }
 
     # prep for assay table info
@@ -410,7 +413,7 @@ def extract(
 
     # pull out essential metadata bits about the dataset itself
     # for study description)
-    dsmeta = metadb.get('.', {})
+    dsmeta = metadb.get('.', {}).get('bids', {})
     info['name'] = dsmeta.get('shortdescription', dsmeta.get('name', 'TODO'))
     info['author'] = '\t'.join(assure_list(dsmeta.get('author', [])))
     info['keywords'] = '\t'.join(assure_list(dsmeta.get('tag', [])))

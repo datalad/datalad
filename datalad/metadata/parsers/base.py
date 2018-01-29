@@ -41,19 +41,17 @@ class BaseMetadataParser(object):
         Returns
         -------
         dict
-          keys are homogenized datalad metadata keys, values are arbitrary
+          keys and values are arbitrary
         """
         raise NotImplementedError
 
     def _get_content_metadata(self):
         """Get ALL metadata for all dataset content.
 
+        Possibly limited to the paths given at to the parser.
+
         Returns
         -------
         generator((location, metadata_dict))
         """
         raise NotImplementedError
-
-    def get_homogenized_key(self, key):
-        # TODO decide on how to error
-        return self._key2stdkey.get(key)

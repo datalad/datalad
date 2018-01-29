@@ -33,7 +33,6 @@ from datalad.interface.save import Save
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
-from datalad.interface.common_opts import merge_native_opt
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.metadata import agginfo_relpath
@@ -124,7 +123,7 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     return hits
 
 
-def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
+def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     """Dump metadata from a dataset into object in the metadata store of another
 
     Info on the metadata objects is placed into a DB dict under the
@@ -135,8 +134,6 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     agginto_ds : Dataset
     aggfrom_ds : Dataset
     db : dict
-    merge_native : str
-      Merge mode.
     """
     subds_relpaths = aggfrom_ds.subdatasets(result_xfm='relpaths', return_type='list')
     # figure out a "state" of the dataset wrt its metadata that we are describing
@@ -167,8 +164,8 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
         lgr.debug('%s has no metadata-relevant content', aggfrom_ds)
     else:
         lgr.debug(
-            'Dump metadata of %s (merge mode: %s) into %s',
-            aggfrom_ds, merge_native, agginto_ds)
+            'Dump metadata of %s into %s',
+            aggfrom_ds, agginto_ds)
 
     agginfo = {}
     # dataset global
@@ -189,9 +186,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, merge_native, to_save):
     nativetypes = get_metadata_type(aggfrom_ds)
     dsmeta, contentmeta, errored = _get_metadata(
         aggfrom_ds,
-        # core must come first
         ['datalad_core'] + assure_list(nativetypes),
-        merge_native,
         # None indicates to honor a datasets per-parser configuration and to be
         # on by default
         global_meta=None,
@@ -566,7 +561,6 @@ class AggregateMetaData(Interface):
             containing dataset will be aggregated.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        merge_native=merge_native_opt,
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         save=nosave_opt,
@@ -578,7 +572,6 @@ class AggregateMetaData(Interface):
     def __call__(
             path=None,
             dataset=None,
-            merge_native='init',
             recursive=False,
             recursion_limit=None,
             save=True):
@@ -665,7 +658,6 @@ class AggregateMetaData(Interface):
                     ds,
                     Dataset(aggsrc),
                     agginfo_db,
-                    merge_native,
                     to_save)
                 if errored:
                     yield get_status_dict(

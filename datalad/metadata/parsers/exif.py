@@ -42,7 +42,7 @@ class MetadataParser(BaseMetadataParser):
             if not info:
                 # got nothing, likely nothing there
                 continue
-            meta = {'exif:{}'.format(k.split()[-1]): _return_as_appropriate_dtype(info[k].printable)
+            meta = {k.split()[-1]: _return_as_appropriate_dtype(info[k].printable)
                     for k in info}
             contentmeta.append((f, meta))
 

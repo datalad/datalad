@@ -29,7 +29,7 @@ lgr = logging.getLogger('datalad.metadata.parser.bids')
 
 vocabulary = {
     # characteristics (metadata keys)
-    "bids:age(years)": {
+    "age(years)": {
         '@id': "pato:0000011",
         'unit': "uo:0000036",
         'unit_label': "year",
@@ -39,8 +39,8 @@ vocabulary = {
 ## only BIDS metadata properties that match a key in this dict will be considered
 ## for reporting, the rest becomes 'comment<orig>'
 content_metakey_map = {
-    'participant_id': 'bids:participant_id',
-    'age': 'bids:age(years)',
+    'participant_id': 'participant_id',
+    'age': 'age(years)',
 }
 
 sex_label_map = {
@@ -138,7 +138,7 @@ class MetadataParser(BaseMetadataParser):
             md = {}
             try:
                 md.update(
-                    {'bids:{}'.format(k): v
+                    {k: v
                      for k, v in bids.get_metadata(opj(self.ds.path, f)).items()
                      # no nested structures for now (can be monstrous when DICOM
                      # metadata is embedded)

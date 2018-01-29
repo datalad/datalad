@@ -55,12 +55,17 @@ def dlplugin(dataset, filename='README.md', existing='skip'):
 
     # get any metadata on the dataset itself
     dsinfo = dataset.metadata('.', reporton='datasets', return_type='item-or-list')
+    meta = {}
     if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
         lgr.warn("Could not obtain dataset metadata, proceeding without")
         dsinfo = {}
-        meta = {}
     else:
-        meta = dsinfo['metadata']
+        # flatten possibly existing multiple metadata sources
+        for src in dsinfo['metadata']:
+            if src.startswith('@'):
+                # not a source
+                continue
+            meta.update(dsinfo['metadata'][src])
 
     metainfo = ''
     for label, content in (
