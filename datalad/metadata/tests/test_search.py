@@ -9,19 +9,26 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
+from shutil import copy
 from mock import patch
+from os import makedirs
+from os.path import join as opj
+from os.path import dirname
 from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
+from datalad.metadata.parsers.tests.test_bids import bids_template
 
 from datalad.tests.utils import skip_if_no_network
 
@@ -175,3 +182,36 @@ def test_search_non_dataset(tdir):
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
     assert_in("datalad create --force", str(cme.exception))
+
+
+
+@with_tree(bids_template)
+def test_within_ds_file_search(path):
+    try:
+        import nibabel
+        import mutagen
+    except ImportError:
+        raise SkipTest
+    ds = Dataset(path).create(force=True)
+    ds.config.add('datalad.metadata.nativetype', 'nifti1', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+    makedirs(opj(path, 'stim'))
+    for src, dst in (
+            ('audio.mp3', opj('stim', 'stim1.mp3')),
+            ('nifti1.nii.gz', opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')),
+            ('nifti1.nii.gz', opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'))):
+        copy(
+            opj(dirname(dirname(__file__)), 'tests', 'data', src),
+            opj(path, dst))
+    ds.add('.')
+    ds.aggregate_metadata()
+    ok_clean_git(ds.path)
+    # basic sanity check on the metadata structure of the dataset
+    dsmeta = ds.metadata('.', reporton='datasets')[0]['metadata']
+    for src in ('audio', 'bids', 'nifti1'):
+        # something for each one
+        assert_in(src, dsmeta)
+        # each src declares its own context
+        assert_in('@context', dsmeta[src])
+        # we have a unique content metadata summary for each src
+        assert_in(src, dsmeta['unique_content_properties'])
