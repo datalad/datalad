@@ -138,7 +138,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           that are already annexed nor will it automatically migrate files,
           hat are 'getted' afterwards.
         create: bool, optional
-          Creates and initializes an annex repository at path, in case
+          Create and initialize an annex repository at path, in case
           there is none. If set to False, and this repository is not an annex
           repository (initialized or not), an exception is raised.
         init: bool, optional
