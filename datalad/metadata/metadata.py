@@ -496,11 +496,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # per source storage here too
             ucp = dsmeta.get('unique_content_properties', {})
             ucp[mtype_key] = {
-                    k: [dict(i) if isinstance(i, frozendict) else i
-                        for i in sorted(
-                            v,
-                            key=lambda x: hash(x))]
-                        if len(v) > 1 else list(v)[0]
+                k: [dict(i) if isinstance(i, frozendict) else i
+                    for i in sorted(
+                        v,
+                        key=lambda x: hash(x))]
+                if len(v) > 1 else list(v)[0]
                 for k, v in unique_cm.items()}
             dsmeta['unique_content_properties'] = ucp
 

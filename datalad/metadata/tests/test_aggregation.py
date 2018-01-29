@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test metadata manipulation"""
+"""Test metadata aggregation"""
 
 
 from os.path import join as opj
