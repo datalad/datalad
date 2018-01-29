@@ -84,7 +84,7 @@ def test_get_metadata(path):
     assert_equal(fmeta['task'], 'some')
     assert_equal(fmeta['modality'], 'func')
     # the fact that there is participant vs subject is already hotly debated in Tal's brain
-    assert_in('handedness', fmeta['bids:participant'])
+    assert_in('handedness', fmeta['participant'])
 
 
 @with_tree(tree={'dataset_description.json': """

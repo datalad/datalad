@@ -118,7 +118,7 @@ class MetadataParser(BaseMetadataParser):
         if exists(participants_fname):
             try:
                 for rx, info in yield_participant_info(participants_fname):
-                    path_props[rx] = {'bids:participant': info}
+                    path_props[rx] = {'participant': info}
             except Exception as exc:
                 lgr.warning(
                     "Failed to load participants info due to: %s. Skipping the rest of file",
