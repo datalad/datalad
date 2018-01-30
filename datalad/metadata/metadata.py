@@ -495,11 +495,17 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if unique_cm:
             # per source storage here too
             ucp = dsmeta.get('unique_content_properties', {})
+            # important: we want to have a stable order regarding
+            # the unique values (a list). we cannot guarantee the
+            # same order of discovery, hence even when not using a
+            # set above we would still need sorting. the callenge
+            # is that any value can be an arbitrarily complex nested
+            # beast
             ucp[mtype_key] = {
                 k: [dict(i) if isinstance(i, frozendict) else i
                     for i in sorted(
                         v,
-                        key=lambda x: hash(x))]
+                        key=_unique_value_key)]
                 if len(v) > 1 else list(v)[0]
                 for k, v in unique_cm.items()}
             dsmeta['unique_content_properties'] = ucp
@@ -509,6 +515,19 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         dsmeta['@context'] = context
 
     return dsmeta, contentmeta, errored
+
+
+def _unique_value_key(x):
+    """Small helper for sorting unique content metadata values"""
+    if isinstance(x, (frozendict, dict)):
+        # turn into an item tuple with keys sorted and values plain
+        # or as a hash if *dicts
+        return [(k,
+                 hash(x[k])
+                 if isinstance(x[k], (frozendict, dict)) else x[k])
+                for k in sorted(x)]
+    else:
+        return x
 
 
 @build_doc
