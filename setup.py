@@ -91,7 +91,6 @@ requires = {
     ],
     'metadata': [
         'duecredit',
-        'frozendict', # only needed to uniqueify nested metadata, we could "import" this class...
         'simplejson',
         'whoosh',
     ] + req_lzma,

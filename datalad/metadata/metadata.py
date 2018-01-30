@@ -23,8 +23,8 @@ from os.path import lexists
 from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
+from collections import Mapping
 from six import binary_type, string_types
-from frozendict import frozendict
 
 from datalad import cfg
 from datalad.auto import AutomagicIO
@@ -484,7 +484,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     vset.add(v)
                 except TypeError:
                     if isinstance(v, dict):
-                        vset.add(frozendict(v))
+                        vset.add(ReadOnlyDict(v))
                     elif isinstance(v, list):
                         vset.add(tuple(v))
                     else:
@@ -502,7 +502,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # is that any value can be an arbitrarily complex nested
             # beast
             ucp[mtype_key] = {
-                k: [dict(i) if isinstance(i, frozendict) else i
+                k: [dict(i) if isinstance(i, ReadOnlyDict) else i
                     for i in sorted(
                         v,
                         key=_unique_value_key)]
@@ -519,15 +519,57 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
 def _unique_value_key(x):
     """Small helper for sorting unique content metadata values"""
-    if isinstance(x, (frozendict, dict)):
+    if isinstance(x, ReadOnlyDict):
         # turn into an item tuple with keys sorted and values plain
         # or as a hash if *dicts
         return [(k,
                  hash(x[k])
-                 if isinstance(x[k], (frozendict, dict)) else x[k])
+                 if isinstance(x[k], ReadOnlyDict) else x[k])
                 for k in sorted(x)]
     else:
         return x
+
+
+class ReadOnlyDict(Mapping):
+    # Taken from https://github.com/slezica/python-frozendict
+    # License: MIT
+    """
+    An immutable wrapper around dictionaries that implements the complete
+    :py:class:`collections.Mapping` interface. It can be used as a drop-in
+    replacement for dictionaries where immutability is desired.
+    """
+    dict_cls = dict
+
+    def __init__(self, *args, **kwargs):
+        self._dict = self.dict_cls(*args, **kwargs)
+        self._hash = None
+
+    def __getitem__(self, key):
+        return self._dict[key]
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def copy(self, **add_or_replace):
+        return self.__class__(self, **add_or_replace)
+
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __len__(self):
+        return len(self._dict)
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self._dict)
+
+    def __hash__(self):
+        iteritems = getattr(dict, 'iteritems', dict.items) # py2-3 compatibility
+        if self._hash is None:
+            h = 0
+            for key, value in iteritems(self._dict):
+                h ^= hash((key, value))
+            self._hash = h
+        return self._hash
 
 
 @build_doc

@@ -144,16 +144,16 @@ def test_nested_metadata(path):
         meta['unique_content_properties']['bids']['participant'],
         [
             {
-                "age(years)": "30-35",
-                "participant_id": "01",
-                "gender": "male",
+                "age(years)": "20-25",
+                "participant_id": "03",
+                "gender": "female",
                 "handedness": "r",
                 "hearing_problems_current": "n"
             },
             {
-                "age(years)": "20-25",
-                "participant_id": "03",
-                "gender": "female",
+                "age(years)": "30-35",
+                "participant_id": "01",
+                "gender": "male",
                 "handedness": "r",
                 "hearing_problems_current": "n"
             },
