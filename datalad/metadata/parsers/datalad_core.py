@@ -52,11 +52,19 @@ class MetadataParser(BaseMetadataParser):
         """
         if not isinstance(self.ds.repo, AnnexRepo):
             for p in self.paths:
+                # this parser does give a response for ANY file as it serves
+                # an an indicator of file presence (i.e. a file list) in the
+                # content metadata, even if we know nothing but the filename
+                # about a file
                 yield (p, dict())
             return
 
-        for file, meta in self.ds.repo.get_metadata(self.paths if self.paths else '.'):
-            if file.startswith('.datalad'):
+        valid_paths = None
+        if self.paths and sum(len(i) for i in self.paths) > 500000:
+            valid_paths = set(self.paths)
+        for file, meta in self.ds.repo.get_metadata(
+                self.paths if self.paths and valid_paths is None else '.'):
+            if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
