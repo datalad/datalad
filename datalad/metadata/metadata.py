@@ -494,7 +494,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
         if unique_cm:
             # per source storage here too
-            ucp = dsmeta.get('unique_content_properties', {})
+            ucp = dsmeta.get('datalad_unique_content_properties', {})
             # important: we want to have a stable order regarding
             # the unique values (a list). we cannot guarantee the
             # same order of discovery, hence even when not using a
@@ -508,7 +508,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                         key=_unique_value_key)]
                 if len(v) > 1 else list(v)[0]
                 for k, v in unique_cm.items()}
-            dsmeta['unique_content_properties'] = ucp
+            dsmeta['datalad_unique_content_properties'] = ucp
 
     # always identify the effective vocabulary - JSON-LD style
     if context:

@@ -141,7 +141,7 @@ def test_nested_metadata(path):
     # or BIDS-specific configuration
     meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
     assert_equal(
-        meta['unique_content_properties']['bids']['participant'],
+        meta['datalad_unique_content_properties']['bids']['participant'],
         [
             {
                 "age(years)": "20-25",
