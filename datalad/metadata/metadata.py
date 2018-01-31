@@ -472,7 +472,9 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # assign
             # only ask each metadata parser once, hence no conflict possible
             loc_dict = contentmeta.get(loc, {})
-            loc_dict[mtype_key] = meta
+            if meta:
+                # do not store empty stuff
+                loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
             # go through content metadata and inject report of unique keys
