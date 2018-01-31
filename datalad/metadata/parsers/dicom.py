@@ -45,9 +45,17 @@ context = {
 }
 
 
+def _struct2dict(struct):
+    return {k: getattr(struct, k)
+            for k in struct.dir()
+            if hasattr(struct, k) and
+            _is_good_type(getattr(struct, k))}
+
+
 class MetadataParser(BaseMetadataParser):
     def get_metadata(self, dataset, content):
         imgseries = {}
+        imgs = {}
         lgr.info("Attempting to extract DICOM metadata from %i files", len(self.paths))
         for f in self.paths:
             try:
@@ -56,13 +64,13 @@ class MetadataParser(BaseMetadataParser):
                 # we can only ignore
                 lgr.debug('"%s" does not look like a DICOM file, skipped', f)
                 continue
+            ddict = None
+            if content:
+                ddict = _struct2dict(d)
+                imgs[f] = ddict
             if d.SeriesInstanceUID not in imgseries:
                 # start with a copy of the metadata of the first dicom in a series
-                series = {k: getattr(d, k)
-                          for k in d.dir()
-                          if hasattr(d, k) and
-                          getattr(d, k) and
-                          _is_good_type(getattr(d, k))}
+                series = _struct2dict(d) if ddict is None else ddict.copy()
                 series_files = []
             else:
                 series, series_files = imgseries.get(d.SeriesInstanceUID)
@@ -76,23 +84,15 @@ class MetadataParser(BaseMetadataParser):
             series_files.append(f)
             # store
             imgseries[d.SeriesInstanceUID] = (series, series_files)
-        for info, files in imgseries.values():
-            # TODO make sure that 'ImageSeries' is defined somewhere
-            info.update({
-                '@type': 'ImageSeries',
-            })
 
         dsmeta = {
             '@context': context,
-            'imageseries_unique_properties': [info for info, files in imgseries.values()]
+            'Series': [info for info, files in imgseries.values()]
         }
         return (
             # no dataset metadata (for now), a summary of all DICOM values will
             # from generic code upstairs
             dsmeta,
             # yield the corresponding series description for each file
-            ((f, info)
-             for info, files in imgseries.values()
-             for f in files)
-            if content else []
+            imgs.items() if content else []
         )
