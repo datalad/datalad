@@ -35,6 +35,16 @@ def _is_good_type(v):
         return False
 
 
+context = {
+    'dicom': {
+        # switch to http://dicom.nema.org/resources/ontology/DCM/
+        # but requires mapping plain text terms to numbers
+        '@id': 'http://semantic-dicom.org/dcm#',
+        'description': 'DICOM vocabulary (seemingly incomplete)',
+        'type': vocabulary_id}
+}
+
+
 class MetadataParser(BaseMetadataParser):
     def get_metadata(self, dataset, content):
         imgseries = {}
@@ -66,17 +76,23 @@ class MetadataParser(BaseMetadataParser):
             series_files.append(f)
             # store
             imgseries[d.SeriesInstanceUID] = (series, series_files)
+        for info, files in imgseries.values():
+            # TODO make sure that 'ImageSeries' is defined somewhere
+            info.update({
+                '@type': 'ImageSeries',
+            })
+
+        dsmeta = {
+            '@context': context,
+            'imageseries_unique_properties': [info for info, files in imgseries.values()]
+        }
         return (
             # no dataset metadata (for now), a summary of all DICOM values will
             # from generic code upstairs
-            {'@context': {
-                'dicom': {
-                    # switch to http://dicom.nema.org/resources/ontology/DCM/
-                    # but requires mapping plain text terms to numbers
-                    '@id': 'http://semantic-dicom.org/dcm#',
-                    'description': 'DICOM vocabulary (seemingly incomplete)',
-                    'type': vocabulary_id}}},
+            dsmeta,
             # yield the corresponding series description for each file
             ((f, info)
-             for info, files in imgseries.values() for f in files)
+             for info, files in imgseries.values()
+             for f in files)
+            if content else []
         )
