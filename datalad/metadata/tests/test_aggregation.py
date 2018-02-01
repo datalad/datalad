@@ -145,14 +145,14 @@ def test_nested_metadata(path):
         [
             {
                 "age(years)": "20-25",
-                "participant_id": "03",
+                "id": "03",
                 "gender": "female",
                 "handedness": "r",
                 "hearing_problems_current": "n"
             },
             {
                 "age(years)": "30-35",
-                "participant_id": "01",
+                "id": "01",
                 "gender": "male",
                 "handedness": "r",
                 "hearing_problems_current": "n"

@@ -36,10 +36,10 @@ vocabulary = {
         'description': "age of a sample (organism) at the time of data acquisition in years"},
 }
 
-## only BIDS metadata properties that match a key in this dict will be considered
-## for reporting, the rest becomes 'comment<orig>'
 content_metakey_map = {
-    'participant_id': 'participant_id',
+    # go with plain 'id' as BIDS has this built-in conflict of subject/participant
+    # for the same concept
+    'participant_id': 'id',
     'age': 'age(years)',
 }
 
