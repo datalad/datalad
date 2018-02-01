@@ -60,9 +60,10 @@ def test_dicom(path):
     eq_(dsmeta['Series'], [meta])
 
     # for this artificial case pretty much the same info also comes out as
-    # unique props
+    # unique props, but wrapped in lists
     assert_dict_equal(
-        dsmeta['Series'][0],
+        {k: [v]
+         for k, v in dsmeta['Series'][0].items()},
         res[0]['metadata']["datalad_unique_content_properties"]['dicom'])
 
     # buuuut, if we switch of file-based metadata storage

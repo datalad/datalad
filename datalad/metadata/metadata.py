@@ -503,12 +503,14 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # set above we would still need sorting. the callenge
             # is that any value can be an arbitrarily complex nested
             # beast
+            # we also want to have each unique value set always come
+            # in a top-level list, so we known if some unique value
+            # was a list, os opposed to a list of unique values
             ucp[mtype_key] = {
                 k: [dict(i) if isinstance(i, ReadOnlyDict) else i
                     for i in sorted(
                         v,
                         key=_unique_value_key)]
-                if len(v) > 1 else list(v)[0]
                 for k, v in unique_cm.items()}
             dsmeta['datalad_unique_content_properties'] = ucp
 
