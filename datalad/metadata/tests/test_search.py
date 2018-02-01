@@ -18,6 +18,7 @@ from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -184,7 +185,6 @@ def test_search_non_dataset(tdir):
     assert_in("datalad create --force", str(cme.exception))
 
 
-
 @with_tree(bids_template)
 def test_within_ds_file_search(path):
     try:
@@ -214,4 +214,26 @@ def test_within_ds_file_search(path):
         # each src declares its own context
         assert_in('@context', dsmeta[src])
         # we have a unique content metadata summary for each src
-        assert_in(src, dsmeta['unique_content_properties'])
+        assert_in(src, dsmeta['datalad_unique_content_properties'])
+
+    # now check that we can discover things from the aggregated metadata
+    for query, hitpath, matched in (
+            ('mp3',
+             opj('stim', 'stim1.mp3'),
+             'audio.format'),
+            ('female',
+             opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
+             'bids.participant.gender'),
+            # TODO extend with more complex queries to test whoosh
+            # query language configuration
+    ):
+        res = ds.search(query)
+        # always a file and the dataset, because they carry metadata in
+        # the same structure
+        assert_result_count(res, 2)
+        assert_result_count(
+            res, 1, type='dataset', path=ds.path)
+        assert_result_count(
+            res, 1, type='file', path=opj(ds.path, hitpath))
+        # test the key of the match
+        assert_in(matched, res[-1]['query_matched'])
