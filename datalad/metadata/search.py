@@ -295,15 +295,15 @@ def _get_search_index(index_dir, ds, force_reindex):
             old_ds_rpath = rpath
 
         doc_props = dict(
-            path=rpath,
-            type=rtype,
+            path=assure_unicode(rpath),
+            type=assure_unicode(rtype),
             **_meta2index_dict(
                 meta,
                 # this time stringification of values so whoosh can handle them
                 val2str=True)
         )
         if 'parentds' in res:
-            doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
+            doc_props['parentds'] = assure_unicode(relpath(res['parentds'], start=ds.path))
         idx.add_document(**doc_props)
         idx_size += 1
 
