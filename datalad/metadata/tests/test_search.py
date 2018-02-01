@@ -217,17 +217,24 @@ def test_within_ds_file_search(path):
         assert_in(src, dsmeta['datalad_unique_content_properties'])
 
     # now check that we can discover things from the aggregated metadata
-    for query, hitpath, matched in (
+    for query, hitpath, matched_key, matched_val in (
             ('mp3',
              opj('stim', 'stim1.mp3'),
-             'audio.format'),
+             'audio.format', 'mp3'),
             ('female',
              opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
-             'bids.participant.gender'),
+             'bids.participant.gender', 'female'),
+            (['bids.type:bold', "bids.participant.id:1"],
+             opj('sub-01', 'func', 'sub-01_task-other_bold.nii.gz'),
+             'bids.type', 'bold'),
+            ("'mime:audio/mp3'",
+             opj('stim', 'stim1.mp3'),
+             'audio.format', 'mime:audio/mp3'),
             # TODO extend with more complex queries to test whoosh
             # query language configuration
     ):
         res = ds.search(query)
+        #import pdb; pdb.set_trace()
         # always a file and the dataset, because they carry metadata in
         # the same structure
         assert_result_count(res, 2)
@@ -235,5 +242,6 @@ def test_within_ds_file_search(path):
             res, 1, type='dataset', path=ds.path)
         assert_result_count(
             res, 1, type='file', path=opj(ds.path, hitpath))
-        # test the key of the match
-        assert_in(matched, res[-1]['query_matched'])
+        # test the key and specific value of the match
+        assert_in(matched_key, res[-1]['query_matched'])
+        assert_equal(res[-1]['query_matched'][matched_key], matched_val)
