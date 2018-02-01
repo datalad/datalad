@@ -480,7 +480,16 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # go through content metadata and inject report of unique keys
             # and values into `dsmeta`
             for k, v in meta.items():
-                # TODO instead of a set, it could be a set with counts
+                if k in dsmeta.get(mtype_key, {}):
+                    # if the dataset already has a dedicated idea
+                    # about a key, we skip it from the unique list
+                    # the point of the list is to make missing info about
+                    # content known in the dataset, not to blindly
+                    # duplicate metadata. Example: list of samples data
+                    # were recorded from. If the dataset has such under
+                    # a 'sample' key, we should prefer that, over an
+                    # aggregated list of a hopefully-kinda-ok structure
+                    continue
                 vset = unique_cm.get(k, set())
                 try:
                     vset.add(v)
