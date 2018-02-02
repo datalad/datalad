@@ -11,6 +11,8 @@ all: clean test
 clean:
 	$(PYTHON) setup.py clean
 	rm -rf dist build bin
+	-find . -name '*.pyc' -delete
+	-find . -name '__pycache__' -type d -delete
 
 bin:
 	mkdir -p $@
