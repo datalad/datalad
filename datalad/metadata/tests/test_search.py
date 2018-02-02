@@ -17,6 +17,7 @@ from os.path import dirname
 from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
+from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
@@ -215,6 +216,68 @@ def test_within_ds_file_search(path):
         assert_in('@context', dsmeta[src])
         # we have a unique content metadata summary for each src
         assert_in(src, dsmeta['datalad_unique_content_properties'])
+
+    # check generated index keys
+    with swallow_outputs() as cmo:
+        ds.search(show_keys=True)
+        assert_equal(cmo.out, """\
+audio.bitrate
+audio.date
+audio.duration(s)
+audio.format
+audio.music-Genre
+audio.music-album
+audio.music-artist
+audio.music-channels
+audio.music-sample_rate
+audio.name
+audio.tracknumber
+bids.author
+bids.citation
+bids.comment<BIDSVersion>
+bids.conformsto
+bids.description
+bids.fundedby
+bids.license
+bids.modality
+bids.name
+bids.participant.age(years)
+bids.participant.gender
+bids.participant.handedness
+bids.participant.hearing_problems_current
+bids.participant.id
+bids.subject
+bids.task
+bids.type
+id
+nifti1.cal_max
+nifti1.cal_min
+nifti1.datatype
+nifti1.description
+nifti1.dim
+nifti1.freq_axis
+nifti1.intent
+nifti1.magic
+nifti1.phase_axis
+nifti1.pixdim
+nifti1.qform_code
+nifti1.sform_code
+nifti1.sizeof_hdr
+nifti1.slice_axis
+nifti1.slice_duration
+nifti1.slice_end
+nifti1.slice_order
+nifti1.slice_start
+nifti1.spatial_resolution(mm)
+nifti1.t_unit
+nifti1.temporal_spacing(s)
+nifti1.toffset
+nifti1.vox_offset
+nifti1.xyz_unit
+parentds
+path
+type
+""")
 
     # now check that we can discover things from the aggregated metadata
     for query, hitpath, matched_key, matched_val in (

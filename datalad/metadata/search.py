@@ -175,7 +175,7 @@ def _get_search_schema(ds):
     }
 
     schema_fields = {
-        n: wf.ID(stored=True, unique=n == '@id')
+        n.lstrip('@'): wf.ID(stored=True, unique=n == '@id')
         for n in definitions}
 
     lgr.info('Scanning for metadata keys')
@@ -534,11 +534,10 @@ class Search(Interface):
                 idx_obj.schema)
             # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
             # upstream
-            #parser.add_plugin(qparse.FuzzyTermPlugin())
-            #parser.add_plugin(qparse.GtLtPlugin())
-            #parser.add_plugin(qparse.SingleQuotePlugin())
+            parser.add_plugin(qparse.FuzzyTermPlugin())
+            parser.add_plugin(qparse.GtLtPlugin())
             # replace field defintion to allow for colons to be part of a field's name:
-            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>\.\w]+|[*]):"))
+            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
             # for convenience we accept any number of args-words from the
             # shell and put them together to a single string here
             querystr = ' '.join(assure_list(query))
