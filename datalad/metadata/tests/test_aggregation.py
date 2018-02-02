@@ -7,7 +7,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test metadata manipulation"""
+"""Test metadata aggregation"""
 
 
 from os.path import join as opj
@@ -18,10 +18,12 @@ from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
+from ..extractors.tests.test_bids import bids_template
 
 
 def _assert_metadata_empty(meta):
@@ -126,3 +128,33 @@ def test_aggregate_query(path):
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://sub.example.com'}, res[0]['metadata'])
+
+
+@with_tree(tree=bids_template)
+def test_nested_metadata(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ds.aggregate_metadata()
+    # BIDS returns participant info as a nested dict for each file in the
+    # content metadata. On the dataset-level this should automatically
+    # yield a sequence of participant info dicts, without any further action
+    # or BIDS-specific configuration
+    meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
+    assert_equal(
+        meta['datalad_unique_content_properties']['bids']['participant'],
+        [
+            {
+                "age(years)": "20-25",
+                "id": "03",
+                "gender": "female",
+                "handedness": "r",
+                "hearing_problems_current": "n"
+            },
+            {
+                "age(years)": "30-35",
+                "id": "01",
+                "gender": "male",
+                "handedness": "r",
+                "hearing_problems_current": "n"
+            },
+        ])

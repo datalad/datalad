@@ -7,7 +7,30 @@ Overview
 ========
 
 DataLad has built-in, modular, and extensible support for metadata in various
-formats.
+formats. Metadata is extracted from a dataset and its content by one or more
+extractors that have to be enabled in a dataset's configuration. Extractors
+yield metadata in a JSON-LD-like structure that can be arbitrarily complex and
+deeply nested. Metadata from each extractor is kept unmodified, unmangled, and
+separate from metadata of other extractors. This design enables tailored
+applications using particular metadata that can use Datalad as a
+content-agnostic aggregation and transport layer without being limited or
+impacted by other metadata sources and schemas.
+
+Extracted metadata is stored in a dataset in (compressed) files using a JSON
+stream format, separately for metadata describing a dataset as a whole, and
+metadata describing individual files in a dataset. This limits the amount of
+metadata that has to be obtained and processed for applications that do not
+require all available metadata.
+
+DataLad provides a content-agnostic metadata aggregation mechanism that
+stores metadata of sub-datasets (with arbitrary nesting levels) in a
+superdataset, where it can then be queried without having the subdatasets
+locally present.
+
+Lastly, DataLad comes with a `search` command that enable metadata queries
+via a flexible query language. However, alternative applications for metadata
+queries (e.g. graph-based queries) can be built on DataLad, by requesting
+a complete or partial dump of aggregated metadata available in a dataset.
 
 .. _JSON-LD: http://json-ld.org/
 .. _linked data: https://en.wikipedia.org/wiki/Linked_data

@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.metadata.search')
 
-import multiprocessing
 import re
 import os
 from os.path import join as opj, exists
@@ -24,7 +23,6 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
-from gzip import open as gzopen
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -37,10 +35,6 @@ from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
-from datalad.support.json_py import dump2fileobj as jsondump2file
-from simplejson import load as jsonload
-from datalad.metadata.definitions import common_defs
-from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.metadata import query_aggregated_metadata
 from datalad.metadata.metadata import MetadataDict
 
@@ -65,94 +59,111 @@ r_url = re.compile(r"^https?://")
 
 
 def _any2unicode(val):
+    if val is None:
+        return u''
     return str_contructor(val) \
         if isinstance(val, (int, float, tuple, list, dict)) \
         else assure_unicode(val)
 
 
-def _add_document(idx, **kwargs):
-    idx.add_document(
-        **{assure_unicode(k):
-           assure_unicode(v) if isinstance(v, unicode_srctypes) else v
-           for k, v in kwargs.items()})
+def _listdict2dictlist(lst):
+    # unique values that we got, always a list
+    if all(not isinstance(uval, dict) for uval in lst):
+        # no nested structures, take as is
+        return lst
+
+    # we need to turn them inside out, instead of a list of
+    # dicts, we want a dict where keys are lists, because we
+    # cannot handle hierarchies in a tabular search index
+    # if you came here to find that out, go ahead and use a graph
+    # DB/search
+    udict = {}
+    for uv in lst:
+        if not isinstance(uv, dict):
+            # we cannot mix and match, discard any scalar values
+            # in favor of the structured metadata
+            continue
+        for k, v in uv.items():
+            if isinstance(v, (tuple, list, dict)):
+                # this is where we draw the line, two levels of
+                # nesting. whoosh can only handle string values
+                # injecting a stringified blob of something doesn't
+                # really enable anything useful -> graph search
+                continue
+            if v == "":
+                # no cruft
+                continue
+            uvals = udict.get(k, set())
+            uvals.add(v)
+            udict[k] = uvals
+    return {
+        # set not good for JSON, have plain list
+        k: list(v) if len(v) > 1 else list(v)[0]
+        for k, v in udict.items()
+        # do not accumulate cruft
+        if len(v)}
 
 
-def _meta2index_dict(meta, definitions, ds_defs):
+def _meta2index_dict(meta, val2str=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
+    # loop over all metadata sources and the report of their unique values
+    for src in meta.get("datalad_unique_content_properties", {}):
+        umeta = meta["datalad_unique_content_properties"][src]
+        srcmeta = meta.get(src, {})
+        for uk in umeta:
+            if uk in srcmeta:
+                # we have a real entry for this key in the dataset metadata
+                # ignore any generated unique value list in favor of the
+                # tailored data
+                continue
+            srcmeta[uk] = _listdict2dictlist(umeta[uk])
+
+    def _deep_kv(basekey, dct):
+        """Return key/value pairs of any depth following a rule for key
+        composition
+
+        dct must be a dict
+        """
+        for k, v in dct.items():
+            if k.startswith('@') or k == 'datalad_unique_content_properties':
+                # ignore all JSON-LD specials
+                continue
+            # TODO `k` might need remapping, if another key was already found
+            # with the same definition
+            key = '{}{}'.format(
+                basekey,
+                # replace now special chars, and avoid spaces
+                # TODO maybe even kill parentheses
+                k.replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
+            )
+            if isinstance(v, list):
+                v = _listdict2dictlist(v)
+
+            if isinstance(v, dict):
+                # dive
+                for i in _deep_kv('{}.'.format(key), v):
+                    yield i
+            else:
+                yield key, v
+
     return {
-        # apply any dataset-specific key mapping
-        ds_defs.get(k, k):
-        # turn lists into CSV strings
-        u', '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
-        # dicts into SSV strings
-        u'; '.join('{}: {}'.format(_any2unicode(i), _any2unicode(v[i])) for i in v) if isinstance(v, dict) else
-        # and the rest into unicode
-        _any2unicode(v)
-        for k, v in (meta or {}).items()
-        # ignore anything that is not defined
-        if k in definitions
+        k:
+        # turn lists into space-separated value strings
+        (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
+         # and the rest into unicode
+         _any2unicode(v)) if val2str else v
+        for k, v in _deep_kv('', meta or {})
     }
-
-
-def _resolve_term(term, definitions, common_defs, blacklist):
-    if term in blacklist:
-        return
-    if r_url.match(term):
-        # already a plain URL -> done
-        return term
-    termdef = common_defs.get(term, {}).get('def', None)
-    if termdef is not None:
-        if r_url.match(termdef):
-            # because is_url('schema:name') -> True
-            # and complains on DEBUG about irrelevant stuff (parsing diff)
-            return termdef
-        else:
-            term = termdef
-
-    # not in the common vocabulary
-    if ':' in term:
-        prefix = term.split(':')[0]
-        prefix_def = definitions.get(prefix, None)
-        prefix_def = prefix_def.get('@id', None) \
-            if isinstance(prefix_def, dict) else prefix_def
-        if prefix_def is None:
-            # try the common defs
-            prefix_def = common_defs.get(prefix, {}).get('def', None)
-            if prefix_def is None:
-                # this key also doesn't have a prefix that is defined in
-                # the vocabulary, we are lost -> ignore this key as it
-                # cannot possibly be resolved
-                lgr.debug(
-                    "Cannot resolve term prefix '%s', no definition found (term: '%s')",
-                    prefix, term)
-                blacklist.add(term)
-                return
-        term = term[len(prefix) + 1:]
-        if r_url.match(prefix_def):
-            # proper URL, just concat to get full definition
-            return u'{}{}'.format(prefix_def, term)
-        else:
-            # make adhoc definitions
-            return u'{} (term: {})'.format(prefix_def, term)
-    elif term.startswith('comment<') and term.endswith('>'):
-        # catch fields like 'comment<someundefinedkey>'
-        return common_defs['comment']['def']
-    else:
-        # we know nothing about this key, ignore
-        lgr.debug(
-            "Cannot resolve term '%s', no definition found",
-            term)
-        return
 
 
 def _get_search_schema(ds):
     from whoosh import fields as wf
+    from whoosh.analysis import StandardAnalyzer
 
     # haven for terms that have been found to be undefined
     # (for faster decision-making upon next encounter)
-    undef = set()
     # this will harvest all discovered term definitions
     definitions = {
         '@id': 'unique identifier of an entity',
@@ -161,106 +172,31 @@ def _get_search_schema(ds):
         # TODO make proper JSON-LD definition
         'parentds': 'path of the datasets that contains an entity',
         # 'type' will not come from a metadata field, hence will not be detected
-        'type': {
-            '@id': _resolve_term(common_defs['type']['def'], {}, common_defs, undef),
-            'description': common_defs['type']['descr']},
+        'type': 'type of a record',
     }
 
     schema_fields = {
-        n: wf.ID(stored=True, unique=n == '@id')
+        n.lstrip('@'): wf.ID(stored=True, unique=n == '@id')
         for n in definitions}
-    # this will contain any dataset-specific term mappings, in case we find
-    # non-unique keys that are differently defined
-    per_ds_defs = {}
-    ds_defs = {}
 
     lgr.info('Scanning for metadata keys')
     # quick 1st pass over all dataset to gather the needed schema fields
-    # sanitization of / should ideally be done while saving, but that would require
-    # fixes in whoosh I guess
-    sanitize_key = lambda k: k.replace(' ', '_').replace('/', '_')
     for res in query_aggregated_metadata(
             reporton='datasets',
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
-            merge_mode='init',
             recursive=True):
-        ds_defs = {}
         meta = res.get('metadata', {})
-        for k, v in meta.get('@context', {}).items():
-            k = sanitize_key(k)
-            if k not in definitions or definitions[k] == v:
-                # this is new, but unique, or uniformly defined
-                definitions[k] = v
-            else:
-                # non-unique key (across all seen datasets)
-                # make unique
-                # TODO we have to deal with @vocab fields in here, those
-                # might be different when some aggregated metadata was
-                # generated with an old version of datalad
-                # in this case we should actually load the old vocabulary
-                #set.add(', '.join(i for i in v) if isinstance(v, (tuple, list)) else v)
-                # and perform the mapping to the current one in here
-                count = 0
-                uk = k
-                while uk in definitions:
-                    if definitions[uk] == v:
-                        break  # already exists and matches
-                    count += 1
-                    uk = '{}_{}'.format(k, count)
-                ds_defs[k] = k = uk
-            definitions[k] = v
-            # we register a field for any definition in the context.
-            # while this has the potential to needlessly blow up the
-            # index size, the only alternative would be to iterate over
-            # all content metadata in this first pass too, in order to
-            # do a full scan.
-            if k == '@vocab' or isinstance(v, dict) and v.get('type', None) == vocabulary_id:
-                continue
-            schema_fields[k] = wf.TEXT(stored=True)
-        if ds_defs:
-            # store ds-specific mapping for the second pass that actually
-            # generates the search index
-            per_ds_defs[res['path']] = ds_defs
+        # no stringification of values for speed, we do not need/use the
+        # actual values at this point, only the keys
+        idxd = _meta2index_dict(meta, val2str=False)
 
-        # anything that is a direct metadata key or is reported as being a content metadata
-        # key is a valid candidate for inclusion into the schema
-        cand_keys = list(meta)
-        cand_keys.extend(meta.get('unique_content_properties', []))
-        # need a copy, we are going to reformat keys of ad-hoc defs
-        final_defs = dict(definitions)
-        for k in cand_keys:
-            k = sanitize_key(k)
-            if k in ('unique_content_properties', '@context'):
-                # those are just means for something else and irrelevant
-                # for searches
-                continue
-            # check if we have any kind of definitions for this key
-            if k not in definitions:
-                termdef = _resolve_term(k, definitions, common_defs, undef)
-                if termdef is None:
-                    # we know nothing about this key, ignore
-                    lgr.debug(
-                        "Ignoring term '%s', no definition found",
-                        k)
-                    continue
-                final_defs[k] = termdef
-                # TODO treat keywords/tags separately
-                schema_fields[k] = wf.TEXT(stored=True)
-            else:
-                if isinstance(definitions[k], dict):
-                    final_defs[k] = {
-                        k_ if k_ == '@id' else '{} ({})'.format(
-                            k_,
-                            _resolve_term(k_, definitions, common_defs, undef))
-                        : _resolve_term(v, definitions, common_defs, undef)
-                        if k_ in ('@id', 'unit') else v
-                        for k_, v in definitions[k].items()
-                        if v  # skip if value is empty
-                    }
+        for k in idxd:
+            schema_fields[k] = wf.TEXT(stored=True,
+                                       analyzer=StandardAnalyzer(minsize=1))
 
     schema = wf.Schema(**schema_fields)
-    return schema, final_defs, per_ds_defs
+    return schema
 
 
 def _get_search_index(index_dir, ds, force_reindex):
@@ -269,7 +205,6 @@ def _get_search_index(index_dir, ds, force_reindex):
     # what is the lastest state of aggregated metadata
     metadata_state = ds.repo.get_last_commit_hash(agginfo_relpath)
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
-    definitions_fname = opj(index_dir, 'datalad_term_definitions.json.gz')
 
     if not force_reindex and \
             exists(stamp_fname) and \
@@ -315,7 +250,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     if not exists(index_dir):
         os.makedirs(index_dir)
 
-    schema, definitions, per_ds_defs = _get_search_schema(ds)
+    schema = _get_search_schema(ds)
 
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer(
@@ -338,9 +273,6 @@ def _get_search_index(index_dir, ds, force_reindex):
             reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
-            # TODO expose? but this would likely only affect metadata in the
-            # base dataset
-            merge_mode='init',
             # MIH: I cannot see a case when we would not want recursion (within
             # the metadata)
             recursive=True):
@@ -364,22 +296,17 @@ def _get_search_index(index_dir, ds, force_reindex):
             old_idx_size = idx_size
             old_ds_rpath = rpath
 
-            # get any custom dataset mappings
-            ds_defs = per_ds_defs.get(res['path'], {})
-            # now we merge all reported unique content properties (flattened representation
-            # of content metadata) with the main metadata set, using the 'add' strategy
-            # this way any existing metadata value of a dataset itself will be amended by
-            # those coming from the content. E.g. a single dataset 'license' might be turned
-            # into a sequence of unique license identifiers across all dataset components
-            meta.merge_add(meta.get('unique_content_properties', {}))
-            meta.pop('unique_content_properties', None)
         doc_props = dict(
-            path=rpath,
-            type=rtype,
-            **_meta2index_dict(meta, definitions, ds_defs))
+            path=assure_unicode(rpath),
+            type=assure_unicode(rtype),
+            **_meta2index_dict(
+                meta,
+                # this time stringification of values so whoosh can handle them
+                val2str=True)
+        )
         if 'parentds' in res:
-            doc_props['parentds'] = relpath(res['parentds'], start=ds.path)
-        _add_document(idx, **doc_props)
+            doc_props['parentds'] = assure_unicode(relpath(res['parentds'], start=ds.path))
+        idx.add_document(**doc_props)
         idx_size += 1
 
     if old_ds_rpath:
@@ -398,15 +325,6 @@ def _get_search_index(index_dir, ds, force_reindex):
     # "timestamp" the search index to allow for automatic invalidation
     with open(stamp_fname, 'w') as f:
         f.write(metadata_state)
-
-    # dump the term/field definitions records for later introspection
-    # use compressed storage, the is not point in inflating the
-    # diskspace requirements
-    lgr.debug("Storing definitions to %s", definitions_fname)
-    with gzopen(definitions_fname, 'wb') as f:
-        # TODO actually go through all, incl. compound, defintions ('@id' plus 'unit'
-        # or similar) and resolve terms to URLs, if anyhow possible
-        jsondump2file(definitions, f)
 
     lgr.info('Search index contains %i documents', idx_size)
     return idx_obj
@@ -485,9 +403,9 @@ class Search(Interface):
     Consequently, the search index will be tailored to data provided in a
     particular collection of datasets.
 
-    Metadata fields (and possibly also values) are typically defined terms
-    from a controlled vocabulary. Term definitions are accessible via the
-    --show-keys flag.
+    Metadata fields (and possibly also values) are typically defined terms from
+    a controlled vocabulary. Field names are accessible via the --show-keys
+    flag.
 
     DataLad's search is built on the Python package 'Whoosh', which provides
     a powerful query language. Links to a description of the language and
@@ -501,14 +419,6 @@ class Search(Interface):
 
       % datalad search searchterm type:file
 
-    Show definitions of search keys/fields::
-
-      % datalad search --show-keys
-        @id (unique identifier of an entity)
-        dcterms:rights (http://purl.org/dc/terms/rights)
-        duration(s) {'unit (http://purl.obolibrary.org/obo/UO_0000000)': 'http://purl.obolibrary.org/obo/UO_0000010', '@id': 'https://www.w3.org/TR/owl-time/#Duration'}
-        name (http://schema.org/name)
-        ...
 
     *Performance considerations*
 
@@ -611,23 +521,8 @@ class Search(Interface):
             index_dir, ds, force_reindex)
 
         if show_keys:
-            definitions_fname = opj(
-                index_dir,
-                'datalad_term_definitions.json.gz')
-            try:
-                defs = jsonload(gzopen(definitions_fname))
-            except Exception as e:
-                lgr.warning(
-                    'No term definitions found alongside search index: %s',
-                    exc_str(e))
-                defs = {}
-
             for k in idx_obj.schema.names():
-                print('{}{}'.format(
-                    k,
-                    ' {}'.format(
-                        defs[k] if isinstance(defs[k], dict) else '({})'.format(
-                            defs[k])) if k in defs else ''))
+                print('{}'.format(k))
             return
 
         if not query:
@@ -643,8 +538,9 @@ class Search(Interface):
             # upstream
             parser.add_plugin(qparse.FuzzyTermPlugin())
             parser.add_plugin(qparse.GtLtPlugin())
+            parser.add_plugin(qparse.SingleQuotePlugin())
             # replace field defintion to allow for colons to be part of a field's name:
-            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>:\w]+|[*]):"))
+            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
             # for convenience we accept any number of args-words from the
             # shell and put them together to a single string here
             querystr = ' '.join(assure_list(query))
@@ -659,14 +555,10 @@ class Search(Interface):
                 wquery,
                 terms=True,
                 limit=max_nresults if max_nresults > 0 else None)
-            # cheap way to get an approximate number of hits, without an expensive
-            # scoring of all items
-            # disabled: unreliable estimate, often confusing
-            #nhits = hits.estimated_min_length()
             # report query stats
             topstr = '{} top {}'.format(
-                        max_nresults,
-                        single_or_plural('match', 'matches', max_nresults)
+                max_nresults,
+                single_or_plural('match', 'matches', max_nresults)
             )
             lgr.info('Query completed in {} sec.{}'.format(
                 hits.runtime,
@@ -698,6 +590,8 @@ class Search(Interface):
                               if k not in ('path', 'parentds')})
                 if 'parentds' in hit:
                     res['parentds'] = normpath(opj(ds.path, hit['parentds']))
+                if res['metadata'].get('type', None) in ('file', 'dataset'):
+                    res['type'] = res['metadata']['type']
                 yield res
                 nhits += 1
 

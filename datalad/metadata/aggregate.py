@@ -187,7 +187,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     dsmeta, contentmeta, errored = _get_metadata(
         aggfrom_ds,
         ['datalad_core'] + assure_list(nativetypes),
-        # None indicates to honor a datasets per-parser configuration and to be
+        # None indicates to honor a datasets per-extractor configuration and to be
         # on by default
         global_meta=None,
         content_meta=None,
@@ -474,16 +474,16 @@ class AggregateMetaData(Interface):
     the DataLad 'search' command).
 
     To enable aggregation of metadata that are contained in files of a dataset,
-    one has to enable one or more metadata parser for a dataset. DataLad
+    one has to enable one or more metadata extractor for a dataset. DataLad
     supports a number of common metadata standards, such as the Exchangeable
     Image File Format (EXIF), Adobe's Extensible Metadata Platform (XMP), and
     various audio file metadata systems like ID3. In addition, a number of
     scientific metadata standards are supported, like DICOM, BIDS, or datacite.
-    Some metadata parsers depend on particular 3rd-party software. The list of
-    metadata parsers available to a particular DataLad installation is reported
+    Some metadata extractors depend on particular 3rd-party software. The list of
+    metadata extractors available to a particular DataLad installation is reported
     by the 'wtf' plugin ('datalad plugin wtf').
 
-    Enabling a metadata parser for a dataset is done by adding its name to the
+    Enabling a metadata extractor for a dataset is done by adding its name to the
     'datalad.metadata.nativetype' configuration variable -- typically in the
     dataset's configuration file (.datalad/config), e.g.::
 
@@ -491,8 +491,8 @@ class AggregateMetaData(Interface):
         nativetype = exif
         nativetype = xmp
 
-    Enabling multiple parsers is supported. In this case, metadata are extracted
-    by each parser individually, and are merged across sources for each described
+    Enabling multiple extractors is supported. In this case, metadata are extracted
+    by each extractor individually, and are merged across sources for each described
     entity (dataset or file(s)). The merge strategy can be selected via the
     --merge-native option.
 
@@ -511,12 +511,12 @@ class AggregateMetaData(Interface):
     or files, aggregated metadata can grow prohibitively large. A number of
     configuration switches are provided to mitigate such issues.
 
-    datalad.metadata.aggregate-content-<parser-name>
+    datalad.metadata.aggregate-content-<extractor-name>
       If set to false, content metadata aggregation will not be performed for
-      the named metadata parser (a potential underscore '_' in the parser name must
+      the named metadata extractor (a potential underscore '_' in the extractor name must
       be replaced by a dash '-'). This can substantially reduce the runtime for
       metadata extraction, and also reduce the size of the generated metadata
-      aggregate. Note, however, that some parsers may not produce any metadata
+      aggregate. Note, however, that some extractors may not produce any metadata
       when this is disabled, because their metadata might come from individual
       file headers only. 'datalad.metadata.store-aggregate-content' might be
       a more appropriate setting in such cases.

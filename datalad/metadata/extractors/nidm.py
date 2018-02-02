@@ -12,20 +12,20 @@
 # it doesn't do anything meaningful
 
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.nidm')
+lgr = logging.getLogger('datalad.metadata.extractors.nidm')
 
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 
-class MetadataParser(BaseMetadataParser):
-    # this parser instance knows:
+class MetadataExtractor(BaseMetadataExtractor):
+    # this extractor instance knows:
     #   self.ds -- an instance of the dataset it shall operate on
     #   self.paths -- a list of paths within the dataset from which
     #                 metadata should be extracted, pretty much up to
-    #                 the parser if those those paths are used. They are
+    #                 the extractor if those those paths are used. They are
     #                 provided to avoid duplicate directory tree traversal
-    #                 when multiples parsers are executed
+    #                 when multiples extractors are executed
     def get_metadata(self, dataset, content):
         # function gets two flags indicating whether to extract dataset-global
         # and/or content metadata

@@ -6,10 +6,10 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata parsers"""
+"""Metadata extractors"""
 
 import logging as __logging
-__lgr = __logging.getLogger('datalad.metadata.parsers')
+__lgr = __logging.getLogger('datalad.metadata.extractors')
 
 from importlib import import_module as __impmod
 
@@ -29,7 +29,7 @@ for __modname in (
     try:
         globals()[__modname] = __impmod(
             '.{}'.format(__modname),
-            'datalad.metadata.parsers')
+            'datalad.metadata.extractors')
     except Exception as _e:
         from datalad.dochelpers import exc_str as _exc_str
-        __lgr.debug('Metadata parser %s unusable: %s', __modname, _exc_str(_e))
+        __lgr.debug('Metadata extractor %s unusable: %s', __modname, _exc_str(_e))

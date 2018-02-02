@@ -6,14 +6,14 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""generic image metadata parser"""
+"""generic image metadata extractor"""
 
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.image')
+lgr = logging.getLogger('datalad.metadata.extractors.image')
 
 from PIL import Image
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.dochelpers import exc_str
 
 
@@ -44,7 +44,7 @@ mode_map = {
 }
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
 
     _extractors = {
         'format': lambda x: x.format_description,
@@ -62,7 +62,7 @@ class MetadataParser(BaseMetadataParser):
             try:
                 img = Image.open(fpath)
             except Exception as e:
-                lgr.debug("Image metadata parser failed to load %s: %s",
+                lgr.debug("Image metadata extractor failed to load %s: %s",
                           fpath, exc_str(e))
                 continue
             meta = {

@@ -23,6 +23,7 @@ from os.path import lexists
 from os.path import join as opj
 from importlib import import_module
 from collections import OrderedDict
+from collections import Mapping
 from six import binary_type, string_types
 
 from datalad import cfg
@@ -309,7 +310,7 @@ def _query_aggregated_metadata_singlepath(
         # we might be onto something here, prepare result
         metadata = MetadataDict(contentmeta.get(fpath, {}))
 
-        # we have to pull out the context for each subparser from the dataset
+        # we have to pull out the context for each extractor from the dataset
         # metadata
         for tlk in metadata:
             if tlk.startswith('@'):
@@ -390,16 +391,16 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         default=[]))]
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-    # keep local, who knows what some parsers might pull in
-    from . import parsers
+    # keep local, who knows what some extractors might pull in
+    from . import extractors
     for mtype in types:
         mtype_key = mtype
         try:
             pmod = import_module('.{}'.format(mtype),
-                                 package=parsers.__package__)
+                                 package=extractors.__package__)
         except ImportError as e:
             lgr.warning(
-                "Failed to import metadata parser for '%s', "
+                "Failed to import metadata extractor for '%s', "
                 "broken dataset configuration (%s)? "
                 "This type of metadata will be ignored: %s",
                 mtype, ds, exc_str(e))
@@ -407,9 +408,9 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 raise
             errored = True
             continue
-        parser = pmod.MetadataParser(ds, paths=paths)
+        extractor = pmod.MetadataExtractor(ds, paths=paths)
         try:
-            dsmeta_t, contentmeta_t = parser.get_metadata(
+            dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
                     'datalad.metadata.aggregate-dataset-{}'.format(mtype.replace('_', '-')),
                     default=True,
@@ -430,7 +431,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if dsmeta_t:
             if dsmeta_t is not None and not isinstance(dsmeta_t, dict):
                 lgr.error(
-                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "Metadata extractor '%s' yielded something other than a dictionary "
                     "for dataset %s -- this is likely a bug, please consider "
                     "reporting it. "
                     "This type of native metadata will be ignored. Got: %s",
@@ -447,7 +448,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         for loc, meta in contentmeta_t or {}:
             if not isinstance(meta, dict):
                 lgr.error(
-                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "Metadata extractor '%s' yielded something other than a dictionary "
                     "for dataset %s content %s -- this is likely a bug, please consider "
                     "reporting it. "
                     "This type of native metadata will be ignored. Got: %s",
@@ -455,8 +456,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 errored = True
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
-            # if there is an issue that a parser needlessly produces empty records, the
-            # parser should be fixed and not a general switch. For example the datalad_core
+            # if there is an issue that a extractor needlessly produces empty records, the
+            # extractor should be fixed and not a general switch. For example the datalad_core
             # issues empty records to document the presence of a file
             #elif not meta:
             #    continue
@@ -469,43 +470,119 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 blacklist=blacklist)
 
             # assign
-            # only ask each metadata parser once, hence no conflict possible
+            # only ask each metadata extractor once, hence no conflict possible
             loc_dict = contentmeta.get(loc, {})
-            loc_dict[mtype_key] = meta
+            if meta:
+                # do not store empty stuff
+                loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
             # go through content metadata and inject report of unique keys
             # and values into `dsmeta`
             for k, v in meta.items():
-                # TODO instead of a set, it could be a set with counts
+                if k in dsmeta.get(mtype_key, {}):
+                    # if the dataset already has a dedicated idea
+                    # about a key, we skip it from the unique list
+                    # the point of the list is to make missing info about
+                    # content known in the dataset, not to blindly
+                    # duplicate metadata. Example: list of samples data
+                    # were recorded from. If the dataset has such under
+                    # a 'sample' key, we should prefer that, over an
+                    # aggregated list of a hopefully-kinda-ok structure
+                    continue
                 vset = unique_cm.get(k, set())
-                # prevent nested structures in unique prop list
-                vset.add(', '.join(str(i)
-                                   # force-convert any non-string item
-                                   if not isinstance(i, string_types) else i
-                                   for i in v)
-                         # any plain sequence
-                         if isinstance(v, (tuple, list))
-                         else v
-                         # keep anything that can live in JSON natively
-                         if isinstance(v, (int, float, bool) + string_types)
-                         # force string-convert anything else
-                         else str(v))
+                try:
+                    vset.add(v)
+                except TypeError:
+                    if isinstance(v, dict):
+                        vset.add(ReadOnlyDict(v))
+                    elif isinstance(v, list):
+                        vset.add(tuple(v))
+                    else:
+                        # no idea
+                        raise
                 unique_cm[k] = vset
 
         if unique_cm:
             # per source storage here too
-            ucp = dsmeta.get('unique_content_properties', {})
+            ucp = dsmeta.get('datalad_unique_content_properties', {})
+            # important: we want to have a stable order regarding
+            # the unique values (a list). we cannot guarantee the
+            # same order of discovery, hence even when not using a
+            # set above we would still need sorting. the callenge
+            # is that any value can be an arbitrarily complex nested
+            # beast
+            # we also want to have each unique value set always come
+            # in a top-level list, so we known if some unique value
+            # was a list, os opposed to a list of unique values
             ucp[mtype_key] = {
-                k: sorted(v) if len(v) > 1 else list(v)[0]
+                k: [dict(i) if isinstance(i, ReadOnlyDict) else i
+                    for i in sorted(
+                        v,
+                        key=_unique_value_key)]
                 for k, v in unique_cm.items()}
-            dsmeta['unique_content_properties'] = ucp
+            dsmeta['datalad_unique_content_properties'] = ucp
 
     # always identify the effective vocabulary - JSON-LD style
     if context:
         dsmeta['@context'] = context
 
     return dsmeta, contentmeta, errored
+
+
+def _unique_value_key(x):
+    """Small helper for sorting unique content metadata values"""
+    if isinstance(x, ReadOnlyDict):
+        # turn into an item tuple with keys sorted and values plain
+        # or as a hash if *dicts
+        return [(k,
+                 hash(x[k])
+                 if isinstance(x[k], ReadOnlyDict) else x[k])
+                for k in sorted(x)]
+    else:
+        return x
+
+
+class ReadOnlyDict(Mapping):
+    # Taken from https://github.com/slezica/python-frozendict
+    # License: MIT
+    """
+    An immutable wrapper around dictionaries that implements the complete
+    :py:class:`collections.Mapping` interface. It can be used as a drop-in
+    replacement for dictionaries where immutability is desired.
+    """
+    dict_cls = dict
+
+    def __init__(self, *args, **kwargs):
+        self._dict = self.dict_cls(*args, **kwargs)
+        self._hash = None
+
+    def __getitem__(self, key):
+        return self._dict[key]
+
+    def __contains__(self, key):
+        return key in self._dict
+
+    def copy(self, **add_or_replace):
+        return self.__class__(self, **add_or_replace)
+
+    def __iter__(self):
+        return iter(self._dict)
+
+    def __len__(self):
+        return len(self._dict)
+
+    def __repr__(self):
+        return '<%s %r>' % (self.__class__.__name__, self._dict)
+
+    def __hash__(self):
+        iteritems = getattr(dict, 'iteritems', dict.items) # py2-3 compatibility
+        if self._hash is None:
+            h = 0
+            for key, value in iteritems(self._dict):
+                h ^= hash((key, value))
+            self._hash = h
+        return self._hash
 
 
 @build_doc

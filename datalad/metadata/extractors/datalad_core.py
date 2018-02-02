@@ -6,12 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata parser for Datalad's own core storage"""
+"""Metadata extractor for Datalad's own core storage"""
 
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 import logging
-lgr = logging.getLogger('datalad.meta.datalad_core')
+lgr = logging.getLogger('datalad.metadata.extractors.datalad_core')
 
 from os.path import join as opj
 from os.path import exists
@@ -19,11 +19,11 @@ from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
 # use main version as core version
-# this must stay, despite being a seemingly unused import, each parser defines a version
+# this must stay, despite being a seemingly unused import, each extractor defines a version
 from datalad.metadata.definitions import version as vocabulary_version
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
 
     def _get_dataset_metadata(self):
@@ -52,11 +52,19 @@ class MetadataParser(BaseMetadataParser):
         """
         if not isinstance(self.ds.repo, AnnexRepo):
             for p in self.paths:
+                # this extractor does give a response for ANY file as it serves
+                # an an indicator of file presence (i.e. a file list) in the
+                # content metadata, even if we know nothing but the filename
+                # about a file
                 yield (p, dict())
             return
 
-        for file, meta in self.ds.repo.get_metadata(self.paths if self.paths else '.'):
-            if file.startswith('.datalad'):
+        valid_paths = None
+        if self.paths and sum(len(i) for i in self.paths) > 500000:
+            valid_paths = set(self.paths)
+        for file, meta in self.ds.repo.get_metadata(
+                self.paths if self.paths and valid_paths is None else '.'):
+            if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v

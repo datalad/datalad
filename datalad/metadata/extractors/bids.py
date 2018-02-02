@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""BIDS metadata parser (http://bids.neuroimaging.io)"""
+"""BIDS metadata extractor (http://bids.neuroimaging.io)"""
 
 from __future__ import absolute_import
 # use pybids to evolve with the standard without having to track it too much
@@ -17,14 +17,14 @@ from io import open
 from os.path import join as opj
 from os.path import exists
 from datalad.dochelpers import exc_str
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.metadata.definitions import vocabulary_id
 from datalad.utils import open_r_encdetect
 
 from datalad import cfg
 
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.bids')
+lgr = logging.getLogger('datalad.metadata.extractors.bids')
 
 
 vocabulary = {
@@ -36,10 +36,10 @@ vocabulary = {
         'description': "age of a sample (organism) at the time of data acquisition in years"},
 }
 
-## only BIDS metadata properties that match a key in this dict will be considered
-## for reporting, the rest becomes 'comment<orig>'
 content_metakey_map = {
-    'participant_id': 'participant_id',
+    # go with plain 'id' as BIDS has this built-in conflict of subject/participant
+    # for the same concept
+    'participant_id': 'id',
     'age': 'age(years)',
 }
 
@@ -49,7 +49,7 @@ sex_label_map = {
 }
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _dsdescr_fname = 'dataset_description.json'
 
     _key2stdkey = {
@@ -118,7 +118,7 @@ class MetadataParser(BaseMetadataParser):
         if exists(participants_fname):
             try:
                 for rx, info in yield_participant_info(participants_fname):
-                    path_props[rx] = info
+                    path_props[rx] = {'participant': info}
             except Exception as exc:
                 lgr.warning(
                     "Failed to load participants info due to: %s. Skipping the rest of file",
@@ -139,7 +139,9 @@ class MetadataParser(BaseMetadataParser):
             try:
                 md.update(
                     {k: v
-                     for k, v in bids.get_metadata(opj(self.ds.path, f)).items()
+                     for k, v in bids.get_metadata(
+                         opj(self.ds.path, f),
+                         include_entities=True).items()
                      # no nested structures for now (can be monstrous when DICOM
                      # metadata is embedded)
                      if not isinstance(v, dict)})
@@ -169,17 +171,18 @@ def yield_participant_info(fname):
             if 'participant_id' not in row:
                 # not sure what this is, but we cannot use it
                 break
+            # strip a potential 'sub-' prefix
+            if row['participant_id'].startswith('sub-'):
+                row['participant_id'] = row['participant_id'][4:]
             props = {}
             for k in row:
                 # take away some ambiguity
                 normk = k.lower()
-                hk = content_metakey_map.get(normk, None)
+                hk = content_metakey_map.get(normk, normk)
                 val = row[k]
-                if hk is None:
-                    hk = 'comment<participant#{}>'.format(normk)
-                if hk in ('comment<participant#sex>', 'comment<participant#gender>'):
+                if hk in ('sex', 'gender'):
                     val = sex_label_map.get(row[k].lower(), row[k].lower())
                 if val:
                     props[hk] = val
             if props:
-                yield re.compile(r'^{}/.*'.format(row['participant_id'])), props
+                yield re.compile(r'^sub-{}/.*'.format(row['participant_id'])), props

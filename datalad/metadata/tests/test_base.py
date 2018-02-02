@@ -23,7 +23,6 @@ from datalad.metadata.metadata import get_metadata_type
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.tests.utils import with_tree, with_tempfile
-from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import slow
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
