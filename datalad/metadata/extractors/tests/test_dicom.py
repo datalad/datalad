@@ -45,8 +45,8 @@ def test_dicom(path):
     # from this extractor
     meta = res[0]['metadata']['dicom']
     assert_in('@context', meta)
-    # no point in testing ALL keys
-    eq_(len(meta.keys()), 89)
+    # no point in testing ALL keys, but we got plenty
+    assert(len(meta.keys()) > 70)
     eq_(meta['SeriesDate'], '20070205')
 
     # now ask for the dataset metadata, which should have both the unique props
