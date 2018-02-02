@@ -160,6 +160,7 @@ def _meta2index_dict(meta, val2str=True):
 
 def _get_search_schema(ds):
     from whoosh import fields as wf
+    from whoosh.analysis import StandardAnalyzer
 
     # haven for terms that have been found to be undefined
     # (for faster decision-making upon next encounter)
@@ -191,7 +192,8 @@ def _get_search_schema(ds):
         idxd = _meta2index_dict(meta, val2str=False)
 
         for k in idxd:
-            schema_fields[k] = wf.TEXT(stored=True)
+            schema_fields[k] = wf.TEXT(stored=True,
+                                       analyzer=StandardAnalyzer(minsize=1))
 
     schema = wf.Schema(**schema_fields)
     return schema
@@ -536,6 +538,7 @@ class Search(Interface):
             # upstream
             parser.add_plugin(qparse.FuzzyTermPlugin())
             parser.add_plugin(qparse.GtLtPlugin())
+            parser.add_plugin(qparse.SingleQuotePlugin())
             # replace field defintion to allow for colons to be part of a field's name:
             parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
             # for convenience we accept any number of args-words from the

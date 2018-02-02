@@ -220,6 +220,7 @@ def test_within_ds_file_search(path):
     # check generated index keys
     with swallow_outputs() as cmo:
         ds.search(show_keys=True)
+
         assert_equal(cmo.out, """\
 audio.bitrate
 audio.date
@@ -287,8 +288,8 @@ type
             ('female',
              opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
              'bids.participant.gender', 'female'),
-            (['bids.type:bold', "bids.participant.id:1"],
-             opj('sub-01', 'func', 'sub-01_task-other_bold.nii.gz'),
+            (['bids.type:bold', 'bids.participant.id:01'],
+             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
              'bids.type', 'bold'),
             ("'mime:audio/mp3'",
              opj('stim', 'stim1.mp3'),
@@ -297,7 +298,6 @@ type
             # query language configuration
     ):
         res = ds.search(query)
-        #import pdb; pdb.set_trace()
         # always a file and the dataset, because they carry metadata in
         # the same structure
         assert_result_count(res, 2)
