@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-""" Extensible Metadata Platform (XMP) metadata parser
+""" Extensible Metadata Platform (XMP) metadata extractor
 
 https://en.wikipedia.org/wiki/Extensible_Metadata_Platform
 """
@@ -14,18 +14,18 @@ https://en.wikipedia.org/wiki/Extensible_Metadata_Platform
 import re
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.xmp')
+lgr = logging.getLogger('datalad.metadata.extractors.xmp')
 
 from libxmp.utils import file_to_dict
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.utils import assure_unicode
 
 
 xmp_field_re = re.compile('^([^\[\]]+)(\[\d+\]|)(/?.*|)')
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []

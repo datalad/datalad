@@ -6,12 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata parser for Datalad's own core storage"""
+"""Metadata extractor for Datalad's own core storage"""
 
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 import logging
-lgr = logging.getLogger('datalad.meta.datalad_core')
+lgr = logging.getLogger('datalad.metadata.extractors.datalad_core')
 
 from os.path import join as opj
 from os.path import exists
@@ -19,11 +19,11 @@ from os.path import exists
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
 # use main version as core version
-# this must stay, despite being a seemingly unused import, each parser defines a version
+# this must stay, despite being a seemingly unused import, each extractor defines a version
 from datalad.metadata.definitions import version as vocabulary_version
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
 
     def _get_dataset_metadata(self):
@@ -52,7 +52,7 @@ class MetadataParser(BaseMetadataParser):
         """
         if not isinstance(self.ds.repo, AnnexRepo):
             for p in self.paths:
-                # this parser does give a response for ANY file as it serves
+                # this extractor does give a response for ANY file as it serves
                 # an an indicator of file presence (i.e. a file list) in the
                 # content metadata, even if we know nothing but the filename
                 # about a file

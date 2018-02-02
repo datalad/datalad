@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""BIDS metadata parser (http://bids.neuroimaging.io)"""
+"""BIDS metadata extractor (http://bids.neuroimaging.io)"""
 
 from __future__ import absolute_import
 # use pybids to evolve with the standard without having to track it too much
@@ -17,14 +17,14 @@ from io import open
 from os.path import join as opj
 from os.path import exists
 from datalad.dochelpers import exc_str
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.metadata.definitions import vocabulary_id
 from datalad.utils import open_r_encdetect
 
 from datalad import cfg
 
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.bids')
+lgr = logging.getLogger('datalad.metadata.extractors.bids')
 
 
 vocabulary = {
@@ -49,7 +49,7 @@ sex_label_map = {
 }
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _dsdescr_fname = 'dataset_description.json'
 
     _key2stdkey = {

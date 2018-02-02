@@ -6,17 +6,17 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""NIfTI metadata parser"""
+"""NIfTI metadata extractor"""
 
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.nifti1')
+lgr = logging.getLogger('datalad.metadata.extractors.nifti1')
 
 from math import isnan
 import nibabel
 import numpy as np
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.dochelpers import exc_str
 
 
@@ -55,7 +55,7 @@ unit_map = {
 # to serve as a default for when expect 0 to be consumable by np.asscalar
 _array0 = np.array(0)
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
 
     _key2stdkey = {
         'descrip': 'description',
@@ -117,7 +117,7 @@ class MetadataParser(BaseMetadataParser):
             try:
                 header = nibabel.load(fpath).header
             except Exception as e:
-                lgr.debug("NIfTI metadata parser failed to load %s: %s",
+                lgr.debug("NIfTI metadata extractor failed to load %s: %s",
                           fpath, exc_str(e))
                 continue
             if not isinstance(header, nibabel.Nifti1Header):

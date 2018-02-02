@@ -6,16 +6,16 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Audio metadata parser"""
+"""Audio metadata extractor"""
 from __future__ import absolute_import
 
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.audio')
+lgr = logging.getLogger('datalad.metadata.extractors.audio')
 
 from mutagen import File as audiofile
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 
 # how properties reported by mutagen map onto our vocabulary
@@ -32,7 +32,7 @@ vocab_map = {
 }
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []

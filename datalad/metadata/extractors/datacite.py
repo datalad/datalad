@@ -6,20 +6,22 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Parser for datacite xml records, currently for CRCNS datasets
+"""Extractor for datacite xml records, currently for CRCNS datasets
 """
 
 import re
 from os.path import join as opj
 from os.path import lexists
 from collections import OrderedDict
+import logging
+lgr = logging.getLogger('datalad.metadata.extractors.datacite')
 
 try:
     import xml.etree.cElementTree as ET
 except ImportError:
     import xml.etree.ElementTree as ET
 
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.interface.base import dedent_docstring
 
 
@@ -93,7 +95,7 @@ def _process_tree(tree, nstag):
     return rec
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _core_metadata_filename = opj('.datalad', 'meta.datacite.xml')
 
     def _get_dataset_metadata(self):

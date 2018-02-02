@@ -6,10 +6,10 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata parser base class"""
+"""Metadata extractor base class"""
 
 
-class BaseMetadataParser(object):
+class BaseMetadataExtractor(object):
     def __init__(self, ds, paths):
         """
         Parameters
@@ -48,7 +48,7 @@ class BaseMetadataParser(object):
     def _get_content_metadata(self):
         """Get ALL metadata for all dataset content.
 
-        Possibly limited to the paths given at to the parser.
+        Possibly limited to the paths given to the extractor.
 
         Returns
         -------

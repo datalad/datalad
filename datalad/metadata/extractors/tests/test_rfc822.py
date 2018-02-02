@@ -6,11 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS metadata parser """
+"""Test BIDS metadata extractor """
 
 from simplejson import dumps
 from datalad.distribution.dataset import Dataset
-from datalad.metadata.parsers.datalad_rfc822 import MetadataParser
+from datalad.metadata.extractors.datalad_rfc822 import MetadataExtractor
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 
@@ -43,7 +43,7 @@ def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
     ds.add('.')
-    meta = MetadataParser(ds, [])._get_dataset_metadata()
+    meta = MetadataExtractor(ds, [])._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test EXIF parser"""
+"""Test EXIF extractor"""
 
 from datalad.tests.utils import SkipTest
 try:
@@ -87,7 +87,7 @@ def test_exif(path):
     assert_status('ok', res)
     res = ds.metadata('exif.jpg')
     assert_result_count(res, 1)
-    # from this parser
+    # from this extractor
     meta = res[0]['metadata']['exif']
     for k, v in target.items():
         eq_(meta[k], v)

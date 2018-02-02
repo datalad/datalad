@@ -6,12 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS metadata parser """
+"""Test BIDS metadata extractor """
 
 from os.path import join as opj
 from simplejson import dumps
 from datalad.api import Dataset
-from datalad.metadata.parsers.bids import MetadataParser
+from datalad.metadata.extractors.bids import MetadataExtractor
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_in
@@ -48,7 +48,7 @@ sub-03\tf\t20-25\tr\tn
 @with_tree(tree=bids_template)
 def test_get_metadata(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -71,7 +71,7 @@ def test_get_metadata(path):
 }""")
 
     test_fname = opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')
-    cmeta = list(MetadataParser(
+    cmeta = list(MetadataExtractor(
         ds,
         [opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')]
     ).get_metadata(False, True)[1])
@@ -100,7 +100,7 @@ description
 def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -126,7 +126,7 @@ description с юникодом
 """})
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test NIDM parser"""
+"""Test NIDM extractor"""
 
 from shutil import copy
 from os.path import dirname
@@ -30,7 +30,7 @@ def test_nidm(path):
     ds.add('.')
     # all nice and tidy, nothing untracked
     ok_clean_git(ds.path)
-    # engage the parser(s)
+    # engage the extractor(s)
     res = ds.aggregate_metadata()
     # aggregation done without whining
     assert_status('ok', res)

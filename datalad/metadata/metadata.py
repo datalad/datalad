@@ -310,7 +310,7 @@ def _query_aggregated_metadata_singlepath(
         # we might be onto something here, prepare result
         metadata = MetadataDict(contentmeta.get(fpath, {}))
 
-        # we have to pull out the context for each subparser from the dataset
+        # we have to pull out the context for each extractor from the dataset
         # metadata
         for tlk in metadata:
             if tlk.startswith('@'):
@@ -391,16 +391,16 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         default=[]))]
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-    # keep local, who knows what some parsers might pull in
-    from . import parsers
+    # keep local, who knows what some extractors might pull in
+    from . import extractors
     for mtype in types:
         mtype_key = mtype
         try:
             pmod = import_module('.{}'.format(mtype),
-                                 package=parsers.__package__)
+                                 package=extractors.__package__)
         except ImportError as e:
             lgr.warning(
-                "Failed to import metadata parser for '%s', "
+                "Failed to import metadata extractor for '%s', "
                 "broken dataset configuration (%s)? "
                 "This type of metadata will be ignored: %s",
                 mtype, ds, exc_str(e))
@@ -408,9 +408,9 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 raise
             errored = True
             continue
-        parser = pmod.MetadataParser(ds, paths=paths)
+        extractor = pmod.MetadataExtractor(ds, paths=paths)
         try:
-            dsmeta_t, contentmeta_t = parser.get_metadata(
+            dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
                     'datalad.metadata.aggregate-dataset-{}'.format(mtype.replace('_', '-')),
                     default=True,
@@ -431,7 +431,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if dsmeta_t:
             if dsmeta_t is not None and not isinstance(dsmeta_t, dict):
                 lgr.error(
-                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "Metadata extractor '%s' yielded something other than a dictionary "
                     "for dataset %s -- this is likely a bug, please consider "
                     "reporting it. "
                     "This type of native metadata will be ignored. Got: %s",
@@ -448,7 +448,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         for loc, meta in contentmeta_t or {}:
             if not isinstance(meta, dict):
                 lgr.error(
-                    "Metadata parser '%s' yielded something other than a dictionary "
+                    "Metadata extractor '%s' yielded something other than a dictionary "
                     "for dataset %s content %s -- this is likely a bug, please consider "
                     "reporting it. "
                     "This type of native metadata will be ignored. Got: %s",
@@ -456,8 +456,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 errored = True
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
-            # if there is an issue that a parser needlessly produces empty records, the
-            # parser should be fixed and not a general switch. For example the datalad_core
+            # if there is an issue that a extractor needlessly produces empty records, the
+            # extractor should be fixed and not a general switch. For example the datalad_core
             # issues empty records to document the presence of a file
             #elif not meta:
             #    continue
@@ -470,7 +470,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 blacklist=blacklist)
 
             # assign
-            # only ask each metadata parser once, hence no conflict possible
+            # only ask each metadata extractor once, hence no conflict possible
             loc_dict = contentmeta.get(loc, {})
             if meta:
                 # do not store empty stuff

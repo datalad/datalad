@@ -30,7 +30,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
-from datalad.metadata.parsers.tests.test_bids import bids_template
+from datalad.metadata.extractors.tests.test_bids import bids_template
 
 from datalad.tests.utils import skip_if_no_network
 

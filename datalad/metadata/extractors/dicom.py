@@ -6,13 +6,13 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""DICOM metadata parser"""
+"""DICOM metadata extractor"""
 from __future__ import absolute_import
 
 from six import string_types
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.dicom')
+lgr = logging.getLogger('datalad.metadata.extractors.dicom')
 
 try:
     # renamed for 1.0 release
@@ -23,7 +23,7 @@ except ImportError:
     from dicom.errors import InvalidDicomError
 
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 
 def _is_good_type(v):
@@ -52,7 +52,7 @@ def _struct2dict(struct):
             _is_good_type(getattr(struct, k))}
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         imgseries = {}
         imgs = {}

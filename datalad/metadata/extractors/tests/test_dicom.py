@@ -6,11 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test audio parser"""
+"""Test audio extractor"""
 
 from datalad.tests.utils import SkipTest
 try:
-    import datalad.metadata.parsers.dicom
+    import datalad.metadata.extractors.dicom
 except ImportError:
     raise SkipTest
 
@@ -42,7 +42,7 @@ def test_dicom(path):
     # query for the file metadata
     res = ds.metadata('dicom.dcm')
     assert_result_count(res, 1)
-    # from this parser
+    # from this extractor
     meta = res[0]['metadata']['dicom']
     assert_in('@context', meta)
     # no point in testing ALL keys

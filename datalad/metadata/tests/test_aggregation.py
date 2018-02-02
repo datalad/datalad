@@ -23,7 +23,7 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
-from ..parsers.tests.test_bids import bids_template
+from ..extractors.tests.test_bids import bids_template
 
 
 def _assert_metadata_empty(meta):
