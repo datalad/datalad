@@ -6,4 +6,4 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata parsers"""
+"""Metadata extractors"""
