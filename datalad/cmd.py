@@ -38,6 +38,10 @@ from .dochelpers import borrowdoc
 lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
+# To be used in the temp file name to distinguish the ones we create
+# in Runner so we take care about their removal, in contrast to those
+# which might be created outside and passed into Runner
+_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
 if PY2:
     # TODO apparently there is a recommended substitution for Python2
@@ -69,8 +73,9 @@ def _get_output_stream(log_std, false_value):
     if log_std:
         if log_std == 'offline':
             # we will open a temporary file
+
             tf = tempfile.mktemp(
-                **get_tempfile_kwargs({}, prefix="outputs")
+                **get_tempfile_kwargs({}, prefix=_MAGICAL_OUTPUT_MARKER)
             )
             return open(tf, 'w')  # XXX PY3 should be 'b' may be?
         else:
@@ -82,7 +87,7 @@ def _get_output_stream(log_std, false_value):
 def _get_output(stream, out_):
     """Helper to process output which might have been obtained from popen or
     should be loaded from file"""
-    if isinstance(stream, file_class):
+    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
         assert out_ is None, "should have gone into a file"
         if not stream.closed:
             stream.close()
@@ -93,7 +98,7 @@ def _get_output(stream, out_):
 
 
 def _cleanup_output(stream, std):
-    if isinstance(stream, file_class):
+    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
         if not stream.closed:
             stream.close()
         if exists(stream.name):

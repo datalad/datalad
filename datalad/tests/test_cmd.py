@@ -215,8 +215,9 @@ def check_runner_heavy_output(log_online):
                 log_stderr='offline',
                 expect_stderr=True
             )
-        assert_equal(len(l), 100)
-        import pdb; pdb.set_trace()
+        assert not ret[0], "all messages went into `logged`"
+        assert_equal(len(logged), 100)
+        assert len(ret[1]) > 1000  # stderr all here
 
     return
     # and now original problematic command with a massive single line
