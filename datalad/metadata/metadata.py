@@ -901,7 +901,7 @@ class Metadata(Interface):
             global metadata ('definition' key). This can be used to
             define (custom) keys used in the datasets's metadata, for
             example by providing a URL to an ontology term for a given
-            key label. This option does not need --dataset-global to
+            key label. This option does not need --apply2global to
             be set to be in effect.""",
             constraints=EnsureStr() | EnsureNone()),
         show_keys=Parameter(
