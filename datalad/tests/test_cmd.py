@@ -182,7 +182,9 @@ def check_runner_heavy_output(log_online):
     cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
 
     with swallow_outputs() as cm, swallow_logs():
-        ret = runner.run(cmd, log_stderr=False, log_stdout=False,
+        ret = runner.run(cmd,
+                         log_online=log_online,
+                         log_stderr=False, log_stdout=False,
                          expect_stderr=True)
         eq_(cm.err, cm.out)  # they are identical in that script
         eq_(cm.out[:10], "[0, 1, 2, ")
@@ -195,7 +197,26 @@ def check_runner_heavy_output(log_online):
 
     #do it again with capturing:
     with swallow_logs():
-        ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
+        ret = runner.run(cmd,
+                         log_online=True, log_stderr=True, log_stdout=True,
+                         expect_stderr=True)
+
+    if log_online:
+        # halting case of datalad add and other batch commands #2116
+        logged = []
+        with swallow_logs():
+            def process_stdout(l):
+                assert l
+                logged.append(l)
+            ret = runner.run(
+                cmd,
+                log_online=log_online,
+                log_stdout=process_stdout,
+                log_stderr='offline',
+                expect_stderr=True
+            )
+        assert_equal(len(l), 100)
+        import pdb; pdb.set_trace()
 
     return
     # and now original problematic command with a massive single line
@@ -210,7 +231,7 @@ def check_runner_heavy_output(log_online):
 
 
 def test_runner_heavy_output():
-    for log_online in [True, False]:
+    for log_online in [False, True]:
         yield check_runner_heavy_output, log_online
 
 
