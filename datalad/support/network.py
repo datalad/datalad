@@ -687,9 +687,10 @@ class RegexBasedURLMixin(object):
         if not re_match:
             # TODO: custom error?
             raise ValueError(
-                "Possibly incorrectly determined string %r correspond to %s address"
-                " -- it failed matching regex. Dunno how to handle. Contact developers"
-                % (cls, url_str,)
+                "Cannot handle URL '%s': categorized as %r, but does not match syntax.%s"
+                % (url_str,
+                   cls,
+                   " Did you intent to use '///'?" if url_str.startswith('//') else '')
             )
         fields = cls._get_blank_fields()
         fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})

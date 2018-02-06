@@ -62,7 +62,7 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
-    This results in the files within archive (which should be under annex
+    This results in the files within archive (which must be already under annex
     control itself) added under annex referencing original archive via
     custom special remotes mechanism
 
@@ -228,6 +228,11 @@ class AddArchiveContent(Interface):
 
         # _rpath below should depict paths relative to the top of the annex
         archive_rpath = relpath(archive_path, annex_path)
+
+        if archive in annex.untracked_files:
+            raise RuntimeError(
+                "The archive is not under annex yet. You should run 'datalad "
+                "add {}' first".format(archive))
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if not allow_dirty and annex.dirty:
