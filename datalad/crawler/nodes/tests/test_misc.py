@@ -31,6 +31,7 @@ from ..misc import _act_if
 from ..misc import rename
 from ..misc import debug
 from ..misc import Sink
+from ..misc import fix_url
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
 from ....utils import updated
@@ -49,6 +50,7 @@ import logging
 from mock import patch
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
+import six.moves.builtins as __builtin__
 
 
 # TODO: redo on a local example
@@ -472,3 +474,10 @@ def test_debug():
     yield _test_debug, "About to run"
     yield _test_debug, "Ran node .* which yielded 1 times", ('after',)
     yield _test_debug, "Ran node .* which yielded 0 times", ('empty',)
+
+
+def test_fix_url():
+    # TODO: actual test
+    print("Test")
+    eq_(list(fix_url({'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication Material.zip'})),
+        [{'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication%20Material.zip'}])

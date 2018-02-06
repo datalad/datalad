@@ -589,3 +589,14 @@ class debug(object):
             lgr.info("Ran node %s which yielded %d times", node, n)
             pdb.set_trace()
 
+
+def fix_url(data):
+    """Given data, get value within 'url' key and fix up so it is legit url
+
+    - replace spaces with %20
+    """
+    url = data['url']
+    print(url)
+    if ' ' in url:
+        data['url'].replace(" ", "%20")
+    yield data
