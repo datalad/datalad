@@ -298,12 +298,11 @@ class Runner(object):
             if log_stderr_:
                 stderr += self._process_one_line(*stderr_args)
 
-        if log_stdout in {'offline'} or log_stderr in {'offline'}:
-            lgr.log(4, "Issuing proc.communicate() since one of the targets "
-                       "is 'offline'")
-            stdout_, stderr_ = proc.communicate()
-            stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
-            stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
+        # Handle possible remaining output
+        stdout_, stderr_ = proc.communicate()
+        # ??? should we condition it on log_stdout in {'offline'} ???
+        stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
+        stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
 
         return stdout, stderr
 
