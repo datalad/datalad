@@ -3423,6 +3423,14 @@ class ProcessAnnexProgressIndicators(object):
             self.total_pbar.update(diff, increment=True)
         pbar.update(new_value)
 
+    def _log_info(self, msg):
+        """Helper to log a message, so we need to clear up the pbars first"""
+        if self.total_pbar:
+            self.total_pbar.clear()
+        for pbar in self.pbars.values():
+            pbar.clear()
+        lgr.info(msg)
+
     def __call__(self, line):
         try:
             j = json.loads(line)
@@ -3440,10 +3448,9 @@ class ProcessAnnexProgressIndicators(object):
                 if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
                     j = j_
                 else:
-                    # XXX
-                    lgr.info(info)
+                    self._log_info(info)
             else:
-                lgr.info(info)
+                self._log_info(info)
                 return
 
         target_size = None

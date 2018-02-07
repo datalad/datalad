@@ -52,6 +52,9 @@ class ProgressBarBase(object):
     def finish(self):
         pass
 
+    def clear(self):
+        pass
+
     def set_desc(self, value):
         pass  # to override in subclass on how to handle description
 
