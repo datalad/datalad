@@ -361,7 +361,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
                 continue
 
-        self.error("Failed to fetch any archive containing {key}. Tried: {akeys_tried}".format(**locals()))
+        raise RuntimeError(
+            "Failed to fetch any archive containing {key}. "
+            "Tried: {akeys_tried}".format(**locals())
+        )
 
 
 def main():

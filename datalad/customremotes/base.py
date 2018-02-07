@@ -331,7 +331,11 @@ class AnnexCustomRemote(object):
             else:
                 raise exc
 
-    def send_unsupported(self):
+    def send_unsupported(self, msg=None):
+        """Send UNSUPPORTED-REQUEST to annex and log optional message in our log
+        """
+        if msg:
+            lgr.debug(msg)
         self.send("UNSUPPORTED-REQUEST")
 
     def read(self, req=None, n=1):
@@ -354,7 +358,9 @@ class AnnexCustomRemote(object):
         msg = l.split(None, n)
         if req and (req != msg[0]):
             # verify correct response was given
-            self.error("Expected %r, got %r.  Ignoring" % (req, msg[0]))
+            self.send_unsupported(
+                "Expected %r, got %r.  Ignoring" % (req, msg[0])
+            )
             return None
         self.heavydebug("Received %r" % (msg,))
         return msg
@@ -415,9 +421,10 @@ class AnnexCustomRemote(object):
             req, req_load = l[0], l[1:]
             method = getattr(self, "req_%s" % req, None)
             if not method:
-                self.debug("We have no support for %s request, part of %s response"
-                           % (req, l))
-                self.send("UNSUPPORTED-REQUEST")
+                self.send_unsupported(
+                    "We have no support for %s request, part of %s response"
+                    % (req, l)
+                )
                 continue
 
             req_nargs = self._req_nargs[req]
@@ -495,10 +502,16 @@ class AnnexCustomRemote(object):
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):
             lgr.debug("%s key %s into/from %s" % (cmd, key, file))  # was INFO level
-            self._transfer(cmd, key, file)
+            try:
+                self._transfer(cmd, key, file)
+            except Exception as exc:
+                self.send(
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc)
+                )
         else:
-            self.error("Retrieved unsupported for TRANSFER command %s" % cmd)
-            self.send_unsupported()
+            self.send_unsupported(
+                "Received unsupported by our TRANSFER command %s" % cmd
+            )
 
     # Specific implementations to be provided in derived classes when necessary
 

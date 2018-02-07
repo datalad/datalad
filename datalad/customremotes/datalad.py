@@ -163,10 +163,12 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
-                self.debug("Failed to download url %s for key %s: %s" % (url, key, exc_str(exc)))
+                self.debug("Failed to download url %s for key %s: %s"
+                           % (url, key, exc_str(exc)))
 
-        self.send('TRANSFER-FAILURE', cmd, key,
-                  "Failed to download from any of %d locations" % len(urls))
+        raise RuntimeError(
+            "Failed to download from any of %d locations" % len(urls)
+        )
 
 
 def main():
