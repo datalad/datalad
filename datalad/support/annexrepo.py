@@ -3430,6 +3430,13 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
+
+        # Process some messages which remotes etc might push to us
+        if list(j) == ['info']:
+            # Just INFO was received without anything else -- we log it at INFO
+            lgr.info(j['info'])
+            return
+
         target_size = None
         if 'command' in j and 'key' in j:
             # might be the finish line message

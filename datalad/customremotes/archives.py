@@ -333,6 +333,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     # Command could have fail to run if key was not present locally yet
                     # Thus retrieve the key using annex
                     # TODO: we need to report user somehow about this happening and progress on the download
+                    akey_size = self.repo.get_size_from_key(akey) or "unknown"
+                    self.info(
+                        "To obtain some keys we need to fetch an archive "
+                        "of size %s. No progress indication will be provided"
+                        % akey_size
+                    )
                     self.runner(["git-annex", "get", "--key", akey],
                                 cwd=self.path, expect_stderr=True)
 
