@@ -92,7 +92,7 @@ def _get_output(stream, out_):
         if not stream.closed:
             stream.close()
         with open(stream.name, 'rb') as f:
-            return f.read().decode()
+            return f.read()
     else:
         return out_
 
