@@ -187,7 +187,7 @@ def check_runner_heavy_output(log_online):
                          log_stderr=False, log_stdout=False,
                          expect_stderr=True)
         eq_(cm.err, cm.out)  # they are identical in that script
-        eq_(cm.out[:10], "[0, 1, 2, ")
+        eq_(cm.out[:10], "0 [0, 1, 2")
         eq_(cm.out[-15:], "997, 998, 999]\n")
 
     # for some reason swallow_logs is not effective, so we just skip altogether
@@ -216,24 +216,13 @@ def check_runner_heavy_output(log_online):
                 expect_stderr=True
             )
         assert_equal(len(logged), 100)
-        assert len(ret[1]) > 1000  # stderr all here
+        assert_greater(len(ret[1]), 1000)  # stderr all here
 
         from datalad.utils import on_osx
         if on_osx:
             raise SkipTest("For some reason we also get ret[0] here on OSX. TODO")
         else:
             assert not ret[0], "all messages went into `logged`"
-
-    return
-    # and now original problematic command with a massive single line
-    if not log_online:
-        # We know it would get stuck in online mode
-        cmd = '%s -c "import sys; x=str(list(range(1000))); ' \
-              '[(sys.stdout.write(x), sys.stderr.write(x)) ' \
-              'for i in range(100)];"' % sys.executable
-        with swallow_logs():
-            ret = runner.run(cmd, log_stderr=True, log_stdout=True,
-                             expect_stderr=True)
 
 
 def test_runner_heavy_output():

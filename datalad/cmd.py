@@ -84,19 +84,6 @@ def _get_output_stream(log_std, false_value):
         return false_value
 
 
-def _get_output(stream, out_):
-    """Helper to process output which might have been obtained from popen or
-    should be loaded from file"""
-    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
-        assert out_ is None, "should have gone into a file"
-        if not stream.closed:
-            stream.close()
-        with open(stream.name, 'rb') as f:
-            return f.read()
-    else:
-        return out_
-
-
 def _cleanup_output(stream, std):
     if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
         if not stream.closed:
@@ -287,59 +274,81 @@ class Runner(object):
 
         log_stdout_ = _decide_to_log(log_stdout)
         log_stderr_ = _decide_to_log(log_stderr)
+        log_stdout_is_callable = callable(log_stdout_)
+        log_stderr_is_callable = callable(log_stderr_)
+
+        # arguments to be passed into _process_one_line
+        stdout_args = (
+                'stdout',
+                proc, log_stdout_, log_stdout_is_callable
+        )
+        stderr_args = (
+                'stderr',
+                proc, log_stderr_, log_stderr_is_callable,
+                expect_stderr or expect_fail
+        )
 
         while proc.poll() is None:
+            # see for a possibly useful approach to processing output
+            # in another thread http://codereview.stackexchange.com/a/17959
+            # current problem is that if there is no output on stderr
+            # it stalls
             if log_stdout_:
-                lgr.log(3, "Reading line from stdout")
-                line = proc.stdout.readline()
-                if line and callable(log_stdout_):
-                    # Let it be processed
-                    line = log_stdout_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stdout += line
-                    self._log_out(line.decode())
-                    # TODO: what level to log at? was: level=5
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stdout()
-            else:
-                pass
-
+                stdout += self._process_one_line(*stdout_args)
             if log_stderr_:
-                # see for a possibly useful approach to processing output
-                # in another thread http://codereview.stackexchange.com/a/17959
-                # current problem is that if there is no output on stderr
-                # it stalls
-                lgr.log(3, "Reading line from stderr")
-                line = proc.stderr.readline()
-                if line and callable(log_stderr_):
-                    # Let it be processed
-                    line = log_stderr_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stderr += line
-                    self._log_err(line.decode() if PY3 else line,
-                                  expect_stderr or expect_fail)
-                    # TODO: what's the proper log level here?
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stderr()
-            else:
-                pass
+                stderr += self._process_one_line(*stderr_args)
 
         if log_stdout in {'offline'} or log_stderr in {'offline'}:
             lgr.log(4, "Issuing proc.communicate() since one of the targets "
                        "is 'offline'")
             stdout_, stderr_ = proc.communicate()
-
-            # apparently proc doesn't reveal what was the output stream
-            stdout += _get_output(outputstream, stdout_)
-            stderr += _get_output(errstream, stderr_)
+            stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
+            stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
 
         return stdout, stderr
+
+    def _process_remaining_output(self, stream, out_, *pargs):
+        """Helper to process output which might have been obtained from popen or
+        should be loaded from file"""
+        out = binary_type()
+        if isinstance(stream,
+                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+            assert out_ is None, "should have gone into a file"
+            if not stream.closed:
+                stream.close()
+            with open(stream.name, 'rb') as f:
+                for line in f:
+                    out += self._process_one_line(*pargs, line=line)
+        else:
+            if out_:
+                for line in out_.split(os.linesep):
+                    out += self._process_one_line(*pargs, line=line)
+        return out
+
+    def _process_one_line(self, out_type, proc, log_, log_is_callable,
+                          expected=False, line=None):
+        if line is None:
+            lgr.log(3, "Reading line from %s", out_type)
+            line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
+        else:
+            lgr.log(3, "Processing provided line")
+        if line and log_is_callable:
+            # Let it be processed
+            line = log_(line.decode())
+            if line is not None:
+                # we are working with binary type here
+                line = line.encode()
+        if line:
+            if out_type == 'stdout':
+                self._log_out(line.decode())
+            elif out_type == 'stderr':
+                self._log_err(line.decode() if PY3 else line,
+                              expected)
+            else:  # pragma: no cover
+                raise RuntimeError("must not get here")
+            return line
+        # it was output already directly but for code to work, return ""
+        return ""
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
