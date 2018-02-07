@@ -347,7 +347,7 @@ class Runner(object):
                 raise RuntimeError("must not get here")
             return line
         # it was output already directly but for code to work, return ""
-        return ""
+        return binary_type()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
