@@ -3434,8 +3434,17 @@ class ProcessAnnexProgressIndicators(object):
         # Process some messages which remotes etc might push to us
         if list(j) == ['info']:
             # Just INFO was received without anything else -- we log it at INFO
-            lgr.info(j['info'])
-            return
+            info = j['info']
+            if info.startswith('PROGRESS-JSON: '):
+                j_ = json.loads(info[len('PROGRESS-JSON: '):])
+                if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
+                    j = j_
+                else:
+                    # XXX
+                    lgr.info(info)
+            else:
+                lgr.info(info)
+                return
 
         target_size = None
         if 'command' in j and 'key' in j:
@@ -3456,6 +3465,7 @@ class ProcessAnnexProgressIndicators(object):
                     target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(target_size, increment=True)
             else:
+                lgr.log(5, "Message with failed status: %s" % str(j))
                 self._failed += 1
 
             if self.total_pbar:
@@ -3485,7 +3495,7 @@ class ProcessAnnexProgressIndicators(object):
             return int(math.ceil(int(count) / (float(perc) / 100.))) \
                 if perc else 0
 
-        # so we have a progress indicator, let's dead with it
+        # so we have a progress indicator, let's deal with it
         action = j['action']
         download_item = action.get('file') or action.get('key')
         download_id = (action['command'], action['key'])

@@ -336,10 +336,21 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     akey_size = self.repo.get_size_from_key(akey) or "unknown"
                     self.info(
                         "To obtain some keys we need to fetch an archive "
-                        "of size %s. No progress indication will be provided"
+                        "of size %s bytes. Some sizes below might be reported incorrectly"
                         % akey_size
                     )
-                    self.runner(["git-annex", "get", "--key", akey],
+
+                    def progress_indicators(l):
+                        self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
+
+                    self.runner(["git-annex", "get",
+                                 "--json", "--json-progress",
+                                 "--key", akey
+                                 ],
+                                log_stdout=progress_indicators,
+                                log_stderr='offline',
+                                # False, # to avoid lock down
+                                log_online=True,
                                 cwd=self.path, expect_stderr=True)
 
                     akey_fpath = self.get_contentlocation(akey)
