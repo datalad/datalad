@@ -217,12 +217,7 @@ def check_runner_heavy_output(log_online):
             )
         assert_equal(len(logged), 100)
         assert_greater(len(ret[1]), 1000)  # stderr all here
-
-        from datalad.utils import on_osx
-        if on_osx:
-            raise SkipTest("For some reason we also get ret[0] here on OSX. TODO")
-        else:
-            assert not ret[0], "all messages went into `logged`"
+        assert not ret[0], "all messages went into `logged`"
 
 
 def test_runner_heavy_output():
