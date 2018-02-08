@@ -90,7 +90,7 @@ def check_interaction_scenario(remote_class, tdir, scenario):
     for in_, out_ in scenario:
         if in_ is not None:
             fin.write(in_ + '\n')
-    cr = remote_class(tdir, fin=fin, fout=fout)
+    cr = remote_class(path=tdir, fin=fin, fout=fout)
 
     cr.main()
 

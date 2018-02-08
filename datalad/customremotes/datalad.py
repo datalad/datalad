@@ -32,7 +32,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     AVAILABILITY = "global"
 
-    def __init__(self, persistent_cache=True, **kwargs):
+    def __init__(self, **kwargs):
         super(DataladAnnexCustomRemote, self).__init__(**kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
