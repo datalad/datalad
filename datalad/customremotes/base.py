@@ -30,6 +30,7 @@ from ..ui import ui
 from ..support.protocol import ProtocolInterface
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
+from ..dochelpers import exc_str
 
 
 URI_PREFIX = "dl"
@@ -356,10 +357,10 @@ class AnnexCustomRemote(object):
         if self._protocol is not None:
             self._protocol += "recv %s" % l
         msg = l.split(None, n)
-        if req and (req != msg[0]):
+        if req and ((not msg) or (req != msg[0])):
             # verify correct response was given
             self.send_unsupported(
-                "Expected %r, got %r.  Ignoring" % (req, msg[0])
+                "Expected %r, got a line %r.  Ignoring" % (req, l)
             )
             return None
         self.heavydebug("Received %r" % (msg,))
@@ -506,7 +507,7 @@ class AnnexCustomRemote(object):
                 self._transfer(cmd, key, file)
             except Exception as exc:
                 self.send(
-                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc)
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
                 )
         else:
             self.send_unsupported(
