@@ -20,29 +20,78 @@ import shutil
 import shlex
 import atexit
 import functools
+import tempfile
 
 from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type
-from os.path import abspath, isabs, pathsep
+from os.path import abspath, isabs, pathsep, exists
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows
+from .utils import on_windows, get_tempfile_kwargs
 from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
+# To be used in the temp file name to distinguish the ones we create
+# in Runner so we take care about their removal, in contrast to those
+# which might be created outside and passed into Runner
+_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
 if PY2:
     # TODO apparently there is a recommended substitution for Python2
     # which is a backported implementation of python3 subprocess
     # https://pypi.python.org/pypi/subprocess32/
-    pass
+    file_class = file
+else:
+    from io import IOBase as file_class
+
+
+def _decide_to_log(v):
+    """Hacky workaround for now so we could specify per each which to
+    log online and which to the log"""
+    if isinstance(v, bool) or callable(v):
+        return v
+    elif v in {'online'}:
+        return True
+    elif v in {'offline'}:
+        return False
+    else:
+        raise ValueError("can be bool, callable, 'online' or 'offline'")
+
+
+def _get_output_stream(log_std, false_value):
+    """Helper to prepare output stream for Popen and use file for 'offline'
+
+    Necessary to avoid lockdowns when both stdout and stderr are pipes
+    """
+    if log_std:
+        if log_std == 'offline':
+            # we will open a temporary file
+
+            tf = tempfile.mktemp(
+                **get_tempfile_kwargs({}, prefix=_MAGICAL_OUTPUT_MARKER)
+            )
+            return open(tf, 'w')  # XXX PY3 should be 'b' may be?
+        else:
+            return subprocess.PIPE
+    else:
+        return false_value
+
+
+def _cleanup_output(stream, std):
+    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+        if not stream.closed:
+            stream.close()
+        if exists(stream.name):
+            os.unlink(stream.name)
+    elif stream == subprocess.PIPE:
+        std.close()
 
 
 class Runner(object):
@@ -197,7 +246,9 @@ class Runner(object):
                      level={True: 9,
                             False: 11}[expected])
 
-    def _get_output_online(self, proc, log_stdout, log_stderr,
+    def _get_output_online(self, proc,
+                           log_stdout, log_stderr,
+                           outputstream, errstream,
                            expect_stderr=False, expect_fail=False):
         """
 
@@ -221,71 +272,82 @@ class Runner(object):
         """
         stdout, stderr = binary_type(), binary_type()
 
-        def decide_to_log(v):
-            """Hacky workaround for now so we could specify per each which to
-            log online and which to the log"""
-            if isinstance(v, bool) or callable(v):
-                return v
-            elif v in {'online'}:
-                return True
-            elif v in {'offline'}:
-                return False
-            else:
-                raise ValueError("can be bool, callable, 'online' or 'offline'")
+        log_stdout_ = _decide_to_log(log_stdout)
+        log_stderr_ = _decide_to_log(log_stderr)
+        log_stdout_is_callable = callable(log_stdout_)
+        log_stderr_is_callable = callable(log_stderr_)
 
-        log_stdout_ = decide_to_log(log_stdout)
-        log_stderr_ = decide_to_log(log_stderr)
+        # arguments to be passed into _process_one_line
+        stdout_args = (
+                'stdout',
+                proc, log_stdout_, log_stdout_is_callable
+        )
+        stderr_args = (
+                'stderr',
+                proc, log_stderr_, log_stderr_is_callable,
+                expect_stderr or expect_fail
+        )
 
         while proc.poll() is None:
+            # see for a possibly useful approach to processing output
+            # in another thread http://codereview.stackexchange.com/a/17959
+            # current problem is that if there is no output on stderr
+            # it stalls
             if log_stdout_:
-                lgr.log(3, "Reading line from stdout")
-                line = proc.stdout.readline()
-                if line and callable(log_stdout_):
-                    # Let it be processed
-                    line = log_stdout_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stdout += line
-                    self._log_out(line.decode())
-                    # TODO: what level to log at? was: level=5
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stdout()
-            else:
-                pass
-
+                stdout += self._process_one_line(*stdout_args)
             if log_stderr_:
-                # see for a possibly useful approach to processing output
-                # in another thread http://codereview.stackexchange.com/a/17959
-                # current problem is that if there is no output on stderr
-                # it stalls
-                lgr.log(3, "Reading line from stderr")
-                line = proc.stderr.readline()
-                if line and callable(log_stderr_):
-                    # Let it be processed
-                    line = log_stderr_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stderr += line
-                    self._log_err(line.decode() if PY3 else line,
-                                  expect_stderr or expect_fail)
-                    # TODO: what's the proper log level here?
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stderr()
-            else:
-                pass
+                stderr += self._process_one_line(*stderr_args)
 
-        if log_stdout in {'offline'} or log_stderr in {'offline'}:
-            lgr.log(4, "Issuing proc.communicate() since one of the targets "
-                       "is 'offline'")
-            stdout_, stderr_ = proc.communicate()
-            stdout += stdout_
-            stderr += stderr_
+        # Handle possible remaining output
+        stdout_, stderr_ = proc.communicate()
+        # ??? should we condition it on log_stdout in {'offline'} ???
+        stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
+        stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
 
         return stdout, stderr
+
+    def _process_remaining_output(self, stream, out_, *pargs):
+        """Helper to process output which might have been obtained from popen or
+        should be loaded from file"""
+        out = binary_type()
+        if isinstance(stream,
+                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+            assert out_ is None, "should have gone into a file"
+            if not stream.closed:
+                stream.close()
+            with open(stream.name, 'rb') as f:
+                for line in f:
+                    out += self._process_one_line(*pargs, line=line)
+        else:
+            if out_:
+                for line in out_.split(os.linesep):
+                    out += self._process_one_line(*pargs, line=line)
+        return out
+
+    def _process_one_line(self, out_type, proc, log_, log_is_callable,
+                          expected=False, line=None):
+        if line is None:
+            lgr.log(3, "Reading line from %s", out_type)
+            line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
+        else:
+            lgr.log(3, "Processing provided line")
+        if line and log_is_callable:
+            # Let it be processed
+            line = log_(line.decode())
+            if line is not None:
+                # we are working with binary type here
+                line = line.encode()
+        if line:
+            if out_type == 'stdout':
+                self._log_out(line.decode())
+            elif out_type == 'stderr':
+                self._log_err(line.decode() if PY3 else line,
+                              expected)
+            else:  # pragma: no cover
+                raise RuntimeError("must not get here")
+            return line
+        # it was output already directly but for code to work, return ""
+        return binary_type()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
@@ -356,12 +418,8 @@ class Runner(object):
            CommandError's `code`-field. Command's stdout and stderr are stored
            in CommandError's `stdout` and `stderr` fields respectively.
         """
-
-        # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
-        # would need either threaded solution as in .communicate or just allow
-        # only one to be monitored and another one just being dumped into a file
-        outputstream = subprocess.PIPE if log_stdout else sys.stdout
-        errstream = subprocess.PIPE if log_stderr else sys.stderr
+        outputstream = _get_output_stream(log_stdout, sys.stdout)
+        errstream = _get_output_stream(log_stderr, sys.stderr)
 
         popen_env = env or self.env
 
@@ -423,7 +481,9 @@ class Runner(object):
 
             try:
                 if log_online:
-                    out = self._get_output_online(proc, log_stdout, log_stderr,
+                    out = self._get_output_online(proc,
+                                                  log_stdout, log_stderr,
+                                                  outputstream, errstream,
                                                   expect_stderr=expect_stderr,
                                                   expect_fail=expect_fail)
                 else:
@@ -457,10 +517,9 @@ class Runner(object):
                              level=8)
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                if outputstream == subprocess.PIPE:
-                    proc.stdout.close()
-                if errstream == subprocess.PIPE:
-                    proc.stderr.close()
+                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                _cleanup_output(outputstream, proc.stdout)
+                _cleanup_output(errstream, proc.stderr)
 
         else:
             if self.protocol.records_ext_commands:

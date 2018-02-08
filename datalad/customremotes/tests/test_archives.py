@@ -178,6 +178,48 @@ def test_no_rdflib_loaded():
         assert_not_in("rdflib", cmo.err)
 
 
+from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
+
+
+@with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
+def test_interactions(tdir):
+    # Just a placeholder since constructor expects a repo
+    repo = AnnexRepo(tdir, create=True, init=True)
+    repo.add('archive.tar.gz')
+    repo.commit('added')
+    for scenario in BASE_INTERACTION_SCENARIOS + [
+        [
+            ('GETCOST', 'COST %d' % ArchiveAnnexCustomRemote.COST),
+        ],
+        [
+            # by default we do not require any fancy init
+            # no urls supported by default
+            ('CLAIMURL http://example.com', 'CLAIMURL-FAILURE'),
+            # we know that is just a single option, url, is expected so full
+            # one would be passed
+            ('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
+        ],
+        # basic interaction failing to fetch content from archive
+        [
+            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
+            ('VALUE dl+archive://somekey2#path', None),
+            ('VALUE dl+archive://somekey3#path', None),
+            ('VALUE',
+             re.compile(
+                 'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
+                 'archive containing somekey. Tried: \[..\]')
+             )
+        ],
+        # # incorrect response received from annex -- something isn't right but ... later
+        # [
+        #     ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
+        #     # We reply with UNSUPPORTED-REQUEST in these cases
+        #     ('GETCOST', 'UNSUPPORTED-REQUEST'),
+        # ],
+    ]:
+        check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
+
+
 from datalad.tests.utils import serve_path_via_http
 @with_tree(tree=
     {'1.tar.gz':
@@ -213,4 +255,3 @@ def check_observe_tqdm(topdir, topurl, outdir):
     # import pdb; pdb.set_trace()
     while True:
        sleep(0.1)
-

@@ -2341,6 +2341,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
+            if e.stderr:
+                # else just warn about present errors
+                shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
+                lgr.warning(
+                    "Running %s resulted in stderr output: %s",
+                    command, shorten(e.stderr)
+                )
         finally:
             if progress_indicators:
                 progress_indicators.finish()
