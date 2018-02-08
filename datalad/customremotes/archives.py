@@ -326,6 +326,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # we should go through all and choose the one easiest to get or smth.
         from humanize import naturalsize
         for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
+            if not akey:
+                lgr.warning("Got an empty archive key %r for key %s. Skipping",
+                            akey, key)
+                continue
             akeys_tried.append(akey)
             try:
                 akey_fpath = self.get_contentlocation(akey)
@@ -338,7 +342,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     self.info(
                         "To obtain some keys we need to fetch an archive "
                         "of size %s"
-                        % naturalsize(akey_size) if akey_size else "unknown"
+                        % (naturalsize(akey_size) if akey_size else "unknown")
                     )
 
                     def progress_indicators(l):

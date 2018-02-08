@@ -207,7 +207,7 @@ def test_interactions(tdir):
             ('VALUE',
              re.compile(
                  'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
-                 'archive containing somekey. Tried: \[..\]')
+                 'archive containing somekey. Tried: \[\]')
              )
         ],
         # # incorrect response received from annex -- something isn't right but ... later
