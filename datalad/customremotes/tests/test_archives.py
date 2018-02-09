@@ -207,7 +207,7 @@ def test_interactions(tdir):
             ('VALUE',
              re.compile(
                  'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
-                 'archive containing somekey. Tried: \[..\]')
+                 'archive containing somekey. Tried: \[\]')
              )
         ],
         # # incorrect response received from annex -- something isn't right but ... later
@@ -219,3 +219,39 @@ def test_interactions(tdir):
     ]:
         check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
 
+
+from datalad.tests.utils import serve_path_via_http
+@with_tree(tree=
+    {'1.tar.gz':
+         {
+             'bu.dat': '52055957098986598349795121365535'*10000,
+             'bu3.dat': '8236397048205454767887168342849275422'*10000
+          },
+    '2.tar.gz':
+         {
+             'bu2.dat': '17470674346319559612580175475351973007892815102'*10000
+          },
+    }
+)
+@serve_path_via_http()
+@with_tempfile
+def check_observe_tqdm(topdir, topurl, outdir):
+    # just a helper to enable/use when want quickly to get some
+    # repository with archives and observe tqdm
+    from datalad.api import create, download_url, add_archive_content
+    ds = create(outdir)
+    for f in '1.tar.gz', '2.tar.gz':
+        with chpwd(outdir):
+            ds.repo.add_url_to_file(f, topurl + f)
+            ds.add(f)
+            add_archive_content(f, delete=True, drop_after=True)
+    files = glob.glob(opj(outdir, '*'))
+    ds.drop(files) # will not drop tarballs
+    ds.repo.drop([], options=['--all', '--fast'])
+    ds.get(files)
+    ds.repo.drop([], options=['--all', '--fast'])
+    # now loop so we could play with it outside
+    print(outdir)
+    # import pdb; pdb.set_trace()
+    while True:
+       sleep(0.1)

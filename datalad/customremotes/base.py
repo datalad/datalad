@@ -28,6 +28,7 @@ lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
 from ..support.protocol import ProtocolInterface
+from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
@@ -250,6 +251,8 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
+        self._annex_supports_info = \
+            external_versions['cmd:annex'] >= '6.20180206'
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -379,6 +382,11 @@ class AnnexCustomRemote(object):
     def error(self, msg, annex_err="ERROR"):
         lgr.error(msg)
         self.send(annex_err, msg)
+
+    def info(self, msg):
+        lgr.info(msg)
+        if self._annex_supports_info:
+            self.send('INFO', msg)
 
     def progress(self, bytes):
         bytes = int(bytes)
