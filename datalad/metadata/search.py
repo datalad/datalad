@@ -255,13 +255,14 @@ def _get_schema_homoblob(ds):
 def _get_parser_homoblob(idx_obj):
     from whoosh import qparser as qparse
 
+    # use whoosh default query parser for now
     return qparse.QueryParser(
         "meta",
         schema=idx_obj.schema
     )
 
 
-def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc):
+def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc, documenttype):
     """Generic entrypoint to index generation
 
     The actual work that determines the structure and content of the index
@@ -346,7 +347,7 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc)
     old_ds_rpath = ''
     idx_size = 0
     for res in query_aggregated_metadata(
-            reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
+            reporton=documenttype,
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
             # MIH: I cannot see a case when we would not want recursion (within
@@ -502,13 +503,13 @@ class Search(Interface):
     search index comprised of documents for datasets and individual files can
     take a considerable amount of time. If this becomes an issue, search index
     generation can be limited to a particular type of document (see the
-    'metadata --reporton' option for possible values). The configuration
-    setting 'datalad.metadata.searchindex-documenttype' will be queried on
+    'metadata --reporton' option for possible values). The per-mode configuration
+    setting 'datalad.metadata.searchindex-<mode>-documenttype' will be queried on
     search index generation. It is recommended to place an appropriate
     configuration into a dataset's configuration file (.datalad/config)::
 
       [datalad "metadata"]
-        searchindex-documenttype = datasets
+        searchindex-default-documenttype = datasets
 
     .. seealso::
       - Description of the Whoosh query language:
@@ -603,10 +604,16 @@ class Search(Interface):
             get_schema_fx = _get_schema_homoblob
             meta2doc_fx = _meta2homoblob_dict
             get_parser = _get_parser_homoblob
+            documenttype = ds.config.obtain(
+                'datalad.metadata.searchindex-default-documenttype',
+                default='datasets')
         elif mode == 'autofield':
             get_schema_fx = _get_schema_autofield
             meta2doc_fx = _meta2autofield_dict
             get_parser = _get_parser_autofield
+            documenttype = ds.config.obtain(
+                'datalad.metadata.searchindex-autofield-documenttype',
+                default='all')
 
         idx_obj = _get_search_index(
             index_dir,
@@ -614,7 +621,8 @@ class Search(Interface):
             ds,
             force_reindex,
             get_schema_fx,
-            meta2doc_fx)
+            meta2doc_fx,
+            documenttype)
 
         if show_keys:
             for k in idx_obj.schema.names():

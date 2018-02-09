@@ -333,13 +333,17 @@ type
             # query language configuration
     ):
         res = ds.search(query, mode=mode)
-        # always a file and the dataset, because they carry metadata in
-        # the same structure
-        assert_result_count(res, 2)
+        if mode == 'default':
+            # 'default' does datasets by default only (be could be configured otherwise
+            assert_result_count(res, 1)
+        else:
+            # the rest has always a file and the dataset, because they carry metadata in
+            # the same structure
+            assert_result_count(res, 2)
+            assert_result_count(
+                res, 1, type='file', path=opj(ds.path, hitpath))
         assert_result_count(
             res, 1, type='dataset', path=ds.path)
-        assert_result_count(
-            res, 1, type='file', path=opj(ds.path, hitpath))
         # test the key and specific value of the match
         assert_in(matched_key, res[-1]['query_matched'])
         assert_equal(res[-1]['query_matched'][matched_key], matched_val)
