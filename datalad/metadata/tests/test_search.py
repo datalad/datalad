@@ -292,6 +292,8 @@ path
 type
 """)
 
+    # stupid yields nothing
+    assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
     for mode, query, hitpath, matched_key, matched_val in (
             # random keyword query
