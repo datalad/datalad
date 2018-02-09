@@ -103,7 +103,7 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
-def _meta2autofield_dict(meta, val2str=True):
+def _meta2autofield_dict(meta, val2str=True, schema=None):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
@@ -154,6 +154,9 @@ def _meta2autofield_dict(meta, val2str=True):
          # and the rest into unicode
          _any2unicode(v)) if val2str else v
         for k, v in _deep_kv('', meta or {})
+        # auto-exclude any key that is not a defined field in the schema (if there is
+        # a schema
+        if schema is None or k in schema
     }
 
 
@@ -207,11 +210,11 @@ def _doc_gen_autofield(ds, schema):
             # the metadata)
             recursive=True):
         meta = res.get('metadata', {})
-        # TODO have it validate field based on the actual schema -> pass that in
         doc = _meta2autofield_dict(
             meta,
             # this time stringification of values so whoosh can handle them
-            val2str=True)
+            val2str=True,
+            schema=schema)
         admin = {
             'type': res['type'],
             'path': relpath(res['path'], start=ds.path),
@@ -235,7 +238,7 @@ def _get_parser_autofield(idx_obj):
     # replace field defintion to allow for colons to be part of a field's name:
     parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
     return parser
- 
+
 
 def _get_search_index(index_dir, label, ds, force_reindex, get_schema, doc_gen):
     """Generic entrypoint to index generation
