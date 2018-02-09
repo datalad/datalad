@@ -47,6 +47,11 @@ from datalad.utils import is_interactive
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
 
+try:
+    import pyout
+except ImportError:
+    pyout = None
+
 
 @build_doc
 class Ls(Interface):
@@ -142,6 +147,9 @@ class Ls(Interface):
         kw['long_'] = kw.pop('long_')
 
         loc_type = "unknown"
+        # TODO for Yarik: _ls_dataset should generate datasets and then a chain
+        #  of those generators should be passed to the actual rendering function
+        #  to consume them in a single loop
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content,
                           **kw)
@@ -200,6 +208,8 @@ class AbsentRepoModel(object):
     @property
     def type(self):
         return "N/A"
+
+    # TODO: waiting for https://github.com/pyout/pyout/issues/37
 
 
 @auto_repr
@@ -283,6 +293,13 @@ class AnnexModel(GitModel):
     def annex_local_size(self):
         info = self.info
         return info['local annex size'] if info else 0.0
+
+    # To please current Pyout features. TODO: support "delayed"
+    def annex_local_size_(self):
+        return self.annex_local_size
+
+    def annex_worktree_size_(self):
+        return self.annex_worktree_size
 
 
 @auto_repr
@@ -476,30 +493,142 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         ds_model.path = path
     dsms = sorted(dsms, key=lambda m: m.path)
 
+    (_pyout_output if pyout else _format_output)(dsms, fast, long_)
+
+
+def _pyout_output(dsms, fast, long_):
+    """Format listing of datasets using pyout"""
+    from collections import OrderedDict
+    columns = ['path', 'type', 'branch', 'describe', 'date']
+    if (not fast) or long_:
+        # ✓
+        columns.append('clean')
+    if long_:
+        columns += [
+            # TODO: columns renames?
+            'annex_local_size_',
+            'annex_worktree_size_'
+        ]
+
+    def fancy_bool(v):
+        # TODO: move such supports into pyout since we should not
+        # investigate here either terminal/output supports ANSI
+        # should be for pyout to know that bool True should be this or that
+        """
+$> datalad ls -rLa  ~/datalad/openfmri/ds000001
+[ERROR  ] 'ascii' codec can't decode byte 0xe2 in position 0: ordinal not in range(128) [tabular.py:_writerow:333] (UnicodeDecodeError)
+        """
+        #return u'✓' if v else '-'
+        return 'X' if v else '-'
+
+    def naturalsize(v):
+        if v in ["", None]:
+            return ""
+        return humanize.naturalsize(v)
+
+    def datefmt(v):
+        return time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(v))
+
+    def empty_for_none(v):
+        return '' if v is None else v
+
+    def summary_counts(values):
+        from collections import Counter
+        return ["%s: %s" % v for v in Counter(['git', 'annex', 'git']).items()]
+
+    def summary_dates(values):
+        return [
+            "earliers: %s" % datefmt(min(values)),
+            "latest: %s" % datefmt(max(values))
+        ]
+
+    out = pyout.Tabular(
+        columns=columns,
+        style=OrderedDict(
+            [
+                ('header_', dict(bold=True, transform=str.upper)),
+                #('default_', dict(align="center")),
+                ('path', dict(
+                    bold=True,
+                    align="left",
+                    underline=True,
+                    # TODO: seems to be wrong
+                    #width='auto'
+                    #summary=lambda x: "TOTAL: %d" % len(x)
+                )),
+                ('type', dict(
+                    transform=lambda s: "[%s]" % s,
+                    #summary=summary_counts
+                )),
+                ('describe', dict(
+                    transform=empty_for_none)),
+                ('clean', dict(
+                    color='green',
+                    transform=fancy_bool,
+                    # delayed="group-git"
+                )),
+                ('annex_local_size_', dict(
+                    transform=naturalsize,
+                    color=dict(
+                        interval=[
+                            [0, 1024, "blue"],
+                            [1024, 1024**2, "green"],
+                            [1024**2, None, "red"]
+                        ])
+                    #summary=sum,
+                    #delayed="group-annex"
+                )),
+                ('annex_worktree_size_', dict(
+                    transform=naturalsize,
+                    #delayed="group-annex"  TODO
+                )),
+                ('date', dict(
+                    transform=datefmt,
+                    #summary=summary_dates
+                ))
+            ]
+        )
+        # , stream=...
+    )
+    with out:
+        for dsm in dsms:
+            out(dsm)
+            # except:
+            #     # TODO -- remove this guard against the ones which are not complete
+            #     pass
+    print("EXITED")  # TODO -- exits upon "not installed ATM"
+
+
+def _format_output(dsms, fast, long_):
+    """Format listing of datasets using regular format"""
     maxpath = max(len(ds_model.path) for ds_model in dsms)
-    path_fmt = u"{ds.path!U:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    path_fmt = u"{ds.path!U:<%d}" % (
+            maxpath + (11 if is_interactive() else 0)
+    )  # + to accommodate ansi codes
     pathtype_fmt = path_fmt + u"  [{ds.type}]"
     full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or long_:
         full_fmt += u"  {ds.clean!X}"
-
     fmts = {
         AbsentRepoModel: pathtype_fmt,
         GitModel: full_fmt,
         AnnexModel: full_fmt
     }
     if long_:
-        fmts[AnnexModel] += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
-
+        fmts[
+            AnnexModel] += u"  {ds.annex_local_size!S}/{" \
+                           u"ds.annex_worktree_size!S}"
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
     # for out in Parallel(n_jobs=1)(
-    #         delayed(format_ds_model)(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}")
+    #         delayed(format_ds_model)(formatter, dsm, full_fmt,
+    # format_exc=path_fmt + "  {msg!R}")
     #         for dsm in dss):
     #     print(out)
     for dsm in dsms:
         fmt = fmts[dsm.__class__]
-        ds_str = format_ds_model(formatter, dsm, fmt, format_exc=path_fmt + u"  {msg!R}")
+        ds_str = format_ds_model(formatter, dsm, fmt,
+                                 format_exc=path_fmt + u"  {msg!R}")
         safe_print(ds_str)
         # workaround for explosion of git cat-file --batch processes
         # https://github.com/datalad/datalad/issues/1888

@@ -59,6 +59,7 @@ requires = {
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
+        'pyout>=0.2',
         'wrapt',
     ] + pbar_requires,
     'downloaders': [
