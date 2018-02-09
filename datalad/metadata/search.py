@@ -201,29 +201,6 @@ def _get_schema_autofield(ds):
     return schema
 
 
-def _doc_gen_autofield(ds, schema):
-    for res in query_aggregated_metadata(
-            reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
-            ds=ds,
-            aps=[dict(path=ds.path, type='dataset')],
-            # MIH: I cannot see a case when we would not want recursion (within
-            # the metadata)
-            recursive=True):
-        meta = res.get('metadata', {})
-        doc = _meta2autofield_dict(
-            meta,
-            # this time stringification of values so whoosh can handle them
-            val2str=True,
-            schema=schema)
-        admin = {
-            'type': res['type'],
-            'path': relpath(res['path'], start=ds.path),
-        }
-        if 'parentds' in res:
-            admin['parentds'] = relpath(res['parentds'], start=ds.path)
-        yield (admin, doc)
-
-
 def _get_parser_autofield(idx_obj):
     from whoosh import qparser as qparse
 
@@ -240,14 +217,14 @@ def _get_parser_autofield(idx_obj):
     return parser
 
 
-def _get_search_index(index_dir, label, ds, force_reindex, get_schema, doc_gen):
+def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc):
     """Generic entrypoint to index generation
 
     The actual work that determines the structure and content of the index
     is done by functions that are passed in as arguments
 
     `get_schema` - must return whoosh schema
-    `doc_gen` - must yield 2-tuples of dicts (admin, metadata)
+    `meta2doc` - must return dict for index document from result input
     `label` - string label to distinguish an index type from others (must be a valid
               directory name
     """
@@ -258,15 +235,17 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, doc_gen):
     # use location common to all index types, they would all invalidate
     # simultaneously
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
+    index_dir = opj(index_dir, label)
 
-    if not force_reindex and \
+    if (not force_reindex) and \
+            exists(index_dir) and \
             exists(stamp_fname) and \
             open(stamp_fname).read() == metadata_state:
         try:
             # TODO check that the index schema is the same
             # as the one we would have used for reindexing
             # TODO support incremental re-indexing, whoosh can do it
-            idx = widx.open_dir(opj(index_dir, label))
+            idx = widx.open_dir(index_dir)
             lgr.debug(
                 'Search index contains %i documents',
                 idx.doc_count())
@@ -322,10 +301,28 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, doc_gen):
     old_idx_size = 0
     old_ds_rpath = ''
     idx_size = 0
-    for admin, idoc in doc_gen(ds, schema):
+    for res in query_aggregated_metadata(
+            reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
+            ds=ds,
+            aps=[dict(path=ds.path, type='dataset')],
+            # MIH: I cannot see a case when we would not want recursion (within
+            # the metadata)
+            recursive=True):
         # this assumes that files are reported after each dataset report,
         # and after a subsequent dataset report no files for the previous
         # dataset will be reported again
+        meta = res.get('metadata', {})
+        doc = meta2doc(
+            meta,
+            # this time stringification of values so whoosh can handle them
+            val2str=True,
+            schema=schema)
+        admin = {
+            'type': res['type'],
+            'path': relpath(res['path'], start=ds.path),
+        }
+        if 'parentds' in res:
+            admin['parentds'] = relpath(res['parentds'], start=ds.path)
         if admin['type'] == 'dataset':
             if old_ds_rpath:
                 lgr.info(
@@ -339,9 +336,9 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, doc_gen):
             old_idx_size = idx_size
             old_ds_rpath = admin['path']
 
-        idoc.update({k: assure_unicode(v) for k, v in admin.items()})
+        doc.update({k: assure_unicode(v) for k, v in admin.items()})
         # inject into index
-        idx.add_document(**idoc)
+        idx.add_document(**doc)
         idx_size += 1
 
     if old_ds_rpath:
@@ -560,7 +557,7 @@ class Search(Interface):
 
         if mode == 'autofield':
             get_schema_fx = _get_schema_autofield
-            doc_gen_fx = _doc_gen_autofield
+            meta2doc_fx = _meta2autofield_dict
             get_parser = _get_parser_autofield
 
         idx_obj = _get_search_index(
@@ -569,7 +566,7 @@ class Search(Interface):
             ds,
             force_reindex,
             get_schema_fx,
-            doc_gen_fx)
+            meta2doc_fx)
 
         if show_keys:
             for k in idx_obj.schema.names():
