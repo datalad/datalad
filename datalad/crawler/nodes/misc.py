@@ -595,8 +595,7 @@ def fix_url(data):
 
     - replace spaces with %20
     """
-    url = data['url']
-    print(url)
-    if ' ' in url:
-        data['url'].replace(" ", "%20")
+
+    for key, value in data.items():
+        data[key] = data[key].replace(" ", "%20")
     yield data
