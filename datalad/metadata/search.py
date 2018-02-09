@@ -103,6 +103,9 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
+#
+# START: autofield mode functions
+#
 def _meta2autofield_dict(meta, val2str=True, schema=None):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
@@ -215,6 +218,47 @@ def _get_parser_autofield(idx_obj):
     # replace field defintion to allow for colons to be part of a field's name:
     parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
     return parser
+
+
+#
+# START: homoblob mode functions
+#
+def _meta2homoblob_dict(meta, val2str=True, schema=None):
+    # coerce the entire flattened metadata dict into a comma-separated string
+    # that also includes the keys
+    return dict(meta=u', '.join(
+        '{}: {}'.format(k, v)
+        for k, v in _meta2autofield_dict(
+            meta,
+            val2str=True,
+            schema=None).items()))
+
+
+def _get_schema_homoblob(ds):
+    from whoosh import fields as wf
+    from whoosh.analysis import StandardAnalyzer
+
+    # TODO support some customizable mapping to homogenize some metadata fields
+    # onto a given set of index keys
+    schema = wf.Schema(
+        id=wf.ID,
+        path=wf.ID(stored=True),
+        type=wf.ID(stored=True),
+        parentds=wf.ID(stored=True),
+        meta=wf.TEXT(
+            stored=False,
+            analyzer=StandardAnalyzer(minsize=2))
+    )
+    return schema
+
+
+def _get_parser_homoblob(idx_obj):
+    from whoosh import qparser as qparse
+
+    return qparse.QueryParser(
+        "meta",
+        schema=idx_obj.schema
+    )
 
 
 def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc):
@@ -505,7 +549,7 @@ class Search(Interface):
             constraints=EnsureInt()),
         mode=Parameter(
             args=("--mode",),
-            choices=('autofield',),
+            choices=('default', 'autofield',),
             nargs=1,
             doc="""Mode of search index structure and content. 'autofield': metadata
             fields are discovered automatically, datasets and files can be discovered.
@@ -537,7 +581,7 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20,
-                 mode='autofield',
+                 mode='default',
                  show_keys=False,
                  show_query=False):
         try:
@@ -555,7 +599,11 @@ class Search(Interface):
         # where does the bunny have the eggs?
         index_dir = opj(ds.path, get_git_dir(ds.path), SEARCH_INDEX_DOTGITDIR)
 
-        if mode == 'autofield':
+        if mode == 'default':
+            get_schema_fx = _get_schema_homoblob
+            meta2doc_fx = _meta2homoblob_dict
+            get_parser = _get_parser_homoblob
+        elif mode == 'autofield':
             get_schema_fx = _get_schema_autofield
             meta2doc_fx = _meta2autofield_dict
             get_parser = _get_parser_autofield
