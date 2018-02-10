@@ -665,7 +665,7 @@ class Metadata(Interface):
                 )
             return
 
-        if not dataset and not path and not show_keys:
+        if not dataset and not path:
             # makes no sense to have no dataset, go with "here"
             # error generation happens during annotation
             path = curdir
