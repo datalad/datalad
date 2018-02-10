@@ -6,13 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Parser for friction-less data packages
+"""Extractor for friction-less data packages
 (http://specs.frictionlessdata.io/data-packages)
 """
 
+import logging
+lgr = logging.getLogger('datalad.metadata.extractors.frictionless_datapackage')
 from os.path import join as opj, exists
 from datalad.support.json_py import load as jsonload
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 
 def _compact_author(obj):
@@ -41,7 +43,7 @@ def _compact_license(obj):
         return obj
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     metadatasrc_fname = 'datapackage.json'
 
     _key2stdkey = {
@@ -62,7 +64,7 @@ class MetadataParser(BaseMetadataParser):
 
         for term in self._key2stdkey:
             if term in foreign:
-                meta[self.get_homogenized_key(term)] = foreign[term]
+                meta[self._key2stdkey[term]] = foreign[term]
         if 'author' in foreign:
             meta['author'] = _compact_author(foreign['author'])
         if 'contributors' in foreign:

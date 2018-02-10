@@ -9,19 +9,28 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
+from shutil import copy
 from mock import patch
+from os import makedirs
+from os.path import join as opj
+from os.path import dirname
 from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import chpwd
+from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
+from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
+from datalad.metadata.extractors.tests.test_bids import bids_template
 
 from datalad.tests.utils import skip_if_no_network
 
@@ -175,3 +184,168 @@ def test_search_non_dataset(tdir):
         list(search('smth', dataset=tdir))
     # Should instruct user how that repo could become a datalad dataset
     assert_in("datalad create --force", str(cme.exception))
+
+
+@with_tree(bids_template)
+def test_within_ds_file_search(path):
+    try:
+        import nibabel
+        import mutagen
+    except ImportError:
+        raise SkipTest
+    ds = Dataset(path).create(force=True)
+    ds.config.add('datalad.metadata.nativetype', 'nifti1', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+    makedirs(opj(path, 'stim'))
+    for src, dst in (
+            ('audio.mp3', opj('stim', 'stim1.mp3')),
+            ('nifti1.nii.gz', opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')),
+            ('nifti1.nii.gz', opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'))):
+        copy(
+            opj(dirname(dirname(__file__)), 'tests', 'data', src),
+            opj(path, dst))
+    ds.add('.')
+    ds.aggregate_metadata()
+    ok_clean_git(ds.path)
+    # basic sanity check on the metadata structure of the dataset
+    dsmeta = ds.metadata('.', reporton='datasets')[0]['metadata']
+    for src in ('audio', 'bids', 'nifti1'):
+        # something for each one
+        assert_in(src, dsmeta)
+        # each src declares its own context
+        assert_in('@context', dsmeta[src])
+        # we have a unique content metadata summary for each src
+        assert_in(src, dsmeta['datalad_unique_content_properties'])
+
+    # test default behavior
+    with swallow_outputs() as cmo:
+        ds.search(show_keys=True)
+
+        assert_equal(cmo.out, """\
+id
+meta
+parentds
+path
+type
+""")
+
+    # check generated autofield index keys
+    with swallow_outputs() as cmo:
+        ds.search(mode='autofield', show_keys=True)
+
+        assert_equal(cmo.out, """\
+audio.bitrate
+audio.date
+audio.duration(s)
+audio.format
+audio.music-Genre
+audio.music-album
+audio.music-artist
+audio.music-channels
+audio.music-sample_rate
+audio.name
+audio.tracknumber
+bids.author
+bids.citation
+bids.comment<BIDSVersion>
+bids.conformsto
+bids.description
+bids.fundedby
+bids.license
+bids.modality
+bids.name
+bids.participant.age(years)
+bids.participant.gender
+bids.participant.handedness
+bids.participant.hearing_problems_current
+bids.participant.id
+bids.subject
+bids.task
+bids.type
+id
+nifti1.cal_max
+nifti1.cal_min
+nifti1.datatype
+nifti1.description
+nifti1.dim
+nifti1.freq_axis
+nifti1.intent
+nifti1.magic
+nifti1.phase_axis
+nifti1.pixdim
+nifti1.qform_code
+nifti1.sform_code
+nifti1.sizeof_hdr
+nifti1.slice_axis
+nifti1.slice_duration
+nifti1.slice_end
+nifti1.slice_order
+nifti1.slice_start
+nifti1.spatial_resolution(mm)
+nifti1.t_unit
+nifti1.temporal_spacing(s)
+nifti1.toffset
+nifti1.vox_offset
+nifti1.xyz_unit
+parentds
+path
+type
+""")
+
+    # stupid yields nothing
+    assert_result_count(ds.search('blablob#'), 0)
+    # now check that we can discover things from the aggregated metadata
+    for mode, query, hitpath, matched_key, matched_val in (
+            # random keyword query
+            ('default',
+             'mp3',
+             opj('stim', 'stim1.mp3'),
+             'meta', 'mp3'),
+            # multi word query implies AND
+            ('default',
+             ['bold', 'male'],
+             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
+             'meta', 'male'),
+            # report which field matched with auto-field
+            ('autofield',
+             'mp3',
+             opj('stim', 'stim1.mp3'),
+             'audio.format', 'mp3'),
+            ('autofield',
+             'female',
+             opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
+             'bids.participant.gender', 'female'),
+            # autofield multi-word query is also AND
+            ('autofield',
+             ['bids.type:bold', 'bids.participant.id:01'],
+             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
+             'bids.type', 'bold'),
+            # XXX next one is not supported by current text field analyser
+            # decomposes the mime type in [mime, audio, mp3]
+            # ('autofield',
+            # "'mime:audio/mp3'",
+            # opj('stim', 'stim1.mp3'),
+            # 'audio.format', 'mime:audio/mp3'),
+            # but this one works
+            ('autofield',
+             "'mime audio mp3'",
+             opj('stim', 'stim1.mp3'),
+             'audio.format', 'mp3'),
+            # TODO extend with more complex queries to test whoosh
+            # query language configuration
+    ):
+        res = ds.search(query, mode=mode)
+        if mode == 'default':
+            # 'default' does datasets by default only (be could be configured otherwise
+            assert_result_count(res, 1)
+        else:
+            # the rest has always a file and the dataset, because they carry metadata in
+            # the same structure
+            assert_result_count(res, 2)
+            assert_result_count(
+                res, 1, type='file', path=opj(ds.path, hitpath))
+        assert_result_count(
+            res, 1, type='dataset', path=ds.path)
+        # test the key and specific value of the match
+        assert_in(matched_key, res[-1]['query_matched'])
+        assert_equal(res[-1]['query_matched'][matched_key], matched_val)

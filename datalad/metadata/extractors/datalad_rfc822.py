@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Parser for RFC822-based metadata specifications
+"""Extractor for RFC822-based metadata specifications
 
 This is inspired by (and very similiar to) Debian's package metadata format.
 The main difference is that information spread across multiple files in Debian
@@ -17,11 +17,13 @@ i.e. can be composed from scratch, by hand, in an editor -- with a good
 chance of producing syntax-compliant content with the first attempt.
 """
 
+import logging
+lgr = logging.getLogger('datalad.metadata.extractors.datalad_rfc822')
 from os.path import exists
 import email
 import email.parser  # necessary on Python 2.7.6 (trusty)
 from os.path import join as opj
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.interface.base import dedent_docstring
 
 
@@ -46,7 +48,7 @@ def _beautify_multiline_field(content):
     return title, content
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     _metadata_compliance = "http://docs.datalad.org/metadata.html#v0-1"
     _core_metadata_filename = opj('.datalad', 'meta.rfc822')
 
@@ -76,7 +78,7 @@ class MetadataParser(BaseMetadataParser):
         for term in self._key2stdkey:
             if term not in spec:
                 continue
-            hkey = self.get_homogenized_key(term)
+            hkey = self._key2stdkey[term]
             content = spec[term]
             if term == 'description':
                 short, long = _beautify_multiline_field(content)

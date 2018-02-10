@@ -6,18 +6,21 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test BIDS metadata parser """
+"""Test BIDS metadata extractor """
 
 from os.path import join as opj
 from simplejson import dumps
 from datalad.api import Dataset
-from datalad.metadata.parsers.bids import MetadataParser
+from datalad.metadata.extractors.bids import MetadataExtractor
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_in
 
 
-@with_tree(tree={'dataset_description.json': """
+bids_template = {
+    '.datalad': {
+        'config': '[datalad "metadata"]\n  nativetype = bids',},
+    'dataset_description.json': """
 {
     "Name": "studyforrest_phase2",
     "BIDSVersion": "1.0.0-rc3",
@@ -38,11 +41,14 @@ participant_id\tgender\tage\thandedness\thearing_problems_current
 sub-01\tm\t30-35\tr\tn
 sub-03\tf\t20-25\tr\tn
 """,
-    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}}})
-def test_get_metadata(path):
+    'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}},
+    'sub-03': {'func': {'sub-03_task-other_bold.nii.gz': ''}}}
 
+
+@with_tree(tree=bids_template)
+def test_get_metadata(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -65,13 +71,20 @@ def test_get_metadata(path):
 }""")
 
     test_fname = opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')
-    cmeta = list(MetadataParser(
+    cmeta = list(MetadataExtractor(
         ds,
         [opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')]
     ).get_metadata(False, True)[1])
     assert_equal(len(cmeta), 1)
     assert_equal(cmeta[0][0], test_fname)
-    assert_in('comment<participant#handedness>', cmeta[0][1])
+    # check that we get file props extracted from the file name from pybids
+    fmeta = cmeta[0][1]
+    assert_equal(fmeta['subject'], '01')
+    assert_equal(fmeta['type'], 'bold')
+    assert_equal(fmeta['task'], 'some')
+    assert_equal(fmeta['modality'], 'func')
+    # the fact that there is participant vs subject is already hotly debated in Tal's brain
+    assert_in('handedness', fmeta['participant'])
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -87,7 +100,7 @@ description
 def test_get_metadata_with_description_and_README(path):
 
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(
@@ -113,7 +126,7 @@ description с юникодом
 """})
 def test_get_metadata_with_README(path):
     ds = Dataset(path).create(force=True)
-    meta = MetadataParser(ds, []).get_metadata(True, False)[0]
+    meta = MetadataExtractor(ds, []).get_metadata(True, False)[0]
     del meta['@context']
     dump = dumps(meta, sort_keys=True, indent=2, ensure_ascii=False)
     assert_equal(

@@ -6,11 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test XMP parser"""
+"""Test audio extractor"""
 
 from datalad.tests.utils import SkipTest
 try:
-    import libxmp
+    import mutagen
 except ImportError:
     raise SkipTest
 
@@ -22,35 +22,41 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import eq_
+from datalad.tests.utils import assert_in
+
+
+target = {
+    "format": "mime:audio/mp3",
+    "duration(s)": 1.0,
+    "name": "dltracktitle",
+    "music:album": "dlalbumtitle",
+    "music:artist": "dlartist",
+    "music:channels": 1,
+    "music:sample_rate": 44100,
+    "music:Genre": "dlgenre",
+    "date": "",
+    "tracknumber": "dltracknumber",
+}
 
 
 @with_tempfile(mkdir=True)
-def test_xmp(path):
+def test_audio(path):
     ds = Dataset(path).create()
-    ds.config.add('datalad.metadata.nativetype', 'xmp', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
     copy(
-        opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'xmp.pdf'),
+        opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'audio.mp3'),
         path)
     ds.add('.')
     ok_clean_git(ds.path)
     res = ds.aggregate_metadata()
     assert_status('ok', res)
-    res = ds.metadata('xmp.pdf')
+    res = ds.metadata('audio.mp3')
     assert_result_count(res, 1)
-    # compare full expected metadata set to catch any change of mind on the
-    # side of the XMP library
-    assert_result_count(
-        res, 1,
-        metadata={
-            'dc:creator': 'Michael Hanke',
-            'dc:description': 'dlsubject',
-            'dc:description<?xml:lang>': 'x-default',
-            'dc:title': 'dltitle',
-            'dc:title<?xml:lang>': 'x-default',
-            'pdfaid:part': '1',
-            'pdfaid:conformance': 'A',
-            'pdf:Keywords': 'dlkeyword1 dlkeyword2',
-            'pdf:Producer': 'LibreOffice 5.2',
-            'xmp:CreateDate': '2017-10-08T10:27:06+02:00',
-            'xmp:CreatorTool': 'Writer',
-        })
+
+    # from this extractor
+    meta = res[0]['metadata']['audio']
+    for k, v in target.items():
+        eq_(meta[k], v)
+
+    assert_in('@context', meta)

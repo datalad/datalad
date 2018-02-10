@@ -6,13 +6,13 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test audio parser"""
+"""Test image extractor"""
 
 from datalad.tests.utils import SkipTest
 try:
-    import mutagen
+    import PIL
 except ImportError:
-    raise SkipTest
+    raise SkipTest("No PIL module available")
 
 from shutil import copy
 from os.path import dirname
@@ -22,36 +22,36 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import eq_
+from datalad.tests.utils import assert_in
+
+
+target = {
+    "dcterms:SizeOrDuration": [4, 3],
+    "color_mode": "3x8-bit pixels, true color",
+    "type": "dctype:Image",
+    "spatial_resolution(dpi)": [72, 72],
+    "format": "JPEG (ISO 10918)"
+}
 
 
 @with_tempfile(mkdir=True)
-def test_audio(path):
+def test_image(path):
     ds = Dataset(path).create()
-    ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
+    ds.config.add('datalad.metadata.nativetype', 'image', where='dataset')
     copy(
-        opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'audio.mp3'),
+        opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'exif.jpg'),
         path)
     ds.add('.')
     ok_clean_git(ds.path)
     res = ds.aggregate_metadata()
     assert_status('ok', res)
-    res = ds.metadata('audio.mp3')
+    res = ds.metadata('exif.jpg')
     assert_result_count(res, 1)
-    # compare full expected metadata set to catch any change of mind on the
-    # side of the mutagen package
-    # but not the bitrate, to variable estimate across decoders
-    res[0]['metadata'].pop("comment<bitrate>", None)
-    assert_result_count(
-        res, 1,
-        metadata={
-           "format": "mime:audio/mp3",
-           "duration(s)": 1.0,
-           "name": "dltracktitle",
-           "music:album": "dlalbumtitle",
-           "music:artist": "dlartist",
-           "music:channels": 1,
-           "music:sample_rate": 44100,
-           "music:Genre": "dlgenre",
-           "comment<date>": "",
-           "comment<tracknumber>": "dltracknumber",
-        })
+
+    # from this extractor
+    meta = res[0]['metadata']['image']
+    for k, v in target.items():
+        eq_(meta[k], v)
+
+    assert_in('@context', meta)

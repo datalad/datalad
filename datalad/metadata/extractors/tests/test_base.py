@@ -6,11 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test all parsers at a basic level"""
+"""Test all extractors at a basic level"""
 
 from inspect import isgenerator
 from datalad.api import Dataset
-from datalad.metadata import parsers
+from datalad.metadata import extractors
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
@@ -21,12 +21,12 @@ def test_api(path):
     ds = Dataset(path).create(force=True)
     ds.add('.')
     ok_clean_git(ds.path)
-    for p in dir(parsers):
+    for p in dir(extractors):
         if p.startswith('_') or p in ('tests', 'base'):
             continue
         # we need to be able to query for metadata, even if there is none
-        # from any parser
-        meta = getattr(parsers, p).MetadataParser(
+        # from any extractor
+        meta = getattr(extractors, p).MetadataExtractor(
             ds, paths=['file.dat']).get_metadata(
                 dataset=True,
                 content=True)

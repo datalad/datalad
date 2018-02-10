@@ -6,17 +6,17 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""NIfTI metadata parser"""
+"""NIfTI metadata extractor"""
 
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.nifti1')
+lgr = logging.getLogger('datalad.metadata.extractors.nifti1')
 
 from math import isnan
 import nibabel
 import numpy as np
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.dochelpers import exc_str
 
 
@@ -55,26 +55,26 @@ unit_map = {
 # to serve as a default for when expect 0 to be consumable by np.asscalar
 _array0 = np.array(0)
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
 
     _key2stdkey = {
         'descrip': 'description',
     }
     _extractors = {
-        'nifti1:datatype': lambda x: x.get_data_dtype().name,
-        'nifti1:intent': lambda x: x.get_intent(code_repr='label')[0],
-        'nifti1:freq_axis': lambda x: x.get_dim_info()[0],
-        'nifti1:phase_axis': lambda x: x.get_dim_info()[1],
-        'nifti1:slice_axis': lambda x: x.get_dim_info()[2],
-        'nifti1:xyz_unit': lambda x: '{} ({})'.format(
+        'datatype': lambda x: x.get_data_dtype().name,
+        'intent': lambda x: x.get_intent(code_repr='label')[0],
+        'freq_axis': lambda x: x.get_dim_info()[0],
+        'phase_axis': lambda x: x.get_dim_info()[1],
+        'slice_axis': lambda x: x.get_dim_info()[2],
+        'xyz_unit': lambda x: '{} ({})'.format(
             *unit_map[x.get_xyzt_units()[0]]) if x.get_xyzt_units()[0] in unit_map else '',
-        'nifti1:t_unit': lambda x: '{} ({})'.format(
+        't_unit': lambda x: '{} ({})'.format(
             *unit_map[x.get_xyzt_units()[1]]) if x.get_xyzt_units()[1] in unit_map else '',
-        'nifti1:qform_code': lambda x: nibabel.nifti1.xform_codes.label[
+        'qform_code': lambda x: nibabel.nifti1.xform_codes.label[
             np.asscalar(x.get('qform_code', _array0))],
-        'nifti1:sform_code': lambda x: nibabel.nifti1.xform_codes.label[
+        'sform_code': lambda x: nibabel.nifti1.xform_codes.label[
             np.asscalar(x.get('sform_code', _array0))],
-        'nifti1:slice_order': lambda x: nibabel.nifti1.slice_order_codes.label[
+        'slice_order': lambda x: nibabel.nifti1.slice_order_codes.label[
             np.asscalar(x.get('slice_code', _array0))],
     }
     _ignore = {
@@ -117,7 +117,7 @@ class MetadataParser(BaseMetadataParser):
             try:
                 header = nibabel.load(fpath).header
             except Exception as e:
-                lgr.debug("NIfTI metadata parser failed to load %s: %s",
+                lgr.debug("NIfTI metadata extractor failed to load %s: %s",
                           fpath, exc_str(e))
                 continue
             if not isinstance(header, nibabel.Nifti1Header):
@@ -126,7 +126,7 @@ class MetadataParser(BaseMetadataParser):
                 continue
 
             # blunt conversion of the entire header
-            meta = {self._key2stdkey.get(k, 'nifti1:{}'.format(k)):
+            meta = {self._key2stdkey.get(k, k):
                     [np.asscalar(i) for i in v]
                     if len(v.shape)
                     # scalar

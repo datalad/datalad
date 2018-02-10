@@ -6,11 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test frictionless datapackage metadata parser """
+"""Test frictionless datapackage metadata extractor """
 
 from simplejson import dumps
 from datalad.api import Dataset
-from datalad.metadata.parsers.frictionless_datapackage import MetadataParser
+from datalad.metadata.extractors.frictionless_datapackage import MetadataExtractor
 from nose.tools import assert_true, assert_false, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
@@ -41,7 +41,7 @@ from datalad.tests.utils import with_tree, with_tempfile
 def test_get_metadata(path):
 
     ds = Dataset(path).create(force=True)
-    p = MetadataParser(ds, [])
+    p = MetadataExtractor(ds, [])
     meta = p._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

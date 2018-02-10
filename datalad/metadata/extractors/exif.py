@@ -6,15 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""EXIF metadata parser"""
+"""EXIF metadata extractor"""
 
 from os.path import join as opj
 import logging
-lgr = logging.getLogger('datalad.metadata.parser.exif')
+lgr = logging.getLogger('datalad.metadata.extractors.exif')
 
 from exifread import process_file
 from datalad.metadata.definitions import vocabulary_id
-from datalad.metadata.parsers.base import BaseMetadataParser
+from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 
 def _return_as_appropriate_dtype(val):
@@ -30,7 +30,7 @@ def _return_as_appropriate_dtype(val):
             return val
 
 
-class MetadataParser(BaseMetadataParser):
+class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []
@@ -42,7 +42,7 @@ class MetadataParser(BaseMetadataParser):
             if not info:
                 # got nothing, likely nothing there
                 continue
-            meta = {'exif:{}'.format(k.split()[-1]): _return_as_appropriate_dtype(info[k].printable)
+            meta = {k.split()[-1]: _return_as_appropriate_dtype(info[k].printable)
                     for k in info}
             contentmeta.append((f, meta))
 
