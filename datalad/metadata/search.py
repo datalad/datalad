@@ -227,7 +227,7 @@ def _meta2homoblob_dict(meta, val2str=True, schema=None):
     # coerce the entire flattened metadata dict into a comma-separated string
     # that also includes the keys
     return dict(meta=u', '.join(
-        '{}: {}'.format(k, v)
+        u'{}: {}'.format(k, v)
         for k, v in _meta2autofield_dict(
             meta,
             val2str=True,
@@ -505,12 +505,12 @@ class Search(Interface):
     take a considerable amount of time. If this becomes an issue, search index
     generation can be limited to a particular type of document (see the
     'metadata --reporton' option for possible values). The per-mode configuration
-    setting 'datalad.metadata.searchindex-<mode>-documenttype' will be queried on
+    setting 'datalad.search.index-<mode>-documenttype' will be queried on
     search index generation. It is recommended to place an appropriate
     configuration into a dataset's configuration file (.datalad/config)::
 
-      [datalad "metadata"]
-        searchindex-default-documenttype = datasets
+      [datalad "search"]
+        index-default-documenttype = datasets
 
     .. seealso::
       - Description of the Whoosh query language:
@@ -605,14 +605,14 @@ class Search(Interface):
             meta2doc_fx = _meta2homoblob_dict
             get_parser = _get_parser_homoblob
             documenttype = ds.config.obtain(
-                'datalad.metadata.searchindex-default-documenttype',
+                'datalad.search.index-default-documenttype',
                 default='datasets')
         elif mode == 'autofield':
             get_schema_fx = _get_schema_autofield
             meta2doc_fx = _meta2autofield_dict
             get_parser = _get_parser_autofield
             documenttype = ds.config.obtain(
-                'datalad.metadata.searchindex-autofield-documenttype',
+                'datalad.search.index-autofield-documenttype',
                 default='all')
         else:
             raise ValueError(
