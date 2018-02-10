@@ -217,9 +217,21 @@ def test_within_ds_file_search(path):
         # we have a unique content metadata summary for each src
         assert_in(src, dsmeta['datalad_unique_content_properties'])
 
-    # check generated index keys
+    # test default behavior
     with swallow_outputs() as cmo:
         ds.search(show_keys=True)
+
+        assert_equal(cmo.out, """\
+id
+meta
+parentds
+path
+type
+""")
+
+    # check generated autofield index keys
+    with swallow_outputs() as cmo:
+        ds.search(mode='autofield', show_keys=True)
 
         assert_equal(cmo.out, """\
 audio.bitrate
@@ -280,37 +292,60 @@ path
 type
 """)
 
+    # stupid yields nothing
+    assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
-    for query, hitpath, matched_key, matched_val in (
-            ('mp3',
+    for mode, query, hitpath, matched_key, matched_val in (
+            # random keyword query
+            ('default',
+             'mp3',
+             opj('stim', 'stim1.mp3'),
+             'meta', 'mp3'),
+            # multi word query implies AND
+            ('default',
+             ['bold', 'male'],
+             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
+             'meta', 'male'),
+            # report which field matched with auto-field
+            ('autofield',
+             'mp3',
              opj('stim', 'stim1.mp3'),
              'audio.format', 'mp3'),
-            ('female',
+            ('autofield',
+             'female',
              opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
              'bids.participant.gender', 'female'),
-            (['bids.type:bold', 'bids.participant.id:01'],
+            # autofield multi-word query is also AND
+            ('autofield',
+             ['bids.type:bold', 'bids.participant.id:01'],
              opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
              'bids.type', 'bold'),
             # XXX next one is not supported by current text field analyser
             # decomposes the mime type in [mime, audio, mp3]
-            #("'mime:audio/mp3'",
+            # ('autofield',
+            # "'mime:audio/mp3'",
             # opj('stim', 'stim1.mp3'),
             # 'audio.format', 'mime:audio/mp3'),
             # but this one works
-            ("'mime audio mp3'",
+            ('autofield',
+             "'mime audio mp3'",
              opj('stim', 'stim1.mp3'),
              'audio.format', 'mp3'),
             # TODO extend with more complex queries to test whoosh
             # query language configuration
     ):
-        res = ds.search(query)
-        # always a file and the dataset, because they carry metadata in
-        # the same structure
-        assert_result_count(res, 2)
+        res = ds.search(query, mode=mode)
+        if mode == 'default':
+            # 'default' does datasets by default only (be could be configured otherwise
+            assert_result_count(res, 1)
+        else:
+            # the rest has always a file and the dataset, because they carry metadata in
+            # the same structure
+            assert_result_count(res, 2)
+            assert_result_count(
+                res, 1, type='file', path=opj(ds.path, hitpath))
         assert_result_count(
             res, 1, type='dataset', path=ds.path)
-        assert_result_count(
-            res, 1, type='file', path=opj(ds.path, hitpath))
         # test the key and specific value of the match
         assert_in(matched_key, res[-1]['query_matched'])
         assert_equal(res[-1]['query_matched'][matched_key], matched_val)

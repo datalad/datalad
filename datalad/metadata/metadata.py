@@ -617,7 +617,10 @@ class Metadata(Interface):
             action='store_true',
             doc="""if set, yields all (sub)datasets for which aggregate
             metadata are available in the dataset. No other action is
-            performed, even if other arguments are given."""),
+            performed, even if other arguments are given. The reported
+            results contain a datasets's ID, the commit hash at which
+            metadata aggregation was performed, and the location of the
+            object file(s) containing the aggregated metadata."""),
         reporton=reporton_opt,
         recursive=recursion_flag)
         # MIH: not sure of a recursion limit makes sense here
@@ -650,11 +653,16 @@ class Metadata(Interface):
                 return
             agginfos = _load_json_object(info_fpath)
             for sd in agginfos:
-                yield get_status_dict(
+                info = agginfos[sd]
+                info.update(
                     path=normpath(opj(refds_path, sd)),
                     type='dataset',
                     status='ok',
-                    **res_kwargs)
+                )
+                yield dict(
+                    info,
+                    **res_kwargs
+                )
             return
 
         if not dataset and not path and not show_keys:

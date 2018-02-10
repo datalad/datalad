@@ -36,7 +36,6 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 from datalad.metadata.metadata import query_aggregated_metadata
-from datalad.metadata.metadata import MetadataDict
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
@@ -104,7 +103,10 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
-def _meta2index_dict(meta, val2str=True):
+#
+# START: autofield mode functions
+#
+def _meta2autofield_dict(meta, val2str=True, schema=None):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
@@ -155,10 +157,13 @@ def _meta2index_dict(meta, val2str=True):
          # and the rest into unicode
          _any2unicode(v)) if val2str else v
         for k, v in _deep_kv('', meta or {})
+        # auto-exclude any key that is not a defined field in the schema (if there is
+        # a schema
+        if schema is None or k in schema
     }
 
 
-def _get_search_schema(ds):
+def _get_schema_autofield(ds):
     from whoosh import fields as wf
     from whoosh.analysis import StandardAnalyzer
 
@@ -189,7 +194,7 @@ def _get_search_schema(ds):
         meta = res.get('metadata', {})
         # no stringification of values for speed, we do not need/use the
         # actual values at this point, only the keys
-        idxd = _meta2index_dict(meta, val2str=False)
+        idxd = _meta2autofield_dict(meta, val2str=False)
 
         for k in idxd:
             schema_fields[k] = wf.TEXT(stored=True,
@@ -199,14 +204,86 @@ def _get_search_schema(ds):
     return schema
 
 
-def _get_search_index(index_dir, ds, force_reindex):
+def _get_parser_autofield(idx_obj):
+    from whoosh import qparser as qparse
+
+    parser = qparse.MultifieldParser(
+        idx_obj.schema.names(),
+        idx_obj.schema)
+    # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
+    # upstream
+    parser.add_plugin(qparse.FuzzyTermPlugin())
+    parser.add_plugin(qparse.GtLtPlugin())
+    parser.add_plugin(qparse.SingleQuotePlugin())
+    # replace field defintion to allow for colons to be part of a field's name:
+    parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
+    return parser
+
+
+#
+# START: homoblob mode functions
+#
+def _meta2homoblob_dict(meta, val2str=True, schema=None):
+    # coerce the entire flattened metadata dict into a comma-separated string
+    # that also includes the keys
+    return dict(meta=u', '.join(
+        '{}: {}'.format(k, v)
+        for k, v in _meta2autofield_dict(
+            meta,
+            val2str=True,
+            schema=None).items()))
+
+
+def _get_schema_homoblob(ds):
+    from whoosh import fields as wf
+    from whoosh.analysis import StandardAnalyzer
+
+    # TODO support some customizable mapping to homogenize some metadata fields
+    # onto a given set of index keys
+    schema = wf.Schema(
+        id=wf.ID,
+        path=wf.ID(stored=True),
+        type=wf.ID(stored=True),
+        parentds=wf.ID(stored=True),
+        meta=wf.TEXT(
+            stored=False,
+            analyzer=StandardAnalyzer(minsize=2))
+    )
+    return schema
+
+
+def _get_parser_homoblob(idx_obj):
+    from whoosh import qparser as qparse
+
+    # use whoosh default query parser for now
+    return qparse.QueryParser(
+        "meta",
+        schema=idx_obj.schema
+    )
+
+
+def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc, documenttype):
+    """Generic entrypoint to index generation
+
+    The actual work that determines the structure and content of the index
+    is done by functions that are passed in as arguments
+
+    `get_schema` - must return whoosh schema
+    `meta2doc` - must return dict for index document from result input
+    `label` - string label to distinguish an index type from others (must be a valid
+              directory name
+    """
     from whoosh import index as widx
     from .metadata import agginfo_relpath
     # what is the lastest state of aggregated metadata
     metadata_state = ds.repo.get_last_commit_hash(agginfo_relpath)
+    # use location common to all index types, they would all invalidate
+    # simultaneously
     stamp_fname = opj(index_dir, 'datalad_metadata_state')
+    index_dir = opj(index_dir, label)
 
-    if not force_reindex and \
+    if (not force_reindex) and \
+            exists(index_dir) and \
             exists(stamp_fname) and \
             open(stamp_fname).read() == metadata_state:
         try:
@@ -250,7 +327,7 @@ def _get_search_index(index_dir, ds, force_reindex):
     if not exists(index_dir):
         os.makedirs(index_dir)
 
-    schema = _get_search_schema(ds)
+    schema = get_schema(ds)
 
     idx_obj = widx.create_in(index_dir, schema)
     idx = idx_obj.writer(
@@ -270,20 +347,28 @@ def _get_search_index(index_dir, ds, force_reindex):
     old_ds_rpath = ''
     idx_size = 0
     for res in query_aggregated_metadata(
-            reporton=ds.config.obtain('datalad.metadata.searchindex-documenttype'),
+            reporton=documenttype,
             ds=ds,
             aps=[dict(path=ds.path, type='dataset')],
             # MIH: I cannot see a case when we would not want recursion (within
             # the metadata)
             recursive=True):
-        rpath = relpath(res['path'], start=ds.path)
         # this assumes that files are reported after each dataset report,
         # and after a subsequent dataset report no files for the previous
         # dataset will be reported again
-        rtype = res['type']
         meta = res.get('metadata', {})
-        meta = MetadataDict(meta)
-        if rtype == 'dataset':
+        doc = meta2doc(
+            meta,
+            # this time stringification of values so whoosh can handle them
+            val2str=True,
+            schema=schema)
+        admin = {
+            'type': res['type'],
+            'path': relpath(res['path'], start=ds.path),
+        }
+        if 'parentds' in res:
+            admin['parentds'] = relpath(res['parentds'], start=ds.path)
+        if admin['type'] == 'dataset':
             if old_ds_rpath:
                 lgr.info(
                     'Added %s on dataset %s',
@@ -294,19 +379,12 @@ def _get_search_index(index_dir, ds, force_reindex):
                         include_count=True),
                     old_ds_rpath)
             old_idx_size = idx_size
-            old_ds_rpath = rpath
+            old_ds_rpath = admin['path']
 
-        doc_props = dict(
-            path=assure_unicode(rpath),
-            type=assure_unicode(rtype),
-            **_meta2index_dict(
-                meta,
-                # this time stringification of values so whoosh can handle them
-                val2str=True)
-        )
-        if 'parentds' in res:
-            doc_props['parentds'] = assure_unicode(relpath(res['parentds'], start=ds.path))
-        idx.add_document(**doc_props)
+        doc.update({k: assure_unicode(v) for k, v in admin.items()})
+        lgr.debug("Adding document to search index: {}".format(doc))
+        # inject into index
+        idx.add_document(**doc)
         idx_size += 1
 
     if old_ds_rpath:
@@ -426,13 +504,13 @@ class Search(Interface):
     search index comprised of documents for datasets and individual files can
     take a considerable amount of time. If this becomes an issue, search index
     generation can be limited to a particular type of document (see the
-    'metadata --reporton' option for possible values). The configuration
-    setting 'datalad.metadata.searchindex-documenttype' will be queried on
+    'metadata --reporton' option for possible values). The per-mode configuration
+    setting 'datalad.metadata.searchindex-<mode>-documenttype' will be queried on
     search index generation. It is recommended to place an appropriate
     configuration into a dataset's configuration file (.datalad/config)::
 
       [datalad "metadata"]
-        searchindex-documenttype = datasets
+        searchindex-default-documenttype = datasets
 
     .. seealso::
       - Description of the Whoosh query language:
@@ -471,6 +549,12 @@ class Search(Interface):
             to 0 will report all search matches, and make searching substantially
             slower on large metadata sets.""",
             constraints=EnsureInt()),
+        mode=Parameter(
+            args=("--mode",),
+            choices=('default', 'autofield',),
+            doc="""Mode of search index structure and content. 'autofield': metadata
+            fields are discovered automatically, datasets and files can be discovered.
+            """),
         show_keys=Parameter(
             args=('--show-keys',),
             action='store_true',
@@ -498,10 +582,9 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20,
+                 mode='default',
                  show_keys=False,
                  show_query=False):
-        from whoosh import qparser as qparse
-
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
             if ds.id is None:
@@ -517,8 +600,32 @@ class Search(Interface):
         # where does the bunny have the eggs?
         index_dir = opj(ds.path, get_git_dir(ds.path), SEARCH_INDEX_DOTGITDIR)
 
+        if mode == 'default':
+            get_schema_fx = _get_schema_homoblob
+            meta2doc_fx = _meta2homoblob_dict
+            get_parser = _get_parser_homoblob
+            documenttype = ds.config.obtain(
+                'datalad.metadata.searchindex-default-documenttype',
+                default='datasets')
+        elif mode == 'autofield':
+            get_schema_fx = _get_schema_autofield
+            meta2doc_fx = _meta2autofield_dict
+            get_parser = _get_parser_autofield
+            documenttype = ds.config.obtain(
+                'datalad.metadata.searchindex-autofield-documenttype',
+                default='all')
+        else:
+            raise ValueError(
+                'unknown search mode "{}"'.format(mode))
+
         idx_obj = _get_search_index(
-            index_dir, ds, force_reindex)
+            index_dir,
+            mode,
+            ds,
+            force_reindex,
+            get_schema_fx,
+            meta2doc_fx,
+            documenttype)
 
         if show_keys:
             for k in idx_obj.schema.names():
@@ -529,18 +636,8 @@ class Search(Interface):
             return
 
         with idx_obj.searcher() as searcher:
-            # parse the query string, default whoosh parser ATM, could be
-            # tailored with plugins
-            parser = qparse.MultifieldParser(
-                idx_obj.schema.names(),
-                idx_obj.schema)
-            # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
-            # upstream
-            parser.add_plugin(qparse.FuzzyTermPlugin())
-            parser.add_plugin(qparse.GtLtPlugin())
-            parser.add_plugin(qparse.SingleQuotePlugin())
-            # replace field defintion to allow for colons to be part of a field's name:
-            parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
+            # parse the query string
+            parser = get_parser(idx_obj)
             # for convenience we accept any number of args-words from the
             # shell and put them together to a single string here
             querystr = ' '.join(assure_list(query))
