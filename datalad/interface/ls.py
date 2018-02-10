@@ -548,6 +548,7 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             [
                 ('header_', dict(bold=True, transform=str.upper)),
                 #('default_', dict(align="center")),
+                ('default_', dict(missing="")),
                 ('path', dict(
                     bold=True,
                     align="left",
