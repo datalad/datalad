@@ -382,6 +382,7 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc,
             old_ds_rpath = admin['path']
 
         doc.update({k: assure_unicode(v) for k, v in admin.items()})
+        lgr.debug("Adding document to search index: {}".format(doc))
         # inject into index
         idx.add_document(**doc)
         idx_size += 1
