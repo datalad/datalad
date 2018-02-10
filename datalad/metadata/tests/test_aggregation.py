@@ -17,6 +17,7 @@ from datalad.api import install
 from datalad.distribution.dataset import Dataset
 
 
+from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_equal
@@ -194,4 +195,42 @@ def test_reaggregate_with_unavailable_objects(path):
     eq_(
         objs,
         [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
+    )
+
+
+# this is for gh-1987
+@skip_ssh
+@with_tree(tree=_dataset_hierarchy_template)
+@skip_direct_mode  #FIXME
+def test_publish_aggregated(path):
+    base = Dataset(opj(path, 'origin')).create(force=True)
+    # force all metadata objects into the annex
+    with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
+        f.write(
+            '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
+    base.create('sub', force=True)
+    base.add('.', recursive=True)
+    ok_clean_git(base.path)
+    base.aggregate_metadata(recursive=True)
+    ok_clean_git(base.path)
+
+    # create sibling and publish to it
+    spath = opj(path, 'remote')
+    base.create_sibling(
+        name="local_target",
+        sshurl="ssh://localhost",
+        target_dir=spath)
+    base.publish('.', to='local_target', transfer_data='all')
+    remote = Dataset(spath)
+    objpath = opj('.datalad', 'metadata', 'objects')
+    objs = [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
+    # all object files a present in both datasets
+    eq_(all(base.repo.file_has_content(objs)), True)
+    eq_(all(remote.repo.file_has_content(objs)), True)
+    # and we can squeeze the same metadata out
+    eq_(
+        [{k: v for k, v in i.items() if k not in ('path', 'refds', 'parentds')}
+         for i in base.metadata('sub')],
+        [{k: v for k, v in i.items() if k not in ('path', 'refds', 'parentds')}
+         for i in remote.metadata('sub')],
     )
