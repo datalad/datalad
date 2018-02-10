@@ -184,7 +184,7 @@ def _update_repo(ds, remote, reobtain_data):
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
             # get all annexed files that have data present
-            lgr.info('Recording file content availability to re-obtain update files later on')
+            lgr.info('Recording file content availability to re-obtain updated files later on')
             reobtain_data = \
                 [opj(ds.path, p)
                  for p in repo.get_annexed_files(with_content_only=True)]
