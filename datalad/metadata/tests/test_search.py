@@ -247,7 +247,7 @@ audio.name
 audio.tracknumber
 bids.author
 bids.citation
-bids.comment<BIDSVersion>
+bids.BIDSVersion
 bids.conformsto
 bids.description
 bids.fundedby
