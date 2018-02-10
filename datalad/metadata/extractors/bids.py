@@ -77,7 +77,7 @@ class MetadataExtractor(BaseMetadataExtractor):
 
     def _get_dsmeta(self, bids):
         context = {}
-        meta = {self._key2stdkey.get(k, 'comment<{}>'.format(k)): v
+        meta = {self._key2stdkey.get(k, k): v
                 for k, v in bids.get_metadata(
                     opj(self.ds.path, self._dsdescr_fname)).items()}
 
@@ -94,7 +94,7 @@ class MetadataExtractor(BaseMetadataExtractor):
 
         # special case
         # Could be None which we can't strip so or ''
-        bids_version = (meta.get('comment<BIDSVersion>', '') or '').strip()
+        bids_version = (meta.get('BIDSVersion', '') or '').strip()
         bids_defurl = 'http://bids.neuroimaging.io'
         if bids_version:
             bids_defurl += '/bids_spec{}.pdf'.format(bids_version)

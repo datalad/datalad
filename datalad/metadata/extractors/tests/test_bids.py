@@ -55,6 +55,7 @@ def test_get_metadata(path):
         dump,
         """\
 {
+  "BIDSVersion": "1.0.0-rc3",
   "author": [
     "Mike One",
     "Anna Two"
@@ -62,7 +63,6 @@ def test_get_metadata(path):
   "citation": [
     "http://studyforrest.org"
   ],
-  "comment<BIDSVersion>": "1.0.0-rc3",
   "conformsto": "http://bids.neuroimaging.io/bids_spec1.0.0-rc3.pdf",
   "description": "Some description",
   "fundedby": "We got money from collecting plastic bottles",

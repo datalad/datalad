@@ -245,9 +245,9 @@ audio.music-channels
 audio.music-sample_rate
 audio.name
 audio.tracknumber
+bids.BIDSVersion
 bids.author
 bids.citation
-bids.comment<BIDSVersion>
 bids.conformsto
 bids.description
 bids.fundedby
