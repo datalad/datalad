@@ -552,7 +552,6 @@ class Search(Interface):
         mode=Parameter(
             args=("--mode",),
             choices=('default', 'autofield',),
-            nargs=1,
             doc="""Mode of search index structure and content. 'autofield': metadata
             fields are discovered automatically, datasets and files can be discovered.
             """),
@@ -615,6 +614,9 @@ class Search(Interface):
             documenttype = ds.config.obtain(
                 'datalad.metadata.searchindex-autofield-documenttype',
                 default='all')
+        else:
+            raise ValueError(
+                'unknown search mode "{}"'.format(mode))
 
         idx_obj = _get_search_index(
             index_dir,
