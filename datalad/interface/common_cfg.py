@@ -236,12 +236,12 @@ definitions = {
         'type': EnsureBool(),
         'default': True,
     },
-    'datalad.metadata.searchindex-documenttype': {
+    'datalad.searchi.index-default-documenttype': {
         'ui': ('question', {
                'title': 'Type of search index documents',
-               'text': 'Labels of document types to include in a search index'}),
+               'text': 'Labels of document types to include in a default search index'}),
         'type': EnsureChoice('all', 'datasets', 'files'),
-        'default': 'all',
+        'default': 'datasets',
     },
     'datalad.metadata.create-aggregate-annex-limit': {
         'ui': ('question', {

@@ -20,6 +20,7 @@ from os.path import dirname
 from os.path import relpath
 from os.path import isabs
 from os.path import exists
+from os.path import lexists
 from os.path import curdir
 
 from hashlib import md5
@@ -230,6 +231,10 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
         # write obj files
         if exists(objpath):
             dest.unlock(objpath)
+        elif lexists(objpath):
+            # if it gets here, we have a symlink that is pointing nowhere
+            # kill it, to be replaced with the newly aggregated content
+            dest.repo.remove(objpath)
         # TODO actually dump a compressed file when annexing is possible
         # to speed up on-demand access
         store(meta, objpath)
@@ -428,7 +433,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             makedirs(target_dir)
         # TODO we could be more clever (later) and maybe `addurl` (or similar)
         # the file from another dataset
-        if exists(copy_to):
+        if lexists(copy_to):
             # no need to unlock, just wipe out and replace
             os.remove(copy_to)
         shutil.copy(copy_from, copy_to)
