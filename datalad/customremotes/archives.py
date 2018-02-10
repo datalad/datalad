@@ -324,7 +324,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # prune the list so we keep only the ones from unique akeys.
         # May be whenever we support extraction directly from the tarballs
         # we should go through all and choose the one easiest to get or smth.
+        from humanize import naturalsize
         for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
+            if not akey:
+                lgr.warning("Got an empty archive key %r for key %s. Skipping",
+                            akey, key)
+                continue
             akeys_tried.append(akey)
             try:
                 akey_fpath = self.get_contentlocation(akey)
@@ -333,7 +338,24 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                     # Command could have fail to run if key was not present locally yet
                     # Thus retrieve the key using annex
                     # TODO: we need to report user somehow about this happening and progress on the download
-                    self.runner(["git-annex", "get", "--key", akey],
+                    akey_size = self.repo.get_size_from_key(akey)
+                    self.info(
+                        "To obtain some keys we need to fetch an archive "
+                        "of size %s"
+                        % (naturalsize(akey_size) if akey_size else "unknown")
+                    )
+
+                    def progress_indicators(l):
+                        self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
+
+                    self.runner(["git-annex", "get",
+                                 "--json", "--json-progress",
+                                 "--key", akey
+                                 ],
+                                log_stdout=progress_indicators,
+                                log_stderr='offline',
+                                # False, # to avoid lock down
+                                log_online=True,
                                 cwd=self.path, expect_stderr=True)
 
                     akey_fpath = self.get_contentlocation(akey)
@@ -361,7 +383,10 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
                 continue
 
-        self.error("Failed to fetch any archive containing {key}. Tried: {akeys_tried}".format(**locals()))
+        raise RuntimeError(
+            "Failed to fetch any archive containing {key}. "
+            "Tried: {akeys_tried}".format(**locals())
+        )
 
 
 def main():

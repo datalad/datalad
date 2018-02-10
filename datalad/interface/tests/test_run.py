@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+
 from datalad.tests.utils import (
     known_failure_direct_mode,
     known_failure_v6,
@@ -45,6 +47,7 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import swallow_logs
 
 
 @with_tempfile(mkdir=True)
@@ -97,6 +100,12 @@ def test_basics(path, nodspath):
         res = ds.run(['touch', 'empty2'], message='TEST')
         assert_status('ok', res)
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
+
+    # running without a command is a noop
+    with chpwd(path):
+        with swallow_logs(new_level=logging.WARN) as cml:
+            ds.run()
+            assert_in("No command given", cml.out)
 
 
 @ignore_nose_capturing_stdout
@@ -234,6 +243,23 @@ def test_rerun_chain(path):
     ds.rerun(revision="first-run")
     _, info = get_commit_runinfo(ds.repo, "HEAD")
     assert info["chain"] == commits[:1]
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_rerun_old_flag_compatibility(path):
+    ds = Dataset(path).create()
+    ds.run("echo x$(cat grows) > grows")
+    # Deprecated `datalad --rerun` still runs the last commit's
+    # command.
+    ds.run(rerun=True)
+    eq_("xx\n", open(opj(path, "grows")).read())
+    # Running with --rerun and a command ignores the command.
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run(rerun=True, cmd="ignored")
+        assert_in("Ignoring provided command in --rerun mode", cml.out)
+        eq_("xxx\n", open(opj(path, "grows")).read())
 
 
 @ignore_nose_capturing_stdout

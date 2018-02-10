@@ -713,12 +713,14 @@ def swallow_outputs():
 
         @property
         def out(self):
-            self._out.flush()
+            if not self._out.closed:
+                self._out.flush()
             return self._read(self._out)
 
         @property
         def err(self):
-            self._err.flush()
+            if not self._err.closed:
+                self._err.flush()
             return self._read(self._err)
 
         @property

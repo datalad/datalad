@@ -447,6 +447,10 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
     for res in results:
+        if 'action' not in res:
+            # XXX Yarik has to no clue on how to track the origin of the
+            # record to figure out WTF, so he just skips it
+            continue
         actsum = action_summary.get(res['action'], {})
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1

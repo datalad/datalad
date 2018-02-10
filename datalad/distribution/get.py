@@ -622,8 +622,14 @@ class Get(Interface):
                 res = annexjson2result(res, ds, type='file', logger=lgr,
                                        refds=refds_path)
                 success = success_status_map[res['status']]
-                respath_by_status[success] = \
-                    respath_by_status.get(success, []) + [res['path']]
+                # TODO: in case of some failed commands (e.g. get) there might
+                # be no path in the record.  yoh has only vague idea of logic
+                # here so just checks for having 'path', but according to
+                # results_from_annex_noinfo, then it would be assumed that
+                # `content` was acquired successfully, which is not the case
+                if 'path' in res:
+                    respath_by_status[success] = \
+                        respath_by_status.get(success, []) + [res['path']]
                 yield res
 
             for r in results_from_annex_noinfo(

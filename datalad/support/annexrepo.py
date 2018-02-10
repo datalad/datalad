@@ -2341,6 +2341,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
+            if e.stderr:
+                # else just warn about present errors
+                shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
+                lgr.warning(
+                    "Running %s resulted in stderr output: %s",
+                    command, shorten(e.stderr)
+                )
         finally:
             if progress_indicators:
                 progress_indicators.finish()
@@ -3423,6 +3430,14 @@ class ProcessAnnexProgressIndicators(object):
             self.total_pbar.update(diff, increment=True)
         pbar.update(new_value)
 
+    def _log_info(self, msg):
+        """Helper to log a message, so we need to clear up the pbars first"""
+        if self.total_pbar:
+            self.total_pbar.clear()
+        for pbar in self.pbars.values():
+            pbar.clear()
+        lgr.info(msg)
+
     def __call__(self, line):
         try:
             j = json.loads(line)
@@ -3430,6 +3445,21 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
+
+        # Process some messages which remotes etc might push to us
+        if list(j) == ['info']:
+            # Just INFO was received without anything else -- we log it at INFO
+            info = j['info']
+            if info.startswith('PROGRESS-JSON: '):
+                j_ = json.loads(info[len('PROGRESS-JSON: '):])
+                if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
+                    j = j_
+                else:
+                    self._log_info(info)
+            else:
+                self._log_info(info)
+                return
+
         target_size = None
         if 'command' in j and 'key' in j:
             # might be the finish line message
@@ -3449,6 +3479,7 @@ class ProcessAnnexProgressIndicators(object):
                     target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(target_size, increment=True)
             else:
+                lgr.log(5, "Message with failed status: %s" % str(j))
                 self._failed += 1
 
             if self.total_pbar:
@@ -3478,7 +3509,7 @@ class ProcessAnnexProgressIndicators(object):
             return int(math.ceil(int(count) / (float(perc) / 100.))) \
                 if perc else 0
 
-        # so we have a progress indicator, let's dead with it
+        # so we have a progress indicator, let's deal with it
         action = j['action']
         download_item = action.get('file') or action.get('key')
         download_id = (action['command'], action['key'])

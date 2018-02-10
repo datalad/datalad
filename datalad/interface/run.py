@@ -69,17 +69,37 @@ class Run(Interface):
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=save_message_opt,
+        rerun=Parameter(
+            args=('--rerun',),
+            action='store_true',
+            doc="""re-run the command recorded in the last saved change (if any).
+            Note: This option is deprecated since version 0.9.2 and
+            will be removed in a later release. Use `datalad rerun`
+            instead."""),
     )
 
     @staticmethod
     @datasetmethod(name='run')
     @eval_results
     def __call__(
-            cmd,
+            cmd=None,
             dataset=None,
-            message=None):
-        for r in run_command(cmd, dataset, message):
-            yield r
+            message=None,
+            rerun=False):
+        if rerun:
+            if cmd:
+                lgr.warning("Ignoring provided command in --rerun mode")
+            lgr.warning("The --rerun option is deprecated since version 0.9.2. "
+                        "Use `datalad rerun` instead.")
+            from datalad.interface.rerun import Rerun
+            for r in Rerun.__call__(dataset=dataset, message=message):
+                yield r
+        else:
+            if cmd:
+                for r in run_command(cmd, dataset, message):
+                    yield r
+            else:
+                lgr.warning("No command given")
 
 
 # This helper function is used to add the rerun_info argument.

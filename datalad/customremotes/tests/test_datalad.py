@@ -15,7 +15,7 @@ from ...tests.utils import *
 from . import _get_custom_runner
 from ...support.exceptions import CommandError
 from ...downloaders.tests.utils import get_test_providers
-
+from ..datalad import DataladAnnexCustomRemote
 
 @with_tempfile()
 @skip_if_no_network
@@ -72,3 +72,34 @@ def test_basic_scenario():
         yield test, False
         if not on_windows:
             yield test, True
+
+
+from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
+
+
+@with_tree(tree={}) #'archive.tar.gz': {'f1.txt': 'content'}})
+def test_interactions(tdir):
+    # Just a placeholder since constructor expects a repo
+    repo = AnnexRepo(tdir, create=True, init=True)
+    for scenario in BASE_INTERACTION_SCENARIOS + [
+        [
+            ('GETCOST', 'COST %d' % DataladAnnexCustomRemote.COST),
+        ],
+        [
+            # We do support regular URLs
+            ('CLAIMURL http://example.com', 'CLAIMURL-SUCCESS'),
+            # we know that is just a single option, url, is expected so full
+            # one would be passed
+            #('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
+
+        ],
+            # basic interaction failing to fetch content from archive
+        [
+            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey http:'),
+            ('VALUE', 'GETURLS somekey https:'),
+            ('VALUE', 'GETURLS somekey s3:'),
+            ('VALUE', re.compile(
+             'TRANSFER-FAILURE RETRIEVE somekey Failed to download from any'))
+        ],
+    ]:
+        check_interaction_scenario(DataladAnnexCustomRemote, tdir, scenario)

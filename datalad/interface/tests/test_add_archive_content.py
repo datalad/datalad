@@ -28,6 +28,7 @@ from ...tests.utils import assert_false
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import SkipTest
+from ...tests.utils import assert_re_in
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
@@ -332,9 +333,12 @@ def test_add_archive_use_archive_dir(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
         # check it gives informative error if archive is not already added
-        with assert_raises(RuntimeError), swallow_outputs() as cm:
+        with assert_raises(RuntimeError) as cmr:
             add_archive_content(archive_path)
-            assert_in("You should run datalad add", cm.err)
+        assert_re_in(
+            "You should run ['\"]datalad add %s['\"] first" % archive_path,
+            str(cmr.exception), match=False
+        )
         with swallow_outputs():
             repo.add(archive_path)
         repo.commit("added 1.tar.gz")
