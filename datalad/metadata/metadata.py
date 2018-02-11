@@ -491,16 +491,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     # aggregated list of a hopefully-kinda-ok structure
                     continue
                 vset = unique_cm.get(k, set())
-                try:
-                    vset.add(v)
-                except TypeError:
-                    if isinstance(v, dict):
-                        vset.add(ReadOnlyDict(v))
-                    elif isinstance(v, list):
-                        vset.add(tuple(v))
-                    else:
-                        # no idea
-                        raise
+                vset.add(_val2hashable(v))
                 unique_cm[k] = vset
 
         if unique_cm:
@@ -541,6 +532,21 @@ def _unique_value_key(x):
                 for k in sorted(x)]
     else:
         return x
+
+
+def _val2hashable(val):
+    """Small helper to convert incoming mutables to something hashable
+
+    The goal is to be able to put the return value into a set, while
+    avoiding conversions that would result in a change of representation
+    in a subsequent JSON string.
+    """
+    if isinstance(val, dict):
+        return ReadOnlyDict(val)
+    elif isinstance(val, list):
+        return tuple(map(_val2hashable, val))
+    else:
+        return val
 
 
 class ReadOnlyDict(Mapping):
