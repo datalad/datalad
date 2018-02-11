@@ -18,9 +18,11 @@ try:
     # renamed for 1.0 release
     import pydicom as dcm
     from pydicom.errors import InvalidDicomError
+    from pydicom.dicomdir import DicomDir
 except ImportError:
     import dicom as dcm
     from dicom.errors import InvalidDicomError
+    from dicom.dicomdir import DicomDir
 
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.extractors.base import BaseMetadataExtractor
@@ -64,6 +66,12 @@ class MetadataExtractor(BaseMetadataExtractor):
                 # we can only ignore
                 lgr.debug('"%s" does not look like a DICOM file, skipped', f)
                 continue
+
+            if isinstance(d, DicomDir):
+                lgr.debug("%s appears to be a DICOMDIR file. Extraction not yet"
+                          " implemented, skipped", f)
+                continue
+
             ddict = None
             if content:
                 ddict = _struct2dict(d)
