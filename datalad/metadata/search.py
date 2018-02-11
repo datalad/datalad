@@ -44,6 +44,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 from datalad.dochelpers import exc_str
+from datalad.metadata.metadata import query_aggregated_metadata
 
 if PY3:
     unicode_srctypes = string_types + (bytes,)
