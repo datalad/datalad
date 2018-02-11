@@ -27,7 +27,6 @@ from collections import Mapping
 from six import binary_type, string_types
 
 from datalad import cfg
-from datalad.auto import AutomagicIO
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.results import get_status_dict
@@ -194,7 +193,8 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
 
     # TODO rename function and query datalad/annex own metadata
     # for all actually present dataset after looking at aggregated data
-
+    # This import is relatively heavy, delayed until needed
+    from datalad.auto import AutomagicIO
     with AutomagicIO(check_once=True):
         # look for and load the aggregation info for the base dataset
         info_fpath = opj(ds.path, agginfo_relpath)
