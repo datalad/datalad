@@ -856,3 +856,33 @@ def test_known_failure_direct_mode():
     else:
         # behaves as if it wasn't decorated at all, no matter what
         assert_raises(AssertionError, failing)
+
+
+from datalad.utils import read_csv_lines
+
+
+@with_tempfile(content="h1 h2\nv1 2\nv2 3")
+def test_read_csv_lines_basic(infile):
+    # Just a basic test, next one with unicode
+    gen = read_csv_lines(infile)
+    ok_generator(gen)
+    eq_(
+        list(gen),
+        [
+            {u'h1': u'v1', u'h2': u'2'},
+            {u'h1': u'v2', u'h2': u'3'},
+        ]
+    )
+
+
+@with_tempfile(content=u"h1\th2\nv1\tдата".encode('utf-8'))
+def test_read_csv_lines_tsv_unicode(infile):
+    # Just a basic test, next one with unicode
+    gen = read_csv_lines(infile)
+    ok_generator(gen)
+    eq_(
+        list(gen),
+        [
+            {u'h1': u'v1', u'h2': u'дата'},
+        ]
+    )

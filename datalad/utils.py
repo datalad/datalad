@@ -1354,6 +1354,9 @@ def safe_print(s):
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
+#
+# IO Helpers
+#
 
 def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
@@ -1378,6 +1381,54 @@ def open_r_encdetect(fname, readahead=1000):
               fname,
               enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
+    """A generator of dict records from a CSV/TSV
+
+    Automatically guesses the encoding for each record to convert to UTF-8
+
+    Parameters
+    ----------
+    fname: str
+      Filename
+    dialect: str, optional
+      Dialect to specify to csv.reader. If not specified -- guessed from
+      the file, if fails to guess, "excel-tab" is assumed
+    readahead: int, optional
+      How many bytes to read from the file to guess the type
+    **kwargs
+      Passed to `csv.reader`
+    """
+    import csv
+    if dialect is None:
+        with open(fname) as tsvfile:
+            # add robustness, use a sniffer
+            try:
+                dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
+            except Exception as exc:
+                from .dochelpers import exc_str
+                lgr.warning(
+                    'Could not determine file-format, assuming TSV: %s',
+                    exc_str(exc)
+                )
+                dialect = 'excel-tab'
+
+    with open(fname, 'rb') as tsvfile:
+        # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+        csv_reader = csv.reader(
+            tsvfile,
+            dialect=dialect,
+            **kwargs
+        )
+        header = None
+        for row in csv_reader:
+            # decode UTF-8 back to Unicode, cell by cell:
+            row_unicode = map(assure_unicode, row)
+            if header is None:
+                header = row_unicode
+            else:
+                yield dict(zip(header, row_unicode))
 
 
 lgr.log(5, "Done importing datalad.utils")
