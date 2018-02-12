@@ -1330,7 +1330,7 @@ def open_r_encdetect(fname):
     lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
               denc,
               fname,
-              enc.get('confidence', 'unkown'))
+              enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
 
 
