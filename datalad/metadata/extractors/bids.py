@@ -19,7 +19,7 @@ from os.path import exists
 from datalad.dochelpers import exc_str
 from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.metadata.definitions import vocabulary_id
-from datalad.utils import open_r_encdetect
+from datalad.utils import assure_unicode
 
 from datalad import cfg
 
@@ -89,7 +89,8 @@ class MetadataExtractor(BaseMetadataExtractor):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            desc = open_r_encdetect(README_fname).read()
+            with open(README_fname) as f:
+                desc = assure_unicode(f.read())
             meta['description'] = desc.strip()
 
         # special case
