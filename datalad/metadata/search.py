@@ -327,6 +327,13 @@ def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc,
     if not exists(index_dir):
         os.makedirs(index_dir)
 
+    # this is a pretty cheap call that just pull this info from a file
+    dsinfo = ds.metadata(
+        get_aggregates=True,
+        return_type='list',
+        result_renderer='disabled')
+
+    lgr.info('Processing metadata records for %i datasets', len(dsinfo))
     schema = get_schema(ds)
 
     idx_obj = widx.create_in(index_dir, schema)
