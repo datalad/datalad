@@ -349,6 +349,26 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
     return o
 
 
+def _ok_metadata(meta, mtype, ds, loc):
+    if meta is None or isinstance(meta, dict):
+        return True
+
+    msg = (
+        "Metadata extractor '%s' yielded something other than a dictionary "
+        "for dataset %s%s -- this is likely a bug, please consider "
+        "reporting it. "
+        "This type of native metadata will be ignored. Got: %s",
+        mtype,
+        ds,
+        '' if loc is None else ' content {}'.format(loc),
+        repr(meta))
+    if cfg.get('datalad.runtime.raiseonerror'):
+        raise RuntimeError(*msg)
+
+    lgr.error(*msg)
+    return False
+
+
 def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     """Make a direct query of a dataset to extract its metadata.
 
@@ -429,31 +449,20 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             continue
 
         if dsmeta_t:
-            if dsmeta_t is not None and not isinstance(dsmeta_t, dict):
-                lgr.error(
-                    "Metadata extractor '%s' yielded something other than a dictionary "
-                    "for dataset %s -- this is likely a bug, please consider "
-                    "reporting it. "
-                    "This type of native metadata will be ignored. Got: %s",
-                    mtype, ds, repr(dsmeta_t))
-                errored = True
-            elif dsmeta_t:
+            if _ok_metadata(dsmeta_t, mtype, ds, None):
                 dsmeta_t = _filter_metadata_fields(
                     dsmeta_t,
                     maxsize=max_fieldsize,
                     blacklist=blacklist)
                 dsmeta[mtype_key] = dsmeta_t
+            else:
+                errored = True
 
         unique_cm = {}
         for loc, meta in contentmeta_t or {}:
-            if not isinstance(meta, dict):
-                lgr.error(
-                    "Metadata extractor '%s' yielded something other than a dictionary "
-                    "for dataset %s content %s -- this is likely a bug, please consider "
-                    "reporting it. "
-                    "This type of native metadata will be ignored. Got: %s",
-                    mtype, ds, loc, repr(meta))
+            if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
+                continue
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
             # if there is an issue that a extractor needlessly produces empty records, the

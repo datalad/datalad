@@ -667,7 +667,7 @@ class AggregateMetaData(Interface):
                 if errored:
                     yield get_status_dict(
                         status='error',
-                        message='Metadata extraction failed (see previous error message)',
+                        message='Metadata extraction failed (see previous error message, set datalad.runtime.raiseonerror=yes to fail immediately)',
                         action='aggregate_metadata',
                         path=aggsrc,
                         logger=lgr)
