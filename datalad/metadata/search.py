@@ -35,7 +35,6 @@ from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
-from datalad.metadata.metadata import query_aggregated_metadata
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
@@ -45,6 +44,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 from datalad.dochelpers import exc_str
+from datalad.metadata.metadata import query_aggregated_metadata
 
 if PY3:
     unicode_srctypes = string_types + (bytes,)
