@@ -110,7 +110,7 @@ def setup_parser(
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
     parser.add_argument(
-        '--output-format', dest='common_output_format',
+        '-f', '--output-format', dest='common_output_format',
         default='default',
         type=assure_unicode,
         metavar="{default,json,json_pp,tailored,'<template>'",

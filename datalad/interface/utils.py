@@ -496,7 +496,9 @@ def _process_results(
                 continue
         ## output rendering
         # TODO RF this in a simple callable that gets passed into this function
-        if result_renderer == 'default':
+        if result_renderer is None or result_renderer == 'disabled':
+            pass
+        elif result_renderer == 'default':
             # TODO have a helper that can expand a result message
             ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
@@ -525,6 +527,8 @@ def _process_results(
             except Exception as e:
                 lgr.warn('Result rendering failed for: %s [%s]',
                          res, exc_str(e))
+        else:
+            raise ValueError('unknown result renderer "{}"'.format(result_renderer))
         if result_xfm:
             res = result_xfm(res)
             if res is None:
