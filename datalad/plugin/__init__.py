@@ -247,9 +247,10 @@ class Plugin(Interface):
                 # use dedicated arg if given, also anything the came with the plugin args
                 # or curdir as the last resort
                 dataset if dataset else kwargs.get('dataset', curdir),
-                # note 'dataset' arg is always first, if we have defaults for all args
-                # we have a default for 'dataset' to -> it is optional
-                check_installed=len(arg_defaults) != len(plugin_args),
+                # if we have enough default args to reach the position of the dataset argument
+                # and if we do, whether that default argument is something truish
+                check_installed=len(plugin_args) - plugin_args.index('dataset') > len(arg_defaults) or \
+                    arg_defaults[0 - (len(plugin_args) - plugin_args.index('dataset'))],
                 purpose='handover to plugin')
 
         # final test whether the call is complete
