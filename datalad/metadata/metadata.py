@@ -653,17 +653,24 @@ class Metadata(Interface):
             if not exists(info_fpath):
                 return
             agginfos = _load_json_object(info_fpath)
-            for sd in agginfos:
+            parentds = []
+            for sd in sorted(agginfos):
                 info = agginfos[sd]
+                dspath = normpath(opj(refds_path, sd))
+                if parentds and not dspath.startswith(_with_sep(parentds[-1])):
+                    parentds.pop()
                 info.update(
-                    path=normpath(opj(refds_path, sd)),
+                    path=dspath,
                     type='dataset',
                     status='ok',
                 )
+                if parentds:
+                    info['parentds'] = parentds[-1]
                 yield dict(
                     info,
                     **res_kwargs
                 )
+                parentds.append(dspath)
             return
 
         if not dataset and not path:
