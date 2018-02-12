@@ -619,6 +619,21 @@ def test_assure_unicode():
     ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
     ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
     eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    # now, non-utf8
+    # Decoding could be deduced with high confidence when the string is
+    # really encoded in that codepage
+    mom_koi8r = u"мама".encode('koi8-r')
+    eq_(assure_unicode(mom_koi8r), u"мама")
+    eq_(assure_unicode(mom_koi8r, confidence=0.9), u"мама")
+    mom_iso8859 = u'mamá'.encode('iso-8859-1')
+    eq_(assure_unicode(mom_iso8859), u'mamá')
+    eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
+    # but when we mix, it does still guess something allowing to decode:
+    mom_mixedin = mom_koi8r + mom_iso8859
+    ok_(isinstance(assure_unicode(mom_mixedin), text_type))
+    # but should fail if we request high confidence result:
+    with assert_raises(ValueError):
+        assure_unicode(mom_mixedin, confidence=0.9)
 
 
 @with_tempfile(mkdir=True)
