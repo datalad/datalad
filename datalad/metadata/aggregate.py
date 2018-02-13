@@ -26,6 +26,7 @@ from os.path import curdir
 from hashlib import md5
 import shutil
 
+import datalad
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -186,6 +187,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
     nativetypes = ['datalad_core'] + assure_list(get_metadata_type(aggfrom_ds))
     agginfo['extractors'] = nativetypes
+    agginfo['datalad_version'] = datalad.__version__
     dsmeta, contentmeta, errored = _get_metadata(
         aggfrom_ds,
         nativetypes,
