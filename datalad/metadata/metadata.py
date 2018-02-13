@@ -482,22 +482,26 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
-            # go through content metadata and inject report of unique keys
-            # and values into `dsmeta`
-            for k, v in meta.items():
-                if k in dsmeta.get(mtype_key, {}):
-                    # if the dataset already has a dedicated idea
-                    # about a key, we skip it from the unique list
-                    # the point of the list is to make missing info about
-                    # content known in the dataset, not to blindly
-                    # duplicate metadata. Example: list of samples data
-                    # were recorded from. If the dataset has such under
-                    # a 'sample' key, we should prefer that, over an
-                    # aggregated list of a hopefully-kinda-ok structure
-                    continue
-                vset = unique_cm.get(k, set())
-                vset.add(_val2hashable(v))
-                unique_cm[k] = vset
+            if ds.config.obtain(
+                    'datalad.metadata.generate-unique-{}'.format(mtype_key.replace('_', '-')),
+                    default=True,
+                    valtype=EnsureBool()):
+                # go through content metadata and inject report of unique keys
+                # and values into `dsmeta`
+                for k, v in meta.items():
+                    if k in dsmeta.get(mtype_key, {}):
+                        # if the dataset already has a dedicated idea
+                        # about a key, we skip it from the unique list
+                        # the point of the list is to make missing info about
+                        # content known in the dataset, not to blindly
+                        # duplicate metadata. Example: list of samples data
+                        # were recorded from. If the dataset has such under
+                        # a 'sample' key, we should prefer that, over an
+                        # aggregated list of a hopefully-kinda-ok structure
+                        continue
+                    vset = unique_cm.get(k, set())
+                    vset.add(_val2hashable(v))
+                    unique_cm[k] = vset
 
         if unique_cm:
             # per source storage here too

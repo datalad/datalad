@@ -469,14 +469,14 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 class AggregateMetaData(Interface):
     """Aggregate metadata of one or more datasets for later query.
 
-    Metadata aggregation refers to a procedure that transforms metadata present
-    in a dataset into a form that is homogenized across datasets and metadata
-    sources, and is stored in a single standardized format. Moreover, metadata
-    aggregation can also extract metadata in this format from one dataset and
-    store it in another (super)dataset. Based on such collections of aggregated
-    metadata it is possible to discover particular datasets and specific parts
-    of their content, without having to obtain the target datasets first (see
-    the DataLad 'search' command).
+    Metadata aggregation refers to a procedure that extracts metadata present
+    in a dataset into a portable representation that is stored a single
+    standardized format. Moreover, metadata aggregation can also extract
+    metadata in this format from one dataset and store it in another
+    (super)dataset. Based on such collections of aggregated metadata it is
+    possible to discover particular datasets and specific parts of their
+    content, without having to obtain the target datasets first (see the
+    DataLad 'search' command).
 
     To enable aggregation of metadata that are contained in files of a dataset,
     one has to enable one or more metadata extractor for a dataset. DataLad
@@ -496,15 +496,10 @@ class AggregateMetaData(Interface):
         nativetype = exif
         nativetype = xmp
 
-    Enabling multiple extractors is supported. In this case, metadata are extracted
-    by each extractor individually, and are merged across sources for each described
-    entity (dataset or file(s)). The merge strategy can be selected via the
-    --merge-native option.
-
-    Metadata aggregation will also extract (and merge) DataLad's own metadata
-    (see the 'metadata' command). By default, DataLad metadata are considered first,
-    and the default merge strategy for other metadata sources is 'init', i.e.
-    metadata will only be added for keys that are not yet present.
+    Enabling multiple extractors is supported. In this case, metadata are
+    extracted by each extractor individually, and stored alongside each other.
+    Metadata aggregation will also extract DataLad's own metadata (extractor
+    'datalad_core').
 
     Metadata aggregation can be performed recursively, in order to aggregate all
     metadata across all subdatasets, for example, to be able to search across
@@ -526,16 +521,6 @@ class AggregateMetaData(Interface):
       file headers only. 'datalad.metadata.store-aggregate-content' might be
       a more appropriate setting in such cases.
 
-    datalad.metadata.store-aggregate-content
-      If set, extracted content metadata are still used to generate a dataset-level
-      summary of present metadata (all keys and their unique values across all
-      files in a dataset are determined and stored as part of the dataset-level
-      metadata aggregate), but metadata on individual files are not stored.
-      This switch can be used to avoid prohibitively large metadata files. Discovery
-      of datasets containing content matching particular metadata properties will
-      still be possible, but such datasets would have to be obtained first in order
-      to discover which particular files in them match these properties.
-
     datalad.metadata.aggregate-ignore-fields
       Any metadata key matching any regular expression in this configuration setting
       is removed prior to generating the dataset-level metadata summary (keys
@@ -543,9 +528,28 @@ class AggregateMetaData(Interface):
       metadata itself. This switch can also be used to filter out sensitive
       information prior aggregation.
 
+    datalad.metadata.generate-unique-<extractor-name>
+      If set to false, DataLad will not auto-generate a summary of unique content
+      metadata values for a particular extractor as part of the dataset-global metadata
+      (a potential underscore '_' in the extractor name must be replaced by a dash '-').
+      This can be useful if such a summary is bloated due to minor uninformative (e.g.
+      numerical) differences, or when a particular extractor already provides a
+      carefully designed content metadata summary.
+
     datalad.metadata.maxfieldsize
       Any metadata value that exceeds the size threshold given by this configuration
       setting (in bytes/characters) is removed.
+
+    datalad.metadata.store-aggregate-content
+      If set, extracted content metadata are still used to generate a dataset-level
+      summary of present metadata (all keys and their unique values across all
+      files in a dataset are determined and stored as part of the dataset-level
+      metadata aggregate, see datalad.metadata.generate-unique-<extractor-name>),
+      but metadata on individual files are not stored.
+      This switch can be used to avoid prohibitively large metadata files. Discovery
+      of datasets containing content matching particular metadata properties will
+      still be possible, but such datasets would have to be obtained first in order
+      to discover which particular files in them match these properties.
     """
     _params_ = dict(
         # TODO add option to not update aggregated data/info in intermediate
