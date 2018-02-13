@@ -409,6 +409,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
     from . import extractors
+    lgr.info('Engage metadata extractors: %s', types)
     for mtype in types:
         mtype_key = mtype
         try:
