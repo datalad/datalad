@@ -400,16 +400,31 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
                      for ai in ds_agginfos.values()
                      for k in location_keys
                      if k in ai)
-    objs2remove = objlocs_was.difference(objlocs_is)
     # TODO do we need to (double?) check if all object files exist?
-    #objs2add = [o for o in objlocs_is if exists(opj(ds_path, o))]
+    # objs2add = [o for o in objlocs_is if exists(opj(ds_path, o))]
     objs2add = objlocs_is
+
+    # yoh: we appanretly do need to filter the ones to remove - I did
+    #      "git reset --hard HEAD^" and
+    #      aggregate-metadata failed upon next run trying to remove
+    #      an unknown to git file. I am yet to figure out why that
+    #      mattered (hopefully not that reflog is used somehow)
+    objs2remove = []
+    for obj in objlocs_was.difference(objlocs_is):
+        obj_path = opj(agg_base_path, obj)
+        if lexists(obj_path):
+            objs2remove.append(obj_path)
+        else:
+            lgr.warning(
+                "Metadata object path %s was not found to be cleaned up, skipping",
+                obj_path
+            )
 
     # secretly remove obsolete object files, not really a result from a
     # user's perspective
     if objs2remove:
         ds.remove(
-            [opj(agg_base_path, p) for p in objs2remove],
+            objs2remove,
             # Don't use the misleading default commit message of `remove`:
             message='[DATALAD] Remove obsolete metadata object files',
             # we do not want to drop these files by default, because we would
