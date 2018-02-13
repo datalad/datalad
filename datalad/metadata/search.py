@@ -134,7 +134,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
                 continue
             # TODO `k` might need remapping, if another key was already found
             # with the same definition
-            key = '{}{}'.format(
+            key = u'{}{}'.format(
                 basekey,
                 # replace now special chars, and avoid spaces
                 # TODO maybe even kill parentheses
