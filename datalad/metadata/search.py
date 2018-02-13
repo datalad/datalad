@@ -639,7 +639,7 @@ class Search(Interface):
 
         if show_keys:
             for k in idx_obj.schema.names():
-                print('{}'.format(k))
+                print(u'{}'.format(k))
             return
 
         if not query:
