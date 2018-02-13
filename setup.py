@@ -59,7 +59,7 @@ req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
 requires = {
     'core': [
         'appdirs',
-        'chardet',      # rarely used but small/omnipresent
+        'chardet>=3.0.4',      # rarely used but small/omnipresent
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
