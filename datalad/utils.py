@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from six import PY2
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -1414,7 +1415,7 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    with open(fname, 'rb') as tsvfile:
+    with open(fname, 'rb' if PY2 else 'r') as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,
@@ -1426,7 +1427,7 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
             # decode UTF-8 back to Unicode, cell by cell:
             row_unicode = map(assure_unicode, row)
             if header is None:
-                header = row_unicode
+                header = list(row_unicode)
             else:
                 yield dict(zip(header, row_unicode))
 
