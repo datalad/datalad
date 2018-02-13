@@ -43,7 +43,6 @@ import datalad.support.ansi_colors as ac
 from datalad.support.json_py import load as jsonload
 from datalad.support.json_py import load_xzstream
 from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import reporton_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -57,9 +56,6 @@ from datalad.dochelpers import single_or_plural
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
-valid_key = re.compile(r'^[0-9a-z._-]+$')
-
-db_relpath = opj('.datalad', 'metadata', 'dataset.json')
 agginfo_relpath = opj('.datalad', 'metadata', 'aggregate_v1.json')
 
 # relative paths which to exclude from any metadata processing
@@ -189,10 +185,6 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     generator
       Of result dictionaries.
     """
-    # TODO recursion_limit
-
-    # TODO rename function and query datalad/annex own metadata
-    # for all actually present dataset after looking at aggregated data
     # This import is relatively heavy, delayed until needed
     from datalad.auto import AutomagicIO
     with AutomagicIO(check_once=True):
@@ -667,17 +659,24 @@ class Metadata(Interface):
             if not exists(info_fpath):
                 return
             agginfos = _load_json_object(info_fpath)
-            for sd in agginfos:
+            parentds = []
+            for sd in sorted(agginfos):
                 info = agginfos[sd]
+                dspath = normpath(opj(refds_path, sd))
+                if parentds and not dspath.startswith(_with_sep(parentds[-1])):
+                    parentds.pop()
                 info.update(
-                    path=normpath(opj(refds_path, sd)),
+                    path=dspath,
                     type='dataset',
                     status='ok',
                 )
+                if parentds:
+                    info['parentds'] = parentds[-1]
                 yield dict(
                     info,
                     **res_kwargs
                 )
+                parentds.append(dspath)
             return
 
         if not dataset and not path:
