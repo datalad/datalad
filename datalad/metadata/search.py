@@ -137,8 +137,11 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
             key = u'{}{}'.format(
                 basekey,
                 # replace now special chars, and avoid spaces
+                # `os.sep` needs to go, because whoosh uses the field name for
+                # temp files during index staging, and trips over absent "directories"
                 # TODO maybe even kill parentheses
-                k.replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
+                # TODO actually, it might be better to have an explicit whitelist
+                k.replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
             )
             if isinstance(v, list):
                 v = _listdict2dictlist(v)
