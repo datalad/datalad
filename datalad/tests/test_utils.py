@@ -629,11 +629,11 @@ def test_assure_unicode():
     eq_(assure_unicode(mom_iso8859), u'mamá')
     eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
     # but when we mix, it does still guess something allowing to decode:
-    mom_mixedin = mom_koi8r + mom_iso8859
-    ok_(isinstance(assure_unicode(mom_mixedin), text_type))
+    mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
+    ok_(isinstance(assure_unicode(mixedin), text_type))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
-        assure_unicode(mom_mixedin, confidence=0.9)
+        assure_unicode(mixedin, confidence=0.9)
 
 
 @with_tempfile(mkdir=True)
