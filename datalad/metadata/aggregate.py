@@ -101,7 +101,7 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
         # nothing found
         # this will be the message in the result for the query path
         # and could be a tuple
-        return ("No matching aggregated metadata in Dataset at %s", ds_path)
+        return ("No matching aggregated metadata for path '%s' in Dataset at %s", rpath, ds_path)
 
     # easy peasy
     seed_abs = opj(ds_path, seed_ds)
