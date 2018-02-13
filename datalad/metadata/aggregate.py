@@ -184,10 +184,11 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # if there is any chance for metadata
     # obtain metadata for dataset and content
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
-    nativetypes = get_metadata_type(aggfrom_ds)
+    nativetypes = ['datalad_core'] + assure_list(get_metadata_type(aggfrom_ds))
+    agginfo['extractors'] = nativetypes
     dsmeta, contentmeta, errored = _get_metadata(
         aggfrom_ds,
-        ['datalad_core'] + assure_list(nativetypes),
+        nativetypes,
         # None indicates to honor a datasets per-extractor configuration and to be
         # on by default
         global_meta=None,
@@ -702,12 +703,14 @@ class AggregateMetaData(Interface):
                 agginfo_db,
                 to_save)
             # update complete
-            yield get_status_dict(
+            res = get_status_dict(
                 status='ok',
                 action='aggregate_metadata',
                 path=parentds_path,
                 type='dataset',
                 logger=lgr)
+            res.update(agginfo_db.get(parentds_path, {}))
+            yield res
         #
         # save potential modifications to dataset global metadata
         #
