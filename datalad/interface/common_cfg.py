@@ -236,7 +236,7 @@ definitions = {
         'type': EnsureBool(),
         'default': True,
     },
-    'datalad.searchi.index-default-documenttype': {
+    'datalad.search.index-default-documenttype': {
         'ui': ('question', {
                'title': 'Type of search index documents',
                'text': 'Labels of document types to include in a default search index'}),
