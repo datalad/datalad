@@ -117,6 +117,14 @@ def test_aggregation(path):
     assert_result_count(res, 3, status='ok', action='save')
     # nice and tidy
     ok_clean_git(ds.path)
+
+    # quick test of aggregate report
+    aggs = ds.metadata(get_aggregates=True)
+    # one for each dataset
+    assert_result_count(aggs, 3)
+    # mother also report layout version
+    assert_result_count(aggs, 1, path=ds.path, layout_version=1)
+
     # store clean direct result
     origres = ds.metadata(recursive=True)
     # basic sanity check

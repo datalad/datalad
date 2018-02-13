@@ -56,7 +56,11 @@ from datalad.dochelpers import single_or_plural
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
-agginfo_relpath = opj('.datalad', 'metadata', 'aggregate_v1.json')
+aggregate_layout_version = 1
+agginfo_relpath = opj(
+    '.datalad',
+    'metadata',
+    'aggregate_v{}.json'.format(aggregate_layout_version))
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them
@@ -670,6 +674,8 @@ class Metadata(Interface):
                     type='dataset',
                     status='ok',
                 )
+                if sd == curdir:
+                    info['layout_version'] = aggregate_layout_version
                 if parentds:
                     info['parentds'] = parentds[-1]
                 yield dict(
