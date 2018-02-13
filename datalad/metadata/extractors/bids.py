@@ -89,7 +89,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            with open(README_fname) as f:
+            with open(README_fname, 'rb') as f:
                 desc = assure_unicode(f.read())
             meta['description'] = desc.strip()
 
