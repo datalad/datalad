@@ -323,14 +323,14 @@ def main(args=None):
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
 
-    # enable overrides
-    datalad.cfg.reload()
-
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
             for o in cmdlineargs.cfg_overrides])
         datalad.cfg.overrides.update(overrides)
+
+    # enable overrides
+    datalad.cfg.reload(force=True)
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
