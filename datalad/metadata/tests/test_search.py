@@ -259,6 +259,7 @@ bids.participant.gender
 bids.participant.handedness
 bids.participant.hearing_problems_current
 bids.participant.id
+bids.participant.language
 bids.subject
 bids.task
 bids.type

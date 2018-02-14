@@ -36,10 +36,10 @@ bids_template = {
     ]
 }
 """,
-    'participants.tsv': """\
-participant_id\tgender\tage\thandedness\thearing_problems_current
-sub-01\tm\t30-35\tr\tn
-sub-03\tf\t20-25\tr\tn
+    'participants.tsv': u"""\
+participant_id\tgender\tage\thandedness\thearing_problems_current\tlanguage
+sub-01\tm\t30-35\tr\tn\tрусский
+sub-03\tf\t20-25\tr\tn\tenglish
 """,
     'sub-01': {'func': {'sub-01_task-some_bold.nii.gz': ''}},
     'sub-03': {'func': {'sub-03_task-other_bold.nii.gz': ''}}}
@@ -85,6 +85,8 @@ def test_get_metadata(path):
     assert_equal(fmeta['modality'], 'func')
     # the fact that there is participant vs subject is already hotly debated in Tal's brain
     assert_in('handedness', fmeta['participant'])
+    assert_in('language', fmeta['participant'])
+    assert_equal(fmeta['participant']['language'], u'русский')
 
 
 @with_tree(tree={'dataset_description.json': """

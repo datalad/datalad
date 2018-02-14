@@ -151,14 +151,16 @@ def test_nested_metadata(path):
                 "id": "03",
                 "gender": "female",
                 "handedness": "r",
-                "hearing_problems_current": "n"
+                "hearing_problems_current": "n",
+                "language": "english"
             },
             {
                 "age(years)": "30-35",
                 "id": "01",
                 "gender": "male",
                 "handedness": "r",
-                "hearing_problems_current": "n"
+                "hearing_problems_current": "n",
+                "language": u"русский"
             },
         ])
     # we can turn off this kind of auto-summary

@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from six import PY2
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -500,9 +501,48 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
-def assure_unicode(s, encoding='utf-8'):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
-    return s.decode(encoding) if isinstance(s, binary_type) else s
+def assure_unicode(s, encoding=None, confidence=None):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  If None, "utf-8" is tried, and then if not a valid
+      UTF-8, encoding will be guessed
+    confidence: float, optional
+      A value between 0 and 1, so if guessing of encoding is of lower than
+      specified confidence, ValueError is raised
+    """
+    if not isinstance(s, binary_type):
+        return s
+    if encoding is None:
+        # Figure out encoding, defaulting to 'utf-8' which is our common
+        # target in contemporary digital society
+        try:
+            return s.decode('utf-8')
+        except UnicodeDecodeError as exc:
+            from .dochelpers import exc_str
+            lgr.debug("Failed to decode a string as utf-8: %s", exc_str(exc))
+        # And now we could try to guess
+        from chardet import detect
+        enc = detect(s)
+        denc = enc.get('encoding', None)
+        if denc:
+            denc_confidence = enc.get('confidence', 0)
+            if confidence is not None and  denc_confidence < confidence:
+                raise ValueError(
+                    "Failed to auto-detect encoding with high enough "
+                    "confidence. Highest confidence was %s for %s"
+                    % (denc_confidence, denc)
+                )
+            return s.decode(denc)
+        else:
+            raise ValueError(
+                "Could not decode value as utf-8, or to guess its encoding: %s"
+                % repr(s)
+            )
+    else:
+        return s.decode(encoding)
 
 
 def assure_bool(s):
@@ -1315,23 +1355,81 @@ def safe_print(s):
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
+#
+# IO Helpers
+#
 
-def open_r_encdetect(fname):
+def open_r_encdetect(fname, readahead=1000):
     """Return a file object in read mode with auto-detected encoding
 
     This is helpful when dealing with files of unknown encoding.
+
+    Parameters
+    ----------
+    readahead: int, optional
+      How many bytes to read for guessing the encoding type.  If
+      negative - full file will be read
     """
     from chardet import detect
     import io
     # read some bytes from the file
-    kbyte = open(fname, 'rb').read(1000)
-    enc = detect(kbyte)
+    with open(fname, 'rb') as f:
+        head = f.read(readahead)
+    enc = detect(head)
     denc = enc.get('encoding', None)
     lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
               denc,
               fname,
-              enc.get('confidence', 'unkown'))
+              enc.get('confidence', 'unknown'))
     return io.open(fname, encoding=denc)
+
+
+def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
+    """A generator of dict records from a CSV/TSV
+
+    Automatically guesses the encoding for each record to convert to UTF-8
+
+    Parameters
+    ----------
+    fname: str
+      Filename
+    dialect: str, optional
+      Dialect to specify to csv.reader. If not specified -- guessed from
+      the file, if fails to guess, "excel-tab" is assumed
+    readahead: int, optional
+      How many bytes to read from the file to guess the type
+    **kwargs
+      Passed to `csv.reader`
+    """
+    import csv
+    if dialect is None:
+        with open(fname) as tsvfile:
+            # add robustness, use a sniffer
+            try:
+                dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
+            except Exception as exc:
+                from .dochelpers import exc_str
+                lgr.warning(
+                    'Could not determine file-format, assuming TSV: %s',
+                    exc_str(exc)
+                )
+                dialect = 'excel-tab'
+
+    with open(fname, 'rb' if PY2 else 'r') as tsvfile:
+        # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+        csv_reader = csv.reader(
+            tsvfile,
+            dialect=dialect,
+            **kwargs
+        )
+        header = None
+        for row in csv_reader:
+            # decode UTF-8 back to Unicode, cell by cell:
+            row_unicode = map(assure_unicode, row)
+            if header is None:
+                header = list(row_unicode)
+            else:
+                yield dict(zip(header, row_unicode))
 
 
 lgr.log(5, "Done importing datalad.utils")

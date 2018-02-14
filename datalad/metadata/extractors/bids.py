@@ -19,7 +19,7 @@ from os.path import exists
 from datalad.dochelpers import exc_str
 from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.metadata.definitions import vocabulary_id
-from datalad.utils import open_r_encdetect
+from datalad.utils import (assure_unicode, read_csv_lines)
 
 from datalad import cfg
 
@@ -89,7 +89,8 @@ class MetadataExtractor(BaseMetadataExtractor):
             # BIDS uses README to provide description, so if was not
             # explicitly provided to possibly override longer README, let's just
             # load README
-            desc = open_r_encdetect(README_fname).read()
+            with open(README_fname, 'rb') as f:
+                desc = assure_unicode(f.read())
             meta['description'] = desc.strip()
 
         # special case
@@ -159,30 +160,22 @@ class MetadataExtractor(BaseMetadataExtractor):
 
 
 def yield_participant_info(fname):
-    with open(fname) as tsvfile:
-        # add robustness, use a sniffer
-        try:
-            dialect = csv.Sniffer().sniff(tsvfile.read(16384))
-        except:
-            lgr.warning('Could not determine file-format, assuming TSV')
-            dialect = 'excel-tab'
-        tsvfile.seek(0)
-        for row in csv.DictReader(tsvfile, dialect=dialect):
-            if 'participant_id' not in row:
-                # not sure what this is, but we cannot use it
-                break
-            # strip a potential 'sub-' prefix
-            if row['participant_id'].startswith('sub-'):
-                row['participant_id'] = row['participant_id'][4:]
-            props = {}
-            for k in row:
-                # take away some ambiguity
-                normk = k.lower()
-                hk = content_metakey_map.get(normk, normk)
-                val = row[k]
-                if hk in ('sex', 'gender'):
-                    val = sex_label_map.get(row[k].lower(), row[k].lower())
-                if val:
-                    props[hk] = val
-            if props:
-                yield re.compile(r'^sub-{}/.*'.format(row['participant_id'])), props
+    for row in read_csv_lines(fname):
+        if 'participant_id' not in row:
+            # not sure what this is, but we cannot use it
+            break
+        # strip a potential 'sub-' prefix
+        if row['participant_id'].startswith('sub-'):
+            row['participant_id'] = row['participant_id'][4:]
+        props = {}
+        for k in row:
+            # take away some ambiguity
+            normk = k.lower()
+            hk = content_metakey_map.get(normk, normk)
+            val = row[k]
+            if hk in ('sex', 'gender'):
+                val = sex_label_map.get(row[k].lower(), row[k].lower())
+            if val:
+                props[hk] = val
+        if props:
+            yield re.compile(r'^sub-{}/.*'.format(row['participant_id'])), props
