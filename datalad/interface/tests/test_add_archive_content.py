@@ -272,7 +272,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0, persistent=False)
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=False)  # is available from the URL -- should be kosher
     repo.get(opj('1', '1 f.txt'))  # that what managed to not work
 
     # TODO: check if persistent archive is there for the 1.tar.gz
@@ -280,7 +280,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     # We should be able to drop everything since available online
     with swallow_outputs():
         clean(dataset=repo.path)
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
@@ -290,9 +290,9 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
-    repo.get(key_1tar, options=['--key'])
+    repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, options=['--key'])
+    res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
     assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))

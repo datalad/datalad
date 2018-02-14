@@ -1250,7 +1250,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
 
     @normalize_paths
-    def get(self, files, remote=None, options=None, jobs=None):
+    def get(self, files, remote=None, options=None, jobs=None, key=False):
         """Get the actual content of files
 
         Parameters
@@ -1263,6 +1263,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             commandline options for the git annex get command
         jobs : int, optional
             how many jobs to run in parallel (passed to git-annex call)
+        key : bool, optional
+            If provided file value is actually a key
 
         Returns
         -------
@@ -1283,12 +1285,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         # analyze provided files to decide which actually are needed to be
         # fetched
 
-        if '--key' not in options:
+        if not key:
             expected_downloads, fetch_files = self._get_expected_files(
                 files, ['--not', '--in', 'here'])
         else:
             fetch_files = files
-            assert(len(files) == 1)
+            assert len(files) == 1, "When key=True only a single file be provided"
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if not fetch_files:
@@ -1306,14 +1308,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: reproduce DK's bug on OSX, and either switch to
         #  --batch mode (I don't think we have --progress support in long
         #  alive batch processes ATM),
-        #
+        if key:
+            kwargs = {'opts': options + ['--key'] + files}
+        else:
+            kwargs = {'opts': options, 'files': files}
         results = self._run_annex_command_json(
             'get',
-            opts=options,
             # TODO: eventually make use of --batch mode
-            files=files,  # fetch_files
             jobs=jobs,
-            expected_entries=expected_downloads)
+            expected_entries=expected_downloads,
+            **kwargs
+        )
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
         # and vomit an exception of incomplete download????
@@ -2439,11 +2444,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
 
         options = assure_list(options, copy=True)
-        options += ["--key"] if key else []
+        if key:
+            kwargs = {'opts': options + ["--key"] + files}
+        else:
+            kwargs = {'files': files}
 
-        json_objects = self._run_annex_command_json(
-            'whereis', opts=options, files=files
-        )
+        json_objects = self._run_annex_command_json('whereis', **kwargs)
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
