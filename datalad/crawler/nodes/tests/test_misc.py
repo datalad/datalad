@@ -477,7 +477,5 @@ def test_debug():
 
 
 def test_fix_url():
-    # TODO: actual test
-    print("Test")
     eq_(list(fix_url({'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication Material.zip'})),
         [{'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication%20Material.zip'}])

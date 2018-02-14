@@ -26,6 +26,7 @@ from ..pipeline import xrun_pipeline
 from ..pipeline import PIPELINE_TYPES
 from ...utils import auto_repr
 from ...utils import find_files as _find_files
+from six.moves.urllib.parse import quote
 
 from logging import getLogger
 from nose.tools import eq_, assert_raises
@@ -597,5 +598,5 @@ def fix_url(data):
     """
 
     for key, value in data.items():
-        data[key] = data[key].replace(" ", "%20")
+         data[key] = quote(data[key], safe = ':/')
     yield data
