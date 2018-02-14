@@ -40,6 +40,7 @@ def dlplugin(type, file=None, dataset=None):
 
       $ datalad plugin extract_metadata type=xmp file=Downloads/freshfromtheweb.pdf
     """
+    from os.path import join as opj
     from datalad.interface.results import get_status_dict
     from datalad.distribution.dataset import require_dataset
     from datalad.metadata.metadata import _get_metadata
@@ -61,6 +62,7 @@ def dlplugin(type, file=None, dataset=None):
         res = get_status_dict(
             action='metadata',
             ds=dataset,
+            refds=dataset,
             metadata=dsmeta,
             status='error' if error else 'ok')
         yield res
@@ -68,8 +70,11 @@ def dlplugin(type, file=None, dataset=None):
     for p in contentmeta:
         res = get_status_dict(
             action='metadata',
-            path=p,
+            path=opj(dataset.path, p) if dataset else p,
+            refds=dataset,
             metadata=contentmeta[p],
             type='file',
             status='error' if error else 'ok')
+        if dataset:
+            res['parentds'] = dataset.path
         yield res
