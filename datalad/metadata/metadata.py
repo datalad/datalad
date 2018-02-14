@@ -372,7 +372,6 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     ----------
     ds : Dataset
     types : list
-    mode : {'init', 'add', 'reset'}
     """
     errored = False
     dsmeta = MetadataDict()
