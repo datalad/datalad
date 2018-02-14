@@ -134,11 +134,14 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
                 continue
             # TODO `k` might need remapping, if another key was already found
             # with the same definition
-            key = '{}{}'.format(
+            key = u'{}{}'.format(
                 basekey,
                 # replace now special chars, and avoid spaces
+                # `os.sep` needs to go, because whoosh uses the field name for
+                # temp files during index staging, and trips over absent "directories"
                 # TODO maybe even kill parentheses
-                k.replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
+                # TODO actually, it might be better to have an explicit whitelist
+                k.replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
             )
             if isinstance(v, list):
                 v = _listdict2dictlist(v)
@@ -636,7 +639,7 @@ class Search(Interface):
 
         if show_keys:
             for k in idx_obj.schema.names():
-                print('{}'.format(k))
+                print(u'{}'.format(k))
             return
 
         if not query:

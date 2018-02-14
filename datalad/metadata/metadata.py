@@ -56,7 +56,11 @@ from datalad.dochelpers import single_or_plural
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
-agginfo_relpath = opj('.datalad', 'metadata', 'aggregate_v1.json')
+aggregate_layout_version = 1
+agginfo_relpath = opj(
+    '.datalad',
+    'metadata',
+    'aggregate_v{}.json'.format(aggregate_layout_version))
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them
@@ -405,6 +409,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
     from . import extractors
+    lgr.info('Engage metadata extractors: %s', types)
     for mtype in types:
         mtype_key = mtype
         try:
@@ -478,22 +483,26 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
-            # go through content metadata and inject report of unique keys
-            # and values into `dsmeta`
-            for k, v in meta.items():
-                if k in dsmeta.get(mtype_key, {}):
-                    # if the dataset already has a dedicated idea
-                    # about a key, we skip it from the unique list
-                    # the point of the list is to make missing info about
-                    # content known in the dataset, not to blindly
-                    # duplicate metadata. Example: list of samples data
-                    # were recorded from. If the dataset has such under
-                    # a 'sample' key, we should prefer that, over an
-                    # aggregated list of a hopefully-kinda-ok structure
-                    continue
-                vset = unique_cm.get(k, set())
-                vset.add(_val2hashable(v))
-                unique_cm[k] = vset
+            if ds.config.obtain(
+                    'datalad.metadata.generate-unique-{}'.format(mtype_key.replace('_', '-')),
+                    default=True,
+                    valtype=EnsureBool()):
+                # go through content metadata and inject report of unique keys
+                # and values into `dsmeta`
+                for k, v in meta.items():
+                    if k in dsmeta.get(mtype_key, {}):
+                        # if the dataset already has a dedicated idea
+                        # about a key, we skip it from the unique list
+                        # the point of the list is to make missing info about
+                        # content known in the dataset, not to blindly
+                        # duplicate metadata. Example: list of samples data
+                        # were recorded from. If the dataset has such under
+                        # a 'sample' key, we should prefer that, over an
+                        # aggregated list of a hopefully-kinda-ok structure
+                        continue
+                    vset = unique_cm.get(k, set())
+                    vset.add(_val2hashable(v))
+                    unique_cm[k] = vset
 
         if unique_cm:
             # per source storage here too
@@ -670,6 +679,8 @@ class Metadata(Interface):
                     type='dataset',
                     status='ok',
                 )
+                if sd == curdir:
+                    info['layout_version'] = aggregate_layout_version
                 if parentds:
                     info['parentds'] = parentds[-1]
                 yield dict(

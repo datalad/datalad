@@ -21,6 +21,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
@@ -160,6 +161,14 @@ def test_nested_metadata(path):
                 "hearing_problems_current": "n"
             },
         ])
+    # we can turn off this kind of auto-summary
+    ds.config.add('datalad.metadata.generate-unique-bids', 'false', where='dataset')
+    ds.aggregate_metadata()
+    meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
+    # protect next test a little, in case we enhance our core extractor in the future
+    # to provide more info
+    if 'datalad_unique_content_properties' in meta:
+        assert_not_in('bids', meta['datalad_unique_content_properties'])
 
 
 # this is for gh-1971
