@@ -21,6 +21,9 @@ import datalad
 from ..main import main
 from datalad import __version__
 from datalad.cmd import Runner
+from datalad.api import create
+from datalad.utils import chpwd
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
@@ -179,3 +182,34 @@ def test_script_shims():
         assert get_numeric_portion(version) # that my lambda is correctish
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
+
+
+@with_tempfile(mkdir=True)
+def test_cfg_override(path):
+    with chpwd(path):
+        # control
+        out, err = Runner()('datalad plugin wtf', shell=True)
+        assert_not_in('datalad.dummy: this', out)
+        # ensure that this is not a dataset's cfg manager
+        assert_not_in('datalad.dataset.id', out)
+        # env var
+        out, err = Runner()('DATALAD_DUMMY=this datalad plugin wtf', shell=True)
+        assert_in('datalad.dummy: this', out)
+        # cmdline arg
+        out, err = Runner()('datalad -c datalad.dummy=this plugin wtf', shell=True)
+        assert_in('datalad.dummy: this', out)
+
+        # now create a dataset in the path. the wtf plugin will switch to
+        # using the dataset's config manager, which must inherit the overrides
+        create(dataset=path)
+        # control
+        out, err = Runner()('datalad plugin wtf', shell=True)
+        assert_not_in('datalad.dummy: this', out)
+        # ensure that this is a dataset's cfg manager
+        assert_in('datalad.dataset.id', out)
+        # env var
+        out, err = Runner()('DATALAD_DUMMY=this datalad plugin wtf', shell=True)
+        assert_in('datalad.dummy: this', out)
+        # cmdline arg
+        out, err = Runner()('datalad -c datalad.dummy=this plugin wtf', shell=True)
+        assert_in('datalad.dummy: this', out)
