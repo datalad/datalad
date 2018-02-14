@@ -272,7 +272,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0, persistent=False)
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    repo.drop(key_1tar, key=False)  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     repo.get(opj('1', '1 f.txt'))  # that what managed to not work
 
     # TODO: check if persistent archive is there for the 1.tar.gz
