@@ -894,6 +894,18 @@ def test_read_csv_lines_tsv_unicode(infile):
     )
 
 
+@with_tempfile(content=u"h1\nv1\nv2")
+def test_read_csv_lines_one_column(infile):
+    # Just a basic test, next one with unicode
+    eq_(
+        list(read_csv_lines(infile)),
+        [
+            {u'h1': u'v1'},
+            {u'h1': u'v2'},
+        ]
+    )
+
+
 # Should be the last one since as discovered in NICEMAN might screw up coverage
 def test_line_profile():
     skip_if_no_module('line_profiler')
