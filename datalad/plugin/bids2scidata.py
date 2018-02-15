@@ -25,7 +25,6 @@ from os.path import split as psplit
 
 from datalad.utils import assure_list
 from datalad.metadata.metadata import query_aggregated_metadata
-from datalad.metadata.search import r_url
 from six.moves.urllib.parse import urlsplit
 from six.moves.urllib.parse import urlunsplit
 from posixpath import split as posixsplit
@@ -35,6 +34,8 @@ try:
 except ImportError:
     pd = None
 
+# regex for a cheap test if something looks like a URL
+r_url = re.compile(r"^https?://")
 
 # standardize columns from participants.tsv
 sample_property_name_map = {
