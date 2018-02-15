@@ -21,6 +21,7 @@ from datalad.tests.utils import assert_true, assert_not_equal, assert_raises, \
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import with_tempfile
 
 from datalad.support.exceptions import IncompleteResultsError
 
@@ -65,7 +66,8 @@ sub-15\tf\t35\tl
 
 
 @with_tree(_dummy_template)
-def test_noop(path):
+@with_tempfile(mkdir=True)
+def test_noop(path, outdir):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.add('.')
     assert_raises(
@@ -73,14 +75,15 @@ def test_noop(path):
         ds.plugin,
         'bids2scidata',
     )
-    assert_raises(
-        IncompleteResultsError,
-        ds.plugin,
-        'bids2scidata',
-        repo_name="dummy",
-        repo_accession='ds1',
-        repo_url='http://example.com',
-    )
+    with chpwd(outdir):  # to not pollute cwd
+        assert_raises(
+            IncompleteResultsError,
+            ds.plugin,
+            'bids2scidata',
+            repo_name="dummy",
+            repo_accession='ds1',
+            repo_url='http://example.com',
+        )
 
 
 @with_tree(_bids_template)
