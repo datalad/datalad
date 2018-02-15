@@ -179,16 +179,38 @@ provided by [Sphinx].
 Additional Hints
 ----------------
 
-1. For merge commits to have more informative description, add to your
-   `.git/config` or `~/.gitconfig` following section:
-   
-        [merge]
-        summary = true
-        log = true
-   
-   and if conflicts occur, provide short summary on how they were resolved
-   in "Conflicts" listing within the merge commit
-   (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+### Merge commits
+
+For merge commits to have more informative description, add to your
+`.git/config` or `~/.gitconfig` following section:
+
+    [merge]
+    summary = true
+    log = true
+
+and if conflicts occur, provide short summary on how they were resolved
+in "Conflicts" listing within the merge commit
+(see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+
+### Issue -> PR
+
+[git-hub](https://github.com/sociomantic/git-hub) utility allows to
+attach commits to an issue, thus effectively converting it into a pull
+request.  This allows to avoid necessity to have 2 items (both issue
+and PR) which often would duplicate information and discussion.  To use
+`git-hub` you first would need to configure it using `git hub setup`
+command which would create a section within your `.git/config` such as
+
+    hub.username=<USER>
+    hub.oauthtoken=<redacted>
+    hub.upstream=datalad/datalad
+    hub.forkremote=<remote name of your fork>
+    hub.pullbase=master
+
+Then, if you are in a branch with the commits that you want to attach
+to an issue, thus making it into a pull request, you can use:
+
+    git hub pull attach <issue number>
 
 
 Quality Assurance
