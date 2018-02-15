@@ -220,10 +220,13 @@ class _Search(object):
     def __init__(self, ds, **kwargs):
         self.ds = ds
 
-    def __call__(self, query, max_nresults=None, show_keys=False, show_query=False):
+    def __call__(self, query, max_nresults=None):
         raise NotImplementedError
 
     def show_keys(self):
+        raise NotImplementedError
+
+    def get_query(self, query):
         raise NotImplementedError
 
 
@@ -242,6 +245,16 @@ class _WhooshSearch(_Search):
     def show_keys(self):
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
+
+    def get_query(self, query):
+        # parse the query string
+        self._mk_parser()
+        # for convenience we accept any number of args-words from the
+        # shell and put them together to a single string here
+        querystr = ' '.join(assure_list(query))
+        # this gives a formal whoosh query
+        wquery = self.parser.parse(querystr)
+        return wquery
 
     def _meta2doc(self, meta, val2str=True, schema=None):
         raise NotImplementedError
@@ -398,20 +411,10 @@ class _WhooshSearch(_Search):
         lgr.info('Search index contains %i documents', idx_size)
         self.idx_obj = idx_obj
 
-    def __call__(self, query, max_nresults=None, force_reindex=False, show_query=False):
-
+    def __call__(self, query, max_nresults=None, force_reindex=False):
         with self.idx_obj.searcher() as searcher:
-            # parse the query string
-            self._mk_parser()
-            # for convenience we accept any number of args-words from the
-            # shell and put them together to a single string here
-            querystr = ' '.join(assure_list(query))
-            # this gives a formal whoosh query
-            wquery = self.parser.parse(querystr)
+            wquery = self.get_query(query)
 
-            if show_query:
-                print(wquery)
-                return
             # perform the actual search
             hits = searcher.search(
                 wquery,
@@ -714,8 +717,11 @@ class Search(Interface):
         if not query:
             return
 
+        if show_query:
+            print(searcher.get_query(query))
+            return
+
         for r in searcher(
                 query,
-                max_nresults=max_nresults,
-                show_query=show_query):
+                max_nresults=max_nresults):
             yield r
