@@ -258,18 +258,21 @@ In case if you want to enter buildbot's environment
 
 2. Find container ID associated with the environment you are interested in, e.g.
 
-       ```docker ps | grep nd16.04```
+        docker ps | grep nd16.04
 
 3. Enter that docker container environment using
 
-       ```docker exec -it <CONTAINER ID> /bin/bash```
+        docker exec -it <CONTAINER ID> /bin/bash
 
 4. Become buildbot user
 
-       ```su - buildbot```
+        su - buildbot
 
-5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
-   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+5. Activate corresponding virtualenv using
+
+        source <VENV/bin/activate>
+
+   e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`
 
 And now you should be in the same environment as the very last tested PR.
 Note that the same path/venv is reused for all the PRs, so you might want
