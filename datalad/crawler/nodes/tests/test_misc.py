@@ -477,5 +477,8 @@ def test_debug():
 
 
 def test_fix_url():
-    eq_(list(fix_url({'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication Material.zip'})),
-        [{'url': 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication%20Material.zip'}])
+    test_url = 'http://myweb.fsu.edu/bgomez/AJPS_2001_Erratum.zip'
+    # urlTest = 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication Material.zip'
+    eq_(list(fix_url({'url': test_url, 'url': test_url + ' ', 'url': test_url + '  ',
+                      'url': ' ' + test_url, 'url': '  ' + test_url})),
+        [{'url': test_url, 'url': test_url, 'url': test_url, 'url': test_url, 'url': test_url}])
