@@ -223,6 +223,9 @@ class _Search(object):
     def __call__(self, query, max_nresults=None, show_keys=False, show_query=False):
         raise NotImplementedError
 
+    def show_keys(self):
+        raise NotImplementedError
+
 
 class _WhooshSearch(_Search):
     def __init__(self, ds, force_reindex=False, **kwargs):
@@ -235,6 +238,10 @@ class _WhooshSearch(_Search):
         # where does the bunny have the eggs?
         self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
+
+    def show_keys(self):
+        for k in self.idx_obj.schema.names():
+            print(u'{}'.format(k))
 
     def _meta2doc(self, meta, val2str=True, schema=None):
         raise NotImplementedError
@@ -391,15 +398,7 @@ class _WhooshSearch(_Search):
         lgr.info('Search index contains %i documents', idx_size)
         self.idx_obj = idx_obj
 
-    def __call__(self, query, max_nresults=None, force_reindex=False, show_keys=False, show_query=False):
-
-        if show_keys:
-            for k in self.idx_obj.schema.names():
-                print(u'{}'.format(k))
-            return
-
-        if not query:
-            return
+    def __call__(self, query, max_nresults=None, force_reindex=False, show_query=False):
 
         with self.idx_obj.searcher() as searcher:
             # parse the query string
@@ -708,9 +707,15 @@ class Search(Interface):
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
 
+        if show_keys:
+            searcher.show_keys()
+            return
+
+        if not query:
+            return
+
         for r in searcher(
                 query,
                 max_nresults=max_nresults,
-                show_keys=show_keys,
                 show_query=show_query):
             yield r
