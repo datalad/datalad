@@ -217,16 +217,16 @@ def _search_from_virgin_install(dataset, query):
 
 
 class _Search(object):
-    def __init__(self, ds):
+    def __init__(self, ds, **kwargs):
         self.ds = ds
 
-    def __call__(self, query, max_nresults=None, force_reindex=False, show_keys=False, show_query=False):
+    def __call__(self, query, max_nresults=None, show_keys=False, show_query=False):
         raise NotImplementedError
 
 
 class _WhooshSearch(_Search):
-    def __init__(self, ds):
-        super(_WhooshSearch, self).__init__(ds)
+    def __init__(self, ds, force_reindex=False, **kwargs):
+        super(_WhooshSearch, self).__init__(ds, **kwargs)
         self.documenttype = self.ds.config.obtain(
             'datalad.search.index-{}-documenttype'.format(self._mode_label),
             default=self._default_documenttype)
@@ -234,6 +234,7 @@ class _WhooshSearch(_Search):
         self.idx_obj = None
         # where does the bunny have the eggs?
         self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self._mk_search_index(force_reindex)
 
     def _meta2doc(self, meta, val2str=True, schema=None):
         raise NotImplementedError
@@ -391,8 +392,6 @@ class _WhooshSearch(_Search):
         self.idx_obj = idx_obj
 
     def __call__(self, query, max_nresults=None, force_reindex=False, show_keys=False, show_query=False):
-
-        self._mk_search_index(force_reindex)
 
         if show_keys:
             for k in self.idx_obj.schema.names():
@@ -702,9 +701,9 @@ class Search(Interface):
             return
 
         if mode == 'default':
-            searcher = _BlobSearch(ds)
+            searcher = _BlobSearch(ds, force_reindex=force_reindex)
         elif mode == 'autofield':
-            searcher = _AutofieldSearch(ds)
+            searcher = _AutofieldSearch(ds, force_reindex=force_reindex)
         else:
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
@@ -712,7 +711,6 @@ class Search(Interface):
         for r in searcher(
                 query,
                 max_nresults=max_nresults,
-                force_reindex=force_reindex,
                 show_keys=show_keys,
                 show_query=show_query):
             yield r
