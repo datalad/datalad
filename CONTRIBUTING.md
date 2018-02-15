@@ -398,6 +398,8 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
+- *DATALAD_TESTS_OBSCURE_PREFIX*:
+  A string to prefix the most obscure (but supported by the filesystem test filename
 - *DATALAD_TESTS_PROTOCOLREMOTE*:
   Binary flag to specify whether to test protocol interactions of custom remote with annex
 - *DATALAD_TESTS_RUNCMDLINE*:

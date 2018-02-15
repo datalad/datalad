@@ -1276,18 +1276,19 @@ def dump_graph(graph, flatten=False):
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
+OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
-    "- \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
-    "- \"';a&b&cd `| ",
-    "- \"';abcd `| ",
-    "- \"';abcd | ",
-    "- \"';abcd ",
-    "- ;abcd ",
-    "- ;abcd",
-    "- ab cd ",
-    "- ab cd",
-    "-a",
-    "- abc d.dat ",
+    " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
+    " \"';a&b&cd `| ",
+    " \"';abcd `| ",
+    " \"';abcd | ",
+    " \"';abcd ",
+    " ;abcd ",
+    " ;abcd",
+    " ab cd ",
+    " ab cd",
+    "a",
+    " abc d.dat ",
     "abc d.dat ",  # they all should at least support spaces and dots
 )
 
@@ -1298,6 +1299,7 @@ def get_most_obscure_supported_name(tdir):
     TODO: we might want to use it as a function where we would provide tdir
     """
     for filename in OBSCURE_FILENAMES:
+        filename = OBSCURE_PREFIX + filename
         if on_windows and filename.rstrip() != filename:
             continue
         try:
