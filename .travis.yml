@@ -46,11 +46,15 @@ matrix:
     env:
     - NOSE_SELECTION_OP=""
     - TMPDIR="/var/tmp/sym link"
+    # And the leading - in filenames for the most challenge
+    - DATALAD_TESTS_OBSCURE_PREFIX=-
   - python: 3.4
     # Run slow etc tests under a single tricky scenario
     env:
     - NOSE_SELECTION_OP=""
     - TMPDIR="/var/tmp/sym link"
+    # And the leading - in filenames for the most challenge
+    - DATALAD_TESTS_OBSCURE_PREFIX=-
   - python: 2.7
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
@@ -71,6 +75,7 @@ matrix:
     - DATALAD_LOG_CMD_ENV=1
     - DATALAD_LOG_CMD_STDIN=1
     - DATALAD_TESTS_UI_BACKEND=console
+    - DATALAD_TESTS_OBSCURE_PREFIX=-
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
