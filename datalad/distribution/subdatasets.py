@@ -268,7 +268,7 @@ class Subdatasets(Interface):
                         k)
         try:
             if not (bottomup or contains or set_property or delete_property or \
-                    (recursive and recursion_limit is not None)):
+                    recursive):
                 # FAST IMPLEMENTATION FOR THE STRAIGHTFORWARD CASE
                 # as fast as possible (just a single call to Git)
                 # need to track current parent
