@@ -35,6 +35,7 @@ from datalad.support.constraints import EnsureKeyChoice
 
 from ..base import Interface
 from ..utils import eval_results
+from ..utils import discover_dataset_trace_to_targets
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
 from datalad.api import create
@@ -302,3 +303,34 @@ def test_result_filter():
         assert_equal(kwargs.get('dataset', 'bob'), None)
         return True
     TestUtils().__call__(4, result_filter=sadfilter)
+
+
+@slow  # >20s
+@with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
+@known_failure_direct_mode  #FIXME
+def test_discover_ds_trace(path):
+    ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
+    ds.add('.', recursive=True)
+    ok_clean_git(ds.path)
+    a = opj(ds.path, 'a')
+    aa = opj(a, 'aa')
+    d = opj(ds.path, 'd')
+    db = opj(d, 'db')
+    for input, goal in (
+            ([], {}),
+            ([ds.path], {}),
+            ([opj(ds.path, 'nothere')], {}),
+            ([opj(d, 'nothere')], {}),
+            ([opj(db, 'nothere')], {}),
+            ([a],
+             {ds.path: [a]}),
+            ([aa, a],
+             {ds.path: [a], a: [aa]}),
+            ([db],
+             {ds.path: [d], d: [db]}),
+            ([opj(db, 'file_db')],
+             {ds.path: [d], d: [db]}),
+    ):
+        spec = {}
+        discover_dataset_trace_to_targets(ds.path, input, [], spec)
+        assert_dict_equal(spec, goal)
