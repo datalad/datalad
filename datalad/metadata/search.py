@@ -665,6 +665,10 @@ class Search(Interface):
     command), in which case a search can discover any dataset or any file in
     of these datasets.
 
+    *Search modes*
+
+    WRITE ME
+
     A search index is automatically built from the available metadata of any
     dataset or file, and a schema for this index is generated dynamically, too.
     Consequently, the search index will be tailored to data provided in a
@@ -740,9 +744,9 @@ class Search(Interface):
             constraints=EnsureInt()),
         mode=Parameter(
             args=("--mode",),
-            choices=('default', 'autofield', 'egrep'),
-            doc="""Mode of search index structure and content. 'autofield': metadata
-            fields are discovered automatically, datasets and files can be discovered.
+            choices=('egrep', 'textblob', 'autofield'),
+            doc="""Mode of search index structure and content. See section
+            SEARCH MODES for details.
             """),
         show_keys=Parameter(
             args=('--show-keys',),
@@ -771,7 +775,7 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20,
-                 mode='default',
+                 mode=None,
                  show_keys=False,
                  show_query=False):
         try:
@@ -786,12 +790,17 @@ class Search(Interface):
                 yield r
             return
 
-        if mode == 'default':
+        if mode is None:
+            # let's get inspired by what the dataset/user think is
+            # default
+            mode = ds.config.obtain('datalad.search.default-mode')
+
+        if mode == 'egrep':
+            searcher = _EGrepSearch
+        elif mode == 'textblob':
             searcher = _BlobSearch
         elif mode == 'autofield':
             searcher = _AutofieldSearch
-        elif mode == 'egrep':
-            searcher = _EGrepSearch
         else:
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
