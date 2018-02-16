@@ -15,6 +15,7 @@ import logging
 lgr = logging.getLogger('datalad.metadata.search')
 
 import os
+import re
 from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
@@ -22,6 +23,7 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
+import json
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -219,6 +221,9 @@ def _search_from_virgin_install(dataset, query):
 class _Search(object):
     def __init__(self, ds, **kwargs):
         self.ds = ds
+        self.documenttype = self.ds.config.obtain(
+            'datalad.search.index-{}-documenttype'.format(self._mode_label),
+            default=self._default_documenttype)
 
     def __call__(self, query, max_nresults=None):
         raise NotImplementedError
@@ -233,9 +238,6 @@ class _Search(object):
 class _WhooshSearch(_Search):
     def __init__(self, ds, force_reindex=False, **kwargs):
         super(_WhooshSearch, self).__init__(ds, **kwargs)
-        self.documenttype = self.ds.config.obtain(
-            'datalad.search.index-{}-documenttype'.format(self._mode_label),
-            default=self._default_documenttype)
 
         self.idx_obj = None
         # where does the bunny have the eggs?
@@ -539,6 +541,8 @@ class _AutofieldSearch(_WhooshSearch):
         lgr.info('Scanning for metadata keys')
         # quick 1st pass over all dataset to gather the needed schema fields
         for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
                 reporton='datasets',
                 ds=self.ds,
                 aps=[dict(path=self.ds.path, type='dataset')],
@@ -568,6 +572,86 @@ class _AutofieldSearch(_WhooshSearch):
         # replace field defintion to allow for colons to be part of a field's name:
         parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
         self.parser = parser
+
+
+class _EGrepSearch(_Search):
+    _mode_label = 'egrep'
+    _default_documenttype = 'datasets'
+
+    def __call__(self, query, max_nresults=None):
+        query = re.compile(self.get_query(query))
+
+        nhits = 0
+        for res in query_aggregated_metadata(
+                reporton=self.documenttype,
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                # MIH: I cannot see a case when we would not want recursion (within
+                # the metadata)
+                recursive=True):
+            # this assumes that files are reported after each dataset report,
+            # and after a subsequent dataset report no files for the previous
+            # dataset will be reported again
+            meta = res.get('metadata', {})
+            # produce a big string blob that also includes the flattened metadata keys
+            # to search through
+            # sorted by keyname
+            doc = u'; '.join(
+                u': '.join((k, v))
+                for k, v in sorted(
+                    _meta2autofield_dict(meta, val2str=True).items(),
+                    key=lambda x: x[0]))
+            # use search instead of match to not just get hits at the start of the string
+            # this will be slower, but avoids having to use actual regex syntax at the user
+            # side even for simple queries
+            # DOTALL is needed to handle multiline description fields and such, and still
+            # be able to match content coming for a later field
+            match = query.search(doc, re.DOTALL | re.UNICODE)
+            if match:
+                hit = dict(
+                    res,
+                    action='search',
+                    query_matched=match.group(),
+                )
+                yield hit
+                nhits += 1
+                if max_nresults and nhits == max_nresults:
+                    # report query stats
+                    topstr = '{} top {}'.format(
+                        max_nresults,
+                        single_or_plural('match', 'matches', max_nresults)
+                    )
+                    lgr.info(
+                        "Reached the limit of {}, there could be more which "
+                        "were not reported.".format(topstr)
+                    )
+                    break
+
+    def show_keys(self):
+        # use a dict already, later we need to map to a definition
+        keys = {}
+        for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
+                reporton='datasets',
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                recursive=True):
+            meta = res.get('metadata', {})
+            # no stringification of values for speed
+            idxd = _meta2autofield_dict(meta, val2str=False)
+
+            for k in idxd:
+                # TODO deal with conflicting definitions when available
+                keys[k] = None
+        for k in sorted(keys):
+            print(k)
+
+    def get_query(self, query):
+        # cmdline args might come in as a list
+        if isinstance(query, list):
+            query = r' '.join(query)
+        return query
 
 
 @build_doc
@@ -656,7 +740,7 @@ class Search(Interface):
             constraints=EnsureInt()),
         mode=Parameter(
             args=("--mode",),
-            choices=('default', 'autofield',),
+            choices=('default', 'autofield', 'egrep'),
             doc="""Mode of search index structure and content. 'autofield': metadata
             fields are discovered automatically, datasets and files can be discovered.
             """),
@@ -703,12 +787,16 @@ class Search(Interface):
             return
 
         if mode == 'default':
-            searcher = _BlobSearch(ds, force_reindex=force_reindex)
+            searcher = _BlobSearch
         elif mode == 'autofield':
-            searcher = _AutofieldSearch(ds, force_reindex=force_reindex)
+            searcher = _AutofieldSearch
+        elif mode == 'egrep':
+            searcher = _EGrepSearch
         else:
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
+
+        searcher = searcher(ds, force_reindex=force_reindex)
 
         if show_keys:
             searcher.show_keys()
@@ -718,7 +806,7 @@ class Search(Interface):
             return
 
         if show_query:
-            print(searcher.get_query(query))
+            print(repr(searcher.get_query(query)))
             return
 
         for r in searcher(
