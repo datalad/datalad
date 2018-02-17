@@ -14,6 +14,7 @@ from datalad.metadata import extractors
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import known_failure_direct_mode
 
 
 @with_tree(tree={'file.dat': ''})
@@ -50,7 +51,11 @@ def check_api(no_annex, path):
         "Should have managed to find at least the core extractor extractor"
 
 
-def test_api():
+def test_api_git():
     # should tollerate both pure git and annex repos
     yield check_api, True
+
+
+@known_failure_direct_mode
+def test_api_annex():
     yield check_api, False
