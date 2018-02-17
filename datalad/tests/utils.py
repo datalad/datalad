@@ -1395,6 +1395,13 @@ def get_datasets_topdir():
 #
 
 
+def patch_config(vars):
+    """Patch our config with custom settings. Returns mock.patch cm
+    """
+    from datalad import cfg
+    return patch.dict(cfg._store, vars)
+
+
 #
 # Test tags
 #

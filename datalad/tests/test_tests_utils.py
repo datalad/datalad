@@ -55,6 +55,9 @@ from .utils import ok_file_has_content
 from .utils import without_http_proxy
 from .utils import with_testsui
 from .utils import skip_ssh
+from .utils import probe_known_failure
+from .utils import patch_config
+from .utils import ignore_nose_capturing_stdout
 
 #
 # Test with_tempfile, especially nested invocations
@@ -602,8 +605,27 @@ def test_skip_ssh():
     # no ssh testing on Windows ATM
     with patch.object(utils, 'on_windows', return_value=True):
         with assert_raises(SkipTest):
-            skip_ssh(lambda _: False)()
+            skip_ssh(lambda: False)()
 
     with patch.dict('os.environ', {'DATALAD_TESTS_SSH': 'no'}):
         with assert_raises(SkipTest):
-            skip_ssh(lambda _: False)()
+            skip_ssh(lambda: False)()
+
+
+def test_probe_known_failure():
+    # should raise assert error if function no longer fails
+    with patch_config({'datalad.tests.knownfailures.probe': True}):
+        with assert_raises(AssertionError):
+            probe_known_failure(lambda: True)()
+
+    with patch_config({'datalad.tests.knownfailures.probe': False}):
+        ok_(probe_known_failure(lambda: True))
+
+
+def test_ignore_nose_capturing_stdout():
+    # Just test the logic, not really a situation under overwritten stdout
+    def raise_exc():
+        raise AttributeError('nose causes a message which includes words '
+                             'StringIO and fileno')
+    with assert_raises(SkipTest):
+        ignore_nose_capturing_stdout(raise_exc)()
