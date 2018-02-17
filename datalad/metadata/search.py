@@ -14,8 +14,8 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.metadata.search')
 
-import re
 import os
+import re
 from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
@@ -23,6 +23,7 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
+import json
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -52,9 +53,6 @@ if PY3:
 else:
     unicode_srctypes = string_types
     str_contructor = unicode
-
-# regex for a cheap test if something looks like a URL
-r_url = re.compile(r"^https?://")
 
 
 def _any2unicode(val):
@@ -103,9 +101,6 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
-#
-# START: autofield mode functions
-#
 def _meta2autofield_dict(meta, val2str=True, schema=None):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
@@ -166,258 +161,6 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
     }
 
 
-def _get_schema_autofield(ds):
-    from whoosh import fields as wf
-    from whoosh.analysis import StandardAnalyzer
-
-    # haven for terms that have been found to be undefined
-    # (for faster decision-making upon next encounter)
-    # this will harvest all discovered term definitions
-    definitions = {
-        '@id': 'unique identifier of an entity',
-        # TODO make proper JSON-LD definition
-        'path': 'path name of an entity relative to the searched base dataset',
-        # TODO make proper JSON-LD definition
-        'parentds': 'path of the datasets that contains an entity',
-        # 'type' will not come from a metadata field, hence will not be detected
-        'type': 'type of a record',
-    }
-
-    schema_fields = {
-        n.lstrip('@'): wf.ID(stored=True, unique=n == '@id')
-        for n in definitions}
-
-    lgr.info('Scanning for metadata keys')
-    # quick 1st pass over all dataset to gather the needed schema fields
-    for res in query_aggregated_metadata(
-            reporton='datasets',
-            ds=ds,
-            aps=[dict(path=ds.path, type='dataset')],
-            recursive=True):
-        meta = res.get('metadata', {})
-        # no stringification of values for speed, we do not need/use the
-        # actual values at this point, only the keys
-        idxd = _meta2autofield_dict(meta, val2str=False)
-
-        for k in idxd:
-            schema_fields[k] = wf.TEXT(stored=True,
-                                       analyzer=StandardAnalyzer(minsize=1))
-
-    schema = wf.Schema(**schema_fields)
-    return schema
-
-
-def _get_parser_autofield(idx_obj):
-    from whoosh import qparser as qparse
-
-    parser = qparse.MultifieldParser(
-        idx_obj.schema.names(),
-        idx_obj.schema)
-    # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
-    # upstream
-    parser.add_plugin(qparse.FuzzyTermPlugin())
-    parser.add_plugin(qparse.GtLtPlugin())
-    parser.add_plugin(qparse.SingleQuotePlugin())
-    # replace field defintion to allow for colons to be part of a field's name:
-    parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
-    return parser
-
-
-#
-# START: homoblob mode functions
-#
-def _meta2homoblob_dict(meta, val2str=True, schema=None):
-    # coerce the entire flattened metadata dict into a comma-separated string
-    # that also includes the keys
-    return dict(meta=u', '.join(
-        u'{}: {}'.format(k, v)
-        for k, v in _meta2autofield_dict(
-            meta,
-            val2str=True,
-            schema=None).items()))
-
-
-def _get_schema_homoblob(ds):
-    from whoosh import fields as wf
-    from whoosh.analysis import StandardAnalyzer
-
-    # TODO support some customizable mapping to homogenize some metadata fields
-    # onto a given set of index keys
-    schema = wf.Schema(
-        id=wf.ID,
-        path=wf.ID(stored=True),
-        type=wf.ID(stored=True),
-        parentds=wf.ID(stored=True),
-        meta=wf.TEXT(
-            stored=False,
-            analyzer=StandardAnalyzer(minsize=2))
-    )
-    return schema
-
-
-def _get_parser_homoblob(idx_obj):
-    from whoosh import qparser as qparse
-
-    # use whoosh default query parser for now
-    return qparse.QueryParser(
-        "meta",
-        schema=idx_obj.schema
-    )
-
-
-def _get_search_index(index_dir, label, ds, force_reindex, get_schema, meta2doc, documenttype):
-    """Generic entrypoint to index generation
-
-    The actual work that determines the structure and content of the index
-    is done by functions that are passed in as arguments
-
-    `get_schema` - must return whoosh schema
-    `meta2doc` - must return dict for index document from result input
-    `label` - string label to distinguish an index type from others (must be a valid
-              directory name
-    """
-    from whoosh import index as widx
-    from .metadata import agginfo_relpath
-    # what is the lastest state of aggregated metadata
-    metadata_state = ds.repo.get_last_commit_hash(agginfo_relpath)
-    # use location common to all index types, they would all invalidate
-    # simultaneously
-    stamp_fname = opj(index_dir, 'datalad_metadata_state')
-    index_dir = opj(index_dir, label)
-
-    if (not force_reindex) and \
-            exists(index_dir) and \
-            exists(stamp_fname) and \
-            open(stamp_fname).read() == metadata_state:
-        try:
-            # TODO check that the index schema is the same
-            # as the one we would have used for reindexing
-            # TODO support incremental re-indexing, whoosh can do it
-            idx = widx.open_dir(index_dir)
-            lgr.debug(
-                'Search index contains %i documents',
-                idx.doc_count())
-            return idx
-        except widx.LockError as e:
-            raise e
-        except widx.IndexError as e:
-            # Generic index error.
-            # we try to regenerate
-            # TODO log this
-            pass
-        except widx.IndexVersionError as e:  # (msg, version, release=None)
-            # Raised when you try to open an index using a format that the
-            # current version of Whoosh cannot read. That is, when the index
-            # you're trying to open is either not backward or forward
-            # compatible with this version of Whoosh.
-            # we try to regenerate
-            lgr.warning(exc_str(e))
-            pass
-        except widx.OutOfDateError as e:
-            # Raised when you try to commit changes to an index which is not
-            # the latest generation.
-            # this should not happen here, but if it does ... KABOOM
-            raise e
-        except widx.EmptyIndexError as e:
-            # Raised when you try to work with an index that has no indexed
-            # terms.
-            # we can just continue with generating an index
-            pass
-
-    lgr.info('{} search index'.format(
-        'Rebuilding' if exists(index_dir) else 'Building'))
-
-    if not exists(index_dir):
-        os.makedirs(index_dir)
-
-    # this is a pretty cheap call that just pull this info from a file
-    dsinfo = ds.metadata(
-        get_aggregates=True,
-        return_type='list',
-        result_renderer='disabled')
-
-    lgr.info('Processing metadata records for %i datasets', len(dsinfo))
-    schema = get_schema(ds)
-
-    idx_obj = widx.create_in(index_dir, schema)
-    idx = idx_obj.writer(
-        # cache size per process
-        limitmb=cfg.obtain('datalad.search.indexercachesize'),
-        # disable parallel indexing for now till #1927 is resolved
-        ## number of processes for indexing
-        #procs=multiprocessing.cpu_count(),
-        ## write separate index segments in each process for speed
-        ## asks for writer.commit(optimize=True)
-        #multisegment=True,
-    )
-
-    # load metadata of the base dataset and what it knows about all its subdatasets
-    # (recursively)
-    old_idx_size = 0
-    old_ds_rpath = ''
-    idx_size = 0
-    for res in query_aggregated_metadata(
-            reporton=documenttype,
-            ds=ds,
-            aps=[dict(path=ds.path, type='dataset')],
-            # MIH: I cannot see a case when we would not want recursion (within
-            # the metadata)
-            recursive=True):
-        # this assumes that files are reported after each dataset report,
-        # and after a subsequent dataset report no files for the previous
-        # dataset will be reported again
-        meta = res.get('metadata', {})
-        doc = meta2doc(
-            meta,
-            # this time stringification of values so whoosh can handle them
-            val2str=True,
-            schema=schema)
-        admin = {
-            'type': res['type'],
-            'path': relpath(res['path'], start=ds.path),
-        }
-        if 'parentds' in res:
-            admin['parentds'] = relpath(res['parentds'], start=ds.path)
-        if admin['type'] == 'dataset':
-            if old_ds_rpath:
-                lgr.info(
-                    'Added %s on dataset %s',
-                    single_or_plural(
-                        'document',
-                        'documents',
-                        idx_size - old_idx_size,
-                        include_count=True),
-                    old_ds_rpath)
-            old_idx_size = idx_size
-            old_ds_rpath = admin['path']
-
-        doc.update({k: assure_unicode(v) for k, v in admin.items()})
-        lgr.debug("Adding document to search index: {}".format(doc))
-        # inject into index
-        idx.add_document(**doc)
-        idx_size += 1
-
-    if old_ds_rpath:
-        lgr.info(
-            'Added %s on dataset %s',
-            single_or_plural(
-                'document',
-                'documents',
-                idx_size - old_idx_size,
-                include_count=True),
-            old_ds_rpath)
-
-    lgr.debug("Committing index")
-    idx.commit(optimize=True)
-
-    # "timestamp" the search index to allow for automatic invalidation
-    with open(stamp_fname, 'w') as f:
-        f.write(metadata_state)
-
-    lgr.info('Search index contains %i documents', idx_size)
-    return idx_obj
-
-
 def _search_from_virgin_install(dataset, query):
     #
     # this is to be nice to newbies
@@ -475,6 +218,442 @@ def _search_from_virgin_install(dataset, query):
         raise
 
 
+class _Search(object):
+    def __init__(self, ds, **kwargs):
+        self.ds = ds
+        self.documenttype = self.ds.config.obtain(
+            'datalad.search.index-{}-documenttype'.format(self._mode_label),
+            default=self._default_documenttype)
+
+    def __call__(self, query, max_nresults=None):
+        raise NotImplementedError
+
+    def show_keys(self):
+        raise NotImplementedError
+
+    def get_query(self, query):
+        raise NotImplementedError
+
+
+class _WhooshSearch(_Search):
+    def __init__(self, ds, force_reindex=False, **kwargs):
+        super(_WhooshSearch, self).__init__(ds, **kwargs)
+
+        self.idx_obj = None
+        # where does the bunny have the eggs?
+        self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self._mk_search_index(force_reindex)
+
+    def show_keys(self):
+        for k in self.idx_obj.schema.names():
+            print(u'{}'.format(k))
+
+    def get_query(self, query):
+        # parse the query string
+        self._mk_parser()
+        # for convenience we accept any number of args-words from the
+        # shell and put them together to a single string here
+        querystr = ' '.join(assure_list(query))
+        # this gives a formal whoosh query
+        wquery = self.parser.parse(querystr)
+        return wquery
+
+    def _meta2doc(self, meta, val2str=True, schema=None):
+        raise NotImplementedError
+
+    def _mk_schema(self):
+        raise NotImplementedError
+
+    def _mk_parser(self):
+        raise NotImplementedError
+
+    def _mk_search_index(self, force_reindex):
+        """Generic entrypoint to index generation
+
+        The actual work that determines the structure and content of the index
+        is done by functions that are passed in as arguments
+
+        `meta2doc` - must return dict for index document from result input
+        """
+        from whoosh import index as widx
+        from .metadata import agginfo_relpath
+        # what is the lastest state of aggregated metadata
+        metadata_state = self.ds.repo.get_last_commit_hash(agginfo_relpath)
+        # use location common to all index types, they would all invalidate
+        # simultaneously
+        stamp_fname = opj(self.index_dir, 'datalad_metadata_state')
+        index_dir = opj(self.index_dir, self._mode_label)
+
+        if (not force_reindex) and \
+                exists(index_dir) and \
+                exists(stamp_fname) and \
+                open(stamp_fname).read() == metadata_state:
+            try:
+                # TODO check that the index schema is the same
+                # as the one we would have used for reindexing
+                # TODO support incremental re-indexing, whoosh can do it
+                idx = widx.open_dir(index_dir)
+                lgr.debug(
+                    'Search index contains %i documents',
+                    idx.doc_count())
+                self.idx_obj = idx
+                return
+            except widx.LockError as e:
+                raise e
+            except widx.IndexError as e:
+                # Generic index error.
+                # we try to regenerate
+                # TODO log this
+                pass
+            except widx.IndexVersionError as e:  # (msg, version, release=None)
+                # Raised when you try to open an index using a format that the
+                # current version of Whoosh cannot read. That is, when the index
+                # you're trying to open is either not backward or forward
+                # compatible with this version of Whoosh.
+                # we try to regenerate
+                lgr.warning(exc_str(e))
+                pass
+            except widx.OutOfDateError as e:
+                # Raised when you try to commit changes to an index which is not
+                # the latest generation.
+                # this should not happen here, but if it does ... KABOOM
+                raise e
+            except widx.EmptyIndexError as e:
+                # Raised when you try to work with an index that has no indexed
+                # terms.
+                # we can just continue with generating an index
+                pass
+
+        lgr.info('{} search index'.format(
+            'Rebuilding' if exists(index_dir) else 'Building'))
+
+        if not exists(index_dir):
+            os.makedirs(index_dir)
+
+        # this is a pretty cheap call that just pull this info from a file
+        dsinfo = self.ds.metadata(
+            get_aggregates=True,
+            return_type='list',
+            result_renderer='disabled')
+
+        lgr.info('Processing metadata records for %i datasets', len(dsinfo))
+        self._mk_schema()
+
+        idx_obj = widx.create_in(index_dir, self.schema)
+        idx = idx_obj.writer(
+            # cache size per process
+            limitmb=cfg.obtain('datalad.search.indexercachesize'),
+            # disable parallel indexing for now till #1927 is resolved
+            ## number of processes for indexing
+            #procs=multiprocessing.cpu_count(),
+            ## write separate index segments in each process for speed
+            ## asks for writer.commit(optimize=True)
+            #multisegment=True,
+        )
+
+        # load metadata of the base dataset and what it knows about all its subdatasets
+        # (recursively)
+        old_idx_size = 0
+        old_ds_rpath = ''
+        idx_size = 0
+        for res in query_aggregated_metadata(
+                reporton=self.documenttype,
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                # MIH: I cannot see a case when we would not want recursion (within
+                # the metadata)
+                recursive=True):
+            # this assumes that files are reported after each dataset report,
+            # and after a subsequent dataset report no files for the previous
+            # dataset will be reported again
+            meta = res.get('metadata', {})
+            doc = self._meta2doc(meta)
+            admin = {
+                'type': res['type'],
+                'path': relpath(res['path'], start=self.ds.path),
+            }
+            if 'parentds' in res:
+                admin['parentds'] = relpath(res['parentds'], start=self.ds.path)
+            if admin['type'] == 'dataset':
+                if old_ds_rpath:
+                    lgr.info(
+                        'Added %s on dataset %s',
+                        single_or_plural(
+                            'document',
+                            'documents',
+                            idx_size - old_idx_size,
+                            include_count=True),
+                        old_ds_rpath)
+                old_idx_size = idx_size
+                old_ds_rpath = admin['path']
+
+            doc.update({k: assure_unicode(v) for k, v in admin.items()})
+            lgr.debug("Adding document to search index: {}".format(doc))
+            # inject into index
+            idx.add_document(**doc)
+            idx_size += 1
+
+        if old_ds_rpath:
+            lgr.info(
+                'Added %s on dataset %s',
+                single_or_plural(
+                    'document',
+                    'documents',
+                    idx_size - old_idx_size,
+                    include_count=True),
+                old_ds_rpath)
+
+        lgr.debug("Committing index")
+        idx.commit(optimize=True)
+
+        # "timestamp" the search index to allow for automatic invalidation
+        with open(stamp_fname, 'w') as f:
+            f.write(metadata_state)
+
+        lgr.info('Search index contains %i documents', idx_size)
+        self.idx_obj = idx_obj
+
+    def __call__(self, query, max_nresults=None, force_reindex=False):
+        with self.idx_obj.searcher() as searcher:
+            wquery = self.get_query(query)
+
+            # perform the actual search
+            hits = searcher.search(
+                wquery,
+                terms=True,
+                limit=max_nresults if max_nresults > 0 else None)
+            # report query stats
+            topstr = '{} top {}'.format(
+                max_nresults,
+                single_or_plural('match', 'matches', max_nresults)
+            )
+            lgr.info('Query completed in {} sec.{}'.format(
+                hits.runtime,
+                ' Reporting {}.'.format(
+                    ('up to ' + topstr)
+                    if max_nresults > 0
+                    else 'all matches'
+                )
+                if not hits.is_empty()
+                else ' No matches.'
+            ))
+
+            if not hits:
+                return
+
+            nhits = 0
+            for hit in hits:
+                res = dict(
+                    action='search',
+                    status='ok',
+                    logger=lgr,
+                    refds=self.ds.path,
+                    # normpath to avoid trailing dot
+                    path=normpath(opj(self.ds.path, hit['path'])),
+                    query_matched={assure_unicode(k): assure_unicode(v)
+                                   if isinstance(v, unicode_srctypes) else v
+                                   for k, v in hit.matched_terms()},
+                    metadata={k: v for k, v in hit.fields().items()
+                              if k not in ('path', 'parentds')})
+                if 'parentds' in hit:
+                    res['parentds'] = normpath(opj(self.ds.path, hit['parentds']))
+                if res['metadata'].get('type', None) in ('file', 'dataset'):
+                    res['type'] = res['metadata']['type']
+                yield res
+                nhits += 1
+
+            if max_nresults and nhits == max_nresults:
+                lgr.info(
+                    "Reached the limit of {}, there could be more which "
+                    "were not reported.".format(topstr)
+                )
+
+
+class _BlobSearch(_WhooshSearch):
+    _mode_label = 'default'
+    _default_documenttype = 'datasets'
+
+    def _meta2doc(self, meta):
+        # coerce the entire flattened metadata dict into a comma-separated string
+        # that also includes the keys
+        return dict(meta=u', '.join(
+            u'{}: {}'.format(k, v)
+            for k, v in _meta2autofield_dict(
+                meta,
+                val2str=True,
+                schema=None).items()))
+
+    def _mk_schema(self):
+        from whoosh import fields as wf
+        from whoosh.analysis import StandardAnalyzer
+
+        # TODO support some customizable mapping to homogenize some metadata fields
+        # onto a given set of index keys
+        self.schema = wf.Schema(
+            id=wf.ID,
+            path=wf.ID(stored=True),
+            type=wf.ID(stored=True),
+            parentds=wf.ID(stored=True),
+            meta=wf.TEXT(
+                stored=False,
+                analyzer=StandardAnalyzer(minsize=2))
+        )
+
+    def _mk_parser(self):
+        from whoosh import qparser as qparse
+
+        # use whoosh default query parser for now
+        self.parser = qparse.QueryParser(
+            "meta",
+            schema=self.idx_obj.schema
+        )
+
+
+class _AutofieldSearch(_WhooshSearch):
+    _mode_label = 'autofield'
+    _default_documenttype = 'all'
+
+    def _meta2doc(self, meta):
+        return _meta2autofield_dict(meta, val2str=True, schema=self.schema)
+
+    def _mk_schema(self):
+        from whoosh import fields as wf
+        from whoosh.analysis import StandardAnalyzer
+        from whoosh.analysis import SimpleAnalyzer
+
+        # haven for terms that have been found to be undefined
+        # (for faster decision-making upon next encounter)
+        # this will harvest all discovered term definitions
+        definitions = {
+            '@id': 'unique identifier of an entity',
+            # TODO make proper JSON-LD definition
+            'path': 'path name of an entity relative to the searched base dataset',
+            # TODO make proper JSON-LD definition
+            'parentds': 'path of the datasets that contains an entity',
+            # 'type' will not come from a metadata field, hence will not be detected
+            'type': 'type of a record',
+        }
+
+        schema_fields = {
+            n.lstrip('@'): wf.ID(stored=True, unique=n == '@id')
+            for n in definitions}
+
+        lgr.info('Scanning for metadata keys')
+        # quick 1st pass over all dataset to gather the needed schema fields
+        for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
+                reporton='datasets',
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                recursive=True):
+            meta = res.get('metadata', {})
+            # no stringification of values for speed, we do not need/use the
+            # actual values at this point, only the keys
+            idxd = _meta2autofield_dict(meta, val2str=False)
+
+            for k in idxd:
+                schema_fields[k] = wf.TEXT(stored=False,
+                                           analyzer=SimpleAnalyzer())
+
+        self.schema = wf.Schema(**schema_fields)
+
+    def _mk_parser(self):
+        from whoosh import qparser as qparse
+
+        parser = qparse.MultifieldParser(
+            self.idx_obj.schema.names(),
+            self.idx_obj.schema)
+        # XXX: plugin is broken in Debian's whoosh 2.7.0-2, but already fixed
+        # upstream
+        parser.add_plugin(qparse.FuzzyTermPlugin())
+        parser.add_plugin(qparse.GtLtPlugin())
+        parser.add_plugin(qparse.SingleQuotePlugin())
+        # replace field defintion to allow for colons to be part of a field's name:
+        parser.replace_plugin(qparse.FieldsPlugin(expr=r"(?P<text>[()<>.\w]+|[*]):"))
+        self.parser = parser
+
+
+class _EGrepSearch(_Search):
+    _mode_label = 'egrep'
+    _default_documenttype = 'datasets'
+
+    def __call__(self, query, max_nresults=None):
+        query = re.compile(self.get_query(query))
+
+        nhits = 0
+        for res in query_aggregated_metadata(
+                reporton=self.documenttype,
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                # MIH: I cannot see a case when we would not want recursion (within
+                # the metadata)
+                recursive=True):
+            # this assumes that files are reported after each dataset report,
+            # and after a subsequent dataset report no files for the previous
+            # dataset will be reported again
+            meta = res.get('metadata', {})
+            # produce a big string blob that also includes the flattened metadata keys
+            # to search through
+            # sorted by keyname
+            doc = u'; '.join(
+                u': '.join((k, v))
+                for k, v in sorted(
+                    _meta2autofield_dict(meta, val2str=True).items(),
+                    key=lambda x: x[0]))
+            # use search instead of match to not just get hits at the start of the string
+            # this will be slower, but avoids having to use actual regex syntax at the user
+            # side even for simple queries
+            # DOTALL is needed to handle multiline description fields and such, and still
+            # be able to match content coming for a later field
+            match = query.search(doc, re.DOTALL | re.UNICODE)
+            if match:
+                hit = dict(
+                    res,
+                    action='search',
+                    query_matched=match.group(),
+                )
+                yield hit
+                nhits += 1
+                if max_nresults and nhits == max_nresults:
+                    # report query stats
+                    topstr = '{} top {}'.format(
+                        max_nresults,
+                        single_or_plural('match', 'matches', max_nresults)
+                    )
+                    lgr.info(
+                        "Reached the limit of {}, there could be more which "
+                        "were not reported.".format(topstr)
+                    )
+                    break
+
+    def show_keys(self):
+        # use a dict already, later we need to map to a definition
+        keys = {}
+        for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
+                reporton='datasets',
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                recursive=True):
+            meta = res.get('metadata', {})
+            # no stringification of values for speed
+            idxd = _meta2autofield_dict(meta, val2str=False)
+
+            for k in idxd:
+                # TODO deal with conflicting definitions when available
+                keys[k] = None
+        for k in sorted(keys):
+            print(k)
+
+    def get_query(self, query):
+        # cmdline args might come in as a list
+        if isinstance(query, list):
+            query = r' '.join(query)
+        return query
+
+
 @build_doc
 class Search(Interface):
     """Search a dataset's metadata.
@@ -485,6 +664,10 @@ class Search(Interface):
     contain metadata from multiple subdatasets (see the 'aggregate-metadata'
     command), in which case a search can discover any dataset or any file in
     of these datasets.
+
+    *Search modes*
+
+    WRITE ME
 
     A search index is automatically built from the available metadata of any
     dataset or file, and a schema for this index is generated dynamically, too.
@@ -561,9 +744,9 @@ class Search(Interface):
             constraints=EnsureInt()),
         mode=Parameter(
             args=("--mode",),
-            choices=('default', 'autofield',),
-            doc="""Mode of search index structure and content. 'autofield': metadata
-            fields are discovered automatically, datasets and files can be discovered.
+            choices=('egrep', 'textblob', 'autofield'),
+            doc="""Mode of search index structure and content. See section
+            SEARCH MODES for details.
             """),
         show_keys=Parameter(
             args=('--show-keys',),
@@ -592,7 +775,7 @@ class Search(Interface):
                  dataset=None,
                  force_reindex=False,
                  max_nresults=20,
-                 mode='default',
+                 mode=None,
                  show_keys=False,
                  show_query=False):
         try:
@@ -607,103 +790,35 @@ class Search(Interface):
                 yield r
             return
 
-        # where does the bunny have the eggs?
-        index_dir = opj(ds.path, get_git_dir(ds.path), SEARCH_INDEX_DOTGITDIR)
+        if mode is None:
+            # let's get inspired by what the dataset/user think is
+            # default
+            mode = ds.config.obtain('datalad.search.default-mode')
 
-        if mode == 'default':
-            get_schema_fx = _get_schema_homoblob
-            meta2doc_fx = _meta2homoblob_dict
-            get_parser = _get_parser_homoblob
-            documenttype = ds.config.obtain(
-                'datalad.search.index-default-documenttype',
-                default='datasets')
+        if mode == 'egrep':
+            searcher = _EGrepSearch
+        elif mode == 'textblob':
+            searcher = _BlobSearch
         elif mode == 'autofield':
-            get_schema_fx = _get_schema_autofield
-            meta2doc_fx = _meta2autofield_dict
-            get_parser = _get_parser_autofield
-            documenttype = ds.config.obtain(
-                'datalad.search.index-autofield-documenttype',
-                default='all')
+            searcher = _AutofieldSearch
         else:
             raise ValueError(
                 'unknown search mode "{}"'.format(mode))
 
-        idx_obj = _get_search_index(
-            index_dir,
-            mode,
-            ds,
-            force_reindex,
-            get_schema_fx,
-            meta2doc_fx,
-            documenttype)
+        searcher = searcher(ds, force_reindex=force_reindex)
 
         if show_keys:
-            for k in idx_obj.schema.names():
-                print(u'{}'.format(k))
+            searcher.show_keys()
             return
 
         if not query:
             return
 
-        with idx_obj.searcher() as searcher:
-            # parse the query string
-            parser = get_parser(idx_obj)
-            # for convenience we accept any number of args-words from the
-            # shell and put them together to a single string here
-            querystr = ' '.join(assure_list(query))
-            # this gives a formal whoosh query
-            wquery = parser.parse(querystr)
+        if show_query:
+            print(repr(searcher.get_query(query)))
+            return
 
-            if show_query:
-                print(wquery)
-                return
-            # perform the actual search
-            hits = searcher.search(
-                wquery,
-                terms=True,
-                limit=max_nresults if max_nresults > 0 else None)
-            # report query stats
-            topstr = '{} top {}'.format(
-                max_nresults,
-                single_or_plural('match', 'matches', max_nresults)
-            )
-            lgr.info('Query completed in {} sec.{}'.format(
-                hits.runtime,
-                ' Reporting {}.'.format(
-                    ('up to ' + topstr)
-                    if max_nresults > 0
-                    else 'all matches'
-                )
-                if not hits.is_empty()
-                else ' No matches.'
-            ))
-
-            if not hits:
-                return
-
-            nhits = 0
-            for hit in hits:
-                res = dict(
-                    action='search',
-                    status='ok',
-                    logger=lgr,
-                    refds=ds.path,
-                    # normpath to avoid trailing dot
-                    path=normpath(opj(ds.path, hit['path'])),
-                    query_matched={assure_unicode(k): assure_unicode(v)
-                                   if isinstance(v, unicode_srctypes) else v
-                                   for k, v in hit.matched_terms()},
-                    metadata={k: v for k, v in hit.fields().items()
-                              if k not in ('path', 'parentds')})
-                if 'parentds' in hit:
-                    res['parentds'] = normpath(opj(ds.path, hit['parentds']))
-                if res['metadata'].get('type', None) in ('file', 'dataset'):
-                    res['type'] = res['metadata']['type']
-                yield res
-                nhits += 1
-
-            if max_nresults and nhits == max_nresults:
-                lgr.info(
-                    "Reached the limit of {}, there could be more which "
-                    "were not reported.".format(topstr)
-                )
+        for r in searcher(
+                query,
+                max_nresults=max_nresults):
+            yield r

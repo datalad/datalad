@@ -219,7 +219,7 @@ def test_within_ds_file_search(path):
 
     # test default behavior
     with swallow_outputs() as cmo:
-        ds.search(show_keys=True)
+        ds.search(show_keys=True, mode='textblob')
 
         assert_equal(cmo.out, """\
 id
@@ -298,12 +298,12 @@ type
     # now check that we can discover things from the aggregated metadata
     for mode, query, hitpath, matched_key, matched_val in (
             # random keyword query
-            ('default',
+            ('textblob',
              'mp3',
              opj('stim', 'stim1.mp3'),
              'meta', 'mp3'),
             # multi word query implies AND
-            ('default',
+            ('textblob',
              ['bold', 'male'],
              opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
              'meta', 'male'),
@@ -336,8 +336,8 @@ type
             # query language configuration
     ):
         res = ds.search(query, mode=mode)
-        if mode == 'default':
-            # 'default' does datasets by default only (be could be configured otherwise
+        if mode == 'textblob':
+            # 'textblob' does datasets by default only (be could be configured otherwise
             assert_result_count(res, 1)
         else:
             # the rest has always a file and the dataset, because they carry metadata in

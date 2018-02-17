@@ -236,6 +236,13 @@ definitions = {
         'type': EnsureBool(),
         'default': True,
     },
+    'datalad.search.default-mode': {
+        'ui': ('question', {
+               'title': 'Default search mode',
+               'text': 'Label of the mode to be used by default'}),
+        'type': EnsureChoice('egrep', 'textblob', 'autofield'),  # graph,...
+        'default': 'egrep',
+    },
     'datalad.search.index-default-documenttype': {
         'ui': ('question', {
                'title': 'Type of search index documents',
