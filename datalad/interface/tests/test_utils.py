@@ -15,8 +15,10 @@ from datalad.tests.utils import known_failure_direct_mode
 import os
 import logging
 from os.path import join as opj
+from os.path import exists
 from nose.tools import assert_raises, assert_equal
 from datalad.tests.utils import with_tempfile, assert_not_equal
+from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
@@ -305,32 +307,53 @@ def test_result_filter():
     TestUtils().__call__(4, result_filter=sadfilter)
 
 
-@slow  # >20s
 @with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-def test_discover_ds_trace(path):
-    ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    ds.add('.', recursive=True)
-    ok_clean_git(ds.path)
+def test_discover_ds_trace(path, otherdir):
+    ds = make_demo_hierarchy_datasets(
+        path,
+        {k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
     a = opj(ds.path, 'a')
     aa = opj(a, 'aa')
     d = opj(ds.path, 'd')
     db = opj(d, 'db')
-    for input, goal in (
-            ([], {}),
-            ([ds.path], {}),
-            ([opj(ds.path, 'nothere')], {}),
-            ([opj(d, 'nothere')], {}),
-            ([opj(db, 'nothere')], {}),
-            ([a],
-             {ds.path: [a]}),
-            ([aa, a],
-             {ds.path: [a], a: [aa]}),
-            ([db],
-             {ds.path: [d], d: [db]}),
-            ([opj(db, 'file_db')],
-             {ds.path: [d], d: [db]}),
+    # we have to check whether we get the correct hierarchy, as the test
+    # subject is also involved in this
+    assert_true(exists(opj(db, 'file_db')))
+    ds.add('.', recursive=True)
+    ok_clean_git(ds.path)
+    # now two datasets which are not available locally, but we
+    # know about them (e.g. from metadata)
+    dba = opj(db, 'sub', 'dba')
+    dbaa = opj(dba, 'subsub', 'dbaa')
+    for input, eds, goal in (
+            ([], None, {}),
+            ([ds.path], None, {}),
+            ([otherdir], None, {}),
+            ([opj(ds.path, 'nothere')], None, {}),
+            ([opj(d, 'nothere')], None, {}),
+            ([opj(db, 'nothere')], None, {}),
+            ([a], None,
+             {ds.path: set([a])}),
+            ([aa, a], None,
+             {ds.path: set([a]), a: set([aa])}),
+            ([db], None,
+             {ds.path: set([d]), d: set([db])}),
+            ([opj(db, 'file_db')], None,
+             {ds.path: set([d]), d: set([db])}),
+            # just a regular non-existing path
+            ([dba], None, {}),
+            # but if we inject this knowledge it must come back out
+            # as the child of the closest existing dataset
+            ([dba], [dba],
+             {ds.path: set([d]), d: set([db]), db: set([dba])}),
+            # regardless of the depth
+            ([dbaa], [dbaa],
+             {ds.path: set([d]), d: set([db]), db: set([dbaa])}),
+            ([dba, dbaa], [dba, dbaa],
+             {ds.path: set([d]), d: set([db]), db: set([dba, dbaa])}),
     ):
         spec = {}
-        discover_dataset_trace_to_targets(ds.path, input, [], spec)
+        discover_dataset_trace_to_targets(ds.path, input, [], spec, includeds=eds)
         assert_dict_equal(spec, goal)

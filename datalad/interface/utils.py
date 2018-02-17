@@ -162,7 +162,8 @@ def path_is_under(values, path=None):
     return False
 
 
-def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
+def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
+                                      spec, includeds=None):
     """Discover the edges and nodes in a dataset tree to given target paths
 
     Parameters
@@ -181,12 +182,20 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
       discovered datasets. Specifically, for each discovered dataset there
       will be in item with its path under the key (path) of the respective
       superdataset.
+    includeds : sequence, optional
+      Any paths given are treated as existing subdatasets, regardless of
+      whether they can be found in the filesystem. Such subdatasets will appear
+      under the key of the closest existing dataset in the `spec`.
 
     Returns
     -------
     None
-      Function calls itself recursively and populates `spec` in-place.
+      Function calls itself recursively and populates `spec` dict in-place.
+      Keys are dataset paths, values are sets of subdataset paths
     """
+    # convert to set for faster lookup
+    includeds = includeds if isinstance(includeds, set) else \
+        set() if includeds is None else set(includeds)
     # this beast walks the directory tree from a given `basepath` until
     # it discovers any of the given `targetpaths`
     # if it finds one, it commits any accummulated trace of visited
@@ -195,29 +204,46 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
     if valid_repo:
         # we are passing into a new dataset, extend the dataset trace
         current_trace = current_trace + [basepath]
-    if basepath in targetpaths:
-        # found a targetpath, commit the trace
-        for i, p in enumerate(current_trace[:-1]):
-            # TODO RF prepare proper annotated path dicts
-            spec[p] = list(set(spec.get(p, []) + [current_trace[i + 1]]))
-    if not isdir(basepath):
-        # nothing underneath this one -> done
-        return
     # this edge is not done, we need to try to reach any downstream
     # dataset
-    for p in listdir(basepath):
-        if valid_repo and p == '.git':
-            # ignore gitdir to speed things up
-            continue
-        p = opj(basepath, p)
-        if all(t != p and not t.startswith(_with_sep(p)) for t in targetpaths):
+    undiscovered_ds = set(t for t in targetpaths) # if t != basepath)
+    # whether anything in this directory matched a targetpath
+    filematch = False
+    if isdir(basepath):
+        for p in listdir(basepath):
+            p = opj(basepath, p)
+            if not isdir(p):
+                if p in targetpaths:
+                    filematch = True
+                # we cannot have anything below this one
+                continue
             # OPT listdir might be large and we could have only few items
             # in `targetpaths` -- so traverse only those in spec which have
             # leading dir basepath
-            continue
-        # we need to call this even for non-directories, to be able to match
-        # file target paths
-        discover_dataset_trace_to_targets(p, targetpaths, current_trace, spec)
+            # filter targets matching this downward path
+            downward_targets = set(
+                t for t in targetpaths if t == p or t.startswith(_with_sep(p)))
+            if not downward_targets:
+                continue
+            # remove the matching ones from the "todo" list
+            undiscovered_ds.difference_update(downward_targets)
+            # go one deeper
+            discover_dataset_trace_to_targets(
+                p, downward_targets, current_trace, spec,
+                includeds=includeds if not includeds else includeds.intersection(
+                    downward_targets))
+    undiscovered_ds = [t for t in undiscovered_ds
+                       if includeds and t.startswith(_with_sep(current_trace[-1])) and
+                       t in includeds]
+    if filematch or basepath in targetpaths or undiscovered_ds:
+        for i, p in enumerate(current_trace[:-1]):
+            # TODO RF prepare proper annotated path dicts
+            subds = spec.get(p, set())
+            subds.add(current_trace[i + 1])
+            spec[p] = subds
+        if undiscovered_ds:
+            spec[current_trace[-1]] = spec.get(current_trace[-1], set()).union(
+                undiscovered_ds)
 
 
 def eval_results(func):
