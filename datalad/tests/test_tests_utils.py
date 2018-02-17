@@ -607,7 +607,7 @@ def test_skip_ssh():
         with assert_raises(SkipTest):
             skip_ssh(lambda: False)()
 
-    with patch.dict('os.environ', {'DATALAD_TESTS_SSH': 'no'}):
+    with patch_config({'datalad.tests.ssh': False}):
         with assert_raises(SkipTest):
             skip_ssh(lambda: False)()
 
