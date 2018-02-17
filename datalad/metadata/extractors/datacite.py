@@ -22,38 +22,15 @@ except ImportError:
     import xml.etree.ElementTree as ET
 
 from datalad.metadata.extractors.base import BaseMetadataExtractor
-from datalad.interface.base import dedent_docstring
-
-
-def _split_list_field(content):
-    return [i.strip() for i in content.split(',') if i.strip()]
-
-
-def _beautify_multiline_field(content):
-    content = dedent_docstring(content)
-    lines = content.split('\n')
-    title = ''
-    if len(lines):
-        title = lines[0]
-    if len(lines) > 1:
-        content = ''
-        for l in lines[1:]:
-            l = l.strip()
-            content = '{}{}{}'.format(
-                content,
-                ' ' if len(content) and l != '.' and content[-1] != '\n' else '',
-                l if l != '.' else '\n')
-    return title, content
 
 
 def _merge(iterable):
-    "Helper: merge multiple items into a single one separating with a newline"
+    """Merge multiple items into a single one separating with a newline"""
     return "\n".join(iterable)
 
 
 def _unwrap(text):
     """Basic unwrapping of text separated by newlines"""
-
     return re.sub(r'\n\s*', ' ', text)
 
 
