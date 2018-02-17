@@ -912,7 +912,7 @@ def test_import_modules_fail():
     failures = []
     import_modules(['bogus'], 'datalad', 'Fail {package}.{module}', failures.append)
     eq_(len(failures), 1)
-    ok_startswith(failures[0], "Fail datalad.bogus: No module named bogus")
+    ok_startswith(failures[0], "Fail datalad.bogus: No module")
 
 
 # Should be the last one since as discovered in NICEMAN might screw up coverage
