@@ -9,27 +9,25 @@
 """Metadata extractors"""
 
 import logging as __logging
-__lgr = __logging.getLogger('datalad.metadata.extractors')
+from datalad.utils import import_modules as __import_modules
 
-from importlib import import_module as __impmod
+__all__ = [
+    'audio',
+    'bids',
+    'datacite',
+    'datalad_core',
+    'datalad_rfc822',
+    'dicom',
+    'exif',
+    'frictionless_datapackage',
+    'image',
+    'nidm',
+    'nifti1',
+    'xmp',
+]
 
-for __modname in (
-        'audio',
-        'bids',
-        'datacite',
-        'datalad_core',
-        'datalad_rfc822',
-        'dicom',
-        'exif',
-        'frictionless_datapackage',
-        'image',
-        'nidm',
-        'nifti1',
-        'xmp'):
-    try:
-        globals()[__modname] = __impmod(
-            '.{}'.format(__modname),
-            'datalad.metadata.extractors')
-    except Exception as _e:
-        from datalad.dochelpers import exc_str as _exc_str
-        __lgr.debug('Metadata extractor %s unusable: %s', __modname, _exc_str(_e))
+__import_modules(
+    __all__,
+    pkg=__name__,
+    msg='Metadata extractor {module} is unusable',
+    log=__logging.getLogger(__name__).debug)
