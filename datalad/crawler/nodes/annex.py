@@ -13,52 +13,40 @@ via Annexificator class, which could be used to add files, checkout branches, et
 
 import os
 import re
-import time
+
 from os import listdir
-from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
+from os.path import join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
-from os.path import isdir, islink
+from os.path import isdir
 from os.path import relpath
-from os import unlink, makedirs
-from collections import OrderedDict
+from os import unlink
 from humanize import naturalsize
 from six import iteritems
 from six import string_types
 from distutils.version import LooseVersion
-from functools import partial
-
-from git import Repo
 
 from ...version import __version__
 from ...api import add_archive_content
 from ...api import clean
-from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
-from ...utils import _path_
-from ...utils import getpwd
 from ...utils import try_multiple
 from ...utils import assure_list
-from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
-from ...distribution.dataset import Dataset
 from ...api import create
-from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.exceptions import AnnexBatchCommandError
-from ...support.external_versions import external_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
 from ...cmd import get_runner
 
-from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
