@@ -353,6 +353,10 @@ def test_discover_ds_trace(path, otherdir):
              {ds.path: set([d]), d: set([db]), db: set([dbaa])}),
             ([dba, dbaa], [dba, dbaa],
              {ds.path: set([d]), d: set([db]), db: set([dba, dbaa])}),
+            # we can simply add existing and non-existing datasets to the
+            # include list get the desired result
+            ([d, dba, dbaa], [d, dba, dbaa],
+             {ds.path: set([d]), d: set([db]), db: set([dba, dbaa])}),
     ):
         spec = {}
         discover_dataset_trace_to_targets(ds.path, input, [], spec, includeds=eds)
