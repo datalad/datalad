@@ -108,7 +108,10 @@ def _parse_git_submodules(dspath):
         sm = {}
         props = submodule_full_props.match(line)
         sm['revision'] = props.group(2)
-        sm['path'] = opj(dspath, props.group(4))
+        subpath = opj(dspath, props.group(4))
+        sm['path'] = subpath
+        if not exists(subpath) or not GitRepo.is_valid_repo(subpath):
+            sm['state'] = 'absent'
         yield sm
 
 
