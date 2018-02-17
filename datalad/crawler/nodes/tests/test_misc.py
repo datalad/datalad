@@ -50,7 +50,6 @@ import logging
 from mock import patch
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
-import six.moves.builtins as __builtin__
 
 
 # TODO: redo on a local example
@@ -477,8 +476,10 @@ def test_debug():
 
 
 def test_fix_url():
-    test_url = 'http://myweb.fsu.edu/bgomez/AJPS_2001_Erratum.zip'
-    # urlTest = 'http://myweb.fsu.edu/bgomez/GomezWilson_2006_JOP_Replication Material.zip'
-    eq_(list(fix_url({'url': test_url, 'url': test_url + ' ', 'url': test_url + '  ',
-                      'url': ' ' + test_url, 'url': '  ' + test_url})),
-        [{'url': test_url, 'url': test_url, 'url': test_url, 'url': test_url, 'url': test_url}])
+    eq_(list(fix_url({'url': "http://site/u r"})), [{'url': "http://site/u%20r"}])
+    eq_(list(fix_url({'url': "http://site/ur "})), [{'url': "http://site/ur%20"}]) # trailing spaces are still spaces
+    eq_(list(fix_url({'html': "http://site/u r", 'url':"http://site/ur "})),
+        [{'html': "http://site/u r", 'url': "http://site/ur%20"}])
+    eq_(list(fix_url({'html': "http://site/u r", 'url': "http://site/ur "}, keys=['url', 'html'])),
+        [{'html': "http://site/u%20r", 'url': "http://site/ur%20"}])
+    eq_(list(fix_url({'html': "http://site/u r"})), [{'html': "http://site/u r"}]) # no urls

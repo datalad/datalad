@@ -26,7 +26,6 @@ from ..pipeline import xrun_pipeline
 from ..pipeline import PIPELINE_TYPES
 from ...utils import auto_repr
 from ...utils import find_files as _find_files
-from six.moves.urllib.parse import quote
 from datalad.support.network import URL
 
 from logging import getLogger
@@ -592,14 +591,13 @@ class debug(object):
             pdb.set_trace()
 
 
-def fix_url(data):
+def fix_url(data, keys=['url']):
     """Given data, get value within 'url' key and fix up so it is legit url
 
     - replace spaces with %20
     """
-
-    for key, value in data.items():
-        while data[key][0] == ' ':
-            data[key] = data[key][1:len(data[key])]
-        data[key] = URL(data[key])
+    data = data.copy()
+    for key in keys:
+        if key in data: # catches key error if dictionary does not contain key
+            data[key] = URL(data[key]).as_str()
     yield data
