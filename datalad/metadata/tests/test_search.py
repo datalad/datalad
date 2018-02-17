@@ -33,6 +33,7 @@ from datalad.api import search
 from datalad.metadata import search as search_mod
 from datalad.metadata.extractors.tests.test_bids import bids_template
 from ..search import _listdict2dictlist
+from ..search import _meta2autofield_dict
 
 
 @with_testsui(interactive=False)
@@ -359,3 +360,15 @@ def test_listdict2dictlist():
     eq_(f([{1: 2}]), {1: 2})  # inside out no need for a list
     # inside out, join into the list, skip entry with a list, or space
     eq_(f([{1: [2, 3], 'a': 1}, {'a': 2, 'c': ''}]), {'a': [1, 2]})
+
+
+def test_meta2autofield_dict():
+    # Just a test that we would obtain the value stored for that extractor
+    # instead of what unique values it already had (whatever that means)
+    eq_(
+        _meta2autofield_dict({
+            'datalad_unique_content_properties':
+                {'extr1': {"prop1": "v1"}},
+            'extr1': {'prop1': 'value'}}),
+        {'extr1.prop1': 'value'}
+    )
