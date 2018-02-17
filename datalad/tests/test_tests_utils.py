@@ -33,6 +33,7 @@ from nose import SkipTest
 
 from ..utils import getpwd, chpwd
 
+from . import utils
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, \
@@ -53,6 +54,7 @@ from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
 from .utils import with_testsui
+from .utils import skip_ssh
 
 #
 # Test with_tempfile, especially nested invocations
@@ -594,3 +596,14 @@ def test_setup():
     eq_(DATASETS_TOPURL, 'http://datasets-tests.datalad.org/')
     from datalad.tests.utils import get_datasets_topdir
     eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')
+
+
+def test_skip_ssh():
+    # no ssh testing on Windows ATM
+    with patch.object(utils, 'on_windows', return_value=True):
+        with assert_raises(SkipTest):
+            skip_ssh(lambda _: False)()
+
+    with patch.dict('os.environ', {'DATALAD_TESTS_SSH': 'no'}):
+        with assert_raises(SkipTest):
+            skip_ssh(lambda _: False)()
