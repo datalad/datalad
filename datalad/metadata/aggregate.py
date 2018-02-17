@@ -443,6 +443,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             to_save(dict(path=ds_path, type='dataset', staged=True))
 
     # must copy object files to local target destination
+    # make sure those objects are present
+    ds.get([f for f, t in objs2copy], result_renderer='disabled')
     for copy_from, copy_to in objs2copy:
         if copy_to == copy_from:
             continue
@@ -705,7 +707,13 @@ class AggregateMetaData(Interface):
         # get adjencency info of the dataset tree spanning the base to all leaf dataset
         # associated with the path arguments
         ds_adj = {}
-        discover_dataset_trace_to_targets(ds.path, to_aggregate, [], ds_adj)
+        discover_dataset_trace_to_targets(
+            ds.path, to_aggregate, [], ds_adj,
+            # we know that to_aggregate only lists datasets, existing and
+            # absent ones -- we want to aggregate all of them, either from
+            # just extracted metadata, or from previously aggregated metadata
+            # of the closest superdataset
+            includeds=to_aggregate)
         # TODO we need to work in the info about dataset that we only got from
         # aggregated metadata, that had no trace on the file system in here!!
         subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
