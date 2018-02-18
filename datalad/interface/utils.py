@@ -33,6 +33,7 @@ import json
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
+from datalad.utils import path_startswith
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
@@ -210,7 +211,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
             # ignore gitdir to speed things up
             continue
         p = opj(basepath, p)
-        if all(t != p and not t.startswith(_with_sep(p)) for t in targetpaths):
+        if all(t != p and not path_startswith(t, p) for t in targetpaths):
             # OPT listdir might be large and we could have only few items
             # in `targetpaths` -- so traverse only those in spec which have
             # leading dir basepath
