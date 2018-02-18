@@ -36,14 +36,29 @@ a complete or partial dump of aggregated metadata available in a dataset.
 .. _linked data: https://en.wikipedia.org/wiki/Linked_data
 
 
-Supported metadata formats
+Supported metadata sources
 ==========================
 
-This following sections provide an overview of supported metadata formats.
+This following sections provide an overview of included metadata extractors for
+particular types of data structures and file formats.
 
+Various audio file formats (``audio``)
+--------------------------------------
 
-RFC822-compliant metadata
--------------------------
+Brain Imaging Data Structure (``bids``)
+---------------------------------------
+
+DataLad has basic support for extraction of metadata from the `BIDS
+<http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
+
+datacite.org compliant datasets (``datacite``)
+----------------------------------------------
+
+Datalad's internal metadata storage (``datalad_core``)
+------------------------------------------------------
+
+RFC822-compliant metadata (``datalad_rfc822``)
+----------------------------------------------
 
 This is a custom metadata format, inspired by the standard used for Debian
 software packages that is particularly suited for manual entry. This format is
@@ -118,20 +133,38 @@ The following fields are supported:
   A version for the dataset. This should be in a format that is alphanumerically
   sortable and lead to a "greater" version for an update of a dataset.
 
+Digital Imaging and Communications in Medicine (``dicom``)
+----------------------------------------------------------
 
-Brain Imaging Data Structure (BIDS)
------------------------------------
-
-DataLad has basic support for extraction of metadata from the `BIDS
-<http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
-
-Friction-less data packages
----------------------------
+Friction-less data packages (``frictionless_datapackage``)
+----------------------------------------------------------
 
 DataLad has basic support for extraction of metadata from `friction-less data
 packages <http://specs.frictionlessdata.io/data-packages>`_
 (``datapackage.json``).  file.
 
+Exchangeable Image File Format (``exif``)
+-----------------------------------------
+
+Various image/photo formats (``image``)
+---------------------------------------
+
+Neuroimaging data exchange format (``nifti1``)
+----------------------------------------------
+
+Extensible Metadata Platform (``xmp``)
+--------------------------------------
+
+
+Metadata aggregation
+====================
+
+To be written
+
+Metadata query
+==============
+
+To be written
 
 Vocabulary
 ==========
