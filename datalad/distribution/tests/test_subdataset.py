@@ -169,7 +169,6 @@ def test_get_subdatasets(path):
         [])
 
 
-@known_failure_direct_mode  #FIXME
 @with_tempfile
 def test_state(path):
     ds = Dataset.create(path)
@@ -194,6 +193,7 @@ def test_state(path):
         ds.subdatasets(), 1, path=sub.path, state='absent')
 
 
+@known_failure_direct_mode  #FIXME same issue as gh-2113
 @with_tempfile
 def test_get_subdatasets_types(path):
     from datalad.api import create
