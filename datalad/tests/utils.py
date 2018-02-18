@@ -880,7 +880,7 @@ def skip_ssh(func):
             raise SkipTest("SSH currently not available on windows.")
         from datalad import cfg
         test_ssh = cfg.get("datalad.tests.ssh", '')
-        if test_ssh in ('', '0', 'false', 'no'):
+        if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
@@ -1393,6 +1393,13 @@ def get_datasets_topdir():
 #
 # Context Managers
 #
+
+
+def patch_config(vars):
+    """Patch our config with custom settings. Returns mock.patch cm
+    """
+    from datalad import cfg
+    return patch.dict(cfg._store, vars)
 
 
 #

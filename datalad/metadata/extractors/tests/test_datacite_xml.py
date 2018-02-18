@@ -62,7 +62,8 @@ from datalad.support.exceptions import IncompleteResultsError
 </resource>
 """}})
 def test_get_metadata(path):
-    ds = Dataset(path).create(force=True)
+    from datalad.api import create
+    ds = create(path, force=True)
     meta = MetadataExtractor(ds, [])._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

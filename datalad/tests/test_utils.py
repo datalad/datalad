@@ -53,6 +53,7 @@ from ..utils import path_startswith
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
+from ..utils import import_modules
 
 from ..support.annexrepo import AnnexRepo
 
@@ -904,6 +905,14 @@ def test_read_csv_lines_one_column(infile):
             {u'h1': u'v2'},
         ]
     )
+
+
+def test_import_modules_fail():
+    # test that we log failures correctly
+    failures = []
+    import_modules(['bogus'], 'datalad', 'Fail {package}.{module}', failures.append)
+    eq_(len(failures), 1)
+    ok_startswith(failures[0], "Fail datalad.bogus: No module")
 
 
 # Should be the last one since as discovered in NICEMAN might screw up coverage

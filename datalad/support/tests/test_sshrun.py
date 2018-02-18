@@ -24,7 +24,8 @@ def test_exit_code():
     # will relay actual exit code on CommandError
     cmd = ['sshrun', 'localhost', 'exit 42']
     with assert_raises(SystemExit) as cme:
-        if isinstance(sys.stdout, StringIO):  # running nosetests without -s
+        # running nosetests without -s
+        if isinstance(sys.stdout, StringIO):  # pragma: no cover
             with swallow_outputs():  # need to give smth with .fileno ;)
                 main(cmd)
         else:

@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
 from .utils import (
     chpwd,
     get_dataset_root,
@@ -45,3 +46,10 @@ def test_git_config_fixture():
             'user.email': 'test@example.com'
          }
     )
+
+
+def test_no_empty_http_proxy():
+    # in __init__ we might prune http_proxy if it is empty, so it must not be
+    # empty if present
+    assert os.environ.get('http_proxy', 'default')
+    assert os.environ.get('https_proxy', 'default')

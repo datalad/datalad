@@ -106,8 +106,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
     and concatenation of sequence-type fields into CSV strings
     """
     # loop over all metadata sources and the report of their unique values
-    for src in meta.get("datalad_unique_content_properties", {}):
-        umeta = meta["datalad_unique_content_properties"][src]
+    ucnprops = meta.get("datalad_unique_content_properties", {})
+    for src, umeta in ucnprops.items():
         srcmeta = meta.get(src, {})
         for uk in umeta:
             if uk in srcmeta:
@@ -151,9 +151,9 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
     return {
         k:
         # turn lists into space-separated value strings
-        (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
-         # and the rest into unicode
-         _any2unicode(v)) if val2str else v
+            (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
+            # and the rest into unicode
+            _any2unicode(v)) if val2str else v
         for k, v in _deep_kv('', meta or {})
         # auto-exclude any key that is not a defined field in the schema (if there is
         # a schema
@@ -215,7 +215,7 @@ def _search_from_virgin_install(dataset, query):
             yield res
         return
     else:
-        raise
+        raise  # this function is called within exception handling block
 
 
 class _Search(object):

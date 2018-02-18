@@ -19,7 +19,7 @@ try:
     import pydicom as dcm
     from pydicom.errors import InvalidDicomError
     from pydicom.dicomdir import DicomDir
-except ImportError:
+except ImportError:  # pragma: no cover
     import dicom as dcm
     from dicom.errors import InvalidDicomError
     from dicom.dicomdir import DicomDir

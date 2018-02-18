@@ -12,7 +12,6 @@ import sys
 from genericpath import exists
 from os import linesep, makedirs
 from os.path import dirname, join as opj
-from importlib import import_module
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError

@@ -1432,5 +1432,33 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 yield dict(zip(header, row_unicode))
 
 
+def import_modules(mods, pkg, msg="Failed to import {module}", log=lgr.debug):
+    """Helper to import a list of modules without failing if N/A
+
+    Parameters
+    ----------
+    mods: list of str
+      List of module names to import
+    pkg: str
+      Package under which to import
+    msg: str, optional
+      Message template for .format() to log at DEBUG level if import fails.
+      Keys {module} and {package} will be provided and ': {exception}' appended
+    log: callable, optional
+      Logger call to use for logging messages
+    """
+    from importlib import import_module
+    _globals = globals()
+    for mod in mods:
+        try:
+            _globals[mod] = import_module(
+                '.{}'.format(mod),
+                pkg)
+        except Exception as exc:
+            from datalad.dochelpers import exc_str
+            log((msg + ': {exception}').format(
+                module=mod, package=pkg, exception=exc_str(exc)))
+
+
 lgr.log(5, "Done importing datalad.utils")
 

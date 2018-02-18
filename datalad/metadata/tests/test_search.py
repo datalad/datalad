@@ -26,13 +26,14 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import eq_
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
 from datalad.metadata.extractors.tests.test_bids import bids_template
-
-from datalad.tests.utils import skip_if_no_network
+from ..search import _listdict2dictlist
+from ..search import _meta2autofield_dict
 
 
 @with_testsui(interactive=False)
@@ -350,3 +351,24 @@ type
         # test the key and specific value of the match
         assert_in(matched_key, res[-1]['query_matched'])
         assert_equal(res[-1]['query_matched'][matched_key], matched_val)
+
+
+def test_listdict2dictlist():
+    f = _listdict2dictlist
+    l1 = [1, 3, [1, 'a']]
+    assert f(l1) is l1, "we return it as is if no emb dict"
+    eq_(f([{1: 2}]), {1: 2})  # inside out no need for a list
+    # inside out, join into the list, skip entry with a list, or space
+    eq_(f([{1: [2, 3], 'a': 1}, {'a': 2, 'c': ''}]), {'a': [1, 2]})
+
+
+def test_meta2autofield_dict():
+    # Just a test that we would obtain the value stored for that extractor
+    # instead of what unique values it already had (whatever that means)
+    eq_(
+        _meta2autofield_dict({
+            'datalad_unique_content_properties':
+                {'extr1': {"prop1": "v1"}},
+            'extr1': {'prop1': 'value'}}),
+        {'extr1.prop1': 'value'}
+    )
