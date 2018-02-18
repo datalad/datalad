@@ -65,7 +65,7 @@ class TraceBack(object):
         self._extract_stack = traceback.extract_stack
 
     def __call__(self):
-        ftb = self._extract_stack(limit=200)[:-2]
+        ftb = self._extract_stack(limit=self.limit+10)[:-2]
         entries = [[mbasename(x[0]), str(x[1])]
                    for x in ftb if mbasename(x[0]) != 'logging.__init__']
         entries = [e for e in entries if e[0] != 'unittest']
@@ -148,7 +148,8 @@ class ColorFormatter(logging.Formatter):
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:
-            record.msg = self._tb() + "  " + record.msg
+            if not getattr(record, 'notraceback', False):
+                record.msg = self._tb() + "  " + record.msg
 
         return logging.Formatter.format(self, record)
 
