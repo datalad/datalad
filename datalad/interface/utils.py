@@ -223,7 +223,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
             # leading dir basepath
             # filter targets matching this downward path
             downward_targets = set(
-                t for t in targetpaths if t == p or t.startswith(_with_sep(p)))
+                t for t in targetpaths if t == p or path_startswith(t, p))
             if not downward_targets:
                 continue
             # remove the matching ones from the "todo" list
@@ -234,7 +234,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                 includeds=includeds if not includeds else includeds.intersection(
                     downward_targets))
     undiscovered_ds = [t for t in undiscovered_ds
-                       if includeds and t.startswith(_with_sep(current_trace[-1])) and
+                       if includeds and path_startswith(t, current_trace[-1]) and
                        t in includeds]
     if filematch or basepath in targetpaths or undiscovered_ds:
         for i, p in enumerate(current_trace[:-1]):

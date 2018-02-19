@@ -116,7 +116,7 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # a little more complicated: we need to loop over all subdataset
     # records an pick the ones that are underneath the seed
     for agginfo_path in agginfos:
-        if agginfo_path.startswith(_with_sep(seed_ds)):
+        if path_startswith(agginfo_path, seed_ds):
             absp = opj(ds_path, agginfo_path)
             db[absp] = _ensure_abs_obj_location(agginfos[agginfo_path])
             hits.append(absp)
@@ -295,7 +295,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
         for rp in [opj(basepath, p) if basepath else p for p in paths]:
             if rp in exclude:
                 continue
-            elif any(ep.startswith(_with_sep(rp)) for ep in exclude):
+            elif path_startswith(any(ep, rp) for ep in exclude):
                 final_paths.extend(
                     _filterpaths(rp, listdir(opj(ds.path, rp)), exclude))
                 pass
