@@ -54,6 +54,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
 from datalad.utils import assure_list
 
 

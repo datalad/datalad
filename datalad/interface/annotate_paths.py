@@ -43,6 +43,7 @@ from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
 from datalad.utils import assure_list
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
@@ -127,7 +128,7 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
                 toappendto.append(r['path'] if path_only else r)
                 content_by_ds[r['path']] = toappendto
             if parentds and refds_path and \
-                    _with_sep(parentds).startswith(_with_sep(refds_path)):
+                    path_startswith(parentds, refds_path):
                 # put also in parentds record if there is any, and the parent
                 # is underneath or identical to the reference dataset
                 toappendto = content_by_ds.get(parentds, [])
@@ -154,7 +155,7 @@ def yield_recursive(ds, path, action, recursion_limit):
         # this check is not the same as subdatasets --contains=path
         # because we want all subdataset below a path, not just the
         # containing one
-        if subd_res['path'].startswith(_with_sep(path)):
+        if path_startswith(subd_res['path'], path):
             # this subdatasets is underneath the search path
             # be careful to not overwrite anything, in case
             # this subdataset has been processed before
@@ -243,7 +244,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
                 ap.update(m)
                 yield ap
                 break
-            if m['path'].startswith(_with_sep(ap['path'])):
+            if path_startswith(m['path'], ap['path']):
                 # a modified path is underneath this AP
                 # yield the modified one instead
                 yield m
@@ -538,7 +539,7 @@ class AnnotatePaths(Interface):
                 for r in requested_paths:
                     p = r['path'] if isinstance(r, dict) else r
                     p = resolve_path(p, ds=refds_path)
-                    if _with_sep(p).startswith(_with_sep(refds_path)):
+                    if path_startswith(p, refds_path):
                         # all good
                         continue
                     # not the refds
@@ -655,7 +656,7 @@ class AnnotatePaths(Interface):
                 continue
 
             # check that we only got SUBdatasets
-            if refds_path and not _with_sep(dspath).startswith(_with_sep(refds_path)):
+            if refds_path and not path_startswith(dspath, refds_path):
                 res = get_status_dict(**dict(res_kwargs, **path_props))
                 res['status'] = nondataset_path_status
                 res['message'] = \
