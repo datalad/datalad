@@ -62,10 +62,10 @@ def _get_bucket_connection(credential):
 
 def _handle_exception(e, bucket_name):
     """Helper to handle S3 connection exception"""
-    if e.error_code == 'AccessDenied':
-        raise AccessDeniedError(exc_str(e))
-    else:
-        raise DownloadError(
+    raise (
+        AccessDeniedError
+        if e.error_code == 'AccessDenied'
+        else DownloadError)(
             "Cannot connect to %s S3 bucket. Exception: %s"
             % (bucket_name, exc_str(e))
         )
@@ -90,7 +90,7 @@ def get_bucket(conn, bucket_name):
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
             lgr.debug("Cannot access all buckets: %s", exc_str(e2))
-            _handle_exception(e, 'any')
+            _handle_exception(e, 'any (originally requested %s)' % bucket_name)
         all_bucket_names = [b.name for b in all_buckets]
         lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
         if bucket_name in all_bucket_names:
