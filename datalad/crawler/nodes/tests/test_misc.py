@@ -31,6 +31,7 @@ from ..misc import _act_if
 from ..misc import rename
 from ..misc import debug
 from ..misc import Sink
+from ..misc import fix_url
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
 from ....utils import updated
@@ -472,3 +473,13 @@ def test_debug():
     yield _test_debug, "About to run"
     yield _test_debug, "Ran node .* which yielded 1 times", ('after',)
     yield _test_debug, "Ran node .* which yielded 0 times", ('empty',)
+
+
+def test_fix_url():
+    eq_(list(fix_url({'url': "http://site/u r"})), [{'url': "http://site/u%20r"}])
+    eq_(list(fix_url({'url': "http://site/ur "})), [{'url': "http://site/ur%20"}]) # trailing spaces are still spaces
+    eq_(list(fix_url({'html': "http://site/u r", 'url':"http://site/ur "})),
+        [{'html': "http://site/u r", 'url': "http://site/ur%20"}])
+    eq_(list(fix_url({'html': "http://site/u r", 'url': "http://site/ur "}, keys=['url', 'html'])),
+        [{'html': "http://site/u%20r", 'url': "http://site/ur%20"}])
+    eq_(list(fix_url({'html': "http://site/u r"})), [{'html': "http://site/u r"}]) # no urls
