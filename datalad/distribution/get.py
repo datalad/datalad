@@ -303,7 +303,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         if start is not None and not subds.path.startswith(_with_sep(start)):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,

@@ -48,16 +48,8 @@ from .dataset import resolve_path
 lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 
-submodule_full_props = re.compile(r'([0-9a-f]+) (.*) \((.*)\)$')
-submodule_nodescribe_props = re.compile(r'([0-9a-f]+) (.*)$')
+submodule_full_props = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
-
-status_map = {
-    ' ': 'clean',
-    '+': 'modified',
-    '-': 'absent',
-    'U': 'conflict',
-}
 
 
 def _parse_gitmodules(dspath):
@@ -84,7 +76,7 @@ def _parse_gitmodules(dspath):
     return mods
 
 
-def _parse_git_submodules(dspath, recursive):
+def _parse_git_submodules(dspath):
     """All known ones with some properties"""
     if not exists(opj(dspath, ".gitmodules")):
         # easy way out. if there is no .gitmodules file
@@ -92,9 +84,7 @@ def _parse_git_submodules(dspath, recursive):
         return
 
     # this will not work in direct mode, need better way #1422
-    cmd = ['git', '--work-tree=.', 'submodule', 'status']
-    if recursive:
-        cmd.append('--recursive')
+    cmd = ['git', 'ls-files', '--stage', '-z']
 
     # need to go rogue  and cannot use proper helper in GitRepo
     # as they also pull in all of GitPython's magic
@@ -112,20 +102,16 @@ def _parse_git_submodules(dspath, recursive):
     except CommandError as e:
         raise InvalidGitRepositoryError(exc_str(e))
 
-    for line in stdout.split('\n'):
-        if not line:
+    for line in stdout.split('\0'):
+        if not line or not line.startswith('160000'):
             continue
         sm = {}
-        sm['state'] = status_map[line[0]]
-        props = submodule_full_props.match(line[1:])
-        if props:
-            sm['revision'] = props.group(1)
-            sm['path'] = opj(dspath, props.group(2))
-            sm['revision_descr'] = props.group(3)
-        else:
-            props = submodule_nodescribe_props.match(line[1:])
-            sm['revision'] = props.group(1)
-            sm['path'] = opj(dspath, props.group(2))
+        props = submodule_full_props.match(line)
+        sm['revision'] = props.group(2)
+        subpath = opj(dspath, props.group(4))
+        sm['path'] = subpath
+        if not exists(subpath) or not GitRepo.is_valid_repo(subpath):
+            sm['state'] = 'absent'
         yield sm
 
 
@@ -266,47 +252,6 @@ class Subdatasets(Interface):
                     raise ValueError(
                         "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
                         k)
-        try:
-            if not (bottomup or contains or set_property or delete_property or \
-                    (recursive and recursion_limit is not None)):
-                # FAST IMPLEMENTATION FOR THE STRAIGHTFORWARD CASE
-                # as fast as possible (just a single call to Git)
-                # need to track current parent
-                stack = [refds_path]
-                modinfo_cache = {}
-                for sm in _parse_git_submodules(refds_path, recursive=recursive):
-                    # unwind the parent stack until we find the right one
-                    # this assumes that submodules come sorted
-                    while not sm['path'].startswith(_with_sep(stack[-1])):
-                        stack.pop()
-                    parent = stack[-1]
-                    if parent not in modinfo_cache:
-                        # read the parent .gitmodules, if not done yet
-                        modinfo_cache[parent] = _parse_gitmodules(parent)
-                    # get URL info, etc.
-                    sm.update(modinfo_cache[parent].get(sm['path'], {}))
-                    subdsres = get_status_dict(
-                        'subdataset',
-                        status='ok',
-                        type='dataset',
-                        refds=refds_path,
-                        logger=lgr)
-                    subdsres.update(sm)
-                    subdsres['parentds'] = parent
-                    if (fulfilled is None or
-                            GitRepo.is_valid_repo(sm['path']) == fulfilled):
-                        yield subdsres
-                    # for the next "parent" commit this subdataset to the stack
-                    stack.append(sm['path'])
-                # MUST RETURN: the rest of the function is doing another implementation
-                return
-        except InvalidGitRepositoryError as e:
-            lgr.debug("fast subdataset query failed, trying slow robust one (%s)",
-                      exc_str(e))
-
-        # MORE ROBUST, FLEXIBLE, BUT SLOWER IMPLEMENTATION
-        # slow but flexible (one Git call per dataset), but deals with subdatasets in
-        # direct mode
         if contains:
             contains = resolve_path(contains, dataset)
         for r in _get_submodules(
@@ -337,7 +282,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     #        gitmodule_path, read_only=False, merge_includes=False)
     #    parser.read()
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(dspath, recursive=False):
+    for sm in _parse_git_submodules(dspath):
         if contains and \
                 not (contains == sm['path'] or
                      contains.startswith(_with_sep(sm['path']))):
