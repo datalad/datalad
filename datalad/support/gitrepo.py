@@ -733,10 +733,13 @@ class GitRepo(RepoInterface):
                     and self.repo is not None:
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
-
                 self.repo.git.clear_cache()
-                if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                    self.repo.index.write()
+                # We used to write out the index to flush GitPython's
+                # state... but such unconditional write is really a workaround
+                # and does not play nice with read-only operations - permission
+                # denied etc. So disabled 
+                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                #    self.repo.index.write()
         except InvalidGitRepositoryError:
             # might have being removed and no longer valid
             pass

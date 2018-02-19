@@ -24,7 +24,7 @@ import tempfile
 
 from collections import OrderedDict
 from six import PY3, PY2
-from six import string_types, binary_type
+from six import string_types, binary_type, text_type
 from os.path import abspath, isabs, pathsep, exists
 
 from .consts import GIT_SSH_COMMAND
@@ -32,10 +32,13 @@ from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows, get_tempfile_kwargs
+from .utils import on_windows, get_tempfile_kwargs, assure_unicode
 from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
+
+# In python3 to split byte stream on newline, it must be bytes
+linesep_bytes = os.linesep.encode()
 
 _TEMP_std = sys.stdout, sys.stderr
 # To be used in the temp file name to distinguish the ones we create
@@ -320,7 +323,10 @@ class Runner(object):
                     out += self._process_one_line(*pargs, line=line)
         else:
             if out_:
-                for line in out_.split(os.linesep):
+                # resolving a once in a while failing test #2185
+                if isinstance(out_, text_type):
+                    out_ = out_.encode('utf-8')
+                for line in out_.split(linesep_bytes):
                     out += self._process_one_line(*pargs, line=line)
         return out
 
@@ -333,13 +339,13 @@ class Runner(object):
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
             # Let it be processed
-            line = log_(line.decode())
+            line = log_(assure_unicode(line))
             if line is not None:
                 # we are working with binary type here
                 line = line.encode()
         if line:
             if out_type == 'stdout':
-                self._log_out(line.decode())
+                self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
                 self._log_err(line.decode() if PY3 else line,
                               expected)
