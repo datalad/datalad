@@ -295,7 +295,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
         for rp in [opj(basepath, p) if basepath else p for p in paths]:
             if rp in exclude:
                 continue
-            elif path_startswith(any(ep, rp) for ep in exclude):
+            elif any(path_startswith(ep, rp) for ep in exclude):
                 final_paths.extend(
                     _filterpaths(rp, listdir(opj(ds.path, rp)), exclude))
                 pass

@@ -123,7 +123,7 @@ def _load_xz_json_stream(fpath, cache=None):
 
 def _get_metadatarelevant_paths(ds, subds_relpaths):
     return (f for f in ds.repo.get_files()
-            if not path_startswith(any(f, ex) or
+            if not any(path_startswith(f, ex) or
                        f == ex
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
