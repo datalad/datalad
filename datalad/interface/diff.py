@@ -116,7 +116,8 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # strip state marker
             line[3:])
         norm_apath = normpath(apath)
-        if paths and not any([norm_apath == p or path_startswith(apath, p) for p in paths]):
+        if paths and not any(norm_apath == p or path_startswith(apath, p)
+                             for p in paths):
             # we got a whitelist for paths, don't report any other
             continue
         ap = dict(
