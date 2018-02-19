@@ -20,6 +20,8 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import if_dirty_opt
 from datalad.interface.common_opts import nosave_opt
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
+
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     Dataset, require_dataset
 from ..support.param import Parameter
@@ -192,7 +194,7 @@ def _dump_submeta(ds, submetas, matchpath, save, modified_ds):
     known_subds = list(submetas.keys())
     for p in known_subds:
         smeta = submetas[p]
-        if matchpath and not p.startswith(_with_sep(matchpath)):
+        if matchpath and not path_startswith(p, matchpath):
             continue
         subds_relpath = relpath(p, matchpath)
         # inject proper inter-dataset relationships
