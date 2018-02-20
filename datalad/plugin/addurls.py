@@ -270,6 +270,13 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
             ds_current.repo.add_url_to_file(ds_filename, url,
                                             batch=True, options=annex_options)
+            yield get_status_dict(action="addurls",
+                                  ds=ds_current,
+                                  type="file",
+                                  path=os.path.join(ds_current.path,
+                                                    ds_filename),
+                                  status="ok")
+
             to_add.append(fname)
 
         msg = message or """\
