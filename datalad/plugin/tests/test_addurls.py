@@ -62,6 +62,18 @@ def test_formatter_placeholder_nonpermitted_chars():
                   fmt.format, "{key:<5}", {"key:<5": "value0"})
 
 
+def test_clean_meta_args():
+    for args, expect in [(["", "field="], []),
+                         ([" field=yes "], ["field=yes"]),
+                         ([" atag "], ["tag=atag"]),
+                         (["field= value="], ["field=value="])]:
+        assert list(addurls.clean_meta_args(args)) == expect
+
+    assert_raises(ValueError,
+                  list,
+                  addurls.clean_meta_args(["=value"]))
+
+
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
            "rows": [{"name": "will", "debut_season": 1,
                      "age_group": "kid", "now_dead": "no"},
@@ -81,15 +93,19 @@ def json_stream(data):
 
 
 def test_extract():
-    fnames, urls, subpaths = zip(*addurls.extract(
+    fnames, urls, meta, subpaths = zip(*addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
-        "{name}_{debut_season}.com"))
+        "{name}_{debut_season}.com",
+        ["group={age_group}"]))
 
     assert urls == ("will_1.com", "bob_2.com", "scott_1.com", "max_2.com")
 
     assert fnames == ("kid/no/will.csv", "adult/yes/bob.csv",
                       "adult/no/scott.csv", "kid/no/max.csv")
+
+    assert meta == (["group=kid"], ["group=adult"],
+                    ["group=adult"], ["group=kid"])
 
     assert subpaths == (["kid", "kid/no"], ["adult", "adult/yes"],
                         ["adult", "adult/no"], ["kid", "kid/no"])
@@ -102,7 +118,8 @@ def test_extract_csv_json_equal():
                     for row in ST_DATA["rows"])
 
     args = ["{age_group}//{now_dead}//{name}.csv",
-            "{name}_{debut_season}.com"]
+            "{name}_{debut_season}.com",
+            ["group={age_group}"]]
 
     json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
     csv_output = addurls.extract(csv_rows, "csv", *args)
@@ -113,4 +130,4 @@ def test_extract_csv_json_equal():
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   list,
-                  addurls.extract(None, "not_csv_or_json", None, None))
+                  addurls.extract(None, "not_csv_or_json", None, None, None))

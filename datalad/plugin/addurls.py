@@ -61,7 +61,36 @@ class Formatter(string.Formatter):
                 key, args, kwargs)
 
 
-def extract(stream, input_type, filename_format, url_format):
+def clean_meta_args(args):
+    """Prepare formatted metadata arguments to be passed to git-annex.
+
+    Parameters
+    ----------
+    args : iterable of str
+        Formatted metadata arguments for 'git-annex metadata --set'.
+
+    Returns
+    -------
+    Generator that yields processed arguments (str).
+    """
+    for arg in args:
+        parts = [x.strip() for x in arg.split("=", 1)]
+        if len(parts) == 2:
+            if not parts[0]:
+                raise ValueError("Empty field name")
+            field, value = parts
+        else:
+            field = "tag"
+            value = parts[0]
+
+        if not value:
+            # The `url_file` may have an empty value.
+            continue
+
+        yield field + "=" + value
+
+
+def extract(stream, input_type, filename_format, url_format, meta):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -99,21 +128,26 @@ def extract(stream, input_type, filename_format, url_format):
     fmt = Formatter(colidx_to_name)
     format_filename = partial(fmt.format, filename_format)
     format_url = partial(fmt.format, url_format)
+    # Unlike `filename_format` and `url_format`, `meta` is a list
+    # because meta may be given multiple times on the command line.
+    formats_meta = [partial(fmt.format, m) for m in meta]
 
     for row in rows:
         url = format_url(row)
         filename = format_filename(row)
+
+        meta_args = list(clean_meta_args(fmt(row) for fmt in formats_meta))
 
         subpaths = []
         if "//" in filename:
             for part in filename.split("//")[:-1]:
                 subpaths.append(os.path.join(*(subpaths + [part])))
             filename = filename.replace("//", os.path.sep)
-        yield filename, url, subpaths
+        yield filename, url, meta_args, subpaths
 
 
 def dlplugin(dataset=None, url_file=None, input_type="ext",
-             url_format="{0}", filename_format="{1}",
+             url_format="{0}", filename_format="{1}", meta=None,
              message=None, dry_run=False, fast=False):
     """Create and update a dataset from a list of URLs.
 
@@ -149,6 +183,14 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         may contain directories.  The separator "//" can be used to
         indicate that the left-side directory should be created as a
         new subdataset.
+    meta : str, optional
+        A format string that specifies metadata.  It should be
+        structured as "<field>=<value>".  The same placeholders from
+        `url_format` can be used.  As an example, "location={3}" would
+        mean that the value for the "location" metadata field should
+        be set the value of the fourth column.  A plain value is
+        shorthand for "tag=<value>".  This option can be given
+        multiple times.
     message : str, optional
         Use this message when committing the URL additions.
     dry_run : bool, optional
@@ -198,8 +240,11 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     from datalad.interface.results import get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.utils import assure_list
 
     lgr = logging.getLogger("datalad.plugin.addurls")
+
+    meta = assure_list(meta)
 
     if url_file is None:
         # `url_file` is not a required argument in `dlplugin` because
@@ -216,12 +261,13 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         input_type = "json" if extension == ".json" else "csv"
 
     with open(url_file) as fd:
-        info = me.extract(fd, input_type, filename_format, url_format)
+        info = me.extract(fd, input_type, filename_format, url_format, meta)
 
         if dry_run:
-            for fname, url, _ in info:
+            for fname, url, meta, _ in info:
                 lgr.info("Would download %s to %s",
                          url, os.path.join(dataset.path, fname))
+                lgr.info("Metadata: %s", meta)
             yield get_status_dict(action="addurls",
                                   ds=dataset,
                                   status="ok",
@@ -241,8 +287,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         annex_options = ["--fast"] if fast else []
 
         seen_subpaths = set()
-        to_add = []
-        for fname, url, subpaths in info:
+        files_to_add = []
+        meta_to_add = []
+        for fname, url, meta, subpaths in info:
             for spath in subpaths:
                 if spath not in seen_subpaths:
                     if os.path.exists(os.path.join(dataset.path, spath)):
@@ -277,7 +324,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                                     ds_filename),
                                   status="ok")
 
-            to_add.append(fname)
+            files_to_add.append(fname)
+            meta_to_add.append((ds_current, ds_filename, meta))
 
         msg = message or """\
 [DATALAD] add files from URLs
@@ -285,5 +333,17 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 url_file='{}'
 url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
-        for r in dataset.add(to_add, message=msg):
+        for r in dataset.add(files_to_add, message=msg):
             yield r
+
+        for ds, fname, meta in meta_to_add:
+            lgr.debug("Adding metadata to %s in %s", fname, ds.path)
+            for arg in meta:
+                ds.repo._run_annex_command("metadata",
+                                           annex_options=["--set", arg, fname])
+            yield get_status_dict(action="addurls-metadata",
+                                  ds=ds_current,
+                                  type="file",
+                                  path=os.path.join(ds.path, fname),
+                                  message="added metadata",
+                                  status="ok")
