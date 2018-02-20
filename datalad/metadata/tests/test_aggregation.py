@@ -247,6 +247,17 @@ def test_publish_aggregated(path):
     )
 
 
+def _get_contained_objs(ds):
+    return set(f for f in ds.repo.get_indexed_files()
+               if f.startswith(opj('.datalad', 'metadata', 'objects', '')))
+
+
+def _get_referenced_objs(ds):
+    return set([opj('.datalad', 'metadata', r[f])
+               for r in ds.metadata(get_aggregates=True)
+               for f in ('content_info', 'dataset_info')])
+
+
 @with_tree(tree=_dataset_hierarchy_template)
 @skip_direct_mode  #FIXME
 def test_aggregate_removal(path):
@@ -260,17 +271,24 @@ def test_aggregate_removal(path):
     base.add('.', recursive=True)
     base.aggregate_metadata(recursive=True)
     ok_clean_git(base.path)
-    assert_result_count(
-        base.metadata(get_aggregates=True),
-        3)
+    res = base.metadata(get_aggregates=True)
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, path=subsub.path)
+    # check that we only have object files that are listed in agginfo
+    eq_(_get_contained_objs(base), _get_referenced_objs(base))
     # now delete the deepest subdataset to test cleanup of aggregated objects
     # in the top-level ds
-    sub.remove('subsub', check=False)
-    # now aggregation has to detect that subsub is not simply missing, but gone for good
+    base.remove(opj('sub', 'subsub'), check=False)
+    # now aggregation has to detect that subsub is not simply missing, but gone
+    # for good
     base.aggregate_metadata(recursive=True)
     ok_clean_git(base.path)
-    assert_result_count(
-        base.metadata(get_aggregates=True),
-        2)
-
-
+    # internally consistent state
+    eq_(_get_contained_objs(base), _get_referenced_objs(base))
+    # info on subsub was removed at all levels
+    res = base.metadata(get_aggregates=True)
+    assert_result_count(res, 0, path=subsub.path)
+    assert_result_count(res, 2)
+    res = sub.metadata(get_aggregates=True)
+    assert_result_count(res, 0, path=subsub.path)
+    assert_result_count(res, 1)
