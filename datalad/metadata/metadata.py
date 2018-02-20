@@ -47,6 +47,7 @@ from datalad.interface.common_opts import reporton_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import require_dataset
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 from datalad.ui import ui
@@ -661,16 +662,18 @@ class Metadata(Interface):
             # yield all datasets for which we have aggregated metadata as results
             # the get actual dataset results, so we can turn them into dataset
             # instances using generic top-level code if desired
-            if not refds_path:
-                refds_path = os.getcwd()
-            info_fpath = opj(refds_path, agginfo_relpath)
+            ds = require_dataset(
+                refds_path,
+                check_installed=True,
+                purpose='aggregate metadata query')
+            info_fpath = opj(ds.path, agginfo_relpath)
             if not exists(info_fpath):
                 return
             agginfos = _load_json_object(info_fpath)
             parentds = []
             for sd in sorted(agginfos):
                 info = agginfos[sd]
-                dspath = normpath(opj(refds_path, sd))
+                dspath = normpath(opj(ds.path, sd))
                 if parentds and not dspath.startswith(_with_sep(parentds[-1])):
                     parentds.pop()
                 info.update(
