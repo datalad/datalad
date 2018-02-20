@@ -3122,18 +3122,28 @@ class AnnexRepo(GitRepo, RepoInterface):
           second item is a dictionary with metadata key/value pairs. Note that annex
           metadata tags are stored under the key 'tag', which is a
           regular metadata item that can be manipulated like any other.
+          This function yields a results for each input file.
         """
         if not files:
             return
         files = assure_list(files)
         opts = ['--json']
+        # homogenize behavior and return something empty
+        # for files in just git in both direct and indirect mode
+        direct = self.is_direct_mode
+        reported = set()
         for res in self._run_annex_command_json(
                 'metadata', opts=opts, files=files):
             yield (
                 res['file'],
-                res['fields'] if timestamps else \
+                res['fields'] if timestamps else
                 {k: v for k, v in res['fields'].items()
                  if not k.endswith('lastchanged')})
+            if direct:
+                reported.add(res['file'])
+        if direct:
+            for f in set(files).difference(reported):
+                yield(f, {})
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,

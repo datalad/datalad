@@ -56,6 +56,5 @@ def test_api_git():
     yield check_api, True
 
 
-@known_failure_direct_mode
 def test_api_annex():
     yield check_api, False
