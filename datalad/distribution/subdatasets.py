@@ -284,9 +284,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath):
-        if contains and \
-                not (contains == sm['path'] or
-                     path_startswith(contains, sm['path'])):
+        if contains and not path_startswith(contains, sm['path']):
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue

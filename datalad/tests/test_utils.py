@@ -50,6 +50,7 @@ from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
 from ..utils import path_startswith
+from ..utils import path_is_subpath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
@@ -711,11 +712,27 @@ def test_get_dataset_root(path):
 
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/a/b'))
+    ok_(path_startswith('/a/b', '/a/b/'))
+    ok_(path_startswith('/a/b/', '/a/b'))
     ok_(path_startswith('/a/b', '/'))
     ok_(path_startswith('/aaa/b/c', '/aaa'))
     nok_(path_startswith('/aaa/b/c', '/aa'))
     nok_(path_startswith('/a/b', '/a/c'))
     nok_(path_startswith('/a/b/c', '/a/c'))
+
+
+def test_path_is_subpath():
+    ok_(path_is_subpath('/a/b', '/a'))
+    ok_(path_is_subpath('/a/b/c', '/a'))
+    nok_(path_is_subpath('/a/b', '/a/b'))
+    nok_(path_is_subpath('/a/b', '/a/b/'))
+    nok_(path_is_subpath('/a/b/', '/a/b'))
+    ok_(path_is_subpath('/a/b', '/'))
+    ok_(path_is_subpath('/aaa/b/c', '/aaa'))
+    nok_(path_is_subpath('/aaa/b/c', '/aa'))
+    nok_(path_is_subpath('/a/b', '/a/c'))
+    nok_(path_is_subpath('/a/b/c', '/a/c'))
 
 
 def test_safe_print():

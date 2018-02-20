@@ -1102,9 +1102,31 @@ def get_path_prefix(path, pwd=None):
 
 
 def path_startswith(path, prefix):
-    """Return True if path starts with prefix path"""
-    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
-           == with_pathsep(prefix)
+    """Return True if path starts with prefix path
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return path.startswith(prefix)
+
+
+def path_is_subpath(path, prefix):
+    """Return True if path is a subpath of prefix
+
+    It will return False if path == prefix.
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
 def knows_annex(path):

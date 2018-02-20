@@ -44,6 +44,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
@@ -155,7 +156,7 @@ def yield_recursive(ds, path, action, recursion_limit):
         # this check is not the same as subdatasets --contains=path
         # because we want all subdataset below a path, not just the
         # containing one
-        if path_startswith(subd_res['path'], path):
+        if path_is_subpath(subd_res['path'], path):
             # this subdatasets is underneath the search path
             # be careful to not overwrite anything, in case
             # this subdataset has been processed before
