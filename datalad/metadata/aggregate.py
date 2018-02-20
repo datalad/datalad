@@ -22,6 +22,7 @@ from os.path import isabs
 from os.path import exists
 from os.path import lexists
 from os.path import curdir
+from os.path import normpath
 
 from hashlib import md5
 import shutil
@@ -59,6 +60,7 @@ from datalad.utils import assure_list
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
 
+# TODO filepath_info is obsolete
 location_keys = ('dataset_info', 'content_info', 'filepath_info')
 
 
@@ -338,7 +340,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
       Absolute path to the dataset to have its aggregate info updates
     subds_paths : list(str)
       Sequence of absolute paths of subdatasets of the to-be-updated dataset,
-      whose agginfo shall be updated within the to-be-updated dataset
+      whose agginfo shall be updated within the to-be-updated dataset.
+      Any subdataset that is not listed here is assumed to be gone (i.e. no longer
+      a subdataset at all, not just not locally installed)
     agginfo_db : dict
       Dictionary with all information on aggregate metadata on all datasets.
       Keys are absolute paths of datasets.
@@ -360,24 +364,16 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
                       for ai in ds_agginfos.values()
                       for k in location_keys
                       if k in ai)
-    # TODO look for datasets that are no longer registered and remove all
-    # info about them
-
-    # track which objects need to be copied
+    # track which objects need to be copied (each item is a from/to tuple
     objs2copy = []
     # for each subdataset (any depth level)
-    for dpath in [ds_path] + subds_paths:
+    procds_paths = [ds_path] + subds_paths
+    for dpath in procds_paths:
+        ds_dbinfo = agginfo_db.get(dpath, {}).copy()
         # relative path of the currect dataset within the dataset we are updating
         drelpath = relpath(dpath, start=ds.path)
-        # TODO figure out why `None` could be a value in the DB
-        ## build aggregate info for the current subdataset
-        #ds_dbinfo = agginfo_db.get(dpath, {})
-        #if not ds_dbinfo:
-        #    # we got nothing new, keep what we had
-        #    continue
-        #ds_dbinfo = ds_dbinfo.copy()
-        ds_dbinfo = agginfo_db.get(dpath, {}).copy()
         for loclabel in location_keys:
+            # TODO filepath_info is obsolete
             if loclabel == 'filepath_info' and drelpath == curdir:
                 # do not write a file list into the dataset it is from
                 if 'filepath_info' in ds_dbinfo:
@@ -398,13 +394,17 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             ds_dbinfo[loclabel] = target_objrelpath
         # (re)assign in case record is new
         ds_agginfos[drelpath] = ds_dbinfo
+    # remove all entries for which we did not (no longer) have a corresponding
+    # subdataset to take care of
+    ds_agginfos = {k: v
+                   for k, v in ds_agginfos.items()
+                   if normpath(opj(ds_path, k)) in procds_paths}
     # set of metadata objects now referenced
-    objlocs_is = set(ai[k]
-                     for ai in ds_agginfos.values()
-                     for k in location_keys
-                     if k in ai)
-    # TODO do we need to (double?) check if all object files exist?
-    # objs2add = [o for o in objlocs_is if exists(opj(ds_path, o))]
+    objlocs_is = set(
+        ai[k]
+        for sdsrpath, ai in ds_agginfos.items()
+        for k in location_keys
+        if k in ai)
     objs2add = objlocs_is
 
     # yoh: we appanretly do need to filter the ones to remove - I did
@@ -418,8 +418,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
         if lexists(obj_path):
             objs2remove.append(obj_path)
         else:
-            lgr.warning(
-                "Metadata object path %s was not found to be cleaned up, skipping",
+            # not really a warning, we don't need it anymore, it is already gone
+            lgr.debug(
+                "To-be-deleted metadata object not found, skip deletion (%s)",
                 obj_path
             )
 
@@ -440,7 +441,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             # this is not the base dataset, make sure to save removal in the
             # parentds -- not needed when objects get added, as removal itself
             # is already committed
-            to_save(dict(path=ds_path, type='dataset', staged=True))
+            to_save.append(dict(path=ds_path, type='dataset', staged=True))
 
     # must copy object files to local target destination
     # make sure those objects are present
@@ -457,8 +458,6 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
             # no need to unlock, just wipe out and replace
             os.remove(copy_to)
         shutil.copy(copy_from, copy_to)
-    # TODO is there any chance that this file could be gone at the end?
-    #if exists(agginfo_fpath):
     to_save.append(
         dict(path=agginfo_fpath, type='file', staged=True))
 
