@@ -11,11 +11,15 @@
 from os.path import join as opj
 from simplejson import dumps
 from datalad.api import Dataset
-from datalad.metadata.extractors.bids import MetadataExtractor
+
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_in
 
+from datalad.tests.utils import skip_if_no_module
+skip_if_no_module('bids')
+
+from datalad.metadata.extractors.bids import MetadataExtractor
 
 bids_template = {
     '.datalad': {

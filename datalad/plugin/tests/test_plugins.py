@@ -35,6 +35,12 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import skip_if
+
+try:
+    import datalad.metadata.extractors.bids as has_bids_extractor
+except ImportError:
+    has_bids_extractor = False
 
 broken_plugin = """garbage"""
 
@@ -250,6 +256,7 @@ _bids_template = {
 '''}
 
 
+@skip_if(not has_bids_extractor, "bids extractor is N/A")
 @with_tree(_bids_template)
 def test_add_readme(path):
     ds = Dataset(path).create(force=True)

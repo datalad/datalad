@@ -27,11 +27,17 @@ from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
+from datalad.tests.utils import skip_if
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
-from datalad.metadata.extractors.tests.test_bids import bids_template
+try:
+    from datalad.metadata.extractors.tests.test_bids import bids_template
+except (ImportError, SkipTest):
+    # pybids might be absent which would preclude this import
+    bids_template = None
+
 from ..search import _listdict2dictlist
 from ..search import _meta2autofield_dict
 
@@ -187,6 +193,7 @@ def test_search_non_dataset(tdir):
     assert_in("datalad create --force", str(cme.exception))
 
 
+@skip_if(not bids_template, "No bids_template (probably no pybids installed)")
 @with_tree(bids_template)
 def test_within_ds_file_search(path):
     try:

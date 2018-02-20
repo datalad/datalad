@@ -25,6 +25,10 @@ from datalad.tests.utils import with_tempfile
 
 from datalad.support.exceptions import IncompleteResultsError
 
+from datalad.tests.utils import skip_if_no_module
+skip_if_no_module('pandas')
+
+
 _dummy_template = {
     'ds': {
         'file_up': 'some_content',
