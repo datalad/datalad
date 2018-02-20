@@ -245,3 +245,32 @@ def test_publish_aggregated(path):
         [{k: v for k, v in i.items() if k not in ('path', 'refds', 'parentds')}
          for i in remote.metadata('sub')],
     )
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+@skip_direct_mode  #FIXME
+def test_aggregate_removal(path):
+    base = Dataset(opj(path, 'origin')).create(force=True)
+    # force all metadata objects into the annex
+    with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
+        f.write(
+            '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
+    sub = base.create('sub', force=True)
+    subsub = sub.create(opj('subsub'), force=True)
+    base.add('.', recursive=True)
+    base.aggregate_metadata(recursive=True)
+    ok_clean_git(base.path)
+    assert_result_count(
+        base.metadata(get_aggregates=True),
+        3)
+    # now delete the deepest subdataset to test cleanup of aggregated objects
+    # in the top-level ds
+    sub.remove('subsub', check=False)
+    # now aggregation has to detect that subsub is not simply missing, but gone for good
+    base.aggregate_metadata(recursive=True)
+    ok_clean_git(base.path)
+    assert_result_count(
+        base.metadata(get_aggregates=True),
+        2)
+
+
