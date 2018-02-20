@@ -53,8 +53,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 
-from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
 
 
@@ -114,9 +114,9 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
         return hits
 
     # a little more complicated: we need to loop over all subdataset
-    # records an pick the ones that are underneath the seed
+    # records and pick the ones that are underneath the seed
     for agginfo_path in agginfos:
-        if path_startswith(agginfo_path, seed_ds):
+        if path_is_subpath(agginfo_path, seed_ds):
             absp = opj(ds_path, agginfo_path)
             db[absp] = _ensure_abs_obj_location(agginfos[agginfo_path])
             hits.append(absp)
@@ -295,7 +295,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
         for rp in [opj(basepath, p) if basepath else p for p in paths]:
             if rp in exclude:
                 continue
-            elif any(path_startswith(ep, rp) for ep in exclude):
+            elif any(path_is_subpath(ep, rp) for ep in exclude):
                 final_paths.extend(
                     _filterpaths(rp, listdir(opj(ds.path, rp)), exclude))
                 pass

@@ -21,6 +21,7 @@ from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
+from datalad.tests.utils import assert_str_equal
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
@@ -230,11 +231,7 @@ path
 type
 """)
 
-    # check generated autofield index keys
-    with swallow_outputs() as cmo:
-        ds.search(mode='autofield', show_keys=True)
-
-        assert_equal(cmo.out, """\
+    target_out = """\
 audio.bitrate
 audio.date
 audio.duration(s)
@@ -292,9 +289,15 @@ nifti1.xyz_unit
 parentds
 path
 type
-""")
+"""
 
-    # stupid yields nothing
+    # check generated autofield index keys
+    from difflib import ndiff
+    with swallow_outputs() as cmo:
+        ds.search(mode='autofield', show_keys=True)
+        # it is impossible to assess what is different from that dump
+        assert_str_equal(cmo.out, target_out)
+
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
     for mode, query, hitpath, matched_key, matched_val in (

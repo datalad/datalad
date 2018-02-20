@@ -1101,6 +1101,15 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def _get_normalized_paths(path, prefix):
+    if isabs(path) != isabs(prefix):
+        raise ValueError("Bot paths must either be absolute or relative. "
+                         "Got %r and %r" % (path, prefix))
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return path, prefix
+
+
 def path_startswith(path, prefix):
     """Return True if path starts with prefix path
 
@@ -1109,8 +1118,8 @@ def path_startswith(path, prefix):
     path: str
     prefix: str
     """
-    path = with_pathsep(path)
-    prefix = with_pathsep(prefix)
+    #lgr.error("DDD STARTSWITH: %s %s" % (path, prefix))
+    path, prefix = _get_normalized_paths(path, prefix)
     return path.startswith(prefix)
 
 
@@ -1124,8 +1133,8 @@ def path_is_subpath(path, prefix):
     path: str
     prefix: str
     """
-    path = with_pathsep(path)
-    prefix = with_pathsep(prefix)
+    #lgr.error("DDD   SUBPATH: %s %s" % (path, prefix))
+    path, prefix = _get_normalized_paths(path, prefix)
     return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
