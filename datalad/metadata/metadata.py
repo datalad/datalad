@@ -668,6 +668,15 @@ class Metadata(Interface):
                 purpose='aggregate metadata query')
             info_fpath = opj(ds.path, agginfo_relpath)
             if not exists(info_fpath):
+                # if there has ever been an aggregation run, this file would
+                # exist, hence there has not been and we need to tell this
+                # to people
+                yield get_status_dict(
+                    ds=ds,
+                    status='impossible',
+                    action='metadata',
+                    logger=lgr,
+                    message='metadata aggregation has never been performed in this dataset')
                 return
             agginfos = _load_json_object(info_fpath)
             parentds = []
