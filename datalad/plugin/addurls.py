@@ -9,7 +9,7 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import Mapping
+from collections import Mapping, namedtuple
 from functools import partial
 import logging
 import os
@@ -102,11 +102,9 @@ def extract(stream, input_type, filename_format, url_format, meta):
 
     Returns
     -------
-    A generator that, for each item in `url_file`, yields a tuple that
-    contains the formatted filename (with any "//" collapsed to a
-    single separator), the formatted url, and a list of subdataset
-    paths.  The length of the subdataset paths list will be equal to
-    the number of "//" occurrences in the `filename_format`.
+    A tuple where the first item is a list with RowInfo instance for
+    each row in `stream` and the second item is a set that contains all
+    the subdataset paths.
     """
     if input_type == "csv":
         import csv
@@ -132,18 +130,25 @@ def extract(stream, input_type, filename_format, url_format, meta):
     # because meta may be given multiple times on the command line.
     formats_meta = [partial(fmt.format, m) for m in meta]
 
+    infos = []
+    subpaths = set()
     for row in rows:
         url = format_url(row)
         filename = format_filename(row)
 
         meta_args = list(clean_meta_args(fmt(row) for fmt in formats_meta))
 
-        subpaths = []
+        subpath = None
         if "//" in filename:
+            spaths = []
             for part in filename.split("//")[:-1]:
-                subpaths.append(os.path.join(*(subpaths + [part])))
+                path = os.path.join(*(spaths + [part]))
+                spaths.append(path)
+                subpaths.add(path)
             filename = filename.replace("//", os.path.sep)
-        yield filename, url, meta_args, subpaths
+            subpath = spaths[-1]
+        infos.append((filename, url, meta_args, subpath))
+    return infos, subpaths
 
 
 def dlplugin(dataset=None, url_file=None, input_type="ext",
@@ -232,7 +237,6 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     `url_file` into a "url filename" format that fed to 'git annex
     addurl --batch --with-files'.
     """
-    from itertools import dropwhile
     import logging
     import os
 
@@ -261,9 +265,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         input_type = "json" if extension == ".json" else "csv"
 
     with open(url_file) as fd:
-        info = me.extract(fd, input_type, filename_format, url_format, meta)
+        info, subpaths = me.extract(fd, input_type,
+                                    filename_format, url_format, meta)
 
         if dry_run:
+            for subpath in subpaths:
+                lgr.info("Would create a subdataset at %s", subpath)
             for fname, url, meta, _ in info:
                 lgr.info("Would download %s to %s",
                          url, os.path.join(dataset.path, fname))
@@ -286,28 +293,22 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
         annex_options = ["--fast"] if fast else []
 
-        seen_subpaths = set()
+        for spath in subpaths:
+            if os.path.exists(os.path.join(dataset.path, spath)):
+                lgr.warning(
+                    "Not creating subdataset at existing path: %s",
+                    spath)
+            else:
+                dataset.create(spath)
+
         files_to_add = []
         meta_to_add = []
-        for fname, url, meta, subpaths in info:
-            for spath in subpaths:
-                if spath not in seen_subpaths:
-                    if os.path.exists(os.path.join(dataset.path, spath)):
-                        lgr.warning(
-                            "Not creating subdataset at existing path: %s",
-                            spath)
-                    else:
-                        dataset.create(spath)
-                seen_subpaths.add(spath)
-
-            if subpaths:
+        for fname, url, meta, subpath in info:
+            if subpath:
                 # Adjust the dataset and filename for an `addurl` call
                 # from within the subdataset that will actually contain
                 # the link.
-                datasets = [Dataset(os.path.join(dataset.path, sp))
-                            for sp in subpaths]
-                ds_current = next(dropwhile(lambda d: not d.repo,
-                                            reversed(datasets)))
+                ds_current = Dataset(os.path.join(dataset.path, subpath))
                 ds_filename = os.path.relpath(
                     os.path.join(dataset.path, fname),
                     ds_current.path)

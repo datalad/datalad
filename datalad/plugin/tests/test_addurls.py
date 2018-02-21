@@ -93,11 +93,15 @@ def json_stream(data):
 
 
 def test_extract():
-    fnames, urls, meta, subpaths = zip(*addurls.extract(
+    info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
-        ["group={age_group}"]))
+        ["group={age_group}"])
+
+    assert subpaths == {"kid", "kid/no", "adult", "adult/yes", "adult/no"}
+
+    fnames, urls, meta, subdss = zip(*info)
 
     assert urls == ("will_1.com", "bob_2.com", "scott_1.com", "max_2.com")
 
@@ -107,8 +111,7 @@ def test_extract():
     assert meta == (["group=kid"], ["group=adult"],
                     ["group=adult"], ["group=kid"])
 
-    assert subpaths == (["kid", "kid/no"], ["adult", "adult/yes"],
-                        ["adult", "adult/no"], ["kid", "kid/no"])
+    assert subdss == ("kid/no", "adult/yes", "adult/no", "kid/no")
 
 
 def test_extract_csv_json_equal():
@@ -124,10 +127,10 @@ def test_extract_csv_json_equal():
     json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
     csv_output = addurls.extract(csv_rows, "csv", *args)
 
-    assert list(json_output) == list(csv_output)
+    assert json_output == csv_output
 
 
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  list,
-                  addurls.extract(None, "not_csv_or_json", None, None, None))
+                  addurls.extract,
+                  None, "not_csv_or_json", None, None, None)
