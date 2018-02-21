@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Helper utility to list things.  ATM list content of S3 bucket
+"""Helper utility to list things.  ATM lists datasets and S3 bucket URLs
 """
 
 __docformat__ = 'restructuredtext'
@@ -824,30 +824,7 @@ def ds_traverse(rootds, parent=None, json=None,
     # BUT if we are recurse_datasets but not recurse_directories
     #     we need to handle those subdatasets then somehow since
     #     otherwise we might not even get to them?!
-    # XXX
 
-    # size_list = [fs['size']]
-    #
-    # # (recursively) traverse each subdataset
-    # children = []
-    # # yoh: was in return results branch returning full datasets:
-    # # for subds in rootds.subdatasets(result_xfm='datasets'):
-    # # but since rpath is needed/used, decided to return relpaths
-    # for subds_rpath in rootds.subdatasets(result_xfm='relpaths'):
-    #
-    #     subfs = _traverse_handle_subds(subds_rpath, rootds, recursive, all_, json)
-    #
-    #     children.extend([subfs])
-    #
-    # # sum sizes of all 1st level children dataset
-    # children_size = {}
-    # for subdataset_size in size_list:
-    #     for size_type, subds_size in subdataset_size.items():
-    #         children_size[size_type] = children_size.get(size_type, 0) + machinesize(subds_size)
-    #
-    # # update current dataset sizes to the humanized aggregate subdataset sizes
-    # fs['size'] = {size_type: humanize.naturalsize(size)
-    #               for size_type, size in children_size.items()}
     fs['nodes'][0]['size'] = fs['size']  # update self's updated size in nodes sublist too!
 
     # add dataset specific entries to its dict
@@ -859,17 +836,18 @@ def ds_traverse(rootds, parent=None, json=None,
         u"%Y-%m-%d %H:%M:%S",
         time.localtime(getmtime(index_file))) if exists(index_file) else ''
 
-    # append children datasets info to current dataset
-    #fs['nodes'].extend(children)
-
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
     fs_render(fs, json=json, ds_path=rootds.path)
     return fs
 
 
-def _traverse_handle_subds(subds_rpath, rootds,
-                    recurse_datasets, recurse_directories, json):
+def _traverse_handle_subds(
+        subds_rpath, rootds,
+        recurse_datasets, recurse_directories, json):
+    """A helper to deal with the subdataset node - recurse or just pick up
+    may be alrady collected in it web meta
+    """
     subds_path = opj(rootds.path, subds_rpath)
     subds = Dataset(subds_path)
     subds_json = metadata_locator(path='.', ds_path=subds_path)
