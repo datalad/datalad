@@ -19,6 +19,8 @@ lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
 
+RowInfo = namedtuple("RowInfo", ["filename", "url", "meta_args", "subpath"])
+
 
 class Formatter(string.Formatter):
     """Formatter that gives precedence to custom keys.
@@ -147,7 +149,7 @@ def extract(stream, input_type, filename_format, url_format, meta):
                 subpaths.add(path)
             filename = filename.replace("//", os.path.sep)
             subpath = spaths[-1]
-        infos.append((filename, url, meta_args, subpath))
+        infos.append(RowInfo(filename, url, meta_args, subpath))
     return infos, subpaths
 
 
@@ -265,16 +267,16 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         input_type = "json" if extension == ".json" else "csv"
 
     with open(url_file) as fd:
-        info, subpaths = me.extract(fd, input_type,
+        rows, subpaths = me.extract(fd, input_type,
                                     filename_format, url_format, meta)
 
         if dry_run:
             for subpath in subpaths:
                 lgr.info("Would create a subdataset at %s", subpath)
-            for fname, url, meta, _ in info:
+            for row in rows:
                 lgr.info("Would download %s to %s",
-                         url, os.path.join(dataset.path, fname))
-                lgr.info("Metadata: %s", meta)
+                         row.url, os.path.join(dataset.path, row.filename))
+                lgr.info("Metadata: %s", row.meta_args)
             yield get_status_dict(action="addurls",
                                   ds=dataset,
                                   status="ok",
@@ -303,20 +305,20 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
         files_to_add = []
         meta_to_add = []
-        for fname, url, meta, subpath in info:
-            if subpath:
+        for row in rows:
+            if row.subpath:
                 # Adjust the dataset and filename for an `addurl` call
                 # from within the subdataset that will actually contain
                 # the link.
-                ds_current = Dataset(os.path.join(dataset.path, subpath))
+                ds_current = Dataset(os.path.join(dataset.path, row.subpath))
                 ds_filename = os.path.relpath(
-                    os.path.join(dataset.path, fname),
+                    os.path.join(dataset.path, row.filename),
                     ds_current.path)
             else:
                 ds_current = dataset
-                ds_filename = fname
+                ds_filename = row.filename
 
-            ds_current.repo.add_url_to_file(ds_filename, url,
+            ds_current.repo.add_url_to_file(ds_filename, row.url,
                                             batch=True, options=annex_options)
             yield get_status_dict(action="addurls",
                                   ds=ds_current,
@@ -325,8 +327,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                                     ds_filename),
                                   status="ok")
 
-            files_to_add.append(fname)
-            meta_to_add.append((ds_current, ds_filename, meta))
+            files_to_add.append(row.filename)
+            meta_to_add.append((ds_current, ds_filename, row.meta_args))
 
         msg = message or """\
 [DATALAD] add files from URLs
