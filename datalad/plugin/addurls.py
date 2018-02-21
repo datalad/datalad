@@ -41,14 +41,17 @@ class Formatter(string.Formatter):
         self.idx_to_name = idx_to_name or {}
         super(Formatter, self).__init__(*args, **kwargs)
 
+    def format(self, format_string, *args, **kwargs):
+        if not isinstance(args[0], Mapping):
+            raise ValueError("First positional argument should be mapping")
+        return super(Formatter, self).format(format_string, *args, **kwargs)
+
     def get_value(self, key, args, kwargs):
         """Look for key's value in `args[0]` mapping first.
         """
         # FIXME: This approach will fail for keys that contain "!" and
         # ":" because they'll be interpreted as formatting flags.
         data = args[0]
-        if not isinstance(data, Mapping):
-            raise ValueError("First positional argument should be mapping")
 
         try:
             key_int = int(key)
