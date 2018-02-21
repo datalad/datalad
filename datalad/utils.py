@@ -1118,7 +1118,6 @@ def path_startswith(path, prefix):
     path: str
     prefix: str
     """
-    #lgr.error("DDD STARTSWITH: %s %s" % (path, prefix))
     path, prefix = _get_normalized_paths(path, prefix)
     return path.startswith(prefix)
 
@@ -1133,7 +1132,6 @@ def path_is_subpath(path, prefix):
     path: str
     prefix: str
     """
-    #lgr.error("DDD   SUBPATH: %s %s" % (path, prefix))
     path, prefix = _get_normalized_paths(path, prefix)
     return (len(prefix) < len(path)) and path.startswith(prefix)
 

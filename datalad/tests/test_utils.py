@@ -720,6 +720,9 @@ def test_path_startswith():
     nok_(path_startswith('/aaa/b/c', '/aa'))
     nok_(path_startswith('/a/b', '/a/c'))
     nok_(path_startswith('/a/b/c', '/a/c'))
+    # must not mix relative and abs
+    assert_raises(ValueError, path_startswith, 'a/b', '/a')
+    assert_raises(ValueError, path_startswith, '/a/b', 'a')
 
 
 def test_path_is_subpath():
@@ -733,6 +736,9 @@ def test_path_is_subpath():
     nok_(path_is_subpath('/aaa/b/c', '/aa'))
     nok_(path_is_subpath('/a/b', '/a/c'))
     nok_(path_is_subpath('/a/b/c', '/a/c'))
+    # must not mix relative and abs
+    assert_raises(ValueError, path_is_subpath, 'a/b', '/a')
+    assert_raises(ValueError, path_is_subpath, '/a/b', 'a')
 
 
 def test_safe_print():
