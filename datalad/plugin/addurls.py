@@ -270,65 +270,65 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         rows, subpaths = me.extract(fd, input_type,
                                     filename_format, url_format, meta)
 
-        if dry_run:
-            for subpath in subpaths:
-                lgr.info("Would create a subdataset at %s", subpath)
-            for row in rows:
-                lgr.info("Would download %s to %s",
-                         row.url, os.path.join(dataset.path, row.filename))
-                lgr.info("Metadata: %s", row.meta_args)
-            yield get_status_dict(action="addurls",
-                                  ds=dataset,
-                                  status="ok",
-                                  message="dry-run finished")
-            return
-
-        if not dataset.repo:
-            # Populate a new dataset with the URLs.
-            dataset.create()
-        elif not isinstance(dataset.repo, AnnexRepo):
-            yield get_status_dict(action="addurls",
-                                  ds=dataset,
-                                  status="error",
-                                  message="not an annex repo")
-            return
-
-        annex_options = ["--fast"] if fast else []
-
-        for spath in subpaths:
-            if os.path.exists(os.path.join(dataset.path, spath)):
-                lgr.warning(
-                    "Not creating subdataset at existing path: %s",
-                    spath)
-            else:
-                dataset.create(spath)
-
-        files_to_add = []
-        meta_to_add = []
+    if dry_run:
+        for subpath in subpaths:
+            lgr.info("Would create a subdataset at %s", subpath)
         for row in rows:
-            if row.subpath:
-                # Adjust the dataset and filename for an `addurl` call
-                # from within the subdataset that will actually contain
-                # the link.
-                ds_current = Dataset(os.path.join(dataset.path, row.subpath))
-                ds_filename = os.path.relpath(
-                    os.path.join(dataset.path, row.filename),
-                    ds_current.path)
-            else:
-                ds_current = dataset
-                ds_filename = row.filename
+            lgr.info("Would download %s to %s",
+                     row.url, os.path.join(dataset.path, row.filename))
+            lgr.info("Metadata: %s", row.meta_args)
+        yield get_status_dict(action="addurls",
+                              ds=dataset,
+                              status="ok",
+                              message="dry-run finished")
+        return
 
-            ds_current.repo.add_url_to_file(ds_filename, row.url,
-                                            batch=True, options=annex_options)
-            yield get_status_dict(action="addurls",
-                                  ds=ds_current,
-                                  type="file",
-                                  path=os.path.join(ds_current.path,
-                                                    ds_filename),
-                                  status="ok")
+    if not dataset.repo:
+        # Populate a new dataset with the URLs.
+        dataset.create()
+    elif not isinstance(dataset.repo, AnnexRepo):
+        yield get_status_dict(action="addurls",
+                              ds=dataset,
+                              status="error",
+                              message="not an annex repo")
+        return
 
-            files_to_add.append(row.filename)
-            meta_to_add.append((ds_current, ds_filename, row.meta_args))
+    annex_options = ["--fast"] if fast else []
+
+    for spath in subpaths:
+        if os.path.exists(os.path.join(dataset.path, spath)):
+            lgr.warning(
+                "Not creating subdataset at existing path: %s",
+                spath)
+        else:
+            dataset.create(spath)
+
+    files_to_add = []
+    meta_to_add = []
+    for row in rows:
+        if row.subpath:
+            # Adjust the dataset and filename for an `addurl` call
+            # from within the subdataset that will actually contain
+            # the link.
+            ds_current = Dataset(os.path.join(dataset.path, row.subpath))
+            ds_filename = os.path.relpath(
+                os.path.join(dataset.path, row.filename),
+                ds_current.path)
+        else:
+            ds_current = dataset
+            ds_filename = row.filename
+
+        ds_current.repo.add_url_to_file(ds_filename, row.url,
+                                        batch=True, options=annex_options)
+        yield get_status_dict(action="addurls",
+                              ds=ds_current,
+                              type="file",
+                              path=os.path.join(ds_current.path,
+                                                ds_filename),
+                              status="ok")
+
+        files_to_add.append(row.filename)
+        meta_to_add.append((ds_current, ds_filename, row.meta_args))
 
         msg = message or """\
 [DATALAD] add files from URLs
@@ -336,17 +336,17 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 url_file='{}'
 url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
-        for r in dataset.add(files_to_add, message=msg):
-            yield r
+    for r in dataset.add(files_to_add, message=msg):
+        yield r
 
-        for ds, fname, meta in meta_to_add:
-            lgr.debug("Adding metadata to %s in %s", fname, ds.path)
-            for arg in meta:
-                ds.repo._run_annex_command("metadata",
-                                           annex_options=["--set", arg, fname])
-            yield get_status_dict(action="addurls-metadata",
-                                  ds=ds_current,
-                                  type="file",
-                                  path=os.path.join(ds.path, fname),
-                                  message="added metadata",
-                                  status="ok")
+    for ds, fname, meta in meta_to_add:
+        lgr.debug("Adding metadata to %s in %s", fname, ds.path)
+        for arg in meta:
+            ds.repo._run_annex_command("metadata",
+                                       annex_options=["--set", arg, fname])
+        yield get_status_dict(action="addurls-metadata",
+                              ds=ds_current,
+                              type="file",
+                              path=os.path.join(ds.path, fname),
+                              message="added metadata",
+                              status="ok")
