@@ -47,8 +47,9 @@ from datalad.interface.common_opts import reporton_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import require_dataset
 from datalad.utils import assure_list
-from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath, path_startswith
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -661,17 +662,28 @@ class Metadata(Interface):
             # yield all datasets for which we have aggregated metadata as results
             # the get actual dataset results, so we can turn them into dataset
             # instances using generic top-level code if desired
-            if not refds_path:
-                refds_path = os.getcwd()
-            info_fpath = opj(refds_path, agginfo_relpath)
+            ds = require_dataset(
+                refds_path,
+                check_installed=True,
+                purpose='aggregate metadata query')
+            info_fpath = opj(ds.path, agginfo_relpath)
             if not exists(info_fpath):
+                # if there has ever been an aggregation run, this file would
+                # exist, hence there has not been and we need to tell this
+                # to people
+                yield get_status_dict(
+                    ds=ds,
+                    status='impossible',
+                    action='metadata',
+                    logger=lgr,
+                    message='metadata aggregation has never been performed in this dataset')
                 return
             agginfos = _load_json_object(info_fpath)
             parentds = []
             for sd in sorted(agginfos):
                 info = agginfos[sd]
-                dspath = normpath(opj(refds_path, sd))
-                if parentds and not path_startswith(dspath, parentds[-1]):
+                dspath = normpath(opj(ds.path, sd))
+                if parentds and not path_is_subpath(dspath, parentds[-1]):
                     parentds.pop()
                 info.update(
                     path=dspath,
