@@ -63,12 +63,14 @@ def test_formatter_placeholder_nonpermitted_chars():
 
 
 def test_clean_meta_args():
-    for args, expect in [(["", "field="], []),
+    for args, expect in [(["field="], []),
                          ([" field=yes "], ["field=yes"]),
-                         ([" atag "], ["tag=atag"]),
                          (["field= value="], ["field=value="])]:
         assert list(addurls.clean_meta_args(args)) == expect
 
+    assert_raises(ValueError,
+                  list,
+                  addurls.clean_meta_args(["noequal"]))
     assert_raises(ValueError,
                   list,
                   addurls.clean_meta_args(["=value"]))

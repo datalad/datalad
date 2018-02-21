@@ -82,8 +82,7 @@ def clean_meta_args(args):
                 raise ValueError("Empty field name")
             field, value = parts
         else:
-            field = "tag"
-            value = parts[0]
+            raise ValueError("meta argument isn't in 'field=value' format")
 
         if not value:
             # The `url_file` may have an empty value.
@@ -218,9 +217,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         A format string that specifies metadata.  It should be
         structured as "<field>=<value>".  The same placeholders from
         `url_format` can be used.  As an example, "location={3}" would
-        mean that the value for the "location" metadata field should
-        be set the value of the fourth column.  A plain value is
-        shorthand for "tag=<value>".  This option can be given
+        mean that the value for the "location" metadata field should be
+        set the value of the fourth column.  This option can be given
         multiple times.
     message : str, optional
         Use this message when committing the URL additions.
