@@ -733,10 +733,13 @@ class GitRepo(RepoInterface):
                     and self.repo is not None:
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
-
                 self.repo.git.clear_cache()
-                if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                    self.repo.index.write()
+                # We used to write out the index to flush GitPython's
+                # state... but such unconditional write is really a workaround
+                # and does not play nice with read-only operations - permission
+                # denied etc. So disabled 
+                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                #    self.repo.index.write()
         except InvalidGitRepositoryError:
             # might have being removed and no longer valid
             pass
@@ -2071,20 +2074,25 @@ class GitRepo(RepoInterface):
             ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
-    def tag(self, tag):
+    def tag(self, tag, message=None):
         """Assign a tag to current commit
 
         Parameters
         ----------
         tag : str
           Custom tag label.
+        message : str, optional
+          If provided, would create an annotated tag with that message
         """
         # TODO later to be extended with tagging particular commits and signing
         # TODO: call in save.py complains about extensive logging. When does it
         # happen in what way? Figure out, whether to just silence it or raise or
         # whatever else.
+        options = []
+        if message:
+            options += ['-m', message]
         self._git_custom_command(
-            '', ['git', 'tag', str(tag)]
+            '', ['git', 'tag'] + options + [str(tag)]
         )
 
     def get_tags(self, output=None):
@@ -2102,17 +2110,20 @@ class GitRepo(RepoInterface):
           Each item is a dictionary with information on a tag. At present
           this includes 'hexsha', and 'name', where the latter is the string
           label of the tag, and the format the hexsha of the object the tag
-          is attched to. The list is sorted by commit date, with the most
+          is attached to. The list is sorted by commit date, with the most
           recent commit being the last element.
         """
-        # TODO it would be straightforward to add more info and tweak the
-        # sorting
-        stdout, stderr = self._git_custom_command(
-            '',
-            ['git', 'tag', '--format=%(refname:strip=2)%00%(object)',
-             '--sort=*committerdate'])
-        fields = ('name', 'hexsha')
-        tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
+        tag_objs = sorted(
+            self.repo.tags,
+            key=lambda t: t.commit.committed_date
+        )
+        tags = [
+            {
+                'name': t.name,
+                'hexsha': t.commit.hexsha
+             }
+            for t in tag_objs
+        ]
         if output:
             return [t[output] for t in tags]
         else:

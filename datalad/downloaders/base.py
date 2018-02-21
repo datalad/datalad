@@ -166,6 +166,12 @@ class BaseDownloader(object):
                         #  3. bug in out code which would render authentication/cookie handling
                         #     ineffective
                         #     - not sure what to do about it
+                        if not ui.is_interactive:
+                            # We cannot ask, so we just (re)blow
+                            lgr.error(
+                                "Interface is non interactive, so we are "
+                                "reraising: %s" % exc_str(e))
+                            raise
                         if ui.yesno(
                                 title="Authentication to access {url} has failed".format(url=url),
                                 text="Do you want to enter other credentials in case they were updated?"):

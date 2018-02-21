@@ -1,4 +1,4 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -27,6 +27,7 @@ from .utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
     on_linux, on_osx, on_windows, with_testrepos
 from .utils import lgr
+from ..utils import assure_unicode
 
 from .utils import local_testrepo_flavors
 
@@ -308,3 +309,17 @@ def test_runner_stdin(path):
     with swallow_outputs() as cmo, open(opj(path, "test_input.txt"), "r") as fake_input:
         runner.run(['cat'], log_stdout=False, stdin=fake_input)
         assert_in("whatever", cmo.out)
+
+
+def test_process_remaining_output():
+    runner = Runner()
+    out = u"""\
+s
+п
+"""
+    out_bytes = out.encode('utf-8')
+    target = u"sп".encode('utf-8')
+    args = ['stdout', None, False, False]
+    #  probably #2185
+    eq_(runner._process_remaining_output(None, out_bytes, *args), target)
+    eq_(runner._process_remaining_output(None, out, *args), target)

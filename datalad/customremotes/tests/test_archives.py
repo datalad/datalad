@@ -133,9 +133,9 @@ def test_annex_get_from_subdir(topdir):
 
     with chpwd(opj(topdir, 'a', 'd')):
         runner = Runner()
-        runner(['git', 'annex', 'drop', fn_inarchive_obscure])  # run git annex drop
+        runner(['git', 'annex', 'drop', '--', fn_inarchive_obscure])  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', fn_inarchive_obscure])   # run git annex get
+        runner(['git', 'annex', 'get', '--', fn_inarchive_obscure])   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 

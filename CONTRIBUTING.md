@@ -179,16 +179,47 @@ provided by [Sphinx].
 Additional Hints
 ----------------
 
-1. For merge commits to have more informative description, add to your
-   `.git/config` or `~/.gitconfig` following section:
-   
-        [merge]
-        summary = true
-        log = true
-   
-   and if conflicts occur, provide short summary on how they were resolved
-   in "Conflicts" listing within the merge commit
-   (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+### Merge commits
+
+For merge commits to have more informative description, add to your
+`.git/config` or `~/.gitconfig` following section:
+
+    [merge]
+    summary = true
+    log = true
+
+and if conflicts occur, provide short summary on how they were resolved
+in "Conflicts" listing within the merge commit
+(see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+
+### Issue -> PR
+
+[git-hub](https://github.com/sociomantic/git-hub) utility allows to
+attach commits to an issue, thus effectively converting it into a pull
+request.  This allows to avoid necessity to have 2 items (both issue
+and PR) which often would duplicate information and discussion.  To use
+`git-hub` you first would need to configure it using `git hub setup`
+command which would create a section within your `.git/config` such as
+
+    [hub]
+      username=<YourLogin>
+      oauthtoken=<redacted>
+      upstream=datalad/datalad
+      forkremote=YourLogin/datalad
+      pullbase=master
+
+Then, if you are in a branch with the commits that you want to attach
+to an issue, thus making it into a pull request, you can use:
+
+    git hub pull attach <issue number>
+
+If you would like to use `git hub clone -t` to fork other projects,
+but would like to maintain our above convention (official repository as
+`origin`, not `upstream`, and your fork as `gh-yourlogin`, not `fork`),
+set following git configuration options globally:
+
+    hub.upstreamremote = origin
+    hub.forkremote = gh-YourLogin
 
 
 Quality Assurance
@@ -258,18 +289,21 @@ In case if you want to enter buildbot's environment
 
 2. Find container ID associated with the environment you are interested in, e.g.
 
-       ```docker ps | grep nd16.04```
+        docker ps | grep nd16.04
 
 3. Enter that docker container environment using
 
-       ```docker exec -it <CONTAINER ID> /bin/bash```
+        docker exec -it <CONTAINER ID> /bin/bash
 
 4. Become buildbot user
 
-       ```su - buildbot```
+        su - buildbot
 
-5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
-   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+5. Activate corresponding virtualenv using
+
+        source <VENV/bin/activate>
+
+   e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`
 
 And now you should be in the same environment as the very last tested PR.
 Note that the same path/venv is reused for all the PRs, so you might want
@@ -398,6 +432,8 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
+- *DATALAD_TESTS_OBSCURE_PREFIX*:
+  A string to prefix the most obscure (but supported by the filesystem test filename
 - *DATALAD_TESTS_PROTOCOLREMOTE*:
   Binary flag to specify whether to test protocol interactions of custom remote with annex
 - *DATALAD_TESTS_RUNCMDLINE*:

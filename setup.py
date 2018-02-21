@@ -144,7 +144,13 @@ README = opj(dirname(__file__), 'README.md')
 try:
     import pypandoc
     long_description = pypandoc.convert(README, 'rst')
-except ImportError:
+except (ImportError, OSError) as exc:
+    # attempting to install pandoc via brew on OSX currently hangs and
+    # pypandoc imports but throws OSError demanding pandoc
+    print(
+        "WARNING: pypandoc failed to import or thrown an error while converting"
+        " README.md to RST: %r   .md version will be used as is" % exc
+    )
     long_description = open(README).read()
 
 

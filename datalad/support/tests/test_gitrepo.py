@@ -1229,3 +1229,27 @@ def test_check_git_configured(newhome):
         # But then if we
     finally:
         GitRepo._config_checked = old
+
+
+@with_tempfile(mkdir=True)
+def test_get_tags(path):
+    gr = GitRepo(path, create=True)
+    eq_(gr.get_tags(), [])
+
+    create_tree(gr.path, {'file': ""})
+    gr.add('file')
+    gr.commit(msg="msg")
+    eq_(gr.get_tags(), [])
+
+    gr.tag("nonannotated")
+    tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
+    eq_(gr.get_tags(), tags1)
+
+    sleep(1)  # so timestamp changes -- we sort in incremental order
+    create_tree(gr.path, {'file': "123"})
+    gr.add('file')
+    gr.commit(msg="changed")
+
+    gr.tag("annotated", message="annotation")
+    tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
+    eq_(gr.get_tags(), tags2)

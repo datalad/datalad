@@ -33,6 +33,7 @@ import json
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
+from datalad.utils import path_startswith
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
@@ -210,7 +211,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
             # ignore gitdir to speed things up
             continue
         p = opj(basepath, p)
-        if all(t != p and not t.startswith(_with_sep(p)) for t in targetpaths):
+        if all(t != p and not path_startswith(t, p) for t in targetpaths):
             # OPT listdir might be large and we could have only few items
             # in `targetpaths` -- so traverse only those in spec which have
             # leading dir basepath
@@ -496,7 +497,9 @@ def _process_results(
                 continue
         ## output rendering
         # TODO RF this in a simple callable that gets passed into this function
-        if result_renderer == 'default':
+        if result_renderer is None or result_renderer == 'disabled':
+            pass
+        elif result_renderer == 'default':
             # TODO have a helper that can expand a result message
             ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
@@ -520,7 +523,13 @@ def _process_results(
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **kwargs)
         elif hasattr(result_renderer, '__call__'):
-            result_renderer(res, **kwargs)
+            try:
+                result_renderer(res, **kwargs)
+            except Exception as e:
+                lgr.warn('Result rendering failed for: %s [%s]',
+                         res, exc_str(e))
+        else:
+            raise ValueError('unknown result renderer "{}"'.format(result_renderer))
         if result_xfm:
             res = result_xfm(res)
             if res is None:
