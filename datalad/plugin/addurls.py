@@ -271,6 +271,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
     from datalad.utils import assure_list
+    from datalad.ui import ui
 
     lgr = logging.getLogger("datalad.plugin.addurls")
 
@@ -330,9 +331,15 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                     return_type='generator'):
                 yield r
 
+    pbar = ui.get_progressbar(total=len(rows), label="Adding files",
+                              unit=" Files")
+    pbar.start()
+
     files_to_add = []
     meta_to_add = []
-    for row in rows:
+    results = []
+    for row_idx, row in enumerate(rows, 1):
+        pbar.update(row_idx)
         if row.subpath:
             # Adjust the dataset and filename for an `addurl` call
             # from within the subdataset that will actually contain
@@ -347,15 +354,22 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
         ds_current.repo.add_url_to_file(ds_filename, row.url,
                                         batch=True, options=annex_options)
-        yield get_status_dict(action="addurls",
-                              ds=ds_current,
-                              type="file",
-                              path=os.path.join(ds_current.path,
-                                                ds_filename),
-                              status="ok")
+        # Collect the status dicts to yield later so that we don't
+        # interrupt the progress bar.
+        results.append(
+            get_status_dict(action="addurls",
+                            ds=ds_current,
+                            type="file",
+                            path=os.path.join(ds_current.path,
+                                              ds_filename),
+                            status="ok"))
 
         files_to_add.append(row.filename)
         meta_to_add.append((ds_current, ds_filename, row.meta_args))
+    pbar.finish()
+
+    for result in results:
+        yield result
 
         msg = message or """\
 [DATALAD] add files from URLs
