@@ -74,6 +74,16 @@ def test_clean_meta_args():
                   addurls.clean_meta_args(["=value"]))
 
 
+def test_get_subpaths():
+    for fname, expect in [("no/dbl/slash", ("no/dbl/slash", [])),
+                          ("p1//n", ("p1/n", ["p1"])),
+                          ("p1//p2/p3//n", ("p1/p2/p3/n",
+                                            ["p1", "p1/p2/p3"])),
+                          ("//n", ("/n", [""])),
+                          ("n//", ("n/", ["n"]))]:
+        assert addurls.get_subpaths(fname) == expect
+
+
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
            "rows": [{"name": "will", "debut_season": 1,
                      "age_group": "kid", "now_dead": "no"},

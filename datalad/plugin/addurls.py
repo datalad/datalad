@@ -92,6 +92,36 @@ def clean_meta_args(args):
         yield field + "=" + value
 
 
+def get_subpaths(filename):
+    """Convert "//" marker in `filename` to a list of subpaths.
+
+    >>> get_subpaths("p1/p2//p3/p4//file")
+    ('p1/p2/p3/p4/file', ['p1/p2', 'p1/p2/p3/p4'])
+
+    Note: With Python 3, the subpaths could be generated with
+
+        itertools.accumulate(filename.split("//")[:-1], os.path.join)
+
+    Parameters
+    ----------
+    filename : str
+        File name with "//" marking subpaths.
+
+    Returns
+    -------
+    A tuple of the filename with any "//" collapsed to a single
+    separator and a list of subpaths (str).
+    """
+    if "//" not in filename:
+        return filename, []
+
+    spaths = []
+    for part in filename.split("//")[:-1]:
+        path = os.path.join(*(spaths + [part]))
+        spaths.append(path)
+    return filename.replace("//", os.path.sep), spaths
+
+
 def extract(stream, input_type, filename_format, url_format, meta):
     """Extract and format information from `url_file`.
 
@@ -140,16 +170,10 @@ def extract(stream, input_type, filename_format, url_format, meta):
 
         meta_args = list(clean_meta_args(fmt(row) for fmt in formats_meta))
 
-        subpath = None
-        if "//" in filename:
-            spaths = []
-            for part in filename.split("//")[:-1]:
-                path = os.path.join(*(spaths + [part]))
-                spaths.append(path)
-                subpaths.add(path)
-            filename = filename.replace("//", os.path.sep)
-            subpath = spaths[-1]
-        infos.append(RowInfo(filename, url, meta_args, subpath))
+        filename, spaths = get_subpaths(filename)
+        subpaths |= set(spaths)
+        infos.append(RowInfo(filename, url, meta_args,
+                             spaths[-1] if spaths else None))
     return infos, subpaths
 
 
