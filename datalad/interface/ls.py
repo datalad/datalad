@@ -292,10 +292,10 @@ class AnnexModel(GitModel):
         return info['local annex size'] if info else 0.0
 
     # To please current Pyout features. TODO: support "delayed"
-    def annex_local_size_(self):
+    def annex_local_(self):
         return self.annex_local_size
 
-    def annex_worktree_size_(self):
+    def annex_worktree_(self):
         return self.annex_worktree_size
 
 
@@ -463,17 +463,21 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 
 
 def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
+    from itertools import chain, imap
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = [topds] + (
-        [Dataset(opj(loc, sm))
-         for sm in topds.subdatasets(recursive=recursive, result_xfm='relpaths')]
-        if recursive else [])
+    if recursive:
+        dss = chain(
+            [topds],
+            (Dataset(opj(loc, sm))
+             for sm in topds.subdatasets(recursive=recursive,
+                                         result_xfm='relpaths')))
+    else:
+        dss = [topds]
 
-    dsms = []
-    for ds in dss:
+    def prepare_model(ds):
         if not ds.is_installed():
             dsm = AbsentRepoModel(ds.path)
         elif isinstance(ds.repo, AnnexRepo):
@@ -483,16 +487,13 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         else:
             raise RuntimeError("Got some dataset which don't know how to handle %s"
                                % ds)
-        dsms.append(dsm)
-
-    # adjust path strings
-    for ds_model in dsms:
-        #path = ds_model.path[len(topdir) + 1 if topdir else 0:]
-        path = relpath(ds_model.path, topdir) if topdir else ds_model.path
+        path = relpath(dsm.path, topdir) if topdir else dsm.path
         if not path:
             path = '.'
-        ds_model.path = path
-    dsms = sorted(dsms, key=lambda m: m.path)
+        dsm.path = path
+        return dsm
+
+    dsms = imap(prepare_model, dss)
 
     (_pyout_output if pyout else _format_output)(dsms, fast, long_)
 
@@ -507,8 +508,8 @@ def _pyout_output(dsms, fast, long_):
     if long_:
         columns += [
             # TODO: columns renames?
-            'annex_local_size_',
-            'annex_worktree_size_'
+            'annex_local_',
+            'annex_worktree_'
         ]
 
     def fancy_bool(v):
@@ -539,9 +540,21 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
 
     def summary_dates(values):
         return [
-            "earliers: %s" % datefmt(min(values)),
+            "earliest: %s" % datefmt(min(values)),
             "latest: %s" % datefmt(max(values))
         ]
+
+    size_style = dict(
+        transform=naturalsize,
+        color=dict(
+        interval=[
+            [0, 1024, "blue"],
+            [1024, 1024**2, "green"],
+            [1024**2, None, "red"]
+        ])
+        #summary=sum,
+        #delayed="group-annex"
+    )
 
     out = pyout.Tabular(
         columns=columns,
@@ -569,21 +582,8 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                     transform=fancy_bool,
                     # delayed="group-git"
                 )),
-                ('annex_local_size_', dict(
-                    transform=naturalsize,
-                    color=dict(
-                        interval=[
-                            [0, 1024, "blue"],
-                            [1024, 1024**2, "green"],
-                            [1024**2, None, "red"]
-                        ])
-                    #summary=sum,
-                    #delayed="group-annex"
-                )),
-                ('annex_worktree_size_', dict(
-                    transform=naturalsize,
-                    #delayed="group-annex"  TODO
-                )),
+                ('annex_local_', size_style),
+                ('annex_worktree_', size_style),
                 ('date', dict(
                     transform=datefmt,
                     #summary=summary_dates
