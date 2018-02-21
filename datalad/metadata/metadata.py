@@ -124,8 +124,7 @@ def _load_xz_json_stream(fpath, cache=None):
 
 def _get_metadatarelevant_paths(ds, subds_relpaths):
     return (f for f in ds.repo.get_files()
-            if not any(path_startswith(f, ex) or
-                       f == ex
+            if not any(path_startswith(f, ex)
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
@@ -152,7 +151,7 @@ def _get_containingds_from_agginfo(info, rpath):
         # containing subdataset (if there is any)
         containing_ds = sorted(
             [subds for subds in sorted(info)
-             if path_startswith(rpath, subds)],
+             if path_is_subpath(rpath, subds)],
             # TODO os.sep might not be OK on windows,
             # depending on where it was aggregated, ensure uniform UNIX
             # storage
@@ -234,7 +233,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 matching_subds = [(sub, sub) for sub in sorted(agginfos)
                                   # we already have the base dataset
                                   if (rpath == curdir and sub != curdir) or
-                                  path_startswith(sub, rpath)]
+                                  path_is_subpath(sub, rpath)]
                 to_query.extend(matching_subds)
 
             for qds, qpath in to_query:
@@ -302,7 +301,6 @@ def _query_aggregated_metadata_singlepath(
 
     for fpath in [f for f in contentmeta.keys()
                   if rparentpath == curdir or
-                  f == rparentpath or
                   path_startswith(f, rparentpath)]:
         # we might be onto something here, prepare result
         metadata = MetadataDict(contentmeta.get(fpath, {}))

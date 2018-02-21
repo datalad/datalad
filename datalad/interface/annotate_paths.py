@@ -245,7 +245,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
                 ap.update(m)
                 yield ap
                 break
-            if path_startswith(m['path'], ap['path']):
+            if path_is_subpath(m['path'], ap['path']):
                 # a modified path is underneath this AP
                 # yield the modified one instead
                 yield m
