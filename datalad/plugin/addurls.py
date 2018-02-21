@@ -309,7 +309,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
     if not dataset.repo:
         # Populate a new dataset with the URLs.
-        dataset.create()
+        for r in dataset.create(result_xfm=None, return_type='generator'):
+            yield r
     elif not isinstance(dataset.repo, AnnexRepo):
         yield get_status_dict(action="addurls",
                               ds=dataset,
@@ -325,7 +326,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                 "Not creating subdataset at existing path: %s",
                 spath)
         else:
-            dataset.create(spath)
+            for r in dataset.create(spath, result_xfm=None,
+                                    return_type='generator'):
+                yield r
 
     files_to_add = []
     meta_to_add = []
