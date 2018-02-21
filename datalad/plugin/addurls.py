@@ -13,6 +13,7 @@ from collections import Mapping, namedtuple
 from functools import partial
 import logging
 import os
+import re
 import string
 
 lgr = logging.getLogger("datalad.plugin.addurls")
@@ -121,7 +122,65 @@ def get_subpaths(filename):
     return filename.replace("//", os.path.sep), spaths
 
 
-def extract(stream, input_type, filename_format, url_format, meta):
+def is_legal_metafield(name):
+    """Test whether `name` is a valid metadata field.
+
+    The set of permitted characters is taken from git-annex's
+    MetaData.hs:legalField.
+    """
+    legal = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*\Z")
+    return True if legal.match(name) else False
+
+
+def filter_legal_metafield(fields):
+    """Remove illegal names from `fields`.
+    """
+    legal = []
+    for field in fields:
+        if is_legal_metafield(field):
+            legal.append(field)
+        else:
+            lgr.debug("%s is not a valid metadata field name; dropping",
+                      field)
+    return legal
+
+
+def fmt_to_name(format_string, num_to_name):
+    """Try to map a format string to a single name.
+
+    Parameters
+    ----------
+    format_string : string
+    num_to_name : dict
+        A dictionary that maps from an integer to a column name.  This
+        enables mapping the format string to an integer to a name.
+
+    Returns
+    -------
+    A placeholder name if `format_string` consists of a single
+    placeholder and no other text.  Otherwise, None is returned.
+    """
+    parsed = list(string.Formatter().parse(format_string))
+    if len(parsed) != 1:
+        # It's an empty string or there's more than one placeholder.
+        return
+    if parsed[0][0]:
+        # Format string contains text before the placeholder.
+        return
+
+    name = parsed[0][1]
+    if not name:
+        # The field name is empty.
+        return
+
+    try:
+        return num_to_name[int(name)]
+    except (KeyError, ValueError):
+        return name
+
+
+def extract(stream, input_type, filename_format, url_format,
+            no_autometa, meta):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -144,7 +203,7 @@ def extract(stream, input_type, filename_format, url_format, meta):
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         colidx_to_name = dict(enumerate(headers))
-        rows = (dict(zip(headers, r)) for r in csvrows)
+        rows = [dict(zip(headers, r)) for r in csvrows]
     elif input_type == "json":
         import json
         rows = json.load(stream)
@@ -157,9 +216,22 @@ def extract(stream, input_type, filename_format, url_format, meta):
     fmt = Formatter(colidx_to_name)
     format_filename = partial(fmt.format, filename_format)
     format_url = partial(fmt.format, url_format)
+
+    auto_meta_args = []
+    if not no_autometa:
+        urlcol = fmt_to_name(url_format, colidx_to_name)
+        # TODO: Try to normalize invalid fields, checking for any
+        # collisions.
+        #
+        # TODO: Add a command line argument for excluding a particular
+        # column(s), maybe based on a regexp.
+        metacols = filter_legal_metafield(c for c in sorted(rows[0].keys())
+                                          if c != urlcol)
+        auto_meta_args = [c + "=" + "{" + c + "}" for c in metacols]
+
     # Unlike `filename_format` and `url_format`, `meta` is a list
     # because meta may be given multiple times on the command line.
-    formats_meta = [partial(fmt.format, m) for m in meta]
+    formats_meta = [partial(fmt.format, m) for m in meta + auto_meta_args]
 
     infos = []
     subpaths = set()
@@ -177,7 +249,8 @@ def extract(stream, input_type, filename_format, url_format, meta):
 
 
 def dlplugin(dataset=None, url_file=None, input_type="ext",
-             url_format="{0}", filename_format="{1}", meta=None,
+             url_format="{0}", filename_format="{1}",
+             no_autometa=False, meta=None,
              message=None, dry_run=False, fast=False, ifexists=None):
     """Create and update a dataset from a list of URLs.
 
@@ -213,6 +286,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         may contain directories.  The separator "//" can be used to
         indicate that the left-side directory should be created as a
         new subdataset.
+    no_autometa : bool, optional
+        By default, metadata field=value pairs are constructed with each
+        column in `url_file`, excluding any single column that is
+        specified via `url_format`.  Set this flag to True to disable
+        this behavior.  Metadata can still be set explicitly with the
+        `meta` argument.
     meta : str, optional
         A format string that specifies metadata.  It should be
         structured as "<field>=<value>".  The same placeholders from
@@ -297,7 +376,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
     with open(url_file) as fd:
         rows, subpaths = me.extract(fd, input_type,
-                                    filename_format, url_format, meta)
+                                    filename_format, url_format,
+                                    no_autometa, meta)
 
     if dry_run:
         for subpath in subpaths:

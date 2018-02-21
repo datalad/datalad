@@ -86,6 +86,32 @@ def test_get_subpaths():
         assert addurls.get_subpaths(fname) == expect
 
 
+def test_is_legal_metafield():
+    for legal in ["legal", "0", "legal_"]:
+        assert addurls.is_legal_metafield(legal)
+    for notlegal in ["_not", "with space"]:
+        assert not addurls.is_legal_metafield(notlegal)
+
+
+def test_filter_legal_metafield():
+    result = addurls.filter_legal_metafield(["legal", "_not", "legal_still"])
+    expect = ["legal", "legal_still"]
+    assert result == expect
+
+
+def test_fmt_to_name():
+    assert addurls.fmt_to_name("{name}", {}) == "name"
+    assert addurls.fmt_to_name("{0}", {0: "name"}) == "name"
+    assert addurls.fmt_to_name("{1}", {0: "name"}) == "1"
+
+    assert not addurls.fmt_to_name("frontmatter{name}", {})
+    assert not addurls.fmt_to_name("{name}backmatter", {})
+    assert not addurls.fmt_to_name("{two}{names}", {})
+    assert not addurls.fmt_to_name("", {})
+    assert not addurls.fmt_to_name("nonames", {})
+    assert not addurls.fmt_to_name("{}", {})
+
+
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
            "rows": [{"name": "will", "debut_season": 1,
                      "age_group": "kid", "now_dead": "no"},
@@ -109,7 +135,7 @@ def test_extract():
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
-        ["group={age_group}"])
+        False, [])
 
     assert subpaths == {"kid", "kid/no", "adult", "adult/yes", "adult/no"}
 
@@ -120,10 +146,28 @@ def test_extract():
     assert fnames == ("kid/no/will.csv", "adult/yes/bob.csv",
                       "adult/no/scott.csv", "kid/no/max.csv")
 
-    assert meta == (["group=kid"], ["group=adult"],
-                    ["group=adult"], ["group=kid"])
+    assert list(map(set, meta)) == [
+        {"name=will", "age_group=kid", "debut_season=1", "now_dead=no"},
+        {"name=bob", "age_group=adult", "debut_season=2", "now_dead=yes"},
+        {"name=scott", "age_group=adult", "debut_season=1", "now_dead=no"},
+        {"name=max", "age_group=kid", "debut_season=2", "now_dead=no"},
+    ]
 
     assert subdss == ("kid/no", "adult/yes", "adult/no", "kid/no")
+
+
+def test_extract_no_autometa():
+    info, subpaths = addurls.extract(
+        json_stream(ST_DATA["rows"]), "json",
+        "{age_group}//{now_dead}//{name}.csv",
+        "{name}_{debut_season}.com",
+        True,
+        ["group={age_group}"])
+
+    meta = list(zip(*info))[2]
+
+    assert meta == (["group=kid"], ["group=adult"],
+                    ["group=adult"], ["group=kid"])
 
 
 def test_extract_csv_json_equal():
@@ -134,6 +178,7 @@ def test_extract_csv_json_equal():
 
     args = ["{age_group}//{now_dead}//{name}.csv",
             "{name}_{debut_season}.com",
+            False,
             ["group={age_group}"]]
 
     json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
@@ -145,4 +190,4 @@ def test_extract_csv_json_equal():
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   addurls.extract,
-                  None, "not_csv_or_json", None, None, None)
+                  None, "not_csv_or_json", None, None, None, None)
