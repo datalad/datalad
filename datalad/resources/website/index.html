@@ -2,8 +2,9 @@
 <html>
     <head>
         <meta charset="UTF-8">
-        <title>Datalad Repository</title>
-        <link rel="shortcut icon" type="image/x-icon" href=".git/datalad/web/assets/images/favicon-16x16.png" />
+        <title>DataLad Repository</title>
+        <link rel="icon" type="image/png" sizes="16x16" href=".git/datalad/web/assets/images/favicon-16x16.png?v=1">
+        <link rel="shortcut icon" href=".git/datalad/web/assets/images/favicon.ico?v=1">
         <link rel="stylesheet" type="text/css" href=".git/datalad/web/assets/css/jquery.dataTables-1.10.12.css">
         <style type="text/css">
           body{ max-width: 1200px; margin: 2em auto; }
@@ -25,12 +26,22 @@
           td.link { color: #FFD03C; }
           td.file { color: #67CDDC; }
 
-          #installation { font-size: 90%; background-color: #fcfcfc; padding: 0.5em; margin: 0.5em; }
+          #installation { font-size: 90%; background-color: #fcfcfc; padding: 0em 0.5em 0.5em 0.5em; margin: 0em 0.5em 0.5em 0.5em; }
           .command { font-family: monospace; font-weight: bold; color: darkgray; padding-left: 2em;}
+          .command-option { font-family: monospace; font-weight: bold; color: darkgray; }
         </style>
     </head>
     <body>
-        <h1><a href="http://www.datalad.org" alt="DataLad website"><img src=".git/datalad/web/assets/images/datalad_banner.svg" width="196" alt="Datalad Repository"></a></h1>
+        <div>
+            <div style="float: left; width: 196px;">
+                <a href="http://www.datalad.org" alt="DataLad website">
+                    <img src=".git/datalad/web/assets/images/logo_wide.svg" width="196" alt="DataLad Repository">
+                </a>
+            </div>
+            <div style="float: right; min-width: 50%; max-width: 80%;" id="installation">
+            </div>
+        </div>
+
         <div id="content"></div>
 	<noscript>
 	  <div style="border: 2px solid #E53B51; padding: 10px">

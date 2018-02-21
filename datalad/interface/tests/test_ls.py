@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -15,9 +15,11 @@ __docformat__ = 'restructuredtext'
 import logging
 import hashlib
 import json as js
+import sys
 
 from glob import glob
 from collections import Counter
+from mock import patch
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -31,6 +33,7 @@ from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
 from ...tests.utils import skip_if_no_network
+from ..ls import LsFormatter
 from datalad.interface.ls import ignored, fs_traverse, _ls_json, machinesize
 from os.path import exists, join as opj
 from os.path import relpath
@@ -82,6 +85,17 @@ def test_ls_repos(toppath):
     # check from within a sibling directory with relative paths
     with chpwd(toppath):
         _test([relpath(x, toppath) for x in repos])
+
+
+@with_tempfile
+def test_ls_uninstalled(path):
+    ds = Dataset(path)
+    ds.create()
+    ds.create('sub')
+    ds.uninstall('sub', check=False)
+    with swallow_outputs() as cmo:
+        ls([path], recursive=True)
+        assert_in('not installed', cmo.out)
 
 
 def test_machinesize():
@@ -193,9 +207,11 @@ def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
     dsj = Dataset(topdir)
     # create some file and commit it
-    open(opj(dsj.path, 'subdsfile.txt'), 'w').write('123')
+    with open(opj(dsj.path, 'subdsfile.txt'), 'w') as f:
+        f.write('123')
     dsj.add(path='subdsfile.txt')
     dsj.save("Hello!", version_tag=1)
+
     # add a subdataset
     dsj.install('subds', source=topdir)
 
@@ -304,3 +320,25 @@ def test_ls_noarg(toppath):
         with chpwd(toppath):
             assert_equal(ls_out, ls([]))
             assert_equal(ls_out, ls('.'))
+
+
+def test_ls_formatter():
+    # we will use unicode symbols only when sys.stdio supports UTF-8
+    for sysioenc, OK, tty in [(None, "OK", True),
+                              ('ascii', 'OK', True),
+                              ('UTF-8', u"✓", True),
+                              ('UTF-8', "OK", False)]:
+
+        # we cannot overload sys.stdout.encoding
+        class fake_stdout(object):
+            encoding = sysioenc
+            def write(self, *args):
+                pass
+
+            def isatty(self):
+                return tty
+
+        with patch.object(sys, 'stdout', fake_stdout()):
+            formatter = LsFormatter()
+            assert_equal(formatter.OK, OK)
+            assert_in(OK, formatter.convert_field(True, 'X'))

@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+set -u -e
+
+# reduce confusion with xdotool
+setxkbmap us
+
+test ! -e $1 && echo "input file does not exist" && exit 1
+title="$(echo $(basename $1) | sed -e 's/.sh$//')"
+bashrc_file="$(dirname $0)/cast_bash.rc"
+
+# shortcut for making xdotool use the right window
+function xdt() {
+    winid=$1
+    shift
+    xdotool windowactivate --sync $winid
+    if [ "$#" -gt 0 ]; then
+        xdotool "$@"
+    fi
+}
+
+# make sure the target xterm is up and running
+# Sizes
+# "small"
+width=80
+height=24
+# "big"
+#width=120
+#height=36
+# live hd resolution with 14 font (trimmed just a bit on the right and bottom)
+# apparently has issue with underscores not printed when working in bash
+#width=116
+#height=32
+#fs=14
+# so let's use fs 15 and slightly smaller window
+width=106
+height=29
+fs=15
+text_width=$(($width - 8))
+
+geometry=${width}x${height}
+this_window=$(xdotool getwindowfocus)
+
+# For consistent appearance
+xterm +sb -fa Hermit -fs $fs -bg black -fg white -geometry $geometry -title Screencast-xterm -e "bash  --rcfile $bashrc_file" &
+xterm_pid=$!
+sleep 1
+
+xterm_window=$(xdotool search --pid $xterm_pid)
+
+# By default should stay in the xterm window, so when we need to deal with
+# current one (waiting etc), then switch
+function wait () {
+    xdt $this_window
+    read -p "$@" in
+    echo "$in"
+    xdt $xterm_window
+}
+function instruct () {
+    xdt $this_window
+    wait "$@"
+}
+function type () {
+	xdt $xterm_window type --clearmodifiers --delay 40  "$1"
+}
+function key () {
+	xdt $xterm_window key --clearmodifiers  $*
+}
+function sleep () {
+	xdotool sleep $1
+}
+function execute () {
+	xdt $xterm_window sleep 0.5 key Return
+	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
+		sleep 0.1
+	done
+}
+function say()
+{
+	ac=$(instruct "SAY: $1")
+	if [ "$ac" != "s" ] ; then
+	    echo "skipping"
+	    return
+	fi
+	type "$(printf "#\n# $1" | fmt -w ${text_width} --prefix '# ')"
+	key Return
+}
+function show () {
+    xdt $xterm_window type --clearmodifiers --delay 0 "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+    key Return
+}
+function run () {
+    help="Press Enter to type, s to skip this action"
+    ac=$(instruct "EXEC: $1.  $help")
+    if [ "$ac" = "s" ]; then
+        echo "skipping"
+        return
+    fi
+    type "$1"
+    ac=$(instruct "EXEC: $1.  $help")
+    if [ "$ac" = "s" ]; then
+        echo "skipping"
+        return
+    fi
+    execute
+}
+function run_expfail () {
+	# TODO we could announce or visualize the expected failure
+	run "$1"
+}
+
+xdt $xterm_window sleep 0.1
+
+echo "xterm PID $xterm_pid (window $xterm_window)  this window $this_window"
+
+show "Welcome to the mighty bash shell"
+key Return
+
+# now get the process tree attached to the terminal so we can
+# figure out when it is idle, and when it is not
+# XXX must happen after asciinema is running
+xterm_pstree="$(pstree -p -A $xterm_pid)"
+
+. $1
+
+sleep 1
+
+show "$(cowsay "Demo was using $(datalad --version 2>&1 | head -n1). Discover more at http://datalad.org")"
+
+# key Control_L+d
+
+echo "INSTRUCTION: Press Ctrl-D or run exit to close the terminal"
+# kill the xterm we opened
+#kill $xterm_pid

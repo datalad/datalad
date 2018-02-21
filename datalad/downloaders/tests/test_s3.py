@@ -93,3 +93,15 @@ def test_reuse_session(tempfile, mocked_auth):
 
     Providers.reset_default_providers()  # necessary to avoid side-effects from having a vcr'ed connection
     # leaking through default provider's bucket, e.g. breaking test_mtime if ran after this one
+
+
+def test_parse_url():
+    from ..s3 import S3Downloader
+    f = S3Downloader._parse_url
+    b1 = "s3://bucket.name/file/path?revision=123"
+    assert_equal(f(b1, bucket_only=True), 'bucket.name')
+    assert_equal(f(b1), ('bucket.name', 'file/path', {'revision': '123'}))
+    assert_equal(f("s3://b/f name"), ('b', 'f name', {}))
+    assert_equal(f("s3://b/f%20name"), ('b', 'f name', {}))
+    assert_equal(f("s3://b/f%2Bname"), ('b', 'f+name', {}))
+    assert_equal(f("s3://b/f%2bname?r=%20"), ('b', 'f+name', {'r': '%20'}))

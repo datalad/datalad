@@ -244,6 +244,9 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     # we don't do any error checking here, done by the command itself
     source = kwargs.get('source', None)
     if source is not None:
+        # we want to be able to deal with Dataset instances given as 'source':
+        if isinstance(source, Dataset):
+            source = source.path
         # if there was a source, it needs to be recorded in the result
         # otherwise this is not what we are looking for
         return source == res.get('source_url', None)

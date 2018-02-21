@@ -9,6 +9,7 @@
 """constants for datalad
 """
 
+import os
 from os.path import join
 from os.path import expanduser
 
@@ -40,7 +41,11 @@ DATALAD_SPECIAL_REMOTES_UUIDS = {
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
 
-DATASETS_TOPURL = "http://datasets.datalad.org/"
+DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
+                  or "http://datasets.datalad.org/"
+# safeguard
+if not DATASETS_TOPURL.endswith('/'):
+    DATASETS_TOPURL += '/'
 
 # Centralized deployment
 LOCAL_CENTRAL_PATH = join(expanduser('~'), 'datalad')
@@ -55,3 +60,6 @@ TIMESTAMP_FMT = "%Y-%m-%dT%H:%M:%S%z"
 # We use custom ssh runner while interacting with git
 #GIT_SSH_COMMAND = "/tmp/sshrun"  # was a little shell script to help troubleshooting
 GIT_SSH_COMMAND = "datalad sshrun"
+
+# magic sha is from `git hash-object -t tree /dev/null`, i.e. from nothing
+PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'

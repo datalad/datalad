@@ -18,6 +18,8 @@ from ....tests.utils import with_tempfile
 from ....tests.utils import use_cassette
 from ....tests.utils import externals_use_cassette
 from ....tests.utils import skip_if_no_network
+from ....tests.utils import ok_clean_git
+from ....tests.utils import ok_file_under_git
 from ..simple_s3 import pipeline
 from datalad.api import crawl_init
 from datalad.api import crawl
@@ -65,3 +67,25 @@ def test_drop(path):
     eq_(len(files), 8)
     for f in files:
         assert_false(repo.file_has_content(f))
+
+
+@with_tempfile
+@use_cassette('test_simple_s3_test2_obscurenames_versioned_crawl')
+@skip_if_no_network
+def test_obscure_names(path):
+    bucket = "datalad-test2-obscurenames-versioned"
+    get_test_providers('s3://' + bucket)  # to verify having s3 credentials
+    create(path)
+    with externals_use_cassette('test_simple_s3_test2_obscurenames_versioned_crawl_ext'), \
+         chpwd(path):
+        crawl_init(template="simple_s3",
+                   args=dict(bucket=bucket),
+                   save=True
+                   )
+        crawl()
+    # fun with unicode was postponed
+    ok_clean_git(path, annex=True)
+    for f in [
+        'f &$=@:+,?;', "f!-_.*'( )", 'f 1', 'f [1][2]'
+    ]:
+        ok_file_under_git(path, f, annexed=True)

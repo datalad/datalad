@@ -40,6 +40,7 @@ from ...utils import auto_repr
 from ...utils import _path_
 from ...utils import getpwd
 from ...utils import try_multiple
+from ...utils import assure_list
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
@@ -248,6 +249,7 @@ class Annexificator(object):
                  auto_finalize=True,
                  statusdb=None,
                  skip_problematic=False,
+                 largefiles=None,
                  **kwargs):
         """
 
@@ -283,6 +285,9 @@ class Annexificator(object):
         skip_problematic: bool, optional
           If True, it would not raise an exception if e.g. url is 404 or forbidden -- then just
           nothing is yielded, and effectively that entry is skipped
+        largefiles: str, optional
+          A setting to pass as '-c annex.largefiles=' option to all git annex calls
+          in case largefiles setting is not yet defined in "git attributes"
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -322,12 +327,22 @@ class Annexificator(object):
                         init_datalad_remote(self.repo, remote, autoenable=True)
 
         self.mode = mode
-        self.options = options or []
+        self.options = assure_list(options, copy=True)
         self.auto_finalize = auto_finalize
         self._states = set()
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
+
+        if largefiles:
+            repo_largefiles = self.repo.get_git_attributes().get('annex.largefiles', None)
+            if repo_largefiles is not None:
+                lgr.info(
+                    "Not adding annex.largefiles=%s to git annex calls because "
+                    "already defined to be %s", largefiles, repo_largefiles
+                )
+            else:
+                self.options += ["-c", "annex.largefiles=%s" % largefiles]
 
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
@@ -848,7 +863,9 @@ class Annexificator(object):
             self._statusdb.save()
         # there is something to commit and backends was set but no .gitattributes yet
         path = self.repo.path
-        if self.repo.dirty and not exists(opj(path, '.gitattributes')) and isinstance(self.repo, AnnexRepo):
+        if self.repo.dirty and \
+                'annex.backend' not in self.repo.get_git_attributes() and \
+                isinstance(self.repo, AnnexRepo):
             backends = self.repo.default_backends
             if backends:
                 self.repo.set_default_backend(backends[0], commit=False)
@@ -1298,7 +1315,7 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
-                _call(self.repo.add, '.', git_options=self.options)  # so everything is committed
+                _call(self.repo.add, '.', options=self.options)  # so everything is committed
 
                 stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
                 _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])

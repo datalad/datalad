@@ -57,19 +57,25 @@ atexit.register(lgr.log, 5, "Exiting")
 from .version import __version__
 
 
-def test(package='datalad', **kwargs):
-    """A helper to run datalad's tests.  Requires numpy and nose
-
-    See numpy.testing.Tester -- **kwargs are passed into the
-    Tester().test call
+def test(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
+    """A helper to run datalad's tests.  Requires nose
     """
-    try:
-        from numpy.testing import Tester
-        Tester(package=package).test(**kwargs)
-        # we don't have any benchmarks atm
-        # bench = Tester().bench
-    except ImportError:
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+    argv = [] #module]
+    # could make it 'smarter' but decided to be explicit so later we could
+    # easily migrate to another runner without changing any API here
+    if verbose:
+        argv.append('-v')
+    if nocapture:
+        argv.append('-s')
+    if pdb:
+        argv.append('--pdb')
+    if stop:
+        argv.append('--stop')
+    from datalad.support.third.nosetester import NoseTester
+    tester = NoseTester(module)
+    tester.package_name = module.split('.', 1)[0]
+    tester.test(extra_argv=argv)
+
 test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
@@ -79,16 +85,42 @@ test.__test__ = False
 _test_states = {
     'loglevel': None,
     'DATALAD_LOG_LEVEL': None,
+    'HOME': None,
 }
 
 
 def setup_package():
     import os
+    from datalad import consts
+    _test_states['HOME'] = os.environ.get('HOME', None)
+    _test_states['DATASETS_TOPURL_ENV'] = os.environ.get('DATALAD_DATASETS_TOPURL', None)
+    _test_states['DATASETS_TOPURL'] = consts.DATASETS_TOPURL
+    os.environ['DATALAD_DATASETS_TOPURL'] = consts.DATASETS_TOPURL = 'http://datasets-tests.datalad.org/'
 
     # To overcome pybuild overriding HOME but us possibly wanting our
     # own HOME where we pre-setup git for testing (name, email)
     if 'GIT_HOME' in os.environ:
         os.environ['HOME'] = os.environ['GIT_HOME']
+    else:
+        # we setup our own new HOME, the BEST and HUGE one
+        from datalad.utils import make_tempfile
+        from datalad.tests import _TEMP_PATHS_GENERATED
+        # TODO: split into a function + context manager
+        with make_tempfile(mkdir=True) as new_home:
+            os.environ['HOME'] = new_home
+        if not os.path.exists(new_home):
+            os.makedirs(new_home)
+        with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
+            f.write("""\
+[user]
+	name = DataLad Tester
+	email = test@example.com
+""")
+        _TEMP_PATHS_GENERATED.append(new_home)
+
+    # For now we will just verify that it is ready to run the tests
+    from datalad.support.gitrepo import check_git_configured
+    check_git_configured()
 
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
@@ -125,6 +157,7 @@ def teardown_package():
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
+    from datalad import consts
     ui.set_backend(_test_states['ui_backend'])
     if _test_states['loglevel'] is not None:
         lgr.setLevel(_test_states['loglevel'])
@@ -143,14 +176,15 @@ def teardown_package():
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
 
+    if _test_states['HOME'] is not None:
+        os.environ['HOME'] = _test_states['HOME']
+
+    if _test_states['DATASETS_TOPURL_ENV']:
+        os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
+    consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
+
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
-    # request versioning for few others which we do not check at runtime
-    for m in ('git', 'system-ssh'):
-        try:  # Let's make sure to not blow up when we are almost done
-            ev[m]
-        except Exception:
-            pass
     print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")

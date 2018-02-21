@@ -95,24 +95,30 @@ class Credential(object):
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
 
-    def _ask_field_value(self, f):
+    def _ask_field_value(self, f, instructions=None):
+        msg = instructions if instructions else \
+            ("You need to authenticate with %r credentials." % self.name +
+                  (" %s provides information on how to gain access"
+                   % self.url if self.url else ''))
+
         return ui.question(
             f,
-            title="You need to authenticate with %r credentials." % self.name +
-                  " %s provides information on how to gain access"
-                  % self.url if self.url else '',
+            title=msg,
             hidden=self._is_field_hidden(f))
 
-    def _ask_and_set(self, f):
-        v = self._ask_field_value(f)
+    def _ask_and_set(self, f, instructions=None):
+        v = self._ask_field_value(f, instructions=instructions)
         self.set(**{f: v})
         return v
 
-    def enter_new(self, **kwargs):
+    def enter_new(self, instructions=None, **kwargs):
         """Enter new values for the credential fields
 
         Parameters
         ----------
+        instructions : str, optional
+          If given, the auto-generated instructions based on a login-URL are
+          replaced by the given string
         **kwargs
           Any given key value pairs with non-None values are used to set the
           field `key` to the given value, without asking for user input
@@ -123,7 +129,7 @@ class Credential(object):
                 # use given value, don't ask
                 self.set(**{f: kwargs[f]})
             elif not self._is_field_optional(f):
-                self._ask_and_set(f)
+                self._ask_and_set(f, instructions=instructions)
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""

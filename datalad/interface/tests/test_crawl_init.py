@@ -8,6 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 from nose.tools import eq_, assert_raises, assert_in
 from mock import patch
 from ...api import crawl_init
@@ -42,7 +46,8 @@ def test_crawl_init():
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n\n'
     yield _test_crawl_init, ['dataset=ds000001', 'versioned_urls=True'], 'openfmri', None, False, \
           '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n_versioned_urls = True\n\n'
-    yield _test_crawl_init, None, 'openfmri', 'superdataset_pipeline', True, \
+    #FIXME:
+    yield known_failure_v6(_test_crawl_init), None, 'openfmri', 'superdataset_pipeline', True, \
           '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n'
 
 

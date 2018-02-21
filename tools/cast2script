@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+set -u -e
+
+function type () {
+	echo "Not supported in scripts"
+	exit 1
+}
+function key () {
+	echo "Not supported in scripts"
+	exit 1
+}
+function sleep () {
+	# do nothing in a script
+	:
+}
+function execute () {
+	# do nothing in a script
+	:
+}
+function say()
+{
+	printf "\n"
+	printf "# %s\n" "$1" | fmt -w 72 --prefix '# '
+}
+function show () {
+	# same as say
+	printf "# %s\n" "$1" | fmt -w 72 --prefix '# '
+}
+function run () {
+        printf "%s\n" "$1"
+}
+function run_expfail () {
+	printf "%s || true\n" "$1"
+}
+
+
+printf "#!/bin/bash\n"
+show "This script was converted using cast2script from: $1"
+cat << EOT
+set -e -u
+export GIT_PAGER=cat
+EOT
+
+. $1

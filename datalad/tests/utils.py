@@ -12,6 +12,7 @@ import glob
 import inspect
 import shutil
 import stat
+from json import dumps
 import os
 import re
 import tempfile
@@ -49,9 +50,12 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
+from ..support.network import RI
 from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
-from ..consts import ARCHIVES_TEMP_DIR
+from ..consts import (
+    ARCHIVES_TEMP_DIR,
+)
 from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
@@ -97,6 +101,29 @@ def skip_if_url_is_not_available(url, regex=None):
         raise SkipTest("%s failed to download" % url)
 
 
+# TODO: eventually we might want to make use of attr module
+class File(object):
+    """Helper for a file entry in the create_tree/@with_tree
+
+    It allows to define additional settings for entries
+    """
+    def __init__(self, name, executable=False):
+        """
+
+        Parameters
+        ----------
+        name : str
+          Name of the file
+        executable: bool, optional
+          Make it executable
+        """
+        self.name = name
+        self.executable = executable
+
+    def __str__(self):
+        return self.name
+
+
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
@@ -130,7 +157,13 @@ def create_tree(path, tree, archives_leading_dir=True):
     if isinstance(tree, dict):
         tree = tree.items()
 
-    for name, load in tree:
+    for file_, load in tree:
+        if isinstance(file_, File):
+            executable = file_.executable
+            name = file_.name
+        else:
+            executable = False
+            name = file_
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
@@ -145,6 +178,8 @@ def create_tree(path, tree, archives_leading_dir=True):
                 if PY2 and isinstance(load, text_type):
                     load = load.encode('utf-8')
                 f.write(load)
+        if executable:
+            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 #
 # Addition "checkers"
@@ -633,6 +668,8 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    if GitRepo(tdir).is_with_annex():
+        AnnexRepo(tdir, init=True)
     _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
@@ -840,9 +877,146 @@ def skip_ssh(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("SSH currently not available on windows.")
-        test_ssh = os.environ.get('DATALAD_TESTS_SSH', '').lower()
+        from datalad import cfg
+        test_ssh = cfg.get("datalad.tests.ssh", '')
         if test_ssh in ('', '0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+# ### ###
+# START known failure decorators
+# ### ###
+
+def probe_known_failure(func):
+    """Test decorator allowing the test to pass when it fails and vice versa
+
+    Setting config datalad.tests.knownfailures.probe to True tests, whether or
+    not the test is still failing. If it's not, an AssertionError is raised in
+    order to indicate that the reason for failure seems to be gone.
+    """
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        from datalad import cfg
+        if cfg.obtain("datalad.tests.knownfailures.probe"):
+            assert_raises(Exception, func, *args, **kwargs)  # marked as known failure
+            # Note: Since assert_raises lacks a `msg` argument, a comment
+            # in the same line is helpful to determine what's going on whenever
+            # this assertion fails and we see a trace back. Otherwise that line
+            # wouldn't be very telling.
+        else:
+            return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_known_failure(func):
+    """Test decorator allowing to skip a test that is known to fail
+
+    Setting config datalad.tests.knownfailures.skip to a bool enables/disables
+    skipping.
+    """
+    from datalad import cfg
+
+    @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
+             msg="Skip test known to fail")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure(func):
+    """Test decorator marking a test as known to fail
+
+    This combines `probe_known_failure` and `skip_known_failure` giving the
+    skipping precedence over the probing.
+    """
+
+    @skip_known_failure
+    @probe_known_failure
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def known_failure_v6(func):
+    """Test decorator marking a test as known to fail in a v6 test run
+
+    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
+    the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    version = cfg.obtain("datalad.repo.version")
+    if version and version == 6:
+
+        @known_failure
+        @wraps(func)
+        def v6_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return v6_func
+
+    return func
+
+
+def known_failure_direct_mode(func):
+    """Test decorator marking a test as known to fail in a direct mode test run
+
+    If datalad.repo.direct is set to True behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+
+    from datalad import cfg
+
+    direct = cfg.obtain("datalad.repo.direct")
+    if direct:
+
+        @known_failure
+        @wraps(func)
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+
+    return func
+
+
+# ### ###
+# END known failure decorators
+# ### ###
+
+
+def skip_v6(func):
+    """Skips tests if datalad is configured to use v6 mode
+    (DATALAD_REPO_VERSION=6)
+    """
+
+    from datalad import cfg
+    version = cfg.obtain("datalad.repo.version")
+
+    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_direct_mode(func):
+    """Skips tests if datalad is configured to use direct mode
+    (set DATALAD_REPO_DIRECT)
+    """
+
+    from datalad import cfg
+
+    @skip_if(cfg.obtain("datalad.repo.direct"),
+             msg="Skip test in direct mode test run")
+    @wraps(func)
+    def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
@@ -891,6 +1065,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
             reraise(*exc_info)
 
     return newfunc
+
 
 @optional_args
 def run_under_dir(func, newdir='.'):
@@ -966,9 +1141,17 @@ def assert_status(label, results):
     in this sequence.
     """
     label = assure_list(label)
-    for r in assure_list(results):
-        assert_in('status', r)
-        assert_in(r['status'], label)
+    results = assure_list(results)
+    for i, r in enumerate(results):
+        try:
+            assert_in('status', r)
+            assert_in(r['status'], label)
+        except AssertionError:
+            raise AssertionError('Test {}/{}: expected status {} not found in:\n{}'.format(
+                i + 1,
+                len(results),
+                label,
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_message(message, results):
@@ -986,12 +1169,20 @@ def assert_message(message, results):
 def assert_result_count(results, n, **kwargs):
     """Verify specific number of results (matching criteria, if any)"""
     count = 0
-    for r in assure_list(results):
+    results = assure_list(results)
+    for r in results:
         if not len(kwargs):
             count += 1
         elif all(k in r and r[k] == v for k, v in kwargs.items()):
             count += 1
-    assert_equal(n, count)
+    if not n == count:
+        raise AssertionError(
+            'Got {} instead of {} expected results matching {}. Inspected {} record(s):\n{}'.format(
+                count,
+                n,
+                kwargs,
+                len(results),
+                dumps(results, indent=1, default=lambda x: "<not serializable>")))
 
 
 def assert_in_results(results, **kwargs):
@@ -1001,7 +1192,7 @@ def assert_in_results(results, **kwargs):
     for r in assure_list(results):
         if all(k in r and r[k] == v for k, v in kwargs.items()):
             found = True
-    assert found
+    assert found, "Found no desired result (%s) among %s" % (repr(kwargs), repr(results))
 
 
 def assert_not_in_results(results, **kwargs):
@@ -1036,7 +1227,7 @@ def ignore_nose_capturing_stdout(func):
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
             if message.find('StringIO') > -1 and message.find('fileno') > -1:
-                pass
+                raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
     return newfunc
@@ -1074,7 +1265,6 @@ def with_batch_direct(t):
 
 
 def dump_graph(graph, flatten=False):
-    from json import dumps
     if flatten:
         from datalad.metadata import flatten_metadata_graph
         graph = flatten_metadata_graph(graph)
@@ -1086,6 +1276,7 @@ def dump_graph(graph, flatten=False):
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
+OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
     " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
     " \"';a&b&cd `| ",
@@ -1097,7 +1288,8 @@ OBSCURE_FILENAMES = (
     " ab cd ",
     " ab cd",
     "a",
-    " abc d.dat ",  # they all should at least support spaces and dots
+    " abc d.dat ",
+    "abc d.dat ",  # they all should at least support spaces and dots
 )
 
 @with_tempfile(mkdir=True)
@@ -1107,6 +1299,7 @@ def get_most_obscure_supported_name(tdir):
     TODO: we might want to use it as a function where we would provide tdir
     """
     for filename in OBSCURE_FILENAMES:
+        filename = OBSCURE_PREFIX + filename
         if on_windows and filename.rstrip() != filename:
             continue
         try:
@@ -1185,6 +1378,10 @@ def get_mtimes_and_digests(target_path):
     return digests, mtimes
 
 
+def get_datasets_topdir():
+    """Delayed parsing so it could be monkey patched etc"""
+    from datalad.consts import DATASETS_TOPURL
+    return RI(DATASETS_TOPURL).hostname
 
 #
 # Context Managers

@@ -8,6 +8,8 @@
 """Test create testdataset helpers
 
 """
+from datalad.tests.utils import skip_direct_mode
+
 from glob import glob
 from os.path import join as opj
 
@@ -36,6 +38,8 @@ def test_parse_spec():
     eq_(_parse_spec(''), [])
 
 
+# Note: This randomly fails in direct mode due to gh-issue #1852
+@skip_direct_mode  #FIXME
 def test_create_test_dataset():
     # rudimentary smoke test
     from datalad.api import create_test_dataset
@@ -47,6 +51,8 @@ def test_create_test_dataset():
         ok_(len(glob(opj(ds, 'file*'))))
 
 
+# Note: This randomly fails in direct mode due to gh-issue #1852
+@skip_direct_mode  #FIXME
 def test_create_1test_dataset():
     # and just a single dataset
     from datalad.api import create_test_dataset
@@ -56,6 +62,8 @@ def test_create_1test_dataset():
     ok_clean_git(dss[0], annex=False)
 
 
+# Note: This randomly fails in direct mode due to gh-issue #1852
+@skip_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_new_relpath(topdir):
     from datalad.api import create_test_dataset
@@ -67,6 +75,8 @@ def test_new_relpath(topdir):
         ok_clean_git(ds, annex=False)
 
 
+# Note: This randomly fails in direct mode due to gh-issue #1852
+@skip_direct_mode  #FIXME
 @with_tempfile()
 def test_hierarchy(topdir):
     # GH 1178

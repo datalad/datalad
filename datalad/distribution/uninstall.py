@@ -41,9 +41,20 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 def _uninstall_dataset(ds, check, has_super, **kwargs):
     if check and ds.is_installed():
+        # if the checks are on we need to make sure to exit this function
+        # whenever any drop failed, because we cannot rely on the error
+        # to actually cause a stop in upstairs code
+        bad_things_happened = False
         for r in _drop_files(
                 ds, curdir, check=True, noannex_iserror=False, **kwargs):
             yield r
+            if r['action'] == 'drop' and \
+                    not r.get('status', None) in ('ok', 'notneeded'):
+                bad_things_happened = True
+        if bad_things_happened:
+            # error reporting already happened, we can just stop here
+            return
+
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that
@@ -169,11 +180,24 @@ class Uninstall(Interface):
                 continue
             # we only have dataset from here
             if not ap.get('parentds', None):
-                ap.update(
-                    status='error',
-                    message="will not uninstall top-level dataset (consider `remove` command)")
-                yield ap
-                continue
+                # this could be a side-effect of the specific call semantics.
+                # As stated in #1714, we are not really interested in whether
+                # a superdataset was obvious in the call, but only whether there
+                # is a superdataset at all. So let's look for one, and only barf
+                # when there really isn't
+                parentds = Dataset(ap['path']).get_superdataset(
+                    datalad_only=False,
+                    topmost=False,
+                    # unless it is properly registered we have no way of
+                    # reinstalling it
+                    registered_only=True)
+                if parentds is None:
+                    ap.update(
+                        status='error',
+                        message="will not uninstall top-level dataset (consider `remove` command)")
+                    yield ap
+                    continue
+                ap['parentds'] = parentds.path
             if not ap['path'] == refds_path:
                 ap['process_content'] = True
             to_uninstall.append(ap)

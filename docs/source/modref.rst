@@ -23,6 +23,7 @@ Dataset operations
 .. autosummary::
    :toctree: generated
 
+   api.Dataset
    api.add
    api.create
    api.create_sibling
