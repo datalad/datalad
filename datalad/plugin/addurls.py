@@ -415,15 +415,15 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                     return_type='generator'):
                 yield r
 
-    pbar = ui.get_progressbar(total=len(rows), label="Adding files",
-                              unit=" Files")
-    pbar.start()
+    pbar_addurl = ui.get_progressbar(total=len(rows), label="Adding files",
+                                     unit=" Files")
+    pbar_addurl.start()
 
     files_to_add = []
     meta_to_add = []
-    results = []
+    addurl_results = []
     for row_idx, row in enumerate(rows, 1):
-        pbar.update(row_idx)
+        pbar_addurl.update(row_idx)
         fname_abs = os.path.join(dataset.path, row.filename)
         if row.subpath:
             # Adjust the dataset and filename for an `addurl` call
@@ -437,7 +437,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
         if os.path.exists(fname_abs) or os.path.islink(fname_abs):
             if ifexists == "skip":
-                results.append(
+                addurl_results.append(
                     get_status_dict(action="addurls",
                                     ds=ds_current,
                                     type="file",
@@ -454,7 +454,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                         batch=True, options=annex_options)
         # Collect the status dicts to yield later so that we don't
         # interrupt the progress bar.
-        results.append(
+        addurl_results.append(
             get_status_dict(action="addurls",
                             ds=ds_current,
                             type="file",
@@ -464,9 +464,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
         files_to_add.append(row.filename)
         meta_to_add.append((ds_current, ds_filename, row.meta_args))
-    pbar.finish()
+    pbar_addurl.finish()
 
-    for result in results:
+    for result in addurl_results:
         yield result
 
         msg = message or """\
@@ -480,14 +480,25 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
         for r in dataset.add(files_to_add, message=msg):
             yield r
 
-    for ds, fname, meta in meta_to_add:
+    # TODO: Wrap this repeated "delayed results/progress bar" pattern.
+    pbar_meta = ui.get_progressbar(total=len(meta_to_add),
+                                   label="Adding metadata", unit=" Files")
+    pbar_meta.start()
+
+    meta_results = []
+    for meta_idx, (ds, fname, meta) in enumerate(meta_to_add, 1):
+        pbar_meta.update(meta_idx)
         lgr.debug("Adding metadata to %s in %s", fname, ds.path)
         for arg in meta:
             ds.repo._run_annex_command("metadata",
                                        annex_options=["--set", arg, fname])
-        yield get_status_dict(action="addurls-metadata",
-                              ds=ds_current,
-                              type="file",
-                              path=os.path.join(ds.path, fname),
-                              message="added metadata",
-                              status="ok")
+        meta_results.append(
+            get_status_dict(action="addurls-metadata",
+                            ds=ds_current,
+                            type="file",
+                            path=os.path.join(ds.path, fname),
+                            message="added metadata",
+                            status="ok"))
+
+    for result in meta_results:
+        yield result
