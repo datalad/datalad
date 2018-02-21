@@ -179,7 +179,7 @@ def extract(stream, input_type, filename_format, url_format, meta):
 
 def dlplugin(dataset=None, url_file=None, input_type="ext",
              url_format="{0}", filename_format="{1}", meta=None,
-             message=None, dry_run=False, fast=False):
+             message=None, dry_run=False, fast=False, ifexists=None):
     """Create and update a dataset from a list of URLs.
 
     Parameters
@@ -230,6 +230,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     fast : bool, optional
         If True, add the URLs, but don't download their content.
         Underneath, this passes the --fast flag to `git annex addurl`.
+    ifexists : {None, 'overwrite', 'skip'}
+        What to do if a constructed file name already exists.  The
+        default (None) behavior to proceed with the `git annex addurl`,
+        which will failed if the file size has changed.  If set to
+        'overwrite', remove the old file before adding the new one.  If
+        set to 'skip', do not add the new file.
 
     Examples
     --------
@@ -340,17 +346,31 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     results = []
     for row_idx, row in enumerate(rows, 1):
         pbar.update(row_idx)
+        fname_abs = os.path.join(dataset.path, row.filename)
         if row.subpath:
             # Adjust the dataset and filename for an `addurl` call
             # from within the subdataset that will actually contain
             # the link.
             ds_current = Dataset(os.path.join(dataset.path, row.subpath))
-            ds_filename = os.path.relpath(
-                os.path.join(dataset.path, row.filename),
-                ds_current.path)
+            ds_filename = os.path.relpath(fname_abs, ds_current.path)
         else:
             ds_current = dataset
             ds_filename = row.filename
+
+        if os.path.exists(fname_abs) or os.path.islink(fname_abs):
+            if ifexists == "skip":
+                results.append(
+                    get_status_dict(action="addurls",
+                                    ds=ds_current,
+                                    type="file",
+                                    path=fname_abs,
+                                    status="notneeded"))
+                continue
+            elif ifexists == "overwrite":
+                lgr.debug("Removing %s", fname_abs)
+                os.unlink(fname_abs)
+            else:
+                lgr.debug("File %s already exists", fname_abs)
 
         ds_current.repo.add_url_to_file(ds_filename, row.url,
                                         batch=True, options=annex_options)
@@ -377,8 +397,10 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 url_file='{}'
 url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
-    for r in dataset.add(files_to_add, message=msg):
-        yield r
+
+    if files_to_add:
+        for r in dataset.add(files_to_add, message=msg):
+            yield r
 
     for ds, fname, meta in meta_to_add:
         lgr.debug("Adding metadata to %s in %s", fname, ds.path)
