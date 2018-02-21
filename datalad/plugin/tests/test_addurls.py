@@ -62,6 +62,19 @@ def test_formatter_placeholder_nonpermitted_chars():
                   fmt.format, "{key:<5}", {"key:<5": "value0"})
 
 
+def test_repformatter():
+    fmt = addurls.RepFormatter({})
+
+    for i in range(3):
+        assert fmt.format("{c}{_repindex}", {"c": "x"}) == "x{}".format(i)
+    # A new result gets a fresh index.
+    for i in range(2):
+        assert fmt.format("{c}{_repindex}", {"c": "y"}) == "y{}".format(i)
+    # We count even if _repindex isn't there.
+    assert fmt.format("{c}", {"c": "z0"}) == "z0"
+    assert fmt.format("{c}{_repindex}", {"c": "z"}) == "z1"
+
+
 def test_clean_meta_args():
     for args, expect in [(["field="], []),
                          ([" field=yes "], ["field=yes"]),

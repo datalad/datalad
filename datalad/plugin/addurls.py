@@ -67,6 +67,31 @@ class Formatter(string.Formatter):
                 key, args, kwargs)
 
 
+class RepFormatter(Formatter):
+    """Extend Formatter to support a {_repindex} placeholder.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(RepFormatter, self).__init__(*args, **kwargs)
+        self.repeats = {}
+        self.repindex = 0
+
+    def format(self, *args, **kwargs):
+        self.repindex = 0
+        result = super(RepFormatter, self).format(*args, **kwargs)
+        if result in self.repeats:
+            self.repindex = self.repeats[result] + 1
+            self.repeats[result] = self.repindex
+            result = super(RepFormatter, self).format(*args, **kwargs)
+        else:
+            self.repeats[result] = 0
+        return result
+
+    def get_value(self, key, args, kwargs):
+        args[0]["_repindex"] = self.repindex
+        return super(RepFormatter, self).get_value(key, args, kwargs)
+
+
 def clean_meta_args(args):
     """Prepare formatted metadata arguments to be passed to git-annex.
 
@@ -216,9 +241,12 @@ def extract(stream, input_type, filename_format, url_format,
     else:
         raise ValueError("input_type must be 'csv', 'json', or 'ext'")
 
-    fmt = Formatter(colidx_to_name)
-    format_filename = partial(fmt.format, filename_format)
+    fmt = Formatter(colidx_to_name)  # For URL and meta
     format_url = partial(fmt.format, url_format)
+
+    # For the file name, we allow the _repindex special key.
+    format_filename = partial(RepFormatter(colidx_to_name).format,
+                              filename_format)
 
     auto_meta_args = []
     if not no_autometa:
@@ -288,7 +316,10 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         to which the URL's content will be downloaded.  The file name
         may contain directories.  The separator "//" can be used to
         indicate that the left-side directory should be created as a
-        new subdataset.
+        new subdataset.  The constructed file names must be unique
+        across all fields rows.  To avoid collisions, the special
+        placeholder "_repindex" can added to the formatter.  It value
+        will start at 0 and increment every time a file name repeats.
     no_autometa : bool, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
@@ -381,6 +412,15 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         rows, subpaths = me.extract(fd, input_type,
                                     filename_format, url_format,
                                     no_autometa, meta)
+
+    all_files = [row.filename for row in rows]
+    if len(all_files) != len(set(all_files)):
+        yield get_status_dict(action="addurls",
+                              ds=dataset,
+                              status="error",
+                              message=("There are file name collisions; "
+                                       "consider using {_repindex}"))
+        return
 
     if dry_run:
         for subpath in subpaths:
