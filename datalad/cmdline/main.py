@@ -113,7 +113,7 @@ def setup_parser(
         '-f', '--output-format', dest='common_output_format',
         default='default',
         type=assure_unicode,
-        metavar="{default,json,json_pp,tailored,'<template>'",
+        metavar="{default,json,json_pp,tailored,'<template>'}",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
         'json' renders a JSON object with all properties for each result (one per
