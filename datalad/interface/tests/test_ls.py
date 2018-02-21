@@ -239,13 +239,13 @@ def test_ls_json(topdir):
         with open(get_metapath(dspath, *path)) as f:
             return js.load(f)
 
-    for all_ in [True, False]:
+    for all_ in [True, False]:  # recurse directories
         for recursive in [True, False]:
             for state in ['file', 'delete']:
                 # subdataset should have its json created and deleted when
                 # all=True else not
                 subds_metapath = get_metapath(opj(topdir, 'subds'))
-                print(exists(subds_metapath))
+                exists_prior = exists(subds_metapath)
 
                 #with swallow_logs(), swallow_outputs():
                 dsj = _ls_json(
@@ -254,8 +254,9 @@ def test_ls_json(topdir):
                     recursive=recursive
                 )
 
-                print(exists(subds_metapath))
-                #XXX assert_equal(exists(subds_metapath), (state == 'file' and recursive))
+                exists_post = exists(subds_metapath)
+                # print("%s %s -> %s" % (state, exists_prior, exists_post))
+                assert_equal(exists_post, (state == 'file' and recursive))
 
                 # root should have its json file created and deleted in all cases
                 ds_metapath = get_metapath(topdir)

@@ -43,6 +43,7 @@ from datalad.support.annexrepo import GitRepo
 import string
 import humanize
 from datalad.utils import is_interactive
+from datalad.utils import with_pathsep
 
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
@@ -319,7 +320,11 @@ class FsModel(AnnexModel):
     def size(self):
         """Size of the node computed based on its type"""
         type_ = self.type_
-        sizes = {'total': 0.0, 'ondisk': 0.0, 'git': 0.0, 'annex': 0.0, 'annex_worktree': 0.0}
+        sizes = {'total': 0.0,
+                 'ondisk': 0.0,
+                 'git': 0.0,
+                 'annex': 0.0,
+                 'annex_worktree': 0.0}
 
         if type_ in ['file', 'link', 'link-broken']:
             # if node is under annex, ask annex for node size, ondisk_size
@@ -515,7 +520,9 @@ def machinesize(humansize):
         size_str, size_unit = humansize.split(" ")
     except AttributeError:
         return float(humansize)
-    unit_converter = {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
+    unit_converter = {
+        'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5
+    }
     machinesize = float(size_str) * (1000 ** unit_converter[size_unit])
     return machinesize
 
@@ -586,18 +593,24 @@ def fs_extract(nodepath, repo, basepath='/'):
     ----------
     nodepath : str
         Full path to the location we are exploring (must be a directory within
-        `repo`
+        `repo`)
     repo : GitRepo
         Is the repository nodepath belongs to
     """
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
-    pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
+    pretty_size = {stype: humanize.naturalsize(svalue)
+                   for stype, svalue in node.size.items()}
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
-    name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
+    name = leaf_name(node._path) \
+        if leaf_name(node._path) != "" \
+        else leaf_name(node.repo.path)
     rec = {
-        "name": name, "path": relpath(node._path, basepath),
-        "type": node.type_, "size": pretty_size, "date": pretty_date,
+        "name": name,
+        "path": relpath(node._path, basepath),
+        "type": node.type_,
+        "size": pretty_size,
+        "date": pretty_date,
     }
     # if there is meta-data for the dataset (done by aggregate-metadata)
     # we include it
@@ -621,7 +634,7 @@ def fs_extract(nodepath, repo, basepath='/'):
 
 
 def fs_render(fs_metadata, json=None, **kwargs):
-    """takes node to render and based on json option passed renders to file, stdout or deletes json at root
+    """render node based on json option passed renders to file, stdout or deletes json at root
 
     Parameters
     ----------
@@ -694,14 +707,15 @@ def fs_traverse(path, repo, parent=None,
             node_subdatasets = []
             is_subdataset = False
             if isdir(nodepath):
+                node_sep = with_pathsep(node)
                 for subds in subdatasets:
                     if subds == node:
                         # it is the subdataset
                         is_subdataset = True
                     else:
-                        subds_split = split(subds)
-                        if subds_split[0] == node:
-                            node_subdatasets.append(opj(*subds_split[1:]))
+                        # use path_is_subdir
+                        if subds.startswith(node_sep):
+                            node_subdatasets += [subds[len(node_sep):]]
 
             # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
@@ -709,7 +723,7 @@ def fs_traverse(path, repo, parent=None,
                 subds = _traverse_handle_subds(
                     relpath(nodepath, repo.path),
                     Dataset(repo.path),
-                    recurse_datasets=recurse_directories,
+                    recurse_datasets=recurse_datasets,
                     recurse_directories=recurse_directories,
                     json=json
                 )
@@ -792,7 +806,8 @@ def ds_traverse(rootds, parent=None, json=None,
       extracts and returns a (recursive) list of dataset(s) info at path
     """
     # extract parent info to pass to traverser
-    fsparent = fs_extract(parent.path, parent.repo, basepath=rootds.path) if parent else None
+    fsparent = fs_extract(parent.path, parent.repo, basepath=rootds.path) \
+        if parent else None
 
     # (recursively) traverse file tree of current dataset
     fs = fs_traverse(
@@ -855,7 +870,6 @@ def ds_traverse(rootds, parent=None, json=None,
 
 def _traverse_handle_subds(subds_rpath, rootds,
                     recurse_datasets, recurse_directories, json):
-
     subds_path = opj(rootds.path, subds_rpath)
     subds = Dataset(subds_path)
     subds_json = metadata_locator(path='.', ds_path=subds_path)
