@@ -409,6 +409,13 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                               message="Must specify url_file argument")
         return
 
+    if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
+        yield get_status_dict(action="addurls",
+                              ds=dataset,
+                              status="error",
+                              message="not an annex repo")
+        return
+
     if input_type == "ext":
         extension = os.path.splitext(url_file)[1]
         input_type = "json" if extension == ".json" else "csv"
@@ -444,12 +451,6 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         # Populate a new dataset with the URLs.
         for r in dataset.create(result_xfm=None, return_type='generator'):
             yield r
-    elif not isinstance(dataset.repo, AnnexRepo):
-        yield get_status_dict(action="addurls",
-                              ds=dataset,
-                              status="error",
-                              message="not an annex repo")
-        return
 
     annex_options = ["--fast"] if fast else []
 
