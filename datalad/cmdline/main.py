@@ -286,16 +286,6 @@ def setup_parser(
         return parser
 
 
-# yoh: arn't used
-# def generate_api_call(cmdlineargs=None):
-#     parser = setup_parser()
-#     # parse cmd args
-#     cmdlineargs = parser.parse_args(cmdlineargs)
-#     # convert cmdline args into API call spec
-#     functor, args, kwargs = cmdlineargs.func(cmdlineargs)
-#     return cmdlineargs, functor, args, kwargs
-
-
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
