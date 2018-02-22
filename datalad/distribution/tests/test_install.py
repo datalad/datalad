@@ -223,7 +223,7 @@ def test_install_datasets_root(tdir):
 
         with assert_raises(IncompleteResultsError) as cme:
             install("sub", source='///')
-            assert_in("already exists and not empty", str(cme))
+        assert_in("already exists and not empty", str(cme.exception))
 
 
 @known_failure_v6  #FIXME
