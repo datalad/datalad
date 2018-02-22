@@ -104,6 +104,14 @@ class WebApp(Interface):
         known_webapps = _get_webapps()
         import cherrypy
 
+        # global config
+        cherrypy.config.update({
+            # prevent visible tracebacks, etc:
+            # http://docs.cherrypy.org/en/latest/config.html#id14
+            #'environment': 'production',
+            #'log.error_file': 'site.log',
+        })
+
         # set the priority according to your needs if you are hooking something
         # else on the 'before_finalize' hook point.
         @cherrypy.tools.register('before_finalize', priority=60)
