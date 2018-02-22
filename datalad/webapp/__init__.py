@@ -104,6 +104,22 @@ class WebApp(Interface):
         known_webapps = _get_webapps()
         import cherrypy
 
+        # set the priority according to your needs if you are hooking something
+        # else on the 'before_finalize' hook point.
+        @cherrypy.tools.register('before_finalize', priority=60)
+        def secureheaders():
+            headers = cherrypy.response.headers
+            headers['X-Frame-Options'] = 'DENY'
+            headers['X-XSS-Protection'] = '1; mode=block'
+            headers['Content-Security-Policy'] = "default-src='self'"
+            # only add Strict-Transport headers if we're actually using SSL; see the ietf spec
+            # "An HSTS Host MUST NOT include the STS header field in HTTP responses
+            # conveyed over non-secure transport"
+            # http://tools.ietf.org/html/draft-ietf-websec-strict-transport-sec-14#section-7.2
+            if (cherrypy.server.ssl_certificate != None and
+                    cherrypy.server.ssl_private_key != None):
+                headers['Strict-Transport-Security'] = 'max-age=31536000'  # one year
+
         if daemonize:
             from cherrypy.process.plugins import Daemonizer
             Daemonizer(cherrypy.engine).subscribe()
@@ -131,6 +147,15 @@ class WebApp(Interface):
                 # app config file, it is ok for that file to not exist
                 config=opj(appinfo['directory'], 'app.conf')
             )
+            # forcefully impose more secure mode
+            # TODO might need one (or more) switch(es) to turn things off for
+            # particular scenarios
+            app.merge({
+                '/': {
+                    # turns all security headers on
+                    'tools.secureheaders.on': True,
+                    'tools.sessions.secure': True,
+                    'tools.sessions.httponly': True}})
             static_dir = opj(appinfo['directory'], 'static')
             if isdir(static_dir):
                 app.merge({
