@@ -49,7 +49,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_is_subpath, path_startswith
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -124,8 +124,7 @@ def _load_xz_json_stream(fpath, cache=None):
 
 def _get_metadatarelevant_paths(ds, subds_relpaths):
     return (f for f in ds.repo.get_files()
-            if not any(f.startswith(_with_sep(ex)) or
-                       f == ex
+            if not any(path_startswith(f, ex)
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
@@ -152,7 +151,7 @@ def _get_containingds_from_agginfo(info, rpath):
         # containing subdataset (if there is any)
         containing_ds = sorted(
             [subds for subds in sorted(info)
-             if rpath.startswith(_with_sep(subds))],
+             if path_is_subpath(rpath, subds)],
             # TODO os.sep might not be OK on windows,
             # depending on where it was aggregated, ensure uniform UNIX
             # storage
@@ -234,7 +233,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 matching_subds = [(sub, sub) for sub in sorted(agginfos)
                                   # we already have the base dataset
                                   if (rpath == curdir and sub != curdir) or
-                                  sub.startswith(_with_sep(rpath))]
+                                  path_is_subpath(sub, rpath)]
                 to_query.extend(matching_subds)
 
             for qds, qpath in to_query:
@@ -302,8 +301,7 @@ def _query_aggregated_metadata_singlepath(
 
     for fpath in [f for f in contentmeta.keys()
                   if rparentpath == curdir or
-                  f == rparentpath or
-                  f.startswith(_with_sep(rparentpath))]:
+                  path_startswith(f, rparentpath)]:
         # we might be onto something here, prepare result
         metadata = MetadataDict(contentmeta.get(fpath, {}))
 
@@ -683,7 +681,7 @@ class Metadata(Interface):
             for sd in sorted(agginfos):
                 info = agginfos[sd]
                 dspath = normpath(opj(ds.path, sd))
-                if parentds and not dspath.startswith(_with_sep(parentds[-1])):
+                if parentds and not path_is_subpath(dspath, parentds[-1]):
                     parentds.pop()
                 info.update(
                     path=dspath,

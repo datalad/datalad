@@ -26,6 +26,7 @@ from six import binary_type
 from six import string_types
 from fnmatch import fnmatch
 import time
+from difflib import unified_diff
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -1139,6 +1140,13 @@ def assert_dict_equal(d1, d2):
         raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
     # do generic comparison just in case we screwed up to detect difference correctly above
     eq_(d1, d2)
+
+
+def assert_str_equal(s1, s2):
+    """Helper to compare two lines"""
+    diff = list(unified_diff(s1.splitlines(), s2.splitlines()))
+    assert not diff, '\n'.join(diff)
+    assert_equal(s1, s2)
 
 
 def assert_status(label, results):

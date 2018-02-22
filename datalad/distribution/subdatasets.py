@@ -38,6 +38,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 
@@ -283,9 +284,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath):
-        if contains and \
-                not (contains == sm['path'] or
-                     contains.startswith(_with_sep(sm['path']))):
+        if contains and not path_startswith(contains, sm['path']):
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
