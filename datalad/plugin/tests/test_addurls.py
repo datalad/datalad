@@ -33,6 +33,13 @@ def test_formatter():
     fmt.format("{notinvals}", values, notinvals="ok") == "ok"
 
 
+def test_formatter_lower_case():
+    fmt = addurls.Formatter({0: "key"})
+    assert fmt.format("{key!l}", {"key": "UP"}) == "up"
+    assert fmt.format("{0!l}", {"key": "UP"}) == "up"
+    assert fmt.format("{other!s}", {}, other=[1, 2]) == "[1, 2]"
+
+
 def test_formatter_no_idx_map():
     fmt = addurls.Formatter({})
     assert_raises(KeyError, fmt.format, "{0}", {"col0": "value0"})

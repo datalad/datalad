@@ -66,6 +66,11 @@ class Formatter(string.Formatter):
             return super(Formatter, self).get_value(
                 key, args, kwargs)
 
+    def convert_field(self, value, conversion):
+        if conversion == 'l':
+            return str(value).lower()
+        return super(Formatter, self).convert_field(value, conversion)
+
 
 class RepFormatter(Formatter):
     """Extend Formatter to support a {_repindex} placeholder.
