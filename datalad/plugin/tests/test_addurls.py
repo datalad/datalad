@@ -10,9 +10,21 @@
 """Test addurls plugin"""
 
 import json
+import logging
+import os
+import tempfile
+
 from six.moves import StringIO
 
-from datalad.tests.utils import assert_false, assert_true, assert_raises, eq_
+from datalad.api import Dataset, plugin, subdatasets
+from datalad.support.exceptions import IncompleteResultsError
+from datalad.tests.utils import chpwd, slow, swallow_logs
+from datalad.tests.utils import assert_false, assert_true, assert_raises
+from datalad.tests.utils import assert_in, assert_in_results, assert_dict_equal
+from datalad.tests.utils import eq_, ok_exists
+from datalad.tests.utils import create_tree, with_tree, with_tempfile, HTTPPath
+from datalad.utils import get_tempfile_kwargs, rmtemp
+
 from datalad.plugin import addurls
 
 
@@ -212,3 +224,179 @@ def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   addurls.extract,
                   None, "not_csv_or_json", None, None, None, None)
+
+
+def test_addurls_no_urlfile():
+    with assert_raises(IncompleteResultsError) as raised:
+        plugin("addurls")
+    assert_in("Must specify url_file argument", str(raised.exception))
+
+
+@with_tempfile(mkdir=True)
+def test_addurls_nonannex_repo(path):
+    ds = Dataset(path).create(force=True, no_annex=True)
+    with assert_raises(IncompleteResultsError) as raised:
+        ds.plugin("addurls", url_file="dummy")
+    assert_in("not an annex repo", str(raised.exception))
+
+
+@with_tempfile(mkdir=True)
+def test_addurls_dry_run(path):
+    ds = Dataset(path).create(force=True)
+
+    with chpwd(path):
+        json_file = "links.json"
+        with open(json_file, "w") as jfh:
+            json.dump([{"url": "URL/a.dat", "name": "a", "subdir": "foo"},
+                       {"url": "URL/b.dat", "name": "b", "subdir": "bar"},
+                       {"url": "URL/c.dat", "name": "c", "subdir": "foo"}],
+                      jfh)
+
+        ds.add(".", message="setup")
+
+        with swallow_logs(new_level=logging.INFO) as cml:
+            ds.plugin("addurls", url_file=json_file, url_format="{url}",
+                      filename_format="{subdir}//{name}", dry_run=True)
+
+            for dir_ in ["foo", "bar"]:
+                assert_in("Would create a subdataset at {}".format(dir_),
+                          cml.out)
+            assert_in(
+                "Would download URL/a.dat to {}".format(
+                    os.path.join(path, "foo", "a")),
+                cml.out)
+
+            assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
+                      cml.out)
+
+
+@slow  # ~9s
+class TestAddurls(object):
+
+    @classmethod
+    def setup_class(cls):
+        mktmp_kws = get_tempfile_kwargs()
+        path = tempfile.mkdtemp(**mktmp_kws)
+        create_tree(path,
+                    {x + ".dat": x + " content" for x in "abcd"})
+
+        cls._hpath = HTTPPath(path)
+        cls._hpath.start()
+        cls.url = cls._hpath.url
+
+        cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
+        with open(cls.json_file, "w") as jfh:
+            json.dump(
+                [{"url": cls.url + "a.dat", "name": "a", "subdir": "foo"},
+                 {"url": cls.url + "b.dat", "name": "b", "subdir": "bar"},
+                 {"url": cls.url + "c.dat", "name": "c", "subdir": "foo"}],
+                jfh)
+
+    @classmethod
+    def teardown_class(cls):
+        cls._hpath.stop()
+        rmtemp(cls._hpath.path)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls(self, path):
+        ds = Dataset(path).create(force=True)
+
+        with chpwd(path):
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}", filename_format="{name}")
+
+            filenames = ["a", "b", "c"]
+            for fname in filenames:
+                ok_exists(fname)
+
+            meta_results = dict(
+                zip(filenames,
+                    ds.repo._run_annex_command_json("metadata",
+                                                    files=filenames)))
+
+            for fname, subdir in zip(filenames, ["foo", "bar", "foo"]):
+                assert_dict_equal(
+                    {k: v for k, v in meta_results[fname]["fields"].items()
+                     if not k.endswith("lastchanged")},
+                    {"subdir": [subdir], "name": [fname]})
+
+            # Add to already existing links, overwriting.
+            with swallow_logs(new_level=logging.DEBUG) as cml:
+                ds.plugin("addurls", url_file=self.json_file,
+                          url_format="{url}", filename_format="{name}",
+                          ifexists="overwrite")
+                for fname in filenames:
+                    assert_in("Removing {}".format(os.path.join(path, fname)),
+                              cml.out)
+
+            # Add to already existing links, skipping.
+            assert_in_results(
+                ds.plugin("addurls", url_file=self.json_file,
+                          url_format="{url}", filename_format="{name}",
+                          ifexists="skip"),
+                action="addurls",
+                status="notneeded")
+
+            # Add to already existing links works, as long content is the same.
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}", filename_format="{name}")
+
+            # But it fails if something has changed.
+            ds.unlock("a")
+            with open("a", "w") as ofh:
+                ofh.write("changed")
+            ds.add("a")
+
+            assert_raises(IncompleteResultsError,
+                          ds.plugin,
+                          "addurls", url_file=self.json_file,
+                          url_format="{url}", filename_format="{name}")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_create_newdataset(self, path):
+        dspath = os.path.join(path, "ds")
+        plugin("addurls",
+               dataset=dspath,
+               url_file=self.json_file,
+               url_format="{url}", filename_format="{name}")
+
+        for fname in ["a", "b", "c"]:
+            ok_exists(os.path.join(dspath, fname))
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_subdataset(self, path):
+        ds = Dataset(path).create(force=True)
+
+        with chpwd(path):
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}", filename_format="{subdir}//{name}")
+
+            for fname in ["foo/a", "bar/b", "foo/c"]:
+                ok_exists(fname)
+
+            eq_(set(subdatasets(ds, recursive=True, result_xfm="relpaths")),
+                {"foo", "bar"})
+
+            # We don't try to recreate existing subdatasets.
+            with swallow_logs(new_level=logging.DEBUG) as cml:
+                ds.plugin("addurls", url_file=self.json_file,
+                          url_format="{url}",
+                          filename_format="{subdir}//{name}")
+                assert_in("Not creating subdataset at existing path", cml.out)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_repindex(self, path):
+        ds = Dataset(path).create(force=True)
+
+        with chpwd(path):
+            with assert_raises(IncompleteResultsError) as raised:
+                ds.plugin("addurls", url_file=self.json_file,
+                          url_format="{url}", filename_format="{subdir}")
+            assert_in("There are file name collisions", str(raised.exception))
+
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}",
+                      filename_format="{subdir}-{_repindex}")
+
+            for fname in ["foo-0", "bar-0", "foo-1"]:
+                ok_exists(fname)
