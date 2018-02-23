@@ -149,6 +149,7 @@ def yield_recursive(ds, path, action, recursion_limit):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
     # is elsewhere
+    from datalad.distribution.subdatasets import Subdatasets
     for subd_res in ds.subdatasets(
             recursive=True,
             recursion_limit=recursion_limit,
@@ -180,6 +181,8 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
     revision : str
       Commit-ish
     """
+    from datalad.interface.diff import Diff
+
     # TODO needs recursion limit
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
@@ -681,6 +684,7 @@ class AnnotatePaths(Interface):
                     (path_type == 'dataset' and 'registered_subds' not in path_props) or
                     path_type == 'directory' or
                     not lexists(path)):
+                from datalad.distribution.subdatasets import Subdatasets
                 # if the path doesn't exist, or is labeled a directory, or a dataset even
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent
