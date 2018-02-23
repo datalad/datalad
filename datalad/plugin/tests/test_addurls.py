@@ -12,7 +12,7 @@
 import json
 from six.moves import StringIO
 
-from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_false, assert_true, assert_raises, eq_
 from datalad.plugin import addurls
 
 
@@ -22,22 +22,22 @@ def test_formatter():
 
     fmt = addurls.Formatter(idx_to_name)
 
-    fmt.format("{0}", values) == "value0"
-    fmt.format("{0}", values) == fmt.format("{col0}", values)
+    eq_(fmt.format("{0}", values), "value0")
+    eq_(fmt.format("{0}", values), fmt.format("{col0}", values))
 
     # Integer placeholders outside of `idx_to_name` don't work.
     assert_raises(KeyError, fmt.format, "{4}", values, 1, 2, 3, 4)
 
     # If the named placeholder is not in `values`, falls back to normal
     # formatting.
-    fmt.format("{notinvals}", values, notinvals="ok") == "ok"
+    eq_(fmt.format("{notinvals}", values, notinvals="ok"), "ok")
 
 
 def test_formatter_lower_case():
     fmt = addurls.Formatter({0: "key"})
-    assert fmt.format("{key!l}", {"key": "UP"}) == "up"
-    assert fmt.format("{0!l}", {"key": "UP"}) == "up"
-    assert fmt.format("{other!s}", {}, other=[1, 2]) == "[1, 2]"
+    eq_(fmt.format("{key!l}", {"key": "UP"}), "up")
+    eq_(fmt.format("{0!l}", {"key": "UP"}), "up")
+    eq_(fmt.format("{other!s}", {}, other=[1, 2]), "[1, 2]")
 
 
 def test_formatter_no_idx_map():
@@ -73,20 +73,20 @@ def test_repformatter():
     fmt = addurls.RepFormatter({})
 
     for i in range(3):
-        assert fmt.format("{c}{_repindex}", {"c": "x"}) == "x{}".format(i)
+        eq_(fmt.format("{c}{_repindex}", {"c": "x"}), "x{}".format(i))
     # A new result gets a fresh index.
     for i in range(2):
-        assert fmt.format("{c}{_repindex}", {"c": "y"}) == "y{}".format(i)
+        eq_(fmt.format("{c}{_repindex}", {"c": "y"}), "y{}".format(i))
     # We count even if _repindex isn't there.
-    assert fmt.format("{c}", {"c": "z0"}) == "z0"
-    assert fmt.format("{c}{_repindex}", {"c": "z"}) == "z1"
+    eq_(fmt.format("{c}", {"c": "z0"}), "z0")
+    eq_(fmt.format("{c}{_repindex}", {"c": "z"}), "z1")
 
 
 def test_clean_meta_args():
     for args, expect in [(["field="], []),
                          ([" field=yes "], ["field=yes"]),
                          (["field= value="], ["field=value="])]:
-        assert list(addurls.clean_meta_args(args)) == expect
+        eq_(list(addurls.clean_meta_args(args)), expect)
 
     assert_raises(ValueError,
                   list,
@@ -103,33 +103,32 @@ def test_get_subpaths():
                                             ["p1", "p1/p2/p3"])),
                           ("//n", ("/n", [""])),
                           ("n//", ("n/", ["n"]))]:
-        assert addurls.get_subpaths(fname) == expect
+        eq_(addurls.get_subpaths(fname), expect)
 
 
 def test_is_legal_metafield():
     for legal in ["legal", "0", "legal_"]:
-        assert addurls.is_legal_metafield(legal)
+        assert_true(addurls.is_legal_metafield(legal))
     for notlegal in ["_not", "with space"]:
-        assert not addurls.is_legal_metafield(notlegal)
+        assert_false(addurls.is_legal_metafield(notlegal))
 
 
 def test_filter_legal_metafield():
-    result = addurls.filter_legal_metafield(["legal", "_not", "legal_still"])
-    expect = ["legal", "legal_still"]
-    assert result == expect
+    eq_(addurls.filter_legal_metafield(["legal", "_not", "legal_still"]),
+        ["legal", "legal_still"])
 
 
 def test_fmt_to_name():
-    assert addurls.fmt_to_name("{name}", {}) == "name"
-    assert addurls.fmt_to_name("{0}", {0: "name"}) == "name"
-    assert addurls.fmt_to_name("{1}", {0: "name"}) == "1"
+    eq_(addurls.fmt_to_name("{name}", {}), "name")
+    eq_(addurls.fmt_to_name("{0}", {0: "name"}), "name")
+    eq_(addurls.fmt_to_name("{1}", {0: "name"}), "1")
 
-    assert not addurls.fmt_to_name("frontmatter{name}", {})
-    assert not addurls.fmt_to_name("{name}backmatter", {})
-    assert not addurls.fmt_to_name("{two}{names}", {})
-    assert not addurls.fmt_to_name("", {})
-    assert not addurls.fmt_to_name("nonames", {})
-    assert not addurls.fmt_to_name("{}", {})
+    assert_false(addurls.fmt_to_name("frontmatter{name}", {}))
+    assert_false(addurls.fmt_to_name("{name}backmatter", {}))
+    assert_false(addurls.fmt_to_name("{two}{names}", {}))
+    assert_false(addurls.fmt_to_name("", {}))
+    assert_false(addurls.fmt_to_name("nonames", {}))
+    assert_false(addurls.fmt_to_name("{}", {}))
 
 
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
@@ -157,23 +156,25 @@ def test_extract():
         "{name}_{debut_season}.com",
         False, [])
 
-    assert subpaths == {"kid", "kid/no", "adult", "adult/yes", "adult/no"}
+    eq_(subpaths,
+        {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
 
     fnames, urls, meta, subdss = zip(*info)
 
-    assert urls == ("will_1.com", "bob_2.com", "scott_1.com", "max_2.com")
+    eq_(urls,
+        ("will_1.com", "bob_2.com", "scott_1.com", "max_2.com"))
 
-    assert fnames == ("kid/no/will.csv", "adult/yes/bob.csv",
-                      "adult/no/scott.csv", "kid/no/max.csv")
+    eq_(fnames,
+        ("kid/no/will.csv", "adult/yes/bob.csv",
+         "adult/no/scott.csv", "kid/no/max.csv"))
 
-    assert list(map(set, meta)) == [
-        {"name=will", "age_group=kid", "debut_season=1", "now_dead=no"},
-        {"name=bob", "age_group=adult", "debut_season=2", "now_dead=yes"},
-        {"name=scott", "age_group=adult", "debut_season=1", "now_dead=no"},
-        {"name=max", "age_group=kid", "debut_season=2", "now_dead=no"},
-    ]
+    eq_(list(map(set, meta)),
+        [{"name=will", "age_group=kid", "debut_season=1", "now_dead=no"},
+         {"name=bob", "age_group=adult", "debut_season=2", "now_dead=yes"},
+         {"name=scott", "age_group=adult", "debut_season=1", "now_dead=no"},
+         {"name=max", "age_group=kid", "debut_season=2", "now_dead=no"}])
 
-    assert subdss == ("kid/no", "adult/yes", "adult/no", "kid/no")
+    eq_(subdss, ("kid/no", "adult/yes", "adult/no", "kid/no"))
 
 
 def test_extract_no_autometa():
@@ -186,8 +187,8 @@ def test_extract_no_autometa():
 
     meta = list(zip(*info))[2]
 
-    assert meta == (["group=kid"], ["group=adult"],
-                    ["group=adult"], ["group=kid"])
+    eq_(meta,
+        (["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]))
 
 
 def test_extract_csv_json_equal():
@@ -204,7 +205,7 @@ def test_extract_csv_json_equal():
     json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
     csv_output = addurls.extract(csv_rows, "csv", *args)
 
-    assert json_output == csv_output
+    eq_(json_output, csv_output)
 
 
 def test_extract_wrong_input_type():
