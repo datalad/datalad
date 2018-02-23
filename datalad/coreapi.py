@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Python DataLad API exposing user-oriented commands (also available via CLI)"""
+"""Python DataLad core API exposing essential command used by other DataLad commands"""
 
 # Should have no spurious imports/definitions at the module level
 from .distribution.dataset import Dataset
