@@ -9,6 +9,39 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.10.0 (??? ??, 2018) -- The Release
+
+This release is a major leap forward in metadata support.
+
+### Major refactoring and deprecations
+
+- Metadata
+  - Prior metadata provided by datasets under `.datalad/meta` is no
+    longer used or supported. Metadata must be reaggregated using 0.10
+    version
+  - Metadata extractor types are no longer auto-guessed and must be
+    explicitly specified in `datalad.metadata.nativetype` config
+    (could contain multiple values)
+- `export_tarball` plugin has been generalized to `export_archive` and
+  can now also generate ZIP archives.
+
+### Fixes
+
+A number of fixes did not make it into 0.9.x series:
+
+- ?
+
+### Enhancements and new features
+
+- Metadata
+  - ?
+- New plugins:
+  - export_to_figshare
+  - bids2scidata
+  - extract_metadata
+- add_readme makes use of available metadata
+
+
 ## 0.9.2 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
@@ -23,8 +56,7 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-- `export_tarball` plugin has been generalized to `export_archive` and can now also
-  generate ZIP archives.
+?
 
 
 # 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
