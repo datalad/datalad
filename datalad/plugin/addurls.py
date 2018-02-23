@@ -392,6 +392,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     from datalad.interface.results import get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.exceptions import AnnexBatchCommandError
     from datalad.utils import assure_list
     from datalad.ui import ui
 
@@ -499,8 +500,20 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             else:
                 lgr.debug("File %s already exists", fname_abs)
 
-        ds_current.repo.add_url_to_file(ds_filename, row.url,
-                                        batch=True, options=annex_options)
+        try:
+            ds_current.repo.add_url_to_file(ds_filename, row.url,
+                                            batch=True, options=annex_options)
+        except AnnexBatchCommandError:
+            addurl_results.append(
+                get_status_dict(action="addurls",
+                                ds=ds_current,
+                                type="file",
+                                path=os.path.join(ds_current.path,
+                                                  ds_filename),
+                                message="failed to add URL",
+                                status="error"))
+
+            continue
         # Collect the status dicts to yield later so that we don't
         # interrupt the progress bar.
         addurl_results.append(
