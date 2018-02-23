@@ -38,6 +38,9 @@ from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
 
+# required to get the binding of `add` as a dataset method
+from datalad.distribution.add import Add
+
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
