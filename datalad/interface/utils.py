@@ -63,6 +63,8 @@ def cls2cmdlinename(cls):
     return r.sub('\\1-\\2', cls.__name__).lower()
 
 
+# TODO remove
+# only `drop` and `uninstall` are still using this
 def handle_dirty_dataset(ds, mode, msg=None):
     """Detect and treat unsaved changes as instructed by `mode`
 
@@ -133,6 +135,8 @@ def get_tree_roots(paths):
     return roots
 
 
+# TODO remove
+# only `remove` and `uninstall` use this, the uses path `path_is_subpath`
 def path_is_under(values, path=None):
     """Whether a given path is a subdirectory of any of the given test values
 

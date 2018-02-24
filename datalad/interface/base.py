@@ -26,8 +26,6 @@ from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
