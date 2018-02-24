@@ -8,30 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
-# Should have no spurious imports/definitions at the module level
-from .distribution.dataset import Dataset
+from datalad.coreapi import *
 
-
-def _generate_func_api():
-    """Auto detect all available interfaces and generate a function-based
-       API from them
-    """
-    from importlib import import_module
-
-    from .interface.base import get_interface_groups
-    from .interface.base import get_api_name
-
-    for grp_name, grp_descr, interfaces in get_interface_groups():
-        for intfspec in interfaces:
-            # turn the interface spec into an instance
-            mod = import_module(intfspec[0], package='datalad')
-            intf = getattr(mod, intfspec[1])
-            api_name = get_api_name(intfspec)
-            globals()[api_name] = intf.__call__
-
-
-# Invoke above helper
-_generate_func_api()
-
-# Be nice and clean up the namespace properly
-del _generate_func_api
+# TODO load plugin commands

@@ -168,19 +168,6 @@ queue
         os.unlink(f.name)
 
 
-class RegexpType(object):
-    """Factory for creating regular expression types for argparse
-
-    DEPRECATED AFAIK -- now things are in the config file,
-    but we might provide a mode where we operate solely from cmdline
-    """
-    def __call__(self, string):
-        if string:
-            return re.compile(string)
-        else:
-            return None
-
-
 # TODO: useful also outside of cmdline, move to support/
 from os import curdir
 

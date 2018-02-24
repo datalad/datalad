@@ -66,6 +66,7 @@ THE SOFTWARE.
 # I wondered if it could somehow decide on what commands to worry about etc
 # by going through sys.args first
 def setup_parser(
+        cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
 
@@ -195,6 +196,7 @@ def setup_parser(
 
     # auto detect all available interfaces and generate a function-based
     # API from them
+    cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
     for grp_name, grp_descr, _interfaces \
@@ -203,6 +205,17 @@ def setup_parser(
         cmd_short_descriptions = []
 
         for _intfspec in _interfaces:
+            cmd_name = get_cmdline_command_name(_intfspec)
+            # for each interface to be imported decide if it is necessary
+            # test conditions from frequent to infrequent occasions
+            # we want to import everything for help requests of any kind
+            # including a cluecless `datalad` without args
+            if not (len(cmdlineargs) == 1 or
+                    cmd_name in cmdlineargs or
+                    '--help' in cmdlineargs or
+                    '-h' in cmdlineargs or
+                    '--help-np' in cmdlineargs):
+                continue
             # turn the interface spec into an instance
             lgr.log(5, "Importing module %s " % _intfspec[0])
             try:
@@ -212,7 +225,6 @@ def setup_parser(
                           _intfspec[0], exc_str(e))
                 continue
             _intf = getattr(_mod, _intfspec[1])
-            cmd_name = get_cmdline_command_name(_intfspec)
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
@@ -286,20 +298,10 @@ def setup_parser(
         return parser
 
 
-# yoh: arn't used
-# def generate_api_call(cmdlineargs=None):
-#     parser = setup_parser()
-#     # parse cmd args
-#     cmdlineargs = parser.parse_args(cmdlineargs)
-#     # convert cmdline args into API call spec
-#     functor, args, kwargs = cmdlineargs.func(cmdlineargs)
-#     return cmdlineargs, functor, args, kwargs
-
-
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
-    parser = setup_parser()
+    parser = setup_parser(args or sys.argv)
     try:
         import argcomplete
         argcomplete.autocomplete(parser)

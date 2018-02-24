@@ -38,6 +38,8 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
+from datalad.distribution.get import Get
+from datalad.distribution.subdatasets import Subdatasets
 from datalad.metadata.metadata import agginfo_relpath
 from datalad.metadata.metadata import exclude_from_metadata
 from datalad.metadata.metadata import get_metadata_type
