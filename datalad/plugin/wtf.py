@@ -153,4 +153,4 @@ Metadata
         yield
 
 
-DLPlugin = WTF
+dlplugin = WTF

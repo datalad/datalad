@@ -49,26 +49,22 @@ def _get_plugins():
 
 
 def _load_plugin(filepath, fail=True):
-    locals = {}
-    globals = {}
+    from datalad.utils import import_module_from_file
     try:
-        exec(compile(open(filepath, "rb").read(),
-                     filepath, 'exec'),
-             globals,
-             locals)
+        mod = import_module_from_file(filepath)
     except Exception as e:
         # any exception means full stop
         raise ValueError('plugin at {} is broken: {}'.format(
             filepath, exc_str(e)))
     # TODO check all symbols whether they are derived from Interface
-    if not len(locals) or 'DLPlugin' not in locals:
+    if not hasattr(mod, 'dlplugin'):
         msg = "loading plugin '%s' did not yield a 'DLPlugin' symbol, found: %s", \
-              filepath, locals.keys() if len(locals) else None
+              filepath, dir(mod)
         if fail:
             raise ValueError(*msg)
         else:
             lgr.debug(*msg)
-    return locals.get('DLPlugin', None)
+    return getattr(mod, 'dlplugin')
 
 
 @build_doc

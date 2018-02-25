@@ -1489,5 +1489,45 @@ def import_modules(mods, pkg, msg="Failed to import {module}", log=lgr.debug):
                 module=mod, package=pkg, exception=exc_str(exc)))
 
 
+def import_module_from_file(modpath, log=lgr.debug):
+    """Import provided module given a path
+
+    TODO:
+    - RF/make use of it in pipeline.py which has similar logic
+    - join with import_modules above?
+    """
+    assert(modpath.endswith('.py'))  # for now just for .py files
+    dirname_ = dirname(modpath)
+
+    try:
+        log("Importing %s" % modpath)
+        sys.path.insert(0, dirname_)
+        modname = basename(modpath)[:-3]
+        if not "TODO":  # dirname_ == opj(dirname(__file__), 'pipelines'):
+            # to allow for relative imports within datalad codebase so
+            # it could be more efficient (e.g. if already loaded) and just "kosher"
+            # In principle, with basic filesystem traversal (go up until no __init__.py)
+            # could potentially be generalized to any.  BUT also should first verify
+            # that the top level package is importable, and if not -- import just as
+            # any other file with the logic below:
+
+            # figure out where under datalad module it is if possible and use that
+            datalad_subpath = "datalad.plugin"  # e.g.
+            mod = __import__(datalad_subpath + '.%s' % modname,
+                             fromlist=[datalad_subpath])
+        else:
+            mod = __import__(modname, level=0)
+        return mod
+    except Exception as e:
+        from datalad.dochelpers import exc_str
+        raise RuntimeError(
+            "Failed to import pipeline from %s: %s" % (modpath, exc_str(e)))
+    finally:
+        if dirname_ in sys.path:
+            sys.path.pop(sys.path.index(dirname_))
+        else:
+            log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
+
+
 lgr.log(5, "Done importing datalad.utils")
 
