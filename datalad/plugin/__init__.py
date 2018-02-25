@@ -43,12 +43,12 @@ def _get_plugins():
         dirname(__file__),
         cfg.obtain('datalad.locations.system-plugins'),
         cfg.obtain('datalad.locations.user-plugins'))
-    return {basename(e)[:-3]: {'file': e}
-            for plugindir in locations
-            for e in glob(opj(plugindir, '[!_]*.py'))}
+    for plugindir in locations:
+        for e in glob(opj(plugindir, '[!_]*.py')):
+            yield basename(e)[:-3], {'file': e}
 
 
-def _load_plugin(filepath):
+def _load_plugin(filepath, fail=True):
     locals = {}
     globals = {}
     try:
@@ -60,11 +60,15 @@ def _load_plugin(filepath):
         # any exception means full stop
         raise ValueError('plugin at {} is broken: {}'.format(
             filepath, exc_str(e)))
-    if not len(locals) or 'dlplugin' not in locals:
-        raise ValueError(
-            "loading plugin '%s' did not yield a 'dlplugin' symbol, found: %s",
-            filepath, locals.keys() if len(locals) else None)
-    return locals['dlplugin']
+    # TODO check all symbols whether they are derived from Interface
+    if not len(locals) or 'DLPlugin' not in locals:
+        msg = "loading plugin '%s' did not yield a 'DLPlugin' symbol, found: %s", \
+              filepath, locals.keys() if len(locals) else None
+        if fail:
+            raise ValueError(*msg)
+        else:
+            lgr.debug(*msg)
+    return locals.get('DLPlugin', None)
 
 
 @build_doc
