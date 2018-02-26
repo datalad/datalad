@@ -11,6 +11,8 @@
 """
 
 import logging
+import re
+
 from os.path import exists
 from os.path import isdir
 from os.path import join as opj
@@ -18,6 +20,8 @@ from os.path import islink
 from os.path import isabs
 from os.path import normpath
 import posixpath
+
+from six.moves.urllib.parse import unquote as urlunquote
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import DataLadRI
@@ -227,7 +231,12 @@ def _get_installationpath_from_url(url):
     This can be used to determine an installation path of a Dataset
     from a URL, analog to what `git clone` does.
     """
-    path = url.rstrip('/')
+    ri = RI(url)
+    if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
+        path = urlunquote(ri.path) or ri.hostname
+    else:
+        path = url
+    path = path.rstrip('/')
     if '/' in path:
         path = path.split('/')
         if path[-1] == '.git':
