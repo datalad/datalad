@@ -143,6 +143,23 @@ def test_fmt_to_name():
     assert_false(addurls.fmt_to_name("{}", {}))
 
 
+def test_get_url_names():
+    eq_(addurls.get_url_names(""), {})
+    eq_(addurls.get_url_names("http://datalad.org"), {})
+
+    assert_dict_equal(addurls.get_url_names("http://datalad.org/about.html"),
+                      {"_url0": "about.html",
+                       "_url_basename": "about.html"})
+    assert_dict_equal(addurls.get_url_names("http://datalad.org/about.html"),
+                      addurls.get_url_names("http://datalad.org//about.html"))
+
+    assert_dict_equal(
+        addurls.get_url_names("http://datalad.org/for/git-users"),
+        {"_url0": "for",
+         "_url1": "git-users",
+         "_url_basename": "git-users"})
+
+
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
            "rows": [{"name": "will", "debut_season": 1,
                      "age_group": "kid", "now_dead": "no"},
@@ -275,7 +292,7 @@ class TestAddurls(object):
         mktmp_kws = get_tempfile_kwargs()
         path = tempfile.mkdtemp(**mktmp_kws)
         create_tree(path,
-                    {x + ".dat": x + " content" for x in "abcd"})
+                    {"udir": {x + ".dat": x + " content" for x in "abcd"}})
 
         cls._hpath = HTTPPath(path)
         cls._hpath.start()
@@ -284,9 +301,9 @@ class TestAddurls(object):
         cls.json_file = tempfile.mktemp(suffix=".json", **mktmp_kws)
         with open(cls.json_file, "w") as jfh:
             json.dump(
-                [{"url": cls.url + "a.dat", "name": "a", "subdir": "foo"},
-                 {"url": cls.url + "b.dat", "name": "b", "subdir": "bar"},
-                 {"url": cls.url + "c.dat", "name": "c", "subdir": "foo"}],
+                [{"url": cls.url + "udir/a.dat", "name": "a", "subdir": "foo"},
+                 {"url": cls.url + "udir/b.dat", "name": "b", "subdir": "bar"},
+                 {"url": cls.url + "udir/c.dat", "name": "c", "subdir": "foo"}],
                 jfh)
 
     @classmethod
@@ -396,4 +413,15 @@ class TestAddurls(object):
                       filename_format="{subdir}-{_repindex}")
 
             for fname in ["foo-0", "bar-0", "foo-1"]:
+                ok_exists(fname)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_parts(self, path):
+        ds = Dataset(path).create(force=True)
+        with chpwd(path):
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}",
+                      filename_format="{_url0}/{_url_basename}")
+
+            for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)

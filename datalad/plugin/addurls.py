@@ -16,6 +16,8 @@ import os
 import re
 import string
 
+from six.moves.urllib.parse import urlparse
+
 lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
@@ -176,6 +178,14 @@ def filter_legal_metafield(fields):
     return legal
 
 
+def get_fmt_names(format_string):
+    """Yield field names in `format_string`.
+    """
+    for _, name, _, _ in string.Formatter().parse(format_string):
+        if name:
+            yield name
+
+
 def fmt_to_name(format_string, num_to_name):
     """Try to map a format string to a single name.
 
@@ -241,6 +251,31 @@ def _format_filenames(format_fn, rows, row_infos):
     return subpaths
 
 
+def get_url_names(url):
+    """Assign a name to each part of a URL's path.
+
+    Parameters
+    ----------
+    url : str
+
+    Returns
+    -------
+    A dict with keys '_url0' through '_urlN' for a path with N+1
+    components.  There is also a `_url_basename` for the rightmost
+    entry.
+    """
+    path = urlparse(url).path.strip("/")
+    if not path:
+        return {}
+
+    url_parts = path.split("/")
+    names = {}
+    for pidx, part in enumerate(url_parts):
+        names["_url{}".format(pidx)] = part
+    names["_url_basename"] = url_parts[-1]
+    return names
+
+
 def extract(stream, input_type, filename_format, url_format,
             no_autometa, meta):
     """Extract and format information from `url_file`.
@@ -285,6 +320,12 @@ def extract(stream, input_type, filename_format, url_format,
         infos.append({"url": format_url(row),
                       "meta_args": meta_args})
 
+    # Format the filename in a second pass so that we can provide
+    # information about the formatted URLs.
+    if any(i.startswith("_url") for i in get_fmt_names(filename_format)):
+        for row, info in zip(rows, infos):
+            row.update(get_url_names(info["url"]))
+
     # For the file name, we allow the _repindex special key.
     format_filename = partial(RepFormatter(colidx_to_name).format,
                               filename_format)
@@ -325,14 +366,29 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         the first column).  Note that a placeholder cannot contain a
         ':' or '!'.
     filename_format : str, optional
-        Like `url_format`, but this format string specifies the file
-        to which the URL's content will be downloaded.  The file name
-        may contain directories.  The separator "//" can be used to
-        indicate that the left-side directory should be created as a
-        new subdataset.  The constructed file names must be unique
-        across all fields rows.  To avoid collisions, the special
-        placeholder "_repindex" can added to the formatter.  It value
-        will start at 0 and increment every time a file name repeats.
+        Like `url_format`, but this format string specifies the file to
+        which the URL's content will be downloaded.  The file name may
+        contain directories.  The separator "//" can be used to indicate
+        that the left-side directory should be created as a new
+        subdataset.
+
+        In addition to the placeholders described in `url_format`, there
+        are a few special placeholder.
+
+          - "_repindex"
+
+            The constructed file names must be unique across all fields
+            rows.  To avoid collisions, the special placeholder
+            "_repindex" can added to the formatter.  It value will start
+            at 0 and increment every time a file name repeats.
+
+          - "_urlN"
+
+            Each part of the formatted URL is available.  For example,
+            in "http://datalad.org/for/git-users", "_url0" and "_url1"
+            would map to "for" and "git-users", respectively.
+
+            The final part is also available as "_url_basename".
     no_autometa : bool, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
