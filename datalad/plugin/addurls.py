@@ -210,6 +210,26 @@ def fmt_to_name(format_string, num_to_name):
         return name
 
 
+def _read(stream, input_type):
+    if input_type == "csv":
+        import csv
+        csvrows = csv.reader(stream)
+        headers = next(csvrows)
+        lgr.debug("Taking %s fields from first line as headers: %s",
+                  len(headers), headers)
+        idx_map = dict(enumerate(headers))
+        rows = [dict(zip(headers, r)) for r in csvrows]
+    elif input_type == "json":
+        import json
+        rows = json.load(stream)
+        # For json input, we do not support indexing by position,
+        # only names.
+        idx_map = {}
+    else:
+        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+    return rows, idx_map
+
+
 def extract(stream, input_type, filename_format, url_format,
             no_autometa, meta):
     """Extract and format information from `url_file`.
@@ -227,22 +247,7 @@ def extract(stream, input_type, filename_format, url_format,
     for each row in `stream` and the second item is a set that contains all the
     subdataset paths.
     """
-    if input_type == "csv":
-        import csv
-        csvrows = csv.reader(stream)
-        headers = next(csvrows)
-        lgr.debug("Taking %s fields from first line as headers: %s",
-                  len(headers), headers)
-        colidx_to_name = dict(enumerate(headers))
-        rows = [dict(zip(headers, r)) for r in csvrows]
-    elif input_type == "json":
-        import json
-        rows = json.load(stream)
-        # For json input, we do not support indexing by position,
-        # only names.
-        colidx_to_name = {}
-    else:
-        raise ValueError("input_type must be 'csv', 'json', or 'ext'")
+    rows, colidx_to_name = _read(stream, input_type)
 
     fmt = Formatter(colidx_to_name)  # For URL and meta
     format_url = partial(fmt.format, url_format)
