@@ -634,9 +634,14 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
     for meta_idx, (ds, fname, meta) in enumerate(meta_to_add, 1):
         pbar_meta.update(meta_idx)
         lgr.debug("Adding metadata to %s in %s", fname, ds.path)
+
+        meta_args = []
         for arg in meta:
-            ds.repo._run_annex_command("metadata",
-                                       annex_options=["--set", arg, fname])
+            meta_args.extend(["--set", arg])
+        meta_args.append(fname)
+
+        ds.repo._run_annex_command("metadata", annex_options=meta_args)
+
         meta_results.append(
             get_status_dict(action="addurls-metadata",
                             ds=ds_current,
