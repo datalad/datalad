@@ -53,22 +53,6 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
-def annotated2ds_props(annotated):
-    """Return a dict with properties of all datasets in `annotated`.
-
-    Returns
-    -------
-    dict
-    """
-    props = {}
-    for a in annotated:
-        if a.get('type', None) == 'dataset':
-            dp = props.get(a['path'], {})
-            dp.update(a)
-            props[a['path']]
-    return props
-
-
 def annotated2content_by_ds(annotated, refds_path, path_only=False):
     """Helper to convert annotated paths into an old-style content_by_ds dict
 
