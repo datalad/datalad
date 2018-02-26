@@ -9,7 +9,7 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import Mapping, namedtuple
+from collections import Mapping
 from functools import partial
 import logging
 import os
@@ -19,8 +19,6 @@ import string
 lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
-
-RowInfo = namedtuple("RowInfo", ["filename", "url", "meta_args", "subpath"])
 
 
 class Formatter(string.Formatter):
@@ -225,9 +223,9 @@ def extract(stream, input_type, filename_format, url_format,
 
     Returns
     -------
-    A tuple where the first item is a list with RowInfo instance for
-    each row in `stream` and the second item is a set that contains all
-    the subdataset paths.
+    A tuple where the first item is a list with a dict of extracted information
+    for each row in `stream` and the second item is a set that contains all the
+    subdataset paths.
     """
     if input_type == "csv":
         import csv
@@ -279,8 +277,10 @@ def extract(stream, input_type, filename_format, url_format,
 
         filename, spaths = get_subpaths(filename)
         subpaths |= set(spaths)
-        infos.append(RowInfo(filename, url, meta_args,
-                             spaths[-1] if spaths else None))
+        infos.append({"filename": filename,
+                      "url": url,
+                      "meta_args": meta_args,
+                      "subpath": spaths[-1] if spaths else None})
     return infos, subpaths
 
 
@@ -426,7 +426,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                     filename_format, url_format,
                                     no_autometa, meta)
 
-    all_files = [row.filename for row in rows]
+    all_files = [row["filename"] for row in rows]
     if len(all_files) != len(set(all_files)):
         yield get_status_dict(action="addurls",
                               ds=dataset,
@@ -440,8 +440,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             lgr.info("Would create a subdataset at %s", subpath)
         for row in rows:
             lgr.info("Would download %s to %s",
-                     row.url, os.path.join(dataset.path, row.filename))
-            lgr.info("Metadata: %s", row.meta_args)
+                     row["url"], os.path.join(dataset.path, row["filename"]))
+            lgr.info("Metadata: %s", row["meta_args"])
         yield get_status_dict(action="addurls",
                               ds=dataset,
                               status="ok",
@@ -474,16 +474,16 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     addurl_results = []
     for row_idx, row in enumerate(rows, 1):
         pbar_addurl.update(row_idx)
-        fname_abs = os.path.join(dataset.path, row.filename)
-        if row.subpath:
+        fname_abs = os.path.join(dataset.path, row["filename"])
+        if row["subpath"]:
             # Adjust the dataset and filename for an `addurl` call
             # from within the subdataset that will actually contain
             # the link.
-            ds_current = Dataset(os.path.join(dataset.path, row.subpath))
+            ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
             ds_filename = os.path.relpath(fname_abs, ds_current.path)
         else:
             ds_current = dataset
-            ds_filename = row.filename
+            ds_filename = row["filename"]
 
         if os.path.exists(fname_abs) or os.path.islink(fname_abs):
             if ifexists == "skip":
@@ -501,7 +501,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                 lgr.debug("File %s already exists", fname_abs)
 
         try:
-            ds_current.repo.add_url_to_file(ds_filename, row.url,
+            ds_current.repo.add_url_to_file(ds_filename, row["url"],
                                             batch=True, options=annex_options)
         except AnnexBatchCommandError:
             addurl_results.append(
@@ -524,8 +524,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                               ds_filename),
                             status="ok"))
 
-        files_to_add.append(row.filename)
-        meta_to_add.append((ds_current, ds_filename, row.meta_args))
+        files_to_add.append(row["filename"])
+        meta_to_add.append((ds_current, ds_filename, row["meta_args"]))
     pbar_addurl.finish()
 
     for result in addurl_results:

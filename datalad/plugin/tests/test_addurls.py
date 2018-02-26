@@ -171,22 +171,21 @@ def test_extract():
     eq_(subpaths,
         {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
 
-    fnames, urls, meta, subdss = zip(*info)
+    eq_([d["url"] for d in info],
+        ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
 
-    eq_(urls,
-        ("will_1.com", "bob_2.com", "scott_1.com", "max_2.com"))
+    eq_([d["filename"] for d in info],
+        ["kid/no/will.csv", "adult/yes/bob.csv",
+         "adult/no/scott.csv", "kid/no/max.csv"])
 
-    eq_(fnames,
-        ("kid/no/will.csv", "adult/yes/bob.csv",
-         "adult/no/scott.csv", "kid/no/max.csv"))
-
-    eq_(list(map(set, meta)),
+    eq_([set(d["meta_args"]) for d in info],
         [{"name=will", "age_group=kid", "debut_season=1", "now_dead=no"},
          {"name=bob", "age_group=adult", "debut_season=2", "now_dead=yes"},
          {"name=scott", "age_group=adult", "debut_season=1", "now_dead=no"},
          {"name=max", "age_group=kid", "debut_season=2", "now_dead=no"}])
 
-    eq_(subdss, ("kid/no", "adult/yes", "adult/no", "kid/no"))
+    eq_([d["subpath"] for d in info],
+        ["kid/no", "adult/yes", "adult/no", "kid/no"])
 
 
 def test_extract_no_autometa():
@@ -197,10 +196,8 @@ def test_extract_no_autometa():
         True,
         ["group={age_group}"])
 
-    meta = list(zip(*info))[2]
-
-    eq_(meta,
-        (["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]))
+    eq_([d["meta_args"] for d in info],
+        [["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]])
 
 
 def test_extract_csv_json_equal():
