@@ -230,6 +230,17 @@ def _read(stream, input_type):
     return rows, idx_map
 
 
+def _format_filenames(format_fn, rows, row_infos):
+    subpaths = set()
+    for row, info in zip(rows, row_infos):
+        filename = format_fn(row)
+        filename, spaths = get_subpaths(filename)
+        subpaths |= set(spaths)
+        info["filename"] = filename
+        info["subpath"] = spaths[-1] if spaths else None
+    return subpaths
+
+
 def extract(stream, input_type, filename_format, url_format,
             no_autometa, meta):
     """Extract and format information from `url_file`.
@@ -252,10 +263,6 @@ def extract(stream, input_type, filename_format, url_format,
     fmt = Formatter(colidx_to_name)  # For URL and meta
     format_url = partial(fmt.format, url_format)
 
-    # For the file name, we allow the _repindex special key.
-    format_filename = partial(RepFormatter(colidx_to_name).format,
-                              filename_format)
-
     auto_meta_args = []
     if not no_autometa:
         urlcol = fmt_to_name(url_format, colidx_to_name)
@@ -273,19 +280,15 @@ def extract(stream, input_type, filename_format, url_format,
     formats_meta = [partial(fmt.format, m) for m in meta + auto_meta_args]
 
     infos = []
-    subpaths = set()
     for row in rows:
-        url = format_url(row)
-        filename = format_filename(row)
-
         meta_args = list(clean_meta_args(fmt(row) for fmt in formats_meta))
+        infos.append({"url": format_url(row),
+                      "meta_args": meta_args})
 
-        filename, spaths = get_subpaths(filename)
-        subpaths |= set(spaths)
-        infos.append({"filename": filename,
-                      "url": url,
-                      "meta_args": meta_args,
-                      "subpath": spaths[-1] if spaths else None})
+    # For the file name, we allow the _repindex special key.
+    format_filename = partial(RepFormatter(colidx_to_name).format,
+                              filename_format)
+    subpaths = _format_filenames(format_filename, rows, infos)
     return infos, subpaths
 
 
