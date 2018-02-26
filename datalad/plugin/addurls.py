@@ -289,7 +289,7 @@ def get_url_names(url):
 
 
 def extract(stream, input_type, filename_format, url_format,
-            no_autometa, meta, missing_value):
+            exclude_autometa, meta, missing_value):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -311,15 +311,15 @@ def extract(stream, input_type, filename_format, url_format,
     format_url = partial(fmt.format, url_format)
 
     auto_meta_args = []
-    if not no_autometa:
+    if exclude_autometa not in ["*", ""]:
         urlcol = fmt_to_name(url_format, colidx_to_name)
         # TODO: Try to normalize invalid fields, checking for any
         # collisions.
-        #
-        # TODO: Add a command line argument for excluding a particular
-        # column(s), maybe based on a regexp.
-        metacols = filter_legal_metafield(c for c in sorted(rows[0].keys())
-                                          if c != urlcol)
+        metacols = (c for c in sorted(rows[0].keys()) if c != urlcol)
+        if exclude_autometa:
+            metacols = (c for c in metacols
+                        if not re.search(exclude_autometa, c))
+        metacols = filter_legal_metafield(metacols)
         auto_meta_args = [c + "=" + "{" + c + "}" for c in metacols]
 
     # Unlike `filename_format` and `url_format`, `meta` is a list
@@ -348,7 +348,7 @@ def extract(stream, input_type, filename_format, url_format,
 
 def dlplugin(dataset=None, url_file=None, input_type="ext",
              url_format="{0}", filename_format="{1}",
-             no_autometa=False, meta=None,
+             exclude_autometa=None, meta=None,
              message=None, dry_run=False, fast=False,
              ifexists=None, missing_value=None):
     """Create and update a dataset from a list of URLs.
@@ -403,12 +403,14 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             would map to "for" and "git-users", respectively.
 
             The final part is also available as "_url_basename".
-    no_autometa : bool, optional
+    exclude_autometa : str, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
-        specified via `url_format`.  Set this flag to True to disable
-        this behavior.  Metadata can still be set explicitly with the
-        `meta` argument.
+        specified via `url_format`.  This argument can be used to
+        exclude columns that match a regular expression.  If set to '*'
+        or an empty string, automatic metadata extraction is disabled
+        completely.  This argument does not affect metadata set
+        explicitly with the `meta` argument.
     meta : str, optional
         A format string that specifies metadata.  It should be
         structured as "<field>=<value>".  The same placeholders from
@@ -504,7 +506,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     with open(url_file) as fd:
         rows, subpaths = me.extract(fd, input_type,
                                     filename_format, url_format,
-                                    no_autometa, meta,
+                                    exclude_autometa, meta,
                                     missing_value)
 
     all_files = [row["filename"] for row in rows]

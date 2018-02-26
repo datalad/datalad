@@ -189,7 +189,7 @@ def test_extract():
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
-        False, [], None)
+        None, [], None)
 
     eq_(subpaths,
         {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
@@ -211,18 +211,33 @@ def test_extract():
         ["kid/no", "adult/yes", "adult/no", "kid/no"])
 
 
-def test_extract_no_autometa():
+def test_extract_disable_autometa():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
-        True,
+        "*",
         ["group={age_group}"],
         None)
 
     eq_([d["meta_args"] for d in info],
         [["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]])
 
+
+def test_extract_exclude_autometa_regexp():
+    info, subpaths = addurls.extract(
+        json_stream(ST_DATA["rows"]), "json",
+        "{age_group}//{now_dead}//{name}.csv",
+        "{name}_{debut_season}.com",
+        "ea",
+        [],
+        None)
+
+    eq_([set(d["meta_args"]) for d in info],
+        [{"name=will", "age_group=kid"},
+         {"name=bob", "age_group=adult"},
+         {"name=scott", "age_group=adult"},
+         {"name=max", "age_group=kid"}])
 
 def test_extract_csv_json_equal():
     keys = ST_DATA["header"]
@@ -232,7 +247,7 @@ def test_extract_csv_json_equal():
 
     args = ["{age_group}//{now_dead}//{name}.csv",
             "{name}_{debut_season}.com",
-            False,
+            None,
             ["group={age_group}"],
             None]
 
