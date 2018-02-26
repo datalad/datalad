@@ -33,6 +33,7 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.save import Save
+from datalad.interface.unlock import Unlock
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
