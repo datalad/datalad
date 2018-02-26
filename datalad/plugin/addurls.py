@@ -16,6 +16,7 @@ import os
 import re
 import string
 
+from six import string_types
 from six.moves.urllib.parse import urlparse
 
 lgr = logging.getLogger("datalad.plugin.addurls")
@@ -35,10 +36,14 @@ class Formatter(string.Formatter):
     idx_to_name : dict
         A mapping from a positional index to a key.  If not provided,
         "{N}" elements are not supported.
+    missing : str, optional
+        When column lookup results in an empty string, use this value in
+        its place.
     """
 
-    def __init__(self, idx_to_name, *args, **kwargs):
+    def __init__(self, idx_to_name, missing_value=None, *args, **kwargs):
         self.idx_to_name = idx_to_name or {}
+        self.missing = missing_value
         super(Formatter, self).__init__(*args, **kwargs)
 
     def format(self, format_string, *args, **kwargs):
@@ -48,23 +53,30 @@ class Formatter(string.Formatter):
 
     def get_value(self, key, args, kwargs):
         """Look for key's value in `args[0]` mapping first.
+
+
         """
         # FIXME: This approach will fail for keys that contain "!" and
         # ":" because they'll be interpreted as formatting flags.
         data = args[0]
 
+        name = key
         try:
             key_int = int(key)
         except ValueError:
             pass
         else:
-            return data[self.idx_to_name[key_int]]
+            name = self.idx_to_name[key_int]
 
         try:
-            return data[key]
+            value = data[name]
         except KeyError:
             return super(Formatter, self).get_value(
                 key, args, kwargs)
+
+        if self.missing is not None and isinstance(value, string_types):
+            return value or self.missing
+        return value
 
     def convert_field(self, value, conversion):
         if conversion == 'l':
@@ -277,7 +289,7 @@ def get_url_names(url):
 
 
 def extract(stream, input_type, filename_format, url_format,
-            no_autometa, meta):
+            no_autometa, meta, missing_value):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -295,7 +307,7 @@ def extract(stream, input_type, filename_format, url_format,
     """
     rows, colidx_to_name = _read(stream, input_type)
 
-    fmt = Formatter(colidx_to_name)  # For URL and meta
+    fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
     format_url = partial(fmt.format, url_format)
 
     auto_meta_args = []
@@ -327,8 +339,9 @@ def extract(stream, input_type, filename_format, url_format,
             row.update(get_url_names(info["url"]))
 
     # For the file name, we allow the _repindex special key.
-    format_filename = partial(RepFormatter(colidx_to_name).format,
-                              filename_format)
+    format_filename = partial(
+        RepFormatter(colidx_to_name, missing_value).format,
+        filename_format)
     subpaths = _format_filenames(format_filename, rows, infos)
     return infos, subpaths
 
@@ -336,7 +349,8 @@ def extract(stream, input_type, filename_format, url_format,
 def dlplugin(dataset=None, url_file=None, input_type="ext",
              url_format="{0}", filename_format="{1}",
              no_autometa=False, meta=None,
-             message=None, dry_run=False, fast=False, ifexists=None):
+             message=None, dry_run=False, fast=False,
+             ifexists=None, missing_value=None):
     """Create and update a dataset from a list of URLs.
 
     Parameters
@@ -416,6 +430,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         which will failed if the file size has changed.  If set to
         'overwrite', remove the old file before adding the new one.  If
         set to 'skip', do not add the new file.
+    missing_value : str, optional
+        When an empty string is encountered, use this value instead.
 
     Examples
     --------
@@ -488,7 +504,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     with open(url_file) as fd:
         rows, subpaths = me.extract(fd, input_type,
                                     filename_format, url_format,
-                                    no_autometa, meta)
+                                    no_autometa, meta,
+                                    missing_value)
 
     all_files = [row["filename"] for row in rows]
     if len(all_files) != len(set(all_files)):

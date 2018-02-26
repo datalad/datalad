@@ -81,6 +81,12 @@ def test_formatter_placeholder_nonpermitted_chars():
                   fmt.format, "{key:<5}", {"key:<5": "value0"})
 
 
+def test_formatter_missing_arg():
+    fmt = addurls.Formatter({}, "NA")
+    eq_(fmt.format("{here},{nothere}", {"here": "ok", "nothere": ""}),
+        "ok,NA")
+
+
 def test_repformatter():
     fmt = addurls.RepFormatter({})
 
@@ -183,7 +189,7 @@ def test_extract():
         json_stream(ST_DATA["rows"]), "json",
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
-        False, [])
+        False, [], None)
 
     eq_(subpaths,
         {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
@@ -211,7 +217,8 @@ def test_extract_no_autometa():
         "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
         True,
-        ["group={age_group}"])
+        ["group={age_group}"],
+        None)
 
     eq_([d["meta_args"] for d in info],
         [["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]])
@@ -226,7 +233,8 @@ def test_extract_csv_json_equal():
     args = ["{age_group}//{now_dead}//{name}.csv",
             "{name}_{debut_season}.com",
             False,
-            ["group={age_group}"]]
+            ["group={age_group}"],
+            None]
 
     json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
     csv_output = addurls.extract(csv_rows, "csv", *args)
@@ -237,7 +245,7 @@ def test_extract_csv_json_equal():
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
                   addurls.extract,
-                  None, "not_csv_or_json", None, None, None, None)
+                  None, "not_csv_or_json", None, None, None, None, None)
 
 
 def test_addurls_no_urlfile():
