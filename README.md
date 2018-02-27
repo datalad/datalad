@@ -137,11 +137,6 @@ platforms.
 MIT/Expat
 
 
-# Disclaimer
-
-It is in a alpha stage -- **nothing** is set in stone yet -- but
-already usable in a limited scope.
-
 [Git]: https://git-scm.com
 [Git-annex]: http://git-annex.branchable.com
 [setup.py]: https://github.com/datalad/datalad/blob/master/setup.py
