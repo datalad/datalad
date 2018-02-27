@@ -233,7 +233,8 @@ def _get_installationpath_from_url(url):
     """
     ri = RI(url)
     if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
-        path = urlunquote(ri.path) or ri.hostname
+        path = ri.path.rstrip('/')
+        path = urlunquote(path) if path else ri.hostname
     else:
         path = url
     path = path.rstrip('/')

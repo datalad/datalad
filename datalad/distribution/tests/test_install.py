@@ -101,6 +101,9 @@ def test_installationpath_from_url():
         '///d1/+last bit',
     ):
         eq_(_get_installationpath_from_url(url), '+last bit')
+    # and the hostname alone
+    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
+    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
