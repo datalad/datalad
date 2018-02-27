@@ -11,6 +11,7 @@
 # Import necessary nodes
 import os
 from ..nodes.crawl_url import crawl_url
+from ..nodes.misc import fix_url
 from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
@@ -73,6 +74,7 @@ def pipeline(url=None,
         incoming_pipeline = [ # Download all the archives found on the project page
             crawler,
             a_href_match(a_href_match_, min_count=1),
+            fix_url,
         ]
         if rename:
             incoming_pipeline += [sub({'filename': get_replacement_dict(rename)})]
