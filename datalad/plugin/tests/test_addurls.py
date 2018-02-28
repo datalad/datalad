@@ -151,17 +151,20 @@ def test_fmt_to_name():
 
 def test_get_url_names():
     eq_(addurls.get_url_names(""), {})
-    eq_(addurls.get_url_names("http://datalad.org"), {})
+    assert_dict_equal(addurls.get_url_names("http://datalad.org"),
+                      {"_url_hostname": "datalad.org"})
 
     assert_dict_equal(addurls.get_url_names("http://datalad.org/about.html"),
-                      {"_url0": "about.html",
+                      {"_url_hostname": "datalad.org",
+                       "_url0": "about.html",
                        "_url_basename": "about.html"})
     assert_dict_equal(addurls.get_url_names("http://datalad.org/about.html"),
                       addurls.get_url_names("http://datalad.org//about.html"))
 
     assert_dict_equal(
         addurls.get_url_names("http://datalad.org/for/git-users"),
-        {"_url0": "for",
+        {"_url_hostname": "datalad.org",
+         "_url0": "for",
          "_url1": "git-users",
          "_url_basename": "git-users"})
 

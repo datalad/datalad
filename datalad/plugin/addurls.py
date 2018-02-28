@@ -265,7 +265,7 @@ def _format_filenames(format_fn, rows, row_infos):
 
 
 def get_url_names(url):
-    """Assign a name to each part of a URL's path.
+    """Assign a name to various parts of the URL.
 
     Parameters
     ----------
@@ -273,16 +273,21 @@ def get_url_names(url):
 
     Returns
     -------
-    A dict with keys '_url0' through '_urlN' for a path with N+1
-    components.  There is also a `_url_basename` for the rightmost
-    entry.
+    A dict with keys `_url_hostname` and, for a path with N+1 parts,
+    '_url0' through '_urlN' .  There is also a `_url_basename` key for
+    the rightmost part of the path.
     """
-    path = urlparse(url).path.strip("/")
-    if not path:
+    parsed = urlparse(url)
+    if not parsed.netloc:
         return {}
 
+    names = {"_url_hostname": parsed.netloc}
+
+    path = parsed.path.strip("/")
+    if not path:
+        return names
+
     url_parts = path.split("/")
-    names = {}
     for pidx, part in enumerate(url_parts):
         names["_url{}".format(pidx)] = part
     names["_url_basename"] = url_parts[-1]
@@ -400,13 +405,16 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             "_repindex" can be added to the formatter.  Its value will
             start at 0 and increment every time a file name repeats.
 
-          - _urlN and _url_basename
+          - _url_hostname, _urlN, and _url_basename
 
-            Each part of the formatted URL is available.  For example,
-            in "http://datalad.org/for/git-users", "_url0" and "_url1"
-            would map to "for" and "git-users", respectively.
+            Various parts of the formatted URL are available.  If the
+            formatted URL is "http://datalad.org/for/git-users",
+            "datalad.org" is stored as "_url_hostname".
 
-            The final part is also available as "_url_basename".
+            Components of the URL's path can be referenced as "_urlN".
+            In the example URL above, "_url0" and "_url1" would map to
+            "for" and "git-users", respectively.  The final part of the
+            path is also available as "_url_basename".
     exclude_autometa : str, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
