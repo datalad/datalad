@@ -1,0 +1,33 @@
+Bootstrap:docker
+From:debian:latest
+
+%post
+    echo "Configuring the environment"
+    apt-get -y update
+
+    # setup the container sources themselves
+    apt-get -y install eatmydata
+    eatmydata apt-get -y install wget gnupg curl
+    wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
+    bash /tmp/nd-configurerepo
+    chmod a+r -R /etc/apt
+
+    # bare essentials to pull everything else in
+    eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
+
+    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3
+
+    # just for scrapy
+    eatmydata apt-get -y install --no-install-recommends python3-twisted
+
+    # little dance because pip cannot handle this url plus [full] in one go
+    wget https://github.com/datalad/datalad/archive/master.zip
+    pip3 install --system master.zip[full]
+    rm -f master.zip
+
+    # clean up
+    rm -rf /tmp/nd-config*
+    apt-get clean
+
+%runscript
+    datalad "$@"
