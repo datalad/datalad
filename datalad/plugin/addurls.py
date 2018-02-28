@@ -172,8 +172,7 @@ def is_legal_metafield(name):
     The set of permitted characters is taken from git-annex's
     MetaData.hs:legalField.
     """
-    legal = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*\Z")
-    return True if legal.match(name) else False
+    return bool(re.match(r"[a-zA-Z0-9][a-zA-Z0-9_.-]*\Z", name))
 
 
 def filter_legal_metafield(fields):
