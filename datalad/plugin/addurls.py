@@ -486,7 +486,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     from datalad.distribution.add import Add
     from datalad.distribution.create import Create
     from datalad.distribution.dataset import Dataset
-    from datalad.interface.results import get_status_dict
+    from datalad.interface.results import annexjson2result, get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.exceptions import AnnexBatchCommandError
@@ -649,15 +649,12 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
         pbar_meta.update(meta_idx)
         lgr.debug("Adding metadata to %s in %s", fname, ds.path)
 
-        list(ds.repo.set_metadata(fname, add=meta))
-
-        meta_results.append(
-            get_status_dict(action="addurls-metadata",
-                            ds=ds_current,
-                            type="file",
-                            path=os.path.join(ds.path, fname),
-                            message="added metadata",
-                            status="ok"))
+        for a in ds.repo.set_metadata(fname, add=meta):
+            res = annexjson2result(a, ds, type="file", logger=lgr)
+            # Don't show all added metadata for the file because that
+            # could quickly flood the output.
+            del res["message"]
+            meta_results.append(res)
 
     for result in meta_results:
         yield result

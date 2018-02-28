@@ -11,6 +11,7 @@
 
 import json
 import logging
+from mock import patch
 import os
 import tempfile
 
@@ -448,3 +449,18 @@ class TestAddurls(object):
 
             for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_metafail(self, path):
+        ds = Dataset(path).create(force=True)
+
+        # Force failure by passing a non-existent file name to annex.
+        fn = ds.repo.set_metadata
+        def set_meta(files, **kwargs):
+            for i in fn("wreaking-havoc-and-such", **kwargs):
+                yield i
+
+        with chpwd(path), patch.object(ds.repo, 'set_metadata', set_meta):
+            with assert_raises(IncompleteResultsError) as raised:
+                ds.plugin("addurls", url_file=self.json_file,
+                          url_format="{url}", filename_format="{name}")
