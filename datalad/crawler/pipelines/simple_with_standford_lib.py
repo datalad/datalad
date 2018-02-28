@@ -1,19 +1,17 @@
-from ..nodes.crawl_url import crawl_url
-from ..nodes.misc import fix_url
-from ..nodes.crawl_url import parse_checksums
-from ..nodes.matches import css_match, a_href_match
-from ..nodes.misc import assign
-from ..nodes.misc import find_files
-from ..nodes.misc import sub
-from ..nodes.misc import skip_if
-from ..nodes.annex import Annexificator
-from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
-from ...support.strings import get_replacement_dict
+from ..nodes.matches import xpath_match
+try:
+    from scrapy.http import Response
+    from scrapy.http import XmlResponse
+    from scrapy.selector import Selector
+except ImportError:  # pragma: no cover
+    class Selector(object):
+        xpath = css = None
+    Response = None
 
 
 # copied the simple_with_archives template in order to show
 def pipeline_2(url=None,
-             x_href_match_='.*/download/.*\.(tgz|tar.*|zip)',
+             x_pathmatch_='.*/download/.*\.(tgz|tar.*|xml)',
              tarballs=True,
              datalad_downloader=False,
              use_current_dir=False,
@@ -24,16 +22,17 @@ def pipeline_2(url=None,
              annex=None,
              incoming_pipeline=None):
 
+    crawler = crawl_xml()
     # adding print_xml to incoming pipeline
     incoming_pipeline = [  # Download all the archives found on the project page
         crawler,
-        x_pathmatch(x_pathMatch, min_count=1), #changed h-ref to x_pathmatch
+        xpath_match(xpath_match, min_count=1), #changed h-ref to xpath_match
         print_xml
     ]
 
 
 # print generator
-def print_xml(data, keys=['xml']):
+def print_xml(data, keys=['url']):
     """Given xml data, get value within 'xml' key and print it
     """
     data = data.copy()
@@ -42,8 +41,14 @@ def print_xml(data, keys=['xml']):
             print((data[key]).as_str())
     yield data
 
+
 # beginning crawl method to crawl xml info
 class crawl_xml:
-    def __init__(self, xml_path = file_id, id):
-        xml_path = xml_path
-        id = Scrapy.parse(xml_path)
+    def __init__(self, url="", file_path='//file[contains(@id)]/@id',
+                 doc_path='//contentMetaData[contains(@objectId)]/@objectId'):
+        response = XmlResponse(url=url)
+
+        # parse data using selectors from scrapy
+        self._file_id = response.select(file_path).extract()
+        self._doc_id= response.select(doc_path).extract()
+        self._url = "https://stacks.stanford.edu/file/druid:" + self._doc_id + "/" + self._file_id
