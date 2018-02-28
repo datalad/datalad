@@ -41,7 +41,7 @@ class Formatter(string.Formatter):
         its place.
     """
 
-    def __init__(self, idx_to_name, missing_value=None):
+    def __init__(self, idx_to_name=None, missing_value=None):
         self.idx_to_name = idx_to_name or {}
         self.missing = missing_value
 
