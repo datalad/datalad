@@ -469,6 +469,8 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     import logging
     import os
 
+    from datalad.distribution.add import Add
+    from datalad.distribution.create import Create
     from datalad.distribution.dataset import Dataset
     from datalad.interface.results import get_status_dict
     import datalad.plugin.addurls as me
