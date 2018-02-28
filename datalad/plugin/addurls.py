@@ -52,8 +52,6 @@ class Formatter(string.Formatter):
 
     def get_value(self, key, args, kwargs):
         """Look for key's value in `args[0]` mapping first.
-
-
         """
         # FIXME: This approach will fail for keys that contain "!" and
         # ":" because they'll be interpreted as formatting flags.
@@ -388,16 +386,16 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         subdataset.
 
         In addition to the placeholders described in `url_format`, there
-        are a few special placeholder.
+        are a few special placeholders.
 
-          - "_repindex"
+          - _repindex
 
             The constructed file names must be unique across all fields
             rows.  To avoid collisions, the special placeholder
-            "_repindex" can added to the formatter.  It value will start
-            at 0 and increment every time a file name repeats.
+            "_repindex" can be added to the formatter.  Its value will
+            start at 0 and increment every time a file name repeats.
 
-          - "_urlN"
+          - _urlN and _url_basename
 
             Each part of the formatted URL is available.  For example,
             in "http://datalad.org/for/git-users", "_url0" and "_url1"
@@ -430,7 +428,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     ifexists : {None, 'overwrite', 'skip'}
         What to do if a constructed file name already exists.  The
         default (None) behavior to proceed with the `git annex addurl`,
-        which will failed if the file size has changed.  If set to
+        which will fail if the file size has changed.  If set to
         'overwrite', remove the old file before adding the new one.  If
         set to 'skip', do not add the new file.
     missing_value : str, optional
