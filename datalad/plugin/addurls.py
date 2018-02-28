@@ -177,6 +177,9 @@ def is_legal_metafield(name):
 
 def filter_legal_metafield(fields):
     """Remove illegal names from `fields`.
+
+    Note: This is like `filter(is_legal_metafield, fields)` but the
+    dropped values are logged.
     """
     legal = []
     for field in fields:
