@@ -344,16 +344,10 @@ class TestAddurls(object):
             for fname in filenames:
                 ok_exists(fname)
 
-            meta_results = dict(
-                zip(filenames,
-                    ds.repo._run_annex_command_json("metadata",
-                                                    files=filenames)))
-
-            for fname, subdir in zip(filenames, ["foo", "bar", "foo"]):
-                assert_dict_equal(
-                    {k: v for k, v in meta_results[fname]["fields"].items()
-                     if not k.endswith("lastchanged")},
-                    {"subdir": [subdir], "name": [fname]})
+            for (fname, meta), subdir in zip(ds.repo.get_metadata(filenames),
+                                             ["foo", "bar", "foo"]):
+                assert_dict_equal(meta,
+                                  {"subdir": [subdir], "name": [fname]})
 
             # Add to already existing links, overwriting.
             with swallow_logs(new_level=logging.DEBUG) as cml:
