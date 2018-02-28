@@ -101,17 +101,17 @@ def test_repformatter():
 
 
 def test_clean_meta_args():
-    for args, expect in [(["field="], []),
-                         ([" field=yes "], ["field=yes"]),
-                         (["field= value="], ["field=value="])]:
-        eq_(list(addurls.clean_meta_args(args)), expect)
+    for args, expect in [(["field="], {}),
+                         ([" field=yes "], {"field": "yes"}),
+                         (["field= value="], {"field": "value="})]:
+        eq_(addurls.clean_meta_args(args), expect)
 
     assert_raises(ValueError,
-                  list,
-                  addurls.clean_meta_args(["noequal"]))
+                  addurls.clean_meta_args,
+                  ["noequal"])
     assert_raises(ValueError,
-                  list,
-                  addurls.clean_meta_args(["=value"]))
+                  addurls.clean_meta_args,
+                  ["=value"])
 
 
 def test_get_subpaths():
@@ -203,11 +203,16 @@ def test_extract():
         ["kid/no/will.csv", "adult/yes/bob.csv",
          "adult/no/scott.csv", "kid/no/max.csv"])
 
-    eq_([set(d["meta_args"]) for d in info],
-        [{"name=will", "age_group=kid", "debut_season=1", "now_dead=no"},
-         {"name=bob", "age_group=adult", "debut_season=2", "now_dead=yes"},
-         {"name=scott", "age_group=adult", "debut_season=1", "now_dead=no"},
-         {"name=max", "age_group=kid", "debut_season=2", "now_dead=no"}])
+    expects = [{"name": "will", "age_group": "kid", "debut_season": "1",
+                "now_dead": "no"},
+               {"name": "bob", "age_group": "adult", "debut_season": "2",
+                "now_dead": "yes"},
+               {"name": "scott", "age_group": "adult", "debut_season": "1",
+                "now_dead": "no"},
+               {"name": "max", "age_group": "kid", "debut_season": "2",
+                "now_dead": "no"}]
+    for d, expect in zip(info, expects):
+        assert_dict_equal(d["meta_args"], expect)
 
     eq_([d["subpath"] for d in info],
         ["kid/no", "adult/yes", "adult/no", "kid/no"])
@@ -223,7 +228,8 @@ def test_extract_disable_autometa():
 
 
     eq_([d["meta_args"] for d in info],
-        [["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]])
+        [{"group": "kid"}, {"group": "adult"}, {"group": "adult"},
+         {"group": "kid"}])
 
 
 def test_extract_exclude_autometa_regexp():
@@ -233,11 +239,13 @@ def test_extract_exclude_autometa_regexp():
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="ea")
 
-    eq_([set(d["meta_args"]) for d in info],
-        [{"name=will", "age_group=kid"},
-         {"name=bob", "age_group=adult"},
-         {"name=scott", "age_group=adult"},
-         {"name=max", "age_group=kid"}])
+    expects = [{"name": "will", "age_group": "kid"},
+               {"name": "bob", "age_group": "adult"},
+               {"name": "scott", "age_group": "adult"},
+               {"name": "max", "age_group": "kid"}]
+    for d, expect in zip(info, expects):
+        assert_dict_equal(d["meta_args"], expect)
+
 
 def test_extract_csv_json_equal():
     keys = ST_DATA["header"]

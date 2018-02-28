@@ -109,7 +109,7 @@ class RepFormatter(Formatter):
 
 
 def clean_meta_args(args):
-    """Prepare formatted metadata arguments to be passed to git-annex.
+    """Process metadata arguments.
 
     Parameters
     ----------
@@ -118,8 +118,9 @@ def clean_meta_args(args):
 
     Returns
     -------
-    Generator that yields processed arguments (str).
+    A dict mapping field names to values.
     """
+    results = {}
     for arg in args:
         parts = [x.strip() for x in arg.split("=", 1)]
         if len(parts) == 2:
@@ -132,8 +133,8 @@ def clean_meta_args(args):
         if not value:
             # The `url_file` may have an empty value.
             continue
-
-        yield field + "=" + value
+        results[field] = value
+    return results
 
 
 def get_subpaths(filename):
@@ -337,7 +338,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 
     infos = []
     for row in rows:
-        meta_args = list(clean_meta_args(fmt(row) for fmt in formats_meta))
+        meta_args = clean_meta_args(fmt(row) for fmt in formats_meta)
         infos.append({"url": format_url(row),
                       "meta_args": meta_args})
 
@@ -535,7 +536,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         for row in rows:
             lgr.info("Would download %s to %s",
                      row["url"], os.path.join(dataset.path, row["filename"]))
-            lgr.info("Metadata: %s", row["meta_args"])
+            lgr.info("Metadata: %s",
+                     sorted(u"{}={}".format(k, v)
+                            for k, v in row["meta_args"].items()))
         yield get_status_dict(action="addurls",
                               ds=dataset,
                               status="ok",
@@ -646,12 +649,7 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
         pbar_meta.update(meta_idx)
         lgr.debug("Adding metadata to %s in %s", fname, ds.path)
 
-        meta_args = []
-        for arg in meta:
-            meta_args.extend(["--set", arg])
-        meta_args.append(fname)
-
-        ds.repo._run_annex_command("metadata", annex_options=meta_args)
+        list(ds.repo.set_metadata(fname, add=meta))
 
         meta_results.append(
             get_status_dict(action="addurls-metadata",
