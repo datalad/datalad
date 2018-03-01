@@ -1,5 +1,5 @@
 Bootstrap:docker
-From:debian:latest
+From:neurodebian:latest
 
 %post
     echo "Configuring the environment"
@@ -7,10 +7,7 @@ From:debian:latest
 
     # setup the container sources themselves
     apt-get -y install eatmydata
-    eatmydata apt-get -y install wget gnupg curl
-    wget -q -O/tmp/nd-configurerepo https://raw.githubusercontent.com/neurodebian/neurodebian/4d26c8f30433145009aa3f74516da12f560a5a13/tools/nd-configurerepo
-    bash /tmp/nd-configurerepo
-    chmod a+r -R /etc/apt
+    eatmydata apt-get -y install gnupg wget
 
     # bare essentials to pull everything else in
     eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
@@ -29,7 +26,6 @@ From:debian:latest
     pip3 install https://github.com/INCF/pybids/archive/master.zip
 
     # clean up
-    rm -rf /tmp/nd-config*
     apt-get clean
 
 
