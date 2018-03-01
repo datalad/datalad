@@ -49,7 +49,7 @@ matrix:
     - TMPDIR="/var/tmp/sym link"
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
-  - python: 3.4
+  - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
     - NOSE_SELECTION_OP=""
