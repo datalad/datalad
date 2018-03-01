@@ -224,7 +224,7 @@ script:
     PATH=$PWD/tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
       -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)"
-      --with-doctest --doctest-tests
+      --with-doctest
       --with-cov --cover-package datalad
       --logging-level=INFO
       $TESTS_TO_PERFORM
@@ -254,5 +254,5 @@ after_success:
 # for a particular debugging
 #after_failure:
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-#  - DATALAD_LOG_LEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=DEBUG
+#  - DATALAD_LOG_LEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG
 #  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
