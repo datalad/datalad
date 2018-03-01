@@ -16,6 +16,9 @@ from datalad.interface.base import build_doc
 
 @build_doc
 class WTF(Interface):
+    """WTF?!
+
+    """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
@@ -153,4 +156,4 @@ Metadata
         yield
 
 
-dlplugin = WTF
+__datalad_plugin__ = WTF

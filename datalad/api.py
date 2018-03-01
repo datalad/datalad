@@ -14,7 +14,6 @@ from datalad.coreapi import *
 def _load_plugins():
     from datalad.plugin import _get_plugins
     from datalad.plugin import _load_plugin
-    from datalad.interface.base import get_api_name
     import re
 
     camel = re.compile(r'([a-z])([A-Z])')

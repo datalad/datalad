@@ -27,6 +27,8 @@ from six import text_type
 import datalad
 
 from datalad.cmdline import helpers
+from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
@@ -199,6 +201,8 @@ def setup_parser(
     cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
+    interface_groups.append(('plugins', 'Plugins', _get_plugins()))
+
     for grp_name, grp_descr, _interfaces \
                 in sorted(interface_groups, key=lambda x: x[1]):
         # for all subcommand modules it can find
@@ -216,22 +220,28 @@ def setup_parser(
                     '-h' in cmdlineargs or
                     '--help-np' in cmdlineargs):
                 continue
-            # turn the interface spec into an instance
-            lgr.log(5, "Importing module %s " % _intfspec[0])
-            try:
-                _mod = import_module(_intfspec[0], package='datalad')
-            except Exception as e:
-                lgr.error("Internal error, cannot import interface '%s': %s",
-                          _intfspec[0], exc_str(e))
-                continue
-            _intf = getattr(_mod, _intfspec[1])
+            if isinstance(_intfspec[1], dict):
+                # plugin
+                _intf = _load_plugin(_intfspec[1]['file'], fail=False)
+                if _intf is None:
+                    continue
+            else:
+                # turn the interface spec into an instance
+                lgr.log(5, "Importing module %s " % _intfspec[0])
+                try:
+                    _mod = import_module(_intfspec[0], package='datalad')
+                except Exception as e:
+                    lgr.error("Internal error, cannot import interface '%s': %s",
+                              _intfspec[0], exc_str(e))
+                    continue
+                _intf = getattr(_mod, _intfspec[1])
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
-                intf_doc = _intf.__doc__.strip()
+                intf_doc = '' if _intf.__doc__ is None else _intf.__doc__.strip()
                 if hasattr(_intf, '_docs_'):
                     # expand docs
                     intf_doc = intf_doc.format(**_intf._docs_)
