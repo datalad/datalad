@@ -862,6 +862,21 @@ def test_install_subds_with_space(opath, tpath):
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
+# https://github.com/datalad/datalad/issues/2232
+@with_tempfile
+@with_tempfile
+def test_install_from_tilda(opath, tpath):
+    ds = create(opath)
+    ds.create('sub ds')
+    orelpath = os.path.join(
+        '~',
+        os.path.relpath(opath, os.path.expanduser('~'))
+    )
+    assert orelpath.startswith('~')  # just to make sure no normalization
+    install(tpath, source=orelpath, recursive=True)
+    assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
 @skip_ssh
 @usecase
 @with_tempfile(mkdir=True)
