@@ -19,9 +19,8 @@ from nose.tools import eq_, assert_raises
 from datalad.tests.utils import skip_if_no_network
 from ..downloaders.tests.utils import get_test_providers
 
-skip_if_no_network()  # ATM we don't ship fixtures, so if no network -- no network!
 
-
+@skip_if_no_network
 @use_cassette('s3_test_version_url')
 def test_version_url():
     get_test_providers('s3://openfmri/tarballs')  # to verify having credentials to access openfmri via S3
@@ -53,14 +52,16 @@ def test_version_url():
         ok_startswith(url, 'http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt?versionId=')
 
 
+@skip_if_no_network
 @use_cassette('s3_test_version_url_deleted')
 def test_version_url_deleted():
-    get_test_providers('s3://openneuro/')  # to verify having credentials to access
+    get_test_providers('s3://datalad-test0-versioned/', reload=True)  # to verify having credentials to access
     # openfmri via S3
     # it existed and then was removed
-    fpath = "ds000158/ds158_R1.0.1/compressed/ds000158_R1.0.1_sub001-055.zip"
-    url = "http://openneuro.s3.amazonaws.com/%s" % fpath
-    turl = "http://openneuro.s3.amazonaws.com/%s?versionId=null" % fpath
+    fpath = "1version-removed.txt"
+    url = "http://datalad-test0-versioned.s3.amazonaws.com/%s" % fpath
+    turl = "http://datalad-test0-versioned.s3.amazonaws.com/%s" \
+           "?versionId=eZ5Hgwo8azfBv3QT7aW9dmm2sbLUY.QP" % fpath
     eq_(get_versioned_url(url), turl)
     # too heavy for verification!
     #eq_(get_versioned_url(url, verify=True), turl)
