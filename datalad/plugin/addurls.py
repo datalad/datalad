@@ -572,16 +572,16 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
     for row in rows:
         # Add additional information that we'll need for various operations.
-        fname_abs = os.path.join(dataset.path, row["filename"])
+        filename_abs = os.path.join(dataset.path, row["filename"])
         if row["subpath"]:
             ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
-            ds_filename = os.path.relpath(fname_abs, ds_current.path)
+            ds_filename = os.path.relpath(filename_abs, ds_current.path)
         else:
             ds_current = dataset
             ds_filename = row["filename"]
-        row.update({"fname_abs": fname_abs,
+        row.update({"filename_abs": filename_abs,
                     "ds": ds_current,
-                    "ds_fname": ds_filename})
+                    "ds_filename": ds_filename})
 
     pbar_addurl = ui.get_progressbar(total=len(rows), label="Adding files",
                                      unit=" Files")
@@ -591,31 +591,31 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     addurl_results = []
     for row_idx, row in enumerate(rows, 1):
         pbar_addurl.update(row_idx)
-        fname_abs = row["fname_abs"]
-        if os.path.exists(fname_abs) or os.path.islink(fname_abs):
+        filename_abs = row["filename_abs"]
+        if os.path.exists(filename_abs) or os.path.islink(filename_abs):
             if ifexists == "skip":
                 addurl_results.append(
                     get_status_dict(action="addurls",
                                     ds=row["ds"],
                                     type="file",
-                                    path=fname_abs,
+                                    path=filename_abs,
                                     status="notneeded"))
                 continue
             elif ifexists == "overwrite":
-                lgr.debug("Removing %s", fname_abs)
-                os.unlink(fname_abs)
+                lgr.debug("Removing %s", filename_abs)
+                os.unlink(filename_abs)
             else:
-                lgr.debug("File %s already exists", fname_abs)
+                lgr.debug("File %s already exists", filename_abs)
 
         try:
-            row["ds"].repo.add_url_to_file(row["ds_fname"], row["url"],
+            row["ds"].repo.add_url_to_file(row["ds_filename"], row["url"],
                                            batch=True, options=annex_options)
         except AnnexBatchCommandError as exc:
             addurl_results.append(
                 get_status_dict(action="addurls",
                                 ds=row["ds"],
                                 type="file",
-                                path=fname_abs,
+                                path=filename_abs,
                                 message=exc_str(exc),
                                 status="error"))
 
@@ -626,7 +626,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             get_status_dict(action="addurls",
                             ds=row["ds"],
                             type="file",
-                            path=fname_abs,
+                            path=filename_abs,
                             status="ok"))
 
         files_to_add.append(row["filename"])
@@ -653,12 +653,12 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
 
     meta_results = []
     for meta_idx, row in enumerate(rows, 1):
-        ds, fname, meta = row["ds"], row["ds_fname"], row["meta_args"]
+        ds, filename, meta = row["ds"], row["ds_filename"], row["meta_args"]
         pbar_meta.update(meta_idx)
         lgr.debug("Adding metadata to %s in %s",
-                  row["ds_fname"], row["ds"].path)
+                  row["ds_filename"], row["ds"].path)
 
-        for a in ds.repo.set_metadata(fname, add=meta):
+        for a in ds.repo.set_metadata(filename, add=meta):
             res = annexjson2result(a, ds, type="file", logger=lgr)
             # Don't show all added metadata for the file because that
             # could quickly flood the output.
