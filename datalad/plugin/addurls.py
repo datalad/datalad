@@ -612,8 +612,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                 get_status_dict(action="addurls",
                                 ds=ds_current,
                                 type="file",
-                                path=os.path.join(ds_current.path,
-                                                  ds_filename),
+                                path=fname_abs,
                                 message="failed to add URL",
                                 status="error"))
 
@@ -624,8 +623,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             get_status_dict(action="addurls",
                             ds=ds_current,
                             type="file",
-                            path=os.path.join(ds_current.path,
-                                              ds_filename),
+                            path=fname_abs,
                             status="ok"))
 
         files_to_add.append(row["filename"])
