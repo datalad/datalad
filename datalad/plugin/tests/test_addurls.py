@@ -21,7 +21,8 @@ from datalad.api import Dataset, plugin, subdatasets
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import chpwd, slow, swallow_logs
 from datalad.tests.utils import assert_false, assert_true, assert_raises
-from datalad.tests.utils import assert_in, assert_in_results, assert_dict_equal
+from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
+from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tree, with_tempfile, HTTPPath
 from datalad.utils import get_tempfile_kwargs, rmtemp
@@ -464,3 +465,13 @@ class TestAddurls(object):
             with assert_raises(IncompleteResultsError) as raised:
                 ds.plugin("addurls", url_file=self.json_file,
                           url_format="{url}", filename_format="{name}")
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_dropped_urls(self, path):
+        ds = Dataset(path).create(force=True)
+        with chpwd(path), swallow_logs(new_level=logging.WARNING) as cml:
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="",
+                      filename_format="{subdir}//{name}")
+            assert_re_in(r".*Dropped [0-9]+ row\(s\) that had an empty URL",
+                         str(cml.out))

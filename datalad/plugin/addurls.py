@@ -336,23 +336,31 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     # because meta may be given multiple times on the command line.
     formats_meta = [partial(fmt.format, m) for m in meta + auto_meta_args]
 
+    rows_with_url = []
     infos = []
     for row in rows:
+        url = format_url(row)
+        if not url or url == missing_value:
+            continue
+        rows_with_url.append(row)
         meta_args = clean_meta_args(fmt(row) for fmt in formats_meta)
-        infos.append({"url": format_url(row),
-                      "meta_args": meta_args})
+        infos.append({"url": url, "meta_args": meta_args})
+
+    n_dropped = len(rows) - len(rows_with_url)
+    if n_dropped:
+        lgr.warning("Dropped %d row(s) that had an empty URL", n_dropped)
 
     # Format the filename in a second pass so that we can provide
     # information about the formatted URLs.
     if any(i.startswith("_url") for i in get_fmt_names(filename_format)):
-        for row, info in zip(rows, infos):
+        for row, info in zip(rows_with_url, infos):
             row.update(get_url_names(info["url"]))
 
     # For the file name, we allow the _repindex special key.
     format_filename = partial(
         RepFormatter(colidx_to_name, missing_value).format,
         filename_format)
-    subpaths = _format_filenames(format_filename, rows, infos)
+    subpaths = _format_filenames(format_filename, rows_with_url, infos)
     return infos, subpaths
 
 
@@ -521,8 +529,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                     exclude_autometa, meta,
                                     missing_value)
 
-    all_files = [row["filename"] for row in rows]
-    if len(all_files) != len(set(all_files)):
+    if len(rows) != len(set(row["filename"] for row in rows)):
         yield get_status_dict(action="addurls",
                               ds=dataset,
                               status="error",
