@@ -197,7 +197,8 @@ setup(
     package_data={
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
-            findsome('downloaders/configs', {'cfg'})
+            findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'dcm', 'jpg', 'gz', 'pdf'})
     },
     **setup_kwargs
 )
