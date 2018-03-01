@@ -1,0 +1,36 @@
+Bootstrap:docker
+From:neurodebian:latest
+
+%post
+    echo "Configuring the environment"
+    apt-get -y update
+
+    # setup the container sources themselves
+    apt-get -y install eatmydata
+    eatmydata apt-get -y install gnupg wget
+
+    # bare essentials to pull everything else in
+    eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
+
+    eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3
+
+    # just for scrapy
+    eatmydata apt-get -y install --no-install-recommends python3-twisted
+
+    # little dance because pip cannot handle this url plus [full] in one go
+    wget https://github.com/datalad/datalad/archive/master.zip
+    pip3 install --system master.zip[full]
+    rm -f master.zip
+
+    # until the next pybids release grab it from master
+    pip3 install https://github.com/INCF/pybids/archive/master.zip
+
+    # clean up
+    apt-get clean
+
+
+%environments
+    unset PYTHONPATH
+
+%runscript
+    datalad "$@"
