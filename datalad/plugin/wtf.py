@@ -16,8 +16,11 @@ from datalad.interface.base import build_doc
 
 @build_doc
 class WTF(Interface):
-    """WTF?!
+    """Generate a report about the DataLad installation and configuration
 
+    IMPORTANT: Sharing this report with untrusted parties (e.g. on the web)
+    should be done with care, as it may include identifying information, and/or
+    credentials or access tokens.
     """
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
@@ -28,30 +31,24 @@ class WTF(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to unlock files in. If
+            doc=""""specify the dataset to report on.
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory. If the latter fails, an
-            attempt is made to identify the dataset based on `path` """,
+            based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
     )
 
     @staticmethod
-    @datasetmethod(name='unlock')
+    @datasetmethod(name='wtf')
     @eval_results
     def __call__(dataset=None):
-        """Generate a report about the DataLad installation and configuration
-
-        IMPORTANT: Sharing this report with untrusted parties (e.g. on the web)
-        should be done with care, as it may include identifying information, and/or
-        credentials or access tokens.
-
-        Parameters
-        ----------
-        dataset : Dataset, optional
-          If a dataset is given or found, information on this dataset is provided
-          (if it exists), and its active configuration is reported.
-        """
-        ds = dataset
+        from datalad.distribution.dataset import require_dataset
+        from datalad.support.exceptions import NoDatasetArgumentFound
+        ds = None
+        try:
+            ds = require_dataset(dataset, check_installed=False, purpose='reporting')
+        except NoDatasetArgumentFound:
+            # failure is already logged
+            pass
         if ds and not ds.is_installed():
             # we don't deal with absent datasets
             ds = None
@@ -116,7 +113,8 @@ Metadata
         if ds and ds.is_installed():
             ds_meta = metadata(
                 dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata')
+                result_filter=lambda x: x['action'] == 'metadata',
+                result_renderer='disabled')
         if ds_meta:
             ds_meta = [dm['metadata'] for dm in ds_meta]
             if len(ds_meta) == 1:
