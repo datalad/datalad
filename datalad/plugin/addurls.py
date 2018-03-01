@@ -570,31 +570,33 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                                     return_type='generator'):
                 yield r
 
-    pbar_addurl = ui.get_progressbar(total=len(rows), label="Adding files",
-                                     unit=" Files")
-    pbar_addurl.start()
-
-    files_to_add = []
-    meta_to_add = []
-    addurl_results = []
-    for row_idx, row in enumerate(rows, 1):
-        pbar_addurl.update(row_idx)
+    for row in rows:
+        # Add additional information that we'll need for various operations.
         fname_abs = os.path.join(dataset.path, row["filename"])
         if row["subpath"]:
-            # Adjust the dataset and filename for an `addurl` call
-            # from within the subdataset that will actually contain
-            # the link.
             ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
             ds_filename = os.path.relpath(fname_abs, ds_current.path)
         else:
             ds_current = dataset
             ds_filename = row["filename"]
+        row.update({"fname_abs": fname_abs,
+                    "ds": ds_current,
+                    "ds_fname": ds_filename})
 
+    pbar_addurl = ui.get_progressbar(total=len(rows), label="Adding files",
+                                     unit=" Files")
+    pbar_addurl.start()
+
+    files_to_add = []
+    addurl_results = []
+    for row_idx, row in enumerate(rows, 1):
+        pbar_addurl.update(row_idx)
+        fname_abs = row["fname_abs"]
         if os.path.exists(fname_abs) or os.path.islink(fname_abs):
             if ifexists == "skip":
                 addurl_results.append(
                     get_status_dict(action="addurls",
-                                    ds=ds_current,
+                                    ds=row["ds"],
                                     type="file",
                                     path=fname_abs,
                                     status="notneeded"))
@@ -606,12 +608,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                 lgr.debug("File %s already exists", fname_abs)
 
         try:
-            ds_current.repo.add_url_to_file(ds_filename, row["url"],
-                                            batch=True, options=annex_options)
+            row["ds"].repo.add_url_to_file(row["ds_fname"], row["url"],
+                                           batch=True, options=annex_options)
         except AnnexBatchCommandError as exc:
             addurl_results.append(
                 get_status_dict(action="addurls",
-                                ds=ds_current,
+                                ds=row["ds"],
                                 type="file",
                                 path=fname_abs,
                                 message=exc_str(exc),
@@ -622,13 +624,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         # interrupt the progress bar.
         addurl_results.append(
             get_status_dict(action="addurls",
-                            ds=ds_current,
+                            ds=row["ds"],
                             type="file",
                             path=fname_abs,
                             status="ok"))
 
         files_to_add.append(row["filename"])
-        meta_to_add.append((ds_current, ds_filename, row["meta_args"]))
     pbar_addurl.finish()
 
     for result in addurl_results:
@@ -646,14 +647,16 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
             yield r
 
     # TODO: Wrap this repeated "delayed results/progress bar" pattern.
-    pbar_meta = ui.get_progressbar(total=len(meta_to_add),
+    pbar_meta = ui.get_progressbar(total=len(rows),
                                    label="Adding metadata", unit=" Files")
     pbar_meta.start()
 
     meta_results = []
-    for meta_idx, (ds, fname, meta) in enumerate(meta_to_add, 1):
+    for meta_idx, row in enumerate(rows, 1):
+        ds, fname, meta = row["ds"], row["ds_fname"], row["meta_args"]
         pbar_meta.update(meta_idx)
-        lgr.debug("Adding metadata to %s in %s", fname, ds.path)
+        lgr.debug("Adding metadata to %s in %s",
+                  row["ds_fname"], row["ds"].path)
 
         for a in ds.repo.set_metadata(fname, add=meta):
             res = annexjson2result(a, ds, type="file", logger=lgr)
