@@ -23,6 +23,7 @@ from datalad.dochelpers import exc_str
 from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.support import ansi_colors
 from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.support.network import get_url_filename
 from datalad.ui import ui
 from datalad.utils import assure_list, optional_args
 
@@ -326,8 +327,40 @@ def get_url_parts(url):
     return names
 
 
+def add_extra_filename_values(filename_format, rows, urls, dry_run):
+    """Extend `rows` with values for special formatting fields.
+    """
+    file_fields = list(get_fmt_names(filename_format))
+    if any(i.startswith("_url") for i in file_fields):
+        for row, url in zip(rows, urls):
+            row.update(get_url_parts(url))
+
+    if any(i.startswith("_url_filename") for i in file_fields):
+        if dry_run:  # Don't waste time making requests.
+            dummy = get_file_parts("DRY_BASE.DRY_EXT", "_url_filename")
+            for idx, row in enumerate(rows):
+                row.update(
+                    {k: v + str(idx) for k, v in dummy.items()})
+        else:
+            pbar = ui.get_progressbar(total=len(urls),
+                                      label="Requesting names", unit=" Files")
+            for row, url in zip(rows, urls):
+                # If we run into any issues here, we're just going to raise an
+                # exception and then abort inside dlplugin.  It'd be good to
+                # disentangle this from `extract` so that we could yield an
+                # individual error, drop the row, and keep going.
+                filename = get_url_filename(url)
+                if filename:
+                    row.update(get_file_parts(filename, "_url_filename"))
+                else:
+                    raise ValueError(
+                        "{} does not contain a filename".format(url))
+                pbar.update(1, increment=True)
+            pbar.finish()
+
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
-            exclude_autometa=None, meta=None, missing_value=None):
+            exclude_autometa=None, meta=None,
+            dry_run=False, missing_value=None):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -372,7 +405,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     for row in rows:
         url = format_url(row)
         if not url or url == missing_value:
-            continue
+            continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
         meta_args = clean_meta_args(fmt(row) for fmt in formats_meta)
         infos.append({"url": url, "meta_args": meta_args})
@@ -383,9 +416,9 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 
     # Format the filename in a second pass so that we can provide
     # information about the formatted URLs.
-    if any(i.startswith("_url") for i in get_fmt_names(filename_format)):
-        for row, info in zip(rows_with_url, infos):
-            row.update(get_url_parts(info["url"]))
+    add_extra_filename_values(filename_format, rows_with_url,
+                              [i["url"] for i in infos],
+                              dry_run)
 
     # For the file name, we allow the _repindex special key.
     format_filename = partial(
@@ -572,6 +605,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
            is also a "leftmost period" (lper) split.  Whereas the
            regular split for "file.tar.gz" would label the extension as
            ".gz", the lper split would label it as ".tar.gz".
+
+          - _url_filename*
+
+            These are similar to _url_basename* fields, but they are
+            obtained with a server request.  This is useful if the file
+            name is set in the Content-Disposition header.
     exclude_autometa : str, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
@@ -639,9 +678,12 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     import logging
     import os
 
+    from requests.exceptions import RequestException
+
     from datalad.distribution.add import Add
     from datalad.distribution.create import Create
     from datalad.distribution.dataset import Dataset
+    from datalad.dochelpers import exc_str
     from datalad.interface.results import get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
@@ -670,10 +712,18 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         input_type = "json" if extension == ".json" else "csv"
 
     with open(url_file) as fd:
-        rows, subpaths = me.extract(fd, input_type,
-                                    url_format, filename_format,
-                                    exclude_autometa, meta,
-                                    missing_value)
+        try:
+            rows, subpaths = me.extract(fd, input_type,
+                                        url_format, filename_format,
+                                        exclude_autometa, meta,
+                                        dry_run,
+                                        missing_value)
+        except (ValueError, RequestException) as exc:
+            yield get_status_dict(action="addurls",
+                                  ds=dataset,
+                                  status="error",
+                                  message=exc_str(exc))
+            return
 
     if len(rows) != len(set(row["filename"] for row in rows)):
         yield get_status_dict(action="addurls",

@@ -318,14 +318,15 @@ def test_addurls_dry_run(path):
 
         with swallow_logs(new_level=logging.INFO) as cml:
             ds.plugin("addurls", url_file=json_file, url_format="{url}",
-                      filename_format="{subdir}//{name}", dry_run=True)
+                      filename_format="{subdir}//{_url_filename_root}",
+                      dry_run=True)
 
             for dir_ in ["foo", "bar"]:
                 assert_in("Would create a subdataset at {}".format(dir_),
                           cml.out)
             assert_in(
                 "Would download URL/a.dat to {}".format(
-                    os.path.join(path, "foo", "a")),
+                    os.path.join(path, "foo", "DRY_BASE0")),
                 cml.out)
 
             assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
@@ -467,6 +468,28 @@ class TestAddurls(object):
 
             for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_filename(self, path):
+        ds = Dataset(path).create(force=True)
+        with chpwd(path):
+            ds.plugin("addurls", url_file=self.json_file,
+                      url_format="{url}",
+                      filename_format="{_url0}/{_url_filename}")
+
+            for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
+                ok_exists(fname)
+
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_url_filename_fail(self, path):
+        ds = Dataset(path).create(force=True)
+        with chpwd(path):
+            assert_raises(IncompleteResultsError,
+                          ds.plugin,
+                          "addurls", url_file=self.json_file,
+                          url_format="{url}/nofilename/",
+                          filename_format="{_url0}/{_url_filename}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_metafail(self, path):
