@@ -494,6 +494,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     from datalad.distribution.add import Add
     from datalad.distribution.create import Create
     from datalad.distribution.dataset import Dataset
+    from datalad.dochelpers import exc_str
     from datalad.interface.results import annexjson2result, get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
@@ -607,13 +608,13 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         try:
             ds_current.repo.add_url_to_file(ds_filename, row["url"],
                                             batch=True, options=annex_options)
-        except AnnexBatchCommandError:
+        except AnnexBatchCommandError as exc:
             addurl_results.append(
                 get_status_dict(action="addurls",
                                 ds=ds_current,
                                 type="file",
                                 path=fname_abs,
-                                message="failed to add URL",
+                                message=exc_str(exc),
                                 status="error"))
 
             continue
