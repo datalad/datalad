@@ -270,6 +270,30 @@ def _format_filenames(format_fn, rows, row_infos):
     return subpaths
 
 
+def get_file_parts(filename, prefix="name"):
+    """Assign a name to various parts of a file.
+
+    Parameters
+    ----------
+    filename : str
+        A file name (no leading path is permitted).
+    prefix : str
+        Prefix to prepend to the key names.
+
+    Returns
+    -------
+    A dict mapping each part to a value.
+    """
+    root, ext = os.path.splitext(filename)
+    root_lper, _, ext_lper = filename.partition(".")
+    if ext_lper:
+        ext_lper = "." + ext_lper
+    return {prefix: filename,
+            prefix + "_root": root,
+            prefix + "_ext": ext,
+            prefix + "_root_lper": root_lper,
+            prefix + "_ext_lper": ext_lper}
+
 def get_url_parts(url):
     """Assign a name to various parts of the URL.
 
@@ -296,7 +320,9 @@ def get_url_parts(url):
     url_parts = path.split("/")
     for pidx, part in enumerate(url_parts):
         names["_url{}".format(pidx)] = part
-    names["_url_basename"] = url_parts[-1]
+    basename = url_parts[-1]
+    names["_url_basename"] = basename
+    names.update(get_file_parts(basename, prefix="_url_basename"))
     return names
 
 
@@ -528,7 +554,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             "_repindex" can be added to the formatter.  Its value will
             start at 0 and increment every time a file name repeats.
 
-          - _url_hostname, _urlN, _url_basename
+          - _url_hostname, _urlN, _url_basename*
 
             Various parts of the formatted URL are available.  Take
             "http://datalad.org/asciicast/seamless_nested_repos.sh" as
@@ -538,7 +564,14 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             the URL's path can be referenced as "_urlN".  "_url0" and
             "_url1" would map to "asciicast" and "seamless_nested_repos.sh",
             respectively.  The final part of the path is also available
-            as "_url_basename".
+            as "_url_basename",
+
+           This name is broken down further.  "_url_basename_root" and
+           "_url_basename_ext" provide access to the result of
+           os.path.splitext ("seamless_nested_repos" and ".sh").  There
+           is also a "leftmost period" (lper) split.  Whereas the
+           regular split for "file.tar.gz" would label the extension as
+           ".gz", the lper split would label it as ".tar.gz".
     exclude_autometa : str, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is

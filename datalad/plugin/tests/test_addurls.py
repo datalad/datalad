@@ -151,6 +151,15 @@ def test_fmt_to_name():
     assert_false(addurls.fmt_to_name("{}", {}))
 
 
+def test_get_file_parts():
+    assert_dict_equal(addurls.get_file_parts("file.tar.gz", "prefix"),
+                      {"prefix": "file.tar.gz",
+                       "prefix_root": "file.tar",
+                       "prefix_ext": ".gz",
+                       "prefix_root_lper": "file",
+                       "prefix_ext_lper": ".tar.gz"})
+
+
 def test_get_url_parts():
     eq_(addurls.get_url_parts(""), {})
     assert_dict_equal(addurls.get_url_parts("http://datalad.org"),
@@ -159,7 +168,11 @@ def test_get_url_parts():
     assert_dict_equal(addurls.get_url_parts("http://datalad.org/about.html"),
                       {"_url_hostname": "datalad.org",
                        "_url0": "about.html",
-                       "_url_basename": "about.html"})
+                       "_url_basename": "about.html",
+                       "_url_basename_root": "about",
+                       "_url_basename_ext": ".html",
+                       "_url_basename_root_lper": "about",
+                       "_url_basename_ext_lper": ".html"})
     assert_dict_equal(addurls.get_url_parts("http://datalad.org/about.html"),
                       addurls.get_url_parts("http://datalad.org//about.html"))
 
@@ -168,7 +181,11 @@ def test_get_url_parts():
         {"_url_hostname": "datalad.org",
          "_url0": "for",
          "_url1": "git-users",
-         "_url_basename": "git-users"})
+         "_url_basename": "git-users",
+         "_url_basename_root": "git-users",
+         "_url_basename_ext": "",
+         "_url_basename_root_lper": "git-users",
+         "_url_basename_ext_lper": ""})
 
 
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
