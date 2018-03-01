@@ -9,7 +9,7 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import Mapping
+from collections import defaultdict, Mapping
 from functools import partial
 import logging
 import os
@@ -19,7 +19,12 @@ import string
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
-from datalad.utils import assure_list
+from datalad.dochelpers import exc_str
+from datalad.interface.results import annexjson2result, get_status_dict
+from datalad.support import ansi_colors
+from datalad.support.exceptions import AnnexBatchCommandError
+from datalad.ui import ui
+from datalad.utils import assure_list, optional_args
 
 lgr = logging.getLogger("datalad.plugin.addurls")
 
@@ -364,6 +369,115 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, subpaths
 
 
+@optional_args
+def progress(fn, label="Total", unit="Files"):
+    """Wrap a progress bar, with status counts, around a function.
+
+    Parameters
+    ----------
+    fn : generator function
+        This function should accept a collection of items as a
+        positional argument and any number of keyword arguments.  After
+        processing each item in the collection, it should yield a status
+        dict.
+    label, unit : str
+        Passed to ui.get_progressbar.
+
+    Returns
+    -------
+    A variant of `fn` that shows a progress bar.  Note that the wrapped
+    function is not a generator function; the status dicts will be
+    returned as a list.
+    """
+    # FIXME: This emulates annexrepo.ProcessAnnexProgressIndicators.  It'd be
+    # nice to rewire things so that it could be used directly.
+
+    def count_str(count, verb, omg=False):
+        if count:
+            msg = "{:d} {}".format(count, verb)
+            if omg:
+                msg = ansi_colors.color_word(msg, ansi_colors.RED)
+            return msg
+
+    def wrapped(items, **kwargs):
+        counts = defaultdict(int)
+        pbar = ui.get_progressbar(total=len(items),
+                                  label=label, unit=" " + unit)
+        results = []
+        for res in fn(items, **kwargs):
+            counts[res["status"]] += 1
+            count_strs = (count_str(*args)
+                          for args in [(counts["notneeded"], "skipped", False),
+                                       (counts["error"], "failed", True)])
+            pbar.update(1, increment=True)
+            if counts["notneeded"] or counts["error"]:
+                pbar.set_desc("{label} ({counts})".format(
+                    label=label,
+                    counts=", ".join(filter(None, count_strs))))
+            pbar.refresh()
+            results.append(res)
+        pbar.finish()
+        return results
+    return wrapped
+
+
+@progress("Adding URLs")
+def add_urls(rows, ifexists=None, options=None):
+    """Call `git annex addurl` using information in `rows`.
+    """
+    for row in rows:
+        filename_abs = row["filename_abs"]
+        ds, filename = row["ds"], row["ds_filename"]
+        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+
+        if os.path.exists(filename_abs) or os.path.islink(filename_abs):
+            if ifexists == "skip":
+                yield get_status_dict(action="addurls",
+                                      ds=ds,
+                                      type="file",
+                                      path=filename_abs,
+                                      status="notneeded")
+                continue
+            elif ifexists == "overwrite":
+                lgr.debug("Removing %s", filename_abs)
+                os.unlink(filename_abs)
+            else:
+                lgr.debug("File %s already exists", filename_abs)
+
+        try:
+            ds.repo.add_url_to_file(filename, row["url"],
+                                    batch=True, options=options)
+        except AnnexBatchCommandError as exc:
+            yield get_status_dict(action="addurls",
+                                  ds=ds,
+                                  type="file",
+                                  path=filename_abs,
+                                  message=exc_str(exc),
+                                  status="error")
+            continue
+        else:
+            yield get_status_dict(action="addurls",
+                                  ds=ds,
+                                  type="file",
+                                  path=filename_abs,
+                                  status="ok")
+
+
+@progress("Adding metadata")
+def add_meta(rows):
+    """Call `git annex metadata --set` using information in `rows`.
+    """
+    for row in rows:
+        ds, filename = row["ds"], row["ds_filename"]
+        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+        for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
+            res = annexjson2result(a, ds, type="file", logger=lgr)
+            # Don't show all added metadata for the file because that
+            # could quickly flood the output.
+            del res["message"]
+            yield res
+
+
 def dlplugin(dataset=None, url_file=None, input_type="ext",
              url_format="{0}", filename_format="{1}",
              exclude_autometa=None, meta=None,
@@ -494,12 +608,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     from datalad.distribution.add import Add
     from datalad.distribution.create import Create
     from datalad.distribution.dataset import Dataset
-    from datalad.dochelpers import exc_str
-    from datalad.interface.results import annexjson2result, get_status_dict
+    from datalad.interface.results import get_status_dict
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
-    from datalad.support.exceptions import AnnexBatchCommandError
-    from datalad.ui import ui
 
     lgr = logging.getLogger("datalad.plugin.addurls")
 
@@ -583,57 +694,11 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
                     "ds": ds_current,
                     "ds_filename": ds_filename})
 
-    pbar_addurl = ui.get_progressbar(total=len(rows), label="Adding files",
-                                     unit=" Files")
-    pbar_addurl.start()
-
-    files_to_add = []
-    addurl_results = []
-    for row_idx, row in enumerate(rows, 1):
-        pbar_addurl.update(row_idx)
-        filename_abs = row["filename_abs"]
-        if os.path.exists(filename_abs) or os.path.islink(filename_abs):
-            if ifexists == "skip":
-                addurl_results.append(
-                    get_status_dict(action="addurls",
-                                    ds=row["ds"],
-                                    type="file",
-                                    path=filename_abs,
-                                    status="notneeded"))
-                continue
-            elif ifexists == "overwrite":
-                lgr.debug("Removing %s", filename_abs)
-                os.unlink(filename_abs)
-            else:
-                lgr.debug("File %s already exists", filename_abs)
-
-        try:
-            row["ds"].repo.add_url_to_file(row["ds_filename"], row["url"],
-                                           batch=True, options=annex_options)
-        except AnnexBatchCommandError as exc:
-            addurl_results.append(
-                get_status_dict(action="addurls",
-                                ds=row["ds"],
-                                type="file",
-                                path=filename_abs,
-                                message=exc_str(exc),
-                                status="error"))
-
-            continue
-        # Collect the status dicts to yield later so that we don't
-        # interrupt the progress bar.
-        addurl_results.append(
-            get_status_dict(action="addurls",
-                            ds=row["ds"],
-                            type="file",
-                            path=filename_abs,
-                            status="ok"))
-
-        files_to_add.append(row["filename"])
-    pbar_addurl.finish()
-
-    for result in addurl_results:
-        yield result
+    files_to_add = set()
+    for r in me.add_urls(rows, ifexists=ifexists, options=annex_options):
+        if r["status"] == "ok":
+            files_to_add.add(r["path"])
+        yield r
 
         msg = message or """\
 [DATALAD] add files from URLs
@@ -646,24 +711,6 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
         for r in dataset.add(files_to_add, message=msg):
             yield r
 
-    # TODO: Wrap this repeated "delayed results/progress bar" pattern.
-    pbar_meta = ui.get_progressbar(total=len(rows),
-                                   label="Adding metadata", unit=" Files")
-    pbar_meta.start()
-
-    meta_results = []
-    for meta_idx, row in enumerate(rows, 1):
-        ds, filename, meta = row["ds"], row["ds_filename"], row["meta_args"]
-        pbar_meta.update(meta_idx)
-        lgr.debug("Adding metadata to %s in %s",
-                  row["ds_filename"], row["ds"].path)
-
-        for a in ds.repo.set_metadata(filename, add=meta):
-            res = annexjson2result(a, ds, type="file", logger=lgr)
-            # Don't show all added metadata for the file because that
-            # could quickly flood the output.
-            del res["message"]
-            meta_results.append(res)
-
-    for result in meta_results:
-        yield result
+        meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
+        for r in me.add_meta(meta_rows):
+            yield r
