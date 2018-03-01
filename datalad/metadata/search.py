@@ -23,7 +23,6 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
-import json
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -442,23 +441,29 @@ class _WhooshSearch(_Search):
                 return
 
             nhits = 0
-            for hit in hits:
-                res = dict(
+            # annotate hits for full metadata report
+            hits = [dict(
+                path=normpath(opj(self.ds.path, hit['path'])),
+                query_matched={assure_unicode(k): assure_unicode(v)
+                               if isinstance(v, unicode_srctypes) else v
+                               for k, v in hit.matched_terms()},
+                parentds=normpath(
+                    opj(self.ds.path, hit['parentds'])) if 'parentds' in hit else None,
+                type=hit.get('type', None))
+                for hit in hits]
+            for res in query_aggregated_metadata(
+                    # type is taken from hit record
+                    reporton=None,
+                    ds=self.ds,
+                    aps=hits,
+                    # never recursive, we have direct hits already
+                    recursive=False):
+                res.update(
+                    refds=self.ds.path,
                     action='search',
                     status='ok',
                     logger=lgr,
-                    refds=self.ds.path,
-                    # normpath to avoid trailing dot
-                    path=normpath(opj(self.ds.path, hit['path'])),
-                    query_matched={assure_unicode(k): assure_unicode(v)
-                                   if isinstance(v, unicode_srctypes) else v
-                                   for k, v in hit.matched_terms()},
-                    metadata={k: v for k, v in hit.fields().items()
-                              if k not in ('path', 'parentds')})
-                if 'parentds' in hit:
-                    res['parentds'] = normpath(opj(self.ds.path, hit['parentds']))
-                if res['metadata'].get('type', None) in ('file', 'dataset'):
-                    res['type'] = res['metadata']['type']
+                )
                 yield res
                 nhits += 1
 
