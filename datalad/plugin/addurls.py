@@ -528,16 +528,17 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             "_repindex" can be added to the formatter.  Its value will
             start at 0 and increment every time a file name repeats.
 
-          - _url_hostname, _urlN, and _url_basename
+          - _url_hostname, _urlN, _url_basename
 
-            Various parts of the formatted URL are available.  If the
-            formatted URL is "http://datalad.org/for/git-users",
-            "datalad.org" is stored as "_url_hostname".
+            Various parts of the formatted URL are available.  Take
+            "http://datalad.org/asciicast/seamless_nested_repos.sh" as
+            an example.
 
-            Components of the URL's path can be referenced as "_urlN".
-            In the example URL above, "_url0" and "_url1" would map to
-            "for" and "git-users", respectively.  The final part of the
-            path is also available as "_url_basename".
+            "datalad.org" is stored as "_url_hostname".  Components of
+            the URL's path can be referenced as "_urlN".  "_url0" and
+            "_url1" would map to "asciicast" and "seamless_nested_repos.sh",
+            respectively.  The final part of the path is also available
+            as "_url_basename".
     exclude_autometa : str, optional
         By default, metadata field=value pairs are constructed with each
         column in `url_file`, excluding any single column that is
