@@ -507,6 +507,8 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             if not superds:
                 return ('error',
                         ("No super-dataset to inherit settings for remote %s", to))
+            # avoid global import, only needed for this corner case
+            from datalad.distribution.create_sibling import CreateSibling
             # XXX due to difference between create-sibling and create-sibling-github
             # would not be as transparent to inherit for -github
             lgr.info("Will try to create a sibling inheriting settings from %s", superds)
