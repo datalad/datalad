@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover
 
 
 # copied the simple_with_archives template in order to show
-def pipeline(url=None,
+def pipeline(doc_id=None,
              x_pathmatch_='.*/download/.*\.(tgz|tar.*|xml)',
              tarballs=True,
              datalad_downloader=False,
@@ -23,16 +23,11 @@ def pipeline(url=None,
              annex=None,
              incoming_pipeline=None):
 
-    response = XmlResponse(url=url)
-    doc_id = response.select('//file[contains(@id)]/@id').extract()
-    file_id = response.select('//contentMetaData[contains(@objectId)]/@objectId').extract()
-    url = "https://stacks.stanford.edu/file/druid:" + doc_id + "/" + file_id
-
-    crawler = crawl_url()
+    crawler = crawl_url("https://purl.stanford.edu/" + doc_id)
     # adding print_xml to incoming pipeline
     incoming_pipeline = [  # Download all the archives found on the project page
         crawler,
-        xpath_match(xpath_match, min_count=1), #changed h-ref to xpath_match
+        xpath_match('//file[contains(@id)]/@id', min_count=1), #changed h-ref to xpath_match
         print_xml
     ]
 
@@ -46,15 +41,3 @@ def print_xml(data, keys=['url']):
         if key in data: # catches key error if dictionary does not contain key
             print((data[key]).as_str())
     yield data
-
-
-# beginning crawl method to crawl xml info
-# class crawl_xml:
-#     def __init__(self, url="", file_path='//file[contains(@id)]/@id',
-#                  doc_path='//contentMetaData[contains(@objectId)]/@objectId'):
-#         response = XmlResponse(url=url)
-#
-#         # parse data using selectors from scrapy
-#         self._file_id = response.select(file_path).extract()
-#         self._doc_id= response.select(doc_path).extract()
-#         self._url = "https://stacks.stanford.edu/file/druid:" + self._doc_id + "/" + self._file_id
