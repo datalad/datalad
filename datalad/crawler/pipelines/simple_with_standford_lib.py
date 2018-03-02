@@ -1,4 +1,5 @@
 from ..nodes.matches import xpath_match
+from ..nodes.crawl_url import crawl_url
 try:
     from scrapy.http import Response
     from scrapy.http import XmlResponse
@@ -10,7 +11,7 @@ except ImportError:  # pragma: no cover
 
 
 # copied the simple_with_archives template in order to show
-def pipeline_2(url=None,
+def pipeline(url=None,
              x_pathmatch_='.*/download/.*\.(tgz|tar.*|xml)',
              tarballs=True,
              datalad_downloader=False,
@@ -22,7 +23,12 @@ def pipeline_2(url=None,
              annex=None,
              incoming_pipeline=None):
 
-    crawler = crawl_xml()
+    response = XmlResponse(url=url)
+    doc_id = response.select('//file[contains(@id)]/@id').extract()
+    file_id = response.select('//contentMetaData[contains(@objectId)]/@objectId').extract()
+    url = "https://stacks.stanford.edu/file/druid:" + doc_id + "/" + file_id
+
+    crawler = crawl_url()
     # adding print_xml to incoming pipeline
     incoming_pipeline = [  # Download all the archives found on the project page
         crawler,
@@ -43,12 +49,12 @@ def print_xml(data, keys=['url']):
 
 
 # beginning crawl method to crawl xml info
-class crawl_xml:
-    def __init__(self, url="", file_path='//file[contains(@id)]/@id',
-                 doc_path='//contentMetaData[contains(@objectId)]/@objectId'):
-        response = XmlResponse(url=url)
-
-        # parse data using selectors from scrapy
-        self._file_id = response.select(file_path).extract()
-        self._doc_id= response.select(doc_path).extract()
-        self._url = "https://stacks.stanford.edu/file/druid:" + self._doc_id + "/" + self._file_id
+# class crawl_xml:
+#     def __init__(self, url="", file_path='//file[contains(@id)]/@id',
+#                  doc_path='//contentMetaData[contains(@objectId)]/@objectId'):
+#         response = XmlResponse(url=url)
+#
+#         # parse data using selectors from scrapy
+#         self._file_id = response.select(file_path).extract()
+#         self._doc_id= response.select(doc_path).extract()
+#         self._url = "https://stacks.stanford.edu/file/druid:" + self._doc_id + "/" + self._file_id
