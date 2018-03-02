@@ -14,8 +14,7 @@ from os.path import dirname
 
 from shutil import copy
 
-from datalad.api import Dataset
-from datalad.api import plugin
+from datalad.coreapi import Dataset
 from datalad.utils import chpwd
 
 from datalad.tests.utils import ok_clean_git
