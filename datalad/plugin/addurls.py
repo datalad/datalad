@@ -41,10 +41,9 @@ class Formatter(string.Formatter):
         its place.
     """
 
-    def __init__(self, idx_to_name, missing_value=None, *args, **kwargs):
+    def __init__(self, idx_to_name, missing_value=None):
         self.idx_to_name = idx_to_name or {}
         self.missing = missing_value
-        super(Formatter, self).__init__(*args, **kwargs)
 
     def format(self, format_string, *args, **kwargs):
         if not isinstance(args[0], Mapping):
