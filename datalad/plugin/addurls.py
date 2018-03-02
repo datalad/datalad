@@ -297,6 +297,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     ----------
     stream : file object
         Items used to construct the file names and URLs.
+    input_type : {'csv', 'json'}
 
     All other parameters match those described in `dlplugin`.
 
