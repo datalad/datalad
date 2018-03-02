@@ -610,25 +610,22 @@ class _EGrepSearch(_Search):
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
             meta = res.get('metadata', {})
-            # produce a big string blob that also includes the flattened metadata keys
-            # to search through
-            # sorted by keyname
-            doc = u'; '.join(
-                u': '.join((k, v))
-                for k, v in sorted(
-                    _meta2autofield_dict(meta, val2str=True).items(),
-                    key=lambda x: x[0]))
+            # produce a flattened metadata dict to search through
+            doc = _meta2autofield_dict(meta, val2str=True)
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            match = query.search(doc, re.DOTALL | re.UNICODE)
-            if match:
+            matches = {k: query.search(v.lower())
+                       for k, v in doc.items()}
+            # retain what actually matched
+            matches = {k: match.group() for k, match in matches.items() if match}
+            if matches:
                 hit = dict(
                     res,
                     action='search',
-                    query_matched=match.group(),
+                    query_matched=matches,
                 )
                 yield hit
                 nhits += 1
@@ -667,8 +664,8 @@ class _EGrepSearch(_Search):
     def get_query(self, query):
         # cmdline args might come in as a list
         if isinstance(query, list):
-            query = r' '.join(query)
-        return query
+            query = u' '.join(query)
+        return query.lower()
 
 
 @build_doc
