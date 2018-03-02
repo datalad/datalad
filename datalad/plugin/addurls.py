@@ -287,7 +287,7 @@ def get_url_names(url):
     return names
 
 
-def extract(stream, input_type, filename_format, url_format,
+def extract(stream, input_type, url_format, filename_format,
             exclude_autometa, meta, missing_value):
     """Extract and format information from `url_file`.
 
@@ -506,7 +506,7 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
 
     with open(url_file) as fd:
         rows, subpaths = me.extract(fd, input_type,
-                                    filename_format, url_format,
+                                    url_format, filename_format,
                                     exclude_autometa, meta,
                                     missing_value)
 

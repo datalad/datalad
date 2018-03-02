@@ -187,8 +187,8 @@ def json_stream(data):
 def test_extract():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
+        "{age_group}//{now_dead}//{name}.csv",
         None, [], None)
 
     eq_(subpaths,
@@ -214,8 +214,8 @@ def test_extract():
 def test_extract_disable_autometa():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
+        "{age_group}//{now_dead}//{name}.csv",
         "*",
         ["group={age_group}"],
         None)
@@ -227,8 +227,8 @@ def test_extract_disable_autometa():
 def test_extract_exclude_autometa_regexp():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{age_group}//{now_dead}//{name}.csv",
         "{name}_{debut_season}.com",
+        "{age_group}//{now_dead}//{name}.csv",
         "ea",
         [],
         None)
@@ -245,8 +245,8 @@ def test_extract_csv_json_equal():
     csv_rows.extend(",".join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
-    args = ["{age_group}//{now_dead}//{name}.csv",
-            "{name}_{debut_season}.com",
+    args = ["{name}_{debut_season}.com",
+            "{age_group}//{now_dead}//{name}.csv",
             None,
             ["group={age_group}"],
             None]
