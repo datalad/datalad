@@ -270,7 +270,7 @@ def _format_filenames(format_fn, rows, row_infos):
     return subpaths
 
 
-def get_url_names(url):
+def get_url_parts(url):
     """Assign a name to various parts of the URL.
 
     Parameters
@@ -359,7 +359,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     # information about the formatted URLs.
     if any(i.startswith("_url") for i in get_fmt_names(filename_format)):
         for row, info in zip(rows_with_url, infos):
-            row.update(get_url_names(info["url"]))
+            row.update(get_url_parts(info["url"]))
 
     # For the file name, we allow the _repindex special key.
     format_filename = partial(
