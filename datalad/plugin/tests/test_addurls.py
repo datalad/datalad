@@ -187,9 +187,8 @@ def json_stream(data):
 def test_extract():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{name}_{debut_season}.com",
-        "{age_group}//{now_dead}//{name}.csv",
-        None, [], None)
+        url_format="{name}_{debut_season}.com",
+        filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
         {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
@@ -214,11 +213,11 @@ def test_extract():
 def test_extract_disable_autometa():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{name}_{debut_season}.com",
-        "{age_group}//{now_dead}//{name}.csv",
-        "*",
-        ["group={age_group}"],
-        None)
+        url_format="{name}_{debut_season}.com",
+        filename_format="{age_group}//{now_dead}//{name}.csv",
+        exclude_autometa="*",
+        meta=["group={age_group}"])
+
 
     eq_([d["meta_args"] for d in info],
         [["group=kid"], ["group=adult"], ["group=adult"], ["group=kid"]])
@@ -227,11 +226,9 @@ def test_extract_disable_autometa():
 def test_extract_exclude_autometa_regexp():
     info, subpaths = addurls.extract(
         json_stream(ST_DATA["rows"]), "json",
-        "{name}_{debut_season}.com",
-        "{age_group}//{now_dead}//{name}.csv",
-        "ea",
-        [],
-        None)
+        url_format="{name}_{debut_season}.com",
+        filename_format="{age_group}//{now_dead}//{name}.csv",
+        exclude_autometa="ea")
 
     eq_([set(d["meta_args"]) for d in info],
         [{"name=will", "age_group=kid"},
@@ -245,22 +242,20 @@ def test_extract_csv_json_equal():
     csv_rows.extend(",".join(str(row[k]) for k in keys)
                     for row in ST_DATA["rows"])
 
-    args = ["{name}_{debut_season}.com",
-            "{age_group}//{now_dead}//{name}.csv",
-            None,
-            ["group={age_group}"],
-            None]
+    kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
+                url_format="{name}_{debut_season}.com",
+                meta=["group={age_group}"])
 
-    json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", *args)
-    csv_output = addurls.extract(csv_rows, "csv", *args)
+
+    json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
+    csv_output = addurls.extract(csv_rows, "csv", **kwds)
 
     eq_(json_output, csv_output)
 
 
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  addurls.extract,
-                  None, "not_csv_or_json", None, None, None, None, None)
+                  addurls.extract, None, "not_csv_or_json")
 
 
 def test_addurls_no_urlfile():

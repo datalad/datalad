@@ -19,6 +19,8 @@ import string
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
+from datalad.utils import assure_list
+
 lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
@@ -287,8 +289,8 @@ def get_url_names(url):
     return names
 
 
-def extract(stream, input_type, url_format, filename_format,
-            exclude_autometa, meta, missing_value):
+def extract(stream, input_type, url_format="{0}", filename_format="{1}",
+            exclude_autometa=None, meta=None, missing_value=None):
     """Extract and format information from `url_file`.
 
     Parameters
@@ -304,6 +306,8 @@ def extract(stream, input_type, url_format, filename_format,
     for each row in `stream` and the second item is a set that contains all the
     subdataset paths.
     """
+    meta = assure_list(meta)
+
     rows, colidx_to_name = _read(stream, input_type)
 
     fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
@@ -476,12 +480,9 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
     import datalad.plugin.addurls as me
     from datalad.support.annexrepo import AnnexRepo
     from datalad.support.exceptions import AnnexBatchCommandError
-    from datalad.utils import assure_list
     from datalad.ui import ui
 
     lgr = logging.getLogger("datalad.plugin.addurls")
-
-    meta = assure_list(meta)
 
     if url_file is None:
         # `url_file` is not a required argument in `dlplugin` because
