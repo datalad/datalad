@@ -1521,7 +1521,7 @@ def import_module_from_file(modpath, log=lgr.debug):
     except Exception as e:
         from datalad.dochelpers import exc_str
         raise RuntimeError(
-            "Failed to import pipeline from %s: %s" % (modpath, exc_str(e)))
+            "Failed to import module from %s: %s" % (modpath, exc_str(e)))
     finally:
         if dirname_ in sys.path:
             sys.path.pop(sys.path.index(dirname_))
