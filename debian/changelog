@@ -1,3 +1,14 @@
+datalad (0.9.2-1) unstable; urgency=medium
+
+  * Large primarily bugfix release
+    - Debian proper has now fresh enough git-annex
+    - upload would mean tests been dealt with (Closes: #891946)
+  * debian/control
+    - carries needed depends on python-msgpack (Closes: #891946)
+      and provides fake http_proxy to prevent downloads
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 02 Mar 2018 23:21:34 -0500
+
 datalad (0.9.1-1) neurodebian; urgency=medium
 
   * Fresh very minor bugfix release
