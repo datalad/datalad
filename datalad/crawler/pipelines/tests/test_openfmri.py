@@ -7,8 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+from datalad.tests.utils import known_failure_direct_mode
+
+
 import os
 from glob import glob
 from os.path import join as opj
@@ -32,7 +34,7 @@ from ....utils import chpwd
 from ....utils import find_files
 from ....utils import swallow_logs
 from ....tests.utils import integration
-from ....tests.utils import with_tree
+from ....tests.utils import (with_tree, File)
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
 from ....tests.utils import assert_in, assert_not_in
@@ -43,6 +45,7 @@ from ....tests.utils import skip_if_no_network
 from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
+from ....tests.utils import ok_clean_git
 
 from .. import openfmri
 from ..openfmri import pipeline as ofpipeline
@@ -186,6 +189,46 @@ _versioned_files = """
 @integration
 @with_tree(tree={
     'ds666': {
+        'ds666_R1.0.0.tar.gz':     {'ds666': {
+            'dataset_description.json': "{}"}},
+        'ds666_R2.0.0.tar.gz':     {'ds666': {
+            # There was a problem leading to this json being added to annex instead of git
+            File('dataset_description.json', executable=True): "{}",
+            'sub-1': {'anat': {File('sub-1_T1w.dat', executable=True): "mighty load 2.0.0"}}}},
+    }},
+    archives_leading_dir=False
+)
+@serve_path_via_http
+@with_tempfile
+@with_tempfile
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_openfmri_addperms(ind, topurl, outd, clonedir):
+    index_html = opj(ind, 'ds666', 'index.html')
+
+    list(initiate_dataset(
+        template="openfmri",
+        dataset_name='dataladtest-ds666',
+        path=outd,
+        data_fields=['dataset'])({'dataset': 'ds666'}))
+
+    ok_clean_git(outd)
+    with chpwd(outd):
+        pipeline = ofpipeline(
+            'ds666', versioned_urls=False, topurl=topurl,
+            s3_prefix=False  # so  we do not invoke s3 subpipeline
+        )
+        ok_clean_git(outd)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    ok_clean_git(outd)
+    ok_file_under_git(outd, 'dataset_description.json', annexed=False)
+
+
+@integration
+@with_tree(tree={
+    'ds666': {
         # there could also be a case of a file with "unique" name without versioned counterpart
         # e.g. ds666_models.tar.gz  which seems to be not treated correctly (not placed into any
         # version in case of ds000017)
@@ -206,8 +249,8 @@ _versioned_files = """
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     index_html = opj(ind, 'ds666', 'index.html')
 
@@ -437,8 +480,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 )
 @serve_path_via_http
 @with_tempfile
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 

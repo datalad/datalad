@@ -46,6 +46,15 @@ Meta data handling
    generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
 
+Reproducible execution
+======================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-run
+   generated/man/datalad-rerun
+
 Miscellaneous commands
 ======================
 
@@ -58,7 +67,6 @@ Miscellaneous commands
    generated/man/datalad-crawl-init
    generated/man/datalad-download-url
    generated/man/datalad-ls
-   generated/man/datalad-run
    generated/man/datalad-test
 
 Plumbing commands

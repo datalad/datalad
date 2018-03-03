@@ -38,6 +38,7 @@ from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 
@@ -277,7 +278,7 @@ class Subdatasets(Interface):
                 for sm in _parse_git_submodules(refds_path, recursive=recursive):
                     # unwind the parent stack until we find the right one
                     # this assumes that submodules come sorted
-                    while not sm['path'].startswith(_with_sep(stack[-1])):
+                    while not path_startswith(sm['path'], stack[-1]):
                         stack.pop()
                     parent = stack[-1]
                     if parent not in modinfo_cache:
@@ -340,7 +341,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     for sm in _parse_git_submodules(dspath, recursive=False):
         if contains and \
                 not (contains == sm['path'] or
-                     contains.startswith(_with_sep(sm['path']))):
+                     path_startswith(contains, sm['path'])):
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue

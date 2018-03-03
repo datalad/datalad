@@ -35,7 +35,9 @@ from ..utils import getpwd, chpwd
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
-    rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
+    rmtemp, \
+    OBSCURE_PREFIX, OBSCURE_FILENAMES,\
+    get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
@@ -195,10 +197,10 @@ def test_with_tempfile_specified_prefix(d1):
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
     if platform.system() in ('Linux', 'Darwin'):
-        eq_(n, OBSCURE_FILENAMES[1])
+        eq_(n, OBSCURE_PREFIX + OBSCURE_FILENAMES[1])
     else:
         # ATM no one else is as good
-        ok_(n in OBSCURE_FILENAMES[2:])
+        ok_(n in OBSCURE_PREFIX + OBSCURE_FILENAMES[2:])
 
 
 def test_keeptemp_via_env_variable():
@@ -584,3 +586,11 @@ def test_testsui():
         assert_false(ui.is_interactive)
         return x*3
     eq_(func3(2), 6)
+
+
+def test_setup():
+    # just verify that we monkey patched consts correctly
+    from datalad.consts import DATASETS_TOPURL
+    eq_(DATASETS_TOPURL, 'http://datasets-tests.datalad.org/')
+    from datalad.tests.utils import get_datasets_topdir
+    eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')

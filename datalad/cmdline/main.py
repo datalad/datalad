@@ -37,7 +37,7 @@ from ..dochelpers import exc_str
 
 def _license_info():
     return """\
-Copyright (c) 2013-2017 DataLad developers
+Copyright (c) 2013-2018 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -216,15 +216,8 @@ def setup_parser(
                     intf_doc)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
-            # all subparser can report the version
-            helpers.parser_add_common_opt(
-                subparser, 'version',
-                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                                 _license_info()))
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
-            helpers.parser_add_common_opt(subparser, 'log_level')
-            helpers.parser_add_common_opt(subparser, 'pbs_runner')
             # let module configure the parser
             _intf.setup_parser(subparser)
             # logger for command
@@ -319,14 +312,14 @@ def main(args=None):
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
 
-    # enable overrides
-    datalad.cfg.reload()
-
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
             for o in cmdlineargs.cfg_overrides])
         datalad.cfg.overrides.update(overrides)
+
+    # enable overrides
+    datalad.cfg.reload(force=True)
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
@@ -345,6 +338,8 @@ def main(args=None):
         if cmdlineargs.common_debug or cmdlineargs.common_idebug:
             # so we could see/stop clearly at the point of failure
             setup_exceptionhook(ipython=cmdlineargs.common_idebug)
+            from datalad.interface.base import Interface
+            Interface._interrupted_exit_code = None
             ret = cmdlineargs.func(cmdlineargs)
         else:
             # otherwise - guard and only log the summary. Postmortem is not
@@ -373,13 +368,9 @@ def main(args=None):
                 if exc.msg:
                     os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
                 if exc.stdout:
-                    os.write(1, exc.stdout.encode()) \
-                        if hasattr(exc.stdout, 'encode')  \
-                        else os.write(1, exc.stdout)
+                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr.encode()) \
-                        if hasattr(exc.stderr, 'encode')  \
-                        else os.write(2, exc.stderr)
+                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, text_type) else exc.stderr)
                 # We must not exit with 0 code if any exception got here but
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)

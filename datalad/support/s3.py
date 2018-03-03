@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8  -*-
 # vi: set ft=python sts=4 ts=4 sw=4 et:
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -24,8 +24,8 @@ import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
-from ..dochelpers import exc_str
-from .exceptions import DownloadError, AccessDeniedError
+from datalad.dochelpers import exc_str
+from datalad.support.exceptions import DownloadError, AccessDeniedError
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import urlparse, urlunparse
@@ -52,7 +52,7 @@ def _get_bucket_connection(credential):
     # with different resources. Thus for now just making an option which
     # one to use
     # do full shebang with entering credentials
-    from ..downloaders.credentials import AWS_S3
+    from datalad.downloaders.credentials import AWS_S3
     credential = AWS_S3(credential, None)
     if not credential.is_known:
         credential.enter_new()
@@ -62,10 +62,10 @@ def _get_bucket_connection(credential):
 
 def _handle_exception(e, bucket_name):
     """Helper to handle S3 connection exception"""
-    if e.error_code == 'AccessDenied':
-        raise AccessDeniedError(exc_str(e))
-    else:
-        raise DownloadError(
+    raise (
+        AccessDeniedError
+        if e.error_code == 'AccessDenied'
+        else DownloadError)(
             "Cannot connect to %s S3 bucket. Exception: %s"
             % (bucket_name, exc_str(e))
         )
@@ -90,7 +90,7 @@ def get_bucket(conn, bucket_name):
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
             lgr.debug("Cannot access all buckets: %s", exc_str(e2))
-            _handle_exception(e, 'any')
+            _handle_exception(e, 'any (originally requested %s)' % bucket_name)
         all_bucket_names = [b.name for b in all_buckets]
         lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
         if bucket_name in all_bucket_names:
@@ -139,6 +139,10 @@ class VersionedFilesPool(object):
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
+    # TODO: here we would need to encode the name since urlquote actually
+    # can't do that on its own... but then we should get a copy of the thing
+    # so we could still do the .format....
+    # ... = e.name.encode('utf-8')  # unicode isn't advised in URLs
     e.name_urlquoted = urlquote(e.name)
     if schema == 'http':
         fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name_urlquoted}"
@@ -262,6 +266,31 @@ def gen_bucket_test1_dirs():
     files("d1", load="smth")
 
 
+def gen_bucket_test2_obscurenames_versioned():
+    # in principle bucket name could also contain ., but boto doesn't digest it
+    # well
+    bucket_name = 'datalad-test2-obscurenames-versioned'
+    bucket = gen_test_bucket(bucket_name)
+    bucket.configure_versioning(True)
+
+    # Enable web access to that bucket to everyone
+    bucket.configure_website('index.html')
+    set_bucket_public_access_policy(bucket)
+
+    files = VersionedFilesPool(bucket)
+
+    # http://docs.aws.amazon.com/AmazonS3/latest/dev/UsingMetadata.html
+    files("f 1", load="")
+    files("f [1][2]")
+    # Need to grow up for this .... TODO
+    #files(u"юникод")
+    #files(u"юни/код")
+    # all fancy ones at once
+    files("f!-_.*'( )")
+    # the super-fancy which aren't guaranteed to be good idea (as well as [] above)
+    files("f &$=@:+,?;")
+
+
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
                       s3conn=None):
     """Given a url return a versioned URL
@@ -292,12 +321,12 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     s3_bucket, fpath = None, url_rec.path.lstrip('/')
 
     if url_rec.netloc.endswith('.s3.amazonaws.com'):
-        if not url_rec.scheme in ('http', 'https'):
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
         s3_bucket = url_rec.netloc.split('.', 1)[0]
     elif url_rec.netloc == 's3.amazonaws.com':
-        if not url_rec.scheme in ('http', 'https'):
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
         s3_bucket, fpath = fpath.split('/', 1)

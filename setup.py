@@ -53,7 +53,7 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.1.6',
+        'GitPython>=2.1.8',
         'iso8601',
         'humanize',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
@@ -84,8 +84,9 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        'duecredit',
         'simplejson',
-        'pyld',
+        'pyld',  # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
     ],
     'metadata-extra': [
         'PyYAML',  # very optional
@@ -142,7 +143,13 @@ README = opj(dirname(__file__), 'README.md')
 try:
     import pypandoc
     long_description = pypandoc.convert(README, 'rst')
-except ImportError:
+except (ImportError, OSError) as exc:
+    # attempting to install pandoc via brew on OSX currently hangs and
+    # pypandoc imports but throws OSError demanding pandoc
+    print(
+        "WARNING: pypandoc failed to import or thrown an error while converting"
+        " README.md to RST: %r   .md version will be used as is" % exc
+    )
     long_description = open(README).read()
 
 

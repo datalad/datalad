@@ -712,12 +712,14 @@ def swallow_outputs():
 
         @property
         def out(self):
-            self._out.flush()
+            if not self._out.closed:
+                self._out.flush()
             return self._read(self._out)
 
         @property
         def err(self):
-            self._err.flush()
+            if not self._err.closed:
+                self._err.flush()
             return self._read(self._err)
 
         @property
@@ -889,6 +891,40 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         adapter.cleanup()
 
 
+# TODO: May be melt in with swallow_logs at some point:
+@contextmanager
+def disable_logger(logger=None):
+    """context manager to temporarily disable logging
+
+    This is to provide one of swallow_logs' purposes without unnecessarily
+    creating temp files (see gh-1865)
+
+    Parameters
+    ----------
+    logger: Logger
+        Logger whose handlers will be ordered to not log anything.
+        Default: datalad's topmost Logger ('datalad')
+    """
+
+    class NullFilter(logging.Filter):
+        """Filter class to reject all records
+        """
+        def filter(self, record):
+            return 0
+
+    if logger is None:
+        # default: all of datalad's logging:
+        logger = logging.getLogger('datalad')
+
+    filter_ = NullFilter(logger.name)
+    [h.addFilter(filter_) for h in logger.handlers]
+
+    try:
+        yield logger
+    finally:
+        [h.removeFilter(filter_) for h in logger.handlers]
+
+
 #
 # Additional handlers
 #
@@ -1024,10 +1060,39 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def _get_normalized_paths(path, prefix):
+    if isabs(path) != isabs(prefix):
+        raise ValueError("Bot paths must either be absolute or relative. "
+                         "Got %r and %r" % (path, prefix))
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return path, prefix
+
+
 def path_startswith(path, prefix):
-    """Return True if path starts with prefix path"""
-    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
-           == with_pathsep(prefix)
+    """Return True if path starts with prefix path
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return path.startswith(prefix)
+
+
+def path_is_subpath(path, prefix):
+    """Return True if path is a subpath of prefix
+
+    It will return False if path == prefix.
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
 def knows_annex(path):

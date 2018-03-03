@@ -12,8 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_v6
+
+
 import logging
 import os
 from os import unlink
@@ -27,6 +28,7 @@ from ...tests.utils import assert_false
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import SkipTest
+from ...tests.utils import assert_re_in
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
@@ -73,8 +75,6 @@ treeargs = dict(
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     chpwd(repo_path)
@@ -162,12 +162,12 @@ tree4uargs = dict(
 )
 
 
+@known_failure_v6   # FIXME
+#  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_content(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -272,7 +272,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0, persistent=False)
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     repo.get(opj('1', '1 f.txt'))  # that what managed to not work
 
     # TODO: check if persistent archive is there for the 1.tar.gz
@@ -280,7 +280,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     # We should be able to drop everything since available online
     with swallow_outputs():
         clean(dataset=repo.path)
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
@@ -290,9 +290,9 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
-    repo.get(key_1tar, options=['--key'])
+    repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, options=['--key'])
+    res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
     assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
@@ -303,10 +303,6 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tree(**tree1args)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
-@skip_direct_mode  #FIXME
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     orig_pwd = getpwd()
@@ -330,14 +326,19 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
-@skip_direct_mode  #FIXME
-@skip_v6  #FIXME
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
     repo = AnnexRepo(repo_path, create=True, direct=direct)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
+        # check it gives informative error if archive is not already added
+        with assert_raises(RuntimeError) as cmr:
+            add_archive_content(archive_path)
+        assert_re_in(
+            "You should run ['\"]datalad add %s['\"] first" % archive_path,
+            str(cmr.exception), match=False
+        )
         with swallow_outputs():
             repo.add(archive_path)
         repo.commit("added 1.tar.gz")
