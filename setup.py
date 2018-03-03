@@ -63,7 +63,7 @@ requires = {
     ] + pbar_requires,
     'downloaders': [
         'boto',
-        'msgpack-python',
+        'msgpack',
         'requests>=1.2',
     ] + keyring_requires,
     'downloaders-extra': [
