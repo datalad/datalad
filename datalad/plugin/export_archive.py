@@ -106,7 +106,7 @@ def dlplugin(dataset, filename=None, archivetype='tar', compression='gz',
                             'File %s has no content available, skipped', fpath)
                         continue
                     else:
-                        raise IOError('File %s has no content available', fpath)
+                        raise IOError('File %s has no content available' % fpath)
 
                 # resolve to possible link target
                 link_target = os.readlink(fpath)
