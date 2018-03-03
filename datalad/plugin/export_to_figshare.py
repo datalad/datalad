@@ -104,7 +104,7 @@ class FigshareRESTLaison(object):
                     data = f.read(part['endOffset'] - part['startOffset'] + 1)
                     url = '{upload_url}/{partNo}'.format(**udata)
                     ok = self.put(url, data=data, binary=True, return_json=False)
-                    assert ok == 'OK'
+                    assert ok == b'OK'
                 pbar.update(part['endOffset'], increment=False)
             pbar.finish()
 
