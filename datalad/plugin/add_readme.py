@@ -37,6 +37,10 @@ def dlplugin(dataset, filename='README.md', existing='skip'):
     from io import open
     import logging
     lgr = logging.getLogger('datalad.plugin.add_readme')
+
+    from datalad.distribution.add import Add
+    from datalad.interface.unlock import Unlock
+    from datalad.metadata.metadata import Metadata
     from datalad.utils import assure_list
 
     filename = opj(dataset.path, filename)
