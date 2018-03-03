@@ -142,7 +142,7 @@ def dlplugin(dataset, filename=None,
     Very quick and dirty approach.  Ideally figshare should be supported as
     a proper git annex special remote.  Unfortunately, figshare does not support
     having directories, and can store only a flat list of files.  That makes
-    it impossible for any sensible publish'ing of complete datasets.
+    it impossible for any sensible publishing of complete datasets.
 
     The only workaround is to publish dataset as a zip-ball, where the entire
     content is wrapped into a .zip archive for which figshare would provide a
