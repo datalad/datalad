@@ -6,6 +6,7 @@ datalad (0.9.2-1) unstable; urgency=medium
   * debian/control
     - carries needed depends on python-msgpack (Closes: #891946)
       and provides fake http_proxy to prevent downloads
+    - added python-duecredit
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 02 Mar 2018 23:21:34 -0500
 
