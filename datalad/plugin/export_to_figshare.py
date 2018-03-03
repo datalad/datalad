@@ -133,7 +133,7 @@ class FigshareRESTLaison(object):
 # PLUGIN API
 def dlplugin(dataset, filename=None,
              missing_content='error',
-             annex=True,
+             no_annex=False,
              # project_id=None,  # TODO: support working with projects and articles within them
              article_id=None
              ):
@@ -162,11 +162,11 @@ def dlplugin(dataset, filename=None,
       only inform about problem at the 'debug' log level. The latter two
       can be helpful when generating a TAR archive from a dataset where
       some file content is not available locally.
-    annex : bool, optional
-      If True generated .zip file would be added to annex, and all files
+    no_annex : bool, optional
+      By default the generated .zip file would be added to annex, and all files
       would get registered in git-annex to be available from such a tarball. Also
       upon upload we will register for that archive to be a possible source for it
-      in annex.
+      in annex. Setting this flag disables this behavior.
     project_id : int, optional
       If given, article (if article_id is not provided) will be created in that
       project
@@ -241,7 +241,10 @@ def dlplugin(dataset, filename=None,
         files_url='account/articles/%s/files' % article_id
     )
 
-    if annex:
+    if no_annex:
+        lgr.info("Removing generated tarball")
+        os.unlink(fname)
+    else:
         # I will leave all the complaining etc to the dataset add if path
         # is outside etc
         lgr.info("'Registering' %s within annex", fname)
@@ -277,10 +280,6 @@ def dlplugin(dataset, filename=None,
         #     # so we could create a branch where to dump and export to figshare
         #     # (kinda closer to my idea)
         #     dataset.save(fname, message="Added the entire dataset into a zip file")
-
-    else:
-        lgr.info("Removing generated tarball")
-        os.unlink(fname)
 
     # TODO: add to downloader knowledge about figshare token so it could download-url
     # those zipballs before they go public
