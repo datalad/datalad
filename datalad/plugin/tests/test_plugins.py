@@ -164,7 +164,7 @@ def test_add_readme(path):
     ds.add('.')
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
-    assert_status('ok', ds.plugin('add_readme'))
+    assert_status('ok', ds.add_readme())
     # should use default name
     eq_(
         open(opj(path, 'README.md')).read(),
@@ -192,4 +192,4 @@ see the DataLad documentation at: http://docs.datalad.org
     id=ds.id))
 
     # should skip on re-run
-    assert_status('notneeded', ds.plugin('add_readme'))
+    assert_status('notneeded', ds.add_readme())
