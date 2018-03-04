@@ -82,7 +82,7 @@ class ExtractMetadata(Interface):
         dsmeta, contentmeta, error = _get_metadata(
             dataset,
             type if isinstance(type, list) else [type],
-            global_meta=dataset is not None,
+            global_meta=True,
             content_meta=file is not None,
             paths=file if isinstance(file, list) else [file])
 
