@@ -22,7 +22,7 @@ from os.path import abspath
 from os.path import normpath
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 
 from datalad.distribution.dataset import Dataset
 
@@ -330,7 +330,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
             # do we have any failures in a subdir of the requested dir?
             failure_results = [
                 fp for fp in respath_by_status.get('failure', [])
-                if path_startswith(fp, p)]
+                if path_is_subpath(fp, p)]
             if failure_results:
                 # we were not able to process all requested_paths, let's label
                 # this 'impossible' to get a warning-type report
@@ -344,7 +344,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 # otherwise cool, but how cool?
                 success_results = [
                     fp for fp in respath_by_status.get('success', [])
-                    if path_startswith(fp, p)]
+                    if path_is_subpath(fp, p)]
                 yield get_status_dict(
                     status='ok' if success_results else 'notneeded',
                     message=None if success_results else (noinfo_dir_msg, p),
