@@ -41,14 +41,16 @@ class ExtractMetadata(Interface):
     from datalad.support.constraints import EnsureNone, EnsureStr
 
     _params_ = dict(
-        type=Parameter(
+        types=Parameter(
             args=("--type",),
+            dest="types",
             metavar=("NAME"),
             nargs="+",
             required=True,
             doc="""Name of the metadata extractor to be executed."""),
-        file=Parameter(
+        files=Parameter(
             args=("--file",),
+            dest="files",
             metavar="FILE",
             nargs="*",
             doc="Path of a file to extract metadata from.",
@@ -63,7 +65,7 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(type, file=None, dataset=None):
+    def __call__(types, files=None, dataset=None):
         from os import curdir
         from os.path import join as opj
         from datalad.interface.results import get_status_dict
@@ -71,20 +73,21 @@ class ExtractMetadata(Interface):
         from datalad.metadata.metadata import _get_metadata
         from datalad.metadata.metadata import _get_metadatarelevant_paths
 
+
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
-                                  check_installed=not file)
-        if not file:
+                                  check_installed=not files)
+        if not files:
             ds = require_dataset(dataset, check_installed=True)
             subds = ds.subdatasets(recursive=False, result_xfm='relpaths')
-            file = list(_get_metadatarelevant_paths(ds, subds))
+            files = list(_get_metadatarelevant_paths(ds, subds))
 
         dsmeta, contentmeta, error = _get_metadata(
             dataset,
-            type if isinstance(type, list) else [type],
+            types,
             global_meta=True,
-            content_meta=file is not None,
-            paths=file if isinstance(file, list) else [file])
+            content_meta=bool(files),
+            paths=files)
 
         if dataset is not None and dataset.is_installed():
             res = get_status_dict(
