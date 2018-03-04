@@ -114,15 +114,15 @@ class AddReadme(Interface):
                 metainfo += u'\n\n{}'.format(content)
 
         default_content=u"""\
-    # {title}{metainfo}
+# {title}{metainfo}
 
-    ## General information
+## General information
 
-    This is a DataLad dataset{id}.
+This is a DataLad dataset{id}.
 
-    For more information on DataLad and on how to work with its datasets,
-    see the DataLad documentation at: http://docs.datalad.org
-    """.format(
+For more information on DataLad and on how to work with its datasets,
+see the DataLad documentation at: http://docs.datalad.org
+""".format(
             title='Dataset "{}"'.format(meta['name']) if 'name' in meta else 'About this dataset',
             metainfo=metainfo,
             id=u' (id: {})'.format(dataset.id) if dataset.id else '',
