@@ -45,6 +45,7 @@ def dlplugin(type, file=None, dataset=None):
     from datalad.distribution.dataset import require_dataset
     from datalad.metadata.metadata import _get_metadata
     from datalad.metadata.metadata import _get_metadatarelevant_paths
+    from datalad.distribution.subdatasets import Subdatasets
 
     if file is None:
         ds = require_dataset(dataset, check_installed=True)
