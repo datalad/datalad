@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+
 from .utils import (
     chpwd,
     get_dataset_root,
@@ -39,13 +40,17 @@ def test_not_under_git(path):
 def test_git_config_fixture():
     # in the setup_package we setup a new HOME with custom config
     from datalad.support.gitrepo import check_git_configured
-    assert_equal(
-        check_git_configured(),
-        {
-            'user.name': 'DataLad Tester',
-            'user.email': 'test@example.com'
-         }
-    )
+    if 'GIT_HOME' not in os.environ:
+        assert_equal(
+            check_git_configured(),
+            {
+                'user.name': 'DataLad Tester',
+                'user.email': 'test@example.com'
+             }
+        )
+    else:
+        # we pick up the ones in the 'GIT_HOME' which might differ
+        assert_equal(sorted(check_git_configured()), ['user.email', 'user.name'])
 
 
 def test_no_empty_http_proxy():
