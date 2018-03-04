@@ -117,7 +117,7 @@ def _parse_git_submodules(dspath, recursive):
         if not line:
             continue
         sm = {}
-        sm['state'] = status_map[line[0]]
+
         props = submodule_full_props.match(line[1:])
         if props:
             sm['revision'] = props.group(1)
@@ -127,6 +127,15 @@ def _parse_git_submodules(dspath, recursive):
             props = submodule_nodescribe_props.match(line[1:])
             sm['revision'] = props.group(1)
             sm['path'] = opj(dspath, props.group(2))
+
+        sm['state'] = status_map[line[0]]
+        if sm['state'] == 'clean':
+            # with git 2.16 we see " " for uninstalled dataset
+            # and ((null)) in the trailing of the line
+            # This code is RFed completely away in datalad 0.10
+            if '((null))' in line:
+                sm['state'] = 'absent'
+
         yield sm
 
 
