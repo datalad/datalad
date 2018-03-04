@@ -9,6 +9,24 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+
+## 0.9.3 (??? ??, 2018) -- if ever be released
+
+bet we will fix some bugs and we might need to kick it out before 0.10.
+
+### Major refactoring and deprecations
+
+- should be none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+- very unlikely
+
+
 ## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
 
 Largely a bugfix release with a few enhancements.
