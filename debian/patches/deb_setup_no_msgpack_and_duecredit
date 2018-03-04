@@ -1,0 +1,32 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: comment out msgpack and duecredit in setup.py
+
+  duecredit is absent on some elderly releases, and anyways
+  not clear yet even why it was needed 
+
+  msgpack -- for some reason on older systems even if installed
+  system-wide from debian package, still attempts to pip install it
+  for no good reason afaik
+
+Last-Update: 2018-03-03
+
+--- a/setup.py
++++ b/setup.py
+@@ -63,7 +63,7 @@ requires = {
+     ] + pbar_requires,
+     'downloaders': [
+         'boto',
+-        'msgpack',
++        #'msgpack',
+         'requests>=1.2',
+     ] + keyring_requires,
+     'downloaders-extra': [
+@@ -84,7 +84,7 @@ requires = {
+         'vcrpy',
+     ],
+     'metadata': [
+-        'duecredit',
++        #'duecredit',
+         'simplejson',
+         'pyld',  # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
+     ],

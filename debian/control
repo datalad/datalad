@@ -16,7 +16,6 @@ Build-Depends:
  python-argcomplete,
  python-boto,
  python-bs4,
- python-duecredit,
  python-iso8601,
  python-jsmin,
  python-git (>= 2.1.6~),
@@ -75,7 +74,6 @@ Depends:
  git-annex (>= 6.20170525~) | git-annex-standalone (>= 6.20170525~),
  patool,
  python-appdirs,
- python-duecredit,
  python-git (>= 2.1.6~),
  python-github,
  python-humanize,
@@ -94,6 +92,7 @@ Depends:
  ${misc:Depends},
  ${python:Depends}
 Recommends:
+ python-duecredit,
  python-jsmin,
  python-html5lib,
  python-httpretty,
