@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 def dlplugin(type, file=None, dataset=None):
     """Run one or more of DataLad's metadata extractors on a dataset or file.
 
-    The result(s) are structured like the metadata,DataLad would extract
+    The result(s) are structured like the metadata DataLad would extract
     during metadata aggregation. There is one result per dataset/file.
 
     Parameters
