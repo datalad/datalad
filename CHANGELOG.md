@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.9.2 (Mar 03, 2017) -- it is (again) better than ever
+## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
 
 Largely a bugfix release with a few enhancements.
 
@@ -22,6 +22,8 @@ Largely a bugfix release with a few enhancements.
   handled correctly
 - Consider more remotes (not just tracking one, which might be none)
   while installing subdatasets
+- Compatibility with git 2.16 with some changed behaviors/annotations
+  for submodules
 - Fail `remove` if `annex drop` failed
 - Do not fail operating on files which start with dash (-)
 - URL unquote paths within S3, URLs and DataLad RIs (///)
