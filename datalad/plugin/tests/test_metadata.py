@@ -15,6 +15,7 @@ from os.path import dirname
 from shutil import copy
 
 from datalad.coreapi import Dataset
+from datalad.api import extract_metadata
 from datalad.utils import chpwd
 
 from datalad.tests.utils import ok_clean_git
@@ -33,8 +34,7 @@ testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data',
 def test_error(path):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
-        res = plugin(
-            'extract_metadata',
+        res = extract_metadata(
             type='bogus__',
             file=testpath)
         assert_status('error', res)
@@ -53,8 +53,7 @@ def test_ds_extraction(path):
     ds.add('.')
     ok_clean_git(ds.path)
 
-    res = plugin(
-        'extract_metadata',
+    res = extract_metadata(
         type='xmp',
         dataset=ds,
         # artificially disable extraction from any file in the dataset
@@ -65,8 +64,7 @@ def test_ds_extraction(path):
     assert_in('xmp', res[0]['metadata'])
 
     # now the more useful case: getting everthing for xmp from a dataset
-    res = plugin(
-        'extract_metadata',
+    res = extract_metadata(
         type='xmp',
         dataset=ds)
     assert_result_count(res, 2)
@@ -91,8 +89,7 @@ def test_file_extraction(path):
 
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
-        res = plugin(
-            'extract_metadata',
+        res = extract_metadata(
             type='xmp',
             file=testpath)
         assert_result_count(res, 1, type='file', status='ok', action='metadata', path=testpath)
