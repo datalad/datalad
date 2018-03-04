@@ -23,6 +23,8 @@ from os.path import relpath
 from os.path import join as opj
 from os.path import split as psplit
 
+from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.utils import assure_list
 from datalad.metadata.metadata import query_aggregated_metadata
 from six.moves.urllib.parse import urlsplit
@@ -146,6 +148,7 @@ def split_term_source_accession(val):
         except Exception as e:
             lgr.warn("Could not identify term source REF in: '%s' [%s]", val, exc_str(e))
             return '', val
+
 
 # TODO pull as this from datalad's aggregated metadata
 def _get_study_df(ds):
@@ -545,85 +548,102 @@ def extract(
             '; '.join(sorted(protocols[p])) for p in protocols)
     return info
 
+
 #
 # Make it work seamlessly as a datalad export plugin
 #
-def dlplugin(
-        dataset,
-        repo_name,
-        repo_accession,
-        repo_url,
-        output=None):
-    """BIDS to ISA-Tab converter
+@build_doc
+class BIDS2Scidata(Interface):
+    """BIDS to ISA-Tab converter"""
+    from datalad.support.param import Parameter
+    from datalad.distribution.dataset import datasetmethod
+    from datalad.interface.utils import eval_results
+    from datalad.distribution.dataset import EnsureDataset
+    from datalad.support.constraints import EnsureNone, EnsureStr
 
-    Parameters
-    ----------
-    ds : Dataset
-      dataset in BIDS-compatible format
-    repo_name : str
-        data repository name to be used in assay tables.
-        Example: OpenfMRI
-    repo_accession : str
-        data repository accession number to be used in assay tables.
-        Example: ds000113d
-    repo_url : str
-        data repository URL to be used in assay tables.
-        Example: https://openfmri.org/dataset/ds000113d
-    output : str, optional
-      directory where ISA-TAB files will be stored
-    """
-    from os.path import dirname
-    from os.path import join as opj
-    from datetime import datetime
-    from io import open
-    import logging
-    lgr = logging.getLogger('datalad.plugin.bids2scidata')
-    import datalad
-    from datalad import cfg
-    from datalad.plugin.bids2scidata import extract
-
-    if not output:
-        output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
-
-    itmpl_path = cfg.obtain(
-        'datalad.plugin.bids2scidata.investigator.template',
-        default=opj(
-            dirname(datalad.__file__),
-            'resources', 'isatab', 'scidata_bids_investigator.txt'))
-    info = extract(
-        dataset,
-        output_directory=output,
-        repository_info={
-            'Comment[Data Repository]': repo_name,
-            'Comment[Data Record Accession]': repo_accession,
-            'Comment[Data Record URI]': repo_url},
+    _params_ = dict(
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc="""BIDS-compatible dataset base metadata export on. If no dataset is given, an
+            attempt is made to identify the dataset based on the current
+            working directory.""",
+            constraints=EnsureDataset() | EnsureNone()),
+        repo_name=Parameter(
+            args=('--repo-name',),
+            doc="""data repository name to be used in assay tables.
+            Example: OpenfMRI"""),
+        repo_accession=Parameter(
+            args=('--repo-accession',),
+            doc="""data repository accession number to be used in assay tables.
+            Example: ds000113d"""),
+        repo_url=Parameter(
+            args=('--repo-url',),
+            doc="""data repository URL to be used in assay tables.
+            Example: https://openfmri.org/dataset/ds000113d"""),
+        output=Parameter(
+            args=('--output',),
+            doc="""directory where ISA-TAB files will be stored""",)
     )
-    if info is None:
+
+    @staticmethod
+    @datasetmethod(name='bids2scidata')
+    @eval_results
+    def __call__(dataset, repo_name, repo_accession, repo_url, output=None):
+        from os.path import dirname
+        from os.path import join as opj
+        from datetime import datetime
+        from io import open
+        import logging
+        lgr = logging.getLogger('datalad.plugin.bids2scidata')
+        import datalad
+        from datalad import cfg
+        from datalad.plugin.bids2scidata import extract
+
+        if not output:
+            output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
+
+        itmpl_path = cfg.obtain(
+            'datalad.plugin.bids2scidata.investigator.template',
+            default=opj(
+                dirname(datalad.__file__),
+                'resources', 'isatab', 'scidata_bids_investigator.txt'))
+        info = extract(
+            dataset,
+            output_directory=output,
+            repository_info={
+                'Comment[Data Repository]': repo_name,
+                'Comment[Data Record Accession]': repo_accession,
+                'Comment[Data Record URI]': repo_url},
+        )
+        if info is None:
+            yield dict(
+                status='error',
+                message='dataset does not seem to contain relevant metadata',
+                path=dataset.path,
+                type='dataset',
+                action='bids2scidata',
+                logger=lgr)
+            return
+
+        itmpl = open(itmpl_path, encoding='utf-8').read()
+        with open(opj(output, 'i_Investigation.txt'), 'w', encoding='utf-8') as ifile:
+            ifile.write(
+                itmpl.format(
+                    datalad_version=datalad.__version__,
+                    date=datetime.now().strftime('%Y/%m/%d'),
+                    repo_name=repo_name,
+                    repo_accession=repo_accession,
+                    repo_url=repo_url,
+                    **info
+                ))
         yield dict(
-            status='error',
-            message='dataset does not seem to contain relevant metadata',
-            path=dataset.path,
-            type='dataset',
+            status='ok',
+            path=output,
+            # TODO add switch to make tarball/ZIP
+            #type='file',
+            type='directory',
             action='bids2scidata',
             logger=lgr)
-        return
 
-    itmpl = open(itmpl_path, encoding='utf-8').read()
-    with open(opj(output, 'i_Investigation.txt'), 'w', encoding='utf-8') as ifile:
-        ifile.write(
-            itmpl.format(
-                datalad_version=datalad.__version__,
-                date=datetime.now().strftime('%Y/%m/%d'),
-                repo_name=repo_name,
-                repo_accession=repo_accession,
-                repo_url=repo_url,
-                **info
-            ))
-    yield dict(
-        status='ok',
-        path=output,
-        # TODO add switch to make tarball/ZIP
-        #type='file',
-        type='directory',
-        action='bids2scidata',
-        logger=lgr)
+
+__datalad_plugin__ = BIDS2Scidata
