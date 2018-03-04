@@ -44,8 +44,8 @@ def _load_plugin(filepath, fail=True):
             filepath, exc_str(e)))
     # TODO check all symbols whether they are derived from Interface
     if not hasattr(mod, magic_plugin_symbol):
-        msg = "loading plugin '%s' did not yield a 'DLPlugin' symbol, found: %s", \
-              filepath, dir(mod)
+        msg = "loading plugin '%s' did not yield a '%s' symbol, found: %s", \
+              filepath, magic_plugin_symbol, dir(mod)
         if fail:
             raise ValueError(*msg)
         else:
