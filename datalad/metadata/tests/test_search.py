@@ -217,13 +217,13 @@ def test_within_ds_file_search(path):
     with swallow_outputs() as cmo:
         ds.search(show_keys=True, mode='textblob')
 
-        assert_equal(cmo.out, """\
+        assert_in("""\
 id
 meta
 parentds
 path
 type
-""")
+""", cmo.out)
 
     target_out = """\
 audio.bitrate
@@ -286,11 +286,10 @@ type
 """
 
     # check generated autofield index keys
-    from difflib import ndiff
     with swallow_outputs() as cmo:
         ds.search(mode='autofield', show_keys=True)
         # it is impossible to assess what is different from that dump
-        assert_str_equal(cmo.out, target_out)
+        assert_in(target_out, cmo.out)
 
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
