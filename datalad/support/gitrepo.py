@@ -32,6 +32,7 @@ from os.path import sep
 import posixpath
 from weakref import WeakValueDictionary
 
+from fasteners import InterProcessLock
 
 from six import string_types
 from six import add_metaclass
@@ -521,7 +522,7 @@ class GitRepo(RepoInterface):
           C='/my/path'   => -C /my/path
 
         """
-
+        self._lock = None  # will be locked later
         if url is not None:
             raise DeprecatedError(
                 new=".clone() class method",
@@ -587,6 +588,13 @@ class GitRepo(RepoInterface):
                 raise NoSuchPathError(path)
             if not _valid_repo:
                 raise InvalidGitRepositoryError(path)
+
+        # try to lock it down
+        self._lock = InterProcessLock(
+            opj(path, '.git', 'datalad.lck')
+        )
+        if not self._lock.acquire(blocking=False):
+            raise RuntimeError("Cannot lock repo %s" % path)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -731,6 +739,9 @@ class GitRepo(RepoInterface):
         return gr
 
     def __del__(self):
+        if self._lock:
+            self._lock.release()
+
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
         self._cfg = None
