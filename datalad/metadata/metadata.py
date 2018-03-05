@@ -192,104 +192,102 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
       Of result dictionaries.
     """
     from datalad.coreapi import get
-    # This import is relatively heavy, delayed until needed
-    from datalad.auto import AutomagicIO
-    with AutomagicIO(check_once=True):
-        # look for and load the aggregation info for the base dataset
-        info_fpath = opj(ds.path, agginfo_relpath)
-        agg_base_path = dirname(info_fpath)
-        agginfos = _load_json_object(info_fpath)
+    # look for and load the aggregation info for the base dataset
+    info_fpath = opj(ds.path, agginfo_relpath)
+    agg_base_path = dirname(info_fpath)
+    agginfos = _load_json_object(info_fpath)
 
-        # cache once loaded metadata objects for additional lookups
-        # TODO possibly supply this cache from outside, if objects could
-        # be needed again -- their filename does not change in a superdataset
-        # if done, cache under relpath, not abspath key
-        cache = {
-            'objcache': {},
-            'subds_relpaths': None,
-        }
-        reported = set()
+    # cache once loaded metadata objects for additional lookups
+    # TODO possibly supply this cache from outside, if objects could
+    # be needed again -- their filename does not change in a superdataset
+    # if done, cache under relpath, not abspath key
+    cache = {
+        'objcache': {},
+        'subds_relpaths': None,
+    }
+    reported = set()
 
-        # for all query paths
-        for ap in aps:
-            # all metadata is registered via its relative path to the
-            # dataset that is being queried
-            rpath = relpath(ap['path'], start=ds.path)
-            if rpath in reported:
-                # we already had this, probably via recursion of some kind
-                continue
-            rap = dict(ap, rpath=rpath, type=ap.get('type', None))
+    # for all query paths
+    for ap in aps:
+        # all metadata is registered via its relative path to the
+        # dataset that is being queried
+        rpath = relpath(ap['path'], start=ds.path)
+        if rpath in reported:
+            # we already had this, probably via recursion of some kind
+            continue
+        rap = dict(ap, rpath=rpath, type=ap.get('type', None))
 
-            # we really have to look this up from the aggregated metadata
-            # and cannot use any 'parentds' property in the incoming annotated
-            # path. the latter will reflect the situation on disk, we need
-            # the record of the containing subdataset in the aggregated metadata
-            # instead
-            containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
-            if containing_ds is None:
-                # could happen if there was no aggregated metadata at all
-                # or the path is in this dataset, but luckily the queried dataset
-                # is known to be present
-                containing_ds = curdir
-            rap['metaprovider'] = containing_ds
+        # we really have to look this up from the aggregated metadata
+        # and cannot use any 'parentds' property in the incoming annotated
+        # path. the latter will reflect the situation on disk, we need
+        # the record of the containing subdataset in the aggregated metadata
+        # instead
+        containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
+        if containing_ds is None:
+            # could happen if there was no aggregated metadata at all
+            # or the path is in this dataset, but luckily the queried dataset
+            # is known to be present
+            containing_ds = curdir
+        rap['metaprovider'] = containing_ds
 
-            # build list of datasets and paths to be queried for this annotated path
-            # in the simple case this is just the containing dataset and the actual
-            # query path
-            to_query = [rap]
-            if recursive:
-                # in case of recursion this is also anything in any dataset underneath
-                # the query path
-                matching_subds = [{'metaprovider': sub, 'rpath': sub, 'type': 'dataset'}
-                                  for sub in sorted(agginfos)
-                                  # we already have the base dataset
-                                  if (rpath == curdir and sub != curdir) or
-                                  path_is_subpath(sub, rpath)]
-                to_query.extend(matching_subds)
+        # build list of datasets and paths to be queried for this annotated path
+        # in the simple case this is just the containing dataset and the actual
+        # query path
+        to_query = [rap]
+        if recursive:
+            # in case of recursion this is also anything in any dataset underneath
+            # the query path
+            matching_subds = [{'metaprovider': sub, 'rpath': sub, 'type': 'dataset'}
+                              for sub in sorted(agginfos)
+                              # we already have the base dataset
+                              if (rpath == curdir and sub != curdir) or
+                              path_is_subpath(sub, rpath)]
+            to_query.extend(matching_subds)
 
-            # one heck of a beast to get the set of filenames for all metadata objects that are
-            # required to be present to fulfill this query
-            objfiles = set(
-                agginfos.get(qap['metaprovider'], {}).get(t, None)
-                for t in ('dataset_info',) + \
-                (('content_info',)
-                    if ((reporton is None and qap.get('type', None) == 'file') or
-                        reporton in ('files', 'all')) else tuple())
-                for qap in to_query)
-            lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
-            get(path=[dict(path=opj(agg_base_path, of), parentds=ds.path, type='file')
-                      for of in objfiles if of],
-                dataset=ds,
-                result_renderer='disabled')
-            for qap in to_query:
-                # info about the dataset that contains the query path
-                dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
-                res_tmpl = get_status_dict()
-                for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
-                    if s in dsinfo:
-                        res_tmpl[d] = dsinfo[s]
+        # one heck of a beast to get the set of filenames for all metadata objects that are
+        # required to be present to fulfill this query
+        objfiles = set(
+            agginfos.get(qap['metaprovider'], {}).get(t, None)
+            for qap in to_query
+            for t in ('dataset_info',) + \
+            (('content_info',)
+                if ((reporton is None and qap.get('type', None) == 'file') or
+                    reporton in ('files', 'all')) else tuple())
+        )
+        lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
+        get(path=[dict(path=opj(agg_base_path, of), parentds=ds.path, type='file')
+                  for of in objfiles if of],
+            dataset=ds,
+            result_renderer='disabled')
+        for qap in to_query:
+            # info about the dataset that contains the query path
+            dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
+            res_tmpl = get_status_dict()
+            for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
+                if s in dsinfo:
+                    res_tmpl[d] = dsinfo[s]
 
-                # pull up dataset metadata, always needed if only for the context
-                dsmeta = {}
-                dsobjloc = dsinfo.get('dataset_info', None)
-                if dsobjloc is not None:
-                    dsmeta = _load_json_object(
-                        opj(agg_base_path, dsobjloc),
-                        cache=cache['objcache'])
+            # pull up dataset metadata, always needed if only for the context
+            dsmeta = {}
+            dsobjloc = dsinfo.get('dataset_info', None)
+            if dsobjloc is not None:
+                dsmeta = _load_json_object(
+                    opj(agg_base_path, dsobjloc),
+                    cache=cache['objcache'])
 
-                for r in _query_aggregated_metadata_singlepath(
-                        ds, agginfos, agg_base_path, qap, reporton,
-                        cache, dsmeta,
-                        dsinfo.get('content_info', None)):
-                    r.update(res_tmpl, **kwargs)
-                    # if we are coming from `search` we want to record why this is being
-                    # reported
-                    if 'query_matched' in ap:
-                        r['query_matched'] = ap['query_matched']
-                    if r.get('type', None) == 'file':
-                        r['parentds'] = normpath(opj(ds.path, qap['metaprovider']))
-                    yield r
-                    reported.add(qap['rpath'])
+            for r in _query_aggregated_metadata_singlepath(
+                    ds, agginfos, agg_base_path, qap, reporton,
+                    cache, dsmeta,
+                    dsinfo.get('content_info', None)):
+                r.update(res_tmpl, **kwargs)
+                # if we are coming from `search` we want to record why this is being
+                # reported
+                if 'query_matched' in ap:
+                    r['query_matched'] = ap['query_matched']
+                if r.get('type', None) == 'file':
+                    r['parentds'] = normpath(opj(ds.path, qap['metaprovider']))
+                yield r
+                reported.add(qap['rpath'])
 
 
 def _query_aggregated_metadata_singlepath(
