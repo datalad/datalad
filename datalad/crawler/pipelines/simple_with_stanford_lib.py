@@ -4,6 +4,7 @@ try:
     from scrapy.http import Response
     from scrapy.http import XmlResponse
     from scrapy.selector import Selector
+
 except ImportError:  # pragma: no cover
     class Selector(object):
         xpath = css = None
@@ -12,24 +13,29 @@ except ImportError:  # pragma: no cover
 
 # copied the simple_with_archives template in order to show
 def pipeline(doc_id=None,
-             x_pathmatch_='.*/download/.*\.(tgz|tar.*|xml)',
-             tarballs=True,
-             datalad_downloader=False,
-             use_current_dir=False,
-             leading_dirs_depth=1,
-             rename=None,
-             backend='MD5E',
-             add_archive_leading_dir=False,
-             annex=None,
+             x_pathmatch_="//file/@id",
              incoming_pipeline=None):
 
-    crawler = crawl_url("https://purl.stanford.edu/" + doc_id)
+    assert not incoming_pipeline
+    crawler = crawl_url("https://purl.stanford.edu/" + doc_id + ".xml")
     # adding print_xml to incoming pipeline
     incoming_pipeline = [  # Download all the archives found on the project page
         crawler,
-        xpath_match('//file[contains(@id)]/@id', min_count=1), #changed h-ref to xpath_match
+        xpath_match(x_pathmatch_, min_count=1), # changed h-ref to xpath_match
+        configure_url,
         print_xml
     ]
+    return incoming_pipeline
+
+
+def configure_url(data, keys=['url'], match='match'):
+    data = data.copy()
+
+    for key in keys:
+        url_elements = data[key].split("/")
+        doc_id = url_elements[3][:-4]
+        data[key] = "https://stacks.stanford.edu/file/druid:" + doc_id + "/" + data[match]
+    yield data
 
 
 # print generator
@@ -38,6 +44,5 @@ def print_xml(data, keys=['url']):
     """
     data = data.copy()
     for key in keys:
-        if key in data: # catches key error if dictionary does not contain key
-            print((data[key]).as_str())
+        print(key, (data[key]))
     yield data
