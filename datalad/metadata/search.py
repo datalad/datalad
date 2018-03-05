@@ -23,6 +23,8 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
+from six import iteritems
+from time import time
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -618,8 +620,12 @@ class _EGrepSearch(_Search):
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
+            lgr.log(7, "Querying %s among %d items", query, len(doc))
+            t0 = time()
             matches = {k: query.search(v.lower())
-                       for k, v in doc.items()}
+                       for k, v in iteritems(doc)}
+            dt = time() - t0
+            lgr.log(7, "Finished querying in %f sec", dt)
             # retain what actually matched
             matches = {k: match.group() for k, match in matches.items() if match}
             if matches:
