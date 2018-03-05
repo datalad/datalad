@@ -388,6 +388,7 @@ class _WhooshSearch(_Search):
                         old_ds_rpath)
                 old_idx_size = idx_size
                 old_ds_rpath = admin['path']
+                admin['id'] = res.get('dsid', None)
                 pbar.update(1, increment=True)
 
             doc.update({k: assure_unicode(v) for k, v in admin.items()})
