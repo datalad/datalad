@@ -601,6 +601,7 @@ class GitRepo(RepoInterface):
         else:
             self.inode = None
 
+
     def acquire_lock(self, blocking=True):
         """Acquire lock on the repository
 
@@ -638,7 +639,12 @@ class GitRepo(RepoInterface):
         """Release lock if that one was acquired"""
         if self._lock:
             if self._lock.acquired:
-                self._lock.release()
+                try:
+                    os.unlink(self._lock.path)  # release does not remove it
+                except:
+                    pass
+                finally:
+                    self._lock.release()
             elif lgr:  # somehow in tests lgr was none -- probably __del__ effect
                 lgr.warning(
                     "Asked to release the lock for %s which we did not acquire",
