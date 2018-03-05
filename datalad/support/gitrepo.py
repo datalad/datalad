@@ -589,31 +589,6 @@ class GitRepo(RepoInterface):
             if not _valid_repo:
                 raise InvalidGitRepositoryError(path)
 
-        # try to lock it down
-        # if not os.path.exists(opj(path, '.git')) or not os.path.isdir(opj(path, '.git')):
-        #     raise ValueError("blow %s" % path)
-        #     import pdb; pdb.set_trace()
-        #     # so it could happen we would have submodule links here
-        #     # so let's just do in the root directory of the dataset for now
-        #     # although should then read that .git file etc
-        #     # Hm - wouldn't work since would break many tests since
-        #     # it creates untracked file etc
-        lck_gitdir = opj(path, '.git')
-        if os.path.exists(lck_gitdir) and not os.path.isdir(lck_gitdir):
-            # a file with gitdir pointing to the original repo
-            with open(lck_gitdir) as f:
-                line = f.readline()
-            # do not want to rely on split
-            _pref = 'gitdir: '
-            assert line.startswith(_pref)
-            lck_gitdir = line[len(_pref):]
-
-        self._lock = InterProcessLock(
-            opj(lck_gitdir, 'datalad.lck')
-        )
-        if not self._lock.acquire(blocking=False):
-            raise RuntimeError("Cannot lock repo %s" % path)
-
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
         # calls above from being actually executed (DryRunProtocol)
@@ -625,6 +600,50 @@ class GitRepo(RepoInterface):
             self.inode = os.stat(self.realpath).st_ino
         else:
             self.inode = None
+
+    def acquire_lock(self, blocking=True):
+        """Acquire lock on the repository
+
+        If lock was already previously acquired - does not do anything.
+        If lock is not acquired, raises RuntimeError
+        """
+        if self._lock and self._lock.acquired:
+            return
+        # try to lock it down
+        # if not os.path.exists(opj(path, '.git')) or not os.path.isdir(opj(
+        # path, '.git')):
+        #     raise ValueError("blow %s" % path)
+        #     import pdb; pdb.set_trace()
+        #     # so it could happen we would have submodule links here
+        #     # so let's just do in the root directory of the dataset for now
+        #     # although should then read that .git file etc
+        #     # Hm - wouldn't work since would break many tests since
+        #     # it creates untracked file etc
+        lck_gitdir = opj(self.path, '.git')
+        if os.path.exists(lck_gitdir) and not os.path.isdir(lck_gitdir):
+            # a file with gitdir pointing to the original repo
+            with open(lck_gitdir) as f:
+                line = f.readline()
+            # do not want to rely on split
+            _pref = 'gitdir: '
+            assert line.startswith(_pref)
+            lck_gitdir = line[len(_pref):]
+        self._lock = InterProcessLock(
+            opj(lck_gitdir, 'datalad.lck')
+        )
+        if not self._lock.acquire(blocking=blocking):
+            raise RuntimeError("Cannot lock repo %s" % self.path)
+
+    def release_lock(self):
+        """Release lock if that one was acquired"""
+        if self._lock:
+            if self._lock.acquired:
+                self._lock.release()
+            elif lgr:  # somehow in tests lgr was none -- probably __del__ effect
+                lgr.warning(
+                    "Asked to release the lock for %s which we did not acquire",
+                    self)
+            self._lock = None
 
     @property
     def repo(self):
@@ -757,8 +776,7 @@ class GitRepo(RepoInterface):
         return gr
 
     def __del__(self):
-        if self._lock and self._lock.acquired:
-            self._lock.release()
+        self.release_lock()
 
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
         # stalls etc
