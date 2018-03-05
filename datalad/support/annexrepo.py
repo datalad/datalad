@@ -155,6 +155,8 @@ class AnnexRepo(GitRepo, RepoInterface):
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+        self._lock = None  # just an early binding since super-constructor
+                           # is called later
         if self.git_annex_version is None:
             self._check_git_annex_version()
 

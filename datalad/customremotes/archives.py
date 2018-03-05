@@ -315,6 +315,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # except ValueError:
         #     self.send("WHEREIS-FAILURE")
 
+    def _prepare(self):
+        super(ArchiveAnnexCustomRemote, self)._prepare()
+        # TODO: wouldn't be sufficient in case of nested datalad-archives
+        # invocation when tarball within tarball
+        self.repo.acquire_lock(blocking=False)
+
     def _transfer(self, cmd, key, path):
 
         akeys_tried = []
