@@ -26,11 +26,11 @@ class ExtractMetadata(Interface):
     Extract metadata with two extractors from a dataset in the current directory
     and also from all its files::
 
-      $ datalad plugin -d . extract_metadata type=frictionless_datapackage type=datalad_core
+      $ datalad extract-metadata -d . --type frictionless_datapackage datalad_core
 
     Extract XMP metadata from a single PDF that is not part of any dataset::
 
-      $ datalad plugin extract_metadata type=xmp file=Downloads/freshfromtheweb.pdf
+      $ datalad extract-metadata --type xmp --file Downloads/freshfromtheweb.pdf
     """
 
     from datalad.support.param import Parameter
