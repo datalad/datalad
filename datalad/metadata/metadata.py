@@ -191,6 +191,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     generator
       Of result dictionaries.
     """
+    from datalad.coreapi import get
     # This import is relatively heavy, delayed until needed
     from datalad.auto import AutomagicIO
     with AutomagicIO(check_once=True):
@@ -246,6 +247,20 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                                   path_is_subpath(sub, rpath)]
                 to_query.extend(matching_subds)
 
+            # one heck of a beast to get the set of filenames for all metadata objects that are
+            # required to be present to fulfill this query
+            objfiles = set(
+                agginfos.get(qap['metaprovider'], {}).get(t, None)
+                for t in ('dataset_info',) + \
+                (('content_info',)
+                    if ((reporton is None and qap.get('type', None) == 'file') or
+                        reporton in ('files', 'all')) else tuple())
+                for qap in to_query)
+            lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
+            get(path=[dict(path=opj(agg_base_path, of), parentds=ds.path, type='file')
+                      for of in objfiles if of],
+                dataset=ds,
+                result_renderer='disabled')
             for qap in to_query:
                 # info about the dataset that contains the query path
                 dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
