@@ -244,7 +244,7 @@ script:
   # Test installation system-wide
   - sudo pip install .
   # Report WTF information using system wide installed version
-  - datalad plugin wtf
+  - datalad wtf
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*
