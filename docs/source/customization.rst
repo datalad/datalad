@@ -29,8 +29,13 @@ overview of plugins included in this DataLad release.
    no_annex
    wtf
 
-Any plugin can be executed via the :ref:`man_datalad-plugin` command, or the
-corresponding Python API function. In the simplest case this could look like this:
+..
+   FIXME: This documentation should be updated for the plugin->command
+   conversion.
+
+..
+   Any plugin can be executed via the :ref:`man_datalad-plugin` command, or the
+   corresponding Python API function. In the simplest case this could look like this:
 
 .. code-block:: shell
 

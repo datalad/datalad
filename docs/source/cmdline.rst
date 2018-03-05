@@ -68,6 +68,21 @@ Miscellaneous commands
    generated/man/datalad-ls
    generated/man/datalad-test
 
+
+Plugin commands
+===============
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-add-readme
+   generated/man/datalad-bids2scidata
+   generated/man/datalad-export-archive
+   generated/man/datalad-export-to-figshare
+   generated/man/datalad-extract-metadata
+   generated/man/datalad-no-annex
+   generated/man/datalad-wtf
+
 Plumbing commands
 =================
 
