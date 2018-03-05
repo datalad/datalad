@@ -20,6 +20,8 @@ from datalad.api import subdatasets
 from nose.tools import eq_
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
@@ -89,7 +91,8 @@ def test_get_subdatasets(path):
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('gitmodule_url', 'state', 'revision', 'gitmodule_name'):
+        #for prop in ('gitmodule_url', 'state', 'revision', 'gitmodule_name'):
+        for prop in ('gitmodule_url', 'revision', 'gitmodule_name'):
             assert_in(prop, r)
         # random property is unknown
         assert_not_in('mike', r)
@@ -166,7 +169,31 @@ def test_get_subdatasets(path):
         [])
 
 
-@known_failure_direct_mode  #FIXME
+@with_tempfile
+def test_state(path):
+    ds = Dataset.create(path)
+    sub = ds.create('sub')
+    res = ds.subdatasets()
+    assert_result_count(res, 1, path=sub.path)
+    # by default we are not reporting any state info
+    assert_not_in('state', res[0])
+    # uninstall the subdataset
+    ds.uninstall('sub')
+    # normale 'gone' is "absent"
+    assert_false(sub.is_installed())
+    assert_result_count(
+        ds.subdatasets(), 1, path=sub.path, state='absent')
+    # with directory totally gone also
+    os.rmdir(sub.path)
+    assert_result_count(
+        ds.subdatasets(), 1, path=sub.path, state='absent')
+    # putting dir back, no change
+    os.makedirs(sub.path)
+    assert_result_count(
+        ds.subdatasets(), 1, path=sub.path, state='absent')
+
+
+@known_failure_direct_mode  #FIXME same issue as gh-2113
 @with_tempfile
 def test_get_subdatasets_types(path):
     from datalad.api import create

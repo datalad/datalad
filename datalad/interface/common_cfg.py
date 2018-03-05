@@ -263,6 +263,13 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.runtime.report-status': {
+        'ui': ('question', {
+               'title': 'Command line result reporting behavior',
+               'text': "If set, constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
+        'type': EnsureChoice('success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
+        'default': None,
+    },
     'datalad.search.indexercachesize': {
         'ui': ('question', {
                'title': 'Maximum cache size for search index (per process)',

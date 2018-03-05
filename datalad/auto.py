@@ -180,8 +180,8 @@ class AutomagicIO(object):
                 else:
                     raise _EarlyExit("mode=%r", mode)
         except _EarlyExit as e:
-            lgr.log(2, " skipping since " + (e.msg % e.args))
-            pass
+            lgr.log(2, " skipping since " + e.msg, *e.args,
+                    extra={'notraceback': True})
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
             with self._patch(origname, origfunc):

@@ -9,6 +9,57 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.10.0 (??? ??, 2018) -- The Release
+
+This release is a major leap forward in metadata support.
+
+### Major refactoring and deprecations
+
+- Metadata
+  - Prior metadata provided by datasets under `.datalad/meta` is no
+    longer used or supported. Metadata must be reaggregated using 0.10
+    version
+  - Metadata extractor types are no longer auto-guessed and must be
+    explicitly specified in `datalad.metadata.nativetype` config
+    (could contain multiple values)
+- `export_tarball` plugin has been generalized to `export_archive` and
+  can now also generate ZIP archives.
+
+### Fixes
+
+A number of fixes did not make it into 0.9.x series:
+
+- Dynamic configuration overrides via the `-c` option were not in effect.
+
+### Enhancements and new features
+
+- Reduced startup latency by only importing commands necessary for a particular
+  command line call.
+- Metadata (everything has changed!)
+  - Metadata extraction and aggregation is now supported for datasets and individual
+    files.
+  - Metadata query via `search` can now discover individual files.
+  - Extracted metadata can now be stored in XZ compressed files, is optionally
+    annexed (when exceeding a configurable size threshold), and obtained on
+    demand (new configuration option `datalad.metadata.create-aggregate-annex-limit`).
+  - Status and availability of aggregated metadata can now be reported via
+    `metadata --get-aggregates`
+  - New configuration option `datalad.metadata.maxfieldsize` to exclude too large
+    metadata fields from aggregation.
+  - Metadata extraction does not longer guess the type of metadata. A new
+    configuration option `datalad.metadata.nativetype` was introduced to enable
+    one or more particular metadata extractors for a dataset.
+  - New configuration option `datalad.metadata.store-aggregate-content` to enable
+    the storage of aggregated metadata for dataset content (i.e. file-based metadata)
+    in contrast to just metadata describing a dataset as a whole.
+- `search` was completely reimplemented
+- New plugins:
+  - export_to_figshare
+  - bids2scidata
+  - extract_metadata
+- add_readme makes use of available metadata
+
+
 ## 0.9.2 (??? ??, 2017) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
@@ -23,8 +74,7 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-- `export_tarball` plugin has been generalized to `export_archive` and can now also
-  generate ZIP archives.
+?
 
 
 # 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)

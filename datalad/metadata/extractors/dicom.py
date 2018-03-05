@@ -10,7 +10,7 @@
 from __future__ import absolute_import
 
 from six import string_types
-from os.path import join as opj
+from os.path import join as opj, basename
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.dicom')
 
@@ -60,6 +60,14 @@ class MetadataExtractor(BaseMetadataExtractor):
         imgs = {}
         lgr.info("Attempting to extract DICOM metadata from %i files", len(self.paths))
         for f in self.paths:
+            if basename(f).startswith('PSg'):
+                # ignore those dicom files, since they appear to not contain
+                # any relevant metadata for image series, but causing trouble
+                # (see gh-2210). We might want to change that whenever we get
+                # a better understanding of how to deal with those files.
+                lgr.debug("Ignoring DICOM file %s", f)
+                continue
+
             try:
                 d = dcm.read_file(opj(self.ds.path, f), stop_before_pixels=True)
             except InvalidDicomError:

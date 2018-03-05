@@ -1101,10 +1101,39 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def _get_normalized_paths(path, prefix):
+    if isabs(path) != isabs(prefix):
+        raise ValueError("Bot paths must either be absolute or relative. "
+                         "Got %r and %r" % (path, prefix))
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return path, prefix
+
+
 def path_startswith(path, prefix):
-    """Return True if path starts with prefix path"""
-    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
-           == with_pathsep(prefix)
+    """Return True if path starts with prefix path
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return path.startswith(prefix)
+
+
+def path_is_subpath(path, prefix):
+    """Return True if path is a subpath of prefix
+
+    It will return False if path == prefix.
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
 def knows_annex(path):

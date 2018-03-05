@@ -47,8 +47,9 @@ from datalad.interface.common_opts import reporton_opt
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import require_dataset
 from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_is_subpath, path_startswith
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -123,8 +124,7 @@ def _load_xz_json_stream(fpath, cache=None):
 
 def _get_metadatarelevant_paths(ds, subds_relpaths):
     return (f for f in ds.repo.get_files()
-            if not any(f.startswith(_with_sep(ex)) or
-                       f == ex
+            if not any(path_startswith(f, ex)
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
@@ -151,7 +151,7 @@ def _get_containingds_from_agginfo(info, rpath):
         # containing subdataset (if there is any)
         containing_ds = sorted(
             [subds for subds in sorted(info)
-             if rpath.startswith(_with_sep(subds))],
+             if path_is_subpath(rpath, subds)],
             # TODO os.sep might not be OK on windows,
             # depending on where it was aggregated, ensure uniform UNIX
             # storage
@@ -173,7 +173,9 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
 
     Parameters
     ----------
-    reporton : {'none', 'dataset', 'files', 'all'}
+    reporton : {None, 'none', 'dataset', 'files', 'all'}
+      If `None`, reporting will be based on the `type` property of the
+      incoming annotated paths.
     ds : Dataset
       Dataset to query
     aps : list
@@ -215,30 +217,38 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             if rpath in reported:
                 # we already had this, probably via recursion of some kind
                 continue
+            rap = dict(ap, rpath=rpath, type=ap.get('type', None))
 
+            # we really have to look this up from the aggregated metadata
+            # and cannot use any 'parentds' property in the incoming annotated
+            # path. the latter will reflect the situation on disk, we need
+            # the record of the containing subdataset in the aggregated metadata
+            # instead
             containing_ds = _get_containingds_from_agginfo(agginfos, rpath)
             if containing_ds is None:
                 # could happen if there was no aggregated metadata at all
                 # or the path is in this dataset, but luckily the queried dataset
                 # is known to be present
                 containing_ds = curdir
+            rap['metaprovider'] = containing_ds
 
             # build list of datasets and paths to be queried for this annotated path
             # in the simple case this is just the containing dataset and the actual
             # query path
-            to_query = [(containing_ds, rpath)]
+            to_query = [rap]
             if recursive:
                 # in case of recursion this is also anything in any dataset underneath
                 # the query path
-                matching_subds = [(sub, sub) for sub in sorted(agginfos)
+                matching_subds = [{'metaprovider': sub, 'rpath': sub, 'type': 'dataset'}
+                                  for sub in sorted(agginfos)
                                   # we already have the base dataset
                                   if (rpath == curdir and sub != curdir) or
-                                  sub.startswith(_with_sep(rpath))]
+                                  path_is_subpath(sub, rpath)]
                 to_query.extend(matching_subds)
 
-            for qds, qpath in to_query:
+            for qap in to_query:
                 # info about the dataset that contains the query path
-                dsinfo = agginfos.get(qds, dict(id=ds.id))
+                dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
                 res_tmpl = get_status_dict()
                 for s, d in (('id', 'dsid'), ('refcommit', 'refcommit')):
                     if s in dsinfo:
@@ -253,7 +263,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                         cache=cache['objcache'])
 
                 for r in _query_aggregated_metadata_singlepath(
-                        ds, agginfos, agg_base_path, qpath, qds, reporton,
+                        ds, agginfos, agg_base_path, qap, reporton,
                         cache, dsmeta,
                         dsinfo.get('content_info', None)):
                     r.update(res_tmpl, **kwargs)
@@ -262,17 +272,22 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                     if 'query_matched' in ap:
                         r['query_matched'] = ap['query_matched']
                     if r.get('type', None) == 'file':
-                        r['parentds'] = normpath(opj(ds.path, qds))
+                        r['parentds'] = normpath(opj(ds.path, qap['metaprovider']))
                     yield r
-                    reported.add(qpath)
+                    reported.add(qap['rpath'])
 
 
 def _query_aggregated_metadata_singlepath(
-        ds, agginfos, agg_base_path, rpath, containing_ds, reporton, cache, dsmeta,
+        ds, agginfos, agg_base_path, qap, reporton, cache, dsmeta,
         contentinfo_objloc):
     """This is the workhorse of query_aggregated_metadata() for querying for a
     single path"""
-    if (rpath == curdir or rpath == containing_ds) and reporton in ('datasets', 'all'):
+    rpath = qap['rpath']
+    containing_ds = qap['metaprovider']
+    qtype = qap.get('type', None)
+    if (rpath == curdir or rpath == containing_ds) and \
+            ((reporton is None and qtype == 'dataset') or \
+             reporton in ('datasets', 'all')):
         # this is a direct match for a dataset (we only have agginfos for
         # datasets) -> prep result
         res = get_status_dict(
@@ -284,7 +299,7 @@ def _query_aggregated_metadata_singlepath(
         # all info on the dataset is gathered -> eject
         yield res
 
-    if reporton not in ('files', 'all'):
+    if (reporton is None and qtype != 'file') or reporton not in (None, 'files', 'all'):
         return
 
     #
@@ -301,8 +316,7 @@ def _query_aggregated_metadata_singlepath(
 
     for fpath in [f for f in contentmeta.keys()
                   if rparentpath == curdir or
-                  f == rparentpath or
-                  f.startswith(_with_sep(rparentpath))]:
+                  path_startswith(f, rparentpath)]:
         # we might be onto something here, prepare result
         metadata = MetadataDict(contentmeta.get(fpath, {}))
 
@@ -661,17 +675,28 @@ class Metadata(Interface):
             # yield all datasets for which we have aggregated metadata as results
             # the get actual dataset results, so we can turn them into dataset
             # instances using generic top-level code if desired
-            if not refds_path:
-                refds_path = os.getcwd()
-            info_fpath = opj(refds_path, agginfo_relpath)
+            ds = require_dataset(
+                refds_path,
+                check_installed=True,
+                purpose='aggregate metadata query')
+            info_fpath = opj(ds.path, agginfo_relpath)
             if not exists(info_fpath):
+                # if there has ever been an aggregation run, this file would
+                # exist, hence there has not been and we need to tell this
+                # to people
+                yield get_status_dict(
+                    ds=ds,
+                    status='impossible',
+                    action='metadata',
+                    logger=lgr,
+                    message='metadata aggregation has never been performed in this dataset')
                 return
             agginfos = _load_json_object(info_fpath)
             parentds = []
             for sd in sorted(agginfos):
                 info = agginfos[sd]
-                dspath = normpath(opj(refds_path, sd))
-                if parentds and not dspath.startswith(_with_sep(parentds[-1])):
+                dspath = normpath(opj(ds.path, sd))
+                if parentds and not path_is_subpath(dspath, parentds[-1]):
                     parentds.pop()
                 info.update(
                     path=dspath,

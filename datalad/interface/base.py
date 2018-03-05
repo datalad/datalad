@@ -317,6 +317,11 @@ class Interface(object):
     # mode would fall into the debugger
     _interrupted_exit_code = 1
 
+    _OLDSTYLE_COMMANDS = (
+        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
+        'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move', 'SSHRun',
+        'Test')
+
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -390,11 +395,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ not in (
-                'AddArchiveContent',
-                'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-                'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
-                'SSHRun', 'Test'):
+        if cls.__name__ not in Interface._OLDSTYLE_COMMANDS:
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -414,18 +415,7 @@ class Interface(object):
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
-            result_filter = None
-            if args.common_report_status:
-                if args.common_report_status == 'success':
-                    result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
-                elif args.common_report_status == 'failure':
-                    result_filter = EnsureKeyChoice('status', ('impossible', 'error'))
-                else:
-                    result_filter = EnsureKeyChoice('status', (args.common_report_status,))
-            if args.common_report_type:
-                tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
-                result_filter = result_filter & tfilt if result_filter else tfilt
-            kwargs['result_filter'] = result_filter
+            kwargs['result_filter'] = cls._get_result_filter(args)
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):
@@ -440,6 +430,25 @@ class Interface(object):
                 sys.exit(cls._interrupted_exit_code)
             else:
                 raise
+
+    @classmethod
+    def _get_result_filter(cls, args):
+        from datalad import cfg
+        result_filter = None
+        if args.common_report_status or 'datalad.runtime.report-status' in cfg:
+            report_status = args.common_report_status or \
+                            cfg.obtain('datalad.runtime.report-status')
+            if report_status == 'success':
+                result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
+            elif report_status == 'failure':
+                result_filter = EnsureKeyChoice('status',
+                                                ('impossible', 'error'))
+            else:
+                result_filter = EnsureKeyChoice('status', (report_status,))
+        if args.common_report_type:
+            tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
+            result_filter = result_filter & tfilt if result_filter else tfilt
+        return result_filter
 
     @classmethod
     def get_refds_path(cls, dataset):

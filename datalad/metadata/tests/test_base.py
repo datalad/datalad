@@ -32,6 +32,7 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -213,3 +214,12 @@ def test_ignore_nondatasets(path):
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
         n_subm += 1
+
+
+@with_tempfile(mkdir=True)
+def test_get_aggregates_fails(path):
+    with chpwd(path), assert_raises(NoDatasetArgumentFound):
+        metadata(get_aggregates=True)
+    ds = Dataset(path).create()
+    res = ds.metadata(get_aggregates=True, on_failure='ignore')
+    assert_result_count(res, 1, path=ds.path, status='impossible')

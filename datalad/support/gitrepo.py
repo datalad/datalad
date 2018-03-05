@@ -61,7 +61,7 @@ from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
-from .network import RI
+from .network import RI, PathRI
 from .network import is_ssh
 from .repo import Flyweight
 from .repo import RepoInterface
@@ -667,22 +667,30 @@ class GitRepo(RepoInterface):
                 # didn't exist - all fine
                 pass
 
+        # Massage URL
+        url_ri = RI(url) if not isinstance(url, RI) else url
         # try to get a local path from `url`:
         try:
-            if not isinstance(url, RI):
-                url = RI(url).localpath
-            else:
-                url = url.localpath
+            url = url_ri.localpath
+            url_ri = RI(url)
         except ValueError:
             pass
 
-        if is_ssh(url):
+        if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             env = GitRepo.GIT_SSH_ENV
         else:
+            if isinstance(url_ri, PathRI):
+                new_url = os.path.expanduser(url)
+                if url != new_url:
+                    # TODO: remove whenever GitPython is fixed:
+                    # https://github.com/gitpython-developers/GitPython/issues/731
+                    lgr.info("Expanded source path to %s from %s", new_url, url)
+                    url = new_url
             env = None
+
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -733,10 +741,13 @@ class GitRepo(RepoInterface):
                     and self.repo is not None:
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
-
                 self.repo.git.clear_cache()
-                if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                    self.repo.index.write()
+                # We used to write out the index to flush GitPython's
+                # state... but such unconditional write is really a workaround
+                # and does not play nice with read-only operations - permission
+                # denied etc. So disabled 
+                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                #    self.repo.index.write()
         except InvalidGitRepositoryError:
             # might have being removed and no longer valid
             pass

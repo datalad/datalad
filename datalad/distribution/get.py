@@ -53,6 +53,8 @@ from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import unique
+from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -300,10 +302,10 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 "subdataset %s is configured to be skipped on recursive installation",
                 sub['path'])
             continue
-        if start is not None and not subds.path.startswith(_with_sep(start)):
+        if start is not None and not path_is_subpath(subds.path, start):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,

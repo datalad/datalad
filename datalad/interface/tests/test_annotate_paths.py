@@ -125,7 +125,7 @@ def test_annotate_paths(dspath, nodspath):
     assert_result_count(base_res, 2)
     assert_result_count(base_res, 2, type='dataset')
     assert_result_count(
-        base_res, 1, type='dataset', state='clean', parentds=parentds.path,
+        base_res, 1, type='dataset', parentds=parentds.path,
         path=opj(parentds.path, 'aa'), status='')
     # same recursion but without a base dataset
     res = annotate_paths(path=opj(dspath, 'a'), recursive=True)

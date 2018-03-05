@@ -45,6 +45,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
 
 from .utils import ok_generator
 from .utils import assert_dict_equal
+from .utils import assert_str_equal
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
@@ -566,6 +567,15 @@ def test_assert_dict_equal():
     # one is scalar another one array
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(1)})
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
+
+
+def test_assert_str_equal():
+    assert_str_equal("a", "a")
+    assert_str_equal("a\n", "a\n")
+    assert_str_equal("a\nb", "a\nb")
+    assert_raises(AssertionError, assert_str_equal, "a", "a\n")
+    assert_raises(AssertionError, assert_str_equal, "a", "b")
+    assert_raises(AssertionError, assert_str_equal, "ab", "b")
 
 
 def test_testsui():

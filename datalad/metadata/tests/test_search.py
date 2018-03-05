@@ -21,17 +21,24 @@ from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
+from datalad.tests.utils import assert_str_equal
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
+from datalad.tests.utils import skip_if
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
-from datalad.metadata.extractors.tests.test_bids import bids_template
+try:
+    from datalad.metadata.extractors.tests.test_bids import bids_template
+except (ImportError, SkipTest):
+    # pybids might be absent which would preclude this import
+    bids_template = None
+
 from ..search import _listdict2dictlist
 from ..search import _meta2autofield_dict
 
@@ -187,6 +194,7 @@ def test_search_non_dataset(tdir):
     assert_in("datalad create --force", str(cme.exception))
 
 
+@skip_if(not bids_template, "No bids_template (probably no pybids installed)")
 @with_tree(bids_template)
 def test_within_ds_file_search(path):
     try:
@@ -230,11 +238,7 @@ path
 type
 """)
 
-    # check generated autofield index keys
-    with swallow_outputs() as cmo:
-        ds.search(mode='autofield', show_keys=True)
-
-        assert_equal(cmo.out, """\
+    target_out = """\
 audio.bitrate
 audio.date
 audio.duration(s)
@@ -292,9 +296,15 @@ nifti1.xyz_unit
 parentds
 path
 type
-""")
+"""
 
-    # stupid yields nothing
+    # check generated autofield index keys
+    from difflib import ndiff
+    with swallow_outputs() as cmo:
+        ds.search(mode='autofield', show_keys=True)
+        # it is impossible to assess what is different from that dump
+        assert_str_equal(cmo.out, target_out)
+
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
     for mode, query, hitpath, matched_key, matched_val in (

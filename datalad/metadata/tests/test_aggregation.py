@@ -245,3 +245,50 @@ def test_publish_aggregated(path):
         [{k: v for k, v in i.items() if k not in ('path', 'refds', 'parentds')}
          for i in remote.metadata('sub')],
     )
+
+
+def _get_contained_objs(ds):
+    return set(f for f in ds.repo.get_indexed_files()
+               if f.startswith(opj('.datalad', 'metadata', 'objects', '')))
+
+
+def _get_referenced_objs(ds):
+    return set([opj('.datalad', 'metadata', r[f])
+               for r in ds.metadata(get_aggregates=True)
+               for f in ('content_info', 'dataset_info')])
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+@skip_direct_mode  #FIXME
+def test_aggregate_removal(path):
+    base = Dataset(opj(path, 'origin')).create(force=True)
+    # force all metadata objects into the annex
+    with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
+        f.write(
+            '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
+    sub = base.create('sub', force=True)
+    subsub = sub.create(opj('subsub'), force=True)
+    base.add('.', recursive=True)
+    base.aggregate_metadata(recursive=True)
+    ok_clean_git(base.path)
+    res = base.metadata(get_aggregates=True)
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, path=subsub.path)
+    # check that we only have object files that are listed in agginfo
+    eq_(_get_contained_objs(base), _get_referenced_objs(base))
+    # now delete the deepest subdataset to test cleanup of aggregated objects
+    # in the top-level ds
+    base.remove(opj('sub', 'subsub'), check=False)
+    # now aggregation has to detect that subsub is not simply missing, but gone
+    # for good
+    base.aggregate_metadata(recursive=True)
+    ok_clean_git(base.path)
+    # internally consistent state
+    eq_(_get_contained_objs(base), _get_referenced_objs(base))
+    # info on subsub was removed at all levels
+    res = base.metadata(get_aggregates=True)
+    assert_result_count(res, 0, path=subsub.path)
+    assert_result_count(res, 2)
+    res = sub.metadata(get_aggregates=True)
+    assert_result_count(res, 0, path=subsub.path)
+    assert_result_count(res, 1)

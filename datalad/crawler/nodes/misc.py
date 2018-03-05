@@ -26,6 +26,7 @@ from ..pipeline import xrun_pipeline
 from ..pipeline import PIPELINE_TYPES
 from ...utils import auto_repr
 from ...utils import find_files as _find_files
+from datalad.support.network import URL
 
 from logging import getLogger
 from nose.tools import eq_, assert_raises
@@ -589,3 +590,14 @@ class debug(object):
             lgr.info("Ran node %s which yielded %d times", node, n)
             pdb.set_trace()
 
+
+def fix_url(data, keys=['url']):
+    """Given data, get value within 'url' key and fix up so it is legit url
+
+    - replace spaces with %20
+    """
+    data = data.copy()
+    for key in keys:
+        if key in data: # catches key error if dictionary does not contain key
+            data[key] = URL(data[key]).as_str()
+    yield data

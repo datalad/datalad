@@ -68,6 +68,7 @@ class BuildManPage(Command):
         try:
             mod = __import__(mod_name, fromlist=fromlist)
             self._parser = getattr(mod, func_name)(
+                ['datalad'],
                 formatter_class=fmt.ManPageFormatter,
                 return_subparsers=True)
 
