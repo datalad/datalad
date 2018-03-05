@@ -590,8 +590,26 @@ class GitRepo(RepoInterface):
                 raise InvalidGitRepositoryError(path)
 
         # try to lock it down
+        # if not os.path.exists(opj(path, '.git')) or not os.path.isdir(opj(path, '.git')):
+        #     raise ValueError("blow %s" % path)
+        #     import pdb; pdb.set_trace()
+        #     # so it could happen we would have submodule links here
+        #     # so let's just do in the root directory of the dataset for now
+        #     # although should then read that .git file etc
+        #     # Hm - wouldn't work since would break many tests since
+        #     # it creates untracked file etc
+        lck_gitdir = opj(path, '.git')
+        if os.path.exists(lck_gitdir) and not os.path.isdir(lck_gitdir):
+            # a file with gitdir pointing to the original repo
+            with open(lck_gitdir) as f:
+                line = f.readline()
+            # do not want to rely on split
+            _pref = 'gitdir: '
+            assert line.startswith(_pref)
+            lck_gitdir = line[len(_pref):]
+
         self._lock = InterProcessLock(
-            opj(path, '.git', 'datalad.lck')
+            opj(lck_gitdir, 'datalad.lck')
         )
         if not self._lock.acquire(blocking=False):
             raise RuntimeError("Cannot lock repo %s" % path)
@@ -739,7 +757,7 @@ class GitRepo(RepoInterface):
         return gr
 
     def __del__(self):
-        if self._lock:
+        if self._lock and self._lock.acquired:
             self._lock.release()
 
         # unbind possibly bound ConfigManager, to prevent all kinds of weird
