@@ -294,7 +294,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     unlink(opj(path_orig, '1.tar.gz'))
     res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
-    assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
+    assert_in('(Use --force to override this check, or adjust numcopies.)', res['note'])
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
