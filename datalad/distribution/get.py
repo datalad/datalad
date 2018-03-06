@@ -431,7 +431,7 @@ class Get(Interface):
             #git_opts=None,
             #annex_opts=None,
             #annex_get_opts=None,
-            jobs=None,
+            jobs='auto',
             verbose=False,
     ):
         # IMPLEMENTATION CONCEPT:
