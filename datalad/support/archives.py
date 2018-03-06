@@ -27,6 +27,7 @@ from six.moves.urllib.parse import unquote as urlunquote
 import string
 import random
 
+from .locking import locked_call_if_not_verified
 from ..utils import any_re_search
 
 import logging
@@ -408,35 +409,41 @@ class ExtractedArchive(object):
         """
         path = self.path
 
-        if not self.is_extracted:
-            # we need to extract the archive
-            # TODO: extract to _tmp and then move in a single command so we
-            # don't end up picking up broken pieces
-            lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
-            if exists(path):
-                lgr.debug("Previous extracted (but probably not fully) cached archive found. Removing %s", path)
-                rmtree(path)
-
-            os.makedirs(path)
-            assert(exists(path))
-            # remove old stamp
-            if exists(self.stamp_path):
-                rmtree(self.stamp_path)
-            decompress_file(self._archive, path, leading_directories=None)
-
-            # TODO: must optional since we might to use this content, move it into the tree etc
-            # lgr.debug("Adjusting permissions to R/O for the extracted content")
-            # rotree(path)
-            assert(exists(path))
-
-            # create a stamp
-            with open(self.stamp_path, 'w') as f:
-                f.write(self._archive)
-
-            # assert that stamp mtime is not older than archive's directory
-            assert(self.is_extracted)
-
+        locked_call_if_not_verified(
+            callable=(self._extract_archive, (path,)),
+            checker=(lambda s: s.is_extracted, (self,)),
+            lock_path_prefix=path,  # custom dir???
+            operation="extract"
+        )
         return path
+
+    def _extract_archive(self, path):
+        # we need to extract the archive
+        # TODO: extract to _tmp and then move in a single command so we
+        # don't end up picking up broken pieces
+        lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+        if exists(path):
+            lgr.debug(
+                "Previous extracted (but probably not fully) cached archive "
+                "found. Removing %s",
+                path)
+            rmtree(path)
+        os.makedirs(path)
+        assert (exists(path))
+        # remove old stamp
+        if exists(self.stamp_path):
+            rmtree(self.stamp_path)
+        decompress_file(self._archive, path, leading_directories=None)
+        # TODO: must optional since we might to use this content, move it
+        # into the tree etc
+        # lgr.debug("Adjusting permissions to R/O for the extracted content")
+        # rotree(path)
+        assert (exists(path))
+        # create a stamp
+        with open(self.stamp_path, 'w') as f:
+            f.write(self._archive)
+        # assert that stamp mtime is not older than archive's directory
+        assert (self.is_extracted)
 
     # TODO: remove?
     #def has_file_ready(self, afile):
