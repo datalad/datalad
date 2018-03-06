@@ -76,6 +76,7 @@ Miscellaneous commands
    :toctree: generated
 
    api.add_archive_content
+   api.configure
    api.crawl
    api.crawl_init
    api.test
