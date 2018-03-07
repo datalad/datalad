@@ -29,6 +29,7 @@ from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import SkipTest
 from ...tests.utils import assert_re_in
+from datalad.tests.utils import assert_result_values_cond
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
@@ -294,7 +295,11 @@ def test_add_archive_content(path_orig, url, repo_path):
     unlink(opj(path_orig, '1.tar.gz'))
     res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
-    assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
+
+    assert_result_values_cond(
+        [res], 'note',
+        lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
+    )
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
