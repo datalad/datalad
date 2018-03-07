@@ -126,8 +126,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
         dct must be a dict
         """
         for k, v in dct.items():
-            if k.startswith('@') or k == 'datalad_unique_content_properties':
-                # ignore all JSON-LD specials
+            if (k != '@id' and k.startswith('@')) or k == 'datalad_unique_content_properties':
+                # ignore all JSON-LD specials, but @id
                 continue
             # TODO `k` might need remapping, if another key was already found
             # with the same definition
@@ -138,7 +138,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                 # temp files during index staging, and trips over absent "directories"
                 # TODO maybe even kill parentheses
                 # TODO actually, it might be better to have an explicit whitelist
-                k.replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
+                k.lstrip('@').replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
             )
             if isinstance(v, list):
                 v = _listdict2dictlist(v)

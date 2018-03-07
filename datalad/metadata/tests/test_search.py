@@ -255,6 +255,8 @@ bids.participant.language
 bids.subject
 bids.task
 bids.type
+datalad_core.id
+datalad_core.version
 id
 nifti1.cal_max
 nifti1.cal_min
