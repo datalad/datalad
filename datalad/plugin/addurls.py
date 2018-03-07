@@ -11,6 +11,7 @@
 
 from collections import defaultdict, Mapping
 from functools import partial
+from itertools import dropwhile
 import logging
 import os
 import re
@@ -271,6 +272,40 @@ def _format_filenames(format_fn, rows, row_infos):
     return subpaths
 
 
+def split_ext(filename):
+    """Use git-annex's splitShortExtensions rule for splitting extensions.
+
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    A tuple with (root, extension)
+
+    Examples
+    --------
+    >>> split_ext("filename.py")
+    ('filename', '.py')
+
+    >>> split_ext("filename.tar.gz")
+    ('filename', '.tar.gz')
+
+    >>> split_ext("filename.above4chars.ext")
+    ('filename.above4chars', '.ext')
+    """
+    parts = filename.split(".")
+    if len(parts) == 1:
+        return filename, ""
+
+    tail = list(dropwhile(lambda x: len(x) < 5,
+                          reversed(parts[1:])))
+
+    file_parts = parts[:1] + tail[::-1]
+    ext_parts = parts[1+len(tail):]
+    return  ".".join(file_parts), "." + ".".join(ext_parts)
+
+
 def get_file_parts(filename, prefix="name"):
     """Assign a name to various parts of a file.
 
@@ -285,15 +320,15 @@ def get_file_parts(filename, prefix="name"):
     -------
     A dict mapping each part to a value.
     """
-    root, ext = os.path.splitext(filename)
-    root_lper, _, ext_lper = filename.partition(".")
-    if ext_lper:
-        ext_lper = "." + ext_lper
+    root, ext = split_ext(filename)
+    root_py, ext_py = os.path.splitext(filename)
+
     return {prefix: filename,
             prefix + "_root": root,
             prefix + "_ext": ext,
-            prefix + "_root_lper": root_lper,
-            prefix + "_ext_lper": ext_lper}
+            prefix + "_root_py": root_py,
+            prefix + "_ext_py": ext_py}
+
 
 def get_url_parts(url):
     """Assign a name to various parts of the URL.
@@ -337,7 +372,7 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
 
     if any(i.startswith("_url_filename") for i in file_fields):
         if dry_run:  # Don't waste time making requests.
-            dummy = get_file_parts("DRY_BASE.DRY_EXT", "_url_filename")
+            dummy = get_file_parts("BASE.EXT", "_url_filename")
             for idx, row in enumerate(rows):
                 row.update(
                     {k: v + str(idx) for k, v in dummy.items()})
@@ -597,14 +632,17 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             the URL's path can be referenced as "_urlN".  "_url0" and
             "_url1" would map to "asciicast" and "seamless_nested_repos.sh",
             respectively.  The final part of the path is also available
-            as "_url_basename",
+            as "_url_basename".
 
-           This name is broken down further.  "_url_basename_root" and
-           "_url_basename_ext" provide access to the result of
-           os.path.splitext ("seamless_nested_repos" and ".sh").  There
-           is also a "leftmost period" (lper) split.  Whereas the
-           regular split for "file.tar.gz" would label the extension as
-           ".gz", the lper split would label it as ".tar.gz".
+            This name is broken down further.  "_url_basename_root" and
+            "_url_basename_ext" provide access to the root name and
+            extension.  These values are similar to the result of
+            os.path.splitext, but, in the case of multiple periods, the
+            extension is identified using the same length heuristic that
+            git-annex uses.  As a result, the extension of "file.tar.gz"
+            would be ".tar.gz", not ".gz".  In addition, the fields
+            "_url_basename_root_py" and "_url_basename_ext_py" provide
+            access to the result of os.path.splitext.
 
           - _url_filename*
 

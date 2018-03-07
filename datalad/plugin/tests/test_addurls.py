@@ -151,13 +151,27 @@ def test_fmt_to_name():
     assert_false(addurls.fmt_to_name("{}", {}))
 
 
+def test_split_ext():
+    eq_(addurls.split_ext("file"), ("file", ""))
+
+    eq_(addurls.split_ext("file.py"), ("file", ".py"))
+    eq_(addurls.split_ext("file.tar.gz"), ("file", ".tar.gz"))
+    eq_(addurls.split_ext("file.toolong.gz"), ("file.toolong", ".gz"))
+
+    eq_(addurls.split_ext("file.a.b.c.d"), ("file", ".a.b.c.d"))
+    eq_(addurls.split_ext("file.a.b.cccc.d"), ("file", ".a.b.cccc.d"))
+    eq_(addurls.split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
+
+    eq_(addurls.split_ext("file.a.b..c"), ("file", ".a.b..c"))
+
+
 def test_get_file_parts():
     assert_dict_equal(addurls.get_file_parts("file.tar.gz", "prefix"),
                       {"prefix": "file.tar.gz",
-                       "prefix_root": "file.tar",
-                       "prefix_ext": ".gz",
-                       "prefix_root_lper": "file",
-                       "prefix_ext_lper": ".tar.gz"})
+                       "prefix_root_py": "file.tar",
+                       "prefix_ext_py": ".gz",
+                       "prefix_root": "file",
+                       "prefix_ext": ".tar.gz"})
 
 
 def test_get_url_parts():
@@ -169,10 +183,10 @@ def test_get_url_parts():
                       {"_url_hostname": "datalad.org",
                        "_url0": "about.html",
                        "_url_basename": "about.html",
+                       "_url_basename_root_py": "about",
+                       "_url_basename_ext_py": ".html",
                        "_url_basename_root": "about",
-                       "_url_basename_ext": ".html",
-                       "_url_basename_root_lper": "about",
-                       "_url_basename_ext_lper": ".html"})
+                       "_url_basename_ext": ".html"})
     assert_dict_equal(addurls.get_url_parts("http://datalad.org/about.html"),
                       addurls.get_url_parts("http://datalad.org//about.html"))
 
@@ -182,10 +196,10 @@ def test_get_url_parts():
          "_url0": "for",
          "_url1": "git-users",
          "_url_basename": "git-users",
+         "_url_basename_root_py": "git-users",
+         "_url_basename_ext_py": "",
          "_url_basename_root": "git-users",
-         "_url_basename_ext": "",
-         "_url_basename_root_lper": "git-users",
-         "_url_basename_ext_lper": ""})
+         "_url_basename_ext": ""})
 
 
 ST_DATA = {"header": ["name", "debut_season", "age_group", "now_dead"],
@@ -326,7 +340,7 @@ def test_addurls_dry_run(path):
                           cml.out)
             assert_in(
                 "Would download URL/a.dat to {}".format(
-                    os.path.join(path, "foo", "DRY_BASE0")),
+                    os.path.join(path, "foo", "BASE")),
                 cml.out)
 
             assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
