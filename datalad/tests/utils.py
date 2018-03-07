@@ -1221,7 +1221,8 @@ def assert_result_values_cond(results, prop, cond):
     cond: callable
     """
     for r in assure_list(results):
-        assert cond(r[prop])
+        ok_(cond(r[prop]),
+            msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
 
 
 def ignore_nose_capturing_stdout(func):
