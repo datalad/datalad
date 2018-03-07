@@ -597,14 +597,14 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
             the URL's path can be referenced as "_urlN".  "_url0" and
             "_url1" would map to "asciicast" and "seamless_nested_repos.sh",
             respectively.  The final part of the path is also available
-            as "_url_basename",
+            as "_url_basename".
 
-           This name is broken down further.  "_url_basename_root" and
-           "_url_basename_ext" provide access to the result of
-           os.path.splitext ("seamless_nested_repos" and ".sh").  There
-           is also a "leftmost period" (lper) split.  Whereas the
-           regular split for "file.tar.gz" would label the extension as
-           ".gz", the lper split would label it as ".tar.gz".
+            This name is broken down further.  "_url_basename_root" and
+            "_url_basename_ext" provide access to the result of
+            os.path.splitext ("seamless_nested_repos" and ".sh").  There
+            is also a "leftmost period" (lper) split.  Whereas the
+            regular split for "file.tar.gz" would label the extension as
+            ".gz", the lper split would label it as ".tar.gz".
 
           - _url_filename*
 
