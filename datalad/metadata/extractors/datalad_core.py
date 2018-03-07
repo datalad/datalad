@@ -18,6 +18,7 @@ from os.path import exists
 
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
+from datalad.coreapi import subdatasets
 # use main version as core version
 # this must stay, despite being a seemingly unused import, each extractor defines a version
 from datalad.metadata.definitions import version as vocabulary_version
@@ -41,6 +42,28 @@ class MetadataExtractor(BaseMetadataExtractor):
             obj['@context'] = obj['definition']
             del obj['definition']
         obj['@id'] = self.ds.id
+        subdsinfo = [{
+            # this version would change anytime we aggregate metadata, let's not
+            # do this for now
+            #'version': sds['revision'],
+            'type': sds['type'],
+            'name': sds['gitmodule_name'],
+        }
+            for sds in subdatasets(
+                dataset=self.ds,
+                recursive=False,
+                return_type='generator',
+                result_renderer='disabled')
+        ]
+        if subdsinfo:
+            obj['haspart'] = subdsinfo
+        superds = self.ds.get_superdataset(registered_only=True, topmost=False)
+        if superds:
+            obj['ispartof'] = {
+                '@id': superds.id,
+                'type': 'dataset',
+            }
+
         return obj
 
     def _get_content_metadata(self):
