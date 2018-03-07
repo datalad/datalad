@@ -324,7 +324,7 @@ class Dataset(object):
             return was_once_installed
 
     def get_superdataset(self, datalad_only=False, topmost=False,
-                         registered_only=False):
+                         registered_only=True):
         """Get the dataset's superdataset
 
         Parameters
