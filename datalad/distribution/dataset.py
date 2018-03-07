@@ -359,10 +359,7 @@ class Dataset(object):
             sds = Dataset(sds_path_)
             if datalad_only:
                 # test if current git is actually a dataset?
-                # can't use ATM since we just autogenerate and ID, see
-                # https://github.com/datalad/datalad/issues/986
-                # if not sds.id:
-                if not sds.config.get('datalad.dataset.id', None):
+                if not sds.id:
                     break
             if registered_only:
                 if path not in sds.subdatasets(
