@@ -363,7 +363,9 @@ class Dataset(object):
                     break
             if registered_only:
                 if path not in sds.subdatasets(
-                        recursive=False, result_xfm='paths'):
+                        recursive=False,
+                        contains=path,
+                        result_xfm='paths'):
                     break
 
             # That was a good candidate
