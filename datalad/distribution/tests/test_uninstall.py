@@ -328,11 +328,6 @@ def test_uninstall_recursive(path):
     res = ds.drop(target_fname, recursive=True, on_failure='ignore')
     assert_status('error', res)
     assert_result_values_cond(
-            res, 'message',
-            lambda x: "(Use --force to override this check, "
-                      "or adjust numcopies.)" in x
-    )
-    assert_result_values_cond(
         res, 'message',
         lambda x: "configured minimum number of copies not found" in x or
         "Could only verify the existence of 0 out of 1 necessary copies" in x
@@ -417,11 +412,6 @@ def test_kill(path):
     # We have a second result with status 'impossible' for the ds, that we need
     # to filter out for those assertions:
     err_result = [r for r in res if r['status'] == 'error'][0]
-    assert_result_values_cond(
-            [err_result], 'message',
-            lambda x: "(Use --force to override this check, "
-                      "or adjust numcopies.)" in x
-    )
     assert_result_values_cond(
         [err_result], 'message',
         lambda x: "configured minimum number of copies not found" in x or
