@@ -14,9 +14,8 @@ except ImportError:  # pragma: no cover
 # copied the simple_with_archives template in order to show
 def pipeline(doc_id=None,
              x_pathmatch_="//file/@id",
-             incoming_pipeline=None):
+             leading_dirs_depth=1):
 
-    assert not incoming_pipeline
     crawler = crawl_url("https://purl.stanford.edu/" + doc_id + ".xml")
     # adding print_xml to incoming pipeline
     incoming_pipeline = [  # Download all the archives found on the project page
@@ -25,7 +24,9 @@ def pipeline(doc_id=None,
         configure_url,
         print_xml
     ]
-    return incoming_pipeline
+
+    from .simple_with_archives import pipeline as sa_pipeline
+    return sa_pipeline(leading_dirs_depth=leading_dirs_depth, incoming_pipeline=incoming_pipeline)
 
 
 def configure_url(data, keys=['url'], match='match'):
