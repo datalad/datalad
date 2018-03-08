@@ -1,14 +1,12 @@
 import fasteners
 import os
 
-from operator import isCallable
-
 
 def _get(entry):
     if isinstance(entry, (tuple, list)):
         func, args = entry
         return func(*args)
-    elif isCallable(entry):
+    elif callable(entry):
         return entry()
     else:
         return entry
