@@ -48,6 +48,7 @@ where ``SCHEME`` could be
 - ``tests`` to also install dependencies used by unit-tests battery of the datalad
 - ``full`` to install all dependencies
 
+
 (Neuro)Debian, Ubuntu, and similar systems
 ------------------------------------------
 
@@ -58,6 +59,7 @@ and all its software dependencies (including the git-annex-standalone package)::
   sudo apt-get install datalad
   
 .. _neurodebian: http://neuro.debian.net
+
 
 MacOSX
 ------
@@ -72,6 +74,37 @@ above. ``pip`` comes with Python distributions like anaconda_.
 
 .. _homebrew: http://brew.sh
 .. _anaconda: https://www.continuum.io/downloads
+
+
+HPC environments or any system with singularity installed
+---------------------------------------------------------
+
+If you want to use DataLad in a high-performance computing (HPC) environment,
+such as a computer cluster, or a similar multi-user machine, where you don't have
+admin privileges, chances are that `Singularity <http://singularity.lbl.gov>`_
+is installed. Even if it isn't installed, singularity helps you make a `solid
+case <http://singularity.lbl.gov/install-request>`_ why your admin might want
+to install it.
+
+On any system with Singularity installed, you can pull a container with a full
+installation of DataLad (~300 MB) straight from `Singularity Hub`_. The
+following command pulls the latest container for the DataLad development version
+(check on `Singularity Hub`_ for alternative container variants)::
+
+  singularity pull shub://datalad/datalad:fullmaster
+
+This will produce an executable image file. You can rename this image to ``datalad``,
+and put the directory it is located in into your :envvar:`PATH` environment variable.
+From there on, you will have a ``datalad`` command in the commandline that transparently
+executes all DataLad functionality in the container.
+
+With Singularity version 2.4.2 you can choose the image name directly in the download
+command::
+
+  singularity pull --name datalad shub://datalad/datalad:fullmaster
+
+
+.. _Singularity Hub: https://singularity-hub.org/collections/667
 
 
 First steps
