@@ -1,0 +1,37 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*-
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+set -e
+set -u
+
+# test the lastest master image unless told otherwise
+flavor="${1:-fullmaster}"
+
+# where are we and where do we find the example runner script
+scriptdir=$(dirname `which $0 | xargs readlink -f `)
+
+# fresh workdir elsewhere
+wdir=$(mktemp --tmpdir -u -d datalad_singularity_test.XXXX)
+mkdir -p $wdir/bin
+cd $wdir/bin
+
+singularity pull --name datalad shub://datalad/datalad:${flavor}
+# some older singularity versions used different naming strategies
+[ ! -e datalad ] && mv datalad* datalad || true
+cd ..
+
+# put datalad front in the PATH
+PATH=$PWD/bin:$PATH
+export PATH
+
+# execute the cmdline examples as a crude test
+"$scriptdir"/run_doc_examples
+
+# TODO cleanup
