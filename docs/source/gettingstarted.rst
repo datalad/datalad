@@ -84,4 +84,10 @@ For example, we might want to look for dataset thats were funded by, or acknowle
 Any known dataset can now be installed inside the local superdataset with a
 command like this::
 
-  datalad install ~/datalad/openfmri/ds000002
+  datalad install ///openfmri/ds000002
+
+Now, have a look at the `demos on the DataLad website
+<http://datalad.org/features.html>`_, some :ref:`common data management
+scenarios <chap_usecases>`, and a bit of background info on the
+:ref:`fundamental concepts <chap_basic_principles>` the DataLad API(s) are built
+on.
