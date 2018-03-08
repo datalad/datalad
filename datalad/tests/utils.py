@@ -1260,6 +1260,21 @@ def assert_result_values_equal(results, prop, values):
         values)
 
 
+def assert_result_values_cond(results, prop, cond):
+    """Verify that the values of all results for a given key in the status dicts
+    fullfill condition `cond`.
+
+    Parameters
+    ----------
+    results:
+    prop: str
+    cond: callable
+    """
+    for r in assure_list(results):
+        ok_(cond(r[prop]),
+            msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
