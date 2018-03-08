@@ -196,7 +196,7 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'dcm', 'jpg', 'gz', 'pdf'})
     },
