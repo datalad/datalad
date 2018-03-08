@@ -405,7 +405,7 @@ def test_rerun_subdir(path):
     subdir = opj(path, 'subdir')
     mkdir(subdir)
     with chpwd(subdir):
-        run("python -c 'open(\"test.dat\", \"wb\").close()'")
+        run("touch test.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
     rec_msg, runinfo = get_commit_runinfo(ds.repo)
@@ -420,7 +420,7 @@ def test_rerun_subdir(path):
 
     # but if we run ds.run -- runs within top of the dataset
     with chpwd(subdir):
-        ds.run("python -c 'open(\"test2.dat\", \"wb\").close()'")
+        ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
     rec_msg, runinfo = get_commit_runinfo(ds.repo)
