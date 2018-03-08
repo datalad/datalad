@@ -509,7 +509,7 @@ class AggregateMetaData(Interface):
     scientific metadata standards are supported, like DICOM, BIDS, or datacite.
     Some metadata extractors depend on particular 3rd-party software. The list of
     metadata extractors available to a particular DataLad installation is reported
-    by the 'wtf' plugin ('datalad plugin wtf').
+    by the 'wtf' plugin ('datalad wtf').
 
     Enabling a metadata extractor for a dataset is done by adding its name to the
     'datalad.metadata.nativetype' configuration variable -- typically in the
