@@ -45,17 +45,33 @@ particular types of data structures and file formats.
 Various audio file formats (``audio``)
 --------------------------------------
 
+This extractor uses the `mutagen <https://github.com/quodlibet/mutagen>`_
+package to extract essential metadata from a range of audio file formats.  For
+the most common metadata properties a constrained vocabulary, based on the
+`Music Ontology <http://purl.org/ontology/mo/>`_ is employed.
+
 Brain Imaging Data Structure (``bids``)
 ---------------------------------------
 
 DataLad has basic support for extraction of metadata from the `BIDS
 <http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
+Support is focused on dataset-level metadata, and participant information.
+At present, there is no standardized vocabulary for BIDS, instead
+field names are based on the conventions in the standard description.
 
 datacite.org compliant datasets (``datacite``)
 ----------------------------------------------
 
+This extractor can handle dataset-level metadata following the `datacite.org
+<https://www.datacite.org>`_ specification. No constrained vocabulary is
+identified at the moment.
+
 Datalad's internal metadata storage (``datalad_core``)
 ------------------------------------------------------
+
+This extractor can express Datalad's internal metadata representation, such
+as the relationship of a super- and a subdataset. It uses DataLad's own
+constrained vocabulary.
 
 RFC822-compliant metadata (``datalad_rfc822``)
 ----------------------------------------------
@@ -133,28 +149,54 @@ The following fields are supported:
   A version for the dataset. This should be in a format that is alphanumerically
   sortable and lead to a "greater" version for an update of a dataset.
 
+Metadata keys used by this extractor are defined in DataLad's own constrained
+vocabulary.
+
 Digital Imaging and Communications in Medicine (``dicom``)
 ----------------------------------------------------------
+
+Metadata can be extracted from any standard DICOM file. The extractor yields
+file-based metadata, and a dataset-level description that identifies individual
+image series. For each image series, all metadata are reported that are
+invariant across individual images in a series. The extractor uses an
+incomplete DICOM vocabulary from http://semantic-dicom.org
 
 Friction-less data packages (``frictionless_datapackage``)
 ----------------------------------------------------------
 
-DataLad has basic support for extraction of metadata from `friction-less data
-packages <http://specs.frictionlessdata.io/data-packages>`_
-(``datapackage.json``).  file.
+DataLad has basic support for extraction of essential dataset-level metadata
+from `friction-less data packages
+<http://specs.frictionlessdata.io/data-packages>`_ (``datapackage.json``).
+file. Metadata keys are constrained to DataLad's own vocabulary.
 
 Exchangeable Image File Format (``exif``)
 -----------------------------------------
 
+The extractor yields EXIF metadata from any compatible file. It uses
+the W3C EXIF vocabulary (http://www.w3.org/2003/12/exif/ns/).
+
 Various image/photo formats (``image``)
 ---------------------------------------
+
+Standard image metadata is extractor using the `Pillow package
+<https://github.com/python-pillow/Pillow>`_. Core metadata is available using
+an adhoc vocabulary defined by the extractor.
 
 Neuroimaging data exchange format (``nifti1``)
 ----------------------------------------------
 
+NIfTI-1 metadata is extracted from the header of individual files. Virtually
+all header information is reported, except for header extensions.  An
+adhoc-vocabulary is used, as no standard vocabulary is available.
+
 Extensible Metadata Platform (``xmp``)
 --------------------------------------
 
+This extractor yields any XMP-compliant metadata from any supported file (e.g.
+PDFs, photos). XMP metadata uses fully qualified terms from standard
+vocabularies that are simply passed through by the extractor. At the moment
+metadata extraction from side-car files is not supported, but would be easy to
+add.
 
 Metadata aggregation
 ====================
