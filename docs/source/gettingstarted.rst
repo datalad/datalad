@@ -10,9 +10,12 @@ Getting started
 Installation
 ============
 
+When there isn't anything more convenient
+-----------------------------------------
+
 Unless system packages are available for your operating system (see below), DataLad
 can be installed via pip_ (**P**\ip **I**\nstalls **P**\ython). To automatically install 
-datalad and all its software dependencies type::
+datalad with all its Python dependencies type::
 
   pip install datalad
 
@@ -22,6 +25,17 @@ In addition, it is necessary to have a current version of git-annex_ installed
 which is not set up automatically by using the pip method.
 
 .. _git-annex: http://git-annex.branchable.com
+
+.. note::
+
+  If you do not have admin powers...
+
+  ``pip`` supports installation into a user's home directory with ``--user``.
+  Git-annex can be deployed by extracting pre-built binaries from a tarball
+  (that also includes an up-to-date Git installation).  `Obtain the tarball
+  <https://downloads.kitenet.net/git-annex/linux/current/>`_, extract it, and
+  set the :envvar:`PATH` environment variable to include the root of the
+  extracted tarball. Fingers crossed and good luck!
 
 Advanced users can chose from several installation schemes (e.g.
 ``publish``, ``metadata``, ``tests`` or ``crawl``)::
