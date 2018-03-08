@@ -205,40 +205,40 @@ Metadata aggregation can be performed with the :ref:`aggregate-metadata
 <man_datalad-aggregate-metadata>` command. Aggregation is done for two
 interrelated but distinct reasons:
 
-- Fast uniform metadata access, independent of local data availably
+- Fast uniform metadata access, independent of local data availability
 - Comprehensive data discovery without access to or knowledge of individual
   datasets
 
 In an individual dataset, metadata aggregation engages any number of enabled
 metadata extractors to build a JSON-LD based metadata representation that is
 separate from the original data files. These metadata objects are added to the
-dataset, and are tracked using the same mechanisms as any other dataset
-content. Based on this metadata, DataLad can provide fast and uniform access to
-metadata for any dataset component (individual files, subdatasets, the whole
-dataset itself), based on the relative path of a component within a dataset.
-(available via the :ref:`metadata <man_datalad-metadata>` command).  This
-extracted metadata can be kept or made available locally for any such query,
-even when it is impossible or undesirable to keep the associated data files
-around (e.g. due to size constraints).
+dataset and are tracked with the same mechanisms that are used for any other
+dataset content. Based on this metadata, DataLad can provide fast and uniform
+access to metadata for any dataset component (individual files, subdatasets,
+the whole dataset itself), based on the relative path of a component within a
+dataset (available via the :ref:`metadata <man_datalad-metadata>` command).
+This extracted metadata can be kept or made available locally for any such
+query, even when it is impossible or undesirable to keep the associated data
+files around (e.g. due to size constraints).
 
 For any superdataset (a dataset that contains subdatasets as components),
 aggregation can go one step further. In this case, aggregation imports
 extracted metadata from subdatasets into the superdataset to offer the just
-describe query feature for any aggregated subdataset too. This works across any
-number of levels of nesting. For example, a subdataset that contains the
+described query feature for any aggregated subdataset too. This works across
+any number of levels of nesting. For example, a subdataset that contains the
 aggregated metadata for eight other datasets (that might have never been
-available locally), can be aggregated into a local superdataset with all its
-metadata. In that superdataset, a DataLad user is than able to query
-information on any content of any subdataset, regardless of their actually
+available locally) can be aggregated into a local superdataset with all its
+metadata. In that superdataset, a DataLad user is then able to query
+information on any content of any subdataset, regardless of their actual
 availability. This principle also allows any user to install the superdataset
-from http://datasets.datalad.org and *locally and offline* query information
-about any dataset available online from this server.
+from http://datasets.datalad.org and perform *local and offline* queries about
+any dataset available online from this server.
 
 Besides full access to all aggregated metadata by path (via the :ref:`metadata
 <man_datalad-metadata>` command), DataLad also comes with a :ref:`search
-<man_datalad-search>` command,that provides different search modes to query the
+<man_datalad-search>` command that provides different search modes to query the
 entirety of the locally available metadata. Its capabilities include simple
-keyword searches, but also more complex queries using date ranges or logical
+keyword searches as well as more complex queries using date ranges or logical
 conjunctions.
 
 
