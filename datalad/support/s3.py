@@ -62,10 +62,10 @@ def _get_bucket_connection(credential):
 
 def _handle_exception(e, bucket_name):
     """Helper to handle S3 connection exception"""
-    if e.error_code == 'AccessDenied':
-        raise AccessDeniedError(exc_str(e))
-    else:
-        raise DownloadError(
+    raise (
+        AccessDeniedError
+        if e.error_code == 'AccessDenied'
+        else DownloadError)(
             "Cannot connect to %s S3 bucket. Exception: %s"
             % (bucket_name, exc_str(e))
         )
@@ -90,7 +90,7 @@ def get_bucket(conn, bucket_name):
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
             lgr.debug("Cannot access all buckets: %s", exc_str(e2))
-            _handle_exception(e, 'any')
+            _handle_exception(e, 'any (originally requested %s)' % bucket_name)
         all_bucket_names = [b.name for b in all_buckets]
         lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
         if bucket_name in all_bucket_names:
@@ -321,12 +321,12 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     s3_bucket, fpath = None, url_rec.path.lstrip('/')
 
     if url_rec.netloc.endswith('.s3.amazonaws.com'):
-        if not url_rec.scheme in ('http', 'https'):
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
         s3_bucket = url_rec.netloc.split('.', 1)[0]
     elif url_rec.netloc == 's3.amazonaws.com':
-        if not url_rec.scheme in ('http', 'https'):
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
         s3_bucket, fpath = fpath.split('/', 1)

@@ -157,7 +157,9 @@ class initiate_dataset(object):
         )
         if self.add_to_super:
             # place hack from 'add-to-super' times here
-            sds = ds.get_superdataset()
+            # MIH: tests indicate that this wants to discover any dataset above
+            # not just true superdatasets
+            sds = ds.get_superdataset(registered_only=False)
             if sds is not None:
                 lgr.debug("Adding %s as a subdataset to %s", ds, sds)
                 sds.add(ds.path, save=False)

@@ -178,7 +178,7 @@ def __urlopen_requests(url):
     if isinstance(url, Request):
         url = url.get_full_url()
     from requests import Session
-    return Session().get(url)
+    return Session().get(url, stream=True)
 
 
 def retry_urlopen(url, retries=3):

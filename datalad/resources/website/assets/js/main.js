@@ -1,6 +1,12 @@
 /* global window XMLHttpRequest */
 var metadataDir = '.git/datalad/metadata/';
 var ntCache = {};   // node_path: type cache[dictionary]
+/* might need (in)validation, e.g. while testing with local
+   localhost:8000  it kept bringing install urls from previous
+   sessions... obscure
+   Or may be should be replaced with sessionStorage altogether
+var stored = sessionStorage['ntCache'];
+*/
 var stored = localStorage['ntCache'];
 if (stored) ntCache = JSON.parse(stored);
 
@@ -84,7 +90,7 @@ function getParameterByName(name, url) {
   var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
   var results = regex.exec(url);
   if (!results || !results[2]) return null;
-  return decodeURIComponent(results[2].replace(/\+/g, " "));
+  return decodeURIComponent(results[2]); // .replace(/\+/g, " "));
 }
 
 /**
@@ -101,6 +107,7 @@ function bread2crumbs(jQuery, md5) {
   for (var index = 2; index < rawCrumbs.length; index++) {
     if (rawCrumbs[index] === '?dir=')
       continue;
+    rawCrumbs[index] = decodeURI(rawCrumbs[index]);
     var crumbLink = rawCrumbs.slice(0, index).join('/');
     var nextLink = crumbLink + '/' + rawCrumbs[index];
     // create span class of crumb based on node type it represents
@@ -195,7 +202,7 @@ function updateParamOrPath(nextUrl, type, currentState) {
  * decide the url to move to based on current location and clicked node
  * @param {string} data data of clicked node
  * @param {string} url url to extract parameter from by getParameterByName
- * @return {Object} json contaning traverse type and traverse path
+ * @return {Object} json containing traverse type and traverse path
  */
 function clickHandler(data, url) {
   // don't do anything for broken links
@@ -210,7 +217,8 @@ function clickHandler(data, url) {
   var traverse = {next: next, type: 'assign'};
   // if to update parameter, make next relative to index.html path
   if (updateParamOrPath(next, data.type, dir))
-    traverse = {next: '?dir=' + next.replace(loc().pathname, '/'), type: 'search'};
+    /* encodeURIComponent would encode more https://stackoverflow.com/a/23842171 */
+    traverse = {next: '?dir=' + encodeURI(next.replace(loc().pathname, '/')), type: 'search'};
   // if clicked was current node '.', remove '.' at at end of next
   if (data.name === '.')
     traverse.next = traverse.next.slice(0, -1);
