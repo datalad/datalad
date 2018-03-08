@@ -1,3 +1,9 @@
+#
+# This container provides a full Python3-based installation of DataLad
+# (http://datalad.org) using DataLad's latest development state at the
+# time the container is built.
+#
+
 Bootstrap:docker
 From:neurodebian:latest
 
@@ -7,7 +13,11 @@ From:neurodebian:latest
 
     # setup the container sources themselves
     apt-get -y install eatmydata
-    eatmydata apt-get -y install gnupg wget
+    eatmydata apt-get -y install gnupg wget locales
+
+    # we need a UTF locale for DataLad to work properly
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+    locale-gen
 
     # bare essentials to pull everything else in
     eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip

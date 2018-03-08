@@ -30,6 +30,7 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 
+from datalad.distribution.add import Add
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod

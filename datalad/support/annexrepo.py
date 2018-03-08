@@ -2076,8 +2076,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not out_json.get('success', False):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
-                    msg="Error, annex reported failure for addurl: %s"
-                    % str(out_json))
+                    msg="Error, annex reported failure for addurl (url='%s'): %s"
+                    % (url, str(out_json)))
             return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,

@@ -190,12 +190,16 @@ def test_subdatasets(path):
         result_xfm='datasets', return_type='item-or-list')
     assert_true(subsubds.is_installed())
     eq_(subsubds.get_superdataset(), subds)
-    eq_(subsubds.get_superdataset(topmost=True), ds)
+    # by default, it will only report a subperdataset that actually
+    # has the queries dataset as a registered true subdataset
+    eq_(subsubds.get_superdataset(topmost=True), subds)
+    # by we can also ask for a dataset that is merely above
+    eq_(subsubds.get_superdataset(topmost=True, registered_only=False), ds)
 
     # verify that '^' alias would work
     with chpwd(subsubds.path):
         dstop = Dataset('^')
-        eq_(dstop, ds)
+        eq_(dstop, subds)
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path, LOCAL_CENTRAL_PATH)

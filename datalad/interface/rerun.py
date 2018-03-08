@@ -21,6 +21,8 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
+from datalad.interface.diff import Diff
+from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
 

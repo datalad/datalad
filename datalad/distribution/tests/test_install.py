@@ -88,8 +88,22 @@ def test_installationpath_from_url():
               'lastbit.git/',
               'http://example.com/lastbit',
               'http://example.com/lastbit.git',
+              'http://lastbit:8000'
               ):
         eq_(_get_installationpath_from_url(p), 'lastbit')
+    # we need to deal with quoted urls
+    for url in (
+        # although some docs say that space could've been replaced with +
+        'http://localhost:8000/+last%20bit',
+        'http://localhost:8000/%2Blast%20bit',
+        '///%2Blast%20bit',
+        '///d1/%2Blast%20bit',
+        '///d1/+last bit',
+    ):
+        eq_(_get_installationpath_from_url(url), '+last bit')
+    # and the hostname alone
+    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
+    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
@@ -223,7 +237,7 @@ def test_install_datasets_root(tdir):
 
         with assert_raises(IncompleteResultsError) as cme:
             install("sub", source='///')
-            assert_in("already exists and not empty", str(cme))
+        assert_in("already exists and not empty", str(cme.exception))
 
 
 @known_failure_v6  #FIXME
@@ -845,6 +859,21 @@ def test_install_subds_with_space(opath, tpath):
     # install(tpath, source=opath, recursive=True)
     # do via ssh!
     install(tpath, source="localhost:" + opath, recursive=True)
+    assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
+# https://github.com/datalad/datalad/issues/2232
+@with_tempfile
+@with_tempfile
+def test_install_from_tilda(opath, tpath):
+    ds = create(opath)
+    ds.create('sub ds')
+    orelpath = os.path.join(
+        '~',
+        os.path.relpath(opath, os.path.expanduser('~'))
+    )
+    assert orelpath.startswith('~')  # just to make sure no normalization
+    install(tpath, source=orelpath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
