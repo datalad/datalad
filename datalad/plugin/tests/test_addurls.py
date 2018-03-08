@@ -17,7 +17,8 @@ import tempfile
 
 from six.moves import StringIO
 
-from datalad.api import Dataset, plugin, subdatasets
+from datalad.api import addurls, Dataset, subdatasets
+import datalad.plugin.addurls as au
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import chpwd, slow, swallow_logs
 from datalad.tests.utils import assert_false, assert_true, assert_raises
@@ -27,14 +28,12 @@ from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tree, with_tempfile, HTTPPath
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
-from datalad.plugin import addurls
-
 
 def test_formatter():
     idx_to_name = {i: "col{}".format(i) for i in range(4)}
     values = {"col{}".format(i): "value{}".format(i) for i in range(4)}
 
-    fmt = addurls.Formatter(idx_to_name)
+    fmt = au.Formatter(idx_to_name)
 
     eq_(fmt.format("{0}", values), "value0")
     eq_(fmt.format("{0}", values), fmt.format("{col0}", values))
@@ -48,29 +47,29 @@ def test_formatter():
 
 
 def test_formatter_lower_case():
-    fmt = addurls.Formatter({0: "key"})
+    fmt = au.Formatter({0: "key"})
     eq_(fmt.format("{key!l}", {"key": "UP"}), "up")
     eq_(fmt.format("{0!l}", {"key": "UP"}), "up")
     eq_(fmt.format("{other!s}", {}, other=[1, 2]), "[1, 2]")
 
 
 def test_formatter_no_idx_map():
-    fmt = addurls.Formatter({})
+    fmt = au.Formatter({})
     assert_raises(KeyError, fmt.format, "{0}", {"col0": "value0"})
 
 
 def test_formatter_no_mapping_arg():
-    fmt = addurls.Formatter({})
+    fmt = au.Formatter({})
     assert_raises(ValueError, fmt.format, "{0}", "not a mapping")
 
 
 def test_formatter_placeholder_with_spaces():
-    fmt = addurls.Formatter({})
+    fmt = au.Formatter({})
     fmt.format("{with spaces}", {"with spaces": "value0"}) == "value0"
 
 
 def test_formatter_placeholder_nonpermitted_chars():
-    fmt = addurls.Formatter({})
+    fmt = au.Formatter({})
 
     # Can't assess keys with !, which will be interpreted as a conversion flag.
     fmt.format("{key!r}", {"key!r": "value0"}, key="x") == "x"
@@ -84,13 +83,13 @@ def test_formatter_placeholder_nonpermitted_chars():
 
 
 def test_formatter_missing_arg():
-    fmt = addurls.Formatter({}, "NA")
+    fmt = au.Formatter({}, "NA")
     eq_(fmt.format("{here},{nothere}", {"here": "ok", "nothere": ""}),
         "ok,NA")
 
 
 def test_repformatter():
-    fmt = addurls.RepFormatter({})
+    fmt = au.RepFormatter({})
 
     for i in range(3):
         eq_(fmt.format("{c}{_repindex}", {"c": "x"}), "x{}".format(i))
@@ -106,13 +105,13 @@ def test_clean_meta_args():
     for args, expect in [(["field="], {}),
                          ([" field=yes "], {"field": "yes"}),
                          (["field= value="], {"field": "value="})]:
-        eq_(addurls.clean_meta_args(args), expect)
+        eq_(au.clean_meta_args(args), expect)
 
     assert_raises(ValueError,
-                  addurls.clean_meta_args,
+                  au.clean_meta_args,
                   ["noequal"])
     assert_raises(ValueError,
-                  addurls.clean_meta_args,
+                  au.clean_meta_args,
                   ["=value"])
 
 
@@ -123,50 +122,50 @@ def test_get_subpaths():
                                             ["p1", "p1/p2/p3"])),
                           ("//n", ("/n", [""])),
                           ("n//", ("n/", ["n"]))]:
-        eq_(addurls.get_subpaths(fname), expect)
+        eq_(au.get_subpaths(fname), expect)
 
 
 def test_is_legal_metafield():
     for legal in ["legal", "0", "legal_"]:
-        assert_true(addurls.is_legal_metafield(legal))
+        assert_true(au.is_legal_metafield(legal))
     for notlegal in ["_not", "with space"]:
-        assert_false(addurls.is_legal_metafield(notlegal))
+        assert_false(au.is_legal_metafield(notlegal))
 
 
 def test_filter_legal_metafield():
-    eq_(addurls.filter_legal_metafield(["legal", "_not", "legal_still"]),
+    eq_(au.filter_legal_metafield(["legal", "_not", "legal_still"]),
         ["legal", "legal_still"])
 
 
 def test_fmt_to_name():
-    eq_(addurls.fmt_to_name("{name}", {}), "name")
-    eq_(addurls.fmt_to_name("{0}", {0: "name"}), "name")
-    eq_(addurls.fmt_to_name("{1}", {0: "name"}), "1")
+    eq_(au.fmt_to_name("{name}", {}), "name")
+    eq_(au.fmt_to_name("{0}", {0: "name"}), "name")
+    eq_(au.fmt_to_name("{1}", {0: "name"}), "1")
 
-    assert_false(addurls.fmt_to_name("frontmatter{name}", {}))
-    assert_false(addurls.fmt_to_name("{name}backmatter", {}))
-    assert_false(addurls.fmt_to_name("{two}{names}", {}))
-    assert_false(addurls.fmt_to_name("", {}))
-    assert_false(addurls.fmt_to_name("nonames", {}))
-    assert_false(addurls.fmt_to_name("{}", {}))
+    assert_false(au.fmt_to_name("frontmatter{name}", {}))
+    assert_false(au.fmt_to_name("{name}backmatter", {}))
+    assert_false(au.fmt_to_name("{two}{names}", {}))
+    assert_false(au.fmt_to_name("", {}))
+    assert_false(au.fmt_to_name("nonames", {}))
+    assert_false(au.fmt_to_name("{}", {}))
 
 
 def test_split_ext():
-    eq_(addurls.split_ext("file"), ("file", ""))
+    eq_(au.split_ext("file"), ("file", ""))
 
-    eq_(addurls.split_ext("file.py"), ("file", ".py"))
-    eq_(addurls.split_ext("file.tar.gz"), ("file", ".tar.gz"))
-    eq_(addurls.split_ext("file.toolong.gz"), ("file.toolong", ".gz"))
+    eq_(au.split_ext("file.py"), ("file", ".py"))
+    eq_(au.split_ext("file.tar.gz"), ("file", ".tar.gz"))
+    eq_(au.split_ext("file.toolong.gz"), ("file.toolong", ".gz"))
 
-    eq_(addurls.split_ext("file.a.b.c.d"), ("file", ".a.b.c.d"))
-    eq_(addurls.split_ext("file.a.b.cccc.d"), ("file", ".a.b.cccc.d"))
-    eq_(addurls.split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
+    eq_(au.split_ext("file.a.b.c.d"), ("file", ".a.b.c.d"))
+    eq_(au.split_ext("file.a.b.cccc.d"), ("file", ".a.b.cccc.d"))
+    eq_(au.split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
 
-    eq_(addurls.split_ext("file.a.b..c"), ("file", ".a.b..c"))
+    eq_(au.split_ext("file.a.b..c"), ("file", ".a.b..c"))
 
 
 def test_get_file_parts():
-    assert_dict_equal(addurls.get_file_parts("file.tar.gz", "prefix"),
+    assert_dict_equal(au.get_file_parts("file.tar.gz", "prefix"),
                       {"prefix": "file.tar.gz",
                        "prefix_root_py": "file.tar",
                        "prefix_ext_py": ".gz",
@@ -175,11 +174,11 @@ def test_get_file_parts():
 
 
 def test_get_url_parts():
-    eq_(addurls.get_url_parts(""), {})
-    assert_dict_equal(addurls.get_url_parts("http://datalad.org"),
+    eq_(au.get_url_parts(""), {})
+    assert_dict_equal(au.get_url_parts("http://datalad.org"),
                       {"_url_hostname": "datalad.org"})
 
-    assert_dict_equal(addurls.get_url_parts("http://datalad.org/about.html"),
+    assert_dict_equal(au.get_url_parts("http://datalad.org/about.html"),
                       {"_url_hostname": "datalad.org",
                        "_url0": "about.html",
                        "_url_basename": "about.html",
@@ -187,11 +186,11 @@ def test_get_url_parts():
                        "_url_basename_ext_py": ".html",
                        "_url_basename_root": "about",
                        "_url_basename_ext": ".html"})
-    assert_dict_equal(addurls.get_url_parts("http://datalad.org/about.html"),
-                      addurls.get_url_parts("http://datalad.org//about.html"))
+    assert_dict_equal(au.get_url_parts("http://datalad.org/about.html"),
+                      au.get_url_parts("http://datalad.org//about.html"))
 
     assert_dict_equal(
-        addurls.get_url_parts("http://datalad.org/for/git-users"),
+        au.get_url_parts("http://datalad.org/for/git-users"),
         {"_url_hostname": "datalad.org",
          "_url0": "for",
          "_url1": "git-users",
@@ -221,7 +220,7 @@ def json_stream(data):
 
 
 def test_extract():
-    info, subpaths = addurls.extract(
+    info, subpaths = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv")
@@ -252,7 +251,7 @@ def test_extract():
 
 
 def test_extract_disable_autometa():
-    info, subpaths = addurls.extract(
+    info, subpaths = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -266,7 +265,7 @@ def test_extract_disable_autometa():
 
 
 def test_extract_exclude_autometa_regexp():
-    info, subpaths = addurls.extract(
+    info, subpaths = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -291,28 +290,22 @@ def test_extract_csv_json_equal():
                 meta=["group={age_group}"])
 
 
-    json_output = addurls.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
-    csv_output = addurls.extract(csv_rows, "csv", **kwds)
+    json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
+    csv_output = au.extract(csv_rows, "csv", **kwds)
 
     eq_(json_output, csv_output)
 
 
 def test_extract_wrong_input_type():
     assert_raises(ValueError,
-                  addurls.extract, None, "not_csv_or_json")
-
-
-def test_addurls_no_urlfile():
-    with assert_raises(IncompleteResultsError) as raised:
-        plugin("addurls")
-    assert_in("Must specify url_file argument", str(raised.exception))
+                  au.extract, None, "not_csv_or_json")
 
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
     ds = Dataset(path).create(force=True, no_annex=True)
     with assert_raises(IncompleteResultsError) as raised:
-        ds.plugin("addurls", url_file="dummy")
+        ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
 
 
@@ -331,8 +324,9 @@ def test_addurls_dry_run(path):
         ds.add(".", message="setup")
 
         with swallow_logs(new_level=logging.INFO) as cml:
-            ds.plugin("addurls", url_file=json_file, url_format="{url}",
-                      filename_format="{subdir}//{_url_filename_root}",
+            ds.addurls(json_file,
+                       "{url}",
+                       "{subdir}//{_url_filename_root}",
                       dry_run=True)
 
             for dir_ in ["foo", "bar"]:
@@ -379,8 +373,7 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
 
         with chpwd(path):
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}", filename_format="{name}")
+            ds.addurls(self.json_file, "{url}", "{name}")
 
             filenames = ["a", "b", "c"]
             for fname in filenames:
@@ -393,24 +386,20 @@ class TestAddurls(object):
 
             # Add to already existing links, overwriting.
             with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.plugin("addurls", url_file=self.json_file,
-                          url_format="{url}", filename_format="{name}",
-                          ifexists="overwrite")
+                ds.addurls(self.json_file,"{url}", "{name}",
+                           ifexists="overwrite")
                 for fname in filenames:
                     assert_in("Removing {}".format(os.path.join(path, fname)),
                               cml.out)
 
             # Add to already existing links, skipping.
             assert_in_results(
-                ds.plugin("addurls", url_file=self.json_file,
-                          url_format="{url}", filename_format="{name}",
-                          ifexists="skip"),
+                ds.addurls(self.json_file, "{url}", "{name}", ifexists="skip"),
                 action="addurls",
                 status="notneeded")
 
             # Add to already existing links works, as long content is the same.
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}", filename_format="{name}")
+            ds.addurls(self.json_file, "{url}", "{name}")
 
             # But it fails if something has changed.
             ds.unlock("a")
@@ -419,18 +408,13 @@ class TestAddurls(object):
             ds.add("a")
 
             assert_raises(IncompleteResultsError,
-                          ds.plugin,
-                          "addurls", url_file=self.json_file,
-                          url_format="{url}", filename_format="{name}")
+                          ds.addurls,
+                          self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
         dspath = os.path.join(path, "ds")
-        plugin("addurls",
-               dataset=dspath,
-               url_file=self.json_file,
-               url_format="{url}", filename_format="{name}")
-
+        addurls(dspath, self.json_file, "{url}", "{name}")
         for fname in ["a", "b", "c"]:
             ok_exists(os.path.join(dspath, fname))
 
@@ -439,8 +423,7 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
 
         with chpwd(path):
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}", filename_format="{subdir}//{name}")
+            ds.addurls(self.json_file, "{url}", "{subdir}//{name}")
 
             for fname in ["foo/a", "bar/b", "foo/c"]:
                 ok_exists(fname)
@@ -450,9 +433,7 @@ class TestAddurls(object):
 
             # We don't try to recreate existing subdatasets.
             with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.plugin("addurls", url_file=self.json_file,
-                          url_format="{url}",
-                          filename_format="{subdir}//{name}")
+                ds.addurls(self.json_file, "{url}", "{subdir}//{name}")
                 assert_in("Not creating subdataset at existing path", cml.out)
 
     @with_tempfile(mkdir=True)
@@ -461,13 +442,10 @@ class TestAddurls(object):
 
         with chpwd(path):
             with assert_raises(IncompleteResultsError) as raised:
-                ds.plugin("addurls", url_file=self.json_file,
-                          url_format="{url}", filename_format="{subdir}")
+                ds.addurls(self.json_file, "{url}", "{subdir}")
             assert_in("There are file name collisions", str(raised.exception))
 
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}",
-                      filename_format="{subdir}-{_repindex}")
+            ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}")
 
             for fname in ["foo-0", "bar-0", "foo-1"]:
                 ok_exists(fname)
@@ -476,9 +454,7 @@ class TestAddurls(object):
     def test_addurls_url_parts(self, path):
         ds = Dataset(path).create(force=True)
         with chpwd(path):
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}",
-                      filename_format="{_url0}/{_url_basename}")
+            ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
 
             for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)
@@ -487,10 +463,7 @@ class TestAddurls(object):
     def test_addurls_url_filename(self, path):
         ds = Dataset(path).create(force=True)
         with chpwd(path):
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="{url}",
-                      filename_format="{_url0}/{_url_filename}")
-
+            ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}")
             for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)
 
@@ -500,10 +473,10 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
         with chpwd(path):
             assert_raises(IncompleteResultsError,
-                          ds.plugin,
-                          "addurls", url_file=self.json_file,
-                          url_format="{url}/nofilename/",
-                          filename_format="{_url0}/{_url_filename}")
+                          ds.addurls,
+                          self.json_file,
+                          "{url}/nofilename/",
+                          "{_url0}/{_url_filename}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_metafail(self, path):
@@ -517,15 +490,12 @@ class TestAddurls(object):
 
         with chpwd(path), patch.object(ds.repo, 'set_metadata', set_meta):
             with assert_raises(IncompleteResultsError) as raised:
-                ds.plugin("addurls", url_file=self.json_file,
-                          url_format="{url}", filename_format="{name}")
+                ds.addurls(self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_dropped_urls(self, path):
         ds = Dataset(path).create(force=True)
         with chpwd(path), swallow_logs(new_level=logging.WARNING) as cml:
-            ds.plugin("addurls", url_file=self.json_file,
-                      url_format="",
-                      filename_format="{subdir}//{name}")
+            ds.addurls(self.json_file, "", "{subdir}//{name}")
             assert_re_in(r".*Dropped [0-9]+ row\(s\) that had an empty URL",
                          str(cml.out))
