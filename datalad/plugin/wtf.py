@@ -110,7 +110,7 @@ Metadata
 {meta}
 """
         ds_meta = None
-        if ds and ds.is_installed():
+        if ds and ds.is_installed() and ds.id:
             ds_meta = metadata(
                 dataset=ds, reporton='datasets', return_type='list',
                 result_filter=lambda x: x['action'] == 'metadata',
