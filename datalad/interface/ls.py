@@ -293,13 +293,6 @@ class AnnexModel(GitModel):
         info = self.info
         return info['local annex size'] if info else 0.0
 
-    # To please current Pyout features. TODO: support "delayed"
-    def annex_local_(self):
-        return self.annex_local_size
-
-    def annex_worktree_(self):
-        return self.annex_worktree_size
-
 
 @auto_repr
 class FsModel(AnnexModel):
@@ -510,8 +503,8 @@ def _pyout_output(dsms, fast, long_):
     if long_:
         columns += [
             # TODO: columns renames?
-            'annex_local_',
-            'annex_worktree_'
+            'annex_local',
+            'annex_worktree'
         ]
 
     def fancy_bool(v):
@@ -563,9 +556,9 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             [1024, 1024**2, "green"],
             [1024**2, None, "red"]
         ]),
-        aggregate=lambda x: naturalsize(sum(x))
+        aggregate=lambda x: naturalsize(sum(x)),
         #summary=sum,
-        #delayed="group-annex"
+        delayed="group-annex"
     )
 
     out = pyout.Tabular(
@@ -596,10 +589,10 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                     color='green',
                     transform=fancy_bool,
                     aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
-                    # delayed="group-git"
+                    delayed="group-git"
                 )),
-                ('annex_local_', size_style),
-                ('annex_worktree_', size_style),
+                ('annex_local', size_style),
+                ('annex_worktree', size_style),
                 ('date', dict(
                     transform=datefmt,
                     aggregate=summary_dates,
