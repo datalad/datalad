@@ -76,6 +76,7 @@ Plugin commands
    :maxdepth: 1
 
    generated/man/datalad-add-readme
+   generated/man/datalad-addurls
    generated/man/datalad-bids2scidata
    generated/man/datalad-export-archive
    generated/man/datalad-export-to-figshare
