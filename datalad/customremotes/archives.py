@@ -23,7 +23,7 @@ from ..dochelpers import exc_str
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
-from ..support.locking import lock_if_check_fails, call_locked_if_check_fails
+from ..support.locking import lock_if_check_fails
 from ..utils import getpwd
 from ..utils import unique
 from .base import AnnexCustomRemote
