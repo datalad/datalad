@@ -15,7 +15,6 @@ import logging
 lgr = logging.getLogger('datalad.plugin.bids2scidata')
 
 from collections import OrderedDict
-from glob import glob
 import os
 import re
 from os.path import exists
@@ -26,7 +25,6 @@ from os.path import split as psplit
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import assure_list
-from datalad.metadata.metadata import query_aggregated_metadata
 from six.moves.urllib.parse import urlsplit
 from six.moves.urllib.parse import urlunsplit
 from posixpath import split as posixsplit
@@ -39,12 +37,20 @@ except ImportError:
 # regex for a cheap test if something looks like a URL
 r_url = re.compile(r"^https?://")
 
+common_sample_props = {
+    "Characteristics[organism]": "homo sapiens",
+    "Characteristics[organism part]": "brain",
+    "Protocol REF": "Participant recruitment",
+}
+
 # standardize columns from participants.tsv
 sample_property_name_map = {
     "age": "Characteristics[age at scan]",
+    "age(years)": "Characteristics[age at scan]",
     "gender": "Characteristics[sex]",
     "handedness": "Characteristics[handedness]",
     "participant_id": "Sample Name",
+    "id": "Sample Name",
     "sex": "Characteristics[sex]",
 }
 
@@ -125,6 +131,15 @@ protocol_defs = {
 }
 
 
+def getprop(obj, path, default):
+    """Helper to get a property from a metadata structure that might not be there"""
+    for p in path:
+        if not p in obj:
+            return default
+        obj = obj[p]
+    return obj
+
+
 def split_term_source_accession(val):
     if val is None:
         return '', ''
@@ -150,72 +165,64 @@ def split_term_source_accession(val):
             return '', val
 
 
-# TODO pull as this from datalad's aggregated metadata
-def _get_study_df(ds):
-    subject_ids = []
-    study_dict = OrderedDict()
-    for file in glob(opj(ds.path, "sub-*")):
-        if os.path.isdir(file):
-            subject_ids.append(psplit(file)[-1][4:])
-    subject_ids.sort()
-    study_dict["Source Name"] = subject_ids
-    study_dict["Characteristics[organism]"] = "homo sapiens"
-    study_dict["Characteristics[organism part]"] = "brain"
-    study_dict["Protocol REF"] = "Participant recruitment"
-    study_dict["Sample Name"] = subject_ids
-    df = pd.DataFrame(study_dict)
-
-    participants_file = opj(ds.path, "participants.tsv")
-    if not exists(participants_file):
-        return df
-
-    participants_df = pd.read_csv(participants_file, sep="\t")
-    rename_rule = sample_property_name_map.copy()
-    # remove all mapping that do not match the columns at hand
-    for r in list(rename_rule.keys()):
-        if r not in participants_df.keys():
-            del rename_rule[r]
-    # turn all unknown properties into comment columns
-    for c in participants_df.keys():
-        if not c in rename_rule:
-            rename_rule[c] = "Comment[{}]".format(c.lower())
-
-    participants_df.rename(columns=rename_rule, inplace=True)
-    # simplify sample names by stripping the common prefix
-    participants_df["Sample Name"] = \
-        [s[4:] for s in list(participants_df["Sample Name"])]
-    # merge participant info with study info
-    df = pd.merge(
-        df,
-        participants_df,
-        left_on="Sample Name",
-        right_on="Sample Name")
+def _get_study_df(dsmeta):
+    # TODO use helper
+    participants = getprop(
+        dsmeta,
+        ["metadata", "datalad_unique_content_properties", "bids", "participant"],
+        [])
+    sample_info = [
+        dict(
+            common_sample_props,
+            **{sample_property_name_map.get(
+                k,
+                "Comment[{}]".format(k.lower())): v
+               for k, v in p.items()})
+        for p in participants]
+    columns_addon = set()
+    for i in sample_info:
+        # we use the participant ID as the source name
+        i["Source Name"] = i.get("Sample Name", None)
+        columns_addon.update(i.keys())
+    # convert to data frame, impose strict order
+    column_order = [
+        "Source Name",
+        "Characteristics[organism]",
+        "Characteristics[organism part]",
+        "Protocol REF",
+        "Sample Name"
+    ]
+    df = pd.DataFrame(
+        sample_info,
+        columns=column_order + sorted(c for c in columns_addon if c not in column_order))
+    if 'Sample Name' in df:
+        df = df.sort_values(['Sample Name'])
     return df
 
 
-def _describe_file(fpath, db):
-    fmeta = db[fpath]
-    fname = psplit(fpath)[-1]
-    fname_components = fname.split(".")[0].split('_')
+def _describe_file(dsmeta, fmeta):
+    meta = getprop(fmeta, ['metadata'], {})
+    bidsmeta = getprop(meta, ['bids'], {})
+    modality = getprop(bidsmeta, ['type'], None)
+    if modality is None:
+        raise ValueError('file record has no type info, not sure what this is')
     info = {
-        'Sample Name': fmeta.get("bids:participant_id", fname_components[0]),
+        'Sample Name': getprop(bidsmeta, ['participant', 'id'], None),
         # assay name is the entire filename except for the modality suffix
         # so that, e.g. simultaneous recordings match wrt to the assay name
         # across assay tables
-        'Assay Name': '_'.join(fname_components[:-1]),
-        'Raw Data File': fpath,
-        'Parameter Value[modality]': fname_components[-1]
+        'Assay Name': psplit(fmeta['path'])[-1].split('.')[0][:-(len(modality) + 1)],
+        'Raw Data File': relpath(fmeta['path'], start=fmeta['parentds']),
+        'Parameter Value[modality]': modality,
     }
-    # more optional info that could be pulled from the filename
-    comp_dict = dict([c.split('-') for c in fname_components[:-1]])
     for l in ('rec', 'recording'):
-        if l in comp_dict:
-            info['Parameter Value[recording label]'] = comp_dict[l]
+        if l in bidsmeta:
+            info['Parameter Value[recording label]'] = bidsmeta[l]
     for l in ('acq', 'acquisition'):
-        if l in comp_dict:
-            info['Parameter Value[acquisition label]'] = comp_dict[l]
-    if 'task' in comp_dict:
-        info['Factor Value[task]'] = comp_dict['task']
+        if l in bidsmeta:
+            info['Parameter Value[acquisition label]'] = bidsmeta[l]
+    if 'task' in bidsmeta:
+        info['Factor Value[task]'] = bidsmeta['task']
 
     # now pull in the value of all recognized properties
     # perform any necessary conversion to achieve final
@@ -223,15 +230,15 @@ def _describe_file(fpath, db):
     for prop in recognized_assay_props:
         src, dst = prop[:2]
         # expand src specfification
-        namespace, src = src if src else None, src
+        namespace, src = src if src else (None, src)
         if src is None:
             # special case, not handled here
             continue
-        if src in fmeta.get(namespace, {}):
+        if src in meta.get(namespace, {}):
             # pull out the value from datalad metadata directly,
             # unless we have a definition URL in another field,
             # in which case put it into a 2-tuple also
-            val = fmeta[namespace][src]
+            val = meta[namespace][src]
             if dst in repr_props and isinstance(val, (list, tuple)):
                 val = repr_props[dst](str(i) for i in val)
             info[dst] = val
@@ -241,7 +248,7 @@ def _describe_file(fpath, db):
             term_source = term_accession = None
             if len(prop) > 2:
                 term_source, term_accession = split_term_source_accession(
-                    fmeta.get(prop[2], None) if len(prop) == 3 else prop[3])
+                    meta.get(prop[2], None) if len(prop) == 3 else prop[3])
             elif prop[0] and prop[1] != 'Sample Name':
                 # exclude all info source outside the metadata
                 # this plugin has no vocabulary info for this field
@@ -249,7 +256,7 @@ def _describe_file(fpath, db):
                 # anything
                 # FIXME TODO the next line should look into the local context
                 # of the 'bids' metadata source
-                termdef = db['.'].get('@context', {}).get(src, {})
+                termdef = getprop(dsmeta, ['metadata', namespace, '@context', src], {})
                 term_source, term_accession = split_term_source_accession(
                     termdef.get('unit' if 'unit' in termdef else '@id', None))
                 if 'unit_label' in termdef:
@@ -261,17 +268,13 @@ def _describe_file(fpath, db):
     return info
 
 
-def _get_file_matches(db, pattern):
-    expr = re.compile(pattern)
-    return [f for f in db if expr.match(f)]
-
-
 def _get_colkey(idx, colname):
     return '{0:0>5}_{1}'.format(idx, colname)
 
 
 def _get_assay_df(
-        db, modality, protocol_ref, files, file_descr,
+        dsmeta,
+        modality, protocol_ref, files, file_descr,
         repository_info=None):
     if not repository_info:
         repository_info = {}
@@ -286,9 +289,9 @@ def _get_assay_df(
     # get all files described and determine the union of all keys
     finfos = []
     info_keys = set()
-    for fname in files:
+    for finfo in files:
         # get file metadata in ISATAB notation
-        finfo = file_descr(fname, db)
+        finfo = file_descr(dsmeta, finfo)
         info_keys = info_keys.union(finfo.keys())
         finfos.append(finfo)
     # receiver for data in all columns of the table
@@ -382,8 +385,9 @@ def _gather_protocol_parameters_from_df(df, protocols):
             params.add(col[16:-1])
 
 
-def extract(
-        ds,
+def convert(
+        dsmeta,
+        filemeta,
         output_directory,
         repository_info=None):
     if pd is None:
@@ -400,16 +404,6 @@ def extract(
             "creating output directory at '{}'".format(output_directory))
         os.makedirs(output_directory)
 
-    # pull out everything we know about any file in the dataset, and the dataset
-    # itself
-    metadb = {
-        relpath(r['path'], ds.path): r.get('metadata', {})
-        for r in query_aggregated_metadata(
-            'all',
-            ds,
-            [dict(path=ds.path, type='dataset')])
-    }
-
     # prep for assay table info
     protocols = OrderedDict()
     for prop in assay_props:
@@ -417,12 +411,12 @@ def extract(
 
     # pull out essential metadata bits about the dataset itself
     # for study description)
-    dsmeta = metadb.get('.', {}).get('bids', {})
-    info['name'] = dsmeta.get('shortdescription', dsmeta.get('name', 'TODO'))
-    info['author'] = '\t'.join(assure_list(dsmeta.get('author', [])))
-    info['keywords'] = '\t'.join(assure_list(dsmeta.get('tag', [])))
+    dsbidsmeta = dsmeta.get('bids', {})
+    info['name'] = dsbidsmeta.get('shortdescription', dsbidsmeta.get('name', 'TODO'))
+    info['author'] = '\t'.join(assure_list(dsbidsmeta.get('author', [])))
+    info['keywords'] = '\t'.join(assure_list(dsbidsmeta.get('tag', [])))
     # generate: s_study.txt
-    study_df = _get_study_df(ds)
+    study_df = _get_study_df(dsmeta)
     if study_df.empty:
         # no samples, no assays, no metadataset
         return None
@@ -441,10 +435,9 @@ def extract(
                      'T1w', 'T2w', 'T1map', 'T2map', 'FLAIR', 'FLASH', 'PD',
                      'PDmap', 'PDT2', 'inplaneT1', 'inplaneT2', 'angio',
                      'sbref', 'bold', 'SWImagandphase'):
-        # what files do we have for this modality
-        modfiles = _get_file_matches(
-            metadb,
-            '^sub-.*_{}\.nii\.gz$'.format(modality))
+        # what files do we have for this type
+        modfiles = [f for f in filemeta
+                    if getprop(f, ['metadata', 'bids', 'type'], None) == modality]
         if not len(modfiles):
             # not files found, try next
             lgr.info(
@@ -452,7 +445,7 @@ def extract(
             continue
 
         df = _get_assay_df(
-            metadb,
+            dsmeta,
             modality,
             "Magnetic Resonance Imaging",
             modfiles,
@@ -512,10 +505,11 @@ def extract(
             ('physio', 'physio', "Physiological Measurement"),
             ('stim', 'stimulation', "Stimulation")):
         df = _get_assay_df(
-            metadb,
+            dsmeta,
             modlabel,
             protoref,
-            _get_file_matches(metadb, '^sub-.*_{}.tsv.gz$'.format(modlabel)),
+            [f for f in filemeta
+             if getprop(f, ['metadata', 'bids', 'type'], None) == modality],
             _describe_file,
             repository_info)
         if df is None:
@@ -564,10 +558,14 @@ class BIDS2Scidata(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""BIDS-compatible dataset base metadata export on. If no dataset is given, an
-            attempt is made to identify the dataset based on the current
-            working directory.""",
+            doc="""Dataset to query for metadata of a BIDS-compatible dataset.
+            The queried dataset itself does not have to be a BIDS dataset.
+            If not dataset is given, an attempt is made to identify the dataset
+            based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
+        path=Parameter(
+            args=('path',),
+            doc="""path to a BIDS-compatible dataset to export metadata on"""),
         repo_name=Parameter(
             args=('--repo-name',),
             doc="""data repository name to be used in assay tables.
@@ -588,7 +586,7 @@ class BIDS2Scidata(Interface):
     @staticmethod
     @datasetmethod(name='bids2scidata')
     @eval_results
-    def __call__(dataset, repo_name, repo_accession, repo_url, output=None):
+    def __call__(path, repo_name, repo_accession, repo_url, output=None, dataset=None):
         from os.path import dirname
         from os.path import join as opj
         from datetime import datetime
@@ -597,18 +595,73 @@ class BIDS2Scidata(Interface):
         lgr = logging.getLogger('datalad.plugin.bids2scidata')
         import datalad
         from datalad import cfg
-        from datalad.plugin.bids2scidata import extract
+        from datalad.plugin.bids2scidata import convert
+        from datalad.coreapi import metadata
+        from datalad.distribution.dataset import require_dataset
 
-        if not output:
-            output = 'scidata_isatab_{}'.format(dataset.repo.get_hexsha())
-
+        # we need this resource file, no point in starting without it
         itmpl_path = cfg.obtain(
             'datalad.plugin.bids2scidata.investigator.template',
             default=opj(
                 dirname(datalad.__file__),
                 'resources', 'isatab', 'scidata_bids_investigator.txt'))
-        info = extract(
-            dataset,
+
+        if path and dataset is None:
+            dataset = path
+        dataset = require_dataset(
+            dataset, purpose='metadata query', check_installed=True)
+
+        errored = False
+        dsmeta = None
+        filemeta = []
+        for m in metadata(
+                path,
+                dataset=dataset,
+                # BIDS hierarchy might go across multiple dataset
+                recursive=True,
+                reporton='all',
+                return_type='generator',
+                result_renderer='disabled'):
+            type = m.get('type', None)
+            if type not in ('dataset', 'file'):
+                continue
+            if m.get('status', None) != 'ok':
+                errored = errored or m.get('status', None) in ('error', 'impossible')
+                yield m
+                continue
+            if type == 'dataset':
+                if dsmeta is not None:
+                    lgr.warn(
+                        'Found metadata for more than one datasets, '
+                        'ignoring their dataset-level metadata')
+                    continue
+                dsmeta = m
+            elif type == 'file':
+                filemeta.append(m)
+        if errored:
+            return
+
+        if not dsmeta:
+            yield dict(
+                status='error',
+                message=("could not find metadata on path '%s'", path),
+                path=dataset.path,
+                type='dataset',
+                action='bids2scidata',
+                logger=lgr)
+            return
+
+        lgr.info("Metadata for %i files associated with '%s' on record in %s",
+                 len(filemeta),
+                 path,
+                 dataset)
+
+        if not output:
+            output = 'scidata_isatab_{}'.format(dsmeta['refcommit'])
+
+        info = convert(
+            dsmeta,
+            filemeta,
             output_directory=output,
             repository_info={
                 'Comment[Data Repository]': repo_name,
