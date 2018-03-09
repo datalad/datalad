@@ -23,7 +23,7 @@ from ..dochelpers import exc_str
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
-from ..support.locking import locked_call_if_not_verified
+from ..support.locking import lock_if_check_fails, call_locked_if_check_fails
 from ..utils import getpwd
 from ..utils import unique
 from .base import AnnexCustomRemote
@@ -332,12 +332,15 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 continue
             akeys_tried.append(akey)
             try:
-                akey_fpath = locked_call_if_not_verified(
-                    callable=(self._annex_get_archive_by_key, (akey,)),
-                    checker=(self.get_contentlocation, (akey,)),
-                    lock_path_prefix=(lambda k: opj(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
+                with lock_if_check_fails(
+                    check=(self.get_contentlocation, (akey,)),
+                    lock_path=(lambda k: opj(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
                     operation="annex-get"
-                )
+                ) as (akey_fpath, lock):
+                    if lock:
+                        assert not akey_fpath
+                        self._annex_get_archive_by_key(akey)
+                        akey_fpath = self.get_contentlocation(akey)
 
                 if not akey_fpath:
                     raise RuntimeError(

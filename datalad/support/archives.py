@@ -27,7 +27,7 @@ from six.moves.urllib.parse import unquote as urlunquote
 import string
 import random
 
-from .locking import locked_call_if_not_verified
+from .locking import lock_if_check_fails
 from ..utils import any_re_search
 
 import logging
@@ -409,12 +409,14 @@ class ExtractedArchive(object):
         """
         path = self.path
 
-        locked_call_if_not_verified(
-            callable=(self._extract_archive, (path,)),
-            checker=(lambda s: s.is_extracted, (self,)),
-            lock_path_prefix=path,  # custom dir???
+        with lock_if_check_fails(
+            check=(lambda s: s.is_extracted, (self,)),
+            lock_path=path,
             operation="extract"
-        )
+        ) as (check, lock):
+            if lock:
+                assert not check
+                self._extract_archive(path)
         return path
 
     def _extract_archive(self, path):
