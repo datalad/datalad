@@ -95,7 +95,8 @@ def test_help_np():
                   'Miscellaneous commands',
                   'General information',
                   'Global options',
-                  'Plumbing commands'})
+                  'Plumbing commands',
+                  'Plugins'})
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
@@ -188,28 +189,28 @@ def test_script_shims():
 def test_cfg_override(path):
     with chpwd(path):
         # control
-        out, err = Runner()('datalad plugin wtf', shell=True)
+        out, err = Runner()('datalad wtf', shell=True)
         assert_not_in('datalad.dummy: this', out)
         # ensure that this is not a dataset's cfg manager
         assert_not_in('datalad.dataset.id', out)
         # env var
-        out, err = Runner()('DATALAD_DUMMY=this datalad plugin wtf', shell=True)
+        out, err = Runner()('DATALAD_DUMMY=this datalad wtf', shell=True)
         assert_in('datalad.dummy: this', out)
         # cmdline arg
-        out, err = Runner()('datalad -c datalad.dummy=this plugin wtf', shell=True)
+        out, err = Runner()('datalad -c datalad.dummy=this wtf', shell=True)
         assert_in('datalad.dummy: this', out)
 
         # now create a dataset in the path. the wtf plugin will switch to
         # using the dataset's config manager, which must inherit the overrides
         create(dataset=path)
         # control
-        out, err = Runner()('datalad plugin wtf', shell=True)
+        out, err = Runner()('datalad wtf', shell=True)
         assert_not_in('datalad.dummy: this', out)
         # ensure that this is a dataset's cfg manager
         assert_in('datalad.dataset.id', out)
         # env var
-        out, err = Runner()('DATALAD_DUMMY=this datalad plugin wtf', shell=True)
+        out, err = Runner()('DATALAD_DUMMY=this datalad wtf', shell=True)
         assert_in('datalad.dummy: this', out)
         # cmdline arg
-        out, err = Runner()('datalad -c datalad.dummy=this plugin wtf', shell=True)
+        out, err = Runner()('datalad -c datalad.dummy=this wtf', shell=True)
         assert_in('datalad.dummy: this', out)

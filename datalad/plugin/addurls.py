@@ -32,6 +32,9 @@ lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
 
+from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
+
 
 class Formatter(string.Formatter):
     """Formatter that gives precedence to custom keys.
@@ -404,7 +407,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
         Items used to construct the file names and URLs.
     input_type : {'csv', 'json'}
 
-    All other parameters match those described in `dlplugin`.
+    All other parameters match those described in `AddUrls`.
 
     Returns
     -------
@@ -572,114 +575,55 @@ def add_meta(rows):
             yield res
 
 
-def dlplugin(dataset=None, url_file=None, input_type="ext",
-             url_format="{0}", filename_format="{1}",
-             exclude_autometa=None, meta=None,
-             message=None, dry_run=False, fast=False,
-             ifexists=None, missing_value=None):
+@build_doc
+class Addurls(Interface):
     """Create and update a dataset from a list of URLs.
 
-    Parameters
-    ----------
-    dataset : Dataset
-        Add the URLs to this dataset (or possibly subdatasets of this
-        dataset).  An empty or non-existent directory is passed to
-        create a new dataset.  New subdatasets can be specified with
-        `filename_format`.
-    url_file : str
-        A file that contains URLs or information that can be used to
-        construct URLs.  Depending on the value of `input_type`, this
-        should be a CSV file (with a header as the first row) or a
-        JSON file (structured as a list of objects with string
-        values).
-    input_type : {"ext", "csv", "json"}, optional
-        Whether `url_file` should be considered a CSV file or a JSON
-        file.  The default value, "ext", means to consider `url_file`
-        as a JSON file if it ends with ".json".  Otherwise, treat it
-        as a CSV file.
-    url_format : str, optional
-        A format string that specifies the URL for each entry.  This
-        value is similar to a normal Python format string where the
-        names from `url_file` (column names for a CSV or properties
-        for JSON) are available as placeholders.  If `url_file` is a
-        CSV file, a positional index can also be used (i.e., "{0}" for
-        the first column).  Note that a placeholder cannot contain a
-        ':' or '!'.
-    filename_format : str, optional
-        Like `url_format`, but this format string specifies the file to
-        which the URL's content will be downloaded.  The file name may
-        contain directories.  The separator "//" can be used to indicate
-        that the left-side directory should be created as a new
-        subdataset.
+    Format specification
+    --------------------
 
-        In addition to the placeholders described in `url_format`, there
-        are a few special placeholders.
+    Several arguments take format strings.  These are similar to normal Python
+    format strings where the names from `URL-FILE` (column names for a CSV or
+    properties for JSON) are available as placeholders.  If `URL-FILE` is a CSV
+    file, a positional index can also be used (i.e., "{0}" for the first
+    column).  Note that a placeholder cannot contain a ':' or '!'.
 
-          - _repindex
+    In addition, the `FILENAME-FORMAT` arguments has a few special
+    placeholders.
 
-            The constructed file names must be unique across all fields
-            rows.  To avoid collisions, the special placeholder
-            "_repindex" can be added to the formatter.  Its value will
-            start at 0 and increment every time a file name repeats.
+      - _repindex
 
-          - _url_hostname, _urlN, _url_basename*
+        The constructed file names must be unique across all fields rows.  To
+        avoid collisions, the special placeholder "_repindex" can be added to
+        the formatter.  Its value will start at 0 and increment every time a
+        file name repeats.
 
-            Various parts of the formatted URL are available.  Take
-            "http://datalad.org/asciicast/seamless_nested_repos.sh" as
-            an example.
+      - _url_hostname, _urlN, _url_basename*
 
-            "datalad.org" is stored as "_url_hostname".  Components of
-            the URL's path can be referenced as "_urlN".  "_url0" and
-            "_url1" would map to "asciicast" and "seamless_nested_repos.sh",
-            respectively.  The final part of the path is also available
-            as "_url_basename".
 
-            This name is broken down further.  "_url_basename_root" and
-            "_url_basename_ext" provide access to the root name and
-            extension.  These values are similar to the result of
-            os.path.splitext, but, in the case of multiple periods, the
-            extension is identified using the same length heuristic that
-            git-annex uses.  As a result, the extension of "file.tar.gz"
-            would be ".tar.gz", not ".gz".  In addition, the fields
-            "_url_basename_root_py" and "_url_basename_ext_py" provide
-            access to the result of os.path.splitext.
+        Various parts of the formatted URL are available.  Take
+        "http://datalad.org/asciicast/seamless_nested_repos.sh" as an example.
 
-          - _url_filename*
+        "datalad.org" is stored as "_url_hostname".  Components of the URL's
+        path can be referenced as "_urlN".  "_url0" and "_url1" would map to
+        "asciicast" and "seamless_nested_repos.sh", respectively.  The final
+        part of the path is also available as "_url_basename".
 
-            These are similar to _url_basename* fields, but they are
-            obtained with a server request.  This is useful if the file
-            name is set in the Content-Disposition header.
-    exclude_autometa : str, optional
-        By default, metadata field=value pairs are constructed with each
-        column in `url_file`, excluding any single column that is
-        specified via `url_format`.  This argument can be used to
-        exclude columns that match a regular expression.  If set to '*'
-        or an empty string, automatic metadata extraction is disabled
-        completely.  This argument does not affect metadata set
-        explicitly with the `meta` argument.
-    meta : str, optional
-        A format string that specifies metadata.  It should be
-        structured as "<field>=<value>".  The same placeholders from
-        `url_format` can be used.  As an example, "location={3}" would
-        mean that the value for the "location" metadata field should be
-        set the value of the fourth column.  This option can be given
-        multiple times.
-    message : str, optional
-        Use this message when committing the URL additions.
-    dry_run : bool, optional
-        Report which URLs would be downloaded to which files and then
-        exit.
-    fast : bool, optional
-        If True, add the URLs, but don't download their content.
-        Underneath, this passes the --fast flag to `git annex addurl`.
-    ifexists : {None, 'overwrite', 'skip'}
-        What to do if a constructed file name already exists.  The
-        default (None) behavior to proceed with the `git annex addurl`,
-        which will fail if the file size has changed.  If set to
-        'overwrite', remove the old file before adding the new one.  If
-        set to 'skip', do not add the new file.
-    missing_value : str, optional
-        When an empty string is encountered, use this value instead.
+        This name is broken down further.  "_url_basename_root" and
+        "_url_basename_ext" provide access to the root name and extension.
+        These values are similar to the result of os.path.splitext, but, in the
+        case of multiple periods, the extension is identified using the same
+        length heuristic that git-annex uses.  As a result, the extension of
+        "file.tar.gz" would be ".tar.gz", not ".gz".  In addition, the fields
+        "_url_basename_root_py" and "_url_basename_ext_py" provide access to
+        the result of os.path.splitext.
+
+      - _url_filename*
+
+        These are similar to _url_basename* fields, but they are obtained with
+        a server request.  This is useful if the file name is set in the
+        Content-Disposition header.
+
 
     Examples
     --------
@@ -689,150 +633,243 @@ def dlplugin(dataset=None, url_file=None, input_type="ext",
         neurodebian,png,https://avatars3.githubusercontent.com/u/260793
         datalad,png,https://avatars1.githubusercontent.com/u/8927200
 
-    To download each link into a file name composed of the 'who' and
-    'ext' fields, we could run
+    To download each link into a file name composed of the 'who' and 'ext'
+    fields, we could run
 
-        $ datalad plugin -d avatar_ds addurls url_file=avatars.csv
-          url_format='{link}' filename_format='{who}.{ext}' fast=True
+      $ datalad addurls -d avatar_ds --fast avatars.csv '{link}' '{who}.{ext}'
 
-    The '-d avatar_ds' is used to create a new dataset in
-    "$PWD/avatar_ds".
+    The '-d avatar_ds' is used to create a new dataset in "$PWD/avatar_ds".
 
-    If we were already in a dataset and wanted to create a new
-    subdataset in an "avatars" subdirectory, we could use "//" in the
-    `filename_format` argument:
+    If we were already in a dataset and wanted to create a new subdataset in an
+    "avatars" subdirectory, we could use "//" in the `FILENAME-FORMAT`
+    argument:
 
-        $ datalad plugin addurls url_file=avatars.csv
-          url_format='{link}' filename_format='avatars//{who}.{ext}'
-          fast=True
+      $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
     Note
     ----
-    For users familiar with 'git annex addurl': A large part of this
-    plugin's functionality can be viewed as transforming data from
-    `url_file` into a "url filename" format that fed to 'git annex
-    addurl --batch --with-files'.
+    For users familiar with 'git annex addurl': A large part of this plugin's
+    functionality can be viewed as transforming data from `URL-FILE` into a
+    "url filename" format that fed to 'git annex addurl --batch --with-files'.
     """
-    import logging
-    import os
 
-    from requests.exceptions import RequestException
+    from datalad.distribution.dataset import datasetmethod
+    from datalad.interface.utils import eval_results
+    from datalad.distribution.dataset import EnsureDataset
+    from datalad.support.constraints import EnsureChoice, EnsureNone, EnsureStr
+    from datalad.support.param import Parameter
 
-    from datalad.distribution.add import Add
-    from datalad.distribution.create import Create
-    from datalad.distribution.dataset import Dataset
-    from datalad.dochelpers import exc_str
-    from datalad.interface.results import get_status_dict
-    import datalad.plugin.addurls as me
-    from datalad.support.annexrepo import AnnexRepo
+    _params_ = dict(
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc="""Add the URLs to this dataset (or possibly subdatasets of
+            this dataset).  An empty or non-existent directory is passed to
+            create a new dataset.  New subdatasets can be specified with
+            `FILENAME-FORMAT`.""",
+            constraints=EnsureDataset() | EnsureNone()),
+        urlfile=Parameter(
+            args=("urlfile",),
+            metavar="URL-FILE",
+            doc="""A file that contains URLs or information that can be used to
+            construct URLs.  Depending on the value of --input-type, this
+            should be a CSV file (with a header as the first row) or a JSON
+            file (structured as a list of objects with string values)."""),
+        urlformat=Parameter(
+            args=("urlformat",),
+            metavar="URL-FORMAT",
+            doc="""A format string that specifies the URL for each entry.  See
+            the 'Format Specification' section above."""),
+        filenameformat=Parameter(
+            args=("filenameformat",),
+            metavar="FILENAME-FORMAT",
+            doc="""Like `URL-FORMAT`, but this format string specifies the file
+            to which the URL's content will be downloaded.  The file name may
+            contain directories.  The separator "//" can be used to indicate
+            that the left-side directory should be created as a new subdataset.
+            See the 'Format Specification' section above."""),
+        input_type=Parameter(
+            args=("-t", "--input-type"),
+            metavar="TYPE",
+            doc="""Whether `URL-FILE` should be considered a CSV file or a JSON
+            file.  The default value, "ext", means to consider `URL-FILE` as a
+            JSON file if it ends with ".json".  Otherwise, treat it as a CSV
+            file.""",
+            constraints=EnsureChoice("ext", "csv", "json")),
+        exclude_autometa=Parameter(
+            args=("-x", "--exclude_autometa"),
+            metavar="REGEXP",
+            doc="""By default, metadata field=value pairs are constructed with
+            each column in `URL-FILE`, excluding any single column that is
+            specified via `URL-FORMAT`.  This argument can be used to exclude
+            columns that match a regular expression.  If set to '*' or an empty
+            string, automatic metadata extraction is disabled completely.  This
+            argument does not affect metadata set explicitly with --meta."""),
+        meta=Parameter(
+            args=("-m", "--meta",),
+            metavar="FORMAT",
+            action="append",
+            doc="""A format string that specifies metadata.  It should be
+            structured as "<field>=<value>".  As an example, "location={3}"
+            would mean that the value for the "location" metadata field should
+            be set the value of the fourth column.  This option can be given
+            multiple times."""),
+        message=Parameter(
+            args=("--message",),
+            metavar="MESSAGE",
+            doc="""Use this message when committing the URL additions.""",
+            constraints=EnsureNone() | EnsureStr()),
+        dry_run=Parameter(
+            args=("-n", "--dry-run"),
+            action="store_true",
+            doc="""Report which URLs would be downloaded to which files and
+            then exit."""),
+        fast=Parameter(
+            args=("--fast",),
+            action="store_true",
+            doc="""If True, add the URLs, but don't download their content.
+            Underneath, this passes the --fast flag to `git annex addurl`."""),
+        ifexists=Parameter(
+            args=("--ifexists",),
+            metavar="ACTION",
+            doc="""What to do if a constructed file name already exists.  The
+            default behavior is to proceed with the `git annex addurl`, which
+            will fail if the file size has changed.  If set to 'overwrite',
+            remove the old file before adding the new one.  If set to 'skip',
+            do not add the new file.""",
+            constraints=EnsureNone() | EnsureChoice("overwrite", "skip")),
+        missing_value=Parameter(
+            args=("--missing-value",),
+            metavar="VALUE",
+            doc="""When an empty string is encountered, use this value
+            instead.""",
+            constraints=EnsureNone() | EnsureStr()),
+    )
 
-    lgr = logging.getLogger("datalad.plugin.addurls")
+    @staticmethod
+    @datasetmethod(name='addurls')
+    @eval_results
+    def __call__(dataset, urlfile, urlformat, filenameformat,
+                 input_type="ext", exclude_autometa=None, meta=None,
+                 message=None, dry_run=False, fast=False, ifexists=None,
+                 missing_value=None):
+        # Temporarily work around gh-2269.
+        url_file, url_format, filename_format = urlfile, urlformat, filenameformat
 
-    if url_file is None:
-        # `url_file` is not a required argument in `dlplugin` because
-        # the argument before it, `dataset`, needs to be optional to
-        # support the creation of new datasets.
-        yield get_status_dict(action="addurls",
-                              ds=dataset,
-                              status="error",
-                              message="Must specify url_file argument")
-        return
+        import logging
+        import os
 
-    if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
-        yield get_status_dict(action="addurls",
-                              ds=dataset,
-                              status="error",
-                              message="not an annex repo")
-        return
+        from requests.exceptions import RequestException
 
-    if input_type == "ext":
-        extension = os.path.splitext(url_file)[1]
-        input_type = "json" if extension == ".json" else "csv"
+        from datalad.distribution.add import Add
+        from datalad.distribution.create import Create
+        from datalad.distribution.dataset import Dataset, require_dataset
+        from datalad.dochelpers import exc_str
+        from datalad.interface.results import get_status_dict
+        from datalad.support.annexrepo import AnnexRepo
 
-    with open(url_file) as fd:
-        try:
-            rows, subpaths = me.extract(fd, input_type,
-                                        url_format, filename_format,
-                                        exclude_autometa, meta,
-                                        dry_run,
-                                        missing_value)
-        except (ValueError, RequestException) as exc:
+        lgr = logging.getLogger("datalad.plugin.addurls")
+
+
+        dataset = require_dataset(dataset, check_installed=False)
+        if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
             yield get_status_dict(action="addurls",
                                   ds=dataset,
                                   status="error",
-                                  message=exc_str(exc))
+                                  message="not an annex repo")
             return
 
-    if len(rows) != len(set(row["filename"] for row in rows)):
-        yield get_status_dict(action="addurls",
-                              ds=dataset,
-                              status="error",
-                              message=("There are file name collisions; "
-                                       "consider using {_repindex}"))
-        return
+        if input_type == "ext":
+            extension = os.path.splitext(url_file)[1]
+            input_type = "json" if extension == ".json" else "csv"
 
-    if dry_run:
-        for subpath in subpaths:
-            lgr.info("Would create a subdataset at %s", subpath)
-        for row in rows:
-            lgr.info("Would download %s to %s",
-                     row["url"], os.path.join(dataset.path, row["filename"]))
-            lgr.info("Metadata: %s",
-                     sorted(u"{}={}".format(k, v)
-                            for k, v in row["meta_args"].items()))
-        yield get_status_dict(action="addurls",
-                              ds=dataset,
-                              status="ok",
-                              message="dry-run finished")
-        return
+        with open(url_file) as fd:
+            try:
+                rows, subpaths = extract(fd, input_type,
+                                         url_format, filename_format,
+                                         exclude_autometa, meta,
+                                         dry_run,
+                                         missing_value)
+            except (ValueError, RequestException) as exc:
+                yield get_status_dict(action="addurls",
+                                      ds=dataset,
+                                      status="error",
+                                      message=exc_str(exc))
+                return
 
-    if not dataset.repo:
-        # Populate a new dataset with the URLs.
-        for r in dataset.create(result_xfm=None, return_type='generator'):
-            yield r
+        if len(rows) != len(set(row["filename"] for row in rows)):
+            yield get_status_dict(action="addurls",
+                                  ds=dataset,
+                                  status="error",
+                                  message=("There are file name collisions; "
+                                           "consider using {_repindex}"))
+            return
 
-    annex_options = ["--fast"] if fast else []
+        if dry_run:
+            for subpath in subpaths:
+                lgr.info("Would create a subdataset at %s", subpath)
+            for row in rows:
+                lgr.info("Would download %s to %s",
+                         row["url"], os.path.join(dataset.path, row["filename"]))
+                lgr.info("Metadata: %s",
+                         sorted(u"{}={}".format(k, v)
+                                for k, v in row["meta_args"].items()))
+            yield get_status_dict(action="addurls",
+                                  ds=dataset,
+                                  status="ok",
+                                  message="dry-run finished")
+            return
 
-    for spath in subpaths:
-        if os.path.exists(os.path.join(dataset.path, spath)):
-            lgr.warning(
-                "Not creating subdataset at existing path: %s",
-                spath)
-        else:
-            for r in dataset.create(spath, result_xfm=None,
-                                    return_type='generator'):
+        if not dataset.repo:
+            # Populate a new dataset with the URLs.
+            for r in dataset.create(result_xfm=None, return_type='generator'):
                 yield r
 
-    for row in rows:
-        # Add additional information that we'll need for various operations.
-        filename_abs = os.path.join(dataset.path, row["filename"])
-        if row["subpath"]:
-            ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
-            ds_filename = os.path.relpath(filename_abs, ds_current.path)
-        else:
-            ds_current = dataset
-            ds_filename = row["filename"]
-        row.update({"filename_abs": filename_abs,
-                    "ds": ds_current,
-                    "ds_filename": ds_filename})
+        annex_options = ["--fast"] if fast else []
 
-    files_to_add = set()
-    for r in me.add_urls(rows, ifexists=ifexists, options=annex_options):
-        if r["status"] == "ok":
-            files_to_add.add(r["path"])
-        yield r
+        for spath in subpaths:
+            if os.path.exists(os.path.join(dataset.path, spath)):
+                lgr.warning(
+                    "Not creating subdataset at existing path: %s",
+                    spath)
+            else:
+                for r in dataset.create(spath, result_xfm=None,
+                                        return_type='generator'):
+                    yield r
 
-        msg = message or """\
+        for row in rows:
+            # Add additional information that we'll need for various
+            # operations.
+            filename_abs = os.path.join(dataset.path, row["filename"])
+            if row["subpath"]:
+                ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
+                ds_filename = os.path.relpath(filename_abs, ds_current.path)
+            else:
+                ds_current = dataset
+                ds_filename = row["filename"]
+            row.update({"filename_abs": filename_abs,
+                        "ds": ds_current,
+                        "ds_filename": ds_filename})
+
+        files_to_add = set()
+        for r in add_urls(rows, ifexists=ifexists, options=annex_options):
+            if r["status"] == "ok":
+                files_to_add.add(r["path"])
+            yield r
+
+            msg = message or """\
 [DATALAD] add files from URLs
 
 url_file='{}'
 url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
-    if files_to_add:
-        for r in dataset.add(files_to_add, message=msg):
-            yield r
+        if files_to_add:
+            for r in dataset.add(files_to_add, message=msg):
+                yield r
 
-        meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
-        for r in me.add_meta(meta_rows):
-            yield r
+            meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
+            for r in add_meta(meta_rows):
+                yield r
+
+
+__datalad_plugin__ = Addurls

@@ -63,6 +63,8 @@ def cls2cmdlinename(cls):
     return r.sub('\\1-\\2', cls.__name__).lower()
 
 
+# TODO remove
+# only `drop` and `uninstall` are still using this
 def handle_dirty_dataset(ds, mode, msg=None):
     """Detect and treat unsaved changes as instructed by `mode`
 
@@ -133,6 +135,8 @@ def get_tree_roots(paths):
     return roots
 
 
+# TODO remove
+# only `remove` and `uninstall` use this, the uses path `path_is_subpath`
 def path_is_under(values, path=None):
     """Whether a given path is a subdirectory of any of the given test values
 
@@ -383,25 +387,24 @@ def eval_results(func):
         # generator-style, it may generate an exception if desired,
         # on incomplete results
         def generator_func(*_args, **_kwargs):
-            from datalad.plugin import Plugin
-
             # flag whether to raise an exception
             incomplete_results = []
             # track what actions were performed how many times
             action_summary = {}
 
-            for pluginspec in run_before or []:
-                lgr.debug('Running pre-proc plugin %s', pluginspec)
-                for r in _process_results(
-                        Plugin.__call__(
-                            pluginspec,
-                            dataset=allkwargs.get('dataset', None),
-                            return_type='generator'),
-                        _func_class, action_summary,
-                        on_failure, incomplete_results,
-                        result_renderer, result_xfm, result_filter,
-                        **_kwargs):
-                    yield r
+            # TODO needs replacement plugin is gone
+            #for pluginspec in run_before or []:
+            #    lgr.debug('Running pre-proc plugin %s', pluginspec)
+            #    for r in _process_results(
+            #            Plugin.__call__(
+            #                pluginspec,
+            #                dataset=allkwargs.get('dataset', None),
+            #                return_type='generator'),
+            #            _func_class, action_summary,
+            #            on_failure, incomplete_results,
+            #            result_renderer, result_xfm, result_filter,
+            #            **_kwargs):
+            #        yield r
 
             # process main results
             for r in _process_results(
@@ -411,18 +414,19 @@ def eval_results(func):
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
 
-            for pluginspec in run_after or []:
-                lgr.debug('Running post-proc plugin %s', pluginspec)
-                for r in _process_results(
-                        Plugin.__call__(
-                            pluginspec,
-                            dataset=allkwargs.get('dataset', None),
-                            return_type='generator'),
-                        _func_class, action_summary,
-                        on_failure, incomplete_results,
-                        result_renderer, result_xfm, result_filter,
-                        **_kwargs):
-                    yield r
+            # TODO needs replacement plugin is gone
+            #for pluginspec in run_after or []:
+            #    lgr.debug('Running post-proc plugin %s', pluginspec)
+            #    for r in _process_results(
+            #            Plugin.__call__(
+            #                pluginspec,
+            #                dataset=allkwargs.get('dataset', None),
+            #                return_type='generator'),
+            #            _func_class, action_summary,
+            #            on_failure, incomplete_results,
+            #            result_renderer, result_xfm, result_filter,
+            #            **_kwargs):
+            #        yield r
 
             # result summary before a potential exception
             if result_renderer == 'default' and action_summary and \
@@ -476,7 +480,7 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
     for res in results:
-        if 'action' not in res:
+        if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
             continue

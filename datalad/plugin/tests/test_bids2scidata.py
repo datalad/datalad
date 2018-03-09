@@ -76,14 +76,12 @@ def test_noop(path, outdir):
     ds.add('.')
     assert_raises(
         TypeError,
-        ds.plugin,
-        'bids2scidata',
+        ds.bids2scidata,
     )
     with chpwd(outdir):  # to not pollute cwd
         assert_raises(
             IncompleteResultsError,
-            ds.plugin,
-            'bids2scidata',
+            ds.bids2scidata,
             repo_name="dummy",
             repo_accession='ds1',
             repo_url='http://example.com',
@@ -107,8 +105,7 @@ def test_minimal(path):
     with chpwd(path):
         assert_status(
             'ok',
-            ds.plugin(
-                'bids2scidata',
+            ds.bids2scidata(
                 repo_name="dummy",
                 repo_accession='ds1',
                 repo_url='http://example.com',
