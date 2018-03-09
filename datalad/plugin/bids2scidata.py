@@ -19,6 +19,7 @@ import os
 import re
 from os.path import exists
 from os.path import relpath
+from os.path import abspath
 from os.path import join as opj
 from os.path import split as psplit
 
@@ -411,7 +412,7 @@ def convert(
 
     # pull out essential metadata bits about the dataset itself
     # for study description)
-    dsbidsmeta = dsmeta.get('bids', {})
+    dsbidsmeta = getprop(dsmeta, ['metadata', 'bids'], {})
     info['name'] = dsbidsmeta.get('shortdescription', dsbidsmeta.get('name', 'TODO'))
     info['author'] = '\t'.join(assure_list(dsbidsmeta.get('author', [])))
     info['keywords'] = '\t'.join(assure_list(dsbidsmeta.get('tag', [])))
@@ -586,7 +587,7 @@ class BIDS2Scidata(Interface):
     @staticmethod
     @datasetmethod(name='bids2scidata')
     @eval_results
-    def __call__(path, repo_name, repo_accession, repo_url, output=None, dataset=None):
+    def __call__(repo_name, repo_accession, repo_url, path=None, output=None, dataset=None):
         from os.path import dirname
         from os.path import join as opj
         from datetime import datetime
@@ -641,10 +642,10 @@ class BIDS2Scidata(Interface):
         if errored:
             return
 
-        if not dsmeta:
+        if not dsmeta or not 'refcommit' in dsmeta:
             yield dict(
                 status='error',
-                message=("could not find metadata on path '%s'", path),
+                message=("could not find aggregated metadata on path '%s'", path),
                 path=dataset.path,
                 type='dataset',
                 action='bids2scidata',
@@ -691,7 +692,7 @@ class BIDS2Scidata(Interface):
                 ))
         yield dict(
             status='ok',
-            path=output,
+            path=abspath(output),
             # TODO add switch to make tarball/ZIP
             #type='file',
             type='directory',
