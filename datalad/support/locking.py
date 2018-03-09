@@ -3,6 +3,9 @@ import os
 
 from contextlib import contextmanager
 
+import logging
+lgr = logging.getLogger('datalad.locking')
+
 
 def _get(entry):
     """A helper to ge the value, be it a callable or callable with args, or value
@@ -81,7 +84,9 @@ def lock_if_check_fails(
     # could use with!
     lock = fasteners.InterProcessLock(lock_filename)
     try:
+        lgr.debug("Acquiring a lock %s", lock_filename)
         lock.acquire(blocking=blocking, **kwargs)
+        lgr.debug("Acquired? lock %s: %s", lock_filename, lock.acquired)
         if blocking:
             assert lock.acquired
         check2 = _get(check)
@@ -91,6 +96,7 @@ def lock_if_check_fails(
             yield check2, lock
     finally:
         if lock.acquired:
+            lgr.debug("Releasing lock %s", lock_filename)
             if os.path.exists(lock_filename):
                 os.unlink(lock_filename)
             lock.release()
