@@ -8,7 +8,7 @@ lgr = logging.getLogger('datalad.locking')
 
 
 def _get(entry):
-    """A helper to ge the value, be it a callable or callable with args, or value
+    """A helper to get the value, be it a callable or callable with args, or value
 
     """
     if isinstance(entry, (tuple, list)):
@@ -28,11 +28,10 @@ def lock_if_check_fails(
     blocking=True,
     **kwargs
 ):
-    """A context manager to establish a lock conditionally on a check
-    function result
+    """A context manager to establish a lock conditionally on result of a check
 
-    It is intended to be used to lock for a specific file and/or operation, e.g.
-    for `annex get`ing a file or extracting an archive, so only one process
+    It is intended to be used as a lock for a specific file and/or operation,
+    e.g. for `annex get`ing a file or extracting an archive, so only one process
     would be performing such an operation.
 
     If verification of the check fails, it tries to acquire the lock, but if
@@ -41,10 +40,10 @@ def lock_if_check_fails(
     checker and lock_path_prefix could be a value, or callable, or
     a tuple composing callable and its args
 
-    Unfortunately yoh did not find any way (in Python 2) to have context manager
-    which just skips the entire block if some condition is met (in python3 there
-    ExitStack which could potentially be used.  So we would need still to check
-    in the block body context manager return value is not None.
+    Unfortunately yoh did not find any way in Python 2 to have a context manager
+    which just skips the entire block if some condition is met (in Python3 there
+    is ExitStack which could potentially be used).  So we would need still to
+    check in the block body if the context manager return value is not None.
 
     Note also that the used type of the lock (fasteners.InterprocessLock) works
     only across processes and would not lock within the same (threads) process.
@@ -81,7 +80,6 @@ def lock_if_check_fails(
         lock_filename += operation + '-'
     lock_filename += 'lck'
 
-    # could use with!
     lock = fasteners.InterProcessLock(lock_filename)
     try:
         lgr.debug("Acquiring a lock %s", lock_filename)
