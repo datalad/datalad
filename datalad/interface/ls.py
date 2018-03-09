@@ -15,6 +15,8 @@ import sys
 import string
 import time
 
+from collections import Counter
+
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir, isfile, islink, isdir, realpath
 from os.path import relpath
@@ -534,15 +536,24 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
     def empty_for_none(v):
         return '' if v is None else v
 
-    def summary_counts(values):
-        from collections import Counter
-        return ["%s: %s" % v for v in Counter(['git', 'annex', 'git']).items()]
-
     def summary_dates(values):
         return [
             "earliest: %s" % datefmt(min(values)),
-            "latest: %s" % datefmt(max(values))
+            "latest:   %s" % datefmt(max(values))
         ]
+
+    def counts(values):
+        return [
+            " {}: {:d}".format(k, v)
+            for k, v in Counter(values).items()
+        ]
+
+    class mapped_counts(object):
+        def __init__(self, mapping):
+            self._mapping = mapping
+        def __call__(self, values):
+            mapped = [self._mapping.get(v, v) for v in values]
+            return counts(mapped)
 
     size_style = dict(
         transform=naturalsize,
@@ -551,7 +562,8 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             [0, 1024, "blue"],
             [1024, 1024**2, "green"],
             [1024**2, None, "red"]
-        ])
+        ]),
+        aggregate=lambda x: naturalsize(sum(x))
         #summary=sum,
         #delayed="group-annex"
     )
@@ -560,6 +572,7 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
         columns=columns,
         style=OrderedDict(
             [
+                ('summary_', {"bold": True}),
                 ('header_', dict(bold=True, transform=str.upper)),
                 #('default_', dict(align="center")),
                 ('default_', dict(missing="")),
@@ -567,12 +580,14 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                     bold=True,
                     align="left",
                     underline=True,
+                    aggregate=lambda _: "Summary:"
                     # TODO: seems to be wrong
                     #width='auto'
                     #summary=lambda x: "TOTAL: %d" % len(x)
                 )),
                 ('type', dict(
                     transform=lambda s: "[%s]" % s,
+                    aggregate=counts,
                     #summary=summary_counts
                 )),
                 ('describe', dict(
@@ -580,12 +595,14 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                 ('clean', dict(
                     color='green',
                     transform=fancy_bool,
+                    aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
                     # delayed="group-git"
                 )),
                 ('annex_local_', size_style),
                 ('annex_worktree_', size_style),
                 ('date', dict(
                     transform=datefmt,
+                    aggregate=summary_dates,
                     #summary=summary_dates
                 ))
             ]
@@ -598,7 +615,6 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             # except:
             #     # TODO -- remove this guard against the ones which are not complete
             #     pass
-    print("EXITED")  # TODO -- exits upon "not installed ATM"
 
 
 def _format_output(dsms, fast, long_):
