@@ -12,17 +12,17 @@ run "git annex addurl https://upload.wikimedia.org/wikipedia/commons/a/a5/Flower
 say "We save it in the dataset"
 run "datalad save -m 'Added flower mosaic from wikimedia'"
 
-say "Now we can use DataLad's 'run' command to process this image and extract one of the mosaic tiles into its own JPEG file."
-run "datalad run convert -extract 1522x1522+0+0 sources/flowers.jpg flower1.jpg"
+say "Now we can use DataLad's 'run' command to process this image and extract one of the mosaic tiles into its own JPEG file.  Let's extract the St. Bernard's Lily tile in the upper left corner."
+run "datalad run convert -extract 1522x1522+0+0 sources/flowers.jpg st-bernard.jpg"
 
 say "All we have to do is prefix ANY command with 'datalad run'. DataLad will inspect the dataset after the command has finished and save all modifications."
-say "In order to reliably detect modifications, a dataset must not contain unsaved modifications prior to running a command"
+say "In order to reliably detect modifications, a dataset must not contain unsaved modifications prior to running a command. For example, if we try to extract the Scarlet Pimpernel image with unsaved changes..."
 run "touch dirt"
-run_expfail "datalad run convert -extract 1522x1522+1470+1470 sources/flowers.jpg flower2.jpg"
+run_expfail "datalad run convert -extract 1522x1522+1470+1470 sources/flowers.jpg pimpernel.jpg"
 
 say "It has to be clean"
 run "rm dirt"
-run "datalad run convert -extract 1522x1522+1470+1470 sources/flowers.jpg flower2.jpg"
+run "datalad run convert -extract 1522x1522+1470+1470 sources/flowers.jpg pimpernel.jpg"
 
 say "Every processing step is saved in the dataset, including the exact command and the content that was changed."
 run "git show --stat"
