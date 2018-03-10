@@ -140,48 +140,35 @@ def _check_mocked_install(central_dspath, mock_install):
     mock_install.assert_called_once_with(central_dspath, source='///')
 
 
-# TODO renable test when /// metadata actually conforms to the new metadata
-# scheme
-#@with_tempfile
-#def test_our_metadataset_search(tdir):
-#    # smoke test for basic search operations on our super-megadataset
-#    # expensive operation but ok
-#    ds = install(
-#        path=tdir, source="///",
-#        result_xfm='datasets', return_type='item-or-list')
-#    assert list(ds.search('.', report='*', regex=True))
-#    assert list(ds.search('.', report='*'))
-#    assert list(ds.search('.', report_matched=True))
-#
-#    # there is a problem with argparse not decoding into utf8 in PY2
-#    from datalad.cmdline.tests.test_main import run_main
-#    # TODO: make it into an independent lean test
-#    from datalad.cmd import Runner
-#    out, err = Runner(cwd=tdir)('datalad search Buzsáki')
-#    assert_in('crcns/pfc-2', out)  # has it in description
-#    # and then another aspect: this entry it among multiple authors, need to
-#    # check if aggregating them into a searchable entity was done correctly
-#    assert_in('crcns/hc-1', out)
-#
-#    # TODO generator
-#    # bring this back when `search` is a new-style command
-#    raise SkipTest("Needs more testing")
-#    #import simplejson
-#    #from datalad.utils import swallow_outputs
-#    #with swallow_outputs() as cmo:
-#    #    assert list(search_('.', report='*', regex=True, format='json', dataset=ds))
-#    #    out = cmo.out
-#    ## since this one is just absorbs all first, we can't go one by one
-#    #assert simplejson.loads(out)
-#
-#    #try:
-#    #    import yaml
-#    #except ImportError:
-#    #    raise SkipTest("no yaml module")
-#    #with swallow_outputs() as cmo:
-#    #    assert list(search_('.', report='*', regex=True, format='yaml', dataset=ds))
-#    #    out = cmo.out
-#    #assert yaml.load(out)
+@with_tempfile
+def test_our_metadataset_search(tdir):
+    # TODO renable when a dataset with new aggregated metadata is
+    # available at some public location
+    raise SkipTest
+    # smoke test for basic search operations on our super-megadataset
+    # expensive operation but ok
+    #ds = install(
+    #    path=tdir,
+    #    # TODO renable test when /// metadata actually conforms to the new metadata
+    #    #source="///",
+    #    source="smaug:/mnt/btrfs/datasets-meta6-4/datalad/crawl",
+    #    result_xfm='datasets', return_type='item-or-list')
+    assert list(ds.search('haxby'))
+    assert_result_count(
+        ds.search('id:873a6eae-7ae6-11e6-a6c8-002590f97d84', mode='textblob'),
+        1,
+        type='dataset',
+        path=opj(ds.path, 'crcns', 'pfc-2'))
+
+    # there is a problem with argparse not decoding into utf8 in PY2
+    from datalad.cmdline.tests.test_main import run_main
+    # TODO: make it into an independent lean test
+    from datalad.cmd import Runner
+    out, err = Runner(cwd=ds.path)('datalad search Buzsáki')
+    assert_in('crcns/pfc-2 ', out)  # has it in description
+    # and then another aspect: this entry it among multiple authors, need to
+    # check if aggregating them into a searchable entity was done correctly
+    assert_in('crcns/hc-1 ', out)
 
 
 @with_tempfile
@@ -230,13 +217,13 @@ def test_within_ds_file_search(path):
     with swallow_outputs() as cmo:
         ds.search(show_keys=True, mode='textblob')
 
-        assert_equal(cmo.out, """\
+        assert_in("""\
 id
 meta
 parentds
 path
 type
-""")
+""", cmo.out)
 
     target_out = """\
 audio.bitrate
@@ -299,11 +286,10 @@ type
 """
 
     # check generated autofield index keys
-    from difflib import ndiff
     with swallow_outputs() as cmo:
         ds.search(mode='autofield', show_keys=True)
         # it is impossible to assess what is different from that dump
-        assert_str_equal(cmo.out, target_out)
+        assert_in(target_out, cmo.out)
 
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
@@ -355,9 +341,12 @@ type
             # the same structure
             assert_result_count(res, 2)
             assert_result_count(
-                res, 1, type='file', path=opj(ds.path, hitpath))
+                res, 1, type='file', path=opj(ds.path, hitpath),
+                # each file must report the ID of the dataset it is from, critical for
+                # discovering related content
+                dsid=ds.id)
         assert_result_count(
-            res, 1, type='dataset', path=ds.path)
+            res, 1, type='dataset', path=ds.path, dsid=ds.id)
         # test the key and specific value of the match
         assert_in(matched_key, res[-1]['query_matched'])
         assert_equal(res[-1]['query_matched'][matched_key], matched_val)
