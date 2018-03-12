@@ -18,6 +18,13 @@ import shlex
 from os.path import join as opj, exists
 from os import pardir
 
+
+def setup(sphinx):
+    sys.path.insert(0, os.path.abspath('utils'))
+    from pygments_ansi_color import AnsiColorLexer
+    sphinx.add_lexer("ansi-color", AnsiColorLexer())
+
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
