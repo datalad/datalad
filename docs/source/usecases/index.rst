@@ -9,3 +9,4 @@ Data management use cases
 
    ../generated/examples/3rdparty_analysis_workflow
    ../generated/examples/nipype_workshop_dataset
+   simple_provenance_tracking
