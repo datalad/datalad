@@ -43,12 +43,17 @@ class WTF(Interface):
             doc="""if set, do not display entire sections such as config and 
             metadata which could potentially contain sensitive information 
             (credentials, names, etc.)"""),
+        clipboard=Parameter(
+            args=("-c", "--clipboard",),
+            action="store_true",
+            doc="""if set, do not print but copy to clipboard (requires pyperclip
+            module"""),
     )
 
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, no_sensitive=False):
+    def __call__(dataset=None, no_sensitive=False, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         ds = None
@@ -132,7 +137,7 @@ Metadata
                 ds_meta = [dm['metadata'] for dm in ds_meta]
                 if len(ds_meta) == 1:
                     ds_meta = ds_meta.pop()
-        ui.message(report_template.format(
+        text = report_template.format(
             system='\n'.join(
                 '{}: {}'.format(*i) for i in (
                     ('OS          ', ' '.join([
@@ -165,7 +170,17 @@ Metadata
                     _HIDDEN if 'user' in k or 'token' in k or 'passwd' in k else v)
                 for k, v in sorted(cfg.items(), key=lambda x: x[0])
             ) if cfg else _HIDDEN,
-        ))
+        )
+        if clipboard:
+            from datalad.support.external_versions import external_versions
+            external_versions.require(
+                'pyperclip', msg="It is needed to be able to use clipboard")
+            import pyperclip
+            pyperclip.copy(text)
+            ui.message("WTF information of length %s copied to clipboard"
+                       % len(text))
+        else:
+            ui.message(text)
         yield
 
 

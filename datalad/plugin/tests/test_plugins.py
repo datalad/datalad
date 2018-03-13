@@ -37,7 +37,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if, skip_if_no_module
 
 try:
     import datalad.metadata.extractors.bids as has_bids_extractor
@@ -123,6 +123,14 @@ def test_wtf(path):
         wtf(dataset=ds.path, no_sensitive=True)
         assert_in(_HIDDEN, cmo.out)
         assert_not_in('user.name:', cmo.out)
+
+    skip_if_no_module('pyperclip')
+    with swallow_outputs() as cmo:
+        wtf(dataset=ds.path, clipboard=True)
+        assert_in("WTF information of length", cmo.out)
+        assert_not_in('user.name', cmo.out)
+        import pyperclip
+        assert_in('user.name', pyperclip.paste())
 
 
 @with_tempfile(mkdir=True)

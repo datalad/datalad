@@ -44,6 +44,10 @@ class UnknownVersion:
 #
 from datalad.cmd import Runner
 from datalad.cmd import GitRunner
+from datalad.support.exceptions import (
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
 _runner = Runner()
 _git_runner = GitRunner()
 
@@ -250,6 +254,15 @@ class ExternalVersions(object):
         else:
             out += " " + ' '.join(items)
         return out
+
+    def require(self, name, min_version=None, msg=""):
+        ver_present = self[name]
+        if ver_present is None:
+            raise MissingExternalDependency(
+                name, ver=min_version, msg=msg)
+        elif min_version and ver_present < min_version:
+            raise OutdatedExternalDependency(
+                name, ver=min_version, ver_present=ver_present, msg=msg)
 
 
 external_versions = ExternalVersions()
