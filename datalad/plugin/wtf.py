@@ -13,6 +13,8 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
+# wording to use for items which were considered sensitive and thus not shown
+_HIDDEN = "<HIDDEN>"
 
 @build_doc
 class WTF(Interface):
@@ -35,12 +37,18 @@ class WTF(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
+        no_sensitive=Parameter(
+            args=("-ns", "--no-sensitive",),
+            action="store_true",
+            doc="""if set, do not display entire sections such as config and 
+            metadata which could potentially contain sensitive information 
+            (credentials, names, etc.)"""),
     )
 
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None):
+    def __call__(dataset=None, no_sensitive=False):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         ds = None
@@ -52,10 +60,13 @@ class WTF(Interface):
         if ds and not ds.is_installed():
             # we don't deal with absent datasets
             ds = None
-        if ds is None:
-            from datalad import cfg
+        if no_sensitive:
+            cfg = None
         else:
-            cfg = ds.config
+            if ds is None:
+                from datalad import cfg
+            else:
+                cfg = ds.config
         from datalad.ui import ui
         from datalad.api import metadata
         from datalad.metadata import extractors as metaextractors
@@ -110,15 +121,17 @@ Metadata
 {meta}
 """
         ds_meta = None
-        if ds and ds.is_installed() and ds.id:
+        if no_sensitive:
+            ds_meta = _HIDDEN
+        elif ds and ds.is_installed() and ds.id:
             ds_meta = metadata(
                 dataset=ds, reporton='datasets', return_type='list',
                 result_filter=lambda x: x['action'] == 'metadata',
                 result_renderer='disabled')
-        if ds_meta:
-            ds_meta = [dm['metadata'] for dm in ds_meta]
-            if len(ds_meta) == 1:
-                ds_meta = ds_meta.pop()
+            if ds_meta:
+                ds_meta = [dm['metadata'] for dm in ds_meta]
+                if len(ds_meta) == 1:
+                    ds_meta = ds_meta.pop()
         ui.message(report_template.format(
             system='\n'.join(
                 '{}: {}'.format(*i) for i in (
@@ -140,16 +153,18 @@ Metadata
                         ('path', ds.path),
                         ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
                     )),
-                meta=json.dumps(ds_meta, indent=1)
-                if ds_meta else '[no metadata]'
+                meta=_HIDDEN if no_sensitive
+                     else json.dumps(ds_meta, indent=1)
+                     if ds_meta else '[no metadata]'
             ),
             externals=external_versions.dumps(preamble=None, indent='', query=True),
             metaextractors='\n'.join(p for p in dir(metaextractors) if not p.startswith('_')),
             cfg='\n'.join(
                 '{}: {}'.format(
                     k,
-                    '<HIDDEN>' if 'user' in k or 'token' in k or 'passwd' in k else v)
-                for k, v in sorted(cfg.items(), key=lambda x: x[0])),
+                    _HIDDEN if 'user' in k or 'token' in k or 'passwd' in k else v)
+                for k, v in sorted(cfg.items(), key=lambda x: x[0])
+            ) if cfg else _HIDDEN,
         ))
         yield
 
