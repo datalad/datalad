@@ -17,7 +17,7 @@ import codecs
 from simplejson import load as jsonload
 from simplejson import dump as jsondump
 # simply mirrored for now
-from simplejson import loads
+from simplejson import loads as json_loads
 from simplejson import JSONDecodeError
 
 
@@ -35,6 +35,18 @@ def dump(obj, fname):
             obj,
             codecs.getwriter('utf-8')(f),
             **json_dump_kwargs)
+
+
+def loads(s, *args, **kwargs):
+    """Helper to log actual value which failed to be parsed"""
+    try:
+        return json_loads(s, *args, **kwargs)
+    except:
+        lgr.error(
+            "Failed to load content from %r with args=%r kwargs=%r"
+            % (s, args, kwargs)
+        )
+        raise
 
 
 def load(fname, fixup=True, **kw):
