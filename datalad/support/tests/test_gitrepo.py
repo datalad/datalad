@@ -1219,19 +1219,6 @@ def test_get_git_attributes(path):
 
 
 @with_tempfile(mkdir=True)
-def test_check_git_configured(newhome):
-    try:
-        old = GitRepo._config_checked
-        GitRepo._config_checked = False
-        with patch.dict('os.environ', {'HOME': newhome}):
-            # clear clear home
-            assert_raises(RuntimeError, GitRepo, newhome, create=True)
-        # But then if we
-    finally:
-        GitRepo._config_checked = old
-
-
-@with_tempfile(mkdir=True)
 def test_get_tags(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
