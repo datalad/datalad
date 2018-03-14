@@ -423,17 +423,27 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
 
         with chpwd(path):
-            ds.addurls(self.json_file, "{url}", "{subdir}//{name}")
+            for save in True, False:
+                label = "save" if save else "nosave"
+                ds.addurls(self.json_file, "{url}",
+                           "{subdir}-" + label + "//{name}",
+                           save=save)
 
-            for fname in ["foo/a", "bar/b", "foo/c"]:
-                ok_exists(fname)
+                for fname in ["foo-{}/a", "bar-{}/b", "foo-{}/c"]:
+                    ok_exists(fname.format(label))
 
-            eq_(set(subdatasets(ds, recursive=True, result_xfm="relpaths")),
-                {"foo", "bar"})
+                assert_true(save ^ ds.repo.dirty)
+
+            # Now save the "--nosave" changes and check that we have
+            # all the subdatasets.
+            ds.add(".")
+            eq_(set(subdatasets(ds, recursive=True,
+                                result_xfm="relpaths")),
+                {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})
 
             # We don't try to recreate existing subdatasets.
             with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.addurls(self.json_file, "{url}", "{subdir}//{name}")
+                ds.addurls(self.json_file, "{url}", "{subdir}-nosave//{name}")
                 assert_in("Not creating subdataset at existing path", cml.out)
 
     @with_tempfile(mkdir=True)
