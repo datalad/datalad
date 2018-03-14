@@ -425,13 +425,16 @@ class TestAddurls(object):
         with chpwd(path):
             for save in True, False:
                 label = "save" if save else "nosave"
+                hexsha_before = ds.repo.get_hexsha()
                 ds.addurls(self.json_file, "{url}",
                            "{subdir}-" + label + "//{name}",
                            save=save)
+                hexsha_after = ds.repo.get_hexsha()
 
                 for fname in ["foo-{}/a", "bar-{}/b", "foo-{}/c"]:
                     ok_exists(fname.format(label))
 
+                assert_true(save ^ (hexsha_before == hexsha_after))
                 assert_true(save ^ ds.repo.dirty)
 
             # Now save the "--nosave" changes and check that we have
