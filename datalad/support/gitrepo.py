@@ -338,17 +338,20 @@ def check_git_configured():
 
     check_runner = GitRunner()
     vals = {}
+    exc_ = ""
     for c in 'user.name', 'user.email':
         try:
             v, err = check_runner.run(['git', 'config', c])
             vals[c] = v.rstrip('\n')
         except CommandError as exc:
-            lgr.debug("Failed to verify that git is configured: %s",
-                      exc_str(exc))
-            raise RuntimeError(
-                "You must configure git first (set both user.name and "
-                "user.email) before using DataLad."
-            )
+            exc_ += exc_str(exc)
+    if exc_:
+        lgr.warning(
+            "It is highly recommended to configure git first (set both "
+            "user.name and user.email) before using DataLad. Failed to "
+            "verify that git is configured: %s.  Some operations might fail or "
+            "not perform correctly." % exc_
+        )
     return vals
 
 
