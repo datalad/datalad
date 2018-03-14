@@ -1253,3 +1253,25 @@ def test_get_tags(path):
     gr.tag("annotated", message="annotation")
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
+
+
+@with_tree(tree={'1': ""})
+def test_get_committed_date(path):
+    gr = GitRepo(path, create=True)
+    assert_equal(gr.get_commit_date(), None)
+
+    # Let's make a commit with a custom date
+    DATE = "Wed Mar 14 03:47:30 2018 -0000"
+    DATE_EPOCH = 1520999250
+    gr.add('1')
+    gr.commit("committed", date=DATE)
+    gr = GitRepo(path, create=True)
+    date = gr.get_commit_date()
+    neq_(date, None)
+    eq_(date, DATE_EPOCH)
+
+    eq_(date, gr.get_commit_date('master'))
+    # and even if we get into a detached head
+    gr.checkout(gr.get_hexsha())
+    eq_(gr.get_active_branch(), None)
+    eq_(date, gr.get_commit_date('master'))
