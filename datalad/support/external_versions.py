@@ -255,7 +255,25 @@ class ExternalVersions(object):
             out += " " + ' '.join(items)
         return out
 
-    def require(self, name, min_version=None, msg=""):
+    def check(self, name, min_version=None, msg=""):
+        """Check if an external (optionally of specified min version) present
+
+        Parameters
+        ----------
+        name: str
+          Name of the external (typically a Python module)
+        min_version: str or version, optional
+          Minimal version to satisfy
+        msg: str, optional
+          An additional message to include into the exception message
+
+        Raises
+        ------
+        MissingExternalDependency
+          if the external is completely missing
+        OutdatedExternalDependency
+          if the external is present but does not satisfy the min_version
+        """
         ver_present = self[name]
         if ver_present is None:
             raise MissingExternalDependency(

@@ -173,7 +173,7 @@ Metadata
         )
         if clipboard:
             from datalad.support.external_versions import external_versions
-            external_versions.require(
+            external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")
             import pyperclip
             pyperclip.copy(text)
