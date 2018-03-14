@@ -20,6 +20,7 @@ from mock import patch
 
 from datalad.coreapi import create
 from datalad.coreapi import Dataset
+from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
 from datalad import cfg
@@ -38,6 +39,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if, skip_if_no_module
+from datalad.tests.utils import SkipTest
 
 try:
     import datalad.metadata.extractors.bids as has_bids_extractor
@@ -126,10 +128,14 @@ def test_wtf(path):
 
     skip_if_no_module('pyperclip')
     with swallow_outputs() as cmo:
-        wtf(dataset=ds.path, clipboard=True)
+        import pyperclip
+        try:
+            wtf(dataset=ds.path, clipboard=True)
+        except (AttributeError, pyperclip.PyperclipException) as exc:
+            # AttributeError could come from pyperclip if no DISPLAY
+            raise SkipTest(exc_str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
-        import pyperclip
         assert_in('user.name', pyperclip.paste())
 
 
