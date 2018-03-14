@@ -122,7 +122,7 @@ def test_wtf(path):
 
     # and if we run with no_sensitive
     with swallow_outputs() as cmo:
-        wtf(dataset=ds.path, no_sensitive=True)
+        wtf(dataset=ds.path, exclude_sensitive=True)
         assert_in(_HIDDEN, cmo.out)
         assert_not_in('user.name:', cmo.out)
 

@@ -37,8 +37,8 @@ class WTF(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
-        no_sensitive=Parameter(
-            args=("-ns", "--no-sensitive",),
+        exclude_sensitive=Parameter(
+            args=("-x", "--exclude-sensitive",),
             action="store_true",
             doc="""if set, do not display entire sections such as config and 
             metadata which could potentially contain sensitive information 
@@ -53,7 +53,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, no_sensitive=False, clipboard=None):
+    def __call__(dataset=None, exclude_sensitive=False, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         ds = None
@@ -65,7 +65,7 @@ class WTF(Interface):
         if ds and not ds.is_installed():
             # we don't deal with absent datasets
             ds = None
-        if no_sensitive:
+        if exclude_sensitive:
             cfg = None
         else:
             if ds is None:
@@ -126,7 +126,7 @@ Metadata
 {meta}
 """
         ds_meta = None
-        if no_sensitive:
+        if exclude_sensitive:
             ds_meta = _HIDDEN
         elif ds and ds.is_installed() and ds.id:
             ds_meta = metadata(
@@ -158,7 +158,7 @@ Metadata
                         ('path', ds.path),
                         ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
                     )),
-                meta=_HIDDEN if no_sensitive
+                meta=_HIDDEN if exclude_sensitive
                      else json.dumps(ds_meta, indent=1)
                      if ds_meta else '[no metadata]'
             ),
