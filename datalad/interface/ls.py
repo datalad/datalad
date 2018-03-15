@@ -242,7 +242,7 @@ class GitModel(object):
     def date(self):
         """Date of the last commit
         """
-        return self.repo.get_committed_date()
+        return self.repo.get_commit_date()
 
     @property
     def count_objects(self):
@@ -312,7 +312,7 @@ class FsModel(AnnexModel):
         if self.type_ is not ['git', 'annex']:
             return lstat(self._path).st_mtime
         else:
-            super(self.__class__, self).date
+            return super(self.__class__, self).date
 
     @property
     def size(self):

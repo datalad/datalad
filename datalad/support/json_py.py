@@ -21,7 +21,7 @@ from os import makedirs
 from simplejson import load as jsonload
 from simplejson import dump as jsondump
 # simply mirrored for now
-from simplejson import loads
+from simplejson import loads as json_loads
 from simplejson import JSONDecodeError
 
 
@@ -82,6 +82,18 @@ def load_xzstream(fname):
     with LZMAFile(fname, mode='r') as f:
         for line in f:
             yield loads(line)
+
+
+def loads(s, *args, **kwargs):
+    """Helper to log actual value which failed to be parsed"""
+    try:
+        return json_loads(s, *args, **kwargs)
+    except:
+        lgr.error(
+            "Failed to load content from %r with args=%r kwargs=%r"
+            % (s, args, kwargs)
+        )
+        raise
 
 
 def load(fname, fixup=True, **kw):

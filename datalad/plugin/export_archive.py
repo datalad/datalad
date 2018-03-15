@@ -87,7 +87,7 @@ class ExportArchive(Interface):
                                   purpose='export archive')
 
         repo = dataset.repo
-        committed_date = repo.get_committed_date()
+        committed_date = repo.get_commit_date()
 
         # could be used later on to filter files by some criterion
         def _filter_tarinfo(ti):
