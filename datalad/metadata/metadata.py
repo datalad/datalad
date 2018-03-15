@@ -320,8 +320,7 @@ class Metadata(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_process,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # iterate over all datasets, order doesn't matter
