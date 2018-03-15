@@ -101,12 +101,13 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
     nondataset_paths = []
     completed = []
     for r in annotated:
+        r_path = r['path']
         if r.get('type', None) == 'dataset':
             # collect all properties of all known datasets from the annotated
             # paths
-            dp = ds_props.get(r['path'], {})
+            dp = ds_props.get(r_path, {})
             dp.update(r)
-            ds_props[r['path']] = dp
+            ds_props[r_path] = dp
         if r.get('status', None) in ('ok', 'notneeded', 'impossible', 'error'):
             completed.append(r)
             continue
@@ -124,21 +125,28 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
                 # content rather then the dataset itself
                 # in both cases we want to process this part as part
                 # of the same dataset, and not any potential parent
-                toappendto = content_by_ds.get(r['path'], [])
-                toappendto.append(r['path'] if path_only else r)
-                content_by_ds[r['path']] = toappendto
+                toappendto = content_by_ds.get(r_path, [])
+                toappendto.append(r_path if path_only else r)
+                content_by_ds[r_path] = toappendto
             if parentds and refds_path and \
                     path_startswith(parentds, refds_path):
                 # put also in parentds record if there is any, and the parent
                 # is underneath or identical to the reference dataset
                 toappendto = content_by_ds.get(parentds, [])
-                toappendto.append(r['path'] if path_only else r)
+                toappendto.append(r_path if path_only else r)
                 content_by_ds[parentds] = toappendto
         else:
             # files and dirs
             # common case, something with a parentds
             toappendto = content_by_ds.get(parentds, [])
-            toappendto.append(r['path'] if path_only else r)
+            if path_only:
+                r_path_src = r.get('path_src')
+                if r_path and r_path != r_path_src and r_path_src:
+                    # things were moved/renamed but we are asked only for paths
+                    toappendto.append(r_path_src)
+                toappendto.append(r_path)
+            else:
+                toappendto.append(r)
             content_by_ds[parentds] = toappendto
 
     return content_by_ds, ds_props, completed, nondataset_paths
