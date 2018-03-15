@@ -41,6 +41,7 @@ from datalad.utils import on_windows
 from datalad.utils import assure_dir
 from datalad import consts
 from datalad import cfg
+from datalad.support.cache import lru_cache
 
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
@@ -281,6 +282,7 @@ class SimpleURLStamper(object):
 #  PreparedRequest().prepare_url(url, params) -- nicely cares about url encodings etc
 #
 
+@lru_cache(maxsize=100)
 def _guess_ri_cls(ri):
     """Factory function which would determine which type of a ri a provided string is"""
     TYPES = {
