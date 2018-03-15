@@ -10,6 +10,7 @@
 import logging
 
 from datalad.support.json_py import load
+from datalad.support.json_py import loads
 from datalad.support.json_py import JSONDecodeError
 
 from datalad.tests.utils import with_tempfile
@@ -27,3 +28,10 @@ def test_load_screwy_unicode(fname):
         eq_(load(fname), {'Authors': ['A1', 'A2']})
         assert_in('Failed to decode content', cml.out)
 
+
+def test_loads():
+    eq_(loads('{"a": 2}'), {'a': 2})
+    with assert_raises(JSONDecodeError),\
+            swallow_logs(new_level=logging.WARNING) as cml:
+        loads('{"a": 2}x')
+    assert_in('Failed to load content from', cml.out)
