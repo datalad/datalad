@@ -22,6 +22,7 @@ from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
 from datalad.interface.results import annexjson2result, get_status_dict
+from datalad.interface.common_opts import nosave_opt
 from datalad.support import ansi_colors
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
@@ -743,6 +744,7 @@ class Addurls(Interface):
             doc="""When an empty string is encountered, use this value
             instead.""",
             constraints=EnsureNone() | EnsureStr()),
+        save=nosave_opt,
     )
 
     @staticmethod
@@ -751,7 +753,7 @@ class Addurls(Interface):
     def __call__(dataset, urlfile, urlformat, filenameformat,
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
-                 missing_value=None):
+                 missing_value=None, save=True):
         # Temporarily work around gh-2269.
         url_file, url_format, filename_format = urlfile, urlformat, filenameformat
 
@@ -821,7 +823,7 @@ class Addurls(Interface):
 
         if not dataset.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None, return_type='generator'):
+            for r in dataset.create(result_xfm=None, return_type='generator', save=save):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -833,7 +835,7 @@ class Addurls(Interface):
                     spath)
             else:
                 for r in dataset.create(spath, result_xfm=None,
-                                        return_type='generator'):
+                                        return_type='generator', save=save):
                     yield r
 
         for row in rows:
@@ -864,7 +866,7 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, message=msg):
+            for r in dataset.add(files_to_add, message=msg, save=save):
                 yield r
 
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
