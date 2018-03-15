@@ -55,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -2395,7 +2396,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if progress_indicators:
                 progress_indicators.finish()
 
-        json_objects = (json.loads(line)
+        json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
@@ -3291,7 +3292,7 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 
 def readline_json(stdout):
-    return json.loads(stdout.readline().strip())
+    return json_loads(stdout.readline().strip())
 
 
 @auto_repr
@@ -3500,7 +3501,7 @@ class ProcessAnnexProgressIndicators(object):
             # Just INFO was received without anything else -- we log it at INFO
             info = j['info']
             if info.startswith('PROGRESS-JSON: '):
-                j_ = json.loads(info[len('PROGRESS-JSON: '):])
+                j_ = json_loads(info[len('PROGRESS-JSON: '):])
                 if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
                     j = j_
                 else:
