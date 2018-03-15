@@ -1,3 +1,11 @@
+datalad (0.9.3-1) unstable; urgency=medium
+
+  * Bugfix upstream release
+  * debian/control
+    - added python-fasteners into depends
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 15 Mar 2018 19:26:44 -0400
+
 datalad (0.9.2-1) unstable; urgency=medium
 
   * Large primarily bugfix release
