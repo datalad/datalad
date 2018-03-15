@@ -121,9 +121,19 @@ def save_dataset(
     # we will blindly call commit not knowing if there is anything to
     # commit -- this is cheaper than to anticipate all possible ways
     # a repo in whatever mode is dirty
+    paths_to_commit = None
+    if not save_entire_ds:
+        paths_to_commit = []
+        for ap in paths:
+            paths_to_commit.append(ap['path'])
+            # was file renamed?
+            path_src = ap.get('path_src')
+            if path_src and path_src != ap['path']:
+                paths_to_commit.append(path_src)
+
     ds.repo.commit(
         message,
-        files=[ap['path'] for ap in paths] if not save_entire_ds else None,
+        files=paths_to_commit,
         _datalad_msg=_datalad_msg,
         careless=True)
 
@@ -248,7 +258,7 @@ class Save(Interface):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
-
+        lgr.log(2, "save, to_process=%r", to_process)
         if got_nothing and recursive and refds_path:
             # path annotation yielded nothing, most likely cause is that nothing
             # was found modified, we need to say something about the reference
