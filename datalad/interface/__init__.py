@@ -67,6 +67,7 @@ _group_misc = (
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         ('datalad.interface.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
+        ('datalad.webapp', 'WebApp', 'webapp'),
     ])
 
 _group_plumbing = (

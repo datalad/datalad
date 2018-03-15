@@ -78,12 +78,26 @@ definitions = {
         'destination': 'global',
         'default': opj(dirs.site_config_dir, 'plugins'),
     },
+    'datalad.locations.system-webapps': {
+        'ui': ('question', {
+               'title': 'System webapp directory',
+               'text': 'Where should datalad search for system webapps?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'webapps'),
+    },
     'datalad.locations.user-plugins': {
         'ui': ('question', {
                'title': 'User plugin directory',
                'text': 'Where should datalad search for user plugins?'}),
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'plugins'),
+    },
+    'datalad.locations.user-webapps': {
+        'ui': ('question', {
+               'title': 'User webapp directory',
+               'text': 'Where should datalad search for user webapps?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'webapps'),
     },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
