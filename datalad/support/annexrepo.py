@@ -34,6 +34,7 @@ from os.path import isabs
 from os.path import relpath
 from os.path import normpath
 from subprocess import Popen, PIPE
+from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from six import string_types
@@ -83,6 +84,9 @@ from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
+
+# Limit to # of CPUs and up to 8, but at least 3 to start with
+N_AUTO_JOBS = min(8, max(3, cpu_count()))
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -1262,8 +1266,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
-        jobs : int, optional
-            how many jobs to run in parallel (passed to git-annex call)
+        jobs : int or None, optional
+            how many jobs to run in parallel (passed to git-annex call).
+            If not specified (None), then
         key : bool, optional
             If provided file value is actually a key
 
@@ -2274,7 +2279,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
-            if jobs:
+            if jobs == 'auto':
+                jobs = N_AUTO_JOBS
+            if jobs and jobs != 1:
                 annex_options += ['-J%d' % jobs]
             if opts:
                 annex_options += opts

@@ -295,7 +295,6 @@ def test_add_archive_content(path_orig, url, repo_path):
     unlink(opj(path_orig, '1.tar.gz'))
     res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
-
     assert_result_values_cond(
         [res], 'note',
         lambda x: '(Use --force to override this check, or adjust numcopies.)' in x

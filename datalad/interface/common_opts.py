@@ -132,7 +132,8 @@ reckless_opt = Parameter(
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
     metavar="NJOBS",
-    constraints=EnsureInt() | EnsureNone(),
+    default=None,
+    constraints=EnsureInt() | EnsureNone() | EnsureChoice('auto'),
     doc="""how many parallel jobs (where possible) to use.""")
 
 verbose = Parameter(
