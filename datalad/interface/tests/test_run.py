@@ -296,13 +296,13 @@ def test_rerun_branch(path):
 
     outfile = opj(path, "run-file")
 
-    with open(opj(path, "nonrun-file"), "w") as f:
-        f.write("foo")
-    ds.add("nonrun-file")
-
     ds.run('echo x$(cat run-file) > run-file')
     ds.rerun()
     eq_('xx\n', open(outfile).read())
+
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
 
     # Rerun the commands on a new branch that starts at the parent
     # commit of the first run.
@@ -311,6 +311,11 @@ def test_rerun_branch(path):
     eq_(ds.repo.get_active_branch(), "rerun")
     eq_('xx\n', open(outfile).read())
 
+    # NOTE: This test depends on the non-run commit above following a
+    # run commit.  Otherwise, all the metadata (e.g., author date)
+    # aside from the parent commit that is used to generated the
+    # commit ID may be set when running the tests, which would result
+    # in two commits rather than three.
     for revrange in ["rerun..master", "master..rerun"]:
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 3)
