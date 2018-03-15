@@ -49,7 +49,7 @@ def test_failure(path):
 def test_tarball(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.add('.')
-    committed_date = ds.repo.get_committed_date()
+    committed_date = ds.repo.get_commit_date()
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
     with chpwd(path):
         res = list(ds.plugin('export_tarball'))

@@ -9,6 +9,33 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+
+## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
+
+Some important bug fixes which should improve usability
+
+### Fixes
+
+- `datalad-archives` special remote now will lock on acquiring or
+  extracting an archive - this allows for it to be used with -J flag
+  for parallel operation
+- relax introduced in 0.9.2 demand on git being configured for datalad
+  operation - now we will just issue a warning
+- `datalad ls` should now list "authored date" and work also for datasets
+  in detached HEAD mode
+- `datalad save` will now save original file as well, if file was
+  "git mv"ed, so you can now `datalad run git mv old new` and have
+  changes recorded
+
+### Enhancements and new features
+
+- `--jobs` argument now could take `auto` value which would decide on
+  # of jobs depending on the # of available CPUs.
+  `git-annex` > 6.20180314 is recommended to avoid regression with -J.
+- memoize calls to `RI` meta-constructor -- should speed up operation a
+  bit
+
+
 ## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
 
 Largely a bugfix release with a few enhancements.
