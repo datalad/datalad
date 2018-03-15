@@ -44,3 +44,6 @@ render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
 
 docs/source/usecases/simple_provenance_tracking.rst.in: build/casts/simple_provenance_tracking.json
 	tools/cast2rst $^ > $@
+
+docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
+	tools/cast2rst $^ > $@
