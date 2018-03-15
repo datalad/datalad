@@ -38,3 +38,9 @@ code-analysis:
 update-changelog:
 	@echo ".. This file is auto-converted from CHANGELOG.md (make update-changelog) -- do not edit\n\nChange log\n**********" > docs/source/changelog.rst
 	pandoc -t rst CHANGELOG.md >> docs/source/changelog.rst
+
+
+render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
+
+docs/source/usecases/simple_provenance_tracking.rst.in: build/casts/simple_provenance_tracking.json
+	tools/cast2rst $^ > $@
