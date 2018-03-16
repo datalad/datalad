@@ -45,6 +45,12 @@ render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
 docs/source/usecases/simple_provenance_tracking.rst.in: build/casts/simple_provenance_tracking.json
 	tools/cast2rst $^ > $@
 
+docs/source/usecases/reproducible_analysis.rst.in: build/casts/reproducible_analysis.json
+	tools/cast2rst $^ > $@
+
+docs/source/usecases/track_data_from_webpage.rst.in: build/casts/track_data_from_webpage.json
+	tools/cast2rst $^ > $@
+
 docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
 	tools/cast2rst $^ > $@
 
