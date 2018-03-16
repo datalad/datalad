@@ -77,6 +77,12 @@ matrix:
     - DATALAD_TESTS_UI_BACKEND=console
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_SEED=1
+    - GIT_AUTHOR_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
+    - GIT_AUTHOR_NAME=blah
+    - GIT_AUTHOR_EMAIL=committer@example.com
+    - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
+    - GIT_COMMITTER_NAME=blah
+    - GIT_COMMITTER_EMAIL=committer@example.com
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
