@@ -47,3 +47,6 @@ docs/source/usecases/simple_provenance_tracking.rst.in: build/casts/simple_prove
 
 docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
 	tools/cast2rst $^ > $@
+
+docs/source/basics_nesteddatasets.rst.in: build/casts/seamless_nested_repos.json
+	tools/cast2rst $^ > $@
