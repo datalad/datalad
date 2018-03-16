@@ -1223,19 +1223,26 @@ def test_get_tags(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
 
-    create_tree(gr.path, {'file': ""})
-    gr.add('file')
-    gr.commit(msg="msg")
-    eq_(gr.get_tags(), [])
+    # Explicitly override the committer date because tests may set it to a
+    # fixed value, but we want to check that the returned tags are sorted by
+    # the committer date.
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Thu, 07 Apr 2005 22:13:13 +0200"}):
+        create_tree(gr.path, {'file': ""})
+        gr.add('file')
+        gr.commit(msg="msg")
+        eq_(gr.get_tags(), [])
 
-    gr.tag("nonannotated")
-    tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
-    eq_(gr.get_tags(), tags1)
+        gr.tag("nonannotated")
+        tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
+        eq_(gr.get_tags(), tags1)
 
-    sleep(1)  # so timestamp changes -- we sort in incremental order
-    create_tree(gr.path, {'file': "123"})
-    gr.add('file')
-    gr.commit(msg="changed")
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Fri, 08 Apr 2005 22:13:13 +0200"}):
+
+        create_tree(gr.path, {'file': "123"})
+        gr.add('file')
+        gr.commit(msg="changed")
 
     gr.tag("annotated", message="annotation")
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
