@@ -55,6 +55,13 @@ Continuing with an earlier example, it is possible to post a curated
 collection of datasets, as a superdataset, on Github, while the actual datasets
 live on different servers all around the world.
 
+Basic command line usage
+========================
+
+.. include:: basics_cmdline.rst.in
+   :end-before:  ___________________________
+
+
 API principles
 ==============
 
