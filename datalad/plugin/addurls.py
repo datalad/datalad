@@ -151,6 +151,7 @@ def clean_meta_args(args):
 def get_subpaths(filename):
     """Convert "//" marker in `filename` to a list of subpaths.
 
+    >>> from datalad.plugin.addurls import get_subpaths
     >>> get_subpaths("p1/p2//p3/p4//file")
     ('p1/p2/p3/p4/file', ['p1/p2', 'p1/p2/p3/p4'])
 
