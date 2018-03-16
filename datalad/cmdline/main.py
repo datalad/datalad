@@ -194,7 +194,7 @@ def setup_parser(
     #                         only warnings and errors are printed.""")
 
     # subparsers
-    subparsers = parser.add_subparsers()
+    subparsers = None
 
     # auto detect all available interfaces and generate a function-based
     # API from them
@@ -248,6 +248,8 @@ def setup_parser(
                 parser_args['description'] = alter_interface_docs_for_cmdline(
                     intf_doc)
             # create subparser, use module suffix as cmd name
+            if subparsers is None:
+                subparsers = parser.add_subparsers()
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
