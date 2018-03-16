@@ -32,9 +32,6 @@ From:neurodebian:latest
     pip3 install --system master.zip[full]
     rm -f master.zip
 
-    # until the next pybids release grab it from master
-    pip3 install https://github.com/INCF/pybids/archive/master.zip
-
     # clean up
     apt-get clean
 
