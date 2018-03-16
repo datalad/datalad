@@ -59,6 +59,22 @@ A number of fixes did not make it into 0.9.x series:
   - extract_metadata
 - add_readme makes use of available metadata
 
+## 0.9.4 (??? ??, 2018) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
 
 ## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
 
