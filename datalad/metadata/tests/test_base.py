@@ -166,14 +166,14 @@ def test_aggregation(path):
     # test search in search tests, not all over the place
     ## query smoke test
     assert_result_count(clone.search('mother', mode='egrep'), 1)
-    #assert_result_count(clone.search('MoTHER*'), 1)
+    assert_result_count(clone.search('MoTHER', mode='egrep'), 1)
 
     child_res = clone.search('child', mode='egrep')
     assert_result_count(child_res, 2)
     for r in child_res:
         if r['type'] == 'dataset':
             assert_in(
-                r['query_matched'],
+                r['query_matched']['bids.name'],
                 r['metadata']['bids']['name'])
 
     ## Test 'and' for multiple search entries

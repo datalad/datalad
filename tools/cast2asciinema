@@ -101,7 +101,7 @@ cmds_log="$title.cmds"
 rm -f "$cmds_log"
 echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
 bashrc_file="$(dirname $0)/cast_bash.rc"
-type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -w 2"
+type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -i 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
 sleep 1.0
@@ -110,13 +110,15 @@ sleep 1.0
 # figure out when it is idle, and when it is not
 # XXX must happen after asciinema is running
 xterm_pstree="$(pstree -p -A $xterm_pid)"
-asciinema_pid="$(pstree -p $xterm_pid -A -h | sed -e 's/.*asciinema(\([0-9]\+\)).*/\1/')"
+asciinema_pid="$(pstree -p $xterm_pid -A -h | head -n1 | sed -e 's/.*asciinema(\([0-9]\+\)).*/\1/')"
 
 . $1
 
 sleep 4
 
 show "$(cowsay "Demo was using $(datalad --version 2>&1 | head -n1). Discover more at http://datalad.org")"
+
+sleep 1
 
 key Control_L+d
 # let it finish
