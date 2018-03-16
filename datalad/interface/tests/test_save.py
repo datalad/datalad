@@ -261,6 +261,21 @@ def test_recursive_save(path):
                  'saving sub')
 
 
+def test_renamed_file():
+    @with_tempfile()
+    def check_renamed_file(recursive, no_annex, path):
+        ds = Dataset(path).create(no_annex=no_annex)
+        create_tree(path, {'old': ''})
+        ds.add('old')
+        ds.repo._git_custom_command(['old', 'new'], ['git', 'mv'])
+        ds.save(recursive=recursive)
+        ok_clean_git(path)
+
+    for recursive in True, False:
+        for no_annex in True, False:
+            yield check_renamed_file, recursive, no_annex
+
+
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 def test_subdataset_save(path):
