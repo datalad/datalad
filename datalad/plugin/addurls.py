@@ -290,6 +290,7 @@ def split_ext(filename):
 
     Examples
     --------
+    >>> from datalad.plugin.addurls import split_ext
     >>> split_ext("filename.py")
     ('filename', '.py')
 
