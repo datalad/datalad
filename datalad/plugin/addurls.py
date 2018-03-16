@@ -580,8 +580,7 @@ def add_meta(rows):
 class Addurls(Interface):
     """Create and update a dataset from a list of URLs.
 
-    Format specification
-    --------------------
+    *Format specification*
 
     Several arguments take format strings.  These are similar to normal Python
     format strings where the names from `URL-FILE` (column names for a CSV or
@@ -600,7 +599,6 @@ class Addurls(Interface):
         file name repeats.
 
       - _url_hostname, _urlN, _url_basename*
-
 
         Various parts of the formatted URL are available.  Take
         "http://datalad.org/asciicast/seamless_nested_repos.sh" as an example.
@@ -626,32 +624,32 @@ class Addurls(Interface):
         Content-Disposition header.
 
 
-    Examples
-    --------
-    Consider a file "avatars.csv" that contains
+    *Examples*
+
+    Consider a file "avatars.csv" that contains::
 
         who,ext,link
         neurodebian,png,https://avatars3.githubusercontent.com/u/260793
         datalad,png,https://avatars1.githubusercontent.com/u/8927200
 
     To download each link into a file name composed of the 'who' and 'ext'
-    fields, we could run
+    fields, we could run::
 
       $ datalad addurls -d avatar_ds --fast avatars.csv '{link}' '{who}.{ext}'
 
-    The '-d avatar_ds' is used to create a new dataset in "$PWD/avatar_ds".
+    The `-d avatar_ds` is used to create a new dataset in "$PWD/avatar_ds".
 
     If we were already in a dataset and wanted to create a new subdataset in an
     "avatars" subdirectory, we could use "//" in the `FILENAME-FORMAT`
-    argument:
+    argument::
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
-    Note
-    ----
-    For users familiar with 'git annex addurl': A large part of this plugin's
-    functionality can be viewed as transforming data from `URL-FILE` into a
-    "url filename" format that fed to 'git annex addurl --batch --with-files'.
+    .. note::
+
+       For users familiar with 'git annex addurl': A large part of this plugin's
+       functionality can be viewed as transforming data from `URL-FILE` into a
+       "url filename" format that fed to 'git annex addurl --batch --with-files'.
     """
 
     from datalad.distribution.dataset import datasetmethod
