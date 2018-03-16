@@ -9,6 +9,12 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
+# For reproducible demos/tests
+import os
+_seed = os.environ.get('DATALAD_SEED', None)
+if _seed:
+    import random
+    random.seed(_seed)
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.

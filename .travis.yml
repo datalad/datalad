@@ -76,6 +76,7 @@ matrix:
     - DATALAD_LOG_CMD_STDIN=1
     - DATALAD_TESTS_UI_BACKEND=console
     - DATALAD_TESTS_OBSCURE_PREFIX=-
+    - DATALAD_SEED=1
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
