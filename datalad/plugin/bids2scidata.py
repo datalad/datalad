@@ -135,7 +135,7 @@ protocol_defs = {
 def getprop(obj, path, default):
     """Helper to get a property from a metadata structure that might not be there"""
     for p in path:
-        if not p in obj:
+        if p not in obj:
             return default
         obj = obj[p]
     return obj
