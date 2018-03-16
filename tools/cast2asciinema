@@ -8,6 +8,9 @@ setxkbmap us
 test ! -e $1 && echo "input file does not exist" && exit 1
 title="$(echo $(basename $1) | sed -e 's/.sh$//')"
 
+outdir=$2
+[ ! -d "$outdir" ] && mkdir -p "$outdir" || true
+
 # shortcut for making xdotool find the right window
 xdt="xdotool search --classname xterm windowactivate"
 
@@ -97,11 +100,11 @@ function cmds2md() {
     sed -i -e 's,\(\<datalad .*'"${commands_re}"'\( \|$\).*\),\1 [help](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$mdfile"
 }
 
-cmds_log="$title.cmds"
+cmds_log="$outdir/$title.cmds"
 rm -f "$cmds_log"
-echo "Recording to $(readlink -f "$title.json") with commands log in $cmds_log"
+echo "Recording to $(readlink -f "$outdir/$title.json") with commands log in $cmds_log"
 bashrc_file="$(dirname $0)/cast_bash.rc"
-type "asciinema rec \"$title.json\" -c 'bash --rcfile $bashrc_file' -i 2"
+type "asciinema rec \"$outdir/$title.json\" -c 'bash --rcfile $bashrc_file' -i 2"
 # XXX cannot use execute here, idle detection not yet functional
 key Return
 sleep 1.0
@@ -129,9 +132,9 @@ kill $xterm_pid
 
 # adjust title if was specified
 full_title="${full_title:-$title} [$geometry]"
-sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$title.json"
+sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$outdir/$title.json"
 
 # Pre-create description with the list of commands annotated in .md
 # ATM those cannot be uploaded automagically to the asciinema but the clip
 # description could be changed online, just cut/paste
-cmds2md "$title.cmds"
+cmds2md "$outdir/$title.cmds"
