@@ -34,6 +34,7 @@ from os.path import isabs
 from os.path import relpath
 from os.path import normpath
 from subprocess import Popen, PIPE
+from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from six import string_types
@@ -54,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -82,6 +84,9 @@ from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
+
+# Limit to # of CPUs and up to 8, but at least 3 to start with
+N_AUTO_JOBS = min(8, max(3, cpu_count()))
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -1261,8 +1266,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
-        jobs : int, optional
-            how many jobs to run in parallel (passed to git-annex call)
+        jobs : int or None, optional
+            how many jobs to run in parallel (passed to git-annex call).
+            If not specified (None), then
         key : bool, optional
             If provided file value is actually a key
 
@@ -2273,7 +2279,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
-            if jobs:
+            if jobs == 'auto':
+                jobs = N_AUTO_JOBS
+            if jobs and jobs != 1:
                 annex_options += ['-J%d' % jobs]
             if opts:
                 annex_options += opts
@@ -2388,7 +2396,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if progress_indicators:
                 progress_indicators.finish()
 
-        json_objects = (json.loads(line)
+        json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
@@ -3284,7 +3292,7 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 
 def readline_json(stdout):
-    return json.loads(stdout.readline().strip())
+    return json_loads(stdout.readline().strip())
 
 
 @auto_repr
@@ -3493,7 +3501,7 @@ class ProcessAnnexProgressIndicators(object):
             # Just INFO was received without anything else -- we log it at INFO
             info = j['info']
             if info.startswith('PROGRESS-JSON: '):
-                j_ = json.loads(info[len('PROGRESS-JSON: '):])
+                j_ = json_loads(info[len('PROGRESS-JSON: '):])
                 if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
                     j = j_
                 else:

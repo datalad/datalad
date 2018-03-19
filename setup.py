@@ -63,6 +63,7 @@ requires = {
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
+        'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
