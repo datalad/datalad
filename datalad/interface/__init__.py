@@ -43,17 +43,6 @@ _group_dataset = (
         ('datalad.interface.save', 'Save', 'save'),
     ])
 
-_group_metadata = (
-    'Commands for metadata handling',
-    [
-        ('datalad.metadata.search', 'Search',
-         'search', 'search'),
-        ('datalad.metadata.metadata', 'Metadata',
-         'metadata'),
-        ('datalad.metadata.aggregate', 'AggregateMetaData',
-         'aggregate-metadata', 'aggregate_metadata'),
-    ])
-
 _group_misc = (
     'Miscellaneous commands',
     [
