@@ -25,7 +25,11 @@ overview of plugins included in this DataLad release.
    :toctree: generated
 
    add_readme
+   addurls
+   bids2scidata
    export_archive
+   export_to_figshare
+   extract_metadata
    no_annex
    wtf
 

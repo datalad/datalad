@@ -716,9 +716,6 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-    SubmoduleDataset, NestedDataset, InnerSubmodule
-
 _TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
@@ -726,6 +723,9 @@ def _get_testrepos_uris(regex, flavors):
     # we should instantiate those whenever test repos actually asked for
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
+        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+            SubmoduleDataset, NestedDataset, InnerSubmodule
+
         _basic_annex_test_repo = BasicAnnexTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
         _submodule_annex_test_repo = SubmoduleDataset()
