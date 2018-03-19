@@ -17,7 +17,6 @@ from setuptools import findall
 from setuptools import setup, find_packages
 
 from setup_support import BuildConfigInfo
-from setup_support import BuildSchema
 from setup_support import BuildManPage, setup_entry_points
 from setup_support import BuildRSTExamplesFromScripts
 from setup_support import get_version
@@ -94,18 +93,6 @@ requires = {
     'metadata': [
         'duecredit',
         'simplejson',
-        'whoosh',
-    ] + req_lzma,
-    'metadata-extra': [
-        'PyYAML',  # very optional
-        'mutagen',  # audio metadata
-        'exifread',  # EXIF metadata
-        'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
-        'pydicom',  # DICOM metadata
-        'pybids>=0.5.1',  # BIDS metadata
-        'Pillow',  # generic image metadata
-        'nibabel',  # NIfTI metadata
-        'pandas',  # bids2scidata export
     ]
 }
 
@@ -150,7 +137,6 @@ cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
-    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 
@@ -196,8 +182,7 @@ setup(
     package_data={
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt'}) +
-            findsome(opj('downloaders', 'configs'), {'cfg'}) +
-            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'dcm', 'jpg', 'gz', 'pdf'})
+            findsome(opj('downloaders', 'configs'), {'cfg'})
     },
     **setup_kwargs
 )

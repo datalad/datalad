@@ -57,8 +57,6 @@ class WTF(Interface):
         else:
             cfg = ds.config
         from datalad.ui import ui
-        from datalad.api import metadata
-        from datalad.metadata import extractors as metaextractors
         from datalad.support.external_versions import external_versions
         import os
         import platform as pl
@@ -89,9 +87,6 @@ Environment
 Externals
 =========
 {externals}
-Available metadata extractors
-=============================
-{metaextractors}
 
 Configuration
 =============
@@ -105,20 +100,7 @@ Dataset information
 ===================
 {basic}
 
-Metadata
---------
-{meta}
 """
-        ds_meta = None
-        if ds and ds.is_installed():
-            ds_meta = metadata(
-                dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata',
-                result_renderer='disabled')
-        if ds_meta:
-            ds_meta = [dm['metadata'] for dm in ds_meta]
-            if len(ds_meta) == 1:
-                ds_meta = ds_meta.pop()
         ui.message(report_template.format(
             system='\n'.join(
                 '{}: {}'.format(*i) for i in (
@@ -140,11 +122,8 @@ Metadata
                         ('path', ds.path),
                         ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
                     )),
-                meta=json.dumps(ds_meta, indent=1)
-                if ds_meta else '[no metadata]'
             ),
             externals=external_versions.dumps(preamble=None, indent='', query=True),
-            metaextractors='\n'.join(p for p in dir(metaextractors) if not p.startswith('_')),
             cfg='\n'.join(
                 '{}: {}'.format(
                     k,

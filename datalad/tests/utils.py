@@ -1329,10 +1329,7 @@ def with_batch_direct(t):
     return newfunc
 
 
-def dump_graph(graph, flatten=False):
-    if flatten:
-        from datalad.metadata import flatten_metadata_graph
-        graph = flatten_metadata_graph(graph)
+def dump_graph(graph):
     return dumps(
         graph,
         indent=1,

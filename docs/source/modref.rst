@@ -38,16 +38,6 @@ Dataset operations
    api.uninstall
    api.unlock
 
-Metadata handling
------------------
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   api.metadata
-   api.aggregate_metadata
-   api.search
 
 Plumbing commands
 -----------------
