@@ -102,21 +102,22 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
-def _meta2autofield_dict(meta, val2str=True, schema=None):
+def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
-    # loop over all metadata sources and the report of their unique values
-    ucnprops = meta.get("datalad_unique_content_properties", {})
-    for src, umeta in ucnprops.items():
-        srcmeta = meta.get(src, {})
-        for uk in umeta:
-            if uk in srcmeta:
-                # we have a real entry for this key in the dataset metadata
-                # ignore any generated unique value list in favor of the
-                # tailored data
-                continue
-            srcmeta[uk] = _listdict2dictlist(umeta[uk])
+    if consider_ucn:
+        # loop over all metadata sources and the report of their unique values
+        ucnprops = meta.get("datalad_unique_content_properties", {})
+        for src, umeta in ucnprops.items():
+            srcmeta = meta.get(src, {})
+            for uk in umeta:
+                if uk in srcmeta:
+                    # we have a real entry for this key in the dataset metadata
+                    # ignore any generated unique value list in favor of the
+                    # tailored data
+                    continue
+                srcmeta[uk] = _listdict2dictlist(umeta[uk])
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
@@ -598,8 +599,11 @@ class _EGrepSearch(_Search):
     _mode_label = 'egrep'
     _default_documenttype = 'datasets'
 
-    def __call__(self, query, max_nresults=None):
-        query = re.compile(self.get_query(query))
+    # If there were custom "per-search engine" options, we could expose
+    # --consider_ucn - search through unique content properties of the dataset
+    #    which might be more computationally demanding
+    def __call__(self, query, max_nresults=None, consider_ucn=False):
+        query_re = re.compile(self.get_query(query))
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -614,15 +618,15 @@ class _EGrepSearch(_Search):
             # dataset will be reported again
             meta = res.get('metadata', {})
             # produce a flattened metadata dict to search through
-            doc = _meta2autofield_dict(meta, val2str=True)
+            doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            lgr.log(7, "Querying %s among %d items", query, len(doc))
+            lgr.log(7, "Querying %s among %d items", query_re, len(doc))
             t0 = time()
-            matches = {k: query.search(v.lower())
+            matches = {k: query_re.search(v.lower())
                        for k, v in iteritems(doc)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
