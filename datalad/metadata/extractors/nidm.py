@@ -8,14 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """NIDM metadata extractor"""
 
-# TODO: ATM this is just a minimalistic place holder to document how it works
-# it doesn't do anything meaningful
-
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.nidm')
 
-from datalad.metadata.definitions import vocabulary_id
+from datalad.support.json_py import loads as json_loads
 from datalad.metadata.extractors.base import BaseMetadataExtractor
+from nidm.experiment.tools.BIDSMRI2NIDM import bidsmri2project
 
 
 class MetadataExtractor(BaseMetadataExtractor):
@@ -39,17 +37,5 @@ class MetadataExtractor(BaseMetadataExtractor):
         #         JSON-LD context is assigned to the metadata dict, hence file metadata
         #         should not be returned with individual/repeated contexts, but rather
         #         the dataset-global context should provide all definitions
-        return {
-            '@context': {
-                'myvocabprefix': {
-                    '@id': 'http://purl.org/ontology/mydefinition',
-                    'description': 'I am a vocabulary',
-                    'type': vocabulary_id,
-                },
-                'mydurationkey': {
-                    "@id": 'time:Duration',
-                },
-            },
-            'mydurationkey': 0.6,
-        }, \
-            []
+        nidm = bidsmri2project(self.ds.path)
+        return json_loads(nidm.serializeJSONLD()), []
