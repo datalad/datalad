@@ -39,9 +39,11 @@ run "datalad rerun"
 run "git log --oneline --graph --name-only @~3..@"
 
 say "In this case, a new commit isn't created because the output file didn't change. But let's say we add a step that displaces the Lily's pixels by a random amount."
-run "datalad run convert -spread 10 st-bernard.jpg st-bernard-displaced.jpg"
+run "export SEED=38"
+run "datalad run 'convert -spread 10 -seed \$SEED st-bernard.jpg st-bernard-displaced.jpg'"
 
-say "Now, if we rerun the previous command, a new commit is created because the output's content changed."
+say "Notice that we're setting the random seed outside of the run command. Now, if we changed the seed and rerun the previous command, a new commit is created because the output's content changed."
+run "export SEED=83"
 run "datalad rerun"
 run "git log --graph --oneline --name-only @~2.."
 
@@ -58,7 +60,7 @@ run "git log --oneline --graph master verify"
 say "Let's compare the two branches."
 run "datalad diff --revision master..verify"
 
-say "We can see that the step that involved a random component produced different results."
+say "We can see that the step that involved the different random seed (38 in the first run, 83 in the second) produced different results."
 say "And these are just two branches, so you can compare them using normal Git operations. The next command, for example, marks which commits are 'patch-equivalent'."
 
 run "git log --oneline --left-right --cherry-mark master...verify"
