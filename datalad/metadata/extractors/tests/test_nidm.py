@@ -12,20 +12,33 @@ from shutil import copy
 from os.path import dirname
 from os.path import join as opj
 from datalad.api import Dataset
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_greater
 from datalad.tests.utils import assert_result_count
+from .test_bids import bids_template
+
+try:
+    from nidm.experiment.tools.BIDSMRI2NIDM import bidsmri2project
+except ImportError:
+    from datalad.tests.utils import SkipTest
+    SkipTest
 
 
-@with_tempfile(mkdir=True)
+@with_tree(tree=bids_template)
 def test_nidm(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).create(force=True)
     ds.config.add('datalad.metadata.nativetype', 'nidm', where='dataset')
     # imagine filling the dataset up with something that NIDM info could be
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'nifti1.nii.gz'),
-        path)
+        opj(path, 'sub-01', 'func', 'sub-01_task-some_bold.nii.gz'))
+    copy(
+        opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'nifti1.nii.gz'),
+        opj(path, 'sub-03', 'func', 'sub-03_task-other_bold.nii.gz'))
     # extracted from
     ds.add('.')
     # all nice and tidy, nothing untracked
@@ -37,27 +50,9 @@ def test_nidm(path):
     res = ds.metadata(reporton='datasets')
     # ATM we do not forsee file-based metadata to come back from NIDM
     assert_result_count(res, 1)
-    # show full structure of the assembled metadata from demo content
-    assert_result_count(
-        res, 1,
-        metadata={
-            "@context": {
-                "@vocab": "http://docs.datalad.org/schema_v2.0.json"
-            },
-            "datalad_core": {
-                "@id": ds.id
-            },
-            "nidm": {
-                "@context": {
-                    "mydurationkey": {
-                        "@id": "time:Duration"
-                    },
-                    "myvocabprefix": {
-                        "@id": "http://purl.org/ontology/mydefinition",
-                        "description": "I am a vocabulary",
-                        "type": "http://purl.org/dc/dcam/VocabularyEncodingScheme"
-                    }
-                },
-                "mydurationkey": 0.6
-            }
-        })
+    # make basic content check, but otherwise we have no idea what we would
+    # get from nidm, but it should be a bunch
+    stuff = res[0]['metadata']['nidm']
+    for key in ('@context', '@graph'):
+        assert_in(key, stuff)
+        assert_greater(len(stuff[key]), 10)
