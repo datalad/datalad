@@ -4,4 +4,5 @@
 # For now, until https://github.com/GrahamDumpleton/wrapt/issues/98 resolved
 # we should use fresh version allowing to disable extensions
 wrapt>=1.10.11
+git+https://github.com/incf-nidash/PyNIDM.git
 -e .[devel]
