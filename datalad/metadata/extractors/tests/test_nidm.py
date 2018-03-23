@@ -21,6 +21,11 @@ from datalad.tests.utils import assert_greater
 from datalad.tests.utils import assert_result_count
 from .test_bids import bids_template
 
+try:
+    from nidm.experiment.tools.BIDSMRI2NIDM import bidsmri2project
+except ImportError:
+    SkipTest
+
 
 @with_tree(tree=bids_template)
 def test_nidm(path):
