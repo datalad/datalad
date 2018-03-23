@@ -1304,7 +1304,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(fetch_files) != len(files):
-            lgr.info("Actually getting %d files", len(fetch_files))
+            lgr.debug("Actually getting %d files", len(fetch_files))
 
         # options  might be the '--key' which should go last
         options = ['--json-progress'] + options
@@ -2994,7 +2994,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(copy_files) != len(files):
-            lgr.info("Actually copying %d files", len(copy_files))
+            lgr.debug("Actually copying %d files", len(copy_files))
 
         annex_options = ['--to=%s' % remote, '--json-progress']
         if options:
