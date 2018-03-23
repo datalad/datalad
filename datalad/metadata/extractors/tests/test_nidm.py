@@ -24,6 +24,7 @@ from .test_bids import bids_template
 try:
     from nidm.experiment.tools.BIDSMRI2NIDM import bidsmri2project
 except ImportError:
+    from datalad.tests.utils import SkipTest
     SkipTest
 
 
