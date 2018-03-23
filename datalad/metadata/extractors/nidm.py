@@ -37,5 +37,9 @@ class MetadataExtractor(BaseMetadataExtractor):
         #         JSON-LD context is assigned to the metadata dict, hence file metadata
         #         should not be returned with individual/repeated contexts, but rather
         #         the dataset-global context should provide all definitions
-        nidm = bidsmri2project(self.ds.path)
+        # this library is rather fragile, protect against basic failure
+        try:
+            nidm = bidsmri2project(self.ds.path)
+        except FileNotFoundError:
+            return {}, []
         return json_loads(nidm.serializeJSONLD()), []
