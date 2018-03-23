@@ -12,14 +12,14 @@ from __future__ import absolute_import
 # use pybids to evolve with the standard without having to track it too much
 from bids.grabbids import BIDSLayout
 import re
-import csv
 from io import open
 from os.path import join as opj
 from os.path import exists
+from os.path import curdir
 from datalad.dochelpers import exc_str
 from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.metadata.definitions import vocabulary_id
-from datalad.utils import (assure_unicode, read_csv_lines)
+from datalad.utils import assure_unicode
 
 from datalad import cfg
 
@@ -67,7 +67,14 @@ class MetadataExtractor(BaseMetadataExtractor):
         if not exists(opj(self.ds.path, self._dsdescr_fname)):
             return {}, []
 
-        bids = BIDSLayout(self.ds.path)
+        bids = BIDSLayout(
+            self.ds.path,
+            config=[
+                'bids', (
+                    'derivatives',
+                    'derivatives' if exists(opj(self.ds.path, 'derivatives')) else curdir
+                )],
+        )
         dsmeta = self._get_dsmeta(bids)
 
         if not content:
