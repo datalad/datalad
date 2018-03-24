@@ -207,7 +207,10 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # inject the info which commmit we are describing into the core metadata
     # this is done here in order to avoid feeding it all the way down
     coremeta = dsmeta.get('datalad_core', {})
-    coremeta['version'] = refcommit
+    version = aggfrom_ds.repo.describe(commitish=refcommit)
+    if version:
+        coremeta['version'] = version
+    coremeta['refcommit'] = refcommit
     dsmeta['datalad_core'] = coremeta
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()

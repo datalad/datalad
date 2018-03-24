@@ -38,7 +38,9 @@ def test_nidm(path):
     # ATM we do not forsee file-based metadata to come back from NIDM
     assert_result_count(res, 1)
     # kill version info
-    res[0]['metadata']['datalad_core'].pop('version')
+    core = res[0]['metadata']['datalad_core']
+    core.pop('version', None)
+    core.pop('refcommit')
     # show full structure of the assembled metadata from demo content
     assert_result_count(
         res, 1,

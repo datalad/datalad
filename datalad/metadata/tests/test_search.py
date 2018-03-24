@@ -256,7 +256,7 @@ bids.subject
 bids.task
 bids.type
 datalad_core.id
-datalad_core.version
+datalad_core.refcommit
 id
 nifti1.cal_max
 nifti1.cal_min
