@@ -22,4 +22,7 @@ RUN rm -f master.zip
 # clean up
 RUN apt-get clean
 
+RUN git config --global user.name "Docker Datalad"
+RUN git config --global user.email "docker-datalad@example.com"
+
 ENTRYPOINT ["datalad"]
