@@ -2174,7 +2174,7 @@ class GitRepo(RepoInterface):
         else:
             return tags
 
-    def describe(self, **kwargs):
+    def describe(self, commitish=None, **kwargs):
         """ Quick and dirty implementation to call git-describe
 
         Parameters:
@@ -2185,10 +2185,13 @@ class GitRepo(RepoInterface):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
+        cmd = ['git', 'describe'] + to_options(**kwargs)
+        if commitish is not None:
+            cmd.append(commitish)
         try:
             describe, outerr = self._git_custom_command(
                 [],
-                ['git', 'describe'] + to_options(**kwargs),
+                cmd,
                 expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?
