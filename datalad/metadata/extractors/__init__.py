@@ -12,6 +12,7 @@ import logging as __logging
 from datalad.utils import import_modules as __import_modules
 
 __all__ = [
+    'annex',
     'audio',
     'bids',
     'datacite',

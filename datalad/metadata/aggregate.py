@@ -192,7 +192,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # if there is any chance for metadata
     # obtain metadata for dataset and content
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
-    nativetypes = ['datalad_core'] + assure_list(get_metadata_type(aggfrom_ds))
+    nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
     dsmeta, contentmeta, errored = _get_metadata(
@@ -204,6 +204,14 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
         content_meta=None,
         paths=relevant_paths)
 
+    # inject the info which commmit we are describing into the core metadata
+    # this is done here in order to avoid feeding it all the way down
+    coremeta = dsmeta.get('datalad_core', {})
+    version = aggfrom_ds.repo.describe(commitish=refcommit)
+    if version:
+        coremeta['version'] = version
+    coremeta['refcommit'] = refcommit
+    dsmeta['datalad_core'] = coremeta
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 

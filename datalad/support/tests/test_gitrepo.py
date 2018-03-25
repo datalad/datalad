@@ -1222,6 +1222,7 @@ def test_get_git_attributes(path):
 def test_get_tags(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
+    eq_(gr.describe(), None)
 
     # Explicitly override the committer date because tests may set it to a
     # fixed value, but we want to check that the returned tags are sorted by
@@ -1232,10 +1233,15 @@ def test_get_tags(path):
         gr.add('file')
         gr.commit(msg="msg")
         eq_(gr.get_tags(), [])
+        eq_(gr.describe(), None)
 
         gr.tag("nonannotated")
         tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
         eq_(gr.get_tags(), tags1)
+        eq_(gr.describe(), None)
+        eq_(gr.describe(tags=True), tags1[0]['name'])
+
+    first_commit = gr.get_hexsha()
 
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Fri, 08 Apr 2005 22:13:13 +0200"}):
@@ -1247,6 +1253,11 @@ def test_get_tags(path):
     gr.tag("annotated", message="annotation")
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
+    eq_(gr.describe(), tags2[1]['name'])
+
+    # compare prev commit
+    eq_(gr.describe(commitish=first_commit), None)
+    eq_(gr.describe(commitish=first_commit, tags=True), tags1[0]['name'])
 
 
 @with_tree(tree={'1': ""})
