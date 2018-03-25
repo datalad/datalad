@@ -45,7 +45,7 @@ def check_api(no_annex, path):
         cm = dict(contentmeta)
         # datalad_core does provide some (not really) information about our
         # precious file
-        if p == 'annex':
+        if p == 'datalad_core':
             assert 'file.dat' in cm
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"

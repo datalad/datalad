@@ -81,3 +81,21 @@ class MetadataExtractor(BaseMetadataExtractor):
                 # about a file
                 yield (p, dict())
             return
+        valid_paths = None
+        if self.paths and sum(len(i) for i in self.paths) > 500000:
+            valid_paths = set(self.paths)
+        # Availability information
+        for file, whereis in self.ds.repo.whereis(
+                self.paths if self.paths and valid_paths is None else '.',
+                output='full').items():
+            if file.startswith('.datalad') or valid_paths and file not in valid_paths:
+                # do not report on our own internal annexed files (e.g. metadata blobs)
+                continue
+            # pull out proper (public) URLs
+            # TODO possibly extend with special remote info later on
+            meta = {'url': whereis[remote].get('urls', [])
+                    for remote in whereis
+                    # "web" remote
+                    if remote == "00000000-0000-0000-0000-000000000001" and
+                    whereis[remote].get('urls', None)}
+            yield (file, meta)
