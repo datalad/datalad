@@ -372,6 +372,12 @@ class TestAddurls(object):
     def test_addurls(self, path):
         ds = Dataset(path).create(force=True)
 
+        def get_annex_commit_counts():
+            return int(
+                ds.repo.repo.git.rev_list("--count", "git-annex").strip())
+
+        n_annex_commits = get_annex_commit_counts()
+
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{name}")
 
@@ -383,6 +389,10 @@ class TestAddurls(object):
                                              ["foo", "bar", "foo"]):
                 assert_dict_equal(meta,
                                   {"subdir": [subdir], "name": [fname]})
+
+            # We should have two new commits on the git-annex: one for the
+            # added urls and one for the added metadata.
+            eq_(n_annex_commits + 2, get_annex_commit_counts())
 
             # Add to already existing links, overwriting.
             with swallow_logs(new_level=logging.DEBUG) as cml:

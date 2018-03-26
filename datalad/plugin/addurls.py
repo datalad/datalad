@@ -569,13 +569,19 @@ def add_meta(rows):
     """
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-        for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
-            res = annexjson2result(a, ds, type="file", logger=lgr)
-            # Don't show all added metadata for the file because that
-            # could quickly flood the output.
-            del res["message"]
-            yield res
+
+        old_always_commit = ds.repo.always_commit
+        ds.repo.always_commit = False
+        try:
+            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+            for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
+                res = annexjson2result(a, ds, type="file", logger=lgr)
+                # Don't show all added metadata for the file because that
+                # could quickly flood the output.
+                del res["message"]
+                yield res
+        finally:
+            ds.repo.always_commit = old_always_commit
 
 
 @build_doc
@@ -866,12 +872,17 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, message=msg, save=save):
+            for r in dataset.add(files_to_add, save=False):
                 yield r
 
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
             for r in add_meta(meta_rows):
                 yield r
 
+            # Save here rather than the add call above to trigger a metadata
+            # commit on the git-annex branch.
+            if save:
+                for r in dataset.save(message=msg, recursive=True):
+                    yield r
 
 __datalad_plugin__ = Addurls
