@@ -14,7 +14,8 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
 # wording to use for items which were considered sensitive and thus not shown
-_HIDDEN = "<HIDDEN>"
+_HIDDEN = "<Sensitive data, use -s=some or -s=all to show>"
+
 
 @build_doc
 class WTF(Interface):
@@ -28,7 +29,7 @@ class WTF(Interface):
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
     from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureNone
+    from datalad.support.constraints import EnsureNone, EnsureChoice
 
     _params_ = dict(
         dataset=Parameter(
@@ -39,10 +40,11 @@ class WTF(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         sensitive=Parameter(
             args=("-s", "--sensitive",),
-            action="store_true",
-            doc="""if set, display entire sections such as config and 
-            metadata which could potentially contain sensitive information 
-            (credentials, names, etc.)"""),
+            constraints=EnsureChoice('some', 'all') | EnsureNone(),
+            doc="""if set to 'some' or 'all', it will display sections such as 
+            config and metadata which could potentially contain sensitive 
+            information (credentials, names, etc.).  If 'some', the fields
+            which are known to be sensitive will still be masked out"""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),
             action="store_true",
@@ -53,7 +55,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=False, clipboard=None):
+    def __call__(dataset=None, sensitive=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         ds = None
@@ -138,6 +140,17 @@ Metadata
                 ds_meta = [dm['metadata'] for dm in ds_meta]
                 if len(ds_meta) == 1:
                     ds_meta = ds_meta.pop()
+
+        if cfg is not None:
+            # make it into a dict to be able to reassign
+            cfg = dict(cfg.items())
+
+        if sensitive != 'all' and cfg:
+            # filter out some of the entries which known to be highly sensitive
+            for k in cfg.keys():
+                if 'user' in k or 'token' in k or 'passwd' in k:
+                    cfg[k] = _HIDDEN
+
         text = report_template.format(
             system='\n'.join(
                 '{}: {}'.format(*i) for i in (

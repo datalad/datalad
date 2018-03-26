@@ -105,8 +105,6 @@ def test_wtf(path):
         wtf(dataset=path)
         assert_not_in('Dataset information', cmo.out)
         assert_in('Configuration', cmo.out)
-        # we fake those for tests anyways, and explicitly not showing them
-        # assert_in('user.name: %s' % _HIDDEN, cmo.out)
         # Those sections get sensored out by default now
         assert_not_in('user.name: ', cmo.out)
     with chpwd(path):
@@ -123,10 +121,17 @@ def test_wtf(path):
         assert_in('path: {}'.format(ds.path), cmo.out)
 
     # and if we run with all sensitive
+    for sensitive in ('some', True):
+        with swallow_outputs() as cmo:
+            wtf(dataset=ds.path, sensitive=sensitive)
+            # we fake those for tests anyways, but we do show cfg in this mode
+            # and explicitly not showing them
+            assert_in('user.name: %s' % _HIDDEN, cmo.out)
+
     with swallow_outputs() as cmo:
-        wtf(dataset=ds.path, sensitive=True)
-        assert_not_in(_HIDDEN, cmo.out)
-        assert_in('user.name:', cmo.out)
+        wtf(dataset=ds.path, sensitive='all')
+        assert_not_in(_HIDDEN, cmo.out)  # all is shown
+        assert_in('user.name: ', cmo.out)
 
     skip_if_no_module('pyperclip')
     with swallow_outputs() as cmo:
