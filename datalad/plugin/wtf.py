@@ -10,6 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import OrderedDict
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
@@ -97,6 +98,10 @@ class WTF(Interface):
 
 
         report_template = """\
+DataLad
+=======
+{datalad}
+
 System
 ======
 {system}
@@ -151,37 +156,40 @@ Metadata
                 if 'user' in k or 'token' in k or 'passwd' in k:
                     cfg[k] = _HIDDEN
 
+        from datalad.version import __version__, __full_version__
         text = report_template.format(
-            system='\n'.join(
-                '{}: {}'.format(*i) for i in (
-                    ('OS          ', ' '.join([
-                        os.name,
-                        pl.system(),
-                        pl.release(),
-                        pl.version()]).rstrip()),
-                    ('Distribution',
-                     ' '.join([_t2s(pl.dist()),
-                               _t2s(pl.mac_ver()),
-                               _t2s(pl.win32_ver())]).rstrip()))),
-            env='\n'.join(
-                '{}: {}'.format(k, v) for k, v in os.environ.items()
-                if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')),
+            datalad=_format_dict([
+                ('Version', __version__),
+                ('Full version', __full_version__)
+            ], indent=True),
+            system=_format_dict([
+                ('OS', ' '.join([
+                    os.name,
+                    pl.system(),
+                    pl.release(),
+                    pl.version()]).rstrip()),
+                ('Distribution',
+                 ' '.join([_t2s(pl.dist()),
+                           _t2s(pl.mac_ver()),
+                           _t2s(pl.win32_ver())]).rstrip())
+            ], indent=True),
+            env=_format_dict([
+                (k, v) for k, v in os.environ.items()
+                if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')
+            ], fmt="{}={!r}"),
             dataset='' if not ds else dataset_template.format(
-                basic='\n'.join(
-                    '{}: {}'.format(k, v) for k, v in (
-                        ('path', ds.path),
-                        ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
-                    )),
+                basic=_format_dict([
+                    ('path', ds.path),
+                    ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
+                ]),
                 meta=_HIDDEN if not sensitive
                      else json.dumps(ds_meta, indent=1)
                      if ds_meta else '[no metadata]'
             ),
             externals=external_versions.dumps(preamble=None, indent='', query=True),
             metaextractors='\n'.join(p for p in dir(metaextractors) if not p.startswith('_')),
-            cfg='\n'.join(
-                '{}: {}'.format(k, v)
-                for k, v in sorted(cfg.items(), key=lambda x: x[0])
-            ) if cfg else _HIDDEN,
+            cfg=_format_dict(sorted(cfg.items(), key=lambda x: x[0]))
+                if cfg else _HIDDEN,
         )
         if clipboard:
             from datalad.support.external_versions import external_versions
@@ -194,6 +202,22 @@ Metadata
         else:
             ui.message(text)
         yield
+
+
+def _format_dict(d, indent=False, fmt=None):
+    """A helper for uniform formatting of an OrderedDict output
+
+    d could be of anything OrderedDict could be built from, e.g a list
+    of tuples
+    """
+    od = OrderedDict(d)
+    assert not (indent and fmt), "specify only indent of fmt"
+    if not fmt:
+        if indent:
+            fmt = '{:%d}: {}' % max(map(len, od))
+        else:
+            fmt = '{}: {}'
+    return '\n'.join(fmt.format(k, v) for k, v in od.items())
 
 
 __datalad_plugin__ = WTF
