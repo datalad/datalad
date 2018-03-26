@@ -59,14 +59,13 @@ A number of fixes did not make it into 0.9.x series:
   - extract_metadata
 - add_readme makes use of available metadata
 
+## 0.9.4 (??? ??, 2018) -- will be better than ever
 
-## 0.9.3 (??? ??, 2018) -- if ever be released
-
-bet we will fix some bugs and we might need to kick it out before 0.10.
+bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- should be none
+- hopefully none
 
 ### Fixes
 
@@ -74,7 +73,35 @@ bet we will fix some bugs and we might need to kick it out before 0.10.
 
 ### Enhancements and new features
 
-- very unlikely
+?
+
+
+## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
+
+Some important bug fixes which should improve usability
+
+### Fixes
+
+- `datalad-archives` special remote now will lock on acquiring or
+  extracting an archive - this allows for it to be used with -J flag
+  for parallel operation
+- relax introduced in 0.9.2 demand on git being configured for datalad
+  operation - now we will just issue a warning
+- `datalad ls` should now list "authored date" and work also for datasets
+  in detached HEAD mode
+- `datalad save` will now save original file as well, if file was
+  "git mv"ed, so you can now `datalad run git mv old new` and have
+  changes recorded
+
+### Enhancements and new features
+
+- `--jobs` argument now could take `auto` value which would decide on
+  # of jobs depending on the # of available CPUs.
+  `git-annex` > 6.20180314 is recommended to avoid regression with -J.
+- memoize calls to `RI` meta-constructor -- should speed up operation a
+  bit
+- `DATALAD_SEED` environment variable could be used to seed Python RNG
+  and provide reproducible UUIDs etc (useful for testing and demos)
 
 
 ## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever

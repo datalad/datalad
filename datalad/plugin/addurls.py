@@ -22,6 +22,7 @@ from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
 from datalad.interface.results import annexjson2result, get_status_dict
+from datalad.interface.common_opts import nosave_opt
 from datalad.support import ansi_colors
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
@@ -150,6 +151,7 @@ def clean_meta_args(args):
 def get_subpaths(filename):
     """Convert "//" marker in `filename` to a list of subpaths.
 
+    >>> from datalad.plugin.addurls import get_subpaths
     >>> get_subpaths("p1/p2//p3/p4//file")
     ('p1/p2/p3/p4/file', ['p1/p2', 'p1/p2/p3/p4'])
 
@@ -288,6 +290,7 @@ def split_ext(filename):
 
     Examples
     --------
+    >>> from datalad.plugin.addurls import split_ext
     >>> split_ext("filename.py")
     ('filename', '.py')
 
@@ -579,8 +582,7 @@ def add_meta(rows):
 class Addurls(Interface):
     """Create and update a dataset from a list of URLs.
 
-    Format specification
-    --------------------
+    *Format specification*
 
     Several arguments take format strings.  These are similar to normal Python
     format strings where the names from `URL-FILE` (column names for a CSV or
@@ -599,7 +601,6 @@ class Addurls(Interface):
         file name repeats.
 
       - _url_hostname, _urlN, _url_basename*
-
 
         Various parts of the formatted URL are available.  Take
         "http://datalad.org/asciicast/seamless_nested_repos.sh" as an example.
@@ -625,32 +626,32 @@ class Addurls(Interface):
         Content-Disposition header.
 
 
-    Examples
-    --------
-    Consider a file "avatars.csv" that contains
+    *Examples*
+
+    Consider a file "avatars.csv" that contains::
 
         who,ext,link
         neurodebian,png,https://avatars3.githubusercontent.com/u/260793
         datalad,png,https://avatars1.githubusercontent.com/u/8927200
 
     To download each link into a file name composed of the 'who' and 'ext'
-    fields, we could run
+    fields, we could run::
 
       $ datalad addurls -d avatar_ds --fast avatars.csv '{link}' '{who}.{ext}'
 
-    The '-d avatar_ds' is used to create a new dataset in "$PWD/avatar_ds".
+    The `-d avatar_ds` is used to create a new dataset in "$PWD/avatar_ds".
 
     If we were already in a dataset and wanted to create a new subdataset in an
     "avatars" subdirectory, we could use "//" in the `FILENAME-FORMAT`
-    argument:
+    argument::
 
       $ datalad addurls --fast avatars.csv '{link}' 'avatars//{who}.{ext}'
 
-    Note
-    ----
-    For users familiar with 'git annex addurl': A large part of this plugin's
-    functionality can be viewed as transforming data from `URL-FILE` into a
-    "url filename" format that fed to 'git annex addurl --batch --with-files'.
+    .. note::
+
+       For users familiar with 'git annex addurl': A large part of this plugin's
+       functionality can be viewed as transforming data from `URL-FILE` into a
+       "url filename" format that fed to 'git annex addurl --batch --with-files'.
     """
 
     from datalad.distribution.dataset import datasetmethod
@@ -743,6 +744,7 @@ class Addurls(Interface):
             doc="""When an empty string is encountered, use this value
             instead.""",
             constraints=EnsureNone() | EnsureStr()),
+        save=nosave_opt,
     )
 
     @staticmethod
@@ -751,7 +753,7 @@ class Addurls(Interface):
     def __call__(dataset, urlfile, urlformat, filenameformat,
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
-                 missing_value=None):
+                 missing_value=None, save=True):
         # Temporarily work around gh-2269.
         url_file, url_format, filename_format = urlfile, urlformat, filenameformat
 
@@ -821,7 +823,7 @@ class Addurls(Interface):
 
         if not dataset.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None, return_type='generator'):
+            for r in dataset.create(result_xfm=None, return_type='generator', save=save):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -833,7 +835,7 @@ class Addurls(Interface):
                     spath)
             else:
                 for r in dataset.create(spath, result_xfm=None,
-                                        return_type='generator'):
+                                        return_type='generator', save=save):
                     yield r
 
         for row in rows:
@@ -864,7 +866,7 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, message=msg):
+            for r in dataset.add(files_to_add, message=msg, save=save):
                 yield r
 
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]

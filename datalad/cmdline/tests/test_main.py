@@ -150,7 +150,7 @@ def check_incorrect_option(opts, err_str):
 
 def test_incorrect_options():
     # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: (invalid|too few arguments)"
+    err_invalid = "error: (invalid|too few arguments|unrecognized arguments)"
     yield check_incorrect_option, ('--buga',), err_invalid
     yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
 

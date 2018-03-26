@@ -12,9 +12,9 @@ The full documentation is available at: http://docs.datalad.org
 # 10000ft overview
 
 DataLad makes data management and data distribution more accessible.
-To do that it stands on the shoulders of [Git] and [Git-annex] to deliver a
+To do that, it stands on the shoulders of [Git] and [Git-annex] to deliver a
 decentralized system for data exchange. This includes automated ingestion of
-data from online portals, and exposing it in readily usable form as Git(-annex)
+data from online portals and exposing it in readily usable form as Git(-annex)
 repositories, so-called datasets. The actual data storage and permission
 management, however, remains with the original data providers.
 
@@ -23,8 +23,8 @@ management, however, remains with the original data providers.
 DataLad is under rapid development.  While the code base is still growing,
 the focus is increasingly shifting towards robust and safe operation 
 with a sensible API. Organization and configuration are still subject of 
-considerable reorganization and standardization.  However, DataLad is, 
-in fact, usable today and user feedback is always welcome.
+considerable reorganization and standardization.  However, DataLad is 
+usable today and user feedback is always welcome.
 
 # Support
 
@@ -54,9 +54,9 @@ those datasets using
 
 which will `git clone` all of those datasets under `datasets.datalad.org`
 sub-directory. This command will not fetch any large data files, but will
-merely recreate full hierarchy of all of those datasets locally, which
+merely recreate full hierarchy of all of those datasets locally which
 also takes a good chunk of your filesystem meta-data storage.  Instead of
-fetching all datasets at once you could either specify specific dataset to
+fetching all datasets at once, you could either specify specific dataset to
 be installed, e.g.
 
     datalad install ///openfmri/ds000113
@@ -69,7 +69,7 @@ possibly with `-r` to install their sub-datasets as well, e.g.
     cd datasets.datalad.org
     datalad install -r openfmri/ds000001 indi/fcon1000
 
-You can navigate datasets you have installed in your terminal or browser,
+You can navigate datasets you have installed in your terminal or browser
 while fetching necessary files or installing new sub-datasets using the
 `datalad get [FILE|DIR]` command.  DataLad will take care about
 downloading, extracting, and possibly authenticating (would ask you for
@@ -79,7 +79,7 @@ and git-annex underneath, you can be assured that you are getting **exact**
 correct version of the data.
 
 Use-cases DataLad covers are not limited to "consumption" of data.
-DataLad aims also to help publishing original or derived data, thus facilitating
+DataLad also aims to help publishing original or derived data, thus facilitating
 more efficient data management when collaborating or simply sharing your data.
 You can find more documentation at http://docs.datalad.org .
 
@@ -93,8 +93,8 @@ contributing to the project.
 
 ## Debian-based systems
 
-On Debian-based systems we recommend to enable [NeuroDebian]
-from which we provide recent releases of DataLad.  datalad package recommends
+On Debian-based systems, we recommend to enable [NeuroDebian]
+from which we provide recent releases of DataLad.  Datalad package recommends
 some relatively heavy packages (e.g. scrapy) which are useful only if you are
 interested in using `crawl` functionality.  If you need just the base
 functionality of the datalad, install without recommended packages
@@ -114,14 +114,14 @@ are available, so you could provide enhanced installation via
 - `full`
      to install all dependencies.
 
-For installation through `pip` you would need some external dependencies
+For installation through `pip`, you will need some external dependencies
 not shipped from it (e.g. `git-annex`, etc.) for which please refer to
 the next section.
 
 ## Dependencies
 
 Our [setup.py] and accompanying packaging describe all necessary dependencies.
-On Debian-based systems we recommend to enable [NeuroDebian]
+On Debian-based systems we recommend to enable [NeuroDebian],
 since we use it to provide backports of recent fixed external modules we
 depend upon, and up-to-date [Git-annex] is necessary for proper operation of
 DataLad packaged (install `git-annex-standalone` from NeuroDebian repository).

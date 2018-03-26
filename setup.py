@@ -63,6 +63,7 @@ requires = {
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
+        'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
@@ -104,9 +105,7 @@ requires = {
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'pydicom',  # DICOM metadata
-        # ATM we need an unreleased version of pybids, added to requirements-devel.txt
-        # TODO revert
-        #'pybids',  # BIDS metadata
+        'pybids>=0.5.1',  # BIDS metadata
         'Pillow',  # generic image metadata
         'nibabel',  # NIfTI metadata
         'pandas',  # bids2scidata export

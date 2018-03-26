@@ -18,6 +18,7 @@ from os.path import exists
 
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
+from datalad.coreapi import subdatasets
 # use main version as core version
 # this must stay, despite being a seemingly unused import, each extractor defines a version
 from datalad.metadata.definitions import version as vocabulary_version
@@ -41,6 +42,28 @@ class MetadataExtractor(BaseMetadataExtractor):
             obj['@context'] = obj['definition']
             del obj['definition']
         obj['@id'] = self.ds.id
+        subdsinfo = [{
+            # this version would change anytime we aggregate metadata, let's not
+            # do this for now
+            #'version': sds['revision'],
+            'type': sds['type'],
+            'name': sds['gitmodule_name'],
+        }
+            for sds in subdatasets(
+                dataset=self.ds,
+                recursive=False,
+                return_type='generator',
+                result_renderer='disabled')
+        ]
+        if subdsinfo:
+            obj['haspart'] = subdsinfo
+        superds = self.ds.get_superdataset(registered_only=True, topmost=False)
+        if superds:
+            obj['ispartof'] = {
+                '@id': superds.id,
+                'type': 'dataset',
+            }
+
         return obj
 
     def _get_content_metadata(self):
@@ -58,15 +81,21 @@ class MetadataExtractor(BaseMetadataExtractor):
                 # about a file
                 yield (p, dict())
             return
-
         valid_paths = None
         if self.paths and sum(len(i) for i in self.paths) > 500000:
             valid_paths = set(self.paths)
-        for file, meta in self.ds.repo.get_metadata(
-                self.paths if self.paths and valid_paths is None else '.'):
+        # Availability information
+        for file, whereis in self.ds.repo.whereis(
+                self.paths if self.paths and valid_paths is None else '.',
+                output='full').items():
             if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
-            meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
-                    for k, v in meta.items()}
+            # pull out proper (public) URLs
+            # TODO possibly extend with special remote info later on
+            meta = {'url': whereis[remote].get('urls', [])
+                    for remote in whereis
+                    # "web" remote
+                    if remote == "00000000-0000-0000-0000-000000000001" and
+                    whereis[remote].get('urls', None)}
             yield (file, meta)

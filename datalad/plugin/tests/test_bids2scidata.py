@@ -101,16 +101,14 @@ def test_minimal(path):
     ok_clean_git(ds.path)
     # do conversion
     # where output should appear by default
-    target_path = opj(path, 'scidata_isatab_{}'.format(ds.repo.get_hexsha()))
     with chpwd(path):
-        assert_status(
-            'ok',
-            ds.bids2scidata(
-                repo_name="dummy",
-                repo_accession='ds1',
-                repo_url='http://example.com',
-            )
+        res = ds.bids2scidata(
+            repo_name="dummy",
+            repo_accession='ds1',
+            repo_url='http://example.com',
         )
+        assert_status('ok', res)
+        target_path = res[0]['path']
     # just a few basic sanity tests that info ends up in the right places
     # a proper test should be a full regression test on a real dataset
     # with hand-validated exported metadata
@@ -126,9 +124,9 @@ def test_minimal(path):
     # study table
     assert_equal(
         """\
-Source Name\tCharacteristics[organism]\tCharacteristics[organism part]\tProtocol REF\tSample Name\tCharacteristics[sex]\tCharacteristics[age at scan]\tCharacteristics[handedness]
-01\thomo sapiens\tbrain\tParticipant recruitment\t01\tm\t30\tr
-15\thomo sapiens\tbrain\tParticipant recruitment\t15\tf\t35\tl
+Source Name\tCharacteristics[organism]\tCharacteristics[organism part]\tProtocol REF\tSample Name\tCharacteristics[age at scan]\tCharacteristics[handedness]\tCharacteristics[sex]
+01\thomo sapiens\tbrain\tParticipant recruitment\t01\t30\tr\tmale
+15\thomo sapiens\tbrain\tParticipant recruitment\t15\t35\tl\tfemale
 """,
         open(opj(target_path, 's_study.txt')).read())
 
@@ -136,14 +134,14 @@ Source Name\tCharacteristics[organism]\tCharacteristics[organism part]\tProtocol
     assert_equal(
         """\
 Sample Name\tProtocol REF\tParameter Value[modality]\tAssay Name\tRaw Data File\tComment[Data Repository]\tComment[Data Record Accession]\tComment[Data Record URI]\tFactor Value[task]
-sub-15\tMagnetic Resonance Imaging\tbold\tsub-15_task-nix_run-1\tsub-15/func/sub-15_task-nix_run-1_bold.nii.gz\tdummy\tds1\thttp://example.com\tnix
+15\tMagnetic Resonance Imaging\tbold\tsub-15_task-nix_run-1\tsub-15/func/sub-15_task-nix_run-1_bold.nii.gz\tdummy\tds1\thttp://example.com\tnix
 """,
         open(opj(target_path, 'a_mri_bold.txt')).read())
 
     assert_equal(
         """\
 Sample Name\tProtocol REF\tParameter Value[modality]\tAssay Name\tRaw Data File\tComment[Data Repository]\tComment[Data Record Accession]\tComment[Data Record URI]
-sub-01\tMagnetic Resonance Imaging\tT1w\tsub-01\tsub-01/anat/sub-01_T1w.nii.gz\tdummy\tds1\thttp://example.com
+01\tMagnetic Resonance Imaging\tT1w\tsub-01\tsub-01/anat/sub-01_T1w.nii.gz\tdummy\tds1\thttp://example.com
 """,
         open(opj(target_path, 'a_mri_t1w.txt')).read())
 

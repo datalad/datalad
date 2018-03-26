@@ -11,6 +11,7 @@
 """
 
 import logging
+import random
 import uuid
 
 from os import listdir
@@ -18,6 +19,7 @@ from os.path import isdir
 from os.path import join as opj
 
 from datalad import cfg
+from datalad import _seed
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.utils import eval_results
@@ -350,9 +352,16 @@ class Create(Interface):
         if id_var in tbds.config:
             # make sure we reset this variable completely, in case of a re-create
             tbds.config.unset(id_var, where='dataset')
+
+        if _seed is None:
+            # just the standard way
+            uuid_id = uuid.uuid1().urn.split(':')[-1]
+        else:
+            # Let's generate preseeded ones
+            uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
         tbds.config.add(
             id_var,
-            tbds.id if tbds.id is not None else uuid.uuid1().urn.split(':')[-1],
+            tbds.id if tbds.id is not None else uuid_id,
             where='dataset')
 
         # make sure that v6 annex repos never commit content under .datalad

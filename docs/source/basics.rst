@@ -22,6 +22,9 @@ A DataLad :term:`dataset` is a Git repository that may or may not have a data
 :term:`annex` that is used to manage data referenced in a dataset. In practice,
 most DataLad datasets will come with an annex.
 
+Dataset nesting
+---------------
+
 Datasets can contain other datasets (:term:`subdataset`\s), which can in turn
 contain subdatasets, and so on. There is no limit to the depth of nesting
 datasets. Each dataset in such a hierarchy has its own annex and its own
@@ -30,7 +33,15 @@ subdataset, and information on where it can be obtained. This is a powerful yet
 lightweight mechanism for combining multiple individual datasets for a specific
 purpose, such as the combination of source code repositories with other
 resources for a tailored application. In many cases DataLad can work with a
-hierarchy of datasets just as if it were a single dataset.
+hierarchy of datasets just as if it were a single dataset. Here is a demo:
+
+.. include:: basics_nesteddatasets.rst.in
+   :start-after: Let's create a dataset
+   :end-before:  ___________________________
+
+
+Dataset collections
+-------------------
 
 A superdataset can also be seen as a curated collection of datasets, for example,
 for a certain data modality, a field of science, a certain author, or from
@@ -54,6 +65,13 @@ datasets in a hierarchy of (sub)datasets need not be stored at the same location
 Continuing with an earlier example, it is possible to post a curated
 collection of datasets, as a superdataset, on Github, while the actual datasets
 live on different servers all around the world.
+
+Basic command line usage
+========================
+
+.. include:: basics_cmdline.rst.in
+   :end-before:  ___________________________
+
 
 API principles
 ==============
