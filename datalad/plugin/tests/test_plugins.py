@@ -106,7 +106,9 @@ def test_wtf(path):
         assert_not_in('Dataset information', cmo.out)
         assert_in('Configuration', cmo.out)
         # we fake those for tests anyways, and explicitly not showing them
-        assert_in('user.name: %s' % _HIDDEN, cmo.out)
+        # assert_in('user.name: %s' % _HIDDEN, cmo.out)
+        # Those sections get sensored out by default now
+        assert_not_in('user.name: ', cmo.out)
     with chpwd(path):
         with swallow_outputs() as cmo:
             wtf()
@@ -120,11 +122,11 @@ def test_wtf(path):
         assert_in('Dataset information', cmo.out)
         assert_in('path: {}'.format(ds.path), cmo.out)
 
-    # and if we run with no_sensitive
+    # and if we run with all sensitive
     with swallow_outputs() as cmo:
-        wtf(dataset=ds.path, exclude_sensitive=True)
-        assert_in(_HIDDEN, cmo.out)
-        assert_not_in('user.name:', cmo.out)
+        wtf(dataset=ds.path, sensitive=True)
+        assert_not_in(_HIDDEN, cmo.out)
+        assert_in('user.name:', cmo.out)
 
     skip_if_no_module('pyperclip')
     with swallow_outputs() as cmo:
@@ -136,7 +138,9 @@ def test_wtf(path):
             raise SkipTest(exc_str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
-        assert_in('user.name', pyperclip.paste())
+        assert_not_in('user.name', pyperclip.paste())
+        assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
+        assert_in("cmd:annex=", pyperclip.paste())  # but the content is there
 
 
 @with_tempfile(mkdir=True)
