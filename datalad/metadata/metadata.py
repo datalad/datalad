@@ -562,12 +562,13 @@ def _unique_value_key(x):
     if isinstance(x, ReadOnlyDict):
         # turn into an item tuple with keys sorted and values plain
         # or as a hash if *dicts
-        return [(k,
-                 hash(x[k])
-                 if isinstance(x[k], ReadOnlyDict) else x[k])
-                for k in sorted(x)]
-    else:
-        return x
+        x = [(k,
+              hash(x[k])
+              if isinstance(x[k], ReadOnlyDict) else x[k])
+             for k in sorted(x)]
+    # we need to force str, because sorted in PY3 refuses to compare
+    # any heterogeneous type combinations, such as str/int, tuple(int)/tuple(str)
+    return str(x)
 
 
 def _val2hashable(val):
