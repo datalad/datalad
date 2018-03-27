@@ -20,9 +20,11 @@ from mock import patch
 
 from datalad.coreapi import create
 from datalad.coreapi import Dataset
+from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
 from datalad import cfg
+from datalad.plugin.wtf import _HIDDEN
 
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
@@ -36,7 +38,8 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if, skip_if_no_module
+from datalad.tests.utils import SkipTest
 
 try:
     import datalad.metadata.extractors.bids as has_bids_extractor
@@ -102,6 +105,8 @@ def test_wtf(path):
         wtf(dataset=path)
         assert_not_in('Dataset information', cmo.out)
         assert_in('Configuration', cmo.out)
+        # Those sections get sensored out by default now
+        assert_not_in('user.name: ', cmo.out)
     with chpwd(path):
         with swallow_outputs() as cmo:
             wtf()
@@ -114,6 +119,33 @@ def test_wtf(path):
         assert_in('Configuration', cmo.out)
         assert_in('Dataset information', cmo.out)
         assert_in('path: {}'.format(ds.path), cmo.out)
+
+    # and if we run with all sensitive
+    for sensitive in ('some', True):
+        with swallow_outputs() as cmo:
+            wtf(dataset=ds.path, sensitive=sensitive)
+            # we fake those for tests anyways, but we do show cfg in this mode
+            # and explicitly not showing them
+            assert_in('user.name: %s' % _HIDDEN, cmo.out)
+
+    with swallow_outputs() as cmo:
+        wtf(dataset=ds.path, sensitive='all')
+        assert_not_in(_HIDDEN, cmo.out)  # all is shown
+        assert_in('user.name: ', cmo.out)
+
+    skip_if_no_module('pyperclip')
+    with swallow_outputs() as cmo:
+        import pyperclip
+        try:
+            wtf(dataset=ds.path, clipboard=True)
+        except (AttributeError, pyperclip.PyperclipException) as exc:
+            # AttributeError could come from pyperclip if no DISPLAY
+            raise SkipTest(exc_str(exc))
+        assert_in("WTF information of length", cmo.out)
+        assert_not_in('user.name', cmo.out)
+        assert_not_in('user.name', pyperclip.paste())
+        assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
+        assert_in("cmd:annex=", pyperclip.paste())  # but the content is there
 
 
 @with_tempfile(mkdir=True)

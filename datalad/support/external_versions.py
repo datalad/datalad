@@ -44,6 +44,10 @@ class UnknownVersion:
 #
 from datalad.cmd import Runner
 from datalad.cmd import GitRunner
+from datalad.support.exceptions import (
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
 _runner = Runner()
 _git_runner = GitRunner()
 
@@ -115,14 +119,23 @@ class ExternalVersions(object):
     }
     INTERESTING = (
         'appdirs',
+        'bids',
         'boto',
-        'iso8601',
-        'git', 'gitdb',
+        'dicom',
+        'exifread',
+        'git',
+        'gitdb',
         'humanize',
+        'iso8601',
         'msgpack',
+        'mutagen',
+        'nibabel',
+        'nidm',
         'patool',
+        'pydicom',
         'requests',
-        'scrapy', 'six',
+        'scrapy',
+        'six',
         'wrapt',
     )
 
@@ -250,6 +263,33 @@ class ExternalVersions(object):
         else:
             out += " " + ' '.join(items)
         return out
+
+    def check(self, name, min_version=None, msg=""):
+        """Check if an external (optionally of specified min version) present
+
+        Parameters
+        ----------
+        name: str
+          Name of the external (typically a Python module)
+        min_version: str or version, optional
+          Minimal version to satisfy
+        msg: str, optional
+          An additional message to include into the exception message
+
+        Raises
+        ------
+        MissingExternalDependency
+          if the external is completely missing
+        OutdatedExternalDependency
+          if the external is present but does not satisfy the min_version
+        """
+        ver_present = self[name]
+        if ver_present is None:
+            raise MissingExternalDependency(
+                name, ver=min_version, msg=msg)
+        elif min_version and ver_present < min_version:
+            raise OutdatedExternalDependency(
+                name, ver=min_version, ver_present=ver_present, msg=msg)
 
 
 external_versions = ExternalVersions()

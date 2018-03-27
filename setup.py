@@ -84,6 +84,9 @@ requires = {
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
     ],
+    'misc': [
+        'pyperclip',         # clipboard manipulations
+    ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.8.14',
