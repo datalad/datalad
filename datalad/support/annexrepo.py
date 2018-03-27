@@ -3206,6 +3206,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         if recursive:
             args.append('--force')
 
+        # Make sure that batch add/addurl operations are closed so that we can
+        # operate on files that were just added.
+        self.precommit()
+
         for jsn in self._run_annex_command_json(
                 'metadata',
                 args,
