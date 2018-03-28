@@ -66,19 +66,19 @@ def test_formatter_no_mapping_arg():
 
 def test_formatter_placeholder_with_spaces():
     fmt = au.Formatter({})
-    fmt.format("{with spaces}", {"with spaces": "value0"}) == "value0"
+    eq_(fmt.format("{with spaces}", {"with spaces": "value0"}), "value0")
 
 
 def test_formatter_placeholder_nonpermitted_chars():
     fmt = au.Formatter({})
 
     # Can't assess keys with !, which will be interpreted as a conversion flag.
-    fmt.format("{key!r}", {"key!r": "value0"}, key="x") == "x"
+    eq_(fmt.format("{key!r}", {"key!r": "value0"}, key="x"), "'x'")
     assert_raises(KeyError,
                   fmt.format, "{key!r}", {"key!r": "value0"})
 
     # Same for ":".
-    fmt.format("{key:<5}", {"key:<5": "value0"}, key="x") == "x    "
+    eq_(fmt.format("{key:<5}", {"key:<5": "value0"}, key="x"), "x    ")
     assert_raises(KeyError,
                   fmt.format, "{key:<5}", {"key:<5": "value0"})
 
