@@ -25,7 +25,26 @@ def _load_plugins():
         globals()[camel.sub('\\1_\\2', pi.__name__).lower()] = pi.__call__
 
 
+def _generate_modules_api():
+    """Auto detect all available modules and generate an API from them
+    """
+    from importlib import import_module
+    from pkg_resources import iter_entry_points
+    from .interface.base import get_api_name
+
+    for entry_point in iter_entry_points('datalad.modules'):
+        grp_descr, interfaces = entry_point.load()
+        for intfspec in interfaces:
+            # turn the interface spec into an instance
+            mod = import_module(intfspec[0])
+            intf = getattr(mod, intfspec[1])
+            api_name = get_api_name(intfspec)
+            globals()[api_name] = intf.__call__
+
+
+_generate_modules_api()
 _load_plugins()
 
 # Be nice and clean up the namespace properly
 del _load_plugins
+del _generate_modules_api

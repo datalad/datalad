@@ -24,6 +24,8 @@ import os
 
 from six import text_type
 
+from pkg_resources import iter_entry_points
+
 import datalad
 
 from datalad.cmdline import helpers
@@ -201,6 +203,9 @@ def setup_parser(
     cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
+    for ep in iter_entry_points('datalad.modules'):
+        spec = ep.load()
+        interface_groups.append((ep.name, spec[0], spec[1]))
     interface_groups.append(('plugins', 'Plugins', _get_plugins()))
 
     for grp_name, grp_descr, _interfaces \
