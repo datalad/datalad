@@ -21,7 +21,7 @@ from datalad.utils import chpwd
 from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import DeprecatedError
+from datalad.support.exceptions import DeprecatedError, IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
 from datalad.tests.utils import assert_raises
@@ -259,6 +259,20 @@ def test_recursive_save(path):
     # super should get it saved too
     assert_equal(next(ds.repo.get_branch_commits('master')).message.rstrip(),
                  'saving sub')
+
+
+@with_tempfile()
+def test_save_message_file(path):
+    ds = Dataset(path).create()
+    with assert_raises(IncompleteResultsError):
+        ds.save("blah", message="me", message_file="and me")
+
+    create_tree(path, {"foo": "x",
+                       "msg": "add foo"})
+    ds.add("foo", save=False)
+    ds.save(message_file=opj(ds.path, "msg"))
+    assert_equal(ds.repo.repo.git.show("--format=%s", "--no-patch"),
+                 "add foo")
 
 
 def test_renamed_file():
