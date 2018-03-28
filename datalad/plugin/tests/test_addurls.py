@@ -252,7 +252,7 @@ def test_extract():
 
 
 def test_extract_disable_autometa():
-    info, subpaths = au.extract(
+    info, _ = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -265,7 +265,7 @@ def test_extract_disable_autometa():
 
 
 def test_extract_exclude_autometa_regexp():
-    info, subpaths = au.extract(
+    info, _ = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -506,12 +506,12 @@ class TestAddurls(object):
         # Force failure by passing a non-existent file name to annex.
         fn = ds.repo.set_metadata
 
-        def set_meta(files, **kwargs):
+        def set_meta(_, **kwargs):
             for i in fn("wreaking-havoc-and-such", **kwargs):
                 yield i
 
         with chpwd(path), patch.object(ds.repo, 'set_metadata', set_meta):
-            with assert_raises(IncompleteResultsError) as raised:
+            with assert_raises(IncompleteResultsError):
                 ds.addurls(self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
