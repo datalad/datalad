@@ -13,15 +13,18 @@ from collections import defaultdict, Mapping
 from functools import partial
 from itertools import dropwhile
 import logging
-from mock import patch
 import os
 import re
 import string
+
+from mock import patch
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
+from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.interface.common_opts import nosave_opt
 from datalad.support import ansi_colors
@@ -33,9 +36,6 @@ from datalad.utils import assure_list, optional_args
 lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
-
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
 
 
 class Formatter(string.Formatter):
@@ -760,15 +760,11 @@ class Addurls(Interface):
         # Temporarily work around gh-2269.
         url_file, url_format, filename_format = urlfile, urlformat, filenameformat
 
-        import logging
-        import os
-
         from requests.exceptions import RequestException
 
         from datalad.distribution.add import Add
         from datalad.distribution.create import Create
         from datalad.distribution.dataset import Dataset, require_dataset
-        from datalad.dochelpers import exc_str
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
 

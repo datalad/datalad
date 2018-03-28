@@ -11,9 +11,10 @@
 
 import json
 import logging
-from mock import patch
 import os
 import tempfile
+
+from mock import patch
 
 from six.moves import StringIO
 
@@ -25,7 +26,7 @@ from datalad.tests.utils import assert_false, assert_true, assert_raises
 from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_, ok_exists
-from datalad.tests.utils import create_tree, with_tree, with_tempfile, HTTPPath
+from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
