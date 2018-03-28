@@ -13,6 +13,7 @@ from collections import defaultdict, Mapping
 from functools import partial
 from itertools import dropwhile
 import logging
+from mock import patch
 import os
 import re
 import string
@@ -570,9 +571,7 @@ def add_meta(rows):
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
 
-        old_always_commit = ds.repo.always_commit
-        ds.repo.always_commit = False
-        try:
+        with patch.object(ds.repo, "always_commit", False):
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
             for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
@@ -580,8 +579,6 @@ def add_meta(rows):
                 # could quickly flood the output.
                 del res["message"]
                 yield res
-        finally:
-            ds.repo.always_commit = old_always_commit
 
 
 @build_doc
