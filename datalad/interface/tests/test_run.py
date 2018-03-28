@@ -47,7 +47,6 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
-from datalad.tests.utils import swallow_logs
 
 
 @with_tempfile(mkdir=True)
