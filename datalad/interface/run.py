@@ -194,7 +194,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
 
     lgr.info("== Command exit (modification check follows) =====")
 
-    # ammend commit message with `run` info:
+    # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
     # - exit code of the command
