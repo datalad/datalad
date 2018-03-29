@@ -352,6 +352,16 @@ def check_git_configured():
             "verify that git is configured: %s.  Some operations might fail or "
             "not perform correctly." % exc_
         )
+        from datalad import ui
+        if ui.is_interactive():
+            # we can try
+            if ui.ui.yesno("Would you like to configure git now?", default='yes'):
+                from datalad.api import configure
+                configure()
+        else:
+            lgr.warning(
+                "Run 'datalad configure' to assist you with initial "
+                "configuration")
     return vals
 
 
