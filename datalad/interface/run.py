@@ -133,21 +133,16 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
 
     # delayed imports
     from datalad.cmd import Runner
-    from datalad.tests.utils import ok_clean_git
 
     lgr.debug('tracking command output underneath %s', ds)
-    if not rerun_info:  # Rerun already takes care of this.
-        try:
-            # base assumption is that the animal smells superb
-            ok_clean_git(ds.path)
-        except AssertionError:
-            yield get_status_dict(
-                'run',
-                ds=ds,
-                status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
-            return
+    if not rerun_info and ds.repo.dirty:  # Rerun already takes care of this.
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=('unsaved modifications present, '
+                     'cannot detect changes by command'))
+        return
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd

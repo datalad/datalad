@@ -144,10 +144,7 @@ class Rerun(Interface):
 
         lgr.debug('rerunning command output underneath %s', ds)
 
-        from datalad.tests.utils import ok_clean_git
-        try:
-            ok_clean_git(ds.path)
-        except AssertionError:
+        if ds.repo.dirty:
             yield get_status_dict(
                 'run',
                 ds=ds,
