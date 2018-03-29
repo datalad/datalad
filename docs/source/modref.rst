@@ -29,7 +29,6 @@ Dataset operations
    api.create_sibling
    api.create_sibling_github
    api.drop
-   api.plugin
    api.get
    api.install
    api.publish
@@ -92,7 +91,11 @@ with DataLad.
    :toctree: generated
 
    add_readme
+   addurls
+   bids2scidata
    export_archive
+   export_to_figshare
+   extract_metadata
    no_annex
    wtf
 

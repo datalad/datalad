@@ -23,6 +23,7 @@ from ..dochelpers import exc_str
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
+from ..support.locking import lock_if_check_fails
 from ..utils import getpwd
 from ..utils import unique
 from .base import AnnexCustomRemote
@@ -324,7 +325,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # prune the list so we keep only the ones from unique akeys.
         # May be whenever we support extraction directly from the tarballs
         # we should go through all and choose the one easiest to get or smth.
-        from humanize import naturalsize
         for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
             if not akey:
                 lgr.warning("Got an empty archive key %r for key %s. Skipping",
@@ -332,35 +332,21 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 continue
             akeys_tried.append(akey)
             try:
-                akey_fpath = self.get_contentlocation(akey)
+                with lock_if_check_fails(
+                    check=(self.get_contentlocation, (akey,)),
+                    lock_path=(lambda k: opj(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
+                    operation="annex-get"
+                ) as (akey_fpath, lock):
+                    if lock:
+                        assert not akey_fpath
+                        self._annex_get_archive_by_key(akey)
+                        akey_fpath = self.get_contentlocation(akey)
+
                 if not akey_fpath:
-                    # TODO: make it more stringent?
-                    # Command could have fail to run if key was not present locally yet
-                    # Thus retrieve the key using annex
-                    # TODO: we need to report user somehow about this happening and progress on the download
-                    akey_size = self.repo.get_size_from_key(akey)
-                    self.info(
-                        "To obtain some keys we need to fetch an archive "
-                        "of size %s"
-                        % (naturalsize(akey_size) if akey_size else "unknown")
-                    )
-
-                    def progress_indicators(l):
-                        self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
-
-                    self.runner(["git-annex", "get",
-                                 "--json", "--json-progress",
-                                 "--key", akey
-                                 ],
-                                log_stdout=progress_indicators,
-                                log_stderr='offline',
-                                # False, # to avoid lock down
-                                log_online=True,
-                                cwd=self.path, expect_stderr=True)
-
-                    akey_fpath = self.get_contentlocation(akey)
-                    if not akey_fpath:
-                        raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+                    raise RuntimeError(
+                        "We were reported to fetch it alright but now can't "
+                        "get its location.  Check logic"
+                )
 
                 akey_path = opj(self.repo.path, akey_fpath)
                 assert exists(akey_path), "Key file %s is not present" % akey_path
@@ -387,6 +373,33 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             "Failed to fetch any archive containing {key}. "
             "Tried: {akeys_tried}".format(**locals())
         )
+
+    def _annex_get_archive_by_key(self, akey):
+        # TODO: make it more stringent?
+        # Command could have fail to run if key was not present locally yet
+        # Thus retrieve the key using annex
+        # TODO: we need to report user somehow about this happening and
+        # progress on the download
+        from humanize import naturalsize
+        akey_size = self.repo.get_size_from_key(akey)
+        self.info(
+            "To obtain some keys we need to fetch an archive "
+            "of size %s"
+            % (naturalsize(akey_size) if akey_size else "unknown")
+        )
+
+        def progress_indicators(l):
+            self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
+
+        self.runner(["git-annex", "get",
+                     "--json", "--json-progress",
+                     "--key", akey
+                     ],
+                    log_stdout=progress_indicators,
+                    log_stderr='offline',
+                    # False, # to avoid lock down
+                    log_online=True,
+                    cwd=self.path, expect_stderr=True)
 
 
 def main():

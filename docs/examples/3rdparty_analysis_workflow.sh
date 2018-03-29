@@ -13,8 +13,8 @@ SERVER_URL=localhost:$(readlink -f "$(mktemp --tmpdir -u -d datalad_demo_testpub
 
 #% EXAMPLE START
 #
-# A typical data management workflow
-# **********************************
+# A typical collaborative data management workflow 
+# ************************************************
 
 # In this demo we will look at how datalad can be used in a rather common data
 # management workflow: A 3rd-party dataset is obtained to serve as input for an

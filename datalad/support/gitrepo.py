@@ -338,17 +338,20 @@ def check_git_configured():
 
     check_runner = GitRunner()
     vals = {}
+    exc_ = ""
     for c in 'user.name', 'user.email':
         try:
             v, err = check_runner.run(['git', 'config', c])
             vals[c] = v.rstrip('\n')
         except CommandError as exc:
-            lgr.debug("Failed to verify that git is configured: %s",
-                      exc_str(exc))
-            raise RuntimeError(
-                "You must configure git first (set both user.name and "
-                "user.email) before using DataLad."
-            )
+            exc_ += exc_str(exc)
+    if exc_:
+        lgr.warning(
+            "It is highly recommended to configure git first (set both "
+            "user.name and user.email) before using DataLad. Failed to "
+            "verify that git is configured: %s.  Some operations might fail or "
+            "not perform correctly." % exc_
+        )
     return vals
 
 
@@ -999,7 +1002,7 @@ class GitRepo(RepoInterface):
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None):
+               files=None, date=None):
         """Commit changes to git.
 
         Parameters
@@ -1016,12 +1019,16 @@ class GitRepo(RepoInterface):
           if True, don't care
         files: list of str, optional
           path(s) to commit
+        date: str, optional
+          Date in one of the formats git understands
         """
 
         self.precommit()
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
+
+        options = options or []
 
         if not msg:
             if options:
@@ -1030,6 +1037,8 @@ class GitRepo(RepoInterface):
             else:
                 options = ["--allow-empty-message"]
 
+        if date:
+            options += ["--date", date]
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation
         # of commit.
@@ -1172,18 +1181,30 @@ class GitRepo(RepoInterface):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def get_committed_date(self, branch=None):
-        """Get the date stamp of the last commit (in a branch). None if no commit"""
+    def get_commit_date(self, branch=None, date='authored'):
+        """Get the date stamp of the last commit (in a branch or head otherwise)
+
+        Parameters
+        ----------
+        date: {'authored', 'committed'}
+          Which date to return.  "authored" will be the date shown by "git show"
+          and the one possibly specified via --date to `git commit`
+
+        Returns
+        -------
+        int or None
+          None if no commit
+        """
         try:
-            commit = next(
-                self.get_branch_commits(branch
-                                        or self.get_active_branch())
-            )
+            if branch:
+                commit = next(self.get_branch_commits(branch))
+            else:
+                commit = self.repo.head.commit
         except Exception as exc:
             lgr.debug("Got exception while trying to get last commit: %s",
                       exc_str(exc))
             return None
-        return commit.committed_date
+        return getattr(commit, "%s_date" % date)
 
     def get_active_branch(self):
         try:
@@ -2153,7 +2174,7 @@ class GitRepo(RepoInterface):
         else:
             return tags
 
-    def describe(self, **kwargs):
+    def describe(self, commitish=None, **kwargs):
         """ Quick and dirty implementation to call git-describe
 
         Parameters:
@@ -2164,10 +2185,13 @@ class GitRepo(RepoInterface):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
+        cmd = ['git', 'describe'] + to_options(**kwargs)
+        if commitish is not None:
+            cmd.append(commitish)
         try:
             describe, outerr = self._git_custom_command(
                 [],
-                ['git', 'describe'] + to_options(**kwargs),
+                cmd,
                 expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?

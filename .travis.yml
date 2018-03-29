@@ -34,7 +34,7 @@ env:
 matrix:
   include:
   # Additional custom ones
-  - python: 2.7
+  - python: 3.5
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - _DATALAD_UPSTREAM_GITPYTHON=1
@@ -42,7 +42,7 @@ matrix:
     - _DATALAD_NONPR_ONLY=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
-  - python: 2.7
+  - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
     - NOSE_SELECTION_OP=""
@@ -56,19 +56,18 @@ matrix:
     - TMPDIR="/var/tmp/sym link"
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
-  - python: 2.7
+  - python: 3.5
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
-    - DATALAD_API_ALWAYSRENDER=1
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
     - DATALAD_LOG_CMD_CWD=1
@@ -77,7 +76,14 @@ matrix:
     - DATALAD_LOG_CMD_STDIN=1
     - DATALAD_TESTS_UI_BACKEND=console
     - DATALAD_TESTS_OBSCURE_PREFIX=-
-  - python: 2.7
+    - DATALAD_SEED=1
+    - GIT_AUTHOR_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
+    - GIT_AUTHOR_NAME=blah
+    - GIT_AUTHOR_EMAIL=committer@example.com
+    - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
+    - GIT_COMMITTER_NAME=blah
+    - GIT_COMMITTER_EMAIL=committer@example.com
+  - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
@@ -85,18 +91,18 @@ matrix:
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     env:
     - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
@@ -104,36 +110,36 @@ matrix:
     # - TMPDIR="/tmp/sym ссылка"
     - TMPDIR="/tmp/sym link"
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     # apparently moving symlink outside has different effects on abspath
     # see  https://github.com/datalad/datalad/issues/878
     env:
     - TMPDIR="/var/tmp/sym link"
-  - python: 2.7
+  - python: 3.5
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
     # To make orthogonal test where it is not a symlink but a dir with spaces
     - TMPDIR="/tmp/d i r"
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     # Test under NFS mount  (only selected sub-set)
     env:
     - TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad/tests datalad/support"
-  - python: 2.7
+  - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
-  - python: 2.7
+  - python: 3.5
     # test whether known v6 failures still fail
     env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-  - python: 2.7
+  - python: 3.5
     # test whether known direct mode failures still fail
     env:
     - DATALAD_TESTS_SSH=1
@@ -141,13 +147,13 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
   # run if git-annex version in neurodebian -devel differs
-  - python: 2.7
+  - python: 3.5
     env:
     - _DATALAD_DEVEL_ANNEX=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
-  - python: 2.7
+  - python: 3.5
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DATALAD_NONPR_ONLY=1
@@ -164,7 +170,7 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
   # run if git-annex version in neurodebian -devel differs
-  - python: 2.7
+  - python: 3.5
     env:
     - _DATALAD_DEVEL_ANNEX=1
 
@@ -245,7 +251,7 @@ script:
   # Test installation system-wide
   - sudo pip install .
   # Report WTF information using system wide installed version
-  - datalad plugin wtf
+  - datalad wtf
 
 after_success:
   - coverage combine -a /tmp/.coverage-entrypoints-*

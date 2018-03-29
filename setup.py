@@ -63,6 +63,7 @@ requires = {
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
+        'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
@@ -70,7 +71,7 @@ requires = {
     ] + pbar_requires,
     'downloaders': [
         'boto',
-        'msgpack-python',
+        'msgpack',
         'requests>=1.2',
     ] + keyring_requires,
     'downloaders-extra': [
@@ -82,6 +83,9 @@ requires = {
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
+    ],
+    'misc': [
+        'pyperclip',         # clipboard manipulations
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -101,9 +105,7 @@ requires = {
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'pydicom',  # DICOM metadata
-        # ATM we need an unreleased version of pybids, added to requirements-devel.txt
-        # TODO revert
-        #'pybids',  # BIDS metadata
+        'pybids>=0.5.1',  # BIDS metadata
         'Pillow',  # generic image metadata
         'nibabel',  # NIfTI metadata
         'pandas',  # bids2scidata export
@@ -196,7 +198,7 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'dcm', 'jpg', 'gz', 'pdf'})
     },

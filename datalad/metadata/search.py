@@ -23,6 +23,8 @@ import sys
 from six import reraise
 from six import string_types
 from six import PY3
+from six import iteritems
+from time import time
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -100,21 +102,22 @@ def _listdict2dictlist(lst):
         if len(v)}
 
 
-def _meta2autofield_dict(meta, val2str=True, schema=None):
+def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
     """
-    # loop over all metadata sources and the report of their unique values
-    ucnprops = meta.get("datalad_unique_content_properties", {})
-    for src, umeta in ucnprops.items():
-        srcmeta = meta.get(src, {})
-        for uk in umeta:
-            if uk in srcmeta:
-                # we have a real entry for this key in the dataset metadata
-                # ignore any generated unique value list in favor of the
-                # tailored data
-                continue
-            srcmeta[uk] = _listdict2dictlist(umeta[uk])
+    if consider_ucn:
+        # loop over all metadata sources and the report of their unique values
+        ucnprops = meta.get("datalad_unique_content_properties", {})
+        for src, umeta in ucnprops.items():
+            srcmeta = meta.get(src, {})
+            for uk in umeta:
+                if uk in srcmeta:
+                    # we have a real entry for this key in the dataset metadata
+                    # ignore any generated unique value list in favor of the
+                    # tailored data
+                    continue
+                srcmeta[uk] = _listdict2dictlist(umeta[uk])
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
@@ -123,8 +126,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
         dct must be a dict
         """
         for k, v in dct.items():
-            if k.startswith('@') or k == 'datalad_unique_content_properties':
-                # ignore all JSON-LD specials
+            if (k != '@id' and k.startswith('@')) or k == 'datalad_unique_content_properties':
+                # ignore all JSON-LD specials, but @id
                 continue
             # TODO `k` might need remapping, if another key was already found
             # with the same definition
@@ -135,7 +138,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None):
                 # temp files during index staging, and trips over absent "directories"
                 # TODO maybe even kill parentheses
                 # TODO actually, it might be better to have an explicit whitelist
-                k.replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
+                k.lstrip('@').replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
             )
             if isinstance(v, list):
                 v = _listdict2dictlist(v)
@@ -335,8 +338,7 @@ class _WhooshSearch(_Search):
             return_type='list',
             result_renderer='disabled')
 
-        lgr.info('Processing metadata records for %i datasets', len(dsinfo))
-        self._mk_schema()
+        self._mk_schema(dsinfo)
 
         idx_obj = widx.create_in(index_dir, self.schema)
         idx = idx_obj.writer(
@@ -355,6 +357,10 @@ class _WhooshSearch(_Search):
         old_idx_size = 0
         old_ds_rpath = ''
         idx_size = 0
+        pbar = ui.get_progressbar(
+            label='Datasets',
+            unit='ds',
+            total=len(dsinfo))
         for res in query_aggregated_metadata(
                 reporton=self.documenttype,
                 ds=self.ds,
@@ -375,7 +381,7 @@ class _WhooshSearch(_Search):
                 admin['parentds'] = relpath(res['parentds'], start=self.ds.path)
             if admin['type'] == 'dataset':
                 if old_ds_rpath:
-                    lgr.info(
+                    lgr.debug(
                         'Added %s on dataset %s',
                         single_or_plural(
                             'document',
@@ -385,6 +391,8 @@ class _WhooshSearch(_Search):
                         old_ds_rpath)
                 old_idx_size = idx_size
                 old_ds_rpath = admin['path']
+                admin['id'] = res.get('dsid', None)
+                pbar.update(1, increment=True)
 
             doc.update({k: assure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
@@ -393,7 +401,7 @@ class _WhooshSearch(_Search):
             idx_size += 1
 
         if old_ds_rpath:
-            lgr.info(
+            lgr.debug(
                 'Added %s on dataset %s',
                 single_or_plural(
                     'document',
@@ -404,6 +412,8 @@ class _WhooshSearch(_Search):
 
         lgr.debug("Committing index")
         idx.commit(optimize=True)
+        pbar.finish()
+
 
         # "timestamp" the search index to allow for automatic invalidation
         with open(stamp_fname, 'w') as f:
@@ -488,7 +498,7 @@ class _BlobSearch(_WhooshSearch):
                 val2str=True,
                 schema=None).items()))
 
-    def _mk_schema(self):
+    def _mk_schema(self, dsinfo):
         from whoosh import fields as wf
         from whoosh.analysis import StandardAnalyzer
 
@@ -521,7 +531,7 @@ class _AutofieldSearch(_WhooshSearch):
     def _meta2doc(self, meta):
         return _meta2autofield_dict(meta, val2str=True, schema=self.schema)
 
-    def _mk_schema(self):
+    def _mk_schema(self, dsinfo):
         from whoosh import fields as wf
         from whoosh.analysis import StandardAnalyzer
         from whoosh.analysis import SimpleAnalyzer
@@ -543,8 +553,12 @@ class _AutofieldSearch(_WhooshSearch):
             n.lstrip('@'): wf.ID(stored=True, unique=n == '@id')
             for n in definitions}
 
-        lgr.info('Scanning for metadata keys')
+        lgr.debug('Scanning for metadata keys')
         # quick 1st pass over all dataset to gather the needed schema fields
+        pbar = ui.get_progressbar(
+            label='Datasets',
+            unit='ds',
+            total=len(dsinfo))
         for res in query_aggregated_metadata(
                 # XXX TODO After #2156 datasets may not necessarily carry all
                 # keys in the "unique" summary
@@ -560,6 +574,8 @@ class _AutofieldSearch(_WhooshSearch):
             for k in idxd:
                 schema_fields[k] = wf.TEXT(stored=False,
                                            analyzer=SimpleAnalyzer())
+            pbar.update(1, increment=True)
+        pbar.finish()
 
         self.schema = wf.Schema(**schema_fields)
 
@@ -583,8 +599,11 @@ class _EGrepSearch(_Search):
     _mode_label = 'egrep'
     _default_documenttype = 'datasets'
 
-    def __call__(self, query, max_nresults=None):
-        query = re.compile(self.get_query(query))
+    # If there were custom "per-search engine" options, we could expose
+    # --consider_ucn - search through unique content properties of the dataset
+    #    which might be more computationally demanding
+    def __call__(self, query, max_nresults=None, consider_ucn=False):
+        query_re = re.compile(self.get_query(query))
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -598,25 +617,26 @@ class _EGrepSearch(_Search):
             # and after a subsequent dataset report no files for the previous
             # dataset will be reported again
             meta = res.get('metadata', {})
-            # produce a big string blob that also includes the flattened metadata keys
-            # to search through
-            # sorted by keyname
-            doc = u'; '.join(
-                u': '.join((k, v))
-                for k, v in sorted(
-                    _meta2autofield_dict(meta, val2str=True).items(),
-                    key=lambda x: x[0]))
+            # produce a flattened metadata dict to search through
+            doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            match = query.search(doc, re.DOTALL | re.UNICODE)
-            if match:
+            lgr.log(7, "Querying %s among %d items", query_re, len(doc))
+            t0 = time()
+            matches = {k: query_re.search(v.lower())
+                       for k, v in iteritems(doc)}
+            dt = time() - t0
+            lgr.log(7, "Finished querying in %f sec", dt)
+            # retain what actually matched
+            matches = {k: match.group() for k, match in matches.items() if match}
+            if matches:
                 hit = dict(
                     res,
                     action='search',
-                    query_matched=match.group(),
+                    query_matched=matches,
                 )
                 yield hit
                 nhits += 1
@@ -655,8 +675,8 @@ class _EGrepSearch(_Search):
     def get_query(self, query):
         # cmdline args might come in as a list
         if isinstance(query, list):
-            query = r' '.join(query)
-        return query
+            query = u' '.join(query)
+        return query.lower()
 
 
 @build_doc

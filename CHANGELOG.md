@@ -59,8 +59,7 @@ A number of fixes did not make it into 0.9.x series:
   - extract_metadata
 - add_readme makes use of available metadata
 
-
-## 0.9.2 (??? ??, 2017) -- will be better than ever
+## 0.9.4 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -75,6 +74,89 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 ?
+
+
+## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
+
+Some important bug fixes which should improve usability
+
+### Fixes
+
+- `datalad-archives` special remote now will lock on acquiring or
+  extracting an archive - this allows for it to be used with -J flag
+  for parallel operation
+- relax introduced in 0.9.2 demand on git being configured for datalad
+  operation - now we will just issue a warning
+- `datalad ls` should now list "authored date" and work also for datasets
+  in detached HEAD mode
+- `datalad save` will now save original file as well, if file was
+  "git mv"ed, so you can now `datalad run git mv old new` and have
+  changes recorded
+
+### Enhancements and new features
+
+- `--jobs` argument now could take `auto` value which would decide on
+  # of jobs depending on the # of available CPUs.
+  `git-annex` > 6.20180314 is recommended to avoid regression with -J.
+- memoize calls to `RI` meta-constructor -- should speed up operation a
+  bit
+- `DATALAD_SEED` environment variable could be used to seed Python RNG
+  and provide reproducible UUIDs etc (useful for testing and demos)
+
+
+## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
+
+Largely a bugfix release with a few enhancements.
+
+### Fixes
+
+- Execution of external commands (git) should not get stuck when
+  lots of both stdout and stderr output, and should not loose remaining
+  output in some cases
+- Config overrides provided in the command line (-c) should now be
+  handled correctly
+- Consider more remotes (not just tracking one, which might be none)
+  while installing subdatasets
+- Compatibility with git 2.16 with some changed behaviors/annotations
+  for submodules
+- Fail `remove` if `annex drop` failed
+- Do not fail operating on files which start with dash (-)
+- URL unquote paths within S3, URLs and DataLad RIs (///)
+- In non-interactive mode fail if authentication/access fails
+- Web UI:
+  - refactored a little to fix incorrect listing of submodules in
+    subdirectories
+  - now auto-focuses on search edit box upon entering the page
+- Assure that extracted from tarballs directories have executable bit set
+
+### Enhancements and new features
+
+- A log message and progress bar will now inform if a tarball to be
+  downloaded while getting specific files
+  (requires git-annex > 6.20180206)
+- A dedicated `datalad rerun` command capable of rerunning entire
+  sequences of previously `run` commands.
+  **Reproducibility through VCS. Use `run` even if not interested in `rerun`**
+- Alert the user if `git` is not yet configured but git operations
+  are requested
+- Delay collection of previous ssh connections until it is actually
+  needed.  Also do not require ':' while specifying ssh host
+- AutomagicIO: Added proxying of isfile, lzma.LZMAFile and io.open
+- Testing:
+  - added DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org to
+    run tests against another website to not obscure access stats
+  - tests run against temporary HOME to avoid side-effects
+  - better unit-testing of interactions with special remotes
+- CONTRIBUTING.md describes how to setup and use `git-hub` tool to
+  "attach" commits to an issue making it into a PR
+- DATALAD_USE_DEFAULT_GIT env variable could be used to cause DataLad
+  to use default (not the one possibly bundled with git-annex) git
+- Be more robust while handling not supported requests by annex in
+  special remotes
+- Use of `swallow_logs` in the code was refactored away -- less
+  mysteries now, just increase logging level
+- `wtf` plugin will report more information about environment, externals
+  and the system
 
 
 # 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)

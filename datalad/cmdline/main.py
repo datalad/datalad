@@ -27,6 +27,8 @@ from six import text_type
 import datalad
 
 from datalad.cmdline import helpers
+from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
@@ -149,26 +151,26 @@ def setup_parser(
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
-    parser.add_argument(
-        '--run-before', dest='common_run_before',
-        nargs='+',
-        action='append',
-        metavar='PLUGINSPEC',
-        help="""DataLad plugin to run after the command. PLUGINSPEC is a list
-        comprised of a plugin name plus optional `key=value` pairs with arguments
-        for the plugin call (see `plugin` command documentation for details).
-        This option can be given more than once to run multiple plugins
-        in the order in which they were given.
-        For running plugins that require a --dataset argument it is important
-        to provide the respective dataset as the --dataset argument of the main
-        command, if it is not in the list of plugin arguments."""),
-    parser.add_argument(
-        '--run-after', dest='common_run_after',
-        nargs='+',
-        action='append',
-        metavar='PLUGINSPEC',
-        help="""Like --run-before, but plugins are executed after the main command
-        has finished."""),
+    #parser.add_argument(
+    #    '--run-before', dest='common_run_before',
+    #    nargs='+',
+    #    action='append',
+    #    metavar='PLUGINSPEC',
+    #    help="""DataLad plugin to run after the command. PLUGINSPEC is a list
+    #    comprised of a plugin name plus optional `key=value` pairs with arguments
+    #    for the plugin call (see `plugin` command documentation for details).
+    #    This option can be given more than once to run multiple plugins
+    #    in the order in which they were given.
+    #    For running plugins that require a --dataset argument it is important
+    #    to provide the respective dataset as the --dataset argument of the main
+    #    command, if it is not in the list of plugin arguments."""),
+    #parser.add_argument(
+    #    '--run-after', dest='common_run_after',
+    #    nargs='+',
+    #    action='append',
+    #    metavar='PLUGINSPEC',
+    #    help="""Like --run-before, but plugins are executed after the main command
+    #    has finished."""),
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
@@ -192,13 +194,15 @@ def setup_parser(
     #                         only warnings and errors are printed.""")
 
     # subparsers
-    subparsers = parser.add_subparsers()
+    subparsers = None
 
     # auto detect all available interfaces and generate a function-based
     # API from them
     cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
+    interface_groups.append(('plugins', 'Plugins', _get_plugins()))
+
     for grp_name, grp_descr, _interfaces \
                 in sorted(interface_groups, key=lambda x: x[1]):
         # for all subcommand modules it can find
@@ -216,28 +220,36 @@ def setup_parser(
                     '-h' in cmdlineargs or
                     '--help-np' in cmdlineargs):
                 continue
-            # turn the interface spec into an instance
-            lgr.log(5, "Importing module %s " % _intfspec[0])
-            try:
-                _mod = import_module(_intfspec[0], package='datalad')
-            except Exception as e:
-                lgr.error("Internal error, cannot import interface '%s': %s",
-                          _intfspec[0], exc_str(e))
-                continue
-            _intf = getattr(_mod, _intfspec[1])
+            if isinstance(_intfspec[1], dict):
+                # plugin
+                _intf = _load_plugin(_intfspec[1]['file'], fail=False)
+                if _intf is None:
+                    continue
+            else:
+                # turn the interface spec into an instance
+                lgr.log(5, "Importing module %s " % _intfspec[0])
+                try:
+                    _mod = import_module(_intfspec[0], package='datalad')
+                except Exception as e:
+                    lgr.error("Internal error, cannot import interface '%s': %s",
+                              _intfspec[0], exc_str(e))
+                    continue
+                _intf = getattr(_mod, _intfspec[1])
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
-                intf_doc = _intf.__doc__.strip()
+                intf_doc = '' if _intf.__doc__ is None else _intf.__doc__.strip()
                 if hasattr(_intf, '_docs_'):
                     # expand docs
                     intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
                     intf_doc)
             # create subparser, use module suffix as cmd name
+            if subparsers is None:
+                subparsers = parser.add_subparsers()
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')

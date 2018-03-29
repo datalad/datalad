@@ -20,7 +20,6 @@ Concepts and technologies
    usecases/index
    metadata
    customization
-   faq
    glossary
 
 Commands and API

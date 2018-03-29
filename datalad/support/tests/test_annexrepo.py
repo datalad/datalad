@@ -2118,6 +2118,17 @@ def test_AnnexRepo_metadata(path):
     eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
 
+@with_tree(tree={'file.txt': 'content'})
+@serve_path_via_http()
+@with_tempfile
+def test_AnnexRepo_addurl_batched_and_set_metadata(path, url, dest):
+    ar = AnnexRepo(dest, create=True)
+    fname = "file.txt"
+    ar.add_url_to_file(fname, urljoin(url, fname), batch=True)
+    list(ar.set_metadata(fname, init={"number": "one"}))
+    eq_(["one"], dict(ar.get_metadata(fname))[fname]["number"])
+
+
 @with_tempfile(mkdir=True)
 def test_change_description(path):
     # prelude

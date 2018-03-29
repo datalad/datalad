@@ -302,13 +302,13 @@ def test_rerun_branch(path):
 
     outfile = opj(path, "run-file")
 
-    with open(opj(path, "nonrun-file"), "w") as f:
-        f.write("foo")
-    ds.add("nonrun-file")
-
     ds.run('echo x$(cat run-file) > run-file')
     ds.rerun()
     eq_('xx\n', open(outfile).read())
+
+    with open(opj(path, "nonrun-file"), "w") as f:
+        f.write("foo")
+    ds.add("nonrun-file")
 
     # Rerun the commands on a new branch that starts at the parent
     # commit of the first run.
@@ -317,6 +317,10 @@ def test_rerun_branch(path):
     eq_(ds.repo.get_active_branch(), "rerun")
     eq_('xx\n', open(outfile).read())
 
+    # NOTE: This test depends on the non-run commit above following a run
+    # commit.  Otherwise, all the metadata (e.g., author date) aside from the
+    # parent commit that is used to generate the commit ID may be set when
+    # running the tests, which would result in two commits rather than three.
     for revrange in ["rerun..master", "master..rerun"]:
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 3)
@@ -405,7 +409,7 @@ def test_rerun_subdir(path):
     subdir = opj(path, 'subdir')
     mkdir(subdir)
     with chpwd(subdir):
-        run("python -c 'open(\"test.dat\", \"wb\").close()'")
+        run("touch test.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
     rec_msg, runinfo = get_commit_runinfo(ds.repo)
@@ -420,7 +424,7 @@ def test_rerun_subdir(path):
 
     # but if we run ds.run -- runs within top of the dataset
     with chpwd(subdir):
-        ds.run("python -c 'open(\"test2.dat\", \"wb\").close()'")
+        ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
     rec_msg, runinfo = get_commit_runinfo(ds.repo)

@@ -205,8 +205,7 @@ class Drop(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_drop,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # iterate over all datasets, order doesn't matter

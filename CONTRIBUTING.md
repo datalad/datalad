@@ -417,6 +417,10 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- *DATALAD_SEED*:
+  To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
+  those random values reproducible.  You might want also to set all the relevant git config variables
+  like we do in one of the travis runs
 - *DATALAD_TESTS_TEMP_KEEP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_TESTS_TEMP_DIR*: 
@@ -444,9 +448,6 @@ Refer datalad/config.py for information on how to add these environment variable
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.
-- *DATALAD_API_ALWAYSRENDER*: 
-  Would make api functions always use a version with cmdline output renderer
-  (i.e. the one with `_` suffix)
 - *DATALAD_CMD_PROTOCOL*: 
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
@@ -461,7 +462,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.9.3 (??? ??, 2017) -- will be better than ever
+## 0.9.5 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

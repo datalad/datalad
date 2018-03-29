@@ -16,7 +16,7 @@ from os.path import isabs
 import tarfile
 
 from datalad.api import Dataset
-from datalad.api import plugin
+from datalad.api import export_archive
 from datalad.utils import chpwd
 from datalad.utils import md5sum
 
@@ -38,28 +38,25 @@ _dataset_template = {
 
 @with_tree(_dataset_template)
 def test_failure(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True)
-    # unknown pluginer
-    assert_raises(ValueError, ds.plugin, 'nah')
     # non-existing dataset
-    assert_raises(ValueError, plugin, 'export_archive', Dataset('nowhere'))
+    assert_raises(ValueError, export_archive, Dataset('nowhere'))
 
 
 @with_tree(_dataset_template)
 def test_archive(path):
     ds = Dataset(opj(path, 'ds')).create(force=True)
     ds.add('.')
-    committed_date = ds.repo.get_committed_date()
+    committed_date = ds.repo.get_commit_date()
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
     with chpwd(path):
-        res = list(ds.plugin('export_archive'))
+        res = list(ds.export_archive())
         assert_status('ok', res)
         assert_result_count(res, 1)
         assert(isabs(res[0]['path']))
     assert_true(os.path.exists(default_outname))
     custom_outname = opj(path, 'myexport.tar.gz')
     # feed in without extension
-    ds.plugin('export_archive', filename=custom_outname[:-7])
+    ds.export_archive(filename=custom_outname[:-7])
     assert_true(os.path.exists(custom_outname))
     custom1_md5 = md5sum(custom_outname)
     # encodes the original archive filename -> different checksum, despit
@@ -67,7 +64,7 @@ def test_archive(path):
     assert_not_equal(md5sum(default_outname), custom1_md5)
     # should really sleep so if they stop using time.time - we know
     time.sleep(1.1)
-    ds.plugin('export_archive', filename=custom_outname)
+    ds.export_archive(filename=custom_outname)
     # should not encode mtime, so should be identical
     assert_equal(md5sum(custom_outname), custom1_md5)
 
@@ -97,8 +94,8 @@ def test_archive(path):
         # for it
         return
     ds.drop('file_up', check=False)
-    assert_raises(IOError, ds.plugin, 'export_archive', filename=opj(path, 'my'))
-    ds.plugin('export_archive', filename=opj(path, 'partial'), missing_content='ignore')
+    assert_raises(IOError, ds.export_archive, filename=opj(path, 'my'))
+    ds.export_archive(filename=opj(path, 'partial'), missing_content='ignore')
     assert_true(os.path.exists(opj(path, 'partial.tar.gz')))
 
 
@@ -107,9 +104,9 @@ def test_zip_archive(path):
     ds = Dataset(opj(path, 'ds')).create(force=True, no_annex=True)
     ds.add('.')
     with chpwd(path):
-        ds.plugin('export_archive', filename='my', archivetype='zip')
+        ds.export_archive(filename='my', archivetype='zip')
         assert_true(os.path.exists('my.zip'))
         custom1_md5 = md5sum('my.zip')
         time.sleep(1.1)
-        ds.plugin('export_archive', filename='my', archivetype='zip')
+        ds.export_archive(filename='my', archivetype='zip')
         assert_equal(md5sum('my.zip'), custom1_md5)

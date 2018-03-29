@@ -1219,37 +1219,64 @@ def test_get_git_attributes(path):
 
 
 @with_tempfile(mkdir=True)
-def test_check_git_configured(newhome):
-    try:
-        old = GitRepo._config_checked
-        GitRepo._config_checked = False
-        with patch.dict('os.environ', {'HOME': newhome}):
-            # clear clear home
-            assert_raises(RuntimeError, GitRepo, newhome, create=True)
-        # But then if we
-    finally:
-        GitRepo._config_checked = old
-
-
-@with_tempfile(mkdir=True)
 def test_get_tags(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
+    eq_(gr.describe(), None)
 
-    create_tree(gr.path, {'file': ""})
-    gr.add('file')
-    gr.commit(msg="msg")
-    eq_(gr.get_tags(), [])
+    # Explicitly override the committer date because tests may set it to a
+    # fixed value, but we want to check that the returned tags are sorted by
+    # the committer date.
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Thu, 07 Apr 2005 22:13:13 +0200"}):
+        create_tree(gr.path, {'file': ""})
+        gr.add('file')
+        gr.commit(msg="msg")
+        eq_(gr.get_tags(), [])
+        eq_(gr.describe(), None)
 
-    gr.tag("nonannotated")
-    tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
-    eq_(gr.get_tags(), tags1)
+        gr.tag("nonannotated")
+        tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
+        eq_(gr.get_tags(), tags1)
+        eq_(gr.describe(), None)
+        eq_(gr.describe(tags=True), tags1[0]['name'])
 
-    sleep(1)  # so timestamp changes -- we sort in incremental order
-    create_tree(gr.path, {'file': "123"})
-    gr.add('file')
-    gr.commit(msg="changed")
+    first_commit = gr.get_hexsha()
+
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Fri, 08 Apr 2005 22:13:13 +0200"}):
+
+        create_tree(gr.path, {'file': "123"})
+        gr.add('file')
+        gr.commit(msg="changed")
 
     gr.tag("annotated", message="annotation")
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
+    eq_(gr.describe(), tags2[1]['name'])
+
+    # compare prev commit
+    eq_(gr.describe(commitish=first_commit), None)
+    eq_(gr.describe(commitish=first_commit, tags=True), tags1[0]['name'])
+
+
+@with_tree(tree={'1': ""})
+def test_get_commit_date(path):
+    gr = GitRepo(path, create=True)
+    assert_equal(gr.get_commit_date(), None)
+
+    # Let's make a commit with a custom date
+    DATE = "Wed Mar 14 03:47:30 2018 -0000"
+    DATE_EPOCH = 1520999250
+    gr.add('1')
+    gr.commit("committed", date=DATE)
+    gr = GitRepo(path, create=True)
+    date = gr.get_commit_date()
+    neq_(date, None)
+    eq_(date, DATE_EPOCH)
+
+    eq_(date, gr.get_commit_date('master'))
+    # and even if we get into a detached head
+    gr.checkout(gr.get_hexsha())
+    eq_(gr.get_active_branch(), None)
+    eq_(date, gr.get_commit_date('master'))
