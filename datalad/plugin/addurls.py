@@ -17,10 +17,14 @@ import os
 import re
 import string
 
+from mock import patch
+
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
+from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.interface.common_opts import nosave_opt
 from datalad.support import ansi_colors
@@ -32,9 +36,6 @@ from datalad.utils import assure_list, optional_args
 lgr = logging.getLogger("datalad.plugin.addurls")
 
 __docformat__ = "restructuredtext"
-
-from datalad.interface.base import Interface
-from datalad.interface.base import build_doc
 
 
 class Formatter(string.Formatter):
@@ -309,7 +310,7 @@ def split_ext(filename):
 
     file_parts = parts[:1] + tail[::-1]
     ext_parts = parts[1+len(tail):]
-    return  ".".join(file_parts), "." + ".".join(ext_parts)
+    return ".".join(file_parts), "." + ".".join(ext_parts)
 
 
 def get_file_parts(filename, prefix="name"):
@@ -398,6 +399,7 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                         "{} does not contain a filename".format(url))
                 pbar.update(1, increment=True)
             pbar.finish()
+
 
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
             exclude_autometa=None, meta=None,
@@ -569,13 +571,15 @@ def add_meta(rows):
     """
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
-        lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-        for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
-            res = annexjson2result(a, ds, type="file", logger=lgr)
-            # Don't show all added metadata for the file because that
-            # could quickly flood the output.
-            del res["message"]
-            yield res
+
+        with patch.object(ds.repo, "always_commit", False):
+            lgr.debug("Adding metadata to %s in %s", filename, ds.path)
+            for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
+                res = annexjson2result(a, ds, type="file", logger=lgr)
+                # Don't show all added metadata for the file because that
+                # could quickly flood the output.
+                del res["message"]
+                yield res
 
 
 @build_doc
@@ -649,9 +653,10 @@ class Addurls(Interface):
 
     .. note::
 
-       For users familiar with 'git annex addurl': A large part of this plugin's
-       functionality can be viewed as transforming data from `URL-FILE` into a
-       "url filename" format that fed to 'git annex addurl --batch --with-files'.
+       For users familiar with 'git annex addurl': A large part of this
+       plugin's functionality can be viewed as transforming data from
+       `URL-FILE` into a "url filename" format that fed to 'git annex addurl
+       --batch --with-files'.
     """
 
     from datalad.distribution.dataset import datasetmethod
@@ -755,22 +760,18 @@ class Addurls(Interface):
                  message=None, dry_run=False, fast=False, ifexists=None,
                  missing_value=None, save=True):
         # Temporarily work around gh-2269.
-        url_file, url_format, filename_format = urlfile, urlformat, filenameformat
-
-        import logging
-        import os
+        url_file = urlfile
+        url_format, filename_format = urlformat, filenameformat
 
         from requests.exceptions import RequestException
 
         from datalad.distribution.add import Add
         from datalad.distribution.create import Create
         from datalad.distribution.dataset import Dataset, require_dataset
-        from datalad.dochelpers import exc_str
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
 
         lgr = logging.getLogger("datalad.plugin.addurls")
-
 
         dataset = require_dataset(dataset, check_installed=False)
         if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
@@ -811,7 +812,8 @@ class Addurls(Interface):
                 lgr.info("Would create a subdataset at %s", subpath)
             for row in rows:
                 lgr.info("Would download %s to %s",
-                         row["url"], os.path.join(dataset.path, row["filename"]))
+                         row["url"],
+                         os.path.join(dataset.path, row["filename"]))
                 lgr.info("Metadata: %s",
                          sorted(u"{}={}".format(k, v)
                                 for k, v in row["meta_args"].items()))
@@ -823,7 +825,8 @@ class Addurls(Interface):
 
         if not dataset.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None, return_type='generator', save=save):
+            for r in dataset.create(result_xfm=None, return_type='generator',
+                                    save=save):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -843,7 +846,8 @@ class Addurls(Interface):
             # operations.
             filename_abs = os.path.join(dataset.path, row["filename"])
             if row["subpath"]:
-                ds_current = Dataset(os.path.join(dataset.path, row["subpath"]))
+                ds_current = Dataset(os.path.join(dataset.path,
+                                                  row["subpath"]))
                 ds_filename = os.path.relpath(filename_abs, ds_current.path)
             else:
                 ds_current = dataset
@@ -866,12 +870,18 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, message=msg, save=save):
+            for r in dataset.add(files_to_add, save=False):
                 yield r
 
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
             for r in add_meta(meta_rows):
                 yield r
+
+            # Save here rather than the add call above to trigger a metadata
+            # commit on the git-annex branch.
+            if save:
+                for r in dataset.save(message=msg, recursive=True):
+                    yield r
 
 
 __datalad_plugin__ = Addurls

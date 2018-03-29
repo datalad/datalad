@@ -11,9 +11,10 @@
 
 import json
 import logging
-from mock import patch
 import os
 import tempfile
+
+from mock import patch
 
 from six.moves import StringIO
 
@@ -25,7 +26,7 @@ from datalad.tests.utils import assert_false, assert_true, assert_raises
 from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_, ok_exists
-from datalad.tests.utils import create_tree, with_tree, with_tempfile, HTTPPath
+from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
@@ -65,19 +66,19 @@ def test_formatter_no_mapping_arg():
 
 def test_formatter_placeholder_with_spaces():
     fmt = au.Formatter({})
-    fmt.format("{with spaces}", {"with spaces": "value0"}) == "value0"
+    eq_(fmt.format("{with spaces}", {"with spaces": "value0"}), "value0")
 
 
 def test_formatter_placeholder_nonpermitted_chars():
     fmt = au.Formatter({})
 
     # Can't assess keys with !, which will be interpreted as a conversion flag.
-    fmt.format("{key!r}", {"key!r": "value0"}, key="x") == "x"
+    eq_(fmt.format("{key!r}", {"key!r": "value0"}, key="x"), "'x'")
     assert_raises(KeyError,
                   fmt.format, "{key!r}", {"key!r": "value0"})
 
     # Same for ":".
-    fmt.format("{key:<5}", {"key:<5": "value0"}, key="x") == "x    "
+    eq_(fmt.format("{key:<5}", {"key:<5": "value0"}, key="x"), "x    ")
     assert_raises(KeyError,
                   fmt.format, "{key:<5}", {"key:<5": "value0"})
 
@@ -251,13 +252,12 @@ def test_extract():
 
 
 def test_extract_disable_autometa():
-    info, subpaths = au.extract(
+    info, _ = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
         exclude_autometa="*",
         meta=["group={age_group}"])
-
 
     eq_([d["meta_args"] for d in info],
         [{"group": "kid"}, {"group": "adult"}, {"group": "adult"},
@@ -265,7 +265,7 @@ def test_extract_disable_autometa():
 
 
 def test_extract_exclude_autometa_regexp():
-    info, subpaths = au.extract(
+    info, _ = au.extract(
         json_stream(ST_DATA["rows"]), "json",
         url_format="{name}_{debut_season}.com",
         filename_format="{age_group}//{now_dead}//{name}.csv",
@@ -288,7 +288,6 @@ def test_extract_csv_json_equal():
     kwds = dict(filename_format="{age_group}//{now_dead}//{name}.csv",
                 url_format="{name}_{debut_season}.com",
                 meta=["group={age_group}"])
-
 
     json_output = au.extract(json_stream(ST_DATA["rows"]), "json", **kwds)
     csv_output = au.extract(csv_rows, "csv", **kwds)
@@ -327,7 +326,7 @@ def test_addurls_dry_run(path):
             ds.addurls(json_file,
                        "{url}",
                        "{subdir}//{_url_filename_root}",
-                      dry_run=True)
+                       dry_run=True)
 
             for dir_ in ["foo", "bar"]:
                 assert_in("Would create a subdataset at {}".format(dir_),
@@ -372,6 +371,12 @@ class TestAddurls(object):
     def test_addurls(self, path):
         ds = Dataset(path).create(force=True)
 
+        def get_annex_commit_counts():
+            return int(
+                ds.repo.repo.git.rev_list("--count", "git-annex").strip())
+
+        n_annex_commits = get_annex_commit_counts()
+
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{name}")
 
@@ -384,9 +389,13 @@ class TestAddurls(object):
                 assert_dict_equal(meta,
                                   {"subdir": [subdir], "name": [fname]})
 
+            # We should have two new commits on the git-annex: one for the
+            # added urls and one for the added metadata.
+            eq_(n_annex_commits + 2, get_annex_commit_counts())
+
             # Add to already existing links, overwriting.
             with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.addurls(self.json_file,"{url}", "{name}",
+                ds.addurls(self.json_file, "{url}", "{name}",
                            ifexists="overwrite")
                 for fname in filenames:
                     assert_in("Removing {}".format(os.path.join(path, fname)),
@@ -480,7 +489,6 @@ class TestAddurls(object):
             for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
                 ok_exists(fname)
 
-
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename_fail(self, path):
         ds = Dataset(path).create(force=True)
@@ -497,12 +505,13 @@ class TestAddurls(object):
 
         # Force failure by passing a non-existent file name to annex.
         fn = ds.repo.set_metadata
-        def set_meta(files, **kwargs):
+
+        def set_meta(_, **kwargs):
             for i in fn("wreaking-havoc-and-such", **kwargs):
                 yield i
 
         with chpwd(path), patch.object(ds.repo, 'set_metadata', set_meta):
-            with assert_raises(IncompleteResultsError) as raised:
+            with assert_raises(IncompleteResultsError):
                 ds.addurls(self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
