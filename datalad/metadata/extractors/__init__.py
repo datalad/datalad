@@ -7,28 +7,3 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Metadata extractors"""
-
-import logging as __logging
-from datalad.utils import import_modules as __import_modules
-
-__all__ = [
-    'annex',
-    'audio',
-    'bids',
-    'datacite',
-    'datalad_core',
-    'datalad_rfc822',
-    'dicom',
-    'exif',
-    'frictionless_datapackage',
-    'image',
-    'nidm',
-    'nifti1',
-    'xmp',
-]
-
-__import_modules(
-    __all__,
-    pkg=__name__,
-    msg='Metadata extractor {module} is unusable',
-    log=__logging.getLogger(__name__).debug)
