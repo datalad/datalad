@@ -334,7 +334,7 @@ type
             # TODO extend with more complex queries to test whoosh
             # query language configuration
     ):
-        res = ds.search(query, mode=mode)
+        res = ds.search(query, mode=mode, full_record=True)
         if mode == 'textblob':
             # 'textblob' does datasets by default only (be could be configured otherwise
             assert_result_count(res, 1)

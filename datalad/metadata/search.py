@@ -37,6 +37,7 @@ from datalad.distribution.utils import get_git_dir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
+from datalad.support.constraints import EnsureBool
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
@@ -414,7 +415,6 @@ class _WhooshSearch(_Search):
         idx.commit(optimize=True)
         pbar.finish()
 
-
         # "timestamp" the search index to allow for automatic invalidation
         with open(stamp_fname, 'w') as f:
             f.write(metadata_state)
@@ -422,7 +422,7 @@ class _WhooshSearch(_Search):
         lgr.info('Search index contains %i documents', idx_size)
         self.idx_obj = idx_obj
 
-    def __call__(self, query, max_nresults=None, force_reindex=False):
+    def __call__(self, query, max_nresults=None, force_reindex=False, full_record=False):
         with self.idx_obj.searcher() as searcher:
             wquery = self.get_query(query)
 
@@ -451,31 +451,43 @@ class _WhooshSearch(_Search):
                 return
 
             nhits = 0
+            annotated_hits = []
             # annotate hits for full metadata report
-            hits = [dict(
-                path=normpath(opj(self.ds.path, hit['path'])),
-                query_matched={assure_unicode(k): assure_unicode(v)
-                               if isinstance(v, unicode_srctypes) else v
-                               for k, v in hit.matched_terms()},
-                parentds=normpath(
-                    opj(self.ds.path, hit['parentds'])) if 'parentds' in hit else None,
-                type=hit.get('type', None))
-                for hit in hits]
-            for res in query_aggregated_metadata(
-                    # type is taken from hit record
-                    reporton=None,
-                    ds=self.ds,
-                    aps=hits,
-                    # never recursive, we have direct hits already
-                    recursive=False):
-                res.update(
-                    refds=self.ds.path,
-                    action='search',
-                    status='ok',
-                    logger=lgr,
-                )
-                yield res
+            for i, hit in enumerate(hits):
+                annotated_hit = dict(
+                    path=normpath(opj(self.ds.path, hit['path'])),
+                    query_matched={assure_unicode(k): assure_unicode(v)
+                                   if isinstance(v, unicode_srctypes) else v
+                                   for k, v in hit.matched_terms()},
+                    parentds=normpath(
+                        opj(self.ds.path, hit['parentds'])) if 'parentds' in hit else None,
+                    type=hit.get('type', None))
+                if not full_record:
+                    annotated_hit.update(
+                        refds=self.ds.path,
+                        action='search',
+                        status='ok',
+                        logger=lgr,
+                    )
+                    yield annotated_hit
+                else:
+                    annotated_hits.append(annotated_hit)
                 nhits += 1
+            if full_record:
+                for res in query_aggregated_metadata(
+                        # type is taken from hit record
+                        reporton=None,
+                        ds=self.ds,
+                        aps=annotated_hits,
+                        # never recursive, we have direct hits already
+                        recursive=False):
+                    res.update(
+                        refds=self.ds.path,
+                        action='search',
+                        status='ok',
+                        logger=lgr,
+                    )
+                    yield res
 
             if max_nresults and nhits == max_nresults:
                 lgr.info(
@@ -602,7 +614,7 @@ class _EGrepSearch(_Search):
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
-    def __call__(self, query, max_nresults=None, consider_ucn=False):
+    def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
         query_re = re.compile(self.get_query(query))
 
         nhits = 0
@@ -773,6 +785,14 @@ class Search(Interface):
             doc="""Mode of search index structure and content. See section
             SEARCH MODES for details.
             """),
+        full_record=Parameter(
+            args=("--full-record", '-f'),
+            action='store_true',
+            doc="""If set, return the full metadata record for each search hit.
+            Depending on the search mode this might require additonal queries.
+            By default, only data that is available to the respective search modes
+            is returned. This always includes essential information, such as the
+            path and the type."""),
         show_keys=Parameter(
             args=('--show-keys',),
             action='store_true',
@@ -801,6 +821,7 @@ class Search(Interface):
                  force_reindex=False,
                  max_nresults=20,
                  mode=None,
+                 full_record=False,
                  show_keys=False,
                  show_query=False):
         try:
@@ -845,5 +866,6 @@ class Search(Interface):
 
         for r in searcher(
                 query,
-                max_nresults=max_nresults):
+                max_nresults=max_nresults,
+                full_record=full_record):
             yield r
