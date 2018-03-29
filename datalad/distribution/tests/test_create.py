@@ -34,6 +34,7 @@ from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_exists
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_file_under_git
@@ -175,6 +176,32 @@ def test_create_sub(path):
     ok_clean_git(subds3.path, annex=False)
     assert_in("third", ds.subdatasets(result_xfm='relpaths'))
 
+
+@with_tempfile
+@known_failure_direct_mode  #FIXME
+def test_create_sub_nosave(path):
+    ds = Dataset(path)
+    ds.create()
+
+    sub_annex = ds.create("sub_annex", save=False)
+    ok_(ds.repo.dirty)
+    ok_(sub_annex.repo.dirty)
+    ok_exists(opj(ds.path, ".gitmodules"))
+    ds.save(recursive=True)
+    ok_clean_git(ds.path)
+    ok_clean_git(sub_annex.path)
+
+    sub_noannex = ds.create("sub_noannex", save=False, no_annex=True)
+    ok_(ds.repo.dirty)
+    ok_(sub_noannex.repo.dirty)
+    # Save has no effect because the non-annex subdataset wasn't registered as
+    # a submodule.
+    ds.save(recursive=True)
+    ok_(ds.repo.dirty)
+    ok_(sub_noannex.repo.dirty)
+
+    # Just the annex subdataset is recognized.
+    eq_(ds.subdatasets(result_xfm="relpaths"), ["sub_annex"])
 
 @with_tree(tree=_dataset_hierarchy_template)
 @known_failure_direct_mode  #FIXME
