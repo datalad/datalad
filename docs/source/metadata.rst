@@ -152,15 +152,6 @@ The following fields are supported:
 Metadata keys used by this extractor are defined in DataLad's own constrained
 vocabulary.
 
-Digital Imaging and Communications in Medicine (``dicom``)
-----------------------------------------------------------
-
-Metadata can be extracted from any standard DICOM file. The extractor yields
-file-based metadata, and a dataset-level description that identifies individual
-image series. For each image series, all metadata are reported that are
-invariant across individual images in a series. The extractor uses an
-incomplete DICOM vocabulary from http://semantic-dicom.org
-
 Friction-less data packages (``frictionless_datapackage``)
 ----------------------------------------------------------
 
