@@ -2841,9 +2841,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(':'.join(annex_cmd), annex_cmd, git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key_)
+            out = self._batched.get(
+                ':'.join(annex_cmd), annex_cmd,
+                git_options=self._GIT_COMMON_OPTIONS,
+                path=self.path)(key_)
             try:
                 return {
+                    # None: False,  # happens on travis in direct/heavy-debug mode
+                    #               # reason is unknown, but causes pain and suffering
+                    #               # and so far was consistent with "False" result
                     '': False,  # when remote is misspecified ... stderr carries the msg
                     '0': False,
                     '1': True,
@@ -3346,14 +3352,24 @@ class BatchedAnnex(object):
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
 
+        Returns
+        -------
+        bool
+          True if process was alive.
+        str
+          stderr if any recorded if was terminated
         """
         process = self._process
+        ret = True
+        ret_stderr = None
         if process and process.poll():
             lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
-            self.close()
+            ret_stderr = self.close(return_stderr=True)
+            ret = False
         if self._process is None and restart:
             lgr.warning("Restarting the process due to previous failure")
             self._initialize()
+        return ret, ret_stderr
 
     def __call__(self, cmds):
         """
@@ -3390,15 +3406,16 @@ class BatchedAnnex(object):
             process.stdin.write(entry)  # .encode())
             process.stdin.flush()
             lgr.log(5, "Done sending.")
-            # TODO: somehow do catch stderr which might be there or not
-            #stderr = str(process.stderr) if process.stderr.closed else None
-            self._check_process(restart=False)
+            still_alive, stderr = self._check_process(restart=False)
+            # TODO: we might want to handle still_alive, e.g. to allow for
+            #       a number of restarts/resends, but it should be per command
+            #       since for some we cannot just resend the same query. But if
+            #       it is just a "get"er - we could resend it few times
             # We are expecting a single line output
             # TODO: timeouts etc
-            #import pdb; pdb.set_trace()
             stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
-            #if stderr:
-            #    lgr.warning("Received output in stderr: %r" % stderr)
+            if stderr:
+                lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)
             output.append(stdout)
 
@@ -3407,24 +3424,37 @@ class BatchedAnnex(object):
     def __del__(self):
         self.close()
 
-    def close(self):
-        """Close communication and wait for process to terminate"""
+    def close(self, return_stderr=False):
+        """Close communication and wait for process to terminate
+
+        Returns
+        -------
+        str
+          stderr output if return_stderr and stderr file was there.
+          None otherwise
+        """
+        ret = None
         if self._stderr_out:
             # close possibly still open fd
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
             # remove the file where we kept dumping stderr
             os.unlink(self._stderr_out_fname)
             self._stderr_out_fname = None
         if self._process:
             process = self._process
-            lgr.debug("Closing stdin of %s and waiting process to finish", process)
+            lgr.debug(
+                "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+        return ret
 
 
 class ProcessAnnexProgressIndicators(object):
