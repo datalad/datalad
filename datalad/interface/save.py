@@ -202,9 +202,10 @@ class Save(Interface):
     @staticmethod
     @datasetmethod(name='save')
     @eval_results
-    def __call__(message=None, message_file=None, path=None, dataset=None,
+    def __call__(message=None, path=None, dataset=None,
                  all_updated=True, all_changes=None, version_tag=None,
-                 recursive=False, recursion_limit=None, super_datasets=False
+                 recursive=False, recursion_limit=None, super_datasets=False,
+                 message_file=None
                  ):
         if all_changes is not None:
             from datalad.support.exceptions import DeprecatedError
