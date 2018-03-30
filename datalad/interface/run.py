@@ -173,15 +173,10 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
         # went to stdout/err -- we just have to exitcode in the same way
         cmd_exitcode = e.code
 
-        if not rerun_info or rerun_info.get("exit", 0) != cmd_exitcode:
-            # we failed during a fresh run, or in a different way during a rerun
-            # the latter can easily happen if we try to alter a locked file
+        if rerun_info and rerun_info.get("exit", 0) != cmd_exitcode:
+            # we failed in a different way during a rerun.  This can easily
+            # happen if we try to alter a locked file
             #
-            # let's fail here, the command could have had a typo or some
-            # other undesirable condition. If we would `add` nevertheless,
-            # we would need to rerun and aggregate annex content that we
-            # likely don't want
-            # TODO add switch to ignore failure (some commands are stupid)
             # TODO add the ability to `git reset --hard` the dataset tree on failure
             # we know that we started clean, so we could easily go back, needs gh-1424
             # to be able to do it recursively
@@ -189,7 +184,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
 
     lgr.info("== Command exit (modification check follows) =====")
 
-    # ammend commit message with `run` info:
+    # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
     # - exit code of the command
@@ -211,10 +206,15 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
         message if message is not None else cmd_shorty,
         json.dumps(run_info, indent=1), sort_keys=True, ensure_ascii=False, encoding='utf-8')
 
-    for r in ds.add('.', recursive=True, message=msg):
-        yield r
-
-    # TODO bring back when we can ignore a command failure
-    #if cmd_exitcode:
-    #    # finally raise due to the original command error
-    #    raise CommandError(code=cmd_exitcode)
+    if not rerun_info and cmd_exitcode:
+        msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
+        with open(msg_path, "w") as ofh:
+            ofh.write(msg)
+        lgr.info("The command had a non-zero exit code. "
+                 "If this is expected, you can save the changes with "
+                 "'datalad save -r -F%s .'",
+                 msg_path)
+        raise CommandError(code=cmd_exitcode)
+    else:
+        for r in ds.add('.', recursive=True, message=msg):
+            yield r

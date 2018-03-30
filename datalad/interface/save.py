@@ -174,6 +174,11 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
+        message_file=Parameter(
+            args=("-F", "--message-file"),
+            doc="""take the commit message from this file. This flag is
+            mutually exclusive with -m.""",
+            constraints=EnsureStr() | EnsureNone()),
         all_changes=Parameter(
             args=("-a", "--all-changes"),
             doc="""save all changes (even to not yet added files) of all components
@@ -199,7 +204,8 @@ class Save(Interface):
     @eval_results
     def __call__(message=None, path=None, dataset=None,
                  all_updated=True, all_changes=None, version_tag=None,
-                 recursive=False, recursion_limit=None, super_datasets=False
+                 recursive=False, recursion_limit=None, super_datasets=False,
+                 message_file=None
                  ):
         if all_changes is not None:
             from datalad.support.exceptions import DeprecatedError
@@ -208,11 +214,25 @@ class Save(Interface):
                 version="0.5.0",
                 msg="RF: all_changes option passed to the save"
             )
+
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # we verify that there is an actual repo next
             dataset = abspath(curdir)
         refds_path = Interface.get_refds_path(dataset)
+
+        if message and message_file:
+            yield get_status_dict(
+                'save',
+                status='error',
+                path=refds_path,
+                message="Both a message and message file were specified",
+                logger=lgr)
+            return
+
+        if message_file:
+            with open(message_file) as mfh:
+                message = mfh.read()
 
         to_process = []
         got_nothing = True

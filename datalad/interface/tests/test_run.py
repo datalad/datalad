@@ -36,6 +36,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_exists
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import eq_
@@ -47,7 +48,6 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
-from datalad.tests.utils import swallow_logs
 
 
 @with_tempfile(mkdir=True)
@@ -289,6 +289,45 @@ def test_rerun_just_one_commit(path):
     # run command.
     ds.repo.commit(msg="empty", options=["--allow-empty"])
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_run_failure(path):
+    ds = Dataset(path).create()
+
+    hexsha_initial = ds.repo.get_hexsha()
+
+    with assert_raises(CommandError):
+        ds.run("echo x$(cat grows) > grows && false")
+    eq_(hexsha_initial, ds.repo.get_hexsha())
+    ok_(ds.repo.dirty)
+
+    msgfile = opj(ds.repo.repo.git_dir, "COMMIT_EDITMSG")
+    ok_exists(msgfile)
+
+    ds.add(".", save=False)
+    ds.save(message_file=msgfile)
+    ok_clean_git(ds.path)
+    neq_(hexsha_initial, ds.repo.get_hexsha())
+
+    outfile = opj(ds.path, "grows")
+    eq_('x\n', open(outfile).read())
+
+    # There is no CommandError on rerun if the non-zero error matches the
+    # original code.
+    ds.rerun()
+    eq_('xx\n', open(outfile).read())
+
+    # On the other hand, we fail if we rerun a command and there is a non-zero
+    # error that doesn't match.
+    ds.run("[ ! -e bar ] && echo c >bar")
+    ok_clean_git(ds.path)
+    with assert_raises(CommandError):
+        ds.rerun()
 
 
 @ignore_nose_capturing_stdout
