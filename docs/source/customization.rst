@@ -36,7 +36,6 @@ overview of plugins included in this DataLad release.
 
    add_readme
    addurls
-   bids2scidata
    export_archive
    export_to_figshare
    extract_metadata
