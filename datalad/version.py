@@ -14,6 +14,7 @@ from os.path import lexists, dirname, join as opj, curdir
 
 # Hard coded version, to be done by release process
 __version__ = '0.10.0.dev1'
+__full_version__ = __version__
 
 # NOTE: might cause problems with "python setup.py develop" deployments
 #  so I have even changed buildbot to use  pip install -e .
@@ -47,4 +48,4 @@ if lexists(opj(projdir, '.git')):
         raise
     except:
         # just stick to the hard-coded
-        __full_version__ = __version__
+        pass
