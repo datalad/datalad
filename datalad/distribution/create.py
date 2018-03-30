@@ -383,12 +383,13 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
+        if isinstance(dataset, Dataset) and dataset.path != tbds.path \
+           and tbds.repo.get_hexsha():
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(
                     tbds.path,
-                    save=True,
+                    save=save,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
