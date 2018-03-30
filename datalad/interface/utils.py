@@ -320,7 +320,7 @@ def eval_results(func):
                 [i for i in mod.__dict__
                  if type(mod.__dict__[i]) == type and
                  issubclass(mod.__dict__[i], Interface) and
-                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('_', ''))]
+                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('datalad_', '').replace('_', ''))]
             assert len(command_class_names) == 1, (command_class_names, mod.__name__)
             command_class_name = command_class_names[0]
         else:
