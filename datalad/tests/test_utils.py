@@ -67,6 +67,7 @@ from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
 from .utils import assure_bool
+from .utils import assure_iter
 from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
@@ -384,6 +385,15 @@ def test_auto_repr():
         "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<WithoutReprClass>)"
     )
     assert_equal(buga().some(), "some")
+
+
+def test_assure_iter():
+    s = {1}
+    assert assure_iter(None, set) == set()
+    assert assure_iter(1, set) == s
+    assert assure_iter(1, list) == [1]
+    assert assure_iter(s, set) is s
+    assert assure_iter(s, set, copy=True) is not s
 
 
 def test_assure_list_copy():

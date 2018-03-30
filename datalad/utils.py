@@ -23,6 +23,7 @@ import gc
 import glob
 import wrapt
 
+from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
@@ -432,6 +433,33 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
+def assure_iter(s, cls, copy=False, iterate=True):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    cls: class
+      Which iterable class to assure
+    copy: bool, optional
+      If correct iterable is passed, it would generate its shallow copy
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
+    """
+
+    if isinstance(s, cls):
+        return s if not copy else shallow_copy(s)
+    elif isinstance(s, text_type):
+        return cls((s,))
+    elif iterate and hasattr(s, '__iter__'):
+        return cls(s)
+    elif s is None:
+        return cls()
+    else:
+        return cls((s,))
+
+
 def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -444,17 +472,7 @@ def assure_list(s, copy=False, iterate=True):
       If it is not a list, but something iterable (but not a text_type)
       iterate over it.
     """
-
-    if isinstance(s, list):
-        return s if not copy else s[:]
-    elif isinstance(s, text_type):
-        return [s]
-    elif iterate and hasattr(s, '__iter__'):
-        return list(s)
-    elif s is None:
-        return []
-    else:
-        return [s]
+    return assure_iter(s, list, copy=copy, iterate=iterate)
 
 
 def assure_list_from_str(s, sep='\n'):
