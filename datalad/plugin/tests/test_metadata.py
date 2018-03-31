@@ -20,7 +20,7 @@ from datalad.utils import chpwd
 
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
 
@@ -34,10 +34,7 @@ testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data',
 def test_error(path):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
-        res = extract_metadata(
-            types=['bogus__'],
-            files=[testpath])
-        assert_status('error', res)
+        assert_raises(ValueError, extract_metadata, types=['bogus__'], files=[testpath])
 
 
 @with_tempfile(mkdir=True)

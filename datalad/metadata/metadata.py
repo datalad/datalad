@@ -21,10 +21,11 @@ from os.path import curdir
 from os.path import exists
 from os.path import lexists
 from os.path import join as opj
-from importlib import import_module
 from collections import OrderedDict
 from collections import Mapping
 from six import binary_type, string_types
+
+from pkg_resources import iter_entry_points
 
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -434,24 +435,24 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
-    from . import extractors
+    extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
     lgr.info('Engage metadata extractors: %s', types)
     for mtype in types:
         mtype_key = mtype
+        if mtype_key not in extractors:
+            # we said that we want to fail, rather then just moan about less metadata
+            raise ValueError(
+                'Enable metadata extractor %s is not available in this installation',
+                mtype_key)
         try:
-            pmod = import_module('.{}'.format(mtype),
-                                 package=extractors.__package__)
-        except ImportError as e:
-            lgr.warning(
-                "Failed to import metadata extractor for '%s', "
-                "broken dataset configuration (%s)? "
-                "This type of metadata will be ignored: %s",
+            extractor_cls = extractors[mtype_key].load()
+            extractor = extractor_cls(ds, paths=paths)
+        except Exception as e:
+            raise ValueError(
+                "Failed to load metadata extractor for '%s', "
+                "broken dataset configuration (%s)?: %s",
                 mtype, ds, exc_str(e))
-            if cfg.get('datalad.runtime.raiseonerror'):
-                raise
-            errored = True
             continue
-        extractor = pmod.MetadataExtractor(ds, paths=paths)
         try:
             dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
