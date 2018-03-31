@@ -215,7 +215,7 @@ def test_within_ds_file_search(path):
 
     # test default behavior
     with swallow_outputs() as cmo:
-        ds.search(show_keys=True, mode='textblob')
+        ds.search(show_keys='name', mode='textblob')
 
         assert_in("""\
 id
@@ -289,7 +289,7 @@ type
 
     # check generated autofield index keys
     with swallow_outputs() as cmo:
-        ds.search(mode='autofield', show_keys=True)
+        ds.search(mode='autofield', show_keys='name')
         # it is impossible to assess what is different from that dump
         assert_in(target_out, cmo.out)
 

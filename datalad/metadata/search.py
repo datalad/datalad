@@ -41,7 +41,7 @@ from datalad.support.constraints import EnsureBool
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.utils import assure_list
+from datalad.utils import assure_list, assure_iter
 from datalad.utils import assure_unicode
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
@@ -231,8 +231,8 @@ class _Search(object):
     def __call__(self, query, max_nresults=None):
         raise NotImplementedError
 
-    def show_keys(self):
-        raise NotImplementedError
+    def show_keys(self, *args):
+        raise NotImplementedError(args)
 
     def get_query(self, query):
         raise NotImplementedError
@@ -247,7 +247,9 @@ class _WhooshSearch(_Search):
         self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
-    def show_keys(self):
+    def show_keys(self, mode):
+        if mode != 'name':
+            raise NotImplementedError()
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
 
@@ -664,9 +666,19 @@ class _EGrepSearch(_Search):
                     )
                     break
 
-    def show_keys(self):
+    def show_keys(self, mode=None):
+        maxl = 100  # maximal line length for unique values in mode=short
         # use a dict already, later we need to map to a definition
-        keys = {}
+        # meanwhile map to the values
+
+        class key_stat:
+            def __init__(self):
+                self.ndatasets = 0  # how many datasets have this field
+                self.uvals = set()
+
+        from collections import defaultdict
+        keys = defaultdict(key_stat)
+
         for res in query_aggregated_metadata(
                 # XXX TODO After #2156 datasets may not necessarily carry all
                 # keys in the "unique" summary
@@ -678,11 +690,52 @@ class _EGrepSearch(_Search):
             # no stringification of values for speed
             idxd = _meta2autofield_dict(meta, val2str=False)
 
-            for k in idxd:
+            for k, kvals in iteritems(idxd):
                 # TODO deal with conflicting definitions when available
-                keys[k] = None
+                keys[k].ndatasets += 1
+                if mode == 'name':
+                    continue
+                try:
+                    kvals_set = assure_iter(kvals, set)
+                except TypeError:
+                    kvals_set = {'unhashable'}
+                keys[k].uvals |= kvals_set
+
         for k in sorted(keys):
-            print(k)
+            if mode == 'name':
+                print(k)
+                continue
+
+            # do a bit more
+            stat = keys[k]
+            uvals = stat.uvals
+            # show only up to X uvals
+            if len(stat.uvals) > 10:
+                uvals = {v for i, v in enumerate(uvals) if i < 10}
+            # all unicode still scares yoh -- he will just use repr
+            # def conv(s):
+            #     try:
+            #         return '{}'.format(s)
+            #     except UnicodeEncodeError:
+            #         return assure_unicode(s).encode('utf-8')
+            stat.uvals_str = assure_unicode(
+                "{} unique values: {}".format(
+                    len(stat.uvals), ', '.join(map(repr, uvals))))
+            if mode == 'short':
+                if len(stat.uvals) > 10:
+                    stat.uvals_str += ', ...'
+                if len(stat.uvals_str) > maxl:
+                    stat.uvals_str = stat.uvals_str[:maxl-4] + ' ....'
+            elif mode == 'full':
+                pass
+            else:
+                raise ValueError(
+                    "Unknown value for stats. Know full and short")
+
+            print(
+                '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
+                k=k, stat=stat
+            ))
 
     def get_query(self, query):
         # cmdline args might come in as a list
@@ -795,11 +848,15 @@ class Search(Interface):
             path and the type."""),
         show_keys=Parameter(
             args=('--show-keys',),
-            action='store_true',
-            doc="""if given, a list of known search keys is shown (one per line).
+            choices=('name', 'short', 'full'),
+            default=None,
+            doc="""if given, a list of known search keys is shown. If 'name' -
+            only the name is printed one per line. If 'short' or 'full' - 
+            statistics (in how many datasets, and unique values) are printed.
+            'short' truncates the listing of unique values.
             No other action is performed (except for reindexing), even if other
             arguments are given. Each key is accompanied by a term definition in
-            parenthesis. In most cases a definition is given in the form
+            parenthesis (TODO). In most cases a definition is given in the form
             of a URL. If an ontology definition for a term is known, this URL
             can resolve to a webpage that provides a comprehensive definition
             of the term. However, for speed reasons term resolution is solely done
@@ -822,7 +879,7 @@ class Search(Interface):
                  max_nresults=20,
                  mode=None,
                  full_record=False,
-                 show_keys=False,
+                 show_keys=None,
                  show_query=False):
         try:
             ds = require_dataset(dataset, check_installed=True, purpose='dataset search')
@@ -854,7 +911,7 @@ class Search(Interface):
         searcher = searcher(ds, force_reindex=force_reindex)
 
         if show_keys:
-            searcher.show_keys()
+            searcher.show_keys(show_keys)
             return
 
         if not query:
