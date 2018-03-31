@@ -83,14 +83,14 @@ def test_get_metadata(path):
     assert_equal(cmeta[0][0], test_fname)
     # check that we get file props extracted from the file name from pybids
     fmeta = cmeta[0][1]
-    assert_equal(fmeta['subject'], '01')
+    assert_equal(fmeta['subject']['id'], '01')
     assert_equal(fmeta['type'], 'bold')
     assert_equal(fmeta['task'], 'some')
     assert_equal(fmeta['modality'], 'func')
     # the fact that there is participant vs subject is already hotly debated in Tal's brain
-    assert_in('handedness', fmeta['participant'])
-    assert_in('language', fmeta['participant'])
-    assert_equal(fmeta['participant']['language'], u'русский')
+    assert_in('handedness', fmeta['subject'])
+    assert_in('language', fmeta['subject'])
+    assert_equal(fmeta['subject']['language'], u'русский')
 
 
 @with_tree(tree={'dataset_description.json': """
