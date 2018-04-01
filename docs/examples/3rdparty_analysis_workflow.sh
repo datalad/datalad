@@ -115,7 +115,7 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 #%
 
 mkdir code
-echo "nib-ls src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # In order to definitively document which data file his analysis needs at this
@@ -213,7 +213,7 @@ datalad get result.txt
 # She can modify Bob's code to help him with his analysis...
 #%
 
-echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # ... and execute it.
