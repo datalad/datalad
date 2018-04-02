@@ -40,6 +40,12 @@ Automated data distributions
 
    crawler/index
 
+Extension modules
+=================
+
+- `Neuroimaging data and workflows <http://docs.datalad.org/projects/neuroimaging>`_
+
+
 Indices and tables
 ==================
 
