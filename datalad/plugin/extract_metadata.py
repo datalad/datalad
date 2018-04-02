@@ -14,23 +14,23 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
 
+@build_doc
 class ExtractMetadata(Interface):
     """Run one or more of DataLad's metadata extractors on a dataset or file.
 
     The result(s) are structured like the metadata DataLad would extract
     during metadata aggregation. There is one result per dataset/file.
 
-    Examples
-    --------
+    Examples:
 
-    Extract metadata with two extractors from a dataset in the current directory
-    and also from all its files::
+      Extract metadata with two extractors from a dataset in the current directory
+      and also from all its files::
 
-      $ datalad extract-metadata -d . --type frictionless_datapackage datalad_core
+        $ datalad extract-metadata -d . --type frictionless_datapackage --type datalad_core
 
-    Extract XMP metadata from a single PDF that is not part of any dataset::
+      Extract XMP metadata from a single PDF that is not part of any dataset::
 
-      $ datalad extract-metadata --type xmp --file Downloads/freshfromtheweb.pdf
+        $ datalad extract-metadata --type xmp Downloads/freshfromtheweb.pdf
     """
 
     from datalad.support.param import Parameter
@@ -45,12 +45,12 @@ class ExtractMetadata(Interface):
             args=("--type",),
             dest="types",
             metavar=("NAME"),
-            nargs="+",
+            action='append',
             required=True,
-            doc="""Name of the metadata extractor to be executed."""),
+            doc="""Name of a metadata extractor to be executed.
+            [CMD: This option can be given more than once CMD]"""),
         files=Parameter(
-            args=("--file",),
-            dest="files",
+            args=("files",),
             metavar="FILE",
             nargs="*",
             doc="Path of a file to extract metadata from.",
@@ -72,7 +72,6 @@ class ExtractMetadata(Interface):
         from datalad.distribution.dataset import require_dataset
         from datalad.metadata.metadata import _get_metadata
         from datalad.metadata.metadata import _get_metadatarelevant_paths
-
 
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
