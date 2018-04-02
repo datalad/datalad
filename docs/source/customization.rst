@@ -19,7 +19,7 @@ Plugins are a quick'n'dirty way to implement a single additional command with ve
 little overhead. They are, however, not the method of choice for extending particular
 Datalad functionality, such as metadata extractor, or providing entire command suites
 for a specialized purpose. For all these scenarios extension packages are the
-recommanded method.
+recommended method.
 
 
 Plugins
@@ -182,10 +182,10 @@ Consequently, there is a significant amount of boilerplate code involved in the
 creation of a new Datalad extension. However, this overhead enables a number of
 useful features for extension developers:
 
-- extension can provide any number of additional command that can be grouped into
+- extensions can provide any number of additional commands that can be grouped into
   labeled command suites, and are automatically exposed via the standard DataLad commandline
   and Python API
-- extension can define `entry_points` for any number of additional metadata extractors
+- extensions can define `entry_points` for any number of additional metadata extractors
   that become automatically available to DataLad
 - extensions can define `entry_points` for their test suites, such that the standard `datalad test`
   command will automatically run these tests in addition to the tests shipped with Datalad core
@@ -198,8 +198,8 @@ A DataLad extension is a standard Python package. Beyond installation of the pac
 no additional setup required.
 
 
-Writing own extensions
-======================
+Writing your own extensions
+===========================
 
 A good starting point for implementing a new extension is the "helloworld" demo extension
 available at https://github.com/datalad/datalad-module-template. This repository can be cloned
@@ -213,6 +213,6 @@ A more complex extension setup can be seen in the DataLad Neuroimaging
 extension: https://github.com/datalad/datalad-neuroimaging, including additional metadata extractors,
 test suite registration, and a sphinx-based documentation setup for a DataLad extension.
 
-As a DataLad extension is a standard Python package, extension will declare
+As a DataLad extension is a standard Python package, an extension should declare
 dependencies on an appropriate DataLad version, and possibly other extensions
 via the standard mechanisms.
