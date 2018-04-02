@@ -10,10 +10,20 @@ Customization and extension of functionality
 DataLad provides numerous commands that cover many use cases. However, there
 will always be a demand for further customization or extensions of built-in
 functionality at a particular site, or for an individual user. DataLad
-addresses this need by providing a generic plugin interface.
+addresses this need with two mechanisms:
 
-Using plugins
-=============
+- Plugins_
+- `Extension packages`_
+
+Plugins are a quick'n'dirty way to implement a single additional command with very
+little overhead. They are, however, not the method of choice for extending particular
+Datalad functionality, such as metadata extractor, or providing entire command suites
+for a specialized purpose. For all these scenarios extension packages are the
+recommanded method.
+
+
+Plugins
+^^^^^^^
 
 A number of plugins are shipped with DataLad. This includes plugins which
 operate on a particular dataset, but also general functionality that can be
@@ -162,3 +172,47 @@ The following keys should exists if possible:
     string message annotating the result, particularly important for
     non-ok results. This can be a tuple with 'logging'-style string
     expansion.
+
+
+Extension packages
+^^^^^^^^^^^^^^^^^^
+
+As the name suggests, an extension package is a proper Python package.
+Consequently, there is a significant amount of boilerplate code involved in the
+creation of a new Datalad extension. However, this overhead enables a number of
+useful features for extension developers:
+
+- extension can provide any number of additional command that can be grouped into
+  labeled command suites, and are automatically exposed via the standard DataLad commandline
+  and Python API
+- extension can define `entry_points` for any number of additional metadata extractors
+  that become automatically available to DataLad
+- extensions can define `entry_points` for their test suites, such that the standard `datalad test`
+  command will automatically run these tests in addition to the tests shipped with Datalad core
+
+
+Using an extension
+==================
+
+A DataLad extension is a standard Python package. Beyond installation of the package there is
+no additional setup required.
+
+
+Writing own extensions
+======================
+
+A good starting point for implementing a new extension is the "helloworld" demo extension
+available at https://github.com/datalad/datalad-module-template. This repository can be cloned
+and adjusted to suit one's needs. It includes:
+
+- a basic Python package setup
+- simple demo command implementation
+- Travis test setup
+
+A more complex extension setup can be seen in the DataLad Neuroimaging
+extension: https://github.com/datalad/datalad-neuroimaging, including additional metadata extractors,
+test suite registration, and a sphinx-based documentation setup for a DataLad extension.
+
+As a DataLad extension is a standard Python package, extension will declare
+dependencies on an appropriate DataLad version, and possibly other extensions
+via the standard mechanisms.
