@@ -2847,9 +2847,13 @@ class AnnexRepo(GitRepo, RepoInterface):
                 path=self.path)(key_)
             try:
                 return {
-                    # None: False,  # happens on travis in direct/heavy-debug mode
-                    #               # reason is unknown, but causes pain and suffering
-                    #               # and so far was consistent with "False" result
+                    # happens on travis in direct/heavy-debug mode, that process
+                    # exits and closes stdout (upon unknown key) before we could
+                    # read it, so we get None as the stdout.
+                    # see https://github.com/datalad/datalad/issues/2330
+                    # but it is associated with an unknown key, and for consistency
+                    # we report False there too, as to ''
+                    None: False,
                     '': False,  # when remote is misspecified ... stderr carries the msg
                     '0': False,
                     '1': True,
