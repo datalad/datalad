@@ -82,7 +82,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'datalad'
+project = u'DataLad'
 copyright = u'2016-2018, DataLad team'
 author = u'DataLad team'
 
