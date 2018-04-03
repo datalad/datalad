@@ -2301,8 +2301,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                     command,
                     annex_options=annex_options + ['--'] + file_chunk,
                     **kwargs)
-                out += out_
-                err += err_
+                # Addition of \n is an attempt to address
+                # https://github.com/datalad/datalad/issues/2301
+                out += out_ + (os.linesep if not out_.endswith(os.linesep) else '')
+                err += err_ + (os.linesep if not err_.endswith(os.linesep) else '')
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
