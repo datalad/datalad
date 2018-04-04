@@ -556,7 +556,13 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     for i in sorted(
                         v,
                         key=_unique_value_key)] if v is not None else None
-                for k, v in unique_cm.items()}
+                for k, v in unique_cm.items()
+                # v == None (disable unique, but there was a value at some point)
+                # otherwise we only want actual values, and also no single-item-lists
+                # of a non-value
+                # those contribute no information, but bloat the operation
+                # (inflated number of keys, inflated storage, inflated search index, ...)
+                if v is None or (v and not v == {''})}
             dsmeta['datalad_unique_content_properties'] = ucp
 
     # always identify the effective vocabulary - JSON-LD style
