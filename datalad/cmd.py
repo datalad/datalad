@@ -351,10 +351,10 @@ class Runner(object):
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
-            if not line.endswith(os.sep):
+            if not line.endswith(os.linesep):
                 # In attempt to mitigate #2301 where multiple json records
                 # ended up in a single line somehow... not yet clear how
-                line += os.sep
+                line += os.linesep
             return line
         # it was output already directly but for code to work, return ""
         return binary_type()
