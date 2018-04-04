@@ -197,7 +197,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
     def _mk_title(self, prog):
         # and an easy to use reference point
-        title = ".. _man_%s:\n\n" % prog
+        title = ".. _man_%s:\n\n" % prog.replace(' ', '-')
         title += "{0}".format(prog)
         title += '\n{0}\n\n'.format('=' * len(prog))
         return title
