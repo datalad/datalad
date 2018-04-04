@@ -22,9 +22,9 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_in
 
 
 target = {
@@ -68,3 +68,8 @@ def test_audio(path):
     # for discovering whole datasets
     assert_in('bitrate', meta)
     eq_(uniques['audio']['bitrate'], None)
+
+    # 'date' field carries not value, hence gets exclude from the unique report
+    assert_in('date', meta)
+    assert(not meta['date'])
+    assert_not_in('date', uniques['audio'])

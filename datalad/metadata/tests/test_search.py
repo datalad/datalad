@@ -227,7 +227,6 @@ type
 
     target_out = """\
 audio.bitrate
-audio.date
 audio.duration(s)
 audio.format
 audio.music-Genre
