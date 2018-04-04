@@ -21,6 +21,7 @@ from datalad.api import Dataset
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_in
@@ -60,3 +61,10 @@ def test_audio(path):
         eq_(meta[k], v)
 
     assert_in('@context', meta)
+
+    uniques = ds.metadata(
+        reporton='datasets', return_type='item-or-list')['metadata']['datalad_unique_content_properties']
+    # test file has it, but uniques have it blanked out, because the extractor considers it worthless
+    # for discovering whole datasets
+    assert_in('bitrate', meta)
+    eq_(uniques['audio']['bitrate'], None)

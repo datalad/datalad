@@ -118,7 +118,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk])
+                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key

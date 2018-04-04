@@ -483,6 +483,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 errored = True
 
         unique_cm = {}
+        extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
         for loc, meta in contentmeta_t or {}:
             if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
@@ -527,6 +528,13 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                         # a 'sample' key, we should prefer that, over an
                         # aggregated list of a hopefully-kinda-ok structure
                         continue
+                    elif k in extractor_unique_exclude:
+                        # the extractor thinks this key is worthless for the purpose
+                        # of discovering whole datasets
+                        # we keep the key (so we know that some file is providing this key),
+                        # but ignore any value it came with
+                        unique_cm[k] = None
+                        continue
                     vset = unique_cm.get(k, set())
                     vset.add(_val2hashable(v))
                     unique_cm[k] = vset
@@ -547,7 +555,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 k: [dict(i) if isinstance(i, ReadOnlyDict) else i
                     for i in sorted(
                         v,
-                        key=_unique_value_key)]
+                        key=_unique_value_key)] if v is not None else None
                 for k, v in unique_cm.items()}
             dsmeta['datalad_unique_content_properties'] = ucp
 
