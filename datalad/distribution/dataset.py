@@ -265,7 +265,7 @@ class Dataset(object):
         # with it. Internally we don't need or use it anymore.
         import inspect
         lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
-        from datalad.api import subdatasets
+        from datalad.coreapi import subdatasets
         if edges:
             return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
                      r['path'] if absolute else relpath(r['path'], start=self.path))
@@ -343,6 +343,7 @@ class Dataset(object):
         -------
         Dataset or None
         """
+        from datalad.coreapi import subdatasets
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
         path = self.path
