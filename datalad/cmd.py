@@ -326,8 +326,9 @@ class Runner(object):
                 # resolving a once in a while failing test #2185
                 if isinstance(out_, text_type):
                     out_ = out_.encode('utf-8')
-                for line in out_.split(linesep_bytes):
-                    out += self._process_one_line(*pargs, line=line)
+                out += linesep_bytes.join(
+                    self._process_one_line(*pargs, line=line)
+                    for line in out_.split(linesep_bytes))
         return out
 
     def _process_one_line(self, out_type, proc, log_, log_is_callable,
