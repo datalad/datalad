@@ -28,8 +28,8 @@ def test_version_url():
         eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
             url_pref + "/tarballs/ds001_raw.tgz?versionId=null")
 
-        eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"),
-            "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1&versionId=null")
+        eq_(get_versioned_url(url_pref + "tarballs/ds001_raw.tgz?param=1"),
+            url_pref + "/tarballs/ds001_raw.tgz?param=1&versionId=null")
 
     # something is wrong there
     #print(get_versioned_url("http://openfmri.s3.amazonaws.com/ds001/demographics.txt"))
