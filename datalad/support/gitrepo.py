@@ -1021,15 +1021,10 @@ class GitRepo(RepoInterface):
     def fake_dates_enabled(self):
         """Is the repository configured to use fake dates?
         """
-        if self._fake_dates_enabled:
-            return True
-
         if self._fake_dates_enabled is None:
-            fake = self.config.get('datalad.dataset.fakedates')
-            if fake == "true":
-                self._fake_dates_enabled = True
-                return True
-        return False
+            self._fake_dates_enabled = \
+                self.config.getbool('datalad.dataset', 'fakedates', default=False)
+        return self._fake_dates_enabled
 
     def add_fake_dates(self, env):
         """Add fake dates to `env`.
