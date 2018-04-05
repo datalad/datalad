@@ -360,10 +360,14 @@ class _WhooshSearch(_Search):
         old_idx_size = 0
         old_ds_rpath = ''
         idx_size = 0
-        pbar = ui.get_progressbar(
-            label='Datasets',
-            unit='ds',
-            total=len(dsinfo))
+        lgr.info(
+            'Start building search index',
+            extra=dict(
+                dlm_progress='autofieldidxbuild',
+                dlm_progress_total=len(dsinfo),
+                dlm_progress_label='Datasets',
+                dlm_progress_unit='ds',
+            ))
         for res in query_aggregated_metadata(
                 reporton=self.documenttype,
                 ds=self.ds,
@@ -395,7 +399,13 @@ class _WhooshSearch(_Search):
                 old_idx_size = idx_size
                 old_ds_rpath = admin['path']
                 admin['id'] = res.get('dsid', None)
-                pbar.update(1, increment=True)
+                lgr.info(
+                    'Indexed %s', self.ds,
+                    extra=dict(
+                        dlm_progress='autofieldidxbuild',
+                        dlm_progress_update=1,
+                        dlm_progress_increment=True,
+                    ))
 
             doc.update({k: assure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
@@ -415,7 +425,11 @@ class _WhooshSearch(_Search):
 
         lgr.debug("Committing index")
         idx.commit(optimize=True)
-        pbar.finish()
+        lgr.info(
+            'Done building search index',
+            extra=dict(
+                dlm_progress='autofieldidxbuild',
+            ))
 
         # "timestamp" the search index to allow for automatic invalidation
         with open(stamp_fname, 'w') as f:

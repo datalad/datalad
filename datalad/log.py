@@ -154,6 +154,41 @@ class ColorFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
+class ProgressHandler(logging.Handler):
+    from datalad.ui import ui
+
+    def __init__(self):
+        super(self.__class__, self).__init__()
+        self.pbars = {}
+
+    def emit(self, record):
+        if not hasattr(record, 'dlm_progress'):
+            return
+
+        from datalad.ui import ui
+        pid = getattr(record, 'dlm_progress')
+        update = getattr(record, 'dlm_progress_update', None)
+        if pid not in self.pbars:
+            # this is new
+            # TODO if the other logging that is happening is less frontpage
+            # we may want to actually "print" the start message
+            pbar = ui.get_progressbar(
+                label=getattr(record, 'dlm_progress_label', ''),
+                unit=getattr(record, 'dlm_progress_unit', ''),
+                total=getattr(record, 'dlm_progress_total', None))
+            self.pbars[pid] = pbar
+        elif update is None:
+            # not an update -> done
+            # TODO if the other logging that is happening is less frontpage
+            # we may want to actually "print" the completion message
+            self.pbars.pop(pid).finish()
+        else:
+            # an update
+            self.pbars[pid].update(
+                update,
+                increment=getattr(record, 'dlm_progress_increment', False))
+
+
 class LoggerHelper(object):
     """Helper to establish and control a Logger"""
 
@@ -267,7 +302,10 @@ class LoggerHelper(object):
                            log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+        # to see the effect you want to disable the next line
         self.lgr.addHandler(loghandler)
+
+        self.lgr.addHandler(ProgressHandler())
 
         self.set_level()  # set default logging level
         return self.lgr
