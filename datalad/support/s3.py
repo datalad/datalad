@@ -18,6 +18,8 @@ __docformat__ = 'restructuredtext'
 import mimetypes
 
 from os.path import splitext
+import re
+
 from datalad.support.network import urlquote
 
 import logging
@@ -291,8 +293,44 @@ def gen_bucket_test2_obscurenames_versioned():
     files("f &$=@:+,?;")
 
 
+def unparse_versioned_url(parsed, version, replace=False):
+    """Construct a versioned URL from `parsed`.
+
+    Parameters
+    ----------
+    parsed : urlparse.ParseResult
+        A parsed URL.
+    version : str
+        The value of 'versionId='.
+    replace : boolean, optional
+        If a versionID is already present in `parsed`, replace it.
+
+    Returns
+    -------
+    An unparsed URL (str)
+    """
+    version_id = "versionId={}".format(version)
+    if not parsed.query:
+        query = version_id
+    else:
+        ver_match = re.match("(?P<pre>.*&)?"
+                             "(?P<vers>versionId=[^&]+)"
+                             "(?P<post>&.*)?",
+                             parsed.query)
+        if ver_match:
+            if replace:
+                query = "".join([ver_match.group("pre") or "",
+                                 version_id,
+                                 ver_match.group("post") or ""])
+            else:
+                query = parsed.query
+        else:
+            query = parsed.query + "&" + version_id
+    return urlunparse(parsed._replace(query=query))
+
+
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
-                      s3conn=None):
+                      s3conn=None, update=False):
     """Given a url return a versioned URL
 
     Originally targeting AWS S3 buckets with versioning enabled
@@ -311,6 +349,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     verify: bool, optional
       Verify that URL is accessible. As discovered some versioned keys might
       be denied access to
+    update : bool, optional
+      If the URL already contains a version ID, update it to the latest version
+      ID.  This option has no effect if return_all is true.
 
     Returns
     -------
@@ -376,10 +417,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             assert(all_keys)
 
             for key in all_keys:
-                version_id = key.version_id
-                query = ((url_rec.query + "&") if url_rec.query else "") \
-                    + "versionId=%s" % version_id
-                url_versioned = urlunparse(url_rec._replace(query=query))
+                url_versioned = unparse_versioned_url(
+                    url_rec, key.version_id, replace=update and not return_all)
+
                 all_versions.append(url_versioned)
                 if verify:
                     # it would throw HTTPError exception if not accessible
