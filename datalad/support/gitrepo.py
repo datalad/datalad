@@ -1025,7 +1025,7 @@ class GitRepo(RepoInterface):
             return True
 
         if self._fake_dates_enabled is None:
-            fake = self.config.get('datalad.dataset.fakedates', None)
+            fake = self.config.get('datalad.dataset.fakedates')
             if fake == "true":
                 self._fake_dates_enabled = True
                 return True
