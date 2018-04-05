@@ -162,9 +162,6 @@ class ProgressHandler(logging.Handler):
         self.pbars = {}
 
     def emit(self, record):
-        if not hasattr(record, 'dlm_progress'):
-            return
-
         from datalad.ui import ui
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
@@ -185,6 +182,16 @@ class ProgressHandler(logging.Handler):
             self.pbars[pid].update(
                 update,
                 increment=getattr(record, 'dlm_progress_increment', False))
+
+
+class NoProgressLog(logging.Filter):
+    def filter(record):
+        return not hasattr(record, 'dlm_progress')
+
+
+class OnlyProgressLog(logging.Filter):
+    def filter(record):
+        return hasattr(record, 'dlm_progress')
 
 
 def log_progress(lgrcall, pid, *args, total=None, label=None, unit=None, update=None,
@@ -334,12 +341,18 @@ class LoggerHelper(object):
                            log_pid=self._get_config("pid", False),
                            ))
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-        # to see the effect you want to disable the next line
         self.lgr.addHandler(loghandler)
 
-        self.lgr.addHandler(ProgressHandler())
+        if is_interactive():
+            phandler = ProgressHandler()
+            # progress only when interactive
+            phandler.addFilter(OnlyProgressLog)
+            # no stream logs of progress messages when interactive
+            loghandler.addFilter(NoProgressLog)
+            self.lgr.addHandler(phandler)
 
         self.set_level()  # set default logging level
         return self.lgr
+
 
 lgr = LoggerHelper().get_initialized_logger()
