@@ -12,6 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
 
 import os
@@ -360,14 +361,14 @@ class _WhooshSearch(_Search):
         old_idx_size = 0
         old_ds_rpath = ''
         idx_size = 0
-        lgr.info(
+        log_progress(
+            lgr.info,
+            'autofieldidxbuild',
             'Start building search index',
-            extra=dict(
-                dlm_progress='autofieldidxbuild',
-                dlm_progress_total=len(dsinfo),
-                dlm_progress_label='Datasets',
-                dlm_progress_unit='ds',
-            ))
+            total=len(dsinfo),
+            label='Building search index',
+            unit=' Datasets',
+        )
         for res in query_aggregated_metadata(
                 reporton=self.documenttype,
                 ds=self.ds,
@@ -396,16 +397,12 @@ class _WhooshSearch(_Search):
                             idx_size - old_idx_size,
                             include_count=True),
                         old_ds_rpath)
+                log_progress(lgr.info, 'autofieldidxbuild',
+                             'Indexed dataset at %s', old_ds_rpath,
+                             update=1, increment=True)
                 old_idx_size = idx_size
                 old_ds_rpath = admin['path']
                 admin['id'] = res.get('dsid', None)
-                lgr.info(
-                    'Indexed %s', self.ds,
-                    extra=dict(
-                        dlm_progress='autofieldidxbuild',
-                        dlm_progress_update=1,
-                        dlm_progress_increment=True,
-                    ))
 
             doc.update({k: assure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
@@ -425,11 +422,8 @@ class _WhooshSearch(_Search):
 
         lgr.debug("Committing index")
         idx.commit(optimize=True)
-        lgr.info(
-            'Done building search index',
-            extra=dict(
-                dlm_progress='autofieldidxbuild',
-            ))
+        log_progress(
+            lgr.info, 'autofieldidxbuild', 'Done building search index')
 
         # "timestamp" the search index to allow for automatic invalidation
         with open(stamp_fname, 'w') as f:
@@ -583,10 +577,14 @@ class _AutofieldSearch(_WhooshSearch):
 
         lgr.debug('Scanning for metadata keys')
         # quick 1st pass over all dataset to gather the needed schema fields
-        pbar = ui.get_progressbar(
-            label='Datasets',
-            unit='ds',
-            total=len(dsinfo))
+        log_progress(
+            lgr.info,
+            'idxschemabuild',
+            'Start building search schema',
+            total=len(dsinfo),
+            label='Building search schema',
+            unit=' Datasets',
+        )
         for res in query_aggregated_metadata(
                 # XXX TODO After #2156 datasets may not necessarily carry all
                 # keys in the "unique" summary
@@ -602,8 +600,11 @@ class _AutofieldSearch(_WhooshSearch):
             for k in idxd:
                 schema_fields[k] = wf.TEXT(stored=False,
                                            analyzer=SimpleAnalyzer())
-            pbar.update(1, increment=True)
-        pbar.finish()
+            log_progress(lgr.info, 'idxschemabuild',
+                         'Scanned dataset at %s', res['path'],
+                         update=1, increment=True)
+        log_progress(
+            lgr.info, 'idxschemabuild', 'Done building search schema')
 
         self.schema = wf.Schema(**schema_fields)
 

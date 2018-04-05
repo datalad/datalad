@@ -170,8 +170,6 @@ class ProgressHandler(logging.Handler):
         update = getattr(record, 'dlm_progress_update', None)
         if pid not in self.pbars:
             # this is new
-            # TODO if the other logging that is happening is less frontpage
-            # we may want to actually "print" the start message
             pbar = ui.get_progressbar(
                 label=getattr(record, 'dlm_progress_label', ''),
                 unit=getattr(record, 'dlm_progress_unit', ''),
@@ -187,6 +185,40 @@ class ProgressHandler(logging.Handler):
             self.pbars[pid].update(
                 update,
                 increment=getattr(record, 'dlm_progress_increment', False))
+
+
+def log_progress(lgrcall, pid, *args, total=None, label=None, unit=None, update=None,
+                 increment=False):
+    """Helper to emit a log message on the progress of some process
+
+    Parameters
+    ----------
+    lgrcall : callable
+      Something like lgr.debug or lgr.info
+    pid : str
+      Some kind of ID for the process the progress is reported on.
+    *args : str
+      Log message, and potential arguments
+    total : int
+      Max progress quantity of the process.
+    label : str
+      Process description. Should be very brief, goes in front of progress bar
+      on the same line.
+    unit : str
+      Progress report unit. Should be very brief, goes after the progress bar
+      on the same line.
+    update : int
+      To which quantity to advance the progress.
+    incremental : bool
+      If set, `update` is interpreted as an incremental value, not absolute.
+    """
+    d = dict(
+        {'dlm_progress_{}'.format(n): v for n, v in (
+            ('total', total), ('label', label), ('unit', unit), ('update', update),
+            ('increment', increment))
+         if v},
+        dlm_progress=pid)
+    lgrcall(*args, extra=d)
 
 
 class LoggerHelper(object):
