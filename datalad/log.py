@@ -185,17 +185,16 @@ class ProgressHandler(logging.Handler):
 
 
 class NoProgressLog(logging.Filter):
-    def filter(record):
+    def filter(self, record):
         return not hasattr(record, 'dlm_progress')
 
 
 class OnlyProgressLog(logging.Filter):
-    def filter(record):
+    def filter(self, record):
         return hasattr(record, 'dlm_progress')
 
 
-def log_progress(lgrcall, pid, *args, total=None, label=None, unit=None, update=None,
-                 increment=False):
+def log_progress(lgrcall, pid, *args, **kwargs):
     """Helper to emit a log message on the progress of some process
 
     Parameters
@@ -220,9 +219,7 @@ def log_progress(lgrcall, pid, *args, total=None, label=None, unit=None, update=
       If set, `update` is interpreted as an incremental value, not absolute.
     """
     d = dict(
-        {'dlm_progress_{}'.format(n): v for n, v in (
-            ('total', total), ('label', label), ('unit', unit), ('update', update),
-            ('increment', increment))
+        {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
          if v},
         dlm_progress=pid)
     lgrcall(*args, extra=d)
@@ -346,9 +343,9 @@ class LoggerHelper(object):
         if is_interactive():
             phandler = ProgressHandler()
             # progress only when interactive
-            phandler.addFilter(OnlyProgressLog)
+            phandler.addFilter(OnlyProgressLog())
             # no stream logs of progress messages when interactive
-            loghandler.addFilter(NoProgressLog)
+            loghandler.addFilter(NoProgressLog())
             self.lgr.addHandler(phandler)
 
         self.set_level()  # set default logging level
