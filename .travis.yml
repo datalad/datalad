@@ -16,7 +16,7 @@ env:
     - BOTO_CONFIG=/tmp/nowhere
     - DATALAD_TESTS_SSH=1
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
-    - TESTS_TO_PERFORM=
+    - TESTS_TO_PERFORM=datalad
     - NOSE_OPTS=-s
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     # Special settings/helper for combined coverage from special remotes execution
@@ -126,7 +126,7 @@ matrix:
     # Test under NFS mount  (only selected sub-set)
     env:
     - TMPDIR="/tmp/nfsmount"
-    - TESTS_TO_PERFORM="datalad/tests datalad/support"
+    - TESTS_TO_PERFORM="datalad.tests datalad.support"
   - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
@@ -224,8 +224,10 @@ install:
   - npm install grunt-contrib-qunit
 
 script:
-  # Verify that setup.py build doesn't puke
-  - python setup.py build
+  # Test installation system-wide
+  - sudo pip install .
+  - mkdir -p __testhome__
+  - cd __testhome__
   # Run tests
   - WRAPT_DISABLE_EXTENSIONS=1 http_proxy=
     PATH=$PWD/tools/coverage-bin:$PATH
@@ -235,6 +237,13 @@ script:
       --with-cov --cover-package datalad
       --logging-level=INFO
       $TESTS_TO_PERFORM
+  # Run doc examples if no spaces in the TMPDIR and SSH is allowed
+  - if [ $DATALAD_TESTS_SSH != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
+      echo "skipping due spaces in $TMPDIR";
+    else
+      $NOSE_WRAPPER ../tools/testing/run_doc_examples;
+    fi
+  - cd ..
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
   - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then
@@ -242,14 +251,6 @@ script:
     fi
   # Run javascript tests
   - grunt test --verbose
-  # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  - if [ $DATALAD_TESTS_SSH != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
-      echo "skipping due spaces in $TMPDIR";
-    else
-      $NOSE_WRAPPER tools/testing/run_doc_examples;
-    fi
-  # Test installation system-wide
-  - sudo pip install .
   # Report WTF information using system wide installed version
   - datalad wtf
 
