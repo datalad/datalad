@@ -27,7 +27,6 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 
-
 @with_tempfile(mkdir=True)
 def test_dicom(path):
     ds = Dataset(path).create()
@@ -61,10 +60,12 @@ def test_dicom(path):
 
     # for this artificial case pretty much the same info also comes out as
     # unique props, but wrapped in lists
+    udp = res[0]['metadata']["datalad_unique_content_properties"]['dicom']
     assert_dict_equal(
         {k: [v]
-         for k, v in dsmeta['Series'][0].items()},
-        res[0]['metadata']["datalad_unique_content_properties"]['dicom'])
+         for k, v in dsmeta['Series'][0].items()
+         if k in udp},
+        udp)
 
     # buuuut, if we switch of file-based metadata storage
     ds.config.add('datalad.metadata.aggregate-content-dicom', 'false', where='dataset')

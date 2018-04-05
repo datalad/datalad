@@ -518,7 +518,7 @@ class AggregateMetaData(Interface):
     scientific metadata standards are supported, like DICOM, BIDS, or datacite.
     Some metadata extractors depend on particular 3rd-party software. The list of
     metadata extractors available to a particular DataLad installation is reported
-    by the 'wtf' plugin ('datalad wtf').
+    by the 'wtf' command ('datalad wtf').
 
     Enabling a metadata extractor for a dataset is done by adding its name to the
     'datalad.metadata.nativetype' configuration variable -- typically in the
@@ -530,8 +530,8 @@ class AggregateMetaData(Interface):
 
     Enabling multiple extractors is supported. In this case, metadata are
     extracted by each extractor individually, and stored alongside each other.
-    Metadata aggregation will also extract DataLad's own metadata (extractor
-    'datalad_core').
+    Metadata aggregation will also extract DataLad's own metadata (extractors
+    'datalad_core', and 'annex').
 
     Metadata aggregation can be performed recursively, in order to aggregate all
     metadata across all subdatasets, for example, to be able to search across
@@ -586,6 +586,8 @@ class AggregateMetaData(Interface):
     _params_ = dict(
         # TODO add option to not update aggregated data/info in intermediate
         # datasets
+        # TODO add option to not store aggregated metadata in the leaf-dataset
+        # it was extracted from
         # TODO add option for full aggregation (not incremental), so when something
         # is not present nothing about it is preserved in the aggregated metadata
         dataset=Parameter(

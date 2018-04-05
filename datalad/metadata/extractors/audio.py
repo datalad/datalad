@@ -33,6 +33,9 @@ vocab_map = {
 
 
 class MetadataExtractor(BaseMetadataExtractor):
+
+    _unique_exclude = {'bitrate'}
+
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []
