@@ -1299,7 +1299,7 @@ def test_fake_dates(path):
     gr.commit("commit bar")
     eq_(FAKE_DATE_ROOT + 2, gr.get_commit_date())
 
-    # If we checkout another branch, it's time is still based of the latest
+    # If we checkout another branch, its time is still based on the latest
     # timestamp in any local branch.
     gr.checkout("other", options=["--orphan"])
     with open(opj(path, "baz"), "w") as ofh:
