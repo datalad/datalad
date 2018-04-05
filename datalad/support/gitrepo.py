@@ -44,7 +44,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
-from datalad.consts import GIT_SSH_COMMAND
+from datalad.consts import GIT_SSH_COMMAND, FAKE_DATE_ROOT
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 from datalad.utils import assure_list
@@ -483,7 +483,7 @@ class GitRepo(RepoInterface):
     # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, repo=None, **kwargs):
+                 git_opts=None, repo=None, fake_dates=False, **kwargs):
         """Creates representation of git repository at `path`.
 
         Can also be used to create a git repository at `path`.
@@ -602,6 +602,11 @@ class GitRepo(RepoInterface):
             self.inode = os.stat(self.realpath).st_ino
         else:
             self.inode = None
+
+        if fake_dates:
+            self.configure_fake_dates()
+        # Set by fake_dates_enabled to cache config value across this instance.
+        self._fake_dates_enabled = None
 
     @property
     def repo(self):
@@ -1001,6 +1006,50 @@ class GitRepo(RepoInterface):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
+    def configure_fake_dates(self):
+        """Configure repository to use fake dates.
+        """
+        lgr.debug("Enabling fake dates")
+        # FIXME: We should probably store this in .datalad/config instead of
+        # .git/config so that the setting is tracked, but we can't just change
+        # to where='dataset' below and then call self.commit because
+        # AnnexRepo.commit will fail if it's called before it sets
+        # self._batched.
+        self.config.set("datalad.dataset.fakedates", "true", where="local")
+
+    @property
+    def fake_dates_enabled(self):
+        """Is the repository configured to use fake dates?
+        """
+        if self._fake_dates_enabled:
+            return True
+
+        if self._fake_dates_enabled is None:
+            fake = self.config.get('datalad.dataset.fakedates', None)
+            if fake == "true":
+                self._fake_dates_enabled = True
+                return True
+        return False
+
+    def add_fake_dates(self, env):
+        """Add fake dates to `env`.
+        """
+        last_date = self._git_custom_command(
+            None,
+            ["git", "for-each-ref", "--count=1",
+             "--sort=-committerdate", "--format=%(committerdate:unix)",
+             "refs/heads"])[0].strip()
+
+        seconds = int(last_date) if last_date else FAKE_DATE_ROOT
+        date = "{} +0000".format(seconds + 1)
+
+        lgr.debug("Setting date to {}".format(date))
+
+        if date:
+            env["GIT_AUTHOR_DATE"] = date
+            env["GIT_COMMITTER_DATE"] = date
+            env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds)
+
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):
         """Commit changes to git.
@@ -1037,8 +1086,12 @@ class GitRepo(RepoInterface):
             else:
                 options = ["--allow-empty-message"]
 
+        env = None
         if date:
             options += ["--date", date]
+        elif self.fake_dates_enabled:
+            env = os.environ.copy()
+            self.add_fake_dates(env)
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation
         # of commit.
@@ -1063,7 +1116,7 @@ class GitRepo(RepoInterface):
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         try:
-            self._git_custom_command(files, cmd,
+            self._git_custom_command(files, cmd, env=env,
                                      expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:

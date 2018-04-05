@@ -117,7 +117,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
-                 repo=None):
+                 repo=None, fake_dates=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -181,7 +181,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
                                             create=create, repo=repo,
-                                            git_opts=git_opts)
+                                            git_opts=git_opts,
+                                            fake_dates=fake_dates)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
@@ -1035,10 +1036,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         cmd_list += [annex_cmd] + backend + debug + annex_options
 
+        env = None
+        if self.fake_dates_enabled:
+            env = os.environ.copy()
+            self.add_fake_dates(env)
+
         if files:
             cmd_list += ['--'] + files
         try:
-            return self.cmd_call_wrapper.run(cmd_list, **kwargs)
+            return self.cmd_call_wrapper.run(cmd_list, env=env, **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),

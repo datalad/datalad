@@ -35,6 +35,7 @@ from mock import patch
 import gc
 
 from datalad.cmd import Runner
+from datalad.consts import FAKE_DATE_ROOT
 
 from datalad.support.external_versions import external_versions
 
@@ -2202,3 +2203,11 @@ def test_fake_is_not_special(path):
     # doesn't exist -- we fail by default
     assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
     assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
+
+
+@with_tempfile(mkdir=True)
+def test_fake_dates(path):
+    ar = AnnexRepo(path, create=True, fake_dates=True)
+    # Commits from the "git annex init" call are one second ahead.
+    for commit in ar.get_branch_commits("git-annex"):
+        eq_(FAKE_DATE_ROOT + 1, commit.committed_date)

@@ -13,6 +13,8 @@
 from nose.tools import assert_is_instance
 
 import os
+
+from datalad.consts import FAKE_DATE_ROOT
 from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -1280,3 +1282,29 @@ def test_get_commit_date(path):
     gr.checkout(gr.get_hexsha())
     eq_(gr.get_active_branch(), None)
     eq_(date, gr.get_commit_date('master'))
+
+
+@with_tree(tree={"foo": "foo content",
+                 "bar": "bar content"})
+def test_fake_dates(path):
+    gr = GitRepo(path, create=True, fake_dates=True)
+
+    gr.add("foo")
+    gr.commit("commit foo")
+    # First commit is incremented by 1 second.
+    eq_(FAKE_DATE_ROOT + 1, gr.get_commit_date())
+
+    # The second commit by 2.
+    gr.add("bar")
+    gr.commit("commit bar")
+    eq_(FAKE_DATE_ROOT + 2, gr.get_commit_date())
+
+    # If we checkout another branch, it's time is still based of the latest
+    # timestamp in any local branch.
+    gr.checkout("other", options=["--orphan"])
+    with open(opj(path, "baz"), "w") as ofh:
+        ofh.write("baz content")
+    gr.add("baz")
+    gr.commit("commit baz")
+    eq_(gr.get_active_branch(), "other")
+    eq_(FAKE_DATE_ROOT + 3, gr.get_commit_date())
