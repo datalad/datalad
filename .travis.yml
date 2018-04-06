@@ -5,7 +5,7 @@ language: python
 python:
   - 2.7
   - 3.5
-  - 3.6
+##1  - 3.6
 
 cache:
   - apt
@@ -18,13 +18,14 @@ env:
     - DATALAD_LOG_CMD_ENV=GIT_SSH_COMMAND
     - TESTS_TO_PERFORM=datalad
     - NOSE_OPTS=-s
+    - NOSE_SELECTION="integration or usecase or slow"
     - NOSE_SELECTION_OP="not "   # so it would be "not (integration or usecase)"
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
   matrix:
     - DATALAD_REPO_DIRECT=yes
-    - DATALAD_REPO_VERSION=6
+##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
 
 # Disabled since old folks don't want to change workflows of submitting through central authority
@@ -34,14 +35,21 @@ env:
 matrix:
   include:
   # Additional custom ones
-  - python: 3.5
-    # By default no logs will be output. This one is to test with log output at INFO level
+  - python: 3.6
+    # Single run for Python 3.6
     env:
-    - _DATALAD_UPSTREAM_GITPYTHON=1
-    - _DATALAD_UPSTREAM_GITANNEX=1
-    - _DATALAD_NONPR_ONLY=1
-    # Just so we test if we did not screw up running under nose without -s as well
-    - NOSE_OPTS=
+    # Run all tests in a single whoop here
+    # We cannot have empty -A selector, so the one which always will be fulfilled
+    - NOSE_SELECTION=sadonistic
+    - NOSE_SELECTION_OP=not
+  - python: 3.5
+    # Single run for v6
+    env:
+    # Run all tests in a single whoop here
+    # We cannot have empty -A selector, so the one which always will be fulfilled
+    - NOSE_SELECTION=sadonistic
+    - NOSE_SELECTION_OP=not
+    - DATALAD_REPO_VERSION=6
   - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
@@ -50,18 +58,17 @@ matrix:
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
   - python: 3.5
-    # Run slow etc tests under a single tricky scenario
+    # A run loaded with various customizations to smoke test those functionalities
+    # apparently moving symlink outside has different effects on abspath
+    # see  https://github.com/datalad/datalad/issues/878
     env:
-    - NOSE_SELECTION_OP=""
+    # eventually: - TMPDIR="/var/tmp/sym ссылка"
     - TMPDIR="/var/tmp/sym link"
-    # And the leading - in filenames for the most challenge
+    # and obscure the names more a bit
     - DATALAD_TESTS_OBSCURE_PREFIX=-
-  - python: 3.5
     # By default no logs will be output. This one is to test with log output at INFO level
-    env:
     - DATALAD_LOG_LEVEL=INFO
     - DATALAD_LOG_TRACEBACK=1  # just a smoke test for now
-    - _DATALAD_NONPR_ONLY=1
   - python: 3.5
     # By default no logs will be output. This one is to test with low level but dumped to /dev/null
     env:
@@ -84,54 +91,52 @@ matrix:
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
   - python: 3.5
+    # Test under NFS mount  (only selected sub-set)
+    env:
+    - TMPDIR="/tmp/nfsmount"
+    - TESTS_TO_PERFORM="datalad.tests datalad.support"
+  #
+  # The ones to run only on weekends against master.
+  # They will not contribute to coverage etc, but might lead to failed status
+  #
+  - python: 3.5
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
+    - _DATALAD_UPSTREAM_GITPYTHON=1
+    - _DATALAD_UPSTREAM_GITANNEX=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
+    # Just so we test if we did not screw up running under nose without -s as well
+    - NOSE_OPTS=
+  # run if git-annex version in neurodebian -devel differs
+  - python: 3.5
+    env:
+    - _DATALAD_DEVEL_ANNEX=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
+  - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
-    - _DATALAD_NONPR_ONLY=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
   - python: 3.5
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
-    - _DATALAD_NONPR_ONLY=1
-  - python: 3.5
-    env:
-    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-    - _DATALAD_NONPR_ONLY=1
-  - python: 3.5
-    # To make sure that operates correctly whenever dataset directories have symlinks
-    # in their path.
-    env:
-    # Eventually we will get there, but atm causes a good number of failures
-    # - TMPDIR="/tmp/sym ссылка"
-    - TMPDIR="/tmp/sym link"
-    - _DATALAD_NONPR_ONLY=1
-  - python: 3.5
-    # apparently moving symlink outside has different effects on abspath
-    # see  https://github.com/datalad/datalad/issues/878
-    env:
-    - TMPDIR="/var/tmp/sym link"
-  - python: 3.5
-    # To make sure that operates correctly whenever dataset directories have symlinks
-    # in their path.
-    env:
-    # To make orthogonal test where it is not a symlink but a dir with spaces
-    - TMPDIR="/tmp/d i r"
-    - _DATALAD_NONPR_ONLY=1
-  - python: 3.5
-    # Test under NFS mount  (only selected sub-set)
-    env:
-    - TMPDIR="/tmp/nfsmount"
-    - TESTS_TO_PERFORM="datalad.tests datalad.support"
+    - _DATALAD_NONPRWEEKEND_ONLY=1
+# May be enable later -- not really important
+#  - python: 3.5
+#    env:
+#    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
+#    - _DATALAD_NONPRWEEKEND_ONLY=1
   - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
     - TMPDIR="/tmp/nfsmount"
-    - _DATALAD_NONPR_ONLY=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
   - python: 3.5
     # test whether known v6 failures still fail
     env:
@@ -139,6 +144,7 @@ matrix:
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+    - _DATALAD_NONPRWEEKEND_ONLY=1
   - python: 3.5
     # test whether known direct mode failures still fail
     env:
@@ -146,33 +152,28 @@ matrix:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-  # run if git-annex version in neurodebian -devel differs
-  - python: 3.5
-    env:
-    - _DATALAD_DEVEL_ANNEX=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
     env:
     - TMPDIR="/tmp/nfsmount"
-    - _DATALAD_NONPR_ONLY=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
   # test whether known v6 failures still fail
   - env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
+    - _DATALAD_NONPRWEEKEND_ONLY=1
   # test whether known direct mode failures still fail
   - env:
     - DATALAD_TESTS_SSH=1
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-  # run if git-annex version in neurodebian -devel differs
-  - python: 3.5
-    env:
-    - _DATALAD_DEVEL_ANNEX=1
+    - _DATALAD_NONPRWEEKEND_ONLY=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -183,7 +184,17 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ] && [ ! -z "${_DATALAD_NONPR_ONLY:-}" ]; then echo "Exiting early since these tests should run only in master branch"; exit 0; fi
+  - if [ ! -z "${_DATALAD_NONPRWEEKEND_ONLY:-}" ]; then
+      if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ]; then
+        echo "Exiting early since these tests should run only in master branch";
+        exit 0;
+      fi
+      if [[ `date +%w` -lt 6 ]]; then
+        echo "Exiting early since we run these tests only on weekends!";
+        exit 0;
+      fi
+    fi
+  - sleep 60   # TEMP -- to spot diff
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
@@ -255,8 +266,11 @@ script:
   - datalad wtf
 
 after_success:
-  - coverage combine -a /tmp/.coverage-entrypoints-*
-  - codecov
+  # submit only what we have covered in the PRs
+  - if [ -z "${_DATALAD_NONPRWEEKEND_ONLY:-}" ]; then
+      coverage combine -a /tmp/.coverage-entrypoints-*;
+      codecov;
+    fi
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
 # for a particular debugging
