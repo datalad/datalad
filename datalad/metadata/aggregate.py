@@ -54,6 +54,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
@@ -586,10 +587,6 @@ class AggregateMetaData(Interface):
       to discover which particular files in them match these properties.
     """
     _params_ = dict(
-        # TODO add option to not update aggregated data/info in intermediate
-        # datasets
-        # TODO add option to not store aggregated metadata in the leaf-dataset
-        # it was extracted from
         # TODO add option for full aggregation (not incremental), so when something
         # is not present nothing about it is preserved in the aggregated metadata
         dataset=Parameter(
@@ -608,6 +605,13 @@ class AggregateMetaData(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        update_mode=Parameter(
+            args=('--update-mode',),
+            constraints=EnsureChoice('all', 'target'),
+            doc="""which datasets to update with newly aggregated metadata:
+            all datasets from any leaf dataset to the top-level target dataset
+            including all intermediate datasets (all), or just the top-level
+            target dataset (target)."""),
         save=nosave_opt,
     )
 
@@ -619,6 +623,7 @@ class AggregateMetaData(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            update_mode='target',
             save=True):
         refds_path = Interface.get_refds_path(dataset)
 
@@ -722,17 +727,24 @@ class AggregateMetaData(Interface):
         # first, let's figure out what dataset need updating at all
         # get adjencency info of the dataset tree spanning the base to all leaf dataset
         # associated with the path arguments
-        ds_adj = {}
-        discover_dataset_trace_to_targets(
-            ds.path, to_aggregate, [], ds_adj,
-            # we know that to_aggregate only lists datasets, existing and
-            # absent ones -- we want to aggregate all of them, either from
-            # just extracted metadata, or from previously aggregated metadata
-            # of the closest superdataset
-            includeds=to_aggregate)
-        # TODO we need to work in the info about dataset that we only got from
-        # aggregated metadata, that had no trace on the file system in here!!
-        subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
+        if update_mode == 'all':
+            ds_adj = {}
+            discover_dataset_trace_to_targets(
+                ds.path, to_aggregate, [], ds_adj,
+                # we know that to_aggregate only lists datasets, existing and
+                # absent ones -- we want to aggregate all of them, either from
+                # just extracted metadata, or from previously aggregated metadata
+                # of the closest superdataset
+                includeds=to_aggregate)
+            # TODO we need to work in the info about dataset that we only got from
+            # aggregated metadata, that had no trace on the file system in here!!
+            subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
+        elif update_mode == 'target':
+            subtrees = {ds.path: list(agginfo_db.keys())}
+        else:
+            raise ValueError(
+                "unknown `update_mode` '%s' for metadata aggregation", update_mode)
+
         # go over datasets in bottom-up fashion
         for parentds_path in sorted(subtrees, reverse=True):
             lgr.info('Update aggregate metadata in dataset at: %s', parentds_path)
