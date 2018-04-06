@@ -127,11 +127,10 @@ matrix:
     - http_proxy=
     - https_proxy=
     - _DL_CRON=1
-# May be enable later -- not really important
-#  - python: 3.5
-#    env:
-#    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-#    - _DL_CRON=1
+  - python: 3.5
+    env:
+    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
+    - _DL_CRON=1
   - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
@@ -202,10 +201,10 @@ before_install:
   # Install grunt-cli
   - eatmydata npm install grunt-cli
   # Install optionally upstream current development so we are sure that they break nothing important for us
-  - if [ ! -z "${_DATALAD_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
-  - if [ ! -z "${_DATALAD_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
+  - if [ ! -z "${_DL_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
+  - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
-  - if [ ! -z "${_DATALAD_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
+  - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
@@ -239,7 +238,7 @@ script:
   - WRAPT_DISABLE_EXTENSIONS=1 http_proxy=
     PATH=$PWD/tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
-      -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)"
+      -v -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
       --with-doctest
       --with-cov --cover-package datalad
       --logging-level=INFO
