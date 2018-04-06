@@ -18,8 +18,8 @@ All datalad-specific configuration variables are prefixed with ``datalad.``.
 It is possible to override or amend the configuration using environment
 variables. Any variable with a name that starts with ``DATALAD_`` will
 be available as the corresponding ``datalad.`` configuration variable,
-replacing any ``_`` in the name with a dot, and all letters converted
-to lower case. Values from environment variables take precedence over
+replacing any ``_`` in the name with a dot and converting all letters to
+lower case. Values from environment variables take precedence over
 configuration file settings.
 
 The following sections provide a (non-exhaustive) list of settings honored
