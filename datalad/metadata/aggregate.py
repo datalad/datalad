@@ -215,7 +215,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds, json_py.dump)]
+    metasources = [('ds', 'dataset', dsmeta, agginto_ds, json_py.dump)]
 
     # do not store content metadata if either the source or the target dataset
     # do not want it
@@ -232,7 +232,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
             'content',
             # sort by path key to get deterministic dump content
             (dict(contentmeta[k], path=k) for k in sorted(contentmeta)),
-            aggfrom_ds,
+            agginto_ds,
             json_py.dump2xzstream))
 
     # for both types of metadata
@@ -458,7 +458,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 
     # must copy object files to local target destination
     # make sure those objects are present
-    ds.get([f for f, t in objs2copy], result_renderer='disabled')
+    # use the reference dataset to resolve paths, as they might point to
+    # any location in the dataset tree
+    Dataset(refds_path).get([f for f, t in objs2copy], result_renderer='disabled')
     for copy_from, copy_to in objs2copy:
         if copy_to == copy_from:
             continue
