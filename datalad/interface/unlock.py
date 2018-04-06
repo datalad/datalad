@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from os.path import join as opj
+
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -168,4 +170,7 @@ class Unlock(Interface):
 
             for r in ds.repo.unlock([ap['path'] for ap in to_unlock]):
                 yield get_status_dict(
-                    path=r, status='ok', type='file', **res_kwargs)
+                    path=opj(ds.path, r),
+                    status='ok',
+                    type='file',
+                    **res_kwargs)
