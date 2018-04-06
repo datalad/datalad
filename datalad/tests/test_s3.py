@@ -51,7 +51,7 @@ def test_get_versioned_url():
         eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
             url_pref + "/tarballs/ds001_raw.tgz?versionId=null")
 
-        eq_(get_versioned_url(url_pref + "tarballs/ds001_raw.tgz?param=1"),
+        eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz?param=1"),
             url_pref + "/tarballs/ds001_raw.tgz?param=1&versionId=null")
 
         # We don't duplicate the version if it already exists.
