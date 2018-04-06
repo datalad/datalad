@@ -47,7 +47,7 @@ def test_unparse_versioned_url():
 
 @skip_if_no_network
 @use_cassette('s3_test_version_url')
-def test_version_url():
+def test_get_versioned_url():
     get_test_providers('s3://openfmri/tarballs')  # to verify having credentials to access openfmri via S3
     for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):
         eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
