@@ -356,7 +356,7 @@ def test_create_text_no_annex(path):
 def test_create_fake_dates(path):
     ds = create(path, fake_dates=True)
 
-    eq_(ds.config.get("datalad.dataset.fakedates"), "true")
+    eq_(ds.config.get("datalad.fake-dates"), "true")
     ok_(ds.repo.fake_dates_enabled)
 
     # Another instance detects the fake date configuration.

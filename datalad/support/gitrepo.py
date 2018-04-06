@@ -1015,7 +1015,7 @@ class GitRepo(RepoInterface):
         # to where='dataset' below and then call self.commit because
         # AnnexRepo.commit will fail if it's called before it sets
         # self._batched.
-        self.config.set("datalad.dataset.fakedates", "true", where="local")
+        self.config.set("datalad.fake-dates", "true", where="local")
 
     @property
     def fake_dates_enabled(self):
@@ -1023,7 +1023,7 @@ class GitRepo(RepoInterface):
         """
         if self._fake_dates_enabled is None:
             self._fake_dates_enabled = \
-                self.config.getbool('datalad.dataset', 'fakedates', default=False)
+                self.config.getbool('datalad', 'fake-dates', default=False)
         return self._fake_dates_enabled
 
     def add_fake_dates(self, env):
