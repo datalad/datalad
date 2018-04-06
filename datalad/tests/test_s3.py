@@ -81,8 +81,8 @@ def test_get_versioned_url():
     # Update a versioned URL with a newer version tag.
     url_3ver = "http://datalad-test0-versioned.s3.amazonaws.com/3versions-allversioned.txt"
     url_3ver_input = url_3ver + "?versionId=b.qCuh7Sg58VIYj8TVHzbRS97EvejzEl"
-    eq_(get_versioned_url(url_3ver_input), url_3ver)
-    eq_(get_versioned_url(url_3ver, update=True),
+    eq_(get_versioned_url(url_3ver_input), url_3ver_input)
+    eq_(get_versioned_url(url_3ver_input, update=True),
         url_3ver + "?versionId=Kvuind11HZh._dCPaDAb0OY9dRrQoTMn")
 
 
