@@ -91,7 +91,7 @@ matrix:
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
   - python: 3.5
-    # Test under NFS mount  (only selected sub-set)
+    # Test some under NFS mount  (only selected sub-set)
     env:
     - TMPDIR="/tmp/nfsmount"
     - TESTS_TO_PERFORM="datalad.tests datalad.support"
@@ -104,14 +104,14 @@ matrix:
     env:
     - _DL_UPSTREAM_GITPYTHON=1
     - _DL_UPSTREAM_GITANNEX=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
   # run if git-annex version in neurodebian -devel differs
   - python: 3.5
     env:
     - _DL_DEVEL_ANNEX=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -119,24 +119,24 @@ matrix:
     - NOSE_WRAPPER="sudo -E"
     # no key authentication for root:
     - DATALAD_TESTS_SSH=0
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   - python: 3.5
     env:
     - DATALAD_TESTS_NONETWORK=1
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
 # May be enable later -- not really important
 #  - python: 3.5
 #    env:
 #    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
-#    - _DL_NONPRWEEKEND_ONLY=1
+#    - _DL_NONPRCRON_ONLY=1
   - python: 3.5
     # Test under NFS mount  (full, only in master)
     env:
     - TMPDIR="/tmp/nfsmount"
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   - python: 3.5
     # test whether known v6 failures still fail
     env:
@@ -144,7 +144,7 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   - python: 3.5
     # test whether known direct mode failures still fail
     env:
@@ -152,28 +152,28 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
     env:
     - TMPDIR="/tmp/nfsmount"
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   # test whether known v6 failures still fail
   - env:
     - DATALAD_REPO_VERSION=6
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
   # test whether known direct mode failures still fail
   - env:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_NONPRWEEKEND_ONLY=1
+    - _DL_NONPRCRON_ONLY=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
@@ -184,13 +184,13 @@ matrix:
 #    - UNSET_S3_SECRETS=1
 
 before_install:
-  - if [ ! -z "${_DL_NONPRWEEKEND_ONLY:-}" ]; then
+  - if [ ! -z "${_DL_NONPRCRON_ONLY:-}" ]; then
       if [ ! "${TRAVIS_PULL_REQUEST:-false}" = "false" ]; then
         echo "Exiting early since these tests should run only in master branch";
         exit 0;
       fi
-      if [[ `date +%w` -lt 6 ]]; then
-        echo "Exiting early since we run these tests only on weekends!";
+      if [ ! ${TRAVIS_EVENT_TYPE} = "cron" ]; then
+        echo "Exiting since should only be ran on a weekly basis by cron!";
         exit 0;
       fi
     fi
@@ -267,7 +267,7 @@ script:
 
 after_success:
   # submit only what we have covered in the PRs
-  - if [ -z "${_DL_NONPRWEEKEND_ONLY:-}" ]; then
+  - if [ -z "${_DL_NONPRCRON_ONLY:-}" ]; then
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
