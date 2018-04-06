@@ -113,6 +113,12 @@ class AddReadme(Interface):
             elif content:
                 metainfo += u'\n\n{}'.format(content)
 
+        for key in 'title', 'name', 'shortdescription':
+            if 'title' in meta:
+                break
+            if key in meta:
+                meta['title'] = meta[key]
+
         default_content=u"""\
 # {title}{metainfo}
 
@@ -123,7 +129,7 @@ This is a DataLad dataset{id}.
 For more information on DataLad and on how to work with its datasets,
 see the DataLad documentation at: http://docs.datalad.org
 """.format(
-            title='Dataset "{}"'.format(meta['name']) if 'name' in meta else 'About this dataset',
+            title='Dataset "{}"'.format(meta['title']) if 'title' in meta else 'About this dataset',
             metainfo=metainfo,
             id=u' (id: {})'.format(dataset.id) if dataset.id else '',
             )
