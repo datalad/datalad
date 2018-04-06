@@ -20,7 +20,7 @@ import mimetypes
 from os.path import splitext
 import re
 
-from datalad.support.network import urlquote
+from datalad.support.network import urlquote, URL
 
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
@@ -30,7 +30,6 @@ from datalad.dochelpers import exc_str
 from datalad.support.exceptions import DownloadError, AccessDeniedError
 
 from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.parse import urlparse, urlunparse
 
 
 try:
@@ -293,40 +292,40 @@ def gen_bucket_test2_obscurenames_versioned():
     files("f &$=@:+,?;")
 
 
-def unparse_versioned_url(parsed, version, replace=False):
-    """Construct a versioned URL from `parsed`.
+def add_version_to_url(url, version, replace=False):
+    """Add a version ID to `url`.
 
     Parameters
     ----------
-    parsed : urlparse.ParseResult
-        A parsed URL.
+    url : datalad.support.network.URL
+        A URL.
     version : str
         The value of 'versionId='.
     replace : boolean, optional
-        If a versionID is already present in `parsed`, replace it.
+        If a versionID is already present in `url`, replace it.
 
     Returns
     -------
-    An unparsed URL (str)
+    A versioned URL (str)
     """
     version_id = "versionId={}".format(version)
-    if not parsed.query:
+    if not url.query:
         query = version_id
     else:
         ver_match = re.match("(?P<pre>.*&)?"
                              "(?P<vers>versionId=[^&]+)"
                              "(?P<post>&.*)?",
-                             parsed.query)
+                             url.query)
         if ver_match:
             if replace:
                 query = "".join([ver_match.group("pre") or "",
                                  version_id,
                                  ver_match.group("post") or ""])
             else:
-                query = parsed.query
+                query = url.query
         else:
-            query = parsed.query + "&" + version_id
-    return urlunparse(parsed._replace(query=query))
+            query = url.query + "&" + version_id
+    return URL(**dict(url.fields, query=query)).as_str()
 
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
@@ -357,22 +356,22 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     -------
     string or list of string
     """
-    url_rec = urlparse(url)
+    url_rec = URL(url)
 
     s3_bucket, fpath = None, url_rec.path.lstrip('/')
 
-    if url_rec.netloc.endswith('.s3.amazonaws.com'):
+    if url_rec.hostname.endswith('.s3.amazonaws.com'):
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
-        s3_bucket = url_rec.netloc.split('.', 1)[0]
-    elif url_rec.netloc == 's3.amazonaws.com':
+        s3_bucket = url_rec.hostname.split('.', 1)[0]
+    elif url_rec.hostname == 's3.amazonaws.com':
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
         s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
-        s3_bucket = url_rec.netloc  # must be
+        s3_bucket = url_rec.hostname  # must be
         # and for now implement magical conversion to URL
         # TODO: wouldn't work if needs special permissions etc
         # actually for now
@@ -417,7 +416,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             assert(all_keys)
 
             for key in all_keys:
-                url_versioned = unparse_versioned_url(
+                url_versioned = add_version_to_url(
                     url_rec, key.version_id, replace=update and not return_all)
 
                 all_versions.append(url_versioned)
@@ -433,7 +432,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
 
     if not all_versions:
         # we didn't get a chance
-        all_versions = [urlunparse(url_rec)]
+        all_versions = [url_rec.as_str()]
 
     if return_all:
         return all_versions

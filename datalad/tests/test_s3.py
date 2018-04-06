@@ -10,9 +10,8 @@
 
 """
 
-from six.moves.urllib.parse import urlparse
-
-from ..support.s3 import get_versioned_url, unparse_versioned_url
+from ..support.network import URL
+from ..support.s3 import add_version_to_url, get_versioned_url
 from .utils import use_cassette
 from .utils import ok_startswith
 
@@ -21,27 +20,26 @@ from datalad.tests.utils import skip_if_no_network
 from ..downloaders.tests.utils import get_test_providers
 
 
-def test_unparse_versioned_url():
+def test_add_version_to_url():
     base_url = "http://ex.com/f.txt"
     base_url_query = "http://ex.com/f.txt?k=v"
     for replace in True, False:
-        eq_(unparse_versioned_url(urlparse(base_url),
-                                  "new.id", replace=replace),
+        eq_(add_version_to_url(URL(base_url), "new.id", replace=replace),
             base_url + "?versionId=new.id")
 
-        eq_(unparse_versioned_url(urlparse(base_url_query),
-                                  "new.id", replace=replace),
+        eq_(add_version_to_url(URL(base_url_query),
+                               "new.id", replace=replace),
             base_url_query + "&versionId=new.id")
 
         expected = "new.id" if replace else "orig.id"
-        eq_(unparse_versioned_url(urlparse(base_url + "?versionId=orig.id"),
-                                  "new.id",
-                                  replace=replace),
+        eq_(add_version_to_url(URL(base_url + "?versionId=orig.id"),
+                               "new.id",
+                               replace=replace),
             base_url + "?versionId=" + expected)
 
-        eq_(unparse_versioned_url(urlparse(base_url_query + "&versionId=orig.id"),
-                                  "new.id",
-                                  replace=replace),
+        eq_(add_version_to_url(URL(base_url_query + "&versionId=orig.id"),
+                               "new.id",
+                               replace=replace),
             base_url_query + "&versionId=" + expected)
 
 
