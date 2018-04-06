@@ -41,10 +41,6 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if, skip_if_no_module
 from datalad.tests.utils import SkipTest
 
-try:
-    import datalad.metadata.extractors.bids as has_bids_extractor
-except ImportError:
-    has_bids_extractor = False
 
 broken_plugin = """garbage"""
 
@@ -169,19 +165,18 @@ def test_no_annex(path):
         ds.repo.get_annexed_files())
 
 
-_bids_template = {
+_ds_template = {
     '.datalad': {
         'config': '''\
 [datalad "metadata"]
-        nativetype = bids
+        nativetype = frictionless_datapackage
 '''},
-    'dataset_description.json': '''\
+    'datapackage.json': '''\
 {
-    "Name": "demo_ds",
-    "BIDSVersion": "1.0.0",
-    "Description": "this is for play",
-    "License": "PDDL",
-    "Authors": [
+    "title": "demo_ds",
+    "description": "this is for play",
+    "license": "PDDL",
+    "author": [
         "Betty",
         "Tom"
     ]
@@ -189,8 +184,7 @@ _bids_template = {
 '''}
 
 
-@skip_if(not has_bids_extractor, "bids extractor is N/A")
-@with_tree(_bids_template)
+@with_tree(_ds_template)
 def test_add_readme(path):
     ds = Dataset(path).create(force=True)
     ds.add('.')
