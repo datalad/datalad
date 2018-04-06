@@ -25,8 +25,8 @@ def _load_plugins():
         globals()[camel.sub('\\1_\\2', pi.__name__).lower()] = pi.__call__
 
 
-def _generate_modules_api():
-    """Auto detect all available modules and generate an API from them
+def _generate_extension_api():
+    """Auto detect all available extensions and generate an API from them
     """
     from importlib import import_module
     from pkg_resources import iter_entry_points
@@ -36,9 +36,9 @@ def _generate_modules_api():
     import logging
     lgr = logging.getLogger('datalad.api')
 
-    for entry_point in iter_entry_points('datalad.modules'):
+    for entry_point in iter_entry_points('datalad.extensions'):
         try:
-            lgr.debug('Loading entrypoint %s from datalad.modules', entry_point.name)
+            lgr.debug('Loading entrypoint %s from datalad.extensions', entry_point.name)
             grp_descr, interfaces = entry_point.load()
         except Exception as e:
             lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, exc_str(e))
@@ -51,15 +51,15 @@ def _generate_modules_api():
             api_name = get_api_name(intfspec)
             if api_name in globals():
                 lgr.debug(
-                    'Command %s from extension module %s is replacing a previously loaded implementation',
+                    'Command %s from extension %s is replacing a previously loaded implementation',
                     api_name,
                     entry_point.name)
             globals()[api_name] = intf.__call__
 
 
-_generate_modules_api()
+_generate_extension_api()
 _load_plugins()
 
 # Be nice and clean up the namespace properly
 del _load_plugins
-del _generate_modules_api
+del _generate_extension_api
