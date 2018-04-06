@@ -1,3 +1,5 @@
+"""A pipeline for Stanford Repository's xml datasets"""
+
 from ..nodes.matches import xpath_match
 from ..nodes.crawl_url import crawl_url
 try:
@@ -15,6 +17,8 @@ except ImportError:  # pragma: no cover
 def pipeline(doc_id=None,
              x_pathmatch_="//file/@id",
              leading_dirs_depth=1):
+    """Pipeline to crawl xml datasets from purls
+    """
 
     crawler = crawl_url("https://purl.stanford.edu/" + doc_id + ".xml")
     # adding print_xml to incoming pipeline
@@ -30,6 +34,8 @@ def pipeline(doc_id=None,
 
 
 def configure_url(data, keys=['url'], match='match'):
+    """Given purl, configure to a url that leads directly to the file
+    """
     data = data.copy()
 
     for key in keys:
