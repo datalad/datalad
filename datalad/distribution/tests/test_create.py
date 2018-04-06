@@ -19,7 +19,6 @@ from os.path import lexists
 
 from ..dataset import Dataset
 from datalad.api import create
-from datalad.consts import FAKE_DATE_ROOT
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.cmd import Runner
@@ -365,4 +364,5 @@ def test_create_fake_dates(path):
     first_commit = ds.repo.repo.commit(
         ds.repo.repo.git.rev_list("--reverse", "--all").split()[0])
 
-    eq_(FAKE_DATE_ROOT + 1, first_commit.committed_date)
+    eq_(ds.config.obtain("datalad.fake-dates-start") + 1,
+        first_commit.committed_date)

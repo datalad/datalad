@@ -97,6 +97,13 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.fake-dates-start': {
+        'ui': ('question', {
+            'title': 'Initial fake date',
+            'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time).'}),
+        'type': EnsureInt(),
+        'default': 1112911993,
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

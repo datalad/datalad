@@ -65,5 +65,3 @@ GIT_SSH_COMMAND = "datalad sshrun"
 
 # magic sha is from `git hash-object -t tree /dev/null`, i.e. from nothing
 PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
-
-FAKE_DATE_ROOT = 1112911993

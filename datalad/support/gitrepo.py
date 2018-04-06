@@ -44,7 +44,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
-from datalad.consts import GIT_SSH_COMMAND, FAKE_DATE_ROOT
+from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 from datalad.utils import assure_list
@@ -1035,7 +1035,10 @@ class GitRepo(RepoInterface):
              "--sort=-committerdate", "--format=%(committerdate:unix)",
              "refs/heads"])[0].strip()
 
-        seconds = int(last_date) if last_date else FAKE_DATE_ROOT
+        if last_date:
+            seconds = int(last_date)
+        else:
+            seconds = self.config.obtain("datalad.fake-dates-start")
         date = "{} +0000".format(seconds + 1)
 
         lgr.debug("Setting date to {}".format(date))

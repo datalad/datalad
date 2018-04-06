@@ -14,7 +14,6 @@ from nose.tools import assert_is_instance
 
 import os
 
-from datalad.consts import FAKE_DATE_ROOT
 from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -1291,13 +1290,16 @@ def test_fake_dates(path):
 
     gr.add("foo")
     gr.commit("commit foo")
+
+    seconds_initial = gr.config.obtain("datalad.fake-dates-start")
+
     # First commit is incremented by 1 second.
-    eq_(FAKE_DATE_ROOT + 1, gr.get_commit_date())
+    eq_(seconds_initial + 1, gr.get_commit_date())
 
     # The second commit by 2.
     gr.add("bar")
     gr.commit("commit bar")
-    eq_(FAKE_DATE_ROOT + 2, gr.get_commit_date())
+    eq_(seconds_initial + 2, gr.get_commit_date())
 
     # If we checkout another branch, its time is still based on the latest
     # timestamp in any local branch.
@@ -1307,4 +1309,4 @@ def test_fake_dates(path):
     gr.add("baz")
     gr.commit("commit baz")
     eq_(gr.get_active_branch(), "other")
-    eq_(FAKE_DATE_ROOT + 3, gr.get_commit_date())
+    eq_(seconds_initial + 3, gr.get_commit_date())
