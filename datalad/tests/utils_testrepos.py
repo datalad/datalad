@@ -188,7 +188,7 @@ class NestedDataset(BasicAnnexTestRepo):
             '', ['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
             cwd=opj(self.path, 'sub dataset1'), **kw)
         GitRepo(opj(self.path, 'sub dataset1')).commit('Added sub dataset.')
-        self.repo.commit('Added subdatasets.')
+        self.repo.commit('Added subdatasets.', options=["-a"])
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'],
             cwd=self.path, **kw)
