@@ -423,6 +423,7 @@ def test_install_recursive_with_data(src, path):
 # to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
 
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
+@known_failure_v6  # https://github.com/datalad/datalad/pull/2391#issuecomment-379414293
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
