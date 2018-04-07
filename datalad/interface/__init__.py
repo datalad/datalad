@@ -57,6 +57,7 @@ _group_metadata = (
 _group_misc = (
     'Miscellaneous commands',
     [
+        ('datalad.interface.configure', 'Configure'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.crawl', 'Crawl'),
         ('datalad.interface.crawl_init', 'CrawlInit', 'crawl-init'),
