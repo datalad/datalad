@@ -255,6 +255,7 @@ script:
   - datalad wtf
 
 after_success:
+  - cp __testhome__/.coverage .
   - coverage combine -a /tmp/.coverage-entrypoints-*
   - codecov
 
