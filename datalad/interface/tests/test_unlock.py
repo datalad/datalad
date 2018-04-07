@@ -106,7 +106,7 @@ def test_unlock(path):
     if ds.repo.is_direct_mode():
         assert_status('notneeded', result)
     else:
-        assert_in_results(result, path='test-annex.dat', status='ok')
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
@@ -131,15 +131,10 @@ def test_unlock(path):
     result = ds.unlock(path='test-annex.dat')
     assert_result_count(result, 1)
 
-    # TODO: Why in the following result there is the absolute path in direct mode
-    # while it's the relative one in indirect mode?
-    # Probably:
-    # => direct mode: no actual call to annex-unlock
-    # => indirect mode: it's what AnnexRepo.unlock returns
     if ds.repo.is_direct_mode():
         assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='notneeded')
     else:
-        assert_in_results(result, path='test-annex.dat', status='ok')
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")
