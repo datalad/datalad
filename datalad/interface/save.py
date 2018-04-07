@@ -217,8 +217,7 @@ class Save(Interface):
 
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
-            # we verify that there is an actual repo next
-            dataset = abspath(curdir)
+            path = abspath(curdir)
         refds_path = Interface.get_refds_path(dataset)
 
         if message and message_file:
