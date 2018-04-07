@@ -236,7 +236,7 @@ script:
   - cd __testhome__
   # Run tests
   - WRAPT_DISABLE_EXTENSIONS=1 http_proxy=
-    PATH=$PWD/tools/coverage-bin:$PATH
+    PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
       -v -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"
       --with-doctest
@@ -263,6 +263,7 @@ script:
 after_success:
   # submit only what we have covered in the PRs
   - if [ -z "${_DL_CRON:-}" ]; then
+      cp __testhome__/.coverage .;
       coverage combine -a /tmp/.coverage-entrypoints-*;
       codecov;
     fi
