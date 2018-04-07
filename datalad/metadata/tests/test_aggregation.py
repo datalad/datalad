@@ -21,6 +21,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
@@ -64,14 +65,14 @@ def test_basic_aggregate(path):
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.add('.', recursive=True)
     ok_clean_git(base.path)
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     direct_meta = base.metadata(recursive=True, return_type='list')
     # loose the deepest dataset
     sub.uninstall('subsub', check=False)
     # no we should eb able to reaggregate metadata, and loose nothing
     # because we can aggregate aggregated metadata of subsub from sub
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     # same result for aggregate query than for (saved) direct query
     agg_meta = base.metadata(recursive=True, return_type='list')
     for d, a in zip(direct_meta, agg_meta):
@@ -137,7 +138,7 @@ def test_aggregate_query(path):
 def test_nested_metadata(path):
     ds = Dataset(path).create(force=True)
     ds.add('.')
-    ds.aggregate_metadata()
+    ds.aggregate_metadata(update_mode='all')
     # BIDS returns participant info as a nested dict for each file in the
     # content metadata. On the dataset-level this should automatically
     # yield a sequence of participant info dicts, without any further action
@@ -165,7 +166,7 @@ def test_nested_metadata(path):
         ])
     # we can turn off this kind of auto-summary
     ds.config.add('datalad.metadata.generate-unique-bids', 'false', where='dataset')
-    ds.aggregate_metadata()
+    ds.aggregate_metadata(update_mode='all')
     meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
     # protect next test a little, in case we enhance our core extractor in the future
     # to provide more info
@@ -186,7 +187,7 @@ def test_reaggregate_with_unavailable_objects(path):
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.add('.', recursive=True)
     ok_clean_git(base.path)
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     objpath = opj('.datalad', 'metadata', 'objects')
     # weird that it comes out as a string...
@@ -200,7 +201,7 @@ def test_reaggregate_with_unavailable_objects(path):
     ok_clean_git(base.path)
     # now re-aggregate, the state hasn't changed, so the file names will
     # be the same
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     eq_(all(base.repo.file_has_content(objs)), True)
     # and there are no new objects
     eq_(
@@ -222,7 +223,7 @@ def test_publish_aggregated(path):
     base.create('sub', force=True)
     base.add('.', recursive=True)
     ok_clean_git(base.path)
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
 
     # create sibling and publish to it
@@ -269,7 +270,7 @@ def test_aggregate_removal(path):
     sub = base.create('sub', force=True)
     subsub = sub.create(opj('subsub'), force=True)
     base.add('.', recursive=True)
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     res = base.metadata(get_aggregates=True)
     assert_result_count(res, 3)
@@ -281,7 +282,7 @@ def test_aggregate_removal(path):
     base.remove(opj('sub', 'subsub'), check=False)
     # now aggregation has to detect that subsub is not simply missing, but gone
     # for good
-    base.aggregate_metadata(recursive=True)
+    base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     # internally consistent state
     eq_(_get_contained_objs(base), _get_referenced_objs(base))
@@ -292,3 +293,59 @@ def test_aggregate_removal(path):
     res = sub.metadata(get_aggregates=True)
     assert_result_count(res, 0, path=subsub.path)
     assert_result_count(res, 1)
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+@skip_direct_mode  #FIXME
+def test_update_strategy(path):
+    base = Dataset(opj(path, 'origin')).create(force=True)
+    # force all metadata objects into the annex
+    with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
+        f.write(
+            '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
+    sub = base.create('sub', force=True)
+    subsub = sub.create(opj('subsub'), force=True)
+    base.add('.', recursive=True)
+    ok_clean_git(base.path)
+    # we start clean
+    for ds in base, sub, subsub:
+        eq_(len(_get_contained_objs(ds)), 0)
+    # aggregate the base dataset only, nothing below changes
+    base.aggregate_metadata()
+    eq_(len(_get_contained_objs(base)), 2)
+    for ds in sub, subsub:
+        eq_(len(_get_contained_objs(ds)), 0)
+    # aggregate the entire tree, but by default only updates
+    # the top-level dataset with all objects, none of the leaf
+    # or intermediate datasets get's touched
+    base.aggregate_metadata(recursive=True)
+    eq_(len(_get_contained_objs(base)), 6)
+    eq_(len(_get_referenced_objs(base)), 6)
+    for ds in sub, subsub:
+        eq_(len(_get_contained_objs(ds)), 0)
+    res = base.metadata(get_aggregates=True)
+    assert_result_count(res, 3)
+    # it is impossible to query an intermediate or leaf dataset
+    # for metadata
+    for ds in sub, subsub:
+        assert_status(
+            'impossible',
+            ds.metadata(get_aggregates=True, on_failure='ignore'))
+    # get the full metadata report
+    target_meta = base.metadata(return_type='list')
+
+    # now redo full aggregation, this time updating all
+    # (intermediate) datasets
+    base.aggregate_metadata(recursive=True, update_mode='all')
+    eq_(len(_get_contained_objs(base)), 6)
+    eq_(len(_get_contained_objs(sub)), 4)
+    eq_(len(_get_contained_objs(subsub)), 2)
+    # it is now OK to query an intermediate or leaf dataset
+    # for metadata
+    for ds in sub, subsub:
+        assert_status(
+            'ok',
+            ds.metadata(get_aggregates=True, on_failure='ignore'))
+
+    # all of that has no impact on the reported metadata
+    eq_(target_meta, base.metadata(return_type='list'))
