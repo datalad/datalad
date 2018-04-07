@@ -230,7 +230,7 @@ script:
   - cd __testhome__
   # Run tests
   - WRAPT_DISABLE_EXTENSIONS=1 http_proxy=
-    PATH=$PWD/tools/coverage-bin:$PATH
+    PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
       -v -A "$NOSE_SELECTION_OP(integration or usecase or slow)"
       --with-doctest
