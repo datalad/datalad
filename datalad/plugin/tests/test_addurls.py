@@ -348,7 +348,9 @@ class TestAddurls(object):
         mktmp_kws = get_tempfile_kwargs()
         path = tempfile.mkdtemp(**mktmp_kws)
         create_tree(path,
-                    {"udir": {x + ".dat": x + " content" for x in "abcd"}})
+                    {"udir": {x + ".dat" + ver: x + " content"
+                              for x in "abcd"
+                              for ver in ["", ".v1"]}})
 
         cls._hpath = HTTPPath(path)
         cls._hpath.start()
@@ -521,3 +523,27 @@ class TestAddurls(object):
             ds.addurls(self.json_file, "", "{subdir}//{name}")
             assert_re_in(r".*Dropped [0-9]+ row\(s\) that had an empty URL",
                          str(cml.out))
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_version(self, path):
+        ds = Dataset(path).create(force=True)
+
+        def version_fn(url):
+            if url.endswith("b.dat"):
+                raise ValueError("Scheme error")
+            return url + ".v1"
+
+        with patch("datalad.plugin.addurls.get_versioned_url", version_fn):
+            with swallow_logs(new_level=logging.WARNING) as cml:
+                ds.addurls(self.json_file, "{url}", "{name}",
+                           version_urls=True)
+                assert_in("b.dat", str(cml.out))
+
+        names = ["a", "c"]
+        for fname in names:
+            ok_exists(os.path.join(path, fname))
+
+        whereis = ds.repo.whereis(names, output="full")
+        for fname, info in whereis.items():
+            eq_(info[ds.repo.WEB_UUID]['urls'],
+                ["{}udir/{}.dat.v1".format(self.url, fname)])
