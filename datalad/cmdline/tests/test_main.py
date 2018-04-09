@@ -28,6 +28,7 @@ from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import slow
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -185,6 +186,7 @@ def test_script_shims():
                      get_numeric_portion(version))
 
 
+@slow  # 11.2591s
 @with_tempfile(mkdir=True)
 def test_cfg_override(path):
     with chpwd(path):

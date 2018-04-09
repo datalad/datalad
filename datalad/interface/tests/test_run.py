@@ -49,6 +49,7 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import slow
 
 
 @with_tempfile(mkdir=True)
@@ -109,6 +110,7 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@slow  # 17.1880s
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
