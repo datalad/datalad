@@ -114,7 +114,7 @@ class XNATServer(object):
             return lower_case_the_keys(j['result'])
         return out
 
-    def get_projects(self, limit=None, asdict=True):
+    def get_projects(self, limit=None, drop_empty=False, asdict=True):
         """Get list of projects 
         
         Parameters
@@ -122,13 +122,24 @@ class XNATServer(object):
         limit: {'public', 'protected', 'private', None} or list of thereoff
            'private' -- projects you have no any access to. 'protected' -- you could
            fetch description but not the data. None - would list all the projects
+
+        drop_empty: whether to drop projects with no experiements
         """
         # accessible  option could limit to the projects I have access to
+        if drop_empty:
+            fields_to_check = DEFAULT_RESULT_FIELDS.union({'title',})
+            experiments = self('data/experiments', 
+                               fields_to_check=fields_to_check)
+            non_empty_projects = set([ e['project'] for e in experiments ])
         kw = {}
         if limit:
             kw['options'] = {"accessible": "true"} if limit else None
             kw['fields_to_check'] = DEFAULT_RESULT_FIELDS | {'title', 'xdat_user_id'}
-        out = self('data/projects', **kw)
+        all_projects = self('data/projects', **kw)
+        if drop_empty:
+            out = [ p for p in all_projects if p['id'] in non_empty_projects ]
+        else:
+            out = all_projects
         if limit:
             limit = assure_list(limit)
             # double check that all the project_access thingies in the set which
