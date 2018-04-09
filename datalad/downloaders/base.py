@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import msgpack
 import os
+import sys
 import time
 
 from abc import ABCMeta, abstractmethod
@@ -21,6 +22,7 @@ from os.path import exists, join as opj, isdir
 from six import PY2
 from six import binary_type, PY3
 from six import add_metaclass
+from six import reraise
 
 
 from .. import cfg
@@ -124,7 +126,7 @@ class BaseDownloader(object):
             if attempt > 20:
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
                 raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
-
+            exc_info = None
             try:
                 used_old_session = False
                 access_denied = False
@@ -137,8 +139,10 @@ class BaseDownloader(object):
                 break
             except AccessDeniedError as e:
                 lgr.debug("Access was denied: %s", exc_str(e))
+                exc_info = sys.exc_info()
                 access_denied = True
             except IncompleteDownloadError as e:
+                exc_info = sys.exc_info()
                 incomplete_attempt += 1
                 if incomplete_attempt > 5:
                     # give up
@@ -167,11 +171,16 @@ class BaseDownloader(object):
                         #     ineffective
                         #     - not sure what to do about it
                         if not ui.is_interactive:
-                            # We cannot ask, so we just (re)blow
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            raise
+                            if exc_info:
+                                reraise(*exc_info)
+                            else:
+                                # must not happen but who knows
+                                raise AccessDeniedError(
+                                    "Interface is not interactive and we were denied access."
+                                    " Report to datalad developers")
                         if ui.yesno(
                                 title="Authentication to access {url} has failed".format(url=url),
                                 text="Do you want to enter other credentials in case they were updated?"):
