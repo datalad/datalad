@@ -70,18 +70,40 @@ def LZMAFile(*args, **kwargs):
     dir(lzmafile)
     return lzmafile
 
-def dump2xzstream(obj, fname):
-    with LZMAFile(fname, mode='w') as f:
+
+def dump2stream(obj, fname, compressed=False):
+
+    _open = LZMAFile if compressed else open
+
+    with _open(fname, mode='w') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
             f.write(b'\n')
 
 
-def load_xzstream(fname):
-    with LZMAFile(fname, mode='r') as f:
+def dump2xzstream(obj, fname):
+    dump2stream(obj, fname, compressed=True)
+    # with LZMAFile(fname, mode='w') as f:
+    #     jwriter = codecs.getwriter('utf-8')(f)
+    #     for o in obj:
+    #         jsondump(o, jwriter, **compressed_json_dump_kwargs)
+    #         f.write(b'\n')
+
+
+def load_stream(fname, compressed=False):
+
+    _open = LZMAFile if compressed else open
+    with _open(fname, mode='r') as f:
         for line in f:
             yield loads(line)
+
+
+def load_xzstream(fname):
+    load_stream(fname, compressed=True)
+    # with LZMAFile(fname, mode='r') as f:
+    #     for line in f:
+    #         yield loads(line)
 
 
 def loads(s, *args, **kwargs):
