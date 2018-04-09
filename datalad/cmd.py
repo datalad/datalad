@@ -326,13 +326,13 @@ class Runner(object):
                 # resolving a once in a while failing test #2185
                 if isinstance(out_, text_type):
                     out_ = out_.encode('utf-8')
-                out += linesep_bytes.join(
-                    self._process_one_line(*pargs, line=line)
-                    for line in out_.split(linesep_bytes))
+                for line in out_.split(linesep_bytes):
+                    out += self._process_one_line(
+                        *pargs, line=line, suf=linesep_bytes)
         return out
 
     def _process_one_line(self, out_type, proc, log_, log_is_callable,
-                          expected=False, line=None):
+                          expected=False, line=None, suf=None):
         if line is None:
             lgr.log(3, "Reading line from %s", out_type)
             line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
@@ -352,7 +352,7 @@ class Runner(object):
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
-            return line
+            return (line + suf) if suf else line
         # it was output already directly but for code to work, return ""
         return binary_type()
 
