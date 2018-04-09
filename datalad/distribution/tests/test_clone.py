@@ -12,7 +12,9 @@
 
 from datalad.tests.utils import (
     known_failure_v6,
-    get_datasets_topdir
+    get_datasets_topdir,
+    integration,
+    slow
 )
 
 
@@ -80,6 +82,7 @@ def test_invalid_args(path, otherpath, alienpath):
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
 
+@integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
@@ -97,6 +100,7 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
+@integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
@@ -215,6 +219,8 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
+
+@slow  # 23.1478s
 @known_failure_v6   #FIXME
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
