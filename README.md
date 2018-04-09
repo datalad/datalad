@@ -139,7 +139,7 @@ MIT/Expat
 
 ## Acknowledgements
 
-DataLad development is supported a US-German collaboration in
+DataLad development is supported by a US-German collaboration in
 computational neuroscience (CRCNS) project "DataGit: converging catalogues,
 warehouses, and deployment logistics into a federated 'data distribution'"
 (Halchenko/Hanke), co-funded by the US National Science Foundation (NSF
