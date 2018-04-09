@@ -59,6 +59,7 @@ def dump2fileobj(obj, fileobj):
         codecs.getwriter('utf-8')(fileobj),
         **json_dump_kwargs)
 
+
 def LZMAFile(*args, **kwargs):
     """A little decorator to overcome a bug in lzma
 
@@ -75,7 +76,7 @@ def dump2stream(obj, fname, compressed=False):
 
     _open = LZMAFile if compressed else open
 
-    with _open(fname, mode='w') as f:
+    with _open(fname, mode='wb') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
@@ -84,11 +85,6 @@ def dump2stream(obj, fname, compressed=False):
 
 def dump2xzstream(obj, fname):
     dump2stream(obj, fname, compressed=True)
-    # with LZMAFile(fname, mode='w') as f:
-    #     jwriter = codecs.getwriter('utf-8')(f)
-    #     for o in obj:
-    #         jsondump(o, jwriter, **compressed_json_dump_kwargs)
-    #         f.write(b'\n')
 
 
 def load_stream(fname, compressed=False):
@@ -100,10 +96,8 @@ def load_stream(fname, compressed=False):
 
 
 def load_xzstream(fname):
-    load_stream(fname, compressed=True)
-    # with LZMAFile(fname, mode='r') as f:
-    #     for line in f:
-    #         yield loads(line)
+    for o in load_stream(fname, compressed=True):
+        yield o
 
 
 def loads(s, *args, **kwargs):
