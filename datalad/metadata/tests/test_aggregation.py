@@ -125,13 +125,18 @@ def test_aggregate_query(path):
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
-    # and the command will report the aggregated metadata as it is recorded
-    # in the dataset that is the closest parent on disk
+    # when no reference dataset is given the command will report the
+    # aggregated metadata as it is recorded in the dataset that is the
+    # closest parent on disk
     ds.create('sub', force=True)
-    # same call as above, different result!
-    res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
+    res = metadata(opj(path, 'sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://sub.example.com'}, res[0]['metadata'])
+    # when a reference dataset is given, it will be used as the metadata
+    # provider
+    res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
+    assert_result_count(res, 1)
+    eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
 
 
 @with_tree(tree=bids_template)
