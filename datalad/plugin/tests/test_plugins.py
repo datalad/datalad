@@ -134,15 +134,23 @@ def test_wtf(path):
         assert_in('user.name: ', cmo.out)
 
     skip_if_no_module('pyperclip')
+
+    # verify that it works correctly in the env/platform
+    import pyperclip
     with swallow_outputs() as cmo:
-        import pyperclip
         try:
+            pyperclip.copy("xxx")
+            pyperclip_works = pyperclip.paste().strip() == "xxx"
             wtf(dataset=ds.path, clipboard=True)
         except (AttributeError, pyperclip.PyperclipException) as exc:
             # AttributeError could come from pyperclip if no DISPLAY
             raise SkipTest(exc_str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
+        if not pyperclip_works:
+            # Some times does not throw but just fails to work
+            raise SkipTest(
+                "Pyperclip seems to be not functioning here correctly")
         assert_not_in('user.name', pyperclip.paste())
         assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
         assert_in("cmd:annex=", pyperclip.paste())  # but the content is there
