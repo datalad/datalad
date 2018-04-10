@@ -1038,7 +1038,7 @@ class GitRepo(RepoInterface):
         seconds_new = seconds + 1
         date = "@{} +0000".format(seconds_new)
 
-        lgr.debug("Setting date to {}".format(date))
+        lgr.debug("Setting date to %s", date)
 
         if date:
             env["GIT_AUTHOR_DATE"] = date
