@@ -113,6 +113,35 @@ def anything2bool(val):
             % repr(val))
 
 
+class delayed_dict(object):
+    def __init__(self, callable, obj, attribute):
+        self._secret_callable = callable
+        self._secret_obj = obj
+        self._secret_attribute = attribute
+
+    def _secret_doit(self):
+        from datalad import lgr
+        import pdb; pdb.set_trace()
+        lgr.debug("Replacing the delayed dict with the royal thing")
+        self._secret_callable()
+        return getattr(self._secret_obj, self._secret_attribute)
+
+    def __iter__(self):
+        d = self._secret_doit()
+        return d.__iter__()
+
+    def __len__(self):
+        d = self._secret_doit()
+        return d.__len__()
+
+    def __getattribute__(self, item):
+        # time to do it
+        if item.startswith('_secret_'):
+            return object.__getattribute__(self, item)
+        proper_dict = self._secret_doit()
+        return proper_dict.__getattribute__(item)
+
+
 class ConfigManager(object):
     """Thin wrapper around `git-config` with support for a dataset configuration.
 
@@ -237,6 +266,11 @@ class ConfigManager(object):
         # from dataset locally or globally
         run_args = ['-z', '-l']
         if self._gitconfig_has_showorgin:
+            try:
+                from datalad import lgr
+                lgr.debug("%s will show origin" % id(self))
+            except:
+                pass
             run_args.append('--show-origin')
 
         if self._dataset_cfgfname:
@@ -526,6 +560,11 @@ class ConfigManager(object):
         out = self._runner.run(['git', 'config'] + args, **kwargs)
         if reload:
             self.reload()
+        elif reload is None:
+            # reload is needed but delay reload until demanded
+            if not isinstance(self._store, delayed_dict):
+                import pdb; pdb.set_trace()
+                self._store = delayed_dict(self.reload, self, '_store')
         return out
 
     def _get_location_args(self, where, args=None):
@@ -556,7 +595,7 @@ class ConfigManager(object):
         return args
 
     @_where_reload
-    def add(self, var, value, where='dataset', reload=True):
+    def add(self, var, value, where='dataset', reload=None):
         """Add a configuration variable and value
 
         Parameters
@@ -570,7 +609,7 @@ class ConfigManager(object):
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
     @_where_reload
-    def set(self, var, value, where='dataset', reload=True, force=False):
+    def set(self, var, value, where='dataset', reload=None, force=False):
         """Set a variable to a value.
 
         In opposition to `add`, this replaces the value of `var` if there is
@@ -594,7 +633,7 @@ class ConfigManager(object):
                   where=where, reload=reload, log_stderr=True)
 
     @_where_reload
-    def rename_section(self, old, new, where='dataset', reload=True):
+    def rename_section(self, old, new, where='dataset', reload=None):
         """Rename a configuration section
 
         Parameters
@@ -607,7 +646,7 @@ class ConfigManager(object):
         self._run(['--rename-section', old, new], where=where, reload=reload)
 
     @_where_reload
-    def remove_section(self, sec, where='dataset', reload=True):
+    def remove_section(self, sec, where='dataset', reload=None):
         """Rename a configuration section
 
         Parameters
@@ -618,7 +657,7 @@ class ConfigManager(object):
         self._run(['--remove-section', sec], where=where, reload=reload)
 
     @_where_reload
-    def unset(self, var, where='dataset', reload=True):
+    def unset(self, var, where='dataset', reload=None):
         """Remove all occurrences of a variable
 
         Parameters
