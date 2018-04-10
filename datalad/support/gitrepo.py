@@ -1035,14 +1035,15 @@ class GitRepo(RepoInterface):
             seconds = int(last_date)
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
-        date = "{} +0000".format(seconds + 1)
+        seconds_new = seconds + 1
+        date = "{} +0000".format(seconds_new)
 
         lgr.debug("Setting date to {}".format(date))
 
         if date:
             env["GIT_AUTHOR_DATE"] = date
             env["GIT_COMMITTER_DATE"] = date
-            env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds)
+            env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):

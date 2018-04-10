@@ -2207,7 +2207,9 @@ def test_fake_is_not_special(path):
 @with_tempfile(mkdir=True)
 def test_fake_dates(path):
     ar = AnnexRepo(path, create=True, fake_dates=True)
+    timestamp = ar.config.obtain("datalad.fake-dates-start") + 1
     # Commits from the "git annex init" call are one second ahead.
     for commit in ar.get_branch_commits("git-annex"):
-        eq_(ar.config.obtain("datalad.fake-dates-start") + 1,
-            commit.committed_date)
+        eq_(timestamp, commit.committed_date)
+    assert_in("timestamp={}s".format(timestamp),
+              ar.repo.git.cat_file("blob", "git-annex:uuid.log"))
