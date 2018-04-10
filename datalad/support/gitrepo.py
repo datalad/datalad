@@ -1026,9 +1026,12 @@ class GitRepo(RepoInterface):
         """
         last_date = self.repo.git.for_each_ref(
             "refs/heads", count=1, sort="-committerdate",
-            format="%(committerdate:unix)").strip()
+            format="%(committerdate:raw)").strip()
 
         if last_date:
+            # Drop the "contextual" timezone, leaving the unix timestamp.  We
+            # avoid :unix above because it wasn't introduced until Git v2.9.4.
+            last_date = last_date.split()[0]
             seconds = int(last_date)
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
