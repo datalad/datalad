@@ -30,7 +30,9 @@ def pipeline(doc_id=None,
     ]
 
     from .simple_with_archives import pipeline as sa_pipeline
-    return sa_pipeline(leading_dirs_depth=leading_dirs_depth, incoming_pipeline=incoming_pipeline)
+    return sa_pipeline(leading_dirs_depth=leading_dirs_depth,
+                       add_annex_to_incoming_pipeline=True,
+                       incoming_pipeline=incoming_pipeline)
 
 
 def configure_url(data, keys=['url'], match='match'):
