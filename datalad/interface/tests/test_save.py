@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.tests.utils import known_failure_direct_mode
 
 import os
-from os.path import join as opj
+from os.path import join as opj, pardir
 from datalad.utils import chpwd
 
 from datalad.interface.results import is_ok_dataset
@@ -331,3 +331,35 @@ def test_subdataset_save(path):
             save(path='sub', super_datasets=True))
     # save super must not cause untracked content to be commited!
     ok_clean_git(parent.path, untracked=['untracked'])
+
+
+@with_tempfile(mkdir=True)
+def test_symlinked_relpath(path):
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    os.makedirs(opj(path, "origin"))
+    dspath = opj(path, "linked")
+    os.symlink('origin', dspath)
+    ds = Dataset(dspath).create()
+    create_tree(dspath, {
+        "mike1": 'mike1',  # will be added from topdir
+        "later": "later",  # later from within subdir
+        "d": {
+            "mike2": 'mike2', # to be added within subdir
+        }
+    })
+
+    # in the root of ds
+    with chpwd(dspath):
+        ds.repo.add("mike1", git=True)
+        ds.save("committing", path="./mike1")
+
+    # Let's also do in subdirectory
+    with chpwd(opj(dspath, 'd')):
+        ds.repo.add("mike2", git=True)
+        ds.save("committing", path="./mike2")
+
+        later = opj(pardir, "later")
+        ds.repo.add(later, git=True)
+        ds.save("committing", path=later)
+
+    ok_clean_git(dspath)
