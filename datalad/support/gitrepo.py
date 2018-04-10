@@ -1010,12 +1010,7 @@ class GitRepo(RepoInterface):
         """Configure repository to use fake dates.
         """
         lgr.debug("Enabling fake dates")
-        # FIXME: We should probably store this in .datalad/config instead of
-        # .git/config so that the setting is tracked, but we can't just change
-        # to where='dataset' below and then call self.commit because
-        # AnnexRepo.commit will fail if it's called before it sets
-        # self._batched.
-        self.config.set("datalad.fake-dates", "true", where="local")
+        self.config.set("datalad.fake-dates", "true")
 
     @property
     def fake_dates_enabled(self):
