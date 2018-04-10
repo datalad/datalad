@@ -563,8 +563,13 @@ class ConfigManager(object):
         elif reload is None:
             # reload is needed but delay reload until demanded
             if not isinstance(self._store, delayed_dict):
-                import pdb; pdb.set_trace()
+                from datalad import lgr
+                lgr.debug("Sticking in our royal thing")
                 self._store = delayed_dict(self.reload, self, '_store')
+            else:
+                from datalad import lgr
+                lgr.debug("Our royal thing is in place")
+
         return out
 
     def _get_location_args(self, where, args=None):
