@@ -20,14 +20,11 @@ from datalad.distribution.dataset import Dataset
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
-from ..extractors.tests.test_bids import bids_template
 
 
 def _assert_metadata_empty(meta):
@@ -137,46 +134,6 @@ def test_aggregate_query(path):
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
     eq_({'homepage': 'http://top.example.com'}, res[0]['metadata'])
-
-
-@with_tree(tree=bids_template)
-def test_nested_metadata(path):
-    ds = Dataset(path).create(force=True)
-    ds.add('.')
-    ds.aggregate_metadata(update_mode='all')
-    # BIDS returns participant info as a nested dict for each file in the
-    # content metadata. On the dataset-level this should automatically
-    # yield a sequence of participant info dicts, without any further action
-    # or BIDS-specific configuration
-    meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
-    assert_equal(
-        meta['datalad_unique_content_properties']['bids']['participant'],
-        [
-            {
-                "age(years)": "20-25",
-                "id": "03",
-                "gender": "female",
-                "handedness": "r",
-                "hearing_problems_current": "n",
-                "language": "english"
-            },
-            {
-                "age(years)": "30-35",
-                "id": "01",
-                "gender": "male",
-                "handedness": "r",
-                "hearing_problems_current": "n",
-                "language": u"русский"
-            },
-        ])
-    # we can turn off this kind of auto-summary
-    ds.config.add('datalad.metadata.generate-unique-bids', 'false', where='dataset')
-    ds.aggregate_metadata(update_mode='all')
-    meta = ds.metadata('.', reporton='datasets', return_type='item-or-list')['metadata']
-    # protect next test a little, in case we enhance our core extractor in the future
-    # to provide more info
-    if 'datalad_unique_content_properties' in meta:
-        assert_not_in('bids', meta['datalad_unique_content_properties'])
 
 
 # this is for gh-1971

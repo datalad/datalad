@@ -55,7 +55,6 @@ A number of fixes did not make it into 0.9.x series:
 - `search` was completely reimplemented
 - New plugins:
   - export_to_figshare
-  - bids2scidata
   - extract_metadata
 - add_readme makes use of available metadata
 

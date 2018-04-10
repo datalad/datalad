@@ -119,9 +119,7 @@ class ExternalVersions(object):
     }
     INTERESTING = (
         'appdirs',
-        'bids',
         'boto',
-        'dicom',
         'exifread',
         'git',
         'gitdb',
@@ -129,10 +127,7 @@ class ExternalVersions(object):
         'iso8601',
         'msgpack',
         'mutagen',
-        'nibabel',
-        'nidm',
         'patool',
-        'pydicom',
         'requests',
         'scrapy',
         'six',

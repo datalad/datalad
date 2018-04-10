@@ -159,7 +159,7 @@ class Create(Interface):
             action='append',
             constraints=EnsureStr() | EnsureNone(),
             doc="""Metadata type label. Must match the name of the respective
-            parser implementation in DataLad (e.g. "bids").[CMD:  This option
+            parser implementation in DataLad (e.g. "xmp").[CMD:  This option
             can be given multiple times CMD]"""),
         # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,

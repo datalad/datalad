@@ -104,11 +104,7 @@ requires = {
         'mutagen',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
-        'pydicom',  # DICOM metadata
-        'pybids>=0.5.1',  # BIDS metadata
         'Pillow',  # generic image metadata
-        'nibabel',  # NIfTI metadata
-        'pandas',  # bids2scidata export
     ]
 }
 
@@ -133,10 +129,6 @@ requires.update({
         # but you might need it
         # 'dbus-python',
     ],
-    'devel-neuroimaging': [
-        # Specifically needed for tests here (e.g. example scripts testing)
-        'nibabel',
-    ]
 })
 requires['devel'] = sum(list(requires.values()), [])
 
@@ -200,21 +192,18 @@ setup(
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
-            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'dcm', 'jpg', 'gz', 'pdf'})},
+            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
+    },
     entry_points={
         'datalad.metadata.extractors': [
             'annex=datalad.metadata.extractors.annex:MetadataExtractor',
             'audio=datalad.metadata.extractors.audio:MetadataExtractor',
-            'bids=datalad.metadata.extractors.bids:MetadataExtractor',
             'datacite=datalad.metadata.extractors.datacite:MetadataExtractor',
             'datalad_core=datalad.metadata.extractors.datalad_core:MetadataExtractor',
             'datalad_rfc822=datalad.metadata.extractors.datalad_rfc822:MetadataExtractor',
-            'dicom=datalad.metadata.extractors.dicom:MetadataExtractor',
             'exif=datalad.metadata.extractors.exif:MetadataExtractor',
             'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
             'image=datalad.metadata.extractors.image:MetadataExtractor',
-            'nidm=datalad.metadata.extractors.nidm:MetadataExtractor',
-            'nifti1=datalad.metadata.extractors.nifti1:MetadataExtractor',
             'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
         ]},
     **setup_kwargs
