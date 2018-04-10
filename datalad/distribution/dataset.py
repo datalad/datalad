@@ -64,9 +64,10 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
-    # TODO: normpath?!
     if is_explicit_path(path):
-        return dlabspath(path)
+        # normalize path consistently between two (explicit and implicit) cases
+        return dlabspath(path, norm=True)
+
     # no dataset given, use CWD as reference
     # note: abspath would disregard symlink in CWD
     top_path = getpwd() \
