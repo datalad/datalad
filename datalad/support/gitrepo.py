@@ -1036,7 +1036,7 @@ class GitRepo(RepoInterface):
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
         seconds_new = seconds + 1
-        date = "{} +0000".format(seconds_new)
+        date = "@{} +0000".format(seconds_new)
 
         lgr.debug("Setting date to {}".format(date))
 
