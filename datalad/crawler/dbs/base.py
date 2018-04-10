@@ -198,6 +198,8 @@ class FileStatusesBaseDB(object):
         # TODO: make use of URL -- we should validate that url is among those associated
         #  with the file
         old_status = self.get(fpath)
+        if old_status is None:
+            return True
         if status.filename and not old_status.filename:
             old_status.filename = basename(fpath)
         return old_status != status
