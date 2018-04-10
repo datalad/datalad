@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 import logging
 import re
 import shlex
+import time
 import os
 from os import linesep
 from os.path import join as opj
@@ -1038,7 +1039,9 @@ class GitRepo(RepoInterface):
         seconds_new = seconds + 1
         date = "@{} +0000".format(seconds_new)
 
-        lgr.debug("Setting date to %s", date)
+        lgr.debug("Setting date to %s",
+                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
+                                time.gmtime(seconds_new)))
 
         if date:
             env["GIT_AUTHOR_DATE"] = date
