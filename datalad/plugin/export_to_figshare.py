@@ -10,6 +10,9 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
+
 
 class FigshareRESTLaison(object):
     """A little helper to provide minimal interface to interact with Figshare
@@ -104,7 +107,7 @@ class FigshareRESTLaison(object):
                     data = f.read(part['endOffset'] - part['startOffset'] + 1)
                     url = '{upload_url}/{partNo}'.format(**udata)
                     ok = self.put(url, data=data, binary=True, return_json=False)
-                    assert ok == 'OK'
+                    assert ok == b'OK'
                 pbar.update(part['endOffset'], increment=False)
             pbar.finish()
 
@@ -130,167 +133,201 @@ class FigshareRESTLaison(object):
         return result
 
 
-# PLUGIN API
-def dlplugin(dataset, filename=None,
-             missing_content='error',
-             annex=True,
-             # project_id=None,  # TODO: support working with projects and articles within them
-             article_id=None
-             ):
+@build_doc
+class ExportToFigshare(Interface):
     """Export the content of a dataset as a ZIP archive to figshare
 
     Very quick and dirty approach.  Ideally figshare should be supported as
     a proper git annex special remote.  Unfortunately, figshare does not support
     having directories, and can store only a flat list of files.  That makes
-    it impossible for any sensible publish'ing of complete datasets.
+    it impossible for any sensible publishing of complete datasets.
 
     The only workaround is to publish dataset as a zip-ball, where the entire
     content is wrapped into a .zip archive for which figshare would provide a
     navigator.
-
-
-    Parameters
-    ----------
-    filename : str, optional
-      File name of the generated ZIP archive. If no file name is given
-      the archive will be generated in the current directory and will
-      be named: datalad_<dataset_uuid>.zip.
-    missing_content : {'error', 'continue', 'ignore'}, optional
-      By default, any discovered file with missing content will result in
-      an error and the plugin is aborted. Setting this to 'continue' will
-      issue warnings instead of failing on error. The value 'ignore' will
-      only inform about problem at the 'debug' log level. The latter two
-      can be helpful when generating a TAR archive from a dataset where
-      some file content is not available locally.
-    annex : bool, optional
-      If True generated .zip file would be added to annex, and all files
-      would get registered in git-annex to be available from such a tarball. Also
-      upon upload we will register for that archive to be a possible source for it
-      in annex.
-    project_id : int, optional
-      If given, article (if article_id is not provided) will be created in that
-      project
-    article_id : int, optional
-      Which article to publish to.
     """
-    import os
-    from datalad.plugin.export_archive import dlplugin as export_archive
-    import logging
-    lgr = logging.getLogger('datalad.plugin.export_to_figshare')
 
-    from datalad.ui import ui
-    from datalad.api import add_archive_content
+    from datalad.support.param import Parameter
+    from datalad.distribution.dataset import datasetmethod
+    from datalad.interface.utils import eval_results
+    from datalad.distribution.dataset import EnsureDataset
+    from datalad.support.constraints import EnsureNone, EnsureInt, EnsureStr
 
-    # pleasing wonderful plugin system
-    from datalad.plugin.export_to_figshare import FigshareRESTLaison
-    from datalad.support.annexrepo import AnnexRepo
-
-    if not isinstance(dataset.repo, AnnexRepo):
-        raise ValueError(
-            "%s is not an annex repo, so annexification could be done"
-            % dataset
-        )
-
-    if dataset.repo.is_dirty():
-        raise RuntimeError(
-            "Paranoid authors of DataLad refuse to proceed in a dirty repository"
-        )
-    lgr.info("Exporting current tree as an archive since figshare does not support directories")
-    archive_out = next(
-        export_archive(
-            dataset,
-            filename=filename,
-            archivetype='zip',
-            missing_content=missing_content
-        )
+    _params_ = dict(
+        dataset=Parameter(
+            args=("-d", "--dataset"),
+            doc=""""specify the dataset to export. If no dataset is given, an
+            attempt is made to identify the dataset based on the current
+            working directory.""",
+            constraints=EnsureDataset() | EnsureNone()),
+        filename=Parameter(
+            args=("filename",),
+            metavar="PATH",
+            nargs='?',
+            doc="""File name of the generated ZIP archive. If no file name is
+            given the archive will be generated in the current directory and
+            will be named: datalad_<dataset_uuid>.zip.""",
+            constraints=EnsureStr() | EnsureNone()),
+        no_annex=Parameter(
+            args=("--no-annex",),
+            action="store_true",
+            doc="""By default the generated .zip file would be added to annex,
+            and all files would get registered in git-annex to be available
+            from such a tarball. Also upon upload we will register for that
+            archive to be a possible source for it in annex. Setting this flag
+            disables this behavior."""),
+        missing_content=Parameter(
+            args=("--missing-content",),
+            metavar="error|continue|ignore",
+            doc="""By default, any discovered file with missing content will
+            result in an error and the plugin is aborted. Setting this to
+            'continue' will issue warnings instead of failing on error. The
+            value 'ignore' will only inform about problem at the 'debug' log
+            level. The latter two can be helpful when generating a TAR archive
+            from a dataset where some file content is not available
+            locally.""",
+            constraints=EnsureStr()),
+        # article_id=Parameter(
+        #     args=("--project-id",),
+        #     metavar="ID",
+        #     doc="""If given, article (if article_id is not provided) will be
+        #     created in that project.""",
+        #     constraints=EnsureInt() | EnsureNone()),
+        article_id=Parameter(
+            args=("--article-id",),
+            metavar="ID",
+            doc="""Which article to publish to.""",
+            constraints=EnsureInt() | EnsureNone()),
     )
-    assert archive_out['status'] == 'ok'
-    fname = archive_out['path']
 
-    lgr.info("Uploading %s to figshare", fname)
-    figshare = FigshareRESTLaison()
+    @staticmethod
+    @datasetmethod(name='export_to_figshare')
+    @eval_results
+    def __call__(dataset, filename=None, missing_content='error', no_annex=False,
+                 # TODO: support working with projects and articles within them
+                 # project_id=None,
+                 article_id=None):
+        import os
+        import logging
+        lgr = logging.getLogger('datalad.plugin.export_to_figshare')
 
-    if not article_id:
-        # TODO: ask if it should be an article within a project
-        if ui.is_interactive:
-            # or should we just upload to a new article?
-            if ui.yesno(
-                "Would you like to create a new article to upload to?  "
-                "If not - we will list existing articles",
-                title="Article"
-            ):
-                article = figshare.create_article(
-                    title=os.path.basename(dataset.path)
-                )
-                lgr.info(
-                    "Created a new (private) article %(id)s at %(url_private_html)s. "
-                    "Please visit it, enter additional meta-data and make public",
-                    article
-                )
-                article_id = article['id']
-            else:
-                article_id = int(ui.question(
-                    "Which of the articles should we upload to.",
-                    choices=map(str, figshare.get_article_ids())
-                ))
+        from datalad.ui import ui
+        from datalad.api import add_archive_content
+        from datalad.api import export_archive
+        from datalad.distribution.dataset import require_dataset
+        from datalad.support.annexrepo import AnnexRepo
+
+        dataset = require_dataset(dataset, check_installed=True,
+                                  purpose='export to figshare')
+
+        if not isinstance(dataset.repo, AnnexRepo):
+            raise ValueError(
+                "%s is not an annex repo, so annexification could be done"
+                % dataset
+            )
+
+        if dataset.repo.is_dirty():
+            raise RuntimeError(
+                "Paranoid authors of DataLad refuse to proceed in a dirty repository"
+            )
+        lgr.info("Exporting current tree as an archive since figshare does not support directories")
+        archive_out = next(
+            export_archive(
+                dataset,
+                filename=filename,
+                archivetype='zip',
+                missing_content=missing_content,
+                return_type="generator"
+            )
+        )
+        assert archive_out['status'] == 'ok'
+        fname = archive_out['path']
+
+        lgr.info("Uploading %s to figshare", fname)
+        figshare = FigshareRESTLaison()
+
         if not article_id:
-            raise ValueError("We need an article to upload to.")
+            # TODO: ask if it should be an article within a project
+            if ui.is_interactive:
+                # or should we just upload to a new article?
+                if ui.yesno(
+                    "Would you like to create a new article to upload to?  "
+                    "If not - we will list existing articles",
+                    title="Article"
+                ):
+                    article = figshare.create_article(
+                        title=os.path.basename(dataset.path)
+                    )
+                    lgr.info(
+                        "Created a new (private) article %(id)s at %(url_private_html)s. "
+                        "Please visit it, enter additional meta-data and make public",
+                        article
+                    )
+                    article_id = article['id']
+                else:
+                    article_id = int(ui.question(
+                        "Which of the articles should we upload to.",
+                        choices=map(str, figshare.get_article_ids())
+                    ))
+            if not article_id:
+                raise ValueError("We need an article to upload to.")
 
-    file_info = figshare.upload_file(
-        fname,
-        files_url='account/articles/%s/files' % article_id
-    )
-
-    if annex:
-        # I will leave all the complaining etc to the dataset add if path
-        # is outside etc
-        lgr.info("'Registering' %s within annex", fname)
-        repo = dataset.repo
-        repo.add(fname, git=False)
-        key = repo.get_file_key(fname)
-        lgr.info("Adding URL %(download_url)s for it", file_info)
-        repo._annex_custom_command([],
-            [
-                "git", "annex", "registerurl", '-c', 'annex.alwayscommit=false',
-                key, file_info['download_url']
-            ]
-        )
-
-        lgr.info("Registering links back for the content of the archive")
-        add_archive_content(
+        file_info = figshare.upload_file(
             fname,
-            annex=dataset.repo,
-            delete_after=True,  # just remove extracted into a temp dir
-            allow_dirty=True,  # since we have a tarball
-            commit=False  # we do not want to commit anything we have done here
+            files_url='account/articles/%s/files' % article_id
         )
 
-        lgr.info("Removing generated and now registered in annex archive")
-        repo.drop(key, key=True, options=['--force'])
-        repo.remove(fname, force=True)  # remove the tarball
+        if no_annex:
+            lgr.info("Removing generated tarball")
+            os.unlink(fname)
+        else:
+            # I will leave all the complaining etc to the dataset add if path
+            # is outside etc
+            lgr.info("'Registering' %s within annex", fname)
+            repo = dataset.repo
+            repo.add(fname, git=False)
+            key = repo.get_file_key(fname)
+            lgr.info("Adding URL %(download_url)s for it", file_info)
+            repo._annex_custom_command([],
+                [
+                    "git", "annex", "registerurl", '-c', 'annex.alwayscommit=false',
+                    key, file_info['download_url']
+                ]
+            )
 
-        # if annex in {'delete'}:
-        #     dataset.repo.remove(fname)
-        # else:
-        #     # kinda makes little sense I guess.
-        #     # Made more sense if export_archive could export an arbitrary treeish
-        #     # so we could create a branch where to dump and export to figshare
-        #     # (kinda closer to my idea)
-        #     dataset.save(fname, message="Added the entire dataset into a zip file")
+            lgr.info("Registering links back for the content of the archive")
+            add_archive_content(
+                fname,
+                annex=dataset.repo,
+                delete_after=True,  # just remove extracted into a temp dir
+                allow_dirty=True,  # since we have a tarball
+                commit=False  # we do not want to commit anything we have done here
+            )
 
-    else:
-        lgr.info("Removing generated tarball")
-        os.unlink(fname)
+            lgr.info("Removing generated and now registered in annex archive")
+            repo.drop(key, key=True, options=['--force'])
+            repo.remove(fname, force=True)  # remove the tarball
 
-    # TODO: add to downloader knowledge about figshare token so it could download-url
-    # those zipballs before they go public
-    yield dict(
-        status='ok',
-        # TODO: add article url (which needs to be queried if only ID is known
-        message="Published archive {}".format(
-            file_info['download_url']),
-        file_info=file_info,
-        path=dataset,
-        action='export_to_figshare',
-        logger=lgr
-    )
+            # if annex in {'delete'}:
+            #     dataset.repo.remove(fname)
+            # else:
+            #     # kinda makes little sense I guess.
+            #     # Made more sense if export_archive could export an arbitrary treeish
+            #     # so we could create a branch where to dump and export to figshare
+            #     # (kinda closer to my idea)
+            #     dataset.save(fname, message="Added the entire dataset into a zip file")
+
+        # TODO: add to downloader knowledge about figshare token so it could download-url
+        # those zipballs before they go public
+        yield dict(
+            status='ok',
+            # TODO: add article url (which needs to be queried if only ID is known
+            message="Published archive {}".format(
+                file_info['download_url']),
+            file_info=file_info,
+            path=dataset,
+            action='export_to_figshare',
+            logger=lgr
+        )
+
+__datalad_plugin__ = ExportToFigshare

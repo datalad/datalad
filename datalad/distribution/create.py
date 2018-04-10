@@ -11,6 +11,7 @@
 """
 
 import logging
+import random
 import uuid
 
 from os import listdir
@@ -18,6 +19,7 @@ from os.path import isdir
 from os.path import join as opj
 
 from datalad import cfg
+from datalad import _seed
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.utils import eval_results
@@ -37,6 +39,9 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
+
+# required to get the binding of `add` as a dataset method
+from datalad.distribution.add import Add
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -154,7 +159,7 @@ class Create(Interface):
             action='append',
             constraints=EnsureStr() | EnsureNone(),
             doc="""Metadata type label. Must match the name of the respective
-            parser implementation in DataLad (e.g. "bids").[CMD:  This option
+            parser implementation in DataLad (e.g. "xmp").[CMD:  This option
             can be given multiple times CMD]"""),
         # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
@@ -347,9 +352,16 @@ class Create(Interface):
         if id_var in tbds.config:
             # make sure we reset this variable completely, in case of a re-create
             tbds.config.unset(id_var, where='dataset')
+
+        if _seed is None:
+            # just the standard way
+            uuid_id = uuid.uuid1().urn.split(':')[-1]
+        else:
+            # Let's generate preseeded ones
+            uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
         tbds.config.add(
             id_var,
-            tbds.id if tbds.id is not None else uuid.uuid1().urn.split(':')[-1],
+            tbds.id if tbds.id is not None else uuid_id,
             where='dataset')
 
         # make sure that v6 annex repos never commit content under .datalad
@@ -371,12 +383,13 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
+        if isinstance(dataset, Dataset) and dataset.path != tbds.path \
+           and tbds.repo.get_hexsha():
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(
                     tbds.path,
-                    save=True,
+                    save=save,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,

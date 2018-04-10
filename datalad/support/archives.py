@@ -27,6 +27,7 @@ from six.moves.urllib.parse import unquote as urlunquote
 import string
 import random
 
+from .locking import lock_if_check_fails
 from ..utils import any_re_search
 
 import logging
@@ -141,6 +142,23 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
             lgr.debug("patool gave stderr:\n%s" % cmo.err)
+
+    # Note: (ben) Experienced issue, where extracted tarball
+    # lacked execution bit of directories, leading to not being
+    # able to delete them while having write permission.
+    # Can't imagine a situation, where we would want to fail on
+    # that kind of mess. So, to be sure set it.
+
+    if not on_windows:
+        os.chmod(dir_,
+                 os.stat(dir_).st_mode |
+                 os.path.stat.S_IEXEC)
+        for root, dirs, files in os.walk(dir_, followlinks=False):
+            for d in dirs:
+                subdir = opj(root, d)
+                os.chmod(subdir,
+                         os.stat(subdir).st_mode |
+                         os.path.stat.S_IEXEC)
 
     if leading_directories == 'strip':
         _, dirs, files = next(os.walk(dir_))
@@ -391,35 +409,43 @@ class ExtractedArchive(object):
         """
         path = self.path
 
-        if not self.is_extracted:
-            # we need to extract the archive
-            # TODO: extract to _tmp and then move in a single command so we
-            # don't end up picking up broken pieces
-            lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
-            if exists(path):
-                lgr.debug("Previous extracted (but probably not fully) cached archive found. Removing %s", path)
-                rmtree(path)
-
-            os.makedirs(path)
-            assert(exists(path))
-            # remove old stamp
-            if exists(self.stamp_path):
-                rmtree(self.stamp_path)
-            decompress_file(self._archive, path, leading_directories=None)
-
-            # TODO: must optional since we might to use this content, move it into the tree etc
-            # lgr.debug("Adjusting permissions to R/O for the extracted content")
-            # rotree(path)
-            assert(exists(path))
-
-            # create a stamp
-            with open(self.stamp_path, 'w') as f:
-                f.write(self._archive)
-
-            # assert that stamp mtime is not older than archive's directory
-            assert(self.is_extracted)
-
+        with lock_if_check_fails(
+            check=(lambda s: s.is_extracted, (self,)),
+            lock_path=path,
+            operation="extract"
+        ) as (check, lock):
+            if lock:
+                assert not check
+                self._extract_archive(path)
         return path
+
+    def _extract_archive(self, path):
+        # we need to extract the archive
+        # TODO: extract to _tmp and then move in a single command so we
+        # don't end up picking up broken pieces
+        lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+        if exists(path):
+            lgr.debug(
+                "Previous extracted (but probably not fully) cached archive "
+                "found. Removing %s",
+                path)
+            rmtree(path)
+        os.makedirs(path)
+        assert (exists(path))
+        # remove old stamp
+        if exists(self.stamp_path):
+            rmtree(self.stamp_path)
+        decompress_file(self._archive, path, leading_directories=None)
+        # TODO: must optional since we might to use this content, move it
+        # into the tree etc
+        # lgr.debug("Adjusting permissions to R/O for the extracted content")
+        # rotree(path)
+        assert (exists(path))
+        # create a stamp
+        with open(self.stamp_path, 'w') as f:
+            f.write(self._archive)
+        # assert that stamp mtime is not older than archive's directory
+        assert (self.is_extracted)
 
     # TODO: remove?
     #def has_file_ready(self, afile):

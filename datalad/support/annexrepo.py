@@ -34,6 +34,7 @@ from os.path import isabs
 from os.path import relpath
 from os.path import normpath
 from subprocess import Popen, PIPE
+from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from six import string_types
@@ -54,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
 # imports from same module:
@@ -82,6 +84,9 @@ from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
 
 lgr = logging.getLogger('datalad.annex')
+
+# Limit to # of CPUs and up to 8, but at least 3 to start with
+N_AUTO_JOBS = min(8, max(3, cpu_count()))
 
 
 class AnnexRepo(GitRepo, RepoInterface):
@@ -122,7 +127,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Parameters
         ----------
         path: str
-          path to git-annex repository. In case it's not an absolute path, it's
+          Path to git-annex repository. In case it's not an absolute path, it's
           relative to PWD
         url: str, optional
           url to the to-be-cloned repository. Requires valid git url
@@ -138,7 +143,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           that are already annexed nor will it automatically migrate files,
           hat are 'getted' afterwards.
         create: bool, optional
-          Create and initializes an annex repository at path, in case
+          Create and initialize an annex repository at path, in case
           there is none. If set to False, and this repository is not an annex
           repository (initialized or not), an exception is raised.
         init: bool, optional
@@ -147,12 +152,12 @@ class AnnexRepo(GitRepo, RepoInterface):
           fresh git clone). Note that if `create=True`, then initialization
           would happen
         batch_size: int, optional
-          if specified and >0, instructs annex to batch this many commands before
+          If specified and >0, instructs annex to batch this many commands before
           annex adds acts on git repository (e.g. adds them them to index for addurl).
         version: int, optional
-          if given, pass as --version to `git annex init`
+          If given, pass as --version to `git annex init`
         description: str, optional
-          short description that humans can use to identify the
+          Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
         if self.git_annex_version is None:
@@ -618,7 +623,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # Note, that _run_annex_command_json returns a generator
                 json_list = \
                     list(self._run_annex_command_json(
-                        'status', args=options_, expect_stderr=False))
+                        'status', opts=options_, expect_stderr=False))
             self.cmd_call_wrapper._log_opts['outputs'] = old_log_state
             if "fatal:" in cml.out:
                 raise CommandError(cmd="git annex status",
@@ -631,7 +636,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 json_list = \
                     list(self._run_annex_command_json(
-                        'status', args=options, expect_stderr=False))
+                        'status', opts=options, expect_stderr=False))
         except CommandError as e:
             if submodules and \
                "fatal: " \
@@ -643,7 +648,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 options = [path] if path else []
                 options.extend(to_options(ignore_submodules='all'))
                 json_list = list(
-                    self._run_annex_command_json('status', args=options)
+                    self._run_annex_command_json('status', opts=options)
                 )
                 # separately get modified submodules:
                 m_subs = \
@@ -978,8 +983,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
-    def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
-                           backend=None, jobs=None, **kwargs):
+    def _run_annex_command(self, annex_cmd,
+                           git_options=None, annex_options=None,
+                           backend=None, jobs=None,
+                           files=None,
+                           **kwargs):
         """Helper to run actual git-annex calls
 
         Unifies annex command calls.
@@ -997,6 +1005,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             achieved by having an item '--backend=XXX' in annex_options.
             This may change.
         jobs : int
+        files: list, optional
+            If command passes list of files
         **kwargs
             these are passed as additional kwargs to datalad.cmd.Runner.run()
 
@@ -1025,6 +1035,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         cmd_list += [annex_cmd] + backend + debug + annex_options
 
+        if files:
+            cmd_list += ['--'] + files
         try:
             return self.cmd_call_wrapper.run(cmd_list, **kwargs)
         except CommandError as e:
@@ -1243,7 +1255,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
 
     @normalize_paths
-    def get(self, files, remote=None, options=None, jobs=None):
+    def get(self, files, remote=None, options=None, jobs=None, key=False):
         """Get the actual content of files
 
         Parameters
@@ -1254,8 +1266,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             from which remote to fetch content
         options : list of str, optional
             commandline options for the git annex get command
-        jobs : int, optional
-            how many jobs to run in parallel (passed to git-annex call)
+        jobs : int or None, optional
+            how many jobs to run in parallel (passed to git-annex call).
+            If not specified (None), then
+        key : bool, optional
+            If provided file value is actually a key
 
         Returns
         -------
@@ -1276,12 +1291,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         # analyze provided files to decide which actually are needed to be
         # fetched
 
-        if '--key' not in options:
+        if not key:
             expected_downloads, fetch_files = self._get_expected_files(
                 files, ['--not', '--in', 'here'])
         else:
             fetch_files = files
-            assert(len(files) == 1)
+            assert len(files) == 1, "When key=True only a single file be provided"
             expected_downloads = {files[0]: AnnexRepo.get_size_from_key(files[0])}
 
         if not fetch_files:
@@ -1289,7 +1304,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(fetch_files) != len(files):
-            lgr.info("Actually getting %d files", len(fetch_files))
+            lgr.debug("Actually getting %d files", len(fetch_files))
 
         # options  might be the '--key' which should go last
         options = ['--json-progress'] + options
@@ -1299,14 +1314,17 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: reproduce DK's bug on OSX, and either switch to
         #  --batch mode (I don't think we have --progress support in long
         #  alive batch processes ATM),
-        #
+        if key:
+            kwargs = {'opts': options + ['--key'] + files}
+        else:
+            kwargs = {'opts': options, 'files': files}
         results = self._run_annex_command_json(
             'get',
-            args=options,
             # TODO: eventually make use of --batch mode
-            files=files,  # fetch_files
             jobs=jobs,
-            expected_entries=expected_downloads)
+            expected_entries=expected_downloads,
+            **kwargs
+        )
         results_list = list(results)
         # TODO:  should we here compare fetch_files against result_list
         # and vomit an exception of incomplete download????
@@ -1336,7 +1354,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         unknown_sizes = []  # unused atm
         # for now just record total size, and
         for j in self._run_annex_command_json(
-                'find', args=expr + files
+                'find', opts=expr, files=files
         ):
             # TODO: some files might not even be here.  So in current fancy
             # output reporting scheme we should then theoretically handle
@@ -1514,7 +1532,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return_list = list(self._run_annex_command_json(
                 'add',
-                args=options + files,
+                opts=options,
+                files=files,
                 backend=backend,
                 expect_fail=True,
                 jobs=jobs,
@@ -1596,9 +1615,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd_str = 'git annex lookupkey %s' % files  # have a string for messages
 
             try:
-                out, err = self._run_annex_command('lookupkey',
-                                                   annex_options=[files],
-                                                   expect_fail=True)
+                out, err = self._run_annex_command(
+                    'lookupkey',
+                    files=[files],
+                    expect_fail=True
+                )
             except CommandError as e:
                 if e.code == 1:
                     if not exists(opj(self.path, files)):
@@ -1644,7 +1665,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         options = options[:] if options else []
-        self._run_annex_command('lock', annex_options=files + options)
+        self._run_annex_command('lock', annex_options=options, files=files)
         # note: there seems to be no output by annex if success.
 
     @normalize_paths
@@ -1688,7 +1709,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             # TODO: catch and parse output if failed (missing content ...)
             std_out, std_err = \
-                self._run_annex_command('unlock', annex_options=files + options)
+                self._run_annex_command(
+                    'unlock', annex_options=options, files=files
+                )
 
             return [line.split()[1]
                     for line in std_out.splitlines()
@@ -1739,8 +1762,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = options[:] if options else []
 
-        std_out, std_err = self._run_annex_command('unannex',
-                                                   annex_options=files + options)
+        std_out, std_err = self._run_annex_command(
+            'unannex', annex_options=options, files=files
+        )
         return [line.split()[1] for line in std_out.splitlines()
                 if line.split()[0] == 'unannex' and line.split()[-1] == 'ok']
 
@@ -1767,7 +1791,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             for f in files:
                 try:
-                    obj, er = self._run_annex_command('find', annex_options=[f], expect_fail=True)
+                    obj, er = self._run_annex_command(
+                        'find', files=[f], expect_fail=True
+                    )
                     objects.append(obj)
                 except CommandError:
                     objects.append('')
@@ -2022,10 +2048,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
             os.unlink(opj(self.path, file_))
         if not batch:
-            self._run_annex_command('addurl',
-                                    annex_options=options + ['--file=%s' % file_] + [url],
-                                    log_online=True, log_stderr=False,
-                                    **kwargs)
+            self._run_annex_command(
+                'addurl',
+                annex_options=options + ['--file=%s' % file_] + [url],
+                log_online=True, log_stderr=False,
+                **kwargs
+            )
             # Don't capture stderr, since download progress provided by wget uses
             # stderr.
         else:
@@ -2054,8 +2082,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not out_json.get('success', False):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
-                    msg="Error, annex reported failure for addurl: %s"
-                    % str(out_json))
+                    msg="Error, annex reported failure for addurl (url='%s'): %s"
+                    % (url, str(out_json)))
             return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
@@ -2104,7 +2132,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         url: str
         """
 
-        self._run_annex_command('rmurl', annex_options=[file_] + [url])
+        self._run_annex_command('rmurl', files=[file_, url])
 
     @normalize_path
     def get_urls(self, file_, key=False, batch=False):
@@ -2153,17 +2181,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                                              "specify 'files' or 'options'")
 
         options = assure_list(options)
-        files = assure_list(files)
 
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
+            files = assure_list(files)
             options = options + ['--key']
-            res = [self._run_annex_command_json(
-                'drop',
-                args=options + [k],
-                jobs=jobs)
-                for k in files]
+            res = [
+                self._run_annex_command_json(
+                    'drop',
+                    opts=options + [k],
+                    jobs=jobs)
+                for k in files
+            ]
             # `normalize_paths` ... magic, useful?
             if len(files) == 1:
                 return res[0]
@@ -2172,7 +2202,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return self._run_annex_command_json(
                 'drop',
-                args=options + files,
+                opts=options,
+                files=files,
                 jobs=jobs)
 
     def drop_key(self, keys, options=None, batch=False):
@@ -2194,9 +2225,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
         options += ['--force']
         if not batch:
-            json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
+            json_objects = self._run_annex_command_json(
+                'dropkey', opts=options, files=keys, expect_stderr=True
+            )
         else:
-            json_objects = self._batched.get('dropkey', git_options=self._GIT_COMMON_OPTIONS, annex_options=options, json=True, path=self.path)(keys)
+            json_objects = self._batched.get(
+                'dropkey',
+                git_options=self._GIT_COMMON_OPTIONS,
+                annex_options=options, json=True, path=self.path
+            )(keys)
         for j in json_objects:
             assert j.get('success', True)
 
@@ -2206,16 +2243,20 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         assert (j.get('success', True) is True)
         # process 'whereis' containing list of remotes
-        remotes = {remote['uuid']: {x: remote.get(x, None) for x in ('description', 'here', 'urls')}
+        remotes = {remote['uuid']: {x: remote.get(x, None)
+                                    for x in ('description', 'here', 'urls')
+                                    }
                    for remote in j.get('whereis')}
         if self.WEB_UUID in remotes:
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
-    def _run_annex_command_json(self, command, args=None,
+    def _run_annex_command_json(self, command,
+                                opts=None,
                                 jobs=None,
-                                files=[],
-                                expected_entries=None, **kwargs):
+                                files=None,
+                                expected_entries=None,
+                                **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
 
         Parameters
@@ -2238,16 +2279,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
-            if jobs:
+            if jobs == 'auto':
+                jobs = N_AUTO_JOBS
+            if jobs and jobs != 1:
                 annex_options += ['-J%d' % jobs]
-            if args:
-                annex_options += args
+            if opts:
+                annex_options += opts
 
             # TODO: RF to use --batch where possible instead of splitting
             # into multiple invocations
             if not files:
                 file_chunks = [[]]
             else:
+                files = assure_list(files)
                 maxl = max(map(len, files))
                 chunk_size = CMD_MAX_ARG // maxl
                 file_chunks = generate_chunks(files, chunk_size)
@@ -2255,7 +2299,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             for file_chunk in file_chunks:
                 out_, err_ = self._run_annex_command(
                     command,
-                    annex_options=annex_options + file_chunk,
+                    annex_options=annex_options + ['--'] + file_chunk,
                     **kwargs)
                 out += out_
                 err += err_
@@ -2341,11 +2385,18 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Or if we had empty stdout but there was stderr
             if out is None or (not out and e.stderr):
                 raise e
+            if e.stderr:
+                # else just warn about present errors
+                shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
+                lgr.warning(
+                    "Running %s resulted in stderr output: %s",
+                    command, shorten(e.stderr)
+                )
         finally:
             if progress_indicators:
                 progress_indicators.finish()
 
-        json_objects = (json.loads(line)
+        json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
@@ -2401,21 +2452,27 @@ class AnnexRepo(GitRepo, RepoInterface):
             )
 
         options = assure_list(options, copy=True)
-        options += ["--key"] if key else []
+        if key:
+            kwargs = {'opts': options + ["--key"] + files}
+        else:
+            kwargs = {'files': files}
 
-        json_objects = self._run_annex_command_json('whereis', args=options + files)
+        json_objects = self._run_annex_command_json('whereis', **kwargs)
         if output in {'descriptions', 'uuids'}:
             return [
                 [remote.get(output[:-1]) for remote in j.get('whereis')]
                 if j.get('success') else []
-                for j in json_objects]
+                for j in json_objects
+            ]
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            return {j['key' if (key or '--all' in options) else 'file']:
-                        self._whereis_json_to_dict(j)
-                    for j in json_objects
-                    if not j.get('key').endswith('.this-is-a-test-key')}
+            return {
+                j['key' if (key or '--all' in options) else 'file']
+                : self._whereis_json_to_dict(j)
+                for j in json_objects
+                if not j.get('key').endswith('.this-is-a-test-key')
+            }
 
     # TODO:
     # I think we should make interface cleaner and less ambigious for those annex
@@ -2443,7 +2500,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
         if not batch:
-            json_objects = self._run_annex_command_json('info', args=options + files)
+            json_objects = self._run_annex_command_json(
+                'info', opts=options, files=files)
         else:
             json_objects = self._batched.get(
                 'info',
@@ -2480,7 +2538,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
-        json_records = list(self._run_annex_command_json('info', args=options))
+        json_records = list(self._run_annex_command_json('info', opts=options))
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields
@@ -2783,9 +2841,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(':'.join(annex_cmd), annex_cmd, git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key_)
+            out = self._batched.get(
+                ':'.join(annex_cmd), annex_cmd,
+                git_options=self._GIT_COMMON_OPTIONS,
+                path=self.path)(key_)
             try:
                 return {
+                    # happens on travis in direct/heavy-debug mode, that process
+                    # exits and closes stdout (upon unknown key) before we could
+                    # read it, so we get None as the stdout.
+                    # see https://github.com/datalad/datalad/issues/2330
+                    # but it is associated with an unknown key, and for consistency
+                    # we report False there too, as to ''
+                    None: False,
                     '': False,  # when remote is misspecified ... stderr carries the msg
                     '0': False,
                     '1': True,
@@ -2936,7 +3004,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(copy_files) != len(files):
-            lgr.info("Actually copying %d files", len(copy_files))
+            lgr.debug("Actually copying %d files", len(copy_files))
 
         annex_options = ['--to=%s' % remote, '--json-progress']
         if options:
@@ -2946,7 +3014,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         #  from annex failed ones
         results = self._run_annex_command_json(
             'copy',
-            args=annex_options,
+            opts=annex_options,
             files=files,  # copy_files,
             jobs=jobs,
             expected_entries=expected_copys
@@ -3076,9 +3144,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         if not files:
             return
         files = assure_list(files)
-        args = ['--json']
-        args.extend(files)
-        for res in self._run_annex_command_json('metadata', args):
+        opts = ['--json']
+        for res in self._run_annex_command_json(
+                'metadata', opts=opts, files=files):
             yield (
                 res['file'],
                 res['fields'] if timestamps else \
@@ -3147,12 +3215,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if recursive:
             args.append('--force')
-        # append actual file path arguments
-        args.extend(assure_list(files))
+
+        # Make sure that batch add/addurl operations are closed so that we can
+        # operate on files that were just added.
+        self.precommit()
 
         for jsn in self._run_annex_command_json(
                 'metadata',
-                args):
+                args,
+                files=files):
             yield jsn
 
 
@@ -3235,7 +3306,7 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 
 def readline_json(stdout):
-    return json.loads(stdout.readline().strip())
+    return json_loads(stdout.readline().strip())
 
 
 @auto_repr
@@ -3285,14 +3356,24 @@ class BatchedAnnex(object):
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
 
+        Returns
+        -------
+        bool
+          True if process was alive.
+        str
+          stderr if any recorded if was terminated
         """
         process = self._process
+        ret = True
+        ret_stderr = None
         if process and process.poll():
             lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
-            self.close()
+            ret_stderr = self.close(return_stderr=True)
+            ret = False
         if self._process is None and restart:
             lgr.warning("Restarting the process due to previous failure")
             self._initialize()
+        return ret, ret_stderr
 
     def __call__(self, cmds):
         """
@@ -3329,15 +3410,16 @@ class BatchedAnnex(object):
             process.stdin.write(entry)  # .encode())
             process.stdin.flush()
             lgr.log(5, "Done sending.")
-            # TODO: somehow do catch stderr which might be there or not
-            #stderr = str(process.stderr) if process.stderr.closed else None
-            self._check_process(restart=False)
+            still_alive, stderr = self._check_process(restart=False)
+            # TODO: we might want to handle still_alive, e.g. to allow for
+            #       a number of restarts/resends, but it should be per command
+            #       since for some we cannot just resend the same query. But if
+            #       it is just a "get"er - we could resend it few times
             # We are expecting a single line output
             # TODO: timeouts etc
-            #import pdb; pdb.set_trace()
             stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
-            #if stderr:
-            #    lgr.warning("Received output in stderr: %r" % stderr)
+            if stderr:
+                lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)
             output.append(stdout)
 
@@ -3346,24 +3428,37 @@ class BatchedAnnex(object):
     def __del__(self):
         self.close()
 
-    def close(self):
-        """Close communication and wait for process to terminate"""
+    def close(self, return_stderr=False):
+        """Close communication and wait for process to terminate
+
+        Returns
+        -------
+        str
+          stderr output if return_stderr and stderr file was there.
+          None otherwise
+        """
+        ret = None
         if self._stderr_out:
             # close possibly still open fd
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
             # remove the file where we kept dumping stderr
             os.unlink(self._stderr_out_fname)
             self._stderr_out_fname = None
         if self._process:
             process = self._process
-            lgr.debug("Closing stdin of %s and waiting process to finish", process)
+            lgr.debug(
+                "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+        return ret
 
 
 class ProcessAnnexProgressIndicators(object):
@@ -3423,6 +3518,14 @@ class ProcessAnnexProgressIndicators(object):
             self.total_pbar.update(diff, increment=True)
         pbar.update(new_value)
 
+    def _log_info(self, msg):
+        """Helper to log a message, so we need to clear up the pbars first"""
+        if self.total_pbar:
+            self.total_pbar.clear()
+        for pbar in self.pbars.values():
+            pbar.clear()
+        lgr.info(msg)
+
     def __call__(self, line):
         try:
             j = json.loads(line)
@@ -3430,6 +3533,21 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
+
+        # Process some messages which remotes etc might push to us
+        if list(j) == ['info']:
+            # Just INFO was received without anything else -- we log it at INFO
+            info = j['info']
+            if info.startswith('PROGRESS-JSON: '):
+                j_ = json_loads(info[len('PROGRESS-JSON: '):])
+                if ('command' in j_ and 'key' in j_) or 'byte-progress' in j_:
+                    j = j_
+                else:
+                    self._log_info(info)
+            else:
+                self._log_info(info)
+                return
+
         target_size = None
         if 'command' in j and 'key' in j:
             # might be the finish line message
@@ -3449,6 +3567,7 @@ class ProcessAnnexProgressIndicators(object):
                     target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(target_size, increment=True)
             else:
+                lgr.log(5, "Message with failed status: %s" % str(j))
                 self._failed += 1
 
             if self.total_pbar:
@@ -3478,7 +3597,7 @@ class ProcessAnnexProgressIndicators(object):
             return int(math.ceil(int(count) / (float(perc) / 100.))) \
                 if perc else 0
 
-        # so we have a progress indicator, let's dead with it
+        # so we have a progress indicator, let's deal with it
         action = j['action']
         download_item = action.get('file') or action.get('key')
         download_id = (action['command'], action['key'])

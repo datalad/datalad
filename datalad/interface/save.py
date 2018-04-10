@@ -121,9 +121,19 @@ def save_dataset(
     # we will blindly call commit not knowing if there is anything to
     # commit -- this is cheaper than to anticipate all possible ways
     # a repo in whatever mode is dirty
+    paths_to_commit = None
+    if not save_entire_ds:
+        paths_to_commit = []
+        for ap in paths:
+            paths_to_commit.append(ap['path'])
+            # was file renamed?
+            path_src = ap.get('path_src')
+            if path_src and path_src != ap['path']:
+                paths_to_commit.append(path_src)
+
     ds.repo.commit(
         message,
-        files=[ap['path'] for ap in paths] if not save_entire_ds else None,
+        files=paths_to_commit,
         _datalad_msg=_datalad_msg,
         careless=True)
 
@@ -164,6 +174,11 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
+        message_file=Parameter(
+            args=("-F", "--message-file"),
+            doc="""take the commit message from this file. This flag is
+            mutually exclusive with -m.""",
+            constraints=EnsureStr() | EnsureNone()),
         all_changes=Parameter(
             args=("-a", "--all-changes"),
             doc="""save all changes (even to not yet added files) of all components
@@ -189,7 +204,8 @@ class Save(Interface):
     @eval_results
     def __call__(message=None, path=None, dataset=None,
                  all_updated=True, all_changes=None, version_tag=None,
-                 recursive=False, recursion_limit=None, super_datasets=False
+                 recursive=False, recursion_limit=None, super_datasets=False,
+                 message_file=None
                  ):
         if all_changes is not None:
             from datalad.support.exceptions import DeprecatedError
@@ -198,11 +214,24 @@ class Save(Interface):
                 version="0.5.0",
                 msg="RF: all_changes option passed to the save"
             )
+
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
-            # we verify that there is an actual repo next
-            dataset = abspath(curdir)
+            path = abspath(curdir)
         refds_path = Interface.get_refds_path(dataset)
+
+        if message and message_file:
+            yield get_status_dict(
+                'save',
+                status='error',
+                path=refds_path,
+                message="Both a message and message file were specified",
+                logger=lgr)
+            return
+
+        if message_file:
+            with open(message_file) as mfh:
+                message = mfh.read()
 
         to_process = []
         got_nothing = True
@@ -248,7 +277,7 @@ class Save(Interface):
                 ap['process_content'] = True
                 ap['process_updated_only'] = all_updated
             to_process.append(ap)
-
+        lgr.log(2, "save, to_process=%r", to_process)
         if got_nothing and recursive and refds_path:
             # path annotation yielded nothing, most likely cause is that nothing
             # was found modified, we need to say something about the reference
@@ -347,8 +376,7 @@ class Save(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 annotated_paths,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # iterate over all datasets, starting at the bottom

@@ -21,10 +21,14 @@ import datalad
 from ..main import main
 from datalad import __version__
 from datalad.cmd import Runner
+from datalad.api import create
+from datalad.utils import chpwd
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import slow
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -92,7 +96,8 @@ def test_help_np():
                   'Miscellaneous commands',
                   'General information',
                   'Global options',
-                  'Plumbing commands'})
+                  'Plumbing commands',
+                  'Plugins'})
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
@@ -146,7 +151,7 @@ def check_incorrect_option(opts, err_str):
 
 def test_incorrect_options():
     # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: (invalid|too few arguments)"
+    err_invalid = "error: (invalid|too few arguments|unrecognized arguments)"
     yield check_incorrect_option, ('--buga',), err_invalid
     yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
 
@@ -179,3 +184,35 @@ def test_script_shims():
         assert get_numeric_portion(version) # that my lambda is correctish
         assert_equal(get_numeric_portion(__version__),
                      get_numeric_portion(version))
+
+
+@slow  # 11.2591s
+@with_tempfile(mkdir=True)
+def test_cfg_override(path):
+    with chpwd(path):
+        # control
+        out, err = Runner()('datalad wtf -s some', shell=True)
+        assert_not_in('datalad.dummy: this', out)
+        # ensure that this is not a dataset's cfg manager
+        assert_not_in('datalad.dataset.id', out)
+        # env var
+        out, err = Runner()('DATALAD_DUMMY=this datalad wtf -s some', shell=True)
+        assert_in('datalad.dummy: this', out)
+        # cmdline arg
+        out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
+        assert_in('datalad.dummy: this', out)
+
+        # now create a dataset in the path. the wtf plugin will switch to
+        # using the dataset's config manager, which must inherit the overrides
+        create(dataset=path)
+        # control
+        out, err = Runner()('datalad wtf -s some', shell=True)
+        assert_not_in('datalad.dummy: this', out)
+        # ensure that this is a dataset's cfg manager
+        assert_in('datalad.dataset.id', out)
+        # env var
+        out, err = Runner()('DATALAD_DUMMY=this datalad wtf -s some', shell=True)
+        assert_in('datalad.dummy: this', out)
+        # cmdline arg
+        out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
+        assert_in('datalad.dummy: this', out)

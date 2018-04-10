@@ -61,7 +61,7 @@ from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import MissingBranchError
-from .network import RI
+from .network import RI, PathRI
 from .network import is_ssh
 from .repo import Flyweight
 from .repo import RepoInterface
@@ -338,17 +338,20 @@ def check_git_configured():
 
     check_runner = GitRunner()
     vals = {}
+    exc_ = ""
     for c in 'user.name', 'user.email':
         try:
             v, err = check_runner.run(['git', 'config', c])
             vals[c] = v.rstrip('\n')
         except CommandError as exc:
-            lgr.debug("Failed to verify that git is configured: %s",
-                      exc_str(exc))
-            raise RuntimeError(
-                "You must configure git first (set both user.name and "
-                "user.email) before using DataLad."
-            )
+            exc_ += exc_str(exc)
+    if exc_:
+        lgr.warning(
+            "It is highly recommended to configure git first (set both "
+            "user.name and user.email) before using DataLad. Failed to "
+            "verify that git is configured: %s.  Some operations might fail or "
+            "not perform correctly." % exc_
+        )
     return vals
 
 
@@ -667,22 +670,30 @@ class GitRepo(RepoInterface):
                 # didn't exist - all fine
                 pass
 
+        # Massage URL
+        url_ri = RI(url) if not isinstance(url, RI) else url
         # try to get a local path from `url`:
         try:
-            if not isinstance(url, RI):
-                url = RI(url).localpath
-            else:
-                url = url.localpath
+            url = url_ri.localpath
+            url_ri = RI(url)
         except ValueError:
             pass
 
-        if is_ssh(url):
+        if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             env = GitRepo.GIT_SSH_ENV
         else:
+            if isinstance(url_ri, PathRI):
+                new_url = os.path.expanduser(url)
+                if url != new_url:
+                    # TODO: remove whenever GitPython is fixed:
+                    # https://github.com/gitpython-developers/GitPython/issues/731
+                    lgr.info("Expanded source path to %s from %s", new_url, url)
+                    url = new_url
             env = None
+
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -733,10 +744,13 @@ class GitRepo(RepoInterface):
                     and self.repo is not None:
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
-
                 self.repo.git.clear_cache()
-                if exists(opj(self.path, '.git')):  # don't try to write otherwise
-                    self.repo.index.write()
+                # We used to write out the index to flush GitPython's
+                # state... but such unconditional write is really a workaround
+                # and does not play nice with read-only operations - permission
+                # denied etc. So disabled 
+                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                #    self.repo.index.write()
         except InvalidGitRepositoryError:
             # might have being removed and no longer valid
             pass
@@ -988,7 +1002,7 @@ class GitRepo(RepoInterface):
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None):
+               files=None, date=None):
         """Commit changes to git.
 
         Parameters
@@ -1005,12 +1019,16 @@ class GitRepo(RepoInterface):
           if True, don't care
         files: list of str, optional
           path(s) to commit
+        date: str, optional
+          Date in one of the formats git understands
         """
 
         self.precommit()
 
         if _datalad_msg:
             msg = self._get_prefixed_commit_msg(msg)
+
+        options = options or []
 
         if not msg:
             if options:
@@ -1019,6 +1037,8 @@ class GitRepo(RepoInterface):
             else:
                 options = ["--allow-empty-message"]
 
+        if date:
+            options += ["--date", date]
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation
         # of commit.
@@ -1161,18 +1181,30 @@ class GitRepo(RepoInterface):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def get_committed_date(self, branch=None):
-        """Get the date stamp of the last commit (in a branch). None if no commit"""
+    def get_commit_date(self, branch=None, date='authored'):
+        """Get the date stamp of the last commit (in a branch or head otherwise)
+
+        Parameters
+        ----------
+        date: {'authored', 'committed'}
+          Which date to return.  "authored" will be the date shown by "git show"
+          and the one possibly specified via --date to `git commit`
+
+        Returns
+        -------
+        int or None
+          None if no commit
+        """
         try:
-            commit = next(
-                self.get_branch_commits(branch
-                                        or self.get_active_branch())
-            )
+            if branch:
+                commit = next(self.get_branch_commits(branch))
+            else:
+                commit = self.repo.head.commit
         except Exception as exc:
             lgr.debug("Got exception while trying to get last commit: %s",
                       exc_str(exc))
             return None
-        return commit.committed_date
+        return getattr(commit, "%s_date" % date)
 
     def get_active_branch(self):
         try:
@@ -2087,20 +2119,25 @@ class GitRepo(RepoInterface):
             ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
-    def tag(self, tag):
+    def tag(self, tag, message=None):
         """Assign a tag to current commit
 
         Parameters
         ----------
         tag : str
           Custom tag label.
+        message : str, optional
+          If provided, would create an annotated tag with that message
         """
         # TODO later to be extended with tagging particular commits and signing
         # TODO: call in save.py complains about extensive logging. When does it
         # happen in what way? Figure out, whether to just silence it or raise or
         # whatever else.
+        options = []
+        if message:
+            options += ['-m', message]
         self._git_custom_command(
-            '', ['git', 'tag', str(tag)]
+            '', ['git', 'tag'] + options + [str(tag)]
         )
 
     def get_tags(self, output=None):
@@ -2118,23 +2155,26 @@ class GitRepo(RepoInterface):
           Each item is a dictionary with information on a tag. At present
           this includes 'hexsha', and 'name', where the latter is the string
           label of the tag, and the format the hexsha of the object the tag
-          is attched to. The list is sorted by commit date, with the most
+          is attached to. The list is sorted by commit date, with the most
           recent commit being the last element.
         """
-        # TODO it would be straightforward to add more info and tweak the
-        # sorting
-        stdout, stderr = self._git_custom_command(
-            '',
-            ['git', 'tag', '--format=%(refname:strip=2)%00%(object)',
-             '--sort=*committerdate'])
-        fields = ('name', 'hexsha')
-        tags = [dict(zip(fields, line.split('\0'))) for line in stdout.splitlines()]
+        tag_objs = sorted(
+            self.repo.tags,
+            key=lambda t: t.commit.committed_date
+        )
+        tags = [
+            {
+                'name': t.name,
+                'hexsha': t.commit.hexsha
+             }
+            for t in tag_objs
+        ]
         if output:
             return [t[output] for t in tags]
         else:
             return tags
 
-    def describe(self, **kwargs):
+    def describe(self, commitish=None, **kwargs):
         """ Quick and dirty implementation to call git-describe
 
         Parameters:
@@ -2145,10 +2185,13 @@ class GitRepo(RepoInterface):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
+        cmd = ['git', 'describe'] + to_options(**kwargs)
+        if commitish is not None:
+            cmd.append(commitish)
         try:
             describe, outerr = self._git_custom_command(
                 [],
-                ['git', 'describe'] + to_options(**kwargs),
+                cmd,
                 expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?

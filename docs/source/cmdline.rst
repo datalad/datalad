@@ -26,7 +26,6 @@ Dataset operations
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
    generated/man/datalad-drop
-   generated/man/datalad-plugin
    generated/man/datalad-get
    generated/man/datalad-install
    generated/man/datalad-publish
@@ -46,6 +45,15 @@ Metadata handling
    generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
 
+Reproducible execution
+======================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-run
+   generated/man/datalad-rerun
+
 Miscellaneous commands
 ======================
 
@@ -58,8 +66,22 @@ Miscellaneous commands
    generated/man/datalad-crawl-init
    generated/man/datalad-download-url
    generated/man/datalad-ls
-   generated/man/datalad-run
    generated/man/datalad-test
+
+
+Plugin commands
+===============
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-add-readme
+   generated/man/datalad-addurls
+   generated/man/datalad-export-archive
+   generated/man/datalad-export-to-figshare
+   generated/man/datalad-extract-metadata
+   generated/man/datalad-no-annex
+   generated/man/datalad-wtf
 
 Plumbing commands
 =================

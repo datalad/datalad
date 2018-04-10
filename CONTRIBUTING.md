@@ -179,16 +179,47 @@ provided by [Sphinx].
 Additional Hints
 ----------------
 
-1. For merge commits to have more informative description, add to your
-   `.git/config` or `~/.gitconfig` following section:
-   
-        [merge]
-        summary = true
-        log = true
-   
-   and if conflicts occur, provide short summary on how they were resolved
-   in "Conflicts" listing within the merge commit
-   (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+### Merge commits
+
+For merge commits to have more informative description, add to your
+`.git/config` or `~/.gitconfig` following section:
+
+    [merge]
+    summary = true
+    log = true
+
+and if conflicts occur, provide short summary on how they were resolved
+in "Conflicts" listing within the merge commit
+(see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+
+### Issue -> PR
+
+[git-hub](https://github.com/sociomantic/git-hub) utility allows to
+attach commits to an issue, thus effectively converting it into a pull
+request.  This allows to avoid necessity to have 2 items (both issue
+and PR) which often would duplicate information and discussion.  To use
+`git-hub` you first would need to configure it using `git hub setup`
+command which would create a section within your `.git/config` such as
+
+    [hub]
+      username=<YourLogin>
+      oauthtoken=<redacted>
+      upstream=datalad/datalad
+      forkremote=YourLogin/datalad
+      pullbase=master
+
+Then, if you are in a branch with the commits that you want to attach
+to an issue, thus making it into a pull request, you can use:
+
+    git hub pull attach <issue number>
+
+If you would like to use `git hub clone -t` to fork other projects,
+but would like to maintain our above convention (official repository as
+`origin`, not `upstream`, and your fork as `gh-yourlogin`, not `fork`),
+set following git configuration options globally:
+
+    hub.upstreamremote = origin
+    hub.forkremote = gh-YourLogin
 
 
 Quality Assurance
@@ -258,18 +289,21 @@ In case if you want to enter buildbot's environment
 
 2. Find container ID associated with the environment you are interested in, e.g.
 
-       ```docker ps | grep nd16.04```
+        docker ps | grep nd16.04
 
 3. Enter that docker container environment using
 
-       ```docker exec -it <CONTAINER ID> /bin/bash```
+        docker exec -it <CONTAINER ID> /bin/bash
 
 4. Become buildbot user
 
-       ```su - buildbot```
+        su - buildbot
 
-5. Activate corresponding virtualenv using ```source <VENV/bin/activate>```
-   (e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`)
+5. Activate corresponding virtualenv using
+
+        source <VENV/bin/activate>
+
+   e.g. `source /home/buildbot/datalad-pr-docker-dl-nd15_04/build/venv-ci/bin/activate`
 
 And now you should be in the same environment as the very last tested PR.
 Note that the same path/venv is reused for all the PRs, so you might want
@@ -383,6 +417,10 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- *DATALAD_SEED*:
+  To seed Python's `random` RNG, which will also be used for generation of dataset UUIDs to make
+  those random values reproducible.  You might want also to set all the relevant git config variables
+  like we do in one of the travis runs
 - *DATALAD_TESTS_TEMP_KEEP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
 - *DATALAD_TESTS_TEMP_DIR*: 
@@ -398,6 +436,8 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_TESTS_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
+- *DATALAD_TESTS_OBSCURE_PREFIX*:
+  A string to prefix the most obscure (but supported by the filesystem test filename
 - *DATALAD_TESTS_PROTOCOLREMOTE*:
   Binary flag to specify whether to test protocol interactions of custom remote with annex
 - *DATALAD_TESTS_RUNCMDLINE*:
@@ -408,22 +448,21 @@ Refer datalad/config.py for information on how to add these environment variable
   Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMP_DIR creation
 - *DATALAD_TESTS_NONLO*:
   Specifies network interfaces to bring down/up for testing. Currently used by travis.
-- *DATALAD_API_ALWAYSRENDER*: 
-  Would make api functions always use a version with cmdline output renderer
-  (i.e. the one with `_` suffix)
 - *DATALAD_CMD_PROTOCOL*: 
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
   'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+- *DATALAD_USE_DEFAULT_GIT*:
+  Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 
 
 # Changelog section
 
 For the upcoming release use this template
 
-## 0.9.3 (??? ??, 2017) -- will be better than ever
+## 0.9.5 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

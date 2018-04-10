@@ -39,7 +39,7 @@ try:
 except ImportError:
     nib = None
 
-# somewhat superseeded by  test_proxying_open_regular but still does
+# somewhat superseeded by test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):

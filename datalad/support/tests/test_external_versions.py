@@ -11,11 +11,12 @@ import logging
 
 from os import linesep
 
+from ... import __version__
 from ...dochelpers import exc_str
 from ...version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
 from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency
+from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
 from ...support.annexrepo import AnnexRepo
 from ...tests.utils import (
     with_tempfile,
@@ -175,6 +176,8 @@ def _test_annex_version_comparison(v, cmp_):
                 assert_equal(AnnexRepo.git_annex_version, v)
         elif cmp == -1:
             with assert_raises(OutdatedExternalDependency):
+                ev.check('cmd:annex', min_version=AnnexRepo.GIT_ANNEX_MIN_VERSION)
+            with assert_raises(OutdatedExternalDependency):
                 AnnexRepo._check_git_annex_version()
 
 
@@ -228,3 +231,20 @@ def test_system_ssh_version():
 def test_humanize():
     # doesn't provide __version__
     assert ExternalVersions()['humanize']
+
+
+def test_check():
+    ev = ExternalVersions()
+    # should be all good
+    ev.check('datalad')
+    ev.check('datalad', min_version=__version__)
+
+    with assert_raises(MissingExternalDependency):
+        ev.check('dataladkukaracha')
+    with assert_raises(MissingExternalDependency) as cme:
+        ev.check('dataladkukaracha', min_version="buga", msg="duga")
+
+    assert_in("duga", str(cme.exception))
+
+    with assert_raises(OutdatedExternalDependency):
+        ev.check('datalad', min_version="10000000")  # we will never get there!

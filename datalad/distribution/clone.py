@@ -37,6 +37,8 @@ from datalad.dochelpers import exc_str
 from datalad.utils import rmtree
 from datalad.utils import assure_list
 
+from datalad.distribution.add import Add
+
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import resolve_path

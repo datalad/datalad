@@ -53,6 +53,8 @@ from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import unique
+from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -300,10 +302,10 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 "subdataset %s is configured to be skipped on recursive installation",
                 sub['path'])
             continue
-        if start is not None and not subds.path.startswith(_with_sep(start)):
+        if start is not None and not path_is_subpath(subds.path, start):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,
@@ -429,7 +431,7 @@ class Get(Interface):
             #git_opts=None,
             #annex_opts=None,
             #annex_get_opts=None,
-            jobs=None,
+            jobs='auto',
             verbose=False,
     ):
         # IMPLEMENTATION CONCEPT:
@@ -591,8 +593,7 @@ class Get(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_get,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # hand over to git-annex, get files content,
@@ -622,8 +623,14 @@ class Get(Interface):
                 res = annexjson2result(res, ds, type='file', logger=lgr,
                                        refds=refds_path)
                 success = success_status_map[res['status']]
-                respath_by_status[success] = \
-                    respath_by_status.get(success, []) + [res['path']]
+                # TODO: in case of some failed commands (e.g. get) there might
+                # be no path in the record.  yoh has only vague idea of logic
+                # here so just checks for having 'path', but according to
+                # results_from_annex_noinfo, then it would be assumed that
+                # `content` was acquired successfully, which is not the case
+                if 'path' in res:
+                    respath_by_status[success] = \
+                        respath_by_status.get(success, []) + [res['path']]
                 yield res
 
             for r in results_from_annex_noinfo(

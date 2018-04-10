@@ -21,7 +21,7 @@ from os import makedirs
 from simplejson import load as jsonload
 from simplejson import dump as jsondump
 # simply mirrored for now
-from simplejson import loads
+from simplejson import loads as json_loads
 from simplejson import JSONDecodeError
 
 
@@ -59,6 +59,7 @@ def dump2fileobj(obj, fileobj):
         codecs.getwriter('utf-8')(fileobj),
         **json_dump_kwargs)
 
+
 def LZMAFile(*args, **kwargs):
     """A little decorator to overcome a bug in lzma
 
@@ -70,18 +71,45 @@ def LZMAFile(*args, **kwargs):
     dir(lzmafile)
     return lzmafile
 
-def dump2xzstream(obj, fname):
-    with LZMAFile(fname, mode='w') as f:
+
+def dump2stream(obj, fname, compressed=False):
+
+    _open = LZMAFile if compressed else open
+
+    with _open(fname, mode='wb') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
             jsondump(o, jwriter, **compressed_json_dump_kwargs)
             f.write(b'\n')
 
 
-def load_xzstream(fname):
-    with LZMAFile(fname, mode='r') as f:
+def dump2xzstream(obj, fname):
+    dump2stream(obj, fname, compressed=True)
+
+
+def load_stream(fname, compressed=False):
+
+    _open = LZMAFile if compressed else open
+    with _open(fname, mode='r') as f:
         for line in f:
             yield loads(line)
+
+
+def load_xzstream(fname):
+    for o in load_stream(fname, compressed=True):
+        yield o
+
+
+def loads(s, *args, **kwargs):
+    """Helper to log actual value which failed to be parsed"""
+    try:
+        return json_loads(s, *args, **kwargs)
+    except:
+        lgr.error(
+            "Failed to load content from %r with args=%r kwargs=%r"
+            % (s, args, kwargs)
+        )
+        raise
 
 
 def load(fname, fixup=True, **kw):

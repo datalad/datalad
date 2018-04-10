@@ -41,7 +41,6 @@ _group_dataset = (
          'create-sibling-github'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
-        ('datalad.plugin', 'Plugin', 'plugin'),
     ])
 
 _group_metadata = (
@@ -67,6 +66,7 @@ _group_misc = (
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         ('datalad.interface.run', 'Run', 'run'),
+        ('datalad.interface.rerun', 'Rerun', 'rerun'),
     ])
 
 _group_plumbing = (

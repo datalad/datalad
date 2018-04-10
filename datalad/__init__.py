@@ -9,6 +9,12 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
+# For reproducible demos/tests
+import os
+_seed = os.environ.get('DATALAD_SEED', None)
+if _seed:
+    import random
+    random.seed(_seed)
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
@@ -108,7 +114,8 @@ def setup_package():
         # TODO: split into a function + context manager
         with make_tempfile(mkdir=True) as new_home:
             os.environ['HOME'] = new_home
-        os.makedirs(new_home)
+        if not os.path.exists(new_home):
+            os.makedirs(new_home)
         with open(os.path.join(new_home, '.gitconfig'), 'w') as f:
             f.write("""\
 [user]

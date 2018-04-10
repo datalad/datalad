@@ -18,7 +18,9 @@ __docformat__ = 'restructuredtext'
 import mimetypes
 
 from os.path import splitext
-from datalad.support.network import urlquote
+import re
+
+from datalad.support.network import urlquote, URL
 
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
@@ -28,7 +30,6 @@ from datalad.dochelpers import exc_str
 from datalad.support.exceptions import DownloadError, AccessDeniedError
 
 from six.moves.urllib.request import urlopen, Request
-from six.moves.urllib.parse import urlparse, urlunparse
 
 
 try:
@@ -62,10 +63,10 @@ def _get_bucket_connection(credential):
 
 def _handle_exception(e, bucket_name):
     """Helper to handle S3 connection exception"""
-    if e.error_code == 'AccessDenied':
-        raise AccessDeniedError(exc_str(e))
-    else:
-        raise DownloadError(
+    raise (
+        AccessDeniedError
+        if e.error_code == 'AccessDenied'
+        else DownloadError)(
             "Cannot connect to %s S3 bucket. Exception: %s"
             % (bucket_name, exc_str(e))
         )
@@ -90,7 +91,7 @@ def get_bucket(conn, bucket_name):
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
             lgr.debug("Cannot access all buckets: %s", exc_str(e2))
-            _handle_exception(e, 'any')
+            _handle_exception(e, 'any (originally requested %s)' % bucket_name)
         all_bucket_names = [b.name for b in all_buckets]
         lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
         if bucket_name in all_bucket_names:
@@ -291,8 +292,44 @@ def gen_bucket_test2_obscurenames_versioned():
     files("f &$=@:+,?;")
 
 
+def add_version_to_url(url, version, replace=False):
+    """Add a version ID to `url`.
+
+    Parameters
+    ----------
+    url : datalad.support.network.URL
+        A URL.
+    version : str
+        The value of 'versionId='.
+    replace : boolean, optional
+        If a versionID is already present in `url`, replace it.
+
+    Returns
+    -------
+    A versioned URL (str)
+    """
+    version_id = "versionId={}".format(version)
+    if not url.query:
+        query = version_id
+    else:
+        ver_match = re.match("(?P<pre>.*&)?"
+                             "(?P<vers>versionId=[^&]+)"
+                             "(?P<post>&.*)?",
+                             url.query)
+        if ver_match:
+            if replace:
+                query = "".join([ver_match.group("pre") or "",
+                                 version_id,
+                                 ver_match.group("post") or ""])
+            else:
+                query = url.query
+        else:
+            query = url.query + "&" + version_id
+    return URL(**dict(url.fields, query=query)).as_str()
+
+
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
-                      s3conn=None):
+                      s3conn=None, update=False):
     """Given a url return a versioned URL
 
     Originally targeting AWS S3 buckets with versioning enabled
@@ -311,27 +348,30 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     verify: bool, optional
       Verify that URL is accessible. As discovered some versioned keys might
       be denied access to
+    update : bool, optional
+      If the URL already contains a version ID, update it to the latest version
+      ID.  This option has no effect if return_all is true.
 
     Returns
     -------
     string or list of string
     """
-    url_rec = urlparse(url)
+    url_rec = URL(url)
 
     s3_bucket, fpath = None, url_rec.path.lstrip('/')
 
-    if url_rec.netloc.endswith('.s3.amazonaws.com'):
-        if not url_rec.scheme in ('http', 'https'):
+    if url_rec.hostname.endswith('.s3.amazonaws.com'):
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
-        s3_bucket = url_rec.netloc.split('.', 1)[0]
-    elif url_rec.netloc == 's3.amazonaws.com':
-        if not url_rec.scheme in ('http', 'https'):
+        s3_bucket = url_rec.hostname.split('.', 1)[0]
+    elif url_rec.hostname == 's3.amazonaws.com':
+        if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # url is s3.amazonaws.com/bucket/PATH
         s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
-        s3_bucket = url_rec.netloc  # must be
+        s3_bucket = url_rec.hostname  # must be
         # and for now implement magical conversion to URL
         # TODO: wouldn't work if needs special permissions etc
         # actually for now
@@ -376,10 +416,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             assert(all_keys)
 
             for key in all_keys:
-                version_id = key.version_id
-                query = ((url_rec.query + "&") if url_rec.query else "") \
-                    + "versionId=%s" % version_id
-                url_versioned = urlunparse(url_rec._replace(query=query))
+                url_versioned = add_version_to_url(
+                    url_rec, key.version_id, replace=update and not return_all)
+
                 all_versions.append(url_versioned)
                 if verify:
                     # it would throw HTTPError exception if not accessible
@@ -393,7 +432,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
 
     if not all_versions:
         # we didn't get a chance
-        all_versions = [urlunparse(url_rec)]
+        all_versions = [url_rec.as_str()]
 
     if return_all:
         return all_versions

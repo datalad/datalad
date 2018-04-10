@@ -5,4 +5,3 @@
 # we should use fresh version allowing to disable extensions
 wrapt>=1.10.11
 -e .[devel]
-

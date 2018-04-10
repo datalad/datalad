@@ -59,9 +59,11 @@ req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
 requires = {
     'core': [
         'appdirs',
+        'chardet>=3.0.4',      # rarely used but small/omnipresent
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
+        'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
@@ -69,7 +71,7 @@ requires = {
     ] + pbar_requires,
     'downloaders': [
         'boto',
-        'msgpack-python',
+        'msgpack',
         'requests>=1.2',
     ] + keyring_requires,
     'downloaders-extra': [
@@ -81,6 +83,9 @@ requires = {
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
+    ],
+    'misc': [
+        'pyperclip',         # clipboard manipulations
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -99,11 +104,7 @@ requires = {
         'mutagen',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
-        'pydicom',  # DICOM metadata
-        'pybids',  # BIDS metadata
         'Pillow',  # generic image metadata
-        'nibabel',  # NIfTI metadata
-        'pandas',  # bids2scidata export
     ]
 }
 
@@ -128,10 +129,6 @@ requires.update({
         # but you might need it
         # 'dbus-python',
     ],
-    'devel-neuroimaging': [
-        # Specifically needed for tests here (e.g. example scripts testing)
-        'nibabel',
-    ]
 })
 requires['devel'] = sum(list(requires.values()), [])
 
@@ -158,7 +155,13 @@ README = opj(dirname(__file__), 'README.md')
 try:
     import pypandoc
     long_description = pypandoc.convert(README, 'rst')
-except ImportError:
+except (ImportError, OSError) as exc:
+    # attempting to install pandoc via brew on OSX currently hangs and
+    # pypandoc imports but throws OSError demanding pandoc
+    print(
+        "WARNING: pypandoc failed to import or thrown an error while converting"
+        " README.md to RST: %r   .md version will be used as is" % exc
+    )
     long_description = open(README).read()
 
 
@@ -187,8 +190,21 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
-            findsome('downloaders/configs', {'cfg'})
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt'}) +
+            findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
+    entry_points={
+        'datalad.metadata.extractors': [
+            'annex=datalad.metadata.extractors.annex:MetadataExtractor',
+            'audio=datalad.metadata.extractors.audio:MetadataExtractor',
+            'datacite=datalad.metadata.extractors.datacite:MetadataExtractor',
+            'datalad_core=datalad.metadata.extractors.datalad_core:MetadataExtractor',
+            'datalad_rfc822=datalad.metadata.extractors.datalad_rfc822:MetadataExtractor',
+            'exif=datalad.metadata.extractors.exif:MetadataExtractor',
+            'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
+            'image=datalad.metadata.extractors.image:MetadataExtractor',
+            'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
+        ]},
     **setup_kwargs
 )

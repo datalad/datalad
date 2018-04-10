@@ -236,12 +236,19 @@ definitions = {
         'type': EnsureBool(),
         'default': True,
     },
-    'datalad.metadata.searchindex-documenttype': {
+    'datalad.search.default-mode': {
+        'ui': ('question', {
+               'title': 'Default search mode',
+               'text': 'Label of the mode to be used by default'}),
+        'type': EnsureChoice('egrep', 'textblob', 'autofield'),  # graph,...
+        'default': 'egrep',
+    },
+    'datalad.search.index-default-documenttype': {
         'ui': ('question', {
                'title': 'Type of search index documents',
-               'text': 'Labels of document types to include in a search index'}),
+               'text': 'Labels of document types to include in a default search index'}),
         'type': EnsureChoice('all', 'datasets', 'files'),
-        'default': 'all',
+        'default': 'datasets',
     },
     'datalad.metadata.create-aggregate-annex-limit': {
         'ui': ('question', {
@@ -255,6 +262,13 @@ definitions = {
                'text': 'Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged'}),
         'type': EnsureBool(),
         'default': False,
+    },
+    'datalad.runtime.report-status': {
+        'ui': ('question', {
+               'title': 'Command line result reporting behavior',
+               'text': "If set, constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
+        'type': EnsureChoice('success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
+        'default': None,
     },
     'datalad.search.indexercachesize': {
         'ui': ('question', {

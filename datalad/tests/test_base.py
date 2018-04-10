@@ -7,14 +7,21 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
+
 from .utils import (
     chpwd,
     get_dataset_root,
     with_tree,
+    swallow_logs,
 
     assert_raises,
     assert_equal,
+    assert_in,
 )
+from datalad.support.gitrepo import check_git_configured
+
+from mock import patch
 
 
 #@with_tempfile(mkdir=True)
@@ -37,11 +44,31 @@ def test_not_under_git(path):
 
 def test_git_config_fixture():
     # in the setup_package we setup a new HOME with custom config
-    from datalad.support.gitrepo import check_git_configured
-    assert_equal(
-        check_git_configured(),
-        {
-            'user.name': 'DataLad Tester',
-            'user.email': 'test@example.com'
-         }
-    )
+    if 'GIT_HOME' not in os.environ:
+        assert_equal(
+            check_git_configured(),
+            {
+                'user.name': 'DataLad Tester',
+                'user.email': 'test@example.com'
+             }
+        )
+    else:
+        # we pick up the ones in the 'GIT_HOME' which might differ
+        assert_equal(sorted(check_git_configured()), ['user.email', 'user.name'])
+
+
+def test_no_empty_http_proxy():
+    # in __init__ we might prune http_proxy if it is empty, so it must not be
+    # empty if present
+    assert os.environ.get('http_proxy', 'default')
+    assert os.environ.get('https_proxy', 'default')
+
+
+@with_tree(tree={})
+def test_git_config_warning(path):
+    with chpwd(path), \
+            patch.dict('os.environ', {'HOME': path}), \
+            swallow_logs(new_level=30) as cml:
+        # no configs in that empty HOME
+        assert_equal(check_git_configured(), {})
+        assert_in("configure git first", cml.out)

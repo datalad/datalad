@@ -23,9 +23,11 @@ from datalad.cmd import GitRunner
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import diff
+from datalad.interface.diff import _parse_git_diff
 from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import ok_
@@ -193,3 +195,37 @@ def test_diff_recursive(path):
     assert_result_count(res, 1, action='diff', state='added', path=opj(ds.path, 'onefile'), type='file')
     assert_result_count(res, 1, action='diff', state='added', path=opj(sub.path, 'twofile'), type='file')
     assert_result_count(res, 1, action='diff', state='modified', path=sub.path, type='dataset')
+
+
+@with_tree(tree={
+    'sub_clean': {},
+    'sub_modified': {'modified': 'original'},
+    'sub_dirty': {'untracked': 'dirt'},
+    'clean': 'clean_content',
+    'modified': 'original_content',
+    'untracked': 'dirt',
+})
+@known_failure_direct_mode  #FIXME
+def test_diff_helper(path):
+    # make test dataset components of interesting states
+    ds = Dataset.create(path, force=True)
+    # detached dataset, not a submodule
+    nosub = Dataset.create(opj(path, 'nosub'))
+    # unmodified, proper submodule
+    sub_clean = ds.create('sub_clean', force=True)
+    # proper submodule, but commited modifications not commited in parent
+    sub_modified = ds.create('sub_modified', force=True)
+    sub_modified.add('modified')
+    # proper submodule with untracked changes
+    sub_dirty = ds.create('sub_dirty', force=True)
+    ds.add(['clean', 'modified'])
+    ds.unlock('modified')
+    with open(opj(ds.path, 'modified'), 'w') as f:
+        f.write('modified_content')
+    file_mod = opj(ds.path, 'modified')
+    # standard `git diff` no special args, reports modified, but not untracked
+    res = list(_parse_git_diff(ds.path))
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, path=file_mod)
+    assert_result_count(res, 1, path=sub_modified.path)
+    assert_result_count(res, 1, path=sub_dirty.path)

@@ -26,6 +26,7 @@ from six import binary_type
 from six import string_types
 from fnmatch import fnmatch
 import time
+from difflib import unified_diff
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -520,6 +521,68 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
     httpd.serve_forever()
 
 
+class HTTPPath(object):
+    """Serve the content of a path via an HTTP URL.
+
+    This class can be used as a context manager, in which case it returns the
+    URL.
+
+    Alternatively, the `start` and `stop` methods can be called directly.
+
+    Parameters
+    ----------
+    path : str
+        Directory with content to serve.
+    """
+    def __init__(self, path):
+        self.path = path
+        self.url = None
+        self._env_patch = None
+        self._mproc = None
+
+    def __enter__(self):
+        self.start()
+        return self.url
+
+    def __exit__(self, *args):
+        self.stop()
+
+    def start(self):
+        """Start serving `path` via HTTP.
+        """
+        # There is a problem with Haskell on wheezy trying to
+        # fetch via IPv6 whenever there is a ::1 localhost entry in
+        # /etc/hosts.  Apparently fixing that docker image reliably
+        # is not that straightforward, although see
+        # http://jasonincode.com/customizing-hosts-file-in-docker/
+        # so we just force to use 127.0.0.1 while on wheezy
+        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        hostname = '127.0.0.1'
+
+        queue = multiprocessing.Queue()
+        self._mproc = multiprocessing.Process(
+            target=_multiproc_serve_path_via_http,
+            args=(hostname, self.path, queue))
+        self._mproc.start()
+        port = queue.get(timeout=300)
+        self.url = 'http://{}:{}/'.format(hostname, port)
+        lgr.debug("HTTP: serving %s under %s", self.path, self.url)
+
+        # Such tests don't require real network so if http_proxy settings were
+        # provided, we remove them from the env for the duration of this run
+        env = os.environ.copy()
+        env.pop('http_proxy', None)
+        self._env_patch = patch.dict('os.environ', env, clear=True)
+        self._env_patch.start()
+
+    def stop(self):
+        """Stop serving `path`.
+        """
+        lgr.debug("HTTP: stopping server under %s", self.path)
+        self._env_patch.stop()
+        self._mproc.terminate()
+
+
 @optional_args
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
@@ -538,35 +601,8 @@ def serve_path_via_http(tfunc, *targs):
         else:
             args, path = (), args[0]
 
-        # There is a problem with Haskell on wheezy trying to
-        # fetch via IPv6 whenever there is a ::1 localhost entry in
-        # /etc/hosts.  Apparently fixing that docker image reliably
-        # is not that straightforward, although see
-        # http://jasonincode.com/customizing-hosts-file-in-docker/
-        # so we just force to use 127.0.0.1 while on wheezy
-        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        hostname = '127.0.0.1'
-
-        queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(
-            target=_multiproc_serve_path_via_http,
-            args=(hostname, path, queue))
-        multi_proc.start()
-        port = queue.get(timeout=300)
-        url = 'http://{}:{}/'.format(hostname, port)
-        lgr.debug("HTTP: serving {} under {}".format(path, url))
-
-        try:
-            # Such tests don't require real network so if http_proxy settings were
-            # provided, we remove them from the env for the duration of this run
-            env = os.environ.copy()
-            env.pop('http_proxy', None)
-            with patch.dict('os.environ', env, clear=True):
-                return tfunc(*(args + (path, url)), **kwargs)
-        finally:
-            lgr.debug("HTTP: stopping server under %s" % path)
-            multi_proc.terminate()
-
+        with HTTPPath(path) as url:
+            return tfunc(*(args + (path, url)), **kwargs)
     return newfunc
 
 
@@ -680,9 +716,6 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-    SubmoduleDataset, NestedDataset, InnerSubmodule
-
 _TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
@@ -690,6 +723,9 @@ def _get_testrepos_uris(regex, flavors):
     # we should instantiate those whenever test repos actually asked for
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
+        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+            SubmoduleDataset, NestedDataset, InnerSubmodule
+
         _basic_annex_test_repo = BasicAnnexTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
         _submodule_annex_test_repo = SubmoduleDataset()
@@ -880,7 +916,7 @@ def skip_ssh(func):
             raise SkipTest("SSH currently not available on windows.")
         from datalad import cfg
         test_ssh = cfg.get("datalad.tests.ssh", '')
-        if test_ssh in ('', '0', 'false', 'no'):
+        if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
@@ -1141,6 +1177,13 @@ def assert_dict_equal(d1, d2):
     eq_(d1, d2)
 
 
+def assert_str_equal(s1, s2):
+    """Helper to compare two lines"""
+    diff = list(unified_diff(s1.splitlines(), s2.splitlines()))
+    assert not diff, '\n'.join(diff)
+    assert_equal(s1, s2)
+
+
 def assert_status(label, results):
     """Verify that each status dict in the results has a given status label
 
@@ -1217,6 +1260,21 @@ def assert_result_values_equal(results, prop, values):
         values)
 
 
+def assert_result_values_cond(results, prop, cond):
+    """Verify that the values of all results for a given key in the status dicts
+    fullfill condition `cond`.
+
+    Parameters
+    ----------
+    results:
+    prop: str
+    cond: callable
+    """
+    for r in assure_list(results):
+        ok_(cond(r[prop]),
+            msg="r[{prop}]: {value}".format(prop=prop, value=r[prop]))
+
+
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
@@ -1283,6 +1341,7 @@ def dump_graph(graph, flatten=False):
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
+OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
     " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
     " \"';a&b&cd `| ",
@@ -1294,7 +1353,8 @@ OBSCURE_FILENAMES = (
     " ab cd ",
     " ab cd",
     "a",
-    " abc d.dat ",  # they all should at least support spaces and dots
+    " abc d.dat ",
+    "abc d.dat ",  # they all should at least support spaces and dots
 )
 
 @with_tempfile(mkdir=True)
@@ -1304,6 +1364,7 @@ def get_most_obscure_supported_name(tdir):
     TODO: we might want to use it as a function where we would provide tdir
     """
     for filename in OBSCURE_FILENAMES:
+        filename = OBSCURE_PREFIX + filename
         if on_windows and filename.rstrip() != filename:
             continue
         try:
@@ -1390,6 +1451,13 @@ def get_datasets_topdir():
 #
 # Context Managers
 #
+
+
+def patch_config(vars):
+    """Patch our config with custom settings. Returns mock.patch cm
+    """
+    from datalad import cfg
+    return patch.dict(cfg._store, vars)
 
 
 #

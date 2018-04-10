@@ -266,7 +266,7 @@ def pipeline(dataset,
                                         # overlay layout to even bigger single one within a minor 2.0.1 "release"
                                         # 158 -- 1.0.1 changed layout completely so should not be overlayed ATM
                                         overlay=None
-                                            if dataset in ('ds000007', 'ds000114', 'ds000119', 'ds000158')
+                                            if dataset in ('ds000007', 'ds000114', 'ds000119', 'ds000158', 'ds000216')
                                             else versions_overlay_level,  # use major.minor to define overlays
                                         #overlay=None, # use major.minor to define overlays
                                         exclude='(README|changelog).*'),

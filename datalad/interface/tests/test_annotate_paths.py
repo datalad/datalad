@@ -26,6 +26,8 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import slow
+
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import annotate_paths
@@ -75,6 +77,7 @@ def test_invalid_call(path):
         annotate_paths, dataset=path, modified="something")
 
 
+@slow  # 15.3509s
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -125,7 +128,7 @@ def test_annotate_paths(dspath, nodspath):
     assert_result_count(base_res, 2)
     assert_result_count(base_res, 2, type='dataset')
     assert_result_count(
-        base_res, 1, type='dataset', state='clean', parentds=parentds.path,
+        base_res, 1, type='dataset', parentds=parentds.path,
         path=opj(parentds.path, 'aa'), status='')
     # same recursion but without a base dataset
     res = annotate_paths(path=opj(dspath, 'a'), recursive=True)
@@ -220,6 +223,7 @@ def test_annotate_paths(dspath, nodspath):
     eq_(orig_res, res_recursion_again)
 
 
+@slow  # 11.0891s
 @with_tree(demo_hierarchy['b'])
 @known_failure_direct_mode  #FIXME
 def test_get_modified_subpaths(path):
@@ -324,6 +328,7 @@ def test_get_modified_subpaths(path):
         type_src='dataset', path=suba.path)
 
 
+@slow  # 41.5367s
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME

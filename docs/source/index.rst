@@ -20,7 +20,6 @@ Concepts and technologies
    usecases/index
    metadata
    customization
-   faq
    glossary
 
 Commands and API
@@ -40,6 +39,12 @@ Automated data distributions
    :maxdepth: 2
 
    crawler/index
+
+Extension modules
+=================
+
+- `Neuroimaging data and workflows <http://docs.datalad.org/projects/neuroimaging>`_
+
 
 Indices and tables
 ==================

@@ -24,9 +24,13 @@ import os
 
 from six import text_type
 
+from pkg_resources import iter_entry_points
+
 import datalad
 
 from datalad.cmdline import helpers
+from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
@@ -38,7 +42,7 @@ from ..dochelpers import exc_str
 
 def _license_info():
     return """\
-Copyright (c) 2013-2017 DataLad developers
+Copyright (c) 2013-2018 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -66,6 +70,7 @@ THE SOFTWARE.
 # I wondered if it could somehow decide on what commands to worry about etc
 # by going through sys.args first
 def setup_parser(
+        cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
 
@@ -110,10 +115,10 @@ def setup_parser(
         read from a file, but is potentially overridden itself by configuration
         variables in the process environment.""")
     parser.add_argument(
-        '--output-format', dest='common_output_format',
+        '-f', '--output-format', dest='common_output_format',
         default='default',
         type=assure_unicode,
-        metavar="{default,json,json_pp,tailored,'<template>'",
+        metavar="{default,json,json_pp,tailored,'<template>'}",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
         'json' renders a JSON object with all properties for each result (one per
@@ -148,26 +153,26 @@ def setup_parser(
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
-    parser.add_argument(
-        '--run-before', dest='common_run_before',
-        nargs='+',
-        action='append',
-        metavar='PLUGINSPEC',
-        help="""DataLad plugin to run after the command. PLUGINSPEC is a list
-        comprised of a plugin name plus optional `key=value` pairs with arguments
-        for the plugin call (see `plugin` command documentation for details).
-        This option can be given more than once to run multiple plugins
-        in the order in which they were given.
-        For running plugins that require a --dataset argument it is important
-        to provide the respective dataset as the --dataset argument of the main
-        command, if it is not in the list of plugin arguments."""),
-    parser.add_argument(
-        '--run-after', dest='common_run_after',
-        nargs='+',
-        action='append',
-        metavar='PLUGINSPEC',
-        help="""Like --run-before, but plugins are executed after the main command
-        has finished."""),
+    #parser.add_argument(
+    #    '--run-before', dest='common_run_before',
+    #    nargs='+',
+    #    action='append',
+    #    metavar='PLUGINSPEC',
+    #    help="""DataLad plugin to run after the command. PLUGINSPEC is a list
+    #    comprised of a plugin name plus optional `key=value` pairs with arguments
+    #    for the plugin call (see `plugin` command documentation for details).
+    #    This option can be given more than once to run multiple plugins
+    #    in the order in which they were given.
+    #    For running plugins that require a --dataset argument it is important
+    #    to provide the respective dataset as the --dataset argument of the main
+    #    command, if it is not in the list of plugin arguments."""),
+    #parser.add_argument(
+    #    '--run-after', dest='common_run_after',
+    #    nargs='+',
+    #    action='append',
+    #    metavar='PLUGINSPEC',
+    #    help="""Like --run-before, but plugins are executed after the main command
+    #    has finished."""),
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
@@ -191,41 +196,70 @@ def setup_parser(
     #                         only warnings and errors are printed.""")
 
     # subparsers
-    subparsers = parser.add_subparsers()
+    subparsers = None
 
     # auto detect all available interfaces and generate a function-based
     # API from them
+    cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
     grp_short_descriptions = []
     interface_groups = get_interface_groups()
+    for ep in iter_entry_points('datalad.extensions'):
+        lgr.debug('Loading entrypoint %s from datalad.extensions', ep.name)
+        try:
+            spec = ep.load()
+            interface_groups.append((ep.name, spec[0], spec[1]))
+        except Exception as e:
+            lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str(e))
+            continue
+    interface_groups.append(('plugins', 'Plugins', _get_plugins()))
+
     for grp_name, grp_descr, _interfaces \
                 in sorted(interface_groups, key=lambda x: x[1]):
         # for all subcommand modules it can find
         cmd_short_descriptions = []
 
         for _intfspec in _interfaces:
-            # turn the interface spec into an instance
-            lgr.log(5, "Importing module %s " % _intfspec[0])
-            try:
-                _mod = import_module(_intfspec[0], package='datalad')
-            except Exception as e:
-                lgr.error("Internal error, cannot import interface '%s': %s",
-                          _intfspec[0], exc_str(e))
-                continue
-            _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
+            # for each interface to be imported decide if it is necessary
+            # test conditions from frequent to infrequent occasions
+            # we want to import everything for help requests of any kind
+            # including a cluecless `datalad` without args
+            if not (len(cmdlineargs) == 1 or
+                    cmd_name in cmdlineargs or
+                    '--help' in cmdlineargs or
+                    '-h' in cmdlineargs or
+                    '--help-np' in cmdlineargs):
+                continue
+            if isinstance(_intfspec[1], dict):
+                # plugin
+                _intf = _load_plugin(_intfspec[1]['file'], fail=False)
+                if _intf is None:
+                    continue
+            else:
+                # turn the interface spec into an instance
+                lgr.log(5, "Importing module %s " % _intfspec[0])
+                try:
+                    _mod = import_module(_intfspec[0], package='datalad')
+                except Exception as e:
+                    lgr.error("Internal error, cannot import interface '%s': %s",
+                              _intfspec[0], exc_str(e))
+                    continue
+                _intf = getattr(_mod, _intfspec[1])
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
                 parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
-                intf_doc = _intf.__doc__.strip()
+                intf_doc = '' if _intf.__doc__ is None else _intf.__doc__.strip()
                 if hasattr(_intf, '_docs_'):
                     # expand docs
                     intf_doc = intf_doc.format(**_intf._docs_)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
                     intf_doc)
             # create subparser, use module suffix as cmd name
+            if subparsers is None:
+                subparsers = parser.add_subparsers()
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
@@ -286,20 +320,10 @@ def setup_parser(
         return parser
 
 
-# yoh: arn't used
-# def generate_api_call(cmdlineargs=None):
-#     parser = setup_parser()
-#     # parse cmd args
-#     cmdlineargs = parser.parse_args(cmdlineargs)
-#     # convert cmdline args into API call spec
-#     functor, args, kwargs = cmdlineargs.func(cmdlineargs)
-#     return cmdlineargs, functor, args, kwargs
-
-
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
-    parser = setup_parser()
+    parser = setup_parser(args or sys.argv)
     try:
         import argcomplete
         argcomplete.autocomplete(parser)
@@ -323,14 +347,14 @@ def main(args=None):
     # to possibly be passed into PBS scheduled call
     args_ = args or sys.argv
 
-    # enable overrides
-    datalad.cfg.reload()
-
     if cmdlineargs.cfg_overrides is not None:
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
             for o in cmdlineargs.cfg_overrides])
         datalad.cfg.overrides.update(overrides)
+
+    # enable overrides
+    datalad.cfg.reload(force=True)
 
     if cmdlineargs.change_path is not None:
         from .common_args import change_path as change_path_opt
@@ -349,6 +373,8 @@ def main(args=None):
         if cmdlineargs.common_debug or cmdlineargs.common_idebug:
             # so we could see/stop clearly at the point of failure
             setup_exceptionhook(ipython=cmdlineargs.common_idebug)
+            from datalad.interface.base import Interface
+            Interface._interrupted_exit_code = None
             ret = cmdlineargs.func(cmdlineargs)
         else:
             # otherwise - guard and only log the summary. Postmortem is not
