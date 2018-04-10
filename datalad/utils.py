@@ -1115,7 +1115,7 @@ def get_path_prefix(path, pwd=None):
     assumed
     """
     pwd = pwd or getpwd()
-    path = dlabspath()
+    path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
     common = commonprefix((path_, pwd_))
