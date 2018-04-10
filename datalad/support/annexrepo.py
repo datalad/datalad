@@ -1084,6 +1084,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # If .git/config lacks an entry "direct",
         # it's actually indirect mode.
+        self.config.reload()
         return self.config.getbool("annex", "direct", False)
 
     def is_direct_mode(self):
@@ -1104,6 +1105,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         True if on crippled filesystem, False otherwise
         """
+        self.config.reload()
         return self.config.getbool("annex", "crippledfilesystem", False)
 
     def set_direct_mode(self, enable_direct_mode=True):

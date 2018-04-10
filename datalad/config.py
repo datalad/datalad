@@ -236,7 +236,9 @@ class ConfigManager(object):
             # to not delay this, but assume it is old
             self._gitconfig_has_showorgin = False
 
-        self.delayed_reload()  # the point of delayed is not force force=True)
+        # no point in delaying since I bet since at least some .get would
+        # follow, and no need to force really since above _cfgmtimes are reset
+        self.reload(force=True)
 
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
