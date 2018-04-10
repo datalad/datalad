@@ -51,6 +51,7 @@ from ..utils import get_dataset_root
 from ..utils import better_wraps
 from ..utils import path_startswith
 from ..utils import path_is_subpath
+from ..utils import dlabspath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
@@ -961,4 +962,22 @@ def test_line_profile():
         assert_equal(f(3), 4)
         assert_equal(cmo.err, '')
         assert_in('i = j + 1  # xyz', cmo.out)
+
+
+@with_tempfile(mkdir=True)
+def test_dlabspath(path):
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    opath = opj(path, "origin")
+    os.makedirs(opath)
+    lpath = opj(path, "linked")
+    os.symlink('origin', lpath)
+    for d in opath, lpath:
+        # regardless under which directory, all results should not resolve
+        # anything
+        eq_(d, dlabspath(d))
+        # in the root of ds
+        with chpwd(d):
+            eq_(dlabspath("bu"), opj(d, "bu"))
+            eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
+            eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
 

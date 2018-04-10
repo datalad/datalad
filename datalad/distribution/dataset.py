@@ -39,6 +39,7 @@ from datalad.support.network import RI
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
+from datalad.utils import dlabspath
 from datalad.distribution.utils import get_git_dir
 
 
@@ -65,7 +66,7 @@ def resolve_path(path, ds=None):
     path = expandpath(path, force_absolute=False)
     # TODO: normpath?!
     if is_explicit_path(path):
-        return abspath(path)
+        return dlabspath(path)
     # no dataset given, use CWD as reference
     # note: abspath would disregard symlink in CWD
     top_path = getpwd() \
