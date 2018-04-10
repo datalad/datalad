@@ -1024,11 +1024,9 @@ class GitRepo(RepoInterface):
     def add_fake_dates(self, env):
         """Add fake dates to `env`.
         """
-        last_date = self._git_custom_command(
-            None,
-            ["git", "for-each-ref", "--count=1",
-             "--sort=-committerdate", "--format=%(committerdate:unix)",
-             "refs/heads"])[0].strip()
+        last_date = self.repo.git.for_each_ref(
+            "refs/heads", count=1, sort="-committerdate",
+            format="%(committerdate:unix)").strip()
 
         if last_date:
             seconds = int(last_date)
