@@ -126,10 +126,11 @@ class XNATServer(object):
         drop_empty: whether to drop projects with no experiements
         """
         # accessible  option could limit to the projects I have access to
+        fields_to_check = DEFAULT_RESULT_FIELDS.union({'title',})
+        experiments = self('data/experiments', 
+                           fields_to_check=fields_to_check)
+        self.experiment_labels = { e['id']: e['label'] for e in experiments }
         if drop_empty:
-            fields_to_check = DEFAULT_RESULT_FIELDS.union({'title',})
-            experiments = self('data/experiments', 
-                               fields_to_check=fields_to_check)
             non_empty_projects = set([ e['project'] for e in experiments ])
         kw = {}
         if limit:
@@ -185,7 +186,10 @@ class XNATServer(object):
         for subject in (subjects or self.get_subjects(project)):
             for experiment in (experiments or self.get_experiments(project, subject)):
                 for file_ in self.get_files(project, subject, experiment):
-                    yield file_
+                    yield updated(file_, 
+                                  {'subject': subject, 
+                                   'experiment': experiment
+                                  })
 
 
 # define a pipeline factory function accepting necessary keyword arguments
@@ -236,6 +240,8 @@ def pipeline(url, dataset, project_access='public', subjects=None):
     subjects = assure_list(subjects)
 
     xnat = XNATServer(url)
+    # set the experiment label cache
+    xnat.get_projects()
 
     def get_project_info(data):
         out = xnat('data/projects/%s' % dataset,
@@ -260,9 +266,11 @@ def pipeline(url, dataset, project_access='public', subjects=None):
             # TODO: might want to allow for
             #   XNAT2BIDS whenever that one is available:
             #     http://reproducibility.stanford.edu/accepted-projects-for-the-2nd-crn-coding-sprint/
+            exp_label = xnat.experiment_labels[f['experiment']]
             yield updated(data,
                           {'url': url + f['uri'],
-                           'path': f['uri'][len(prefix):]
+                           'path': f['uri'][len(prefix):], 
+                           'name': '%s-%s' % (exp_label, f['name'])
                            })
 
     annex = Annexificator(
