@@ -112,6 +112,14 @@ def anything2bool(val):
             "Got value %s which could not be interpreted as a boolean"
             % repr(val))
 
+# TEMP!
+def debug(msg, *args):
+    try:  # might not be importable yet
+        from datalad import lgr
+        lgr.debug(msg, *args)
+    except:
+        pass
+
 
 class delayed_dict(object):
     def __init__(self, callable, obj, attribute):
@@ -120,9 +128,7 @@ class delayed_dict(object):
         self._secret_attribute = attribute
 
     def _secret_doit(self):
-        from datalad import lgr
-        import pdb; pdb.set_trace()
-        lgr.debug("Replacing the delayed dict with the royal thing")
+        debug("Replacing the delayed dict with the royal thing")
         self._secret_callable()
         return getattr(self._secret_obj, self._secret_attribute)
 
@@ -230,7 +236,7 @@ class ConfigManager(object):
             # to not delay this, but assume it is old
             self._gitconfig_has_showorgin = False
 
-        self.reload(force=True)
+        self.delayed_reload()  # the point of delayed is not force force=True)
 
     def reload(self, force=False):
         """Reload all configuration items from the configured sources
@@ -266,11 +272,7 @@ class ConfigManager(object):
         # from dataset locally or globally
         run_args = ['-z', '-l']
         if self._gitconfig_has_showorgin:
-            try:
-                from datalad import lgr
-                lgr.debug("%s will show origin" % id(self))
-            except:
-                pass
+            debug("%s will show origin" % id(self))
             run_args.append('--show-origin')
 
         if self._dataset_cfgfname:
@@ -561,16 +563,20 @@ class ConfigManager(object):
         if reload:
             self.reload()
         elif reload is None:
-            # reload is needed but delay reload until demanded
-            if not isinstance(self._store, delayed_dict):
-                from datalad import lgr
-                lgr.debug("Sticking in our royal thing")
-                self._store = delayed_dict(self.reload, self, '_store')
-            else:
-                from datalad import lgr
-                lgr.debug("Our royal thing is in place")
+            self.delayed_reload()
 
         return out
+
+    def delayed_reload(self):
+        """Do not reload, but rather stick our lazy helper to (re)load
+        only when actually asked for some information
+        """
+        # reload is needed but delay reload until demanded
+        if not isinstance(self._store, delayed_dict):
+            debug("Sticking in our royal thing for %s" % id(self))
+            self._store = delayed_dict(self.reload, self, '_store')
+        else:
+            debug("Our royal thing is in place")
 
     def _get_location_args(self, where, args=None):
         if args is None:

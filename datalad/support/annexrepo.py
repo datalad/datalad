@@ -1127,7 +1127,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         self._run_annex_command('direct' if enable_direct_mode else 'indirect',
                                 expect_stderr=True)
-        self.config.reload()
+        self.config.delayed_reload()
 
         # For paranoid we will just re-request
         self._direct_mode = None
@@ -1241,7 +1241,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('init', annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
-        self.config.reload()
+        self.config.delayed_reload()
 
     @normalize_paths
     def get(self, files, remote=None, options=None, jobs=None, key=False):
@@ -1880,7 +1880,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: figure out consistent way for passing options + document
 
         self._run_annex_command('initremote', annex_options=[name] + options)
-        self.config.reload()
+        self.config.delayed_reload()
 
     def enable_remote(self, name, env=None):
         """Enables use of an existing special remote
@@ -1905,7 +1905,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise AccessFailedError(e.stderr)
             else:
                 raise e
-        self.config.reload()
+        self.config.delayed_reload()
 
     def merge_annex(self, remote=None):
         """Merge git-annex branch
