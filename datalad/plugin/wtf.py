@@ -76,13 +76,23 @@ class WTF(Interface):
         else:
             cfg = None
 
+        from pkg_resources import iter_entry_points
         from datalad.ui import ui
         from datalad.api import metadata
-        from datalad.metadata import extractors as metaextractors
         from datalad.support.external_versions import external_versions
         import os
         import platform as pl
         import json
+
+        extractors={}
+        for ep in iter_entry_points('datalad.metadata.extractors'):
+            status = 'BROKEN'
+            try:
+                ep.load()
+                status = 'OK'
+            except:
+                pass
+            extractors[ep.name] = status
 
         # formatting helper
         def _t2s(t):
@@ -113,8 +123,12 @@ Environment
 Externals
 =========
 {externals}
-Available metadata extractors
-=============================
+Installed extensions
+====================
+{extensions}
+
+Known metadata extractors
+=========================
 {metaextractors}
 
 Configuration
@@ -187,7 +201,8 @@ Metadata
                      if ds_meta else '[no metadata]'
             ),
             externals=external_versions.dumps(preamble=None, indent='', query=True),
-            metaextractors='\n'.join(p for p in dir(metaextractors) if not p.startswith('_')),
+            extensions='\n'.join(ep.name for ep in iter_entry_points('datalad.extensions')),
+            metaextractors='\n'.join('{}: {}'.format(k, v) for k, v in extractors.items()),
             cfg=_format_dict(sorted(cfg.items(), key=lambda x: x[0]))
                 if cfg else _HIDDEN,
         )
