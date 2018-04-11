@@ -120,6 +120,7 @@ requires.update({
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
+        'asv',
         'nose-timer',
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
