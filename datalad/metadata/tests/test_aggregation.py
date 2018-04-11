@@ -314,6 +314,8 @@ def test_update_strategy(path):
     eq_(target_meta, base.metadata(return_type='list'))
 
 
+# needs two subdatasets, no possible in direct mode
+@skip_direct_mode  #FIXME
 @with_tree({
     'this': 'that',
     'sub1': {'here': 'there'},
