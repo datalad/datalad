@@ -1088,6 +1088,21 @@ class chpwd(object):
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
+def dlabspath(path, norm=False):
+    """Symlinks-in-the-cwd aware abspath
+
+    os.path.abspath relies on os.getcwd() which would not know about symlinks
+    in the path
+
+    TODO: we might want to norm=True by default to match behavior of
+    os .path.abspath?
+    """
+    if not isabs(path):
+        # if not absolute -- relative to pwd
+        path = opj(getpwd(), path)
+    return normpath(path) if norm else path
+
+
 def with_pathsep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
@@ -1101,9 +1116,7 @@ def get_path_prefix(path, pwd=None):
     assumed
     """
     pwd = pwd or getpwd()
-    if not isabs(path):
-        # if not absolute -- relative to pwd
-        path = opj(getpwd(), path)
+    path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
     common = commonprefix((path_, pwd_))
