@@ -19,6 +19,7 @@ from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_dict_equal
@@ -311,3 +312,21 @@ def test_update_strategy(path):
 
     # all of that has no impact on the reported metadata
     eq_(target_meta, base.metadata(return_type='list'))
+
+
+@with_tempfile()
+def test_partial_aggregation(path):
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = ds.create('sub2')
+    ds.aggregate_metadata(recursive=True)
+    # baseline, recursive aggregation gets us something for all three datasets
+    res = ds.metadata(get_aggregates=True)
+    assert_result_count(res, 3)
+    # now let's do partial aggregation from just one subdataset
+    # we should not loose information on the other datasets
+    # as this would be a problem any time anything in a dataset
+    # subtree is missing: no installed, too expensive to reaggregate, ...
+    ds.aggregate_metadata(path='sub1')
+    res = ds.metadata(get_aggregates=True)
+    assert_result_count(res, 3)
