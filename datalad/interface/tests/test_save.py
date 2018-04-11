@@ -404,4 +404,10 @@ def test_bf1886(path):
     with chpwd(opj(parent.path, 'subdir', 'subsubdir')):
         add([opj(parent.path, 'sub3'),
              opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
-    ok_clean_git(parent.path)
+    # here is where we need to disagree with the repo in #1886
+    # we would not expect that `add` registers sub3 as a subdataset
+    # of parent, because no reference dataset was given and the
+    # command cannot decide (with the current semantics) whether
+    # it should "add anything in sub3 to sub3" or "add sub3 to whatever
+    # sub3 is in"
+    ok_clean_git(parent.path, untracked=['sub3/'])
