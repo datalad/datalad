@@ -359,37 +359,37 @@ package to ease pycharm installation even further.
 
 ### Benchmarking
 
-We use [asv] for benchmarking of some core DataLad functionality.
-Benchmarks suite is located under [benchmarks/](./benchmarks), and
+We use [asv] to benchmark some core DataLad functionality.
+The benchmarks suite is located under [benchmarks/](./benchmarks), and
 periodically we publish results of running benchmarks on a dedicated host
 to http://datalad.github.io/datalad/ .  Those results are collected
-and available under `.asv/` submodule of this repository, so to get started
+and available under the `.asv/` submodule of this repository, so to get started
 
 - `git submodule update --init .asv`
 - `pip install .[devel]` or just `pip install asv`
 - `asv machine` - to configure asv for your host if you want to run
   benchmarks locally
 
-And then you could use [asv] multiple ways
+And then you could use [asv] in multiple ways.
 
-#### Quickly benchmark current work tree
+#### Quickly benchmark the working tree
 
-- `asv run -E existing` benchmark using existing python environment
-  and just print out results (not stored anywhere).  Could add `-q`
-  for running each benchmark once (thus less reliable estimates)
+- `asv run -E existing` - benchmark using the existing python environment
+  and just print out results (not stored anywhere).  You can add `-q`
+  to run each benchmark just once (thus less reliable estimates)
 - `asv run -b api.supers.time_createadd_to_dataset -E existing`
-  would run that specific benchmark using existing python environment
+  would run that specific benchmark using the existing python environment
 
 Note: `--python=same` (`-E existing`) seems to have restricted
-applicability, e.g. can't be used for a range of commits, so not to
+applicability, e.g. can't be used for a range of commits, so it can't
 be used with `continuous`.
 
 #### Compare results for two commits from recorded runs
 
-Results should be available under `.asv/results/<machine>` and then use
-[asv compare].  In the example below we overcome a current
-[limitation in asv compare](https://github.com/airspeed-velocity/asv/issues/632)
-requiring specifying hexshas for the commits:
+Use [asv compare] to compare results from different runs, which should be
+available under `.asv/results/<machine>`.  In the example below we overcome a
+current [limitation in asv compare](https://github.com/airspeed-velocity/asv/issues/632)
+that requires commits to be specified as hexshas:
 
 ```shell
 > grp(){git rev-parse $1;}; asv compare -m hopa $(grp 0.9.x) $(grp master)
@@ -415,12 +415,12 @@ All benchmarks:
 
 #### Run and compare results for two commits
 
-[asv continuous] could be used to first run benchmarks for to be tested
+[asv continuous] could be used to first run benchmarks for the to-be-tested
 commits and then provide stats:
 
 - `asv continuous 0.9.x master` - would run and compare 0.9.x and master branches
-- `asv contineous HEAD` - would compare HEAD against HEAD^
-- `asv contineous master HEAD` - would compare HEAD against state of master
+- `asv continuous HEAD` - would compare HEAD against HEAD^
+- `asv continuous master HEAD` - would compare HEAD against state of master
 - [TODO: contineous -E existing](https://github.com/airspeed-velocity/asv/issues/338#issuecomment-380520022)
 
 Notes:
@@ -430,8 +430,8 @@ Notes:
 
 #### Run and record benchmarks results (for later comparison etc)
 
-- `asv run` would run all defined to be benchmarked branches
-  (see [asv.conf.json](./asv.conf.json))
+- `asv run` would run all configured branches (see
+  [asv.conf.json](./asv.conf.json))
 
 
 #### Common options
