@@ -825,6 +825,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
@@ -835,6 +836,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
+                # The is_explicit_path check is needed because it may be a URL,
+                # but check_dates needs a local path or GitRepo object.
+                if fake_dates and is_explicit_path(uri):
+                    from ..support.repodates import check_dates
+                    assert_false(
+                        check_dates(uri, annex="tree")["newer-objects"])
                 if uri in _TEMP_PATHS_CLONES:
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
