@@ -34,6 +34,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
+from datalad.tests.utils import known_failure_v6
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -362,4 +363,4 @@ def test_symlinked_relpath(path):
         ds.repo.add(later, git=True)
         ds.save("committing", path=later)
 
-    ok_clean_git(dspath)
+    known_failure_v6(ok_clean_git)(dspath)
