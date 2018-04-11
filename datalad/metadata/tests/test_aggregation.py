@@ -314,11 +314,15 @@ def test_update_strategy(path):
     eq_(target_meta, base.metadata(return_type='list'))
 
 
-@with_tempfile()
+@with_tree({
+    'this': 'that',
+    'sub1': {'here': 'there'},
+    'sub2': {'down': 'under'}})
 def test_partial_aggregation(path):
-    ds = Dataset(path).create()
-    sub1 = ds.create('sub1')
-    sub2 = ds.create('sub2')
+    ds = Dataset(path).create(force=True)
+    sub1 = ds.create('sub1', force=True)
+    sub2 = ds.create('sub2', force=True)
+    ds.add('.', recursive=True)
     ds.aggregate_metadata(recursive=True)
     # baseline, recursive aggregation gets us something for all three datasets
     res = ds.metadata(get_aggregates=True)
@@ -327,6 +331,26 @@ def test_partial_aggregation(path):
     # we should not loose information on the other datasets
     # as this would be a problem any time anything in a dataset
     # subtree is missing: no installed, too expensive to reaggregate, ...
-    ds.aggregate_metadata(path='sub1')
+    ds.aggregate_metadata(path='sub1', incremental=True)
     res = ds.metadata(get_aggregates=True)
     assert_result_count(res, 3)
+    assert_result_count(res, 1, path=sub2.path)
+    # from-scratch aggregation kills datasets that where not listed
+    ds.aggregate_metadata(path='sub1', incremental=False)
+    res = ds.metadata(get_aggregates=True)
+    assert_result_count(res, 2)
+    assert_result_count(res, 0, path=sub2.path)
+    # now reaggregated in full
+    ds.aggregate_metadata(recursive=True)
+    # make change in sub1
+    sub1.unlock('here')
+    with open(opj(sub1.path, 'here'), 'w') as f:
+        f.write('fresh')
+    ds.save(recursive=True)
+    ok_clean_git(path)
+    # TODO for later
+    # test --since with non-incremental
+    #ds.aggregate_metadata(recursive=True, since='HEAD~1', incremental=False)
+    #res = ds.metadata(get_aggregates=True)
+    #assert_result_count(res, 3)
+    #assert_result_count(res, 1, path=sub2.path)
