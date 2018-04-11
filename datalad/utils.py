@@ -1091,10 +1091,11 @@ class chpwd(object):
 def dlabspath(path, norm=False):
     """Symlinks-in-the-cwd aware abspath
 
-    os.path.abspath relies on os.getcwd() with would not know about symlinks
+    os.path.abspath relies on os.getcwd() which would not know about symlinks
     in the path
-    TODO: we might want to norm=True by default to match behavior of os
-    .path.abspath?
+
+    TODO: we might want to norm=True by default to match behavior of
+    os .path.abspath?
     """
     if not isabs(path):
         # if not absolute -- relative to pwd
