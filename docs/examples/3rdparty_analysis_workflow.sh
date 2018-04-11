@@ -1,4 +1,5 @@
 #!/bin/sh
+# SKIP_IN_V6
 
 set -e
 
@@ -151,14 +152,16 @@ bash code/get_required_data.sh
 bash code/run_analysis.sh
 
 #%
-# and add generated results to the dataset but to not save automatically
-# this addition, so he could provide a custom message to depict a better
-# description of the accomplished work:
+# and add generated results to the dataset and provide a custom message to
+# better describe accomplished work:
 #%
-datalad add --nosave result.txt
+datalad add  -m "First analysis results" result.txt
 
-# and save current state
-datalad save -m "First analysis results"
+#%
+# You could also use ``--nosave`` option with add, and invoke ``datalad save``
+# later on to group multiple changes into a single commit.
+#%
+
 # git log
 
 #%
