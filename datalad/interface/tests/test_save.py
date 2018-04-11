@@ -369,6 +369,9 @@ def test_symlinked_relpath(path):
     known_failure_v6(ok_clean_git)(dspath)
 
 
+# two subdatasets not possible in direct mode
+@known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
 def test_bf1886(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
