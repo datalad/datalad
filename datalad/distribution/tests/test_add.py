@@ -1,4 +1,5 @@
 # ex: set sts=4 ts=4 sw=4 noet:
+# -*- coding: utf-8 -*-
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -62,7 +63,7 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'test1.dat': 'test file 1',
                       'test2.dat': 'test file 2',
                       'dir': {'testindir': 'someother',
-                              'testindir2': 'none'},
+                              'äöü東': 'none'},
                       'dir2': {'testindir3': 'someother3'}})
 
 
@@ -75,7 +76,7 @@ def test_add_files(path):
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
     test_list_3 = ['test1.dat', 'test2.dat']
-    test_list_4 = [opj('dir', 'testindir'), opj('dir', 'testindir2')]
+    test_list_4 = [opj('dir', 'testindir'), opj('dir', 'äöü東')]
     all_files = test_list_1 + test_list_2 + test_list_3 + test_list_4
     unstaged = set(all_files)
     staged = set()
