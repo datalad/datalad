@@ -1025,7 +1025,8 @@ class GitRepo(RepoInterface):
     def add_fake_dates(self, env):
         """Add fake dates to `env`.
         """
-        # Note: Using repo.git.for_each_ref here triggers a few test errors.
+        # Note: Use _git_custom_command here rather than repo.git.for_each_ref
+        # so that we use annex-proxy in direct mode.
         last_date = self._git_custom_command(
             None,
             ["git", "for-each-ref", "--count=1",
