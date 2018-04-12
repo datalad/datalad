@@ -1025,9 +1025,12 @@ class GitRepo(RepoInterface):
     def add_fake_dates(self, env):
         """Add fake dates to `env`.
         """
-        last_date = self.repo.git.for_each_ref(
-            "refs/heads", count=1, sort="-committerdate",
-            format="%(committerdate:raw)").strip()
+        # Note: Using repo.git.for_each_ref here triggers a few test errors.
+        last_date = self._git_custom_command(
+            None,
+            ["git", "for-each-ref", "--count=1",
+             "--sort=-committerdate", "--format=%(committerdate:raw)",
+             "refs/heads"])[0].strip()
 
         if last_date:
             # Drop the "contextual" timezone, leaving the unix timestamp.  We
