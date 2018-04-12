@@ -342,7 +342,7 @@ def _get_obj_location(hash_str, ref_type):
             hash_str[2:]))
 
 
-def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
+def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db, to_save):
     """Perform metadata aggregation for ds and a given list of subdataset paths
 
     Parameters
@@ -357,6 +357,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
       whose agginfo shall be updated within the to-be-updated dataset.
       Any subdataset that is not listed here is assumed to be gone (i.e. no longer
       a subdataset at all, not just not locally installed)
+    incremental : bool
+      If set, the update will not remove any information on datasets not listed in
+      subds_paths
     agginfo_db : dict
       Dictionary with all information on aggregate metadata on all datasets.
       Keys are absolute paths of datasets.
@@ -410,9 +413,10 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
         ds_agginfos[drelpath] = ds_dbinfo
     # remove all entries for which we did not (no longer) have a corresponding
     # subdataset to take care of
-    ds_agginfos = {k: v
-                   for k, v in ds_agginfos.items()
-                   if normpath(opj(ds_path, k)) in procds_paths}
+    if not incremental:
+        ds_agginfos = {k: v
+                       for k, v in ds_agginfos.items()
+                       if normpath(opj(ds_path, k)) in procds_paths}
     # set of metadata objects now referenced
     objlocs_is = set(
         ai[k]
@@ -440,7 +444,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 
     # secretly remove obsolete object files, not really a result from a
     # user's perspective
-    if objs2remove:
+    if not incremental and objs2remove:
         ds.remove(
             objs2remove,
             # Don't use the misleading default commit message of `remove`:
@@ -587,8 +591,6 @@ class AggregateMetaData(Interface):
       to discover which particular files in them match these properties.
     """
     _params_ = dict(
-        # TODO add option for full aggregation (not incremental), so when something
-        # is not present nothing about it is preserved in the aggregated metadata
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""topmost dataset metadata will be aggregated into. All dataset
@@ -612,6 +614,13 @@ class AggregateMetaData(Interface):
             all datasets from any leaf dataset to the top-level target dataset
             including all intermediate datasets (all), or just the top-level
             target dataset (target)."""),
+        incremental=Parameter(
+            args=('--incremental',),
+            action='store_true',
+            doc="""If set, all information on metadata records of subdatasets
+            that have not been (re-)aggregated in this run will be kept unchanged.
+            This is sueful when (re-)aggregation only a subset of a dataset hierarchy,
+            for example, because not all subdatasets are locally available."""),
         save=nosave_opt,
     )
 
@@ -624,6 +633,7 @@ class AggregateMetaData(Interface):
             recursive=False,
             recursion_limit=None,
             update_mode='target',
+            incremental=False,
             save=True):
         refds_path = Interface.get_refds_path(dataset)
 
@@ -753,6 +763,7 @@ class AggregateMetaData(Interface):
                 ds.path,
                 parentds_path,
                 subtrees[parentds_path],
+                incremental,
                 agginfo_db,
                 to_save)
             # update complete
