@@ -863,7 +863,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True, git_options=None,
+    def add(self, files, git=True, git_options=None,
             _datalad_msg=False, update=False):
         """Adds file(s) to the repository.
 
@@ -871,11 +871,6 @@ class GitRepo(RepoInterface):
         ----------
         files: list
           list of paths to add
-        commit: bool
-          whether or not to directly commit
-        msg: str
-          commit message in case `commit=True`. A default message, containing
-          the list of files that were added, is created by default.
         git: bool
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
@@ -934,11 +929,6 @@ class GitRepo(RepoInterface):
 
         else:
             lgr.warning("add was called with empty file list and no options.")
-
-        if commit:
-            if msg is None:
-                msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg, _datalad_msg=_datalad_msg)
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
         # currently simulating similar return value, assuming success
