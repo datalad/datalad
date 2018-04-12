@@ -387,6 +387,17 @@ def test_add_mimetypes(path):
 
 
 @with_tempfile(mkdir=True)
+def test_gh1597_simpler(path):
+    ds = Dataset(path).create()
+    # same goes for .gitattributes
+    with open(opj(ds.path, '.gitignore'), 'a') as f:
+        f.write('*.swp\n')
+    ds.add('.gitignore')
+    ok_clean_git(ds.path)
+    ok_file_under_git(ds.path, '.gitignore', annexed=False)
+
+
+@with_tempfile(mkdir=True)
 def test_gh1597(path):
     ds = Dataset(path).create()
     sub = ds.create('sub', save=False)
