@@ -15,7 +15,8 @@ __docformat__ = 'restructuredtext'
 from datalad.tests.utils import known_failure_direct_mode
 
 import os
-from os.path import join as opj, pardir
+from os.path import pardir
+from os.path import join as opj
 from datalad.utils import chpwd
 
 from datalad.interface.results import is_ok_dataset
@@ -24,6 +25,8 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import DeprecatedError, IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
+from datalad.api import create
+from datalad.api import add
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
@@ -364,3 +367,50 @@ def test_symlinked_relpath(path):
         ds.save("committing", path=later)
 
     known_failure_v6(ok_clean_git)(dspath)
+
+
+# two subdatasets not possible in direct mode
+@known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
+def test_bf1886(path):
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    ok_clean_git(parent.path)
+    # create a symlink pointing down to the subdataset, and add it
+    os.symlink('sub', opj(parent.path, 'down'))
+    parent.add('down')
+    ok_clean_git(parent.path)
+    # now symlink pointing up
+    os.makedirs(opj(parent.path, 'subdir', 'subsubdir'))
+    os.symlink(opj(pardir, 'sub'), opj(parent.path, 'subdir', 'up'))
+    parent.add(opj('subdir', 'up'))
+    ok_clean_git(parent.path)
+    # now symlink pointing 2xup, as in #1886
+    os.symlink(opj(pardir, pardir, 'sub'), opj(parent.path, 'subdir', 'subsubdir', 'upup'))
+    parent.add(opj('subdir', 'subsubdir', 'upup'))
+    ok_clean_git(parent.path)
+    # simulatenously add a subds and a symlink pointing to it
+    # create subds, but don't register it
+    sub2 = create(opj(parent.path, 'sub2'))
+    os.symlink(
+        opj(pardir, pardir, 'sub2'),
+        opj(parent.path, 'subdir', 'subsubdir', 'upup2'))
+    parent.add(['sub2', opj('subdir', 'subsubdir', 'upup2')])
+    ok_clean_git(parent.path)
+    # full replication of #1886: the above but be in subdir of symlink
+    # with no reference dataset
+    sub3 = create(opj(parent.path, 'sub3'))
+    os.symlink(
+        opj(pardir, pardir, 'sub3'),
+        opj(parent.path, 'subdir', 'subsubdir', 'upup3'))
+    # need to use absolute paths
+    with chpwd(opj(parent.path, 'subdir', 'subsubdir')):
+        add([opj(parent.path, 'sub3'),
+             opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
+    # here is where we need to disagree with the repo in #1886
+    # we would not expect that `add` registers sub3 as a subdataset
+    # of parent, because no reference dataset was given and the
+    # command cannot decide (with the current semantics) whether
+    # it should "add anything in sub3 to sub3" or "add sub3 to whatever
+    # sub3 is in"
+    ok_clean_git(parent.path, untracked=['sub3/'])
