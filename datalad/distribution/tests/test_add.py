@@ -204,10 +204,10 @@ def test_add_dirty_tree(path):
     # added to git, so parsed git output record
     assert_result_count(
         added2, 1,
-        path=opj(ds.path, 'dir', 'testindir2'), action='add',
+        path=opj(ds.path, 'dir', 'äöü東'), action='add',
         message='non-large file; adding content to git repository',
         status='ok')
-    assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+    assert_in('äöü東', Dataset(opj(path, 'dir')).repo.get_indexed_files())
     ok_clean_git(ds.path)
 
     # We used to fail to add to pure git repository, but now it should all be
