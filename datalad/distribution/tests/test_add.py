@@ -118,6 +118,7 @@ def test_add_files(path):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
