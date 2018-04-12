@@ -80,18 +80,18 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.api import metadata
         from datalad.support.external_versions import external_versions
+        from datalad.dochelpers import exc_str
         import os
         import platform as pl
         import json
 
         extractors={}
         for ep in iter_entry_points('datalad.metadata.extractors'):
-            status = 'BROKEN'
             try:
                 ep.load()
                 status = 'OK'
-            except:
-                pass
+            except Exception as e:
+                status = 'BROKEN ({})'.format(exc_str(e))
             extractors[ep.name] = status
 
         # formatting helper
@@ -202,7 +202,7 @@ Metadata
             ),
             externals=external_versions.dumps(preamble=None, indent='', query=True),
             extensions='\n'.join(ep.name for ep in iter_entry_points('datalad.extensions')),
-            metaextractors='\n'.join('{}: {}'.format(k, v) for k, v in extractors.items()),
+            metaextractors=_format_dict(extractors),
             cfg=_format_dict(sorted(cfg.items(), key=lambda x: x[0]))
                 if cfg else _HIDDEN,
         )
