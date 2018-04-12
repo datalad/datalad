@@ -17,8 +17,6 @@ import os
 import re
 import string
 
-from mock import patch
-
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
@@ -570,6 +568,8 @@ def add_urls(rows, ifexists=None, options=None):
 def add_meta(rows):
     """Call `git annex metadata --set` using information in `rows`.
     """
+    from mock import patch
+
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
 
