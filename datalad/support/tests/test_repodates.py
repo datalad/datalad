@@ -11,9 +11,11 @@ from contextlib import contextmanager
 from mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.support.repodates import check_dates
-from datalad.tests.utils import assert_equal, assert_in, assert_not_in, \
-    assert_raises, eq_, ok_, with_tree
+from datalad.tests.utils import assert_equal, assert_false, \
+    assert_in, assert_not_in, assert_raises, eq_, ok_, \
+    with_tempfile, with_tree
 
 
 @contextmanager
@@ -25,6 +27,11 @@ def set_date(timestamp):
                      "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
                      "DATALAD_FAKE__DATES": "0"}):
         yield
+
+
+@with_tempfile(mkdir=True)
+def test_check_dates_empty_repo(path):
+    assert_false(check_dates(GitRepo(path, create=True))["objects"])
 
 
 @with_tree(tree={"foo": "foo content",

@@ -171,6 +171,12 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
     if isinstance(repo, string_types):
         repo = GitRepo(repo, create=False)
 
+    branches = repo.get_branches()
+    if not branches:
+        return {"reference-timestamp": timestamp,
+                "which": which,
+                "objects": {}}
+
     if timestamp is None:
         timestamp = int(time.time()) - 60 * 60 * 24
 
@@ -190,7 +196,7 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
                                "author-timestamp": a_timestamp,
                                "committer-timestamp": c_timestamp}
 
-    if annex and "git-annex" in repo.get_branches():
+    if annex and "git-annex" in branches:
         all_objects = annex != "tree"
         lgr.debug("Checking dates in blobs of git-annex branch%s",
                   "" if all_objects else "'s tip")
