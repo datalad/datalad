@@ -202,4 +202,5 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
                                    "filename": fname}
 
     return {"reference-timestamp": timestamp,
-            "{}-objects".format(which): results}
+            "which": which,
+            "objects".format(which): results}
