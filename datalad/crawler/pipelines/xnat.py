@@ -47,11 +47,10 @@ from datalad.dochelpers import exc_str
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
-lgr = getLogger("datalad.crawler.pipelines.openfmri")
+lgr = getLogger("datalad.crawler.pipelines.xnat")
 
 from datalad.tests.utils import eq_
-from datalad.utils import assure_list
-
+from datalad.utils import assure_list, assure_bool
 
 def list_to_dict(l, field):
     return {r.pop(field): r for r in l}
@@ -133,32 +132,46 @@ class XNATServer(object):
             return lower_case_the_keys(j['result'])
         return out
 
-    def get_projects(self, limit=None, drop_empty=False, asdict=True):
+    def get_projects(self, limit=None, drop_empty=True, asdict=True):
         """Get list of projects 
         
         Parameters
         ----------
-        limit: {'public', 'protected', 'private', None} or list of thereoff
+        limit: {'public', 'protected', 'private', None} or list of thereof
            'private' -- projects you have no any access to. 'protected' -- you could
            fetch description but not the data. None - would list all the projects
 
-        drop_empty: whether to drop projects with no experiements
+        drop_empty: whether to drop projects with no experiments
         """
         # accessible  option could limit to the projects I have access to
         fields_to_check = DEFAULT_RESULT_FIELDS.union({'title'})
         experiments = self('data/experiments', fields_to_check=fields_to_check)
         self.experiment_labels = { e['id']: e['label'] for e in experiments }
         if drop_empty:
+            # TODO: describe assumption here.  Verify e.g. on ADHD200 within
+            # xnat-central -- seems to download nothing.  So might not be
+            # enough
             non_empty_projects = set([ e['project'] for e in experiments ])
+
         kw = {}
         if limit:
             kw['options'] = {"accessible": "true"} if limit else None
             kw['fields_to_check'] = DEFAULT_RESULT_FIELDS | {'title', 'xdat_user_id'}
         all_projects = self('data/projects', **kw)
+
         if drop_empty:
-            out = [ p for p in all_projects if p['id'] in non_empty_projects ]
+            out = []
+            for p in all_projects:
+                if p['id'] in non_empty_projects:
+                    out.append(p)
+                else:
+                    lgr.debug("Skipping %s because seems to not be listed "
+                              "among experiments",
+                              p)
+            lgr.info("Skipped %d empty projects", len(all_projects) - len(out))
         else:
             out = all_projects
+
         if limit:
             limit = assure_list(limit)
             # double check that all the project_access thingies in the set which
@@ -219,7 +232,7 @@ class XNATServer(object):
 
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
-def superdataset_pipeline(url, limit=None, **kwargs):
+def superdataset_pipeline(url, limit=None, drop_empty=True, **kwargs):
     """
     
     Parameters
@@ -237,10 +250,15 @@ def superdataset_pipeline(url, limit=None, **kwargs):
     annex = Annexificator(no_annex=True, allow_dirty=False)
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     limit = assure_list(limit)
+    drop_empty = assure_bool(drop_empty)
 
     def get_projects(data):
         xnat = XNATServer(url)
-        for p in xnat.get_projects(asdict=False, limit=limit or PROJECT_ACCESS_TYPES):
+        for p in xnat.get_projects(
+                asdict=False,
+                limit=limit or PROJECT_ACCESS_TYPES,
+                drop_empty=drop_empty
+        ):
             yield updated(data, p)
 
     return [
