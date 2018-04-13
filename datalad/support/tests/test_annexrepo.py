@@ -930,6 +930,10 @@ def test_AnnexRepo_get_contentlocation():
 @with_tempfile
 def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
+    if os.environ.get('DATALAD_FAKE__DATES'):
+        raise SkipTest(
+            "Faked dates are enabled; skipping batched addurl tests")
+
     ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
     testurl2 = urljoin(siteurl, 'about2.txt')
@@ -1024,6 +1028,30 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     raise SkipTest("TODO: more, e.g. add with a custom backend")
     # TODO: also with different modes (relaxed, fast)
     # TODO: verify that file is added with that backend and that we got a new batched process
+
+
+@with_tree(tree={"foo": "foo content"})
+@serve_path_via_http()
+@with_tree(tree={"bar": "bar content"})
+def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
+    ar = AnnexRepo(dst, create=True, fake_dates=True)
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ar.add_url_to_file("foo-dst", urljoin(siteurl, "foo"), batch=True)
+        cml.assert_logged(
+            msg="Not batching addurl call because fake dates are enabled",
+            level="DEBUG",
+            regex=False)
+
+    ar.add("bar")
+    ar.commit("add bar")
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ar.drop_key(ar.get_file_key(["bar"]), batch=True)
+        cml.assert_logged(
+            msg="Not batching drop_key call because fake dates are enabled",
+            level="DEBUG",
+            regex=False)
 
 
 @with_tempfile(mkdir=True)

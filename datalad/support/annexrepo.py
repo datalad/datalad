@@ -2053,7 +2053,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 " be added under annex", self, file_
             )
             os.unlink(opj(self.path, file_))
-        if not batch:
+        if not batch or self.fake_dates_enabled:
+            if batch:
+                lgr.debug("Not batching addurl call "
+                          "because fake dates are enabled")
             self._run_annex_command(
                 'addurl',
                 annex_options=options + ['--file=%s' % file_] + [url],
@@ -2230,7 +2233,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = options[:] if options else []
         options += ['--force']
-        if not batch:
+        if not batch or self.fake_dates_enabled:
+            if batch:
+                lgr.debug("Not batching drop_key call "
+                          "because fake dates are enabled")
             json_objects = self._run_annex_command_json(
                 'dropkey', opts=options, files=keys, expect_stderr=True
             )
