@@ -343,12 +343,12 @@ class Runner(object):
             line = log_(assure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = line.encode()
+                line = line.encode('utf-8')
         if line:
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
-                self._log_err(line.decode() if PY3 else line,
+                self._log_err(line.decode('utf-8') if PY3 else line,
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")

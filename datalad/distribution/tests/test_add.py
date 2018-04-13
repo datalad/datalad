@@ -76,7 +76,7 @@ def test_add_files(path):
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
     test_list_3 = ['test1.dat', 'test2.dat']
-    test_list_4 = [opj('dir', 'testindir'), opj('dir', 'äöü東')]
+    test_list_4 = [opj('dir', 'testindir'), opj('dir', u'äöü東')]
     all_files = test_list_1 + test_list_2 + test_list_3 + test_list_4
     unstaged = set(all_files)
     staged = set()
@@ -204,10 +204,10 @@ def test_add_dirty_tree(path):
     # added to git, so parsed git output record
     assert_result_count(
         added2, 1,
-        path=opj(ds.path, 'dir', 'äöü東'), action='add',
+        path=opj(ds.path, 'dir', u'äöü東'), action='add',
         message='non-large file; adding content to git repository',
         status='ok')
-    assert_in('äöü東', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+    assert_in(u'äöü東', Dataset(opj(path, 'dir')).repo.get_indexed_files())
     ok_clean_git(ds.path)
 
     # We used to fail to add to pure git repository, but now it should all be
