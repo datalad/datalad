@@ -82,6 +82,25 @@ def lower_case_the_keys(d):
     return out
 
 
+def extract_subject_info(data):
+    subject_item = data['items'][0]
+    info = {'label': subject_item['data_fields']['label'], 
+            'group': subject_item['data_fields'].get('group')}
+    for child in subject_item['children']:
+        if child['field'] == 'demographics':
+            demographics = child['items'][0]['data_fields']
+            info['gender'] = demographics.get('gender')
+            info['age'] = demographics.get('age')
+            info['handedness'] = demographics.get('handedness')
+            break
+    return info
+
+
+def extract_experiment_info(data):
+    experiment_item = data['items'][0]
+    return experiment_item['data_fields']
+
+
 class XNATServer(object):
     def __init__(self, topurl):
         self.topurl = topurl
@@ -126,9 +145,8 @@ class XNATServer(object):
         drop_empty: whether to drop projects with no experiements
         """
         # accessible  option could limit to the projects I have access to
-        fields_to_check = DEFAULT_RESULT_FIELDS.union({'title',})
-        experiments = self('data/experiments', 
-                           fields_to_check=fields_to_check)
+        fields_to_check = DEFAULT_RESULT_FIELDS.union({'title'})
+        experiments = self('data/experiments', fields_to_check=fields_to_check)
         self.experiment_labels = { e['id']: e['label'] for e in experiments }
         if drop_empty:
             non_empty_projects = set([ e['project'] for e in experiments ])
@@ -184,12 +202,19 @@ class XNATServer(object):
         # TODO: grow the dictionary with all the information about subject/experiment/file
         # to be yielded so we could tune up file name anyway we like
         for subject in (subjects or self.get_subjects(project)):
+            subject_url = 'data/projects/%s/subjects/%s' % (project, subject)
+            subject_data = self(subject_url, return_plain=True)
+            subject_info = extract_subject_info(subject_data)
             for experiment in (experiments or self.get_experiments(project, subject)):
+                experiment_data = self('data/experiments/%s' % experiment, 
+                                       return_plain=True)
+                experiment_info = extract_experiment_info(experiment_data)
                 for file_ in self.get_files(project, subject, experiment):
-                    yield updated(file_, 
-                                  {'subject': subject, 
-                                   'experiment': experiment
-                                  })
+                    file_info = updated(file_, {'subject_id': subject, 
+                                                'subject_info': subject_info, 
+                                                'experiment_id': experiment, 
+                                                'experiment_info': experiment_info})
+                    yield file_info
 
 
 # define a pipeline factory function accepting necessary keyword arguments
@@ -266,7 +291,7 @@ def pipeline(url, dataset, project_access='public', subjects=None):
             # TODO: might want to allow for
             #   XNAT2BIDS whenever that one is available:
             #     http://reproducibility.stanford.edu/accepted-projects-for-the-2nd-crn-coding-sprint/
-            exp_label = xnat.experiment_labels[f['experiment']]
+            exp_label = xnat.experiment_labels[f['experiment_id']]
             yield updated(data,
                           {'url': url + f['uri'],
                            'path': f['uri'][len(prefix):], 
