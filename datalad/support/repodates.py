@@ -70,11 +70,12 @@ def branch_blobs_in_tree(repo, branch):
     seen_blobs = set()
     git = repo.repo.git
     tree_lines = git.ls_tree(branch, z=True, r=True)
-    for line in tree_lines.strip("\0").split("\0"):
-        _, obj_type, obj, fname = line.split()
-        if obj_type == "blob" and obj not in seen_blobs:
-            yield obj, git.cat_file("blob", obj), fname
-        seen_blobs.add(obj)
+    if tree_lines:
+        for line in tree_lines.strip("\0").split("\0"):
+            _, obj_type, obj, fname = line.split()
+            if obj_type == "blob" and obj not in seen_blobs:
+                yield obj, git.cat_file("blob", obj), fname
+            seen_blobs.add(obj)
 
 
 # In uuid.log, timestamps look like "timestamp=1523283745.683191724s" and occur
