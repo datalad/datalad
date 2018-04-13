@@ -169,7 +169,7 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
     A dict that reports newer timestamps.
     """
     if isinstance(repo, string_types):
-        repo = GitRepo(repo)
+        repo = GitRepo(repo, create=False)
 
     if timestamp is None:
         timestamp = int(time.time()) - 60 * 60 * 24
