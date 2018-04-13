@@ -1449,7 +1449,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
                 return self._process_git_get_output(
-                    linesep.join(["'{}'".format(p) for p in paths]))
+                    linesep.join(["'{}'".format(p.encode('utf-8')) for p in paths]))
             else:
                 # Note: if a path involves a submodule in direct mode, while we
                 # are not in direct mode at current level, we might still fail.
