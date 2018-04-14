@@ -875,7 +875,8 @@ class Annexificator(object):
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
-        self.repo._git_custom_command([], ["git", "commit"] + options)
+        self.repo._git_custom_command([], ["git", "commit"] + options,
+                                      check_fake_dates=True)
         # self.repo.commit(msg)
         # self.repo.repo.git.commit(options)
 
