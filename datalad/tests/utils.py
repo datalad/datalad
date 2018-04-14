@@ -841,7 +841,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 if fake_dates and is_explicit_path(uri):
                     from ..support.repodates import check_dates
                     assert_false(
-                        check_dates(uri, annex="tree")["newer-objects"])
+                        check_dates(uri, annex="tree")["objects"])
                 if uri in _TEMP_PATHS_CLONES:
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
