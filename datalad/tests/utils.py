@@ -1290,12 +1290,13 @@ def ignore_nose_capturing_stdout(func):
 
     @make_decorator(func)
     def newfunc(*args, **kwargs):
+        import io
         try:
             func(*args, **kwargs)
-        except AttributeError as e:
+        except (AttributeError, io.UnsupportedOperation) as e:
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
-            if message.find('StringIO') > -1 and message.find('fileno') > -1:
+            if re.search('^(.*StringIO.*)?fileno', message):
                 raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
