@@ -106,7 +106,7 @@ matrix:
     - _DL_UPSTREAM_GITANNEX=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
-    - _DL_CRON=1
+    # TEMP - _DL_CRON=1
   # run if git-annex version in neurodebian -devel differs
   - python: 3.5
     env:
