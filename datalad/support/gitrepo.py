@@ -1088,12 +1088,8 @@ class GitRepo(RepoInterface):
             else:
                 options = ["--allow-empty-message"]
 
-        env = None
         if date:
             options += ["--date", date]
-        elif self.fake_dates_enabled:
-            env = os.environ.copy()
-            self.add_fake_dates(env)
         # Note: We used to use a direct call to git only if there were options,
         # since we can't pass all possible options to gitpython's implementation
         # of commit.
@@ -1118,8 +1114,9 @@ class GitRepo(RepoInterface):
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         try:
-            self._git_custom_command(files, cmd, env=env,
-                                     expect_stderr=True, expect_fail=True)
+            self._git_custom_command(files, cmd,
+                                     expect_stderr=True, expect_fail=True,
+                                     check_fake_dates=True)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1524,7 +1521,8 @@ class GitRepo(RepoInterface):
     def _git_custom_command(self, files, cmd_str,
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
-                            shell=None, expect_fail=False):
+                            shell=None, expect_fail=False,
+                            check_fake_dates=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1557,6 +1555,10 @@ class GitRepo(RepoInterface):
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
         from .exceptions import GitIgnoreError
+
+        if check_fake_dates and self.fake_dates_enabled:
+            env = (env or os.environ).copy()
+            self.add_fake_dates(env)
 
         try:
             out, err = self.cmd_call_wrapper.run(
