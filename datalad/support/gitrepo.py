@@ -1944,6 +1944,7 @@ class GitRepo(RepoInterface):
             options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
+            check_fake_dates=True,
             **kwargs
         )
 
