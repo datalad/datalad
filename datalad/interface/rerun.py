@@ -242,7 +242,9 @@ class Rerun(Interface):
                 yield dict(err_info, status='ok', message=err_msg)
 
                 if pick:
-                    ds.repo.repo.git.cherry_pick(rev.id)
+                    ds.repo._git_custom_command(
+                        None, ["git", "cherry-pick", rev.id],
+                        check_fakes_dates=True)
                 continue
 
             # Keep a "rerun" trail.
