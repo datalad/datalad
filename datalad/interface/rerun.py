@@ -244,7 +244,7 @@ class Rerun(Interface):
                 if pick:
                     ds.repo._git_custom_command(
                         None, ["git", "cherry-pick", rev.id],
-                        check_fakes_dates=True)
+                        check_fake_dates=True)
                 continue
 
             # Keep a "rerun" trail.
