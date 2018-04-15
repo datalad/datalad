@@ -1038,7 +1038,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         env = kwargs.pop("env", None)
         if self.fake_dates_enabled:
-            env = env if env is not None else os.environ.copy()
+            env = (env if env is not None else os.environ).copy()
             self.add_fake_dates(env)
 
         if files:
