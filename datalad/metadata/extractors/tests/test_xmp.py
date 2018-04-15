@@ -11,8 +11,9 @@
 from datalad.tests.utils import SkipTest
 try:
     import libxmp
-except ImportError:
-    raise SkipTest
+except Exception as exc:
+    from datalad.dochelpers import exc_str
+    raise SkipTest("libxmp cannot be imported: %s" % exc_str(exc))
 
 from shutil import copy
 from os.path import dirname

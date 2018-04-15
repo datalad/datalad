@@ -77,7 +77,6 @@ Plugin commands
 
    generated/man/datalad-add-readme
    generated/man/datalad-addurls
-   generated/man/datalad-bids2scidata
    generated/man/datalad-export-archive
    generated/man/datalad-export-to-figshare
    generated/man/datalad-extract-metadata

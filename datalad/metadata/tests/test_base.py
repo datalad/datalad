@@ -41,24 +41,20 @@ from nose.tools import assert_true, assert_equal, assert_raises
 
 _dataset_hierarchy_template = {
     'origin': {
-        'dataset_description.json': """
-{
-    "Name": "mother_äöü東"
-}""",
         'datapackage.json': """
 {
     "name": "MOTHER_äöü東",
     "keywords": ["example", "multitype metadata"]
 }""",
     'sub': {
-        'dataset_description.json': """
+        'datapackage.json': """
 {
-    "Name": "child_äöü東"
+    "name": "child_äöü東"
 }""",
     'subsub': {
-        'dataset_description.json': """
+        'datapackage.json': """
 {
-    "Name": "grandchild_äöü東"
+    "name": "grandchild_äöü東"
 }"""}}}}
 
 
@@ -100,18 +96,19 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
-    ds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                   where='dataset')
     subds = ds.create('sub', force=True)
-    subds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
+    subds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
+                     where='dataset')
     subsubds = subds.create('subsub', force=True)
-    subsubds.config.add('datalad.metadata.nativetype', 'bids', where='dataset')
+    subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
+                        where='dataset')
     ds.add('.', recursive=True)
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
-    res = ds.aggregate_metadata(recursive=True)
+    res = ds.aggregate_metadata(recursive=True, update_mode='all')
     # we get success report for both subdatasets and the superdataset,
     # and they get saved
     assert_result_count(res, 6)
@@ -130,15 +127,16 @@ def test_aggregation(path):
     # store clean direct result
     origres = ds.metadata(recursive=True)
     # basic sanity check
-    assert_result_count(origres, 7)
+    assert_result_count(origres, 6)
     assert_result_count(origres, 3, type='dataset')
-    assert_result_count(origres, 4, type='file')
+    assert_result_count(origres, 3, type='file')
     # three different IDs
     assert_equal(3, len(set([s['dsid'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
-    for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
+    for name in ('MOTHER_äöü東', 'child_äöü東', 'grandchild_äöü東'):
         assert_true(
-            sum([s['metadata']['bids']['name'] == assure_unicode(name) for s in origres
+            sum([s['metadata']['frictionless_datapackage']['name'] \
+                    == assure_unicode(name) for s in origres
                  if s['type'] == 'dataset']))
 
     # now clone the beast to simulate a new user installing an empty dataset
@@ -151,9 +149,9 @@ def test_aggregation(path):
     # get fresh metadata
     cloneres = clone.metadata()
     # basic sanity check
-    assert_result_count(cloneres, 3)
+    assert_result_count(cloneres, 2)
     assert_result_count(cloneres, 1, type='dataset')
-    assert_result_count(cloneres, 2, type='file')
+    assert_result_count(cloneres, 1, type='file')
 
     # now loop over the previous results from the direct metadata query of
     # origin and make sure we get the extact same stuff from the clone
@@ -173,8 +171,8 @@ def test_aggregation(path):
     for r in child_res:
         if r['type'] == 'dataset':
             assert_in(
-                r['query_matched']['bids.name'],
-                r['metadata']['bids']['name'])
+                r['query_matched']['frictionless_datapackage.name'],
+                r['metadata']['frictionless_datapackage']['name'])
 
     ## Test 'and' for multiple search entries
     #assert_result_count(clone.search(['*child*', '*bids*']), 2)

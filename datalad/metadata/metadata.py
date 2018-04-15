@@ -483,6 +483,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 errored = True
 
         unique_cm = {}
+        extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
         for loc, meta in contentmeta_t or {}:
             if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
@@ -527,6 +528,13 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                         # a 'sample' key, we should prefer that, over an
                         # aggregated list of a hopefully-kinda-ok structure
                         continue
+                    elif k in extractor_unique_exclude:
+                        # the extractor thinks this key is worthless for the purpose
+                        # of discovering whole datasets
+                        # we keep the key (so we know that some file is providing this key),
+                        # but ignore any value it came with
+                        unique_cm[k] = None
+                        continue
                     vset = unique_cm.get(k, set())
                     vset.add(_val2hashable(v))
                     unique_cm[k] = vset
@@ -547,8 +555,14 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 k: [dict(i) if isinstance(i, ReadOnlyDict) else i
                     for i in sorted(
                         v,
-                        key=_unique_value_key)]
-                for k, v in unique_cm.items()}
+                        key=_unique_value_key)] if v is not None else None
+                for k, v in unique_cm.items()
+                # v == None (disable unique, but there was a value at some point)
+                # otherwise we only want actual values, and also no single-item-lists
+                # of a non-value
+                # those contribute no information, but bloat the operation
+                # (inflated number of keys, inflated storage, inflated search index, ...)
+                if v is None or (v and not v == {''})}
             dsmeta['datalad_unique_content_properties'] = ucp
 
     # always identify the effective vocabulary - JSON-LD style
@@ -631,7 +645,7 @@ class ReadOnlyDict(Mapping):
 
 @build_doc
 class Metadata(Interface):
-    """Metadata manipulation for files and entire datasets
+    """Metadata reporting for files and entire datasets
 
     Two types of metadata are supported:
 
@@ -640,6 +654,33 @@ class Metadata(Interface):
     2. metadata for files in a dataset (content metadata).
 
     Both types can be accessed with this command.
+
+    Examples:
+
+      Report the metadata of a single file, as aggregated into the closest
+      locally available dataset, containing the query path::
+
+        % datalad metadata somedir/subdir/thisfile.dat
+
+      Sometimes it is helpful to get metadata records formatted in a more accessible
+      form, here as pretty-printed JSON::
+
+        % datalad -f json_pp metadata somedir/subdir/thisfile.dat
+
+      Same query as above, but specify which dataset to query (must be
+      containing the query path)::
+
+        % datalad metadata -d . somedir/subdir/thisfile.dat
+
+      Report any metadata record of any dataset known to the queried dataset::
+
+        % datalad metadata --recursive --reporton datasets 
+
+      Get a JSON-formatted report of aggregated metadata in a dataset, incl.
+      information on enabled metadata extractors, dataset versions, dataset IDs,
+      and dataset paths::
+
+        % datalad -f json metadata --get-aggregates
     """
     # make the custom renderer the default, path reporting isn't the top
     # priority here
@@ -648,12 +689,14 @@ class Metadata(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""dataset to operate on""",
+            doc="""dataset to query. If given, metadata will be reported
+            as stored in this dataset. Otherwise, the closest available
+            dataset containing a query path will be consulted.""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path(s) to set/get metadata for",
+            doc="path(s) to query metadata for",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         get_aggregates=Parameter(
@@ -800,7 +843,13 @@ class Metadata(Interface):
                 continue
             # report from aggregated metadata
             for r in query_aggregated_metadata(
-                    reporton, ds, query_agg,
+                    reporton,
+                    # by default query the reference dataset, only if there is none
+                    # try our luck in the dataset that contains the queried path
+                    # this is consistent with e.g. `get_aggregates` reporting the
+                    # situation in the reference dataset only
+                    Dataset(refds_path) if refds_path else ds,
+                    query_agg,
                     # recursion above could only recurse into datasets
                     # on the filesystem, but there might be any number of
                     # uninstalled datasets underneath the last installed one

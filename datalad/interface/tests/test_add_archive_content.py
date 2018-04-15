@@ -27,7 +27,7 @@ from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_false
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
-from ...tests.utils import SkipTest
+from ...tests.utils import slow
 from ...tests.utils import assert_re_in
 from datalad.tests.utils import assert_result_values_cond
 
@@ -163,6 +163,7 @@ tree4uargs = dict(
 )
 
 
+@slow  # 29.4293s
 @known_failure_v6   # FIXME
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)

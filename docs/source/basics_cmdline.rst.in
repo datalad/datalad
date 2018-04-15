@@ -20,7 +20,7 @@ of basic options, and a list of available sub-commands.
                   [--report-status {success,failure,ok,notneeded,impossible,error}]
                   [--report-type {dataset,file}]
                   [--on-failure {ignore,continue,stop}] [--cmd]
-                  {create,install,get,add,publish,uninstall,drop,remove,update,create-sibling,create-sibling-github,unlock,save,search,metadata,aggregate-metadata,test,crawl,crawl-init,ls,clean,add-archive-content,download-url,run,rerun,addurls,export-archive,extract-metadata,export-to-figshare,bids2scidata,no-annex,wtf,add-readme,annotate-paths,clone,create-test-dataset,diff,siblings,sshrun,subdatasets}
+                  {create,install,get,add,publish,uninstall,drop,remove,update,create-sibling,create-sibling-github,unlock,save,search,metadata,aggregate-metadata,test,crawl,crawl-init,ls,clean,add-archive-content,download-url,run,rerun,addurls,export-archive,extract-metadata,export-to-figshare,no-annex,wtf,add-readme,annotate-paths,clone,create-test-dataset,diff,siblings,sshrun,subdatasets}
                   ...
    [[1;31mERROR  [0m] Please specify the command 
    [0m[1;36m~[0m % #

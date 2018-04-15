@@ -39,6 +39,7 @@ from datalad.support.network import RI
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
+from datalad.utils import dlabspath
 from datalad.distribution.utils import get_git_dir
 
 
@@ -63,9 +64,10 @@ def resolve_path(path, ds=None):
     Absolute path
     """
     path = expandpath(path, force_absolute=False)
-    # TODO: normpath?!
     if is_explicit_path(path):
-        return abspath(path)
+        # normalize path consistently between two (explicit and implicit) cases
+        return dlabspath(path, norm=True)
+
     # no dataset given, use CWD as reference
     # note: abspath would disregard symlink in CWD
     top_path = getpwd() \
@@ -265,7 +267,7 @@ class Dataset(object):
         # with it. Internally we don't need or use it anymore.
         import inspect
         lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
-        from datalad.api import subdatasets
+        from datalad.coreapi import subdatasets
         if edges:
             return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
                      r['path'] if absolute else relpath(r['path'], start=self.path))
@@ -343,6 +345,7 @@ class Dataset(object):
         -------
         Dataset or None
         """
+        from datalad.coreapi import subdatasets
         # TODO: return only if self is subdataset of the superdataset
         #       (meaning: registered as submodule)?
         path = self.path

@@ -17,8 +17,6 @@ import os
 import re
 import string
 
-from mock import patch
-
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
@@ -30,6 +28,7 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.support import ansi_colors
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
+from datalad.support.s3 import get_versioned_url
 from datalad.ui import ui
 from datalad.utils import assure_list, optional_args
 
@@ -569,6 +568,8 @@ def add_urls(rows, ifexists=None, options=None):
 def add_meta(rows):
     """Call `git annex metadata --set` using information in `rows`.
     """
+    from mock import patch
+
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
 
@@ -750,6 +751,11 @@ class Addurls(Interface):
             instead.""",
             constraints=EnsureNone() | EnsureStr()),
         save=nosave_opt,
+        version_urls=Parameter(
+            args=("--version-urls",),
+            action="store_true",
+            doc="""Try to add a version ID to the URL. This currently only has
+            an effect on URLs for AWS S3 buckets."""),
     )
 
     @staticmethod
@@ -758,7 +764,7 @@ class Addurls(Interface):
     def __call__(dataset, urlfile, urlformat, filenameformat,
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
-                 missing_value=None, save=True):
+                 missing_value=None, save=True, version_urls=False):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
@@ -855,6 +861,23 @@ class Addurls(Interface):
             row.update({"filename_abs": filename_abs,
                         "ds": ds_current,
                         "ds_filename": ds_filename})
+
+        if version_urls:
+            lgr.info("Versioning URLs")
+            pbar = ui.get_progressbar(total=len(rows),
+                                      label="Versioning URLs", unit=" URLs")
+            for row in rows:
+                try:
+                    row["url"] = get_versioned_url(row["url"])
+                except (ValueError, NotImplementedError) as exc:
+                    # We don't expect this to happen because get_versioned_url
+                    # should return the original URL if it isn't an S3 bucket.
+                    # It only raises exceptions if it doesn't know how to
+                    # handle the scheme for what looks like an S3 bucket.
+                    lgr.warning("error getting version of %s: %s",
+                                row["url"], exc_str(exc))
+                pbar.update(1, increment=True)
+            pbar.finish()
 
         files_to_add = set()
         for r in add_urls(rows, ifexists=ifexists, options=annex_options):

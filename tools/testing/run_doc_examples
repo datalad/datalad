@@ -26,6 +26,11 @@ for t in `grep -l DATALAD_TESTS_RUNCMDLINE docs/examples/* 2>/dev/null`; do
         echo -e "\n\nI: not running $t in direct mode";
         continue
     fi
+    if [ "${DATALAD_REPO_VERSION:-}" = "6" ] && grep -q SKIP_IN_V6 "$t"; then
+        echo -e "\n\nI: not running $t in v6 mode";
+        continue
+    fi
+
     echo -e "\n\nI: running $t"
     bash "$t" && status=ok || { exitcode=$?; status=failed; }
     echo "I: done running $t: $status"

@@ -41,10 +41,6 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if, skip_if_no_module
 from datalad.tests.utils import SkipTest
 
-try:
-    import datalad.metadata.extractors.bids as has_bids_extractor
-except ImportError:
-    has_bids_extractor = False
 
 broken_plugin = """garbage"""
 
@@ -134,15 +130,23 @@ def test_wtf(path):
         assert_in('user.name: ', cmo.out)
 
     skip_if_no_module('pyperclip')
+
+    # verify that it works correctly in the env/platform
+    import pyperclip
     with swallow_outputs() as cmo:
-        import pyperclip
         try:
+            pyperclip.copy("xxx")
+            pyperclip_works = pyperclip.paste().strip() == "xxx"
             wtf(dataset=ds.path, clipboard=True)
         except (AttributeError, pyperclip.PyperclipException) as exc:
             # AttributeError could come from pyperclip if no DISPLAY
             raise SkipTest(exc_str(exc))
         assert_in("WTF information of length", cmo.out)
         assert_not_in('user.name', cmo.out)
+        if not pyperclip_works:
+            # Some times does not throw but just fails to work
+            raise SkipTest(
+                "Pyperclip seems to be not functioning here correctly")
         assert_not_in('user.name', pyperclip.paste())
         assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
         assert_in("cmd:annex=", pyperclip.paste())  # but the content is there
@@ -169,19 +173,18 @@ def test_no_annex(path):
         ds.repo.get_annexed_files())
 
 
-_bids_template = {
+_ds_template = {
     '.datalad': {
         'config': '''\
 [datalad "metadata"]
-        nativetype = bids
+        nativetype = frictionless_datapackage
 '''},
-    'dataset_description.json': '''\
+    'datapackage.json': '''\
 {
-    "Name": "demo_ds",
-    "BIDSVersion": "1.0.0",
-    "Description": "this is for play",
-    "License": "PDDL",
-    "Authors": [
+    "title": "demo_ds",
+    "description": "this is for play",
+    "license": "PDDL",
+    "author": [
         "Betty",
         "Tom"
     ]
@@ -189,8 +192,7 @@ _bids_template = {
 '''}
 
 
-@skip_if(not has_bids_extractor, "bids extractor is N/A")
-@with_tree(_bids_template)
+@with_tree(_ds_template)
 def test_add_readme(path):
     ds = Dataset(path).create(force=True)
     ds.add('.')

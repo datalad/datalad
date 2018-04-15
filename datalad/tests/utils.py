@@ -64,6 +64,10 @@ from . import _TEMP_PATHS_GENERATED
 _TEMP_PATHS_CLONES = set()
 
 
+# Additional indicators
+on_travis = bool(os.environ.get('TRAVIS', False))
+
+
 # additional shortcuts
 neq_ = assert_not_equal
 nok_ = assert_false
@@ -1293,12 +1297,13 @@ def ignore_nose_capturing_stdout(func):
 
     @make_decorator(func)
     def newfunc(*args, **kwargs):
+        import io
         try:
             func(*args, **kwargs)
-        except AttributeError as e:
+        except (AttributeError, io.UnsupportedOperation) as e:
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
-            if message.find('StringIO') > -1 and message.find('fileno') > -1:
+            if re.search('^(.*StringIO.*)?fileno', message):
                 raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
@@ -1412,6 +1417,28 @@ def with_testsui(t, responses=None, interactive=True):
     return newfunc
 
 with_testsui.__test__ = False
+
+
+@optional_args
+def with_direct(func):
+    """To test functions under both direct and indirect mode
+
+    Unlike fancy generators would just fail on the first failure
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows or on_travis:
+            # since on windows would become indirect anyways
+            # on travis -- we have a dedicated matrix run
+            # which would select one or another based on config
+            # if we specify None
+            directs = [None]
+        else:
+            # otherwise we assume that we have to test both modes
+            directs = [True, False]
+        for direct in directs:
+            func(*(args + (direct,)), **kwargs)
+    return newfunc
 
 
 def assert_no_errors_logged(func, skip_re=None):

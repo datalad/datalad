@@ -54,6 +54,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
@@ -215,7 +216,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # shorten to MD5sum
     objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, aggfrom_ds, json_py.dump)]
+    metasources = [('ds', 'dataset', dsmeta, agginto_ds, json_py.dump)]
 
     # do not store content metadata if either the source or the target dataset
     # do not want it
@@ -232,7 +233,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
             'content',
             # sort by path key to get deterministic dump content
             (dict(contentmeta[k], path=k) for k in sorted(contentmeta)),
-            aggfrom_ds,
+            agginto_ds,
             json_py.dump2xzstream))
 
     # for both types of metadata
@@ -341,7 +342,7 @@ def _get_obj_location(hash_str, ref_type):
             hash_str[2:]))
 
 
-def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
+def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db, to_save):
     """Perform metadata aggregation for ds and a given list of subdataset paths
 
     Parameters
@@ -356,6 +357,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
       whose agginfo shall be updated within the to-be-updated dataset.
       Any subdataset that is not listed here is assumed to be gone (i.e. no longer
       a subdataset at all, not just not locally installed)
+    incremental : bool
+      If set, the update will not remove any information on datasets not listed in
+      subds_paths
     agginfo_db : dict
       Dictionary with all information on aggregate metadata on all datasets.
       Keys are absolute paths of datasets.
@@ -409,9 +413,10 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
         ds_agginfos[drelpath] = ds_dbinfo
     # remove all entries for which we did not (no longer) have a corresponding
     # subdataset to take care of
-    ds_agginfos = {k: v
-                   for k, v in ds_agginfos.items()
-                   if normpath(opj(ds_path, k)) in procds_paths}
+    if not incremental:
+        ds_agginfos = {k: v
+                       for k, v in ds_agginfos.items()
+                       if normpath(opj(ds_path, k)) in procds_paths}
     # set of metadata objects now referenced
     objlocs_is = set(
         ai[k]
@@ -439,7 +444,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 
     # secretly remove obsolete object files, not really a result from a
     # user's perspective
-    if objs2remove:
+    if not incremental and objs2remove:
         ds.remove(
             objs2remove,
             # Don't use the misleading default commit message of `remove`:
@@ -458,7 +463,9 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, agginfo_db, to_save):
 
     # must copy object files to local target destination
     # make sure those objects are present
-    ds.get([f for f, t in objs2copy], result_renderer='disabled')
+    # use the reference dataset to resolve paths, as they might point to
+    # any location in the dataset tree
+    Dataset(refds_path).get([f for f, t in objs2copy], result_renderer='disabled')
     for copy_from, copy_to in objs2copy:
         if copy_to == copy_from:
             continue
@@ -518,7 +525,7 @@ class AggregateMetaData(Interface):
     scientific metadata standards are supported, like DICOM, BIDS, or datacite.
     Some metadata extractors depend on particular 3rd-party software. The list of
     metadata extractors available to a particular DataLad installation is reported
-    by the 'wtf' plugin ('datalad wtf').
+    by the 'wtf' command ('datalad wtf').
 
     Enabling a metadata extractor for a dataset is done by adding its name to the
     'datalad.metadata.nativetype' configuration variable -- typically in the
@@ -530,8 +537,8 @@ class AggregateMetaData(Interface):
 
     Enabling multiple extractors is supported. In this case, metadata are
     extracted by each extractor individually, and stored alongside each other.
-    Metadata aggregation will also extract DataLad's own metadata (extractor
-    'datalad_core').
+    Metadata aggregation will also extract DataLad's own metadata (extractors
+    'datalad_core', and 'annex').
 
     Metadata aggregation can be performed recursively, in order to aggregate all
     metadata across all subdatasets, for example, to be able to search across
@@ -584,10 +591,6 @@ class AggregateMetaData(Interface):
       to discover which particular files in them match these properties.
     """
     _params_ = dict(
-        # TODO add option to not update aggregated data/info in intermediate
-        # datasets
-        # TODO add option for full aggregation (not incremental), so when something
-        # is not present nothing about it is preserved in the aggregated metadata
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""topmost dataset metadata will be aggregated into. All dataset
@@ -604,6 +607,20 @@ class AggregateMetaData(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        update_mode=Parameter(
+            args=('--update-mode',),
+            constraints=EnsureChoice('all', 'target'),
+            doc="""which datasets to update with newly aggregated metadata:
+            all datasets from any leaf dataset to the top-level target dataset
+            including all intermediate datasets (all), or just the top-level
+            target dataset (target)."""),
+        incremental=Parameter(
+            args=('--incremental',),
+            action='store_true',
+            doc="""If set, all information on metadata records of subdatasets
+            that have not been (re-)aggregated in this run will be kept unchanged.
+            This is sueful when (re-)aggregation only a subset of a dataset hierarchy,
+            for example, because not all subdatasets are locally available."""),
         save=nosave_opt,
     )
 
@@ -615,6 +632,8 @@ class AggregateMetaData(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
+            update_mode='target',
+            incremental=False,
             save=True):
         refds_path = Interface.get_refds_path(dataset)
 
@@ -718,17 +737,24 @@ class AggregateMetaData(Interface):
         # first, let's figure out what dataset need updating at all
         # get adjencency info of the dataset tree spanning the base to all leaf dataset
         # associated with the path arguments
-        ds_adj = {}
-        discover_dataset_trace_to_targets(
-            ds.path, to_aggregate, [], ds_adj,
-            # we know that to_aggregate only lists datasets, existing and
-            # absent ones -- we want to aggregate all of them, either from
-            # just extracted metadata, or from previously aggregated metadata
-            # of the closest superdataset
-            includeds=to_aggregate)
-        # TODO we need to work in the info about dataset that we only got from
-        # aggregated metadata, that had no trace on the file system in here!!
-        subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
+        if update_mode == 'all':
+            ds_adj = {}
+            discover_dataset_trace_to_targets(
+                ds.path, to_aggregate, [], ds_adj,
+                # we know that to_aggregate only lists datasets, existing and
+                # absent ones -- we want to aggregate all of them, either from
+                # just extracted metadata, or from previously aggregated metadata
+                # of the closest superdataset
+                includeds=to_aggregate)
+            # TODO we need to work in the info about dataset that we only got from
+            # aggregated metadata, that had no trace on the file system in here!!
+            subtrees = _adj2subtrees(ds.path, ds_adj, to_aggregate)
+        elif update_mode == 'target':
+            subtrees = {ds.path: list(agginfo_db.keys())}
+        else:
+            raise ValueError(
+                "unknown `update_mode` '%s' for metadata aggregation", update_mode)
+
         # go over datasets in bottom-up fashion
         for parentds_path in sorted(subtrees, reverse=True):
             lgr.info('Update aggregate metadata in dataset at: %s', parentds_path)
@@ -737,6 +763,7 @@ class AggregateMetaData(Interface):
                 ds.path,
                 parentds_path,
                 subtrees[parentds_path],
+                incremental,
                 agginfo_db,
                 to_save)
             # update complete
