@@ -36,6 +36,9 @@ from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
+# haunted imports/bindings
+from datalad.interface.diff import Diff
+
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
