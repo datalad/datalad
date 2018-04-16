@@ -2206,7 +2206,8 @@ class GitRepo(RepoInterface):
         if message:
             options += ['-m', message]
         self._git_custom_command(
-            '', ['git', 'tag'] + options + [str(tag)]
+            '', ['git', 'tag'] + options + [str(tag)],
+            check_fake_dates=True
         )
 
     def get_tags(self, output=None):
