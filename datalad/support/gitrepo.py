@@ -1024,7 +1024,18 @@ class GitRepo(RepoInterface):
 
     def add_fake_dates(self, env):
         """Add fake dates to `env`.
+
+        Parameters
+        ----------
+        env : dict or None
+            Environment variables.
+
+        Returns
+        -------
+        A dict (copied from env), with date-related environment
+        variables for git and git-annex set.
         """
+        env = (env if env is not None else os.environ).copy()
         # Note: Use _git_custom_command here rather than repo.git.for_each_ref
         # so that we use annex-proxy in direct mode.
         last_date = self._git_custom_command(
@@ -1050,6 +1061,8 @@ class GitRepo(RepoInterface):
         env["GIT_AUTHOR_DATE"] = date
         env["GIT_COMMITTER_DATE"] = date
         env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
+
+        return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):
@@ -1556,8 +1569,7 @@ class GitRepo(RepoInterface):
         from .exceptions import GitIgnoreError
 
         if check_fake_dates and self.fake_dates_enabled:
-            env = (env or os.environ).copy()
-            self.add_fake_dates(env)
+            env = self.add_fake_dates(env)
 
         try:
             out, err = self.cmd_call_wrapper.run(
