@@ -2057,12 +2057,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             if batch:
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
-            self._run_annex_command(
+            out_json = self._run_annex_command_json(
                 'addurl',
-                annex_options=options + ['--file=%s' % file_] + [url],
+                opts=options + ['--file=%s' % file_] + [url],
                 log_online=True, log_stderr=False,
                 **kwargs
             )
+            assert len(out_json) == 1, "should always be a single-time list"
+            # Make the output's structure match bcmd's.
+            out_json = out_json[0]
             # Don't capture stderr, since download progress provided by wget uses
             # stderr.
         else:
@@ -2093,7 +2096,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     cmd="addurl",
                     msg="Error, annex reported failure for addurl (url='%s'): %s"
                     % (url, str(out_json)))
-            return out_json
+        return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
                  jobs=None,
