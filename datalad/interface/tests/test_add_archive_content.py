@@ -419,7 +419,12 @@ class TestAddArchiveOptions():
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.annex.get_branch_commits('git-annex'))
         # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
-        assert_equal(len(commits_after), len(commits_prior) + 2)
+        # If faking dates, there should be another +1 because
+        # annex.alwayscommit isn't set to false.
+        assert_equal(len(commits_after),
+                     # We expect one more when faking dates because
+                     # annex.alwayscommit isn't set to false.
+                     len(commits_prior) + 2 + self.annex.fake_dates_enabled)
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
@@ -454,8 +459,11 @@ class TestAddArchiveOptions():
             commits_after_master = list(self.annex.get_branch_commits())
             commits_after = list(self.annex.get_branch_commits('git-annex'))
             # There should be a single commit for all additions +1 to
-            # initiate datalad-archives gh-1258
-            assert_equal(len(commits_after), len(commits_prior) + 2)
+            # initiate datalad-archives gh-1258.  If faking dates,
+            # there should be another +1 because annex.alwayscommit
+            # isn't set to false.
+            assert_equal(len(commits_after),
+                         len(commits_prior) + 2 + self.annex.fake_dates_enabled)
             assert_equal(len(commits_after_master), len(commits_prior_master))
             assert(add_out is self.annex)
             # there should be no .datalad temporary files hanging around

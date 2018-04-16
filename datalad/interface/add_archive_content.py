@@ -306,7 +306,9 @@ class AddArchiveContent(Interface):
         delete_after_rpath = None
         try:
             old_always_commit = annex.always_commit
-            annex.always_commit = False
+            # When faking dates, batch mode is disabled, so we want to always
+            # commit.
+            annex.always_commit = annex.fake_dates_enabled
 
             if annex_options:
                 if isinstance(annex_options, string_types):
