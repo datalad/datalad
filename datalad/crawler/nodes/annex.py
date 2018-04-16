@@ -1348,7 +1348,7 @@ class Annexificator(object):
                             tag_ = tag__
                         else:
                             raise ValueError(existing_tag)
-                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (
+                    self.repo.tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (
                         __version__, stats_str))
 
             if cleanup:
