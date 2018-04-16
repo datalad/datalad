@@ -546,8 +546,8 @@ def add_urls(rows, ifexists=None, options=None):
                 lgr.debug("File %s already exists", filename_abs)
 
         try:
-            ds.repo.add_url_to_file(filename, row["url"],
-                                    batch=True, options=options)
+            out_json = ds.repo.add_url_to_file(filename, row["url"],
+                                               batch=True, options=options)
         except AnnexBatchCommandError as exc:
             yield get_status_dict(action="addurls",
                                   ds=ds,
@@ -556,12 +556,12 @@ def add_urls(rows, ifexists=None, options=None):
                                   message=exc_str(exc),
                                   status="error")
             continue
-        else:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  type="file",
-                                  path=filename_abs,
-                                  status="ok")
+
+        # In the case of an error, the json object has file=None.
+        if out_json["file"] is None:
+            out_json["file"] = filename_abs
+        yield annexjson2result(out_json, ds, action="addurls",
+                               type="file", logger=lgr)
 
 
 @progress("Adding metadata")
