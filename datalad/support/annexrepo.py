@@ -2900,6 +2900,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
             if isinstance(cmd_str, string_types) \
             else cmd_str + files
+
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+
         return self.cmd_call_wrapper.run(
             cmd,
             log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
