@@ -1047,10 +1047,9 @@ class GitRepo(RepoInterface):
                   time.strftime("%a %d %b %Y %H:%M:%S +0000",
                                 time.gmtime(seconds_new)))
 
-        if date:
-            env["GIT_AUTHOR_DATE"] = date
-            env["GIT_COMMITTER_DATE"] = date
-            env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
+        env["GIT_AUTHOR_DATE"] = date
+        env["GIT_COMMITTER_DATE"] = date
+        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):
