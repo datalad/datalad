@@ -30,6 +30,7 @@ from datalad.api import add
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
@@ -414,3 +415,17 @@ def test_bf1886(path):
     # it should "add anything in sub3 to sub3" or "add sub3 to whatever
     # sub3 is in"
     ok_clean_git(parent.path, untracked=['sub3/'])
+
+
+@with_tree({
+    'staged': 'staged',
+    'untracked': 'untracked'})
+def test_bf2043(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('staged', save=False)
+    ok_clean_git(ds.path, head_modified=['staged'], untracked=['untracked'])
+    # plain save does not commit untracked content
+    # this tests the second issue in #2043
+    with chpwd(path):
+        save()
+    ok_clean_git(ds.path, untracked=['untracked'])
