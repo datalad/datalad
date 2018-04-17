@@ -107,10 +107,12 @@ def save_dataset(
                    lexists(ap['path'])]
 
     if to_gitadd or save_entire_ds:
+        lgr.debug('Adding files straight to Git at %s: %s', ds, to_gitadd)
         ds.repo.add(to_gitadd, git=True, commit=False,
                     # this makes sure that pending submodule updates are added too
                     update=save_entire_ds)
     if to_annexadd:
+        lgr.debug('Adding files to annex at %s: %s', ds, to_annexadd)
         ds.repo.add(to_annexadd, commit=False)
 
     _datalad_msg = False
@@ -217,7 +219,9 @@ class Save(Interface):
 
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
-            path = abspath(curdir)
+            # make sure we don't treat this as a user-provided '.' argument
+            path = [{'path': abspath(curdir), 'raw_input': False}]
+
         refds_path = Interface.get_refds_path(dataset)
 
         if message and message_file:
