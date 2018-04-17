@@ -50,9 +50,6 @@ def pipeline(url=None,
     if not isinstance(leading_dirs_depth, int):
         leading_dirs_depth = int(leading_dirs_depth)
 
-    if not tarballs:
-        raise NotImplementedError("yet to simplify for no tarballs case")
-
     lgr.info("Creating a pipeline to crawl data files from %s", url)
     if annex is None:
         # if no annex to use was provided -- let's just make one
