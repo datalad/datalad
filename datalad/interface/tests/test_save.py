@@ -418,9 +418,28 @@ def test_bf1886(path):
 
 
 @with_tree({
+    '1': '',
+    '2': '',
+    '3': ''})
+def test_bf2043p1(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('1')
+    ok_clean_git(ds.path, untracked=['2', '3'])
+    ds.unlock('1')
+    ok_clean_git(ds.path, index_modified=['1'], untracked=['2', '3'])
+    # save(.) should recommit unlocked file, and not touch anything else
+    # this tests the second issue in #2043
+    with chpwd(path):
+        # this would work: save('.'), because the first arg is the dataset
+        # but this doesn't
+        save(path='.')
+    ok_clean_git(ds.path, untracked=['2', '3'])
+
+
+@with_tree({
     'staged': 'staged',
     'untracked': 'untracked'})
-def test_bf2043(path):
+def test_bf2043p2(path):
     ds = Dataset(path).create(force=True)
     ds.add('staged', save=False)
     ok_clean_git(ds.path, head_modified=['staged'], untracked=['untracked'])
