@@ -436,7 +436,9 @@ class Interface(object):
         if args.common_report_status or 'datalad.runtime.report-status' in cfg:
             report_status = args.common_report_status or \
                             cfg.obtain('datalad.runtime.report-status')
-            if report_status == 'success':
+            if report_status == "all":
+                pass  # no filter
+            elif report_status == 'success':
                 result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
             elif report_status == 'failure':
                 result_filter = EnsureKeyChoice('status',
