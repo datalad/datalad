@@ -48,27 +48,27 @@ class Rerun(Interface):
 
     Examples:
 
-        Re-execute the command from the previous commit.
+      Re-execute the command from the previous commit::
 
-        $ datalad rerun
+        % datalad rerun
 
-        Re-execute any commands in the last five commits.
+      Re-execute any commands in the last five commits::
 
-        $ datalad rerun --since=HEAD~5
+        % datalad rerun --since=HEAD~5
 
-        Do the same as above, but re-execute the commands on top of
-        HEAD~5 in a detached state.
+      Do the same as above, but re-execute the commands on top of
+      HEAD~5 in a detached state::
 
-        $ datalad rerun --onto= --since=HEAD~5
+        % datalad rerun --onto= --since=HEAD~5
 
-        Re-execute all previous commands and compare the old and new
-        results.
+      Re-execute all previous commands and compare the old and new
+      results::
 
-        $ # on master branch
-        $ datalad rerun --branch=verify --since=
-        $ # now on verify branch
-        $ datalad diff --revision=master..
-        $ git log --oneline --left-right --cherry-pick master...
+        % # on master branch
+        % datalad rerun --branch=verify --since=
+        % # now on verify branch
+        % datalad diff --revision=master..
+        % git log --oneline --left-right --cherry-pick master...
     """
     _params_ = dict(
         revision=Parameter(
