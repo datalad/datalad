@@ -422,6 +422,8 @@ def test_bf1886(path):
     '2': '',
     '3': ''})
 def test_gh2043p1(path):
+    # this tests documents the interim agreement on what should happen
+    # in the case documented in gh-2043
     ds = Dataset(path).create(force=True)
     ds.add('1')
     ok_clean_git(ds.path, untracked=['2', '3'])
