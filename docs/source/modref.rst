@@ -49,6 +49,18 @@ Metadata handling
    api.aggregate_metadata
    api.search
 
+
+Reproducible execution
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.run
+   api.rerun
+
+
 Plumbing commands
 -----------------
 
