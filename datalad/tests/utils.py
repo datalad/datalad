@@ -208,8 +208,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     Note
     ----
     Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only and are ignored otherwise!
-    Implementation is yet to do!
+    in pure git or indirect mode annex only. If they are given, no
+    test of modification of known repo content is performed.
 
     Parameters
     ----------
@@ -263,15 +263,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     if annex and r.is_direct_mode():
         if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not quite valid "
-                        "concepts in direct mode! Looking for any change "
-                        "(staged or not) instead.")
-            status = r.get_status(untracked=False, submodules=not ignore_submodules)
-            modified = []
-            for s in status:
-                modified.extend(status[s])
-            eq_(sorted(head_modified + index_modified),
-                sorted(f for f in modified))
+            lgr.warning("head_modified and index_modified are not supported "
+                        "for direct mode repositories!")
         else:
             ok_(not r.is_dirty(untracked_files=not untracked,
                                submodules=not ignore_submodules))
