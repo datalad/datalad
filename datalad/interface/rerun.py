@@ -75,20 +75,20 @@ class Rerun(Interface):
             args=("revision",),
             metavar="REVISION",
             nargs="?",
-            doc="""rerun command(s) in REVISION. By default, the
-            command from this commit will be executed, but the --since
-            option can be used to construct a revision range.""",
+            doc="""rerun command(s) in `revision`. By default, the command from
+            this commit will be executed, but [CMD: --since CMD][PY: `since`
+            PY] can be used to construct a revision range.""",
             default="HEAD",
             constraints=EnsureStr()),
         since=Parameter(
             args=("--since",),
-            doc="""If SINCE is a commit-ish, the commands from all
-            commits that are reachable from REVISION but not SINCE
-            will be re-executed (in other words, the commands in `git
-            log SINCE..REVISION`). If SINCE is an empty string, it is
-            set to the parent of the first commit that contains a
-            recorded command (i.e., all commands in `git log REVISION`
-            will be re-executed).""",
+            doc="""If `since` is a commit-ish, the commands from all commits
+            that are reachable from `revision` but not `since` will be
+            re-executed (in other words, the commands in :command:`git log
+            SINCE..REVISION`). If SINCE is an empty string, it is set to the
+            parent of the first commit that contains a recorded command (i.e.,
+            all commands in :command:`git log REVISION` will be
+            re-executed).""",
             constraints=EnsureStr() | EnsureNone()),
         branch=Parameter(
             metavar="NAME",
@@ -98,13 +98,13 @@ class Rerun(Interface):
         onto=Parameter(
             metavar="base",
             args=("--onto",),
-            doc="""start point for rerunning the commands. If not
-            specified, commands are executed at HEAD. This option can
-            be used to specify an alternative start point, which will
-            be checked out with the branch name specified by --branch
-            or in a detached state otherwise. As a special case, an
-            empty value for this option means to use the commit
-            specified by --since.""",
+            doc="""start point for rerunning the commands. If not specified,
+            commands are executed at HEAD. This option can be used to specify
+            an alternative start point, which will be checked out with the
+            branch name specified by [CMD: --branch CMD][PY: `branch` PY] or in
+            a detached state otherwise. As a special case, an empty value for
+            this option means to use the commit specified by [CMD: --since
+            CMD][PY: `since` PY].""",
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m", "--message",),
@@ -116,7 +116,8 @@ class Rerun(Interface):
         script=Parameter(
             args=("--script",),
             metavar="FILE",
-            doc="""extract the commands into FILE rather than rerunning.""",
+            doc="""extract the commands into [CMD: FILE CMD][PY: this file PY]
+            rather than rerunning.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
