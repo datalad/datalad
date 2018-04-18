@@ -421,7 +421,7 @@ def test_bf1886(path):
     '1': '',
     '2': '',
     '3': ''})
-def test_bf2043p1(path):
+def test_gh2043p1(path):
     ds = Dataset(path).create(force=True)
     ds.add('1')
     ok_clean_git(ds.path, untracked=['2', '3'])
@@ -430,10 +430,14 @@ def test_bf2043p1(path):
     # save(.) should recommit unlocked file, and not touch anything else
     # this tests the second issue in #2043
     with chpwd(path):
-        # this would work: save('.'), because the first arg is the dataset
-        # but this doesn't
-        save(path='.')
+        # only save modified bits by default
+        save('.')  #  because the first arg is the dataset
     ok_clean_git(ds.path, untracked=['2', '3'])
+    with chpwd(path):
+        # but when a path is given, anything that matches this path
+        # untracked or not is added/saved
+        save(path='.')
+    ok_clean_git(ds.path)
 
 
 @with_tree({
