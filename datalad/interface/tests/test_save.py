@@ -53,10 +53,6 @@ def test_save(path):
     ds.repo.add("new_file.tst", git=True)
     ok_(ds.repo.dirty)
 
-    # no all_changes any longer
-    with assert_raises(DeprecatedError):
-        ds.save("add a new file", all_changes=True)
-
     ds.save("add a new file")
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 

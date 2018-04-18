@@ -181,11 +181,6 @@ class Save(Interface):
             doc="""take the commit message from this file. This flag is
             mutually exclusive with -m.""",
             constraints=EnsureStr() | EnsureNone()),
-        all_changes=Parameter(
-            args=("-a", "--all-changes"),
-            doc="""save all changes (even to not yet added files) of all components
-            in datasets that contain any of the given paths [DEPRECATED!].""",
-            action="store_true"),
         all_updated=Parameter(
             args=("-u", "--all-updated"),
             doc="""if no explicit paths are given, save changes of all known
@@ -205,18 +200,10 @@ class Save(Interface):
     @datasetmethod(name='save')
     @eval_results
     def __call__(message=None, path=None, dataset=None,
-                 all_updated=True, all_changes=None, version_tag=None,
+                 all_updated=True, version_tag=None,
                  recursive=False, recursion_limit=None, super_datasets=False,
                  message_file=None
                  ):
-        if all_changes is not None:
-            from datalad.support.exceptions import DeprecatedError
-            raise DeprecatedError(
-                new="all_updated option where fits and/or datalad add",
-                version="0.5.0",
-                msg="RF: all_changes option passed to the save"
-            )
-
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
             # make sure we don't treat this as a user-provided '.' argument
