@@ -148,25 +148,33 @@ def save_dataset(
 class Save(Interface):
     """Save the current state of a dataset
 
-    Saving the state of a dataset records all changes that have been made
-    to it. This change record is annotated with a user-provided description.
+    Saving the state of a dataset records changes that have been made to it.
+    This change record is annotated with a user-provided description.
     Optionally, an additional tag, such as a version, can be assigned to the
-    saved state. Such tag enables straightforward retrieval of past versions
-    at a later point in time.
+    saved state. Such tag enables straightforward retrieval of past versions at
+    a later point in time.
 
-    || PYTHON >>
-    Returns
-    -------
-    commit or None
-      `None` if nothing was saved, the resulting commit otherwise.
-    << PYTHON ||
+    Examples:
+
+      Save any content underneath the current directory, without altering
+      any potential subdataset (use --recursive for that)::
+
+        % datalad save .
+
+      Save any modification of known dataset content, but leave untracked
+      files (e.g. temporary files) untouched::
+
+        % dataset save -d <path_to_dataset>
+
+      Tag the most recent saved state of a dataset::
+
+        % dataset save -d <path_to_dataset> --version-tag bestyet
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to save. If a dataset is given, but
-            no `files`, the entire dataset will be saved.""",
+            doc=""""specify the dataset to save""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
@@ -181,6 +189,8 @@ class Save(Interface):
             doc="""take the commit message from this file. This flag is
             mutually exclusive with -m.""",
             constraints=EnsureStr() | EnsureNone()),
+        # switch not functional from cmdline: default True, action=store_true
+        # TODO remove from API? all_updated=False is not used anywhere in the codebase
         all_updated=Parameter(
             args=("-u", "--all-updated"),
             doc="""if no explicit paths are given, save changes of all known
