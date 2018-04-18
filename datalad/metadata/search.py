@@ -65,11 +65,19 @@ def _any2unicode(val):
         else assure_unicode(val)
 
 
-def _listdict2dictlist(lst):
+class WasUniqueValDict(dict):
+    pass
+
+
+class WasUniqueValList(list):
+    pass
+
+
+def _listdict2dictlist(lst, list_type=list, dict_type=dict):
     # unique values that we got, always a list
     if all(not isinstance(uval, dict) for uval in lst):
         # no nested structures, take as is
-        return lst
+        return list_type(lst)
 
     # we need to turn them inside out, instead of a list of
     # dicts, we want a dict where keys are lists, because we
@@ -95,17 +103,26 @@ def _listdict2dictlist(lst):
             uvals = udict.get(k, set())
             uvals.add(v)
             udict[k] = uvals
-    return {
+    return dict_type({
         # set not good for JSON, have plain list
-        k: list(v) if len(v) > 1 else list(v)[0]
+        k: list_type(v) if len(v) > 1 else list_type(v)[0]
         for k, v in udict.items()
         # do not accumulate cruft
-        if len(v)}
+        if len(v)})
 
 
+# RF val2str to val2type
 def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
+
+    ATTN: Modifies `meta` in-place.
+
+    With `consider_ucn` this function also fills in values from a report
+    of unqiue metadata values, using the keys an individual record would have.
+    In order to distinguish these records from actual ones, the are using
+    the types WasUniqueValList and WasUniqueValDict respectively (such values
+    would always come in a list, or a dict).
     """
     if consider_ucn:
         # loop over all metadata sources and the report of their unique values
@@ -118,15 +135,20 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+                srcmeta[uk] = _listdict2dictlist(
+                    umeta[uk], list_type=WasUniqueValList, dict_type=WasUniqueValDict) \
+                    if umeta[uk] is not None else None
 
-    def _deep_kv(basekey, dct):
+    def _deep_kv(basekey, dct, from_unqiue):
         """Return key/value pairs of any depth following a rule for key
         composition
 
         dct must be a dict
         """
         for k, v in dct.items():
+            # either we are processing a nested structure of unique values already
+            # or we hit such value for this particular key
+            from_unqiue = from_unqiue or isinstance(v, (WasUniqueValList, WasUniqueValDict))
             if (k != '@id' and k.startswith('@')) or k == 'datalad_unique_content_properties':
                 # ignore all JSON-LD specials, but @id
                 continue
@@ -142,11 +164,14 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                 k.lstrip('@').replace(os.sep, '_').replace(' ', '_').replace('-', '_').replace('.', '_').replace(':', '-')
             )
             if isinstance(v, list):
-                v = _listdict2dictlist(v)
+                v = _listdict2dictlist(
+                    v,
+                    list_type=WasUniqueValList if from_unqiue else list,
+                    dict_type=WasUniqueValDict if from_unqiue else list)
 
             if isinstance(v, dict):
                 # dive
-                for i in _deep_kv('{}.'.format(key), v):
+                for i in _deep_kv('{}.'.format(key), v, from_unqiue):
                     yield i
             else:
                 yield key, v
@@ -157,7 +182,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
             (u' '.join(_any2unicode(i) for i in v) if isinstance(v, (list, tuple)) else
             # and the rest into unicode
             _any2unicode(v)) if val2str else v
-        for k, v in _deep_kv('', meta or {})
+        for k, v in _deep_kv('', meta or {}, from_unqiue=False)
         # auto-exclude any key that is not a defined field in the schema (if there is
         # a schema
         if schema is None or k in schema
@@ -281,6 +306,7 @@ class _WhooshSearch(_Search):
         `meta2doc` - must return dict for index document from result input
         """
         from whoosh import index as widx
+        from whoosh.writing import BufferedWriter
         from .metadata import agginfo_relpath
         # what is the lastest state of aggregated metadata
         metadata_state = self.ds.repo.get_last_commit_hash(agginfo_relpath)
@@ -344,16 +370,24 @@ class _WhooshSearch(_Search):
         self._mk_schema(dsinfo)
 
         idx_obj = widx.create_in(index_dir, self.schema)
+        # tried the BufferedWriter, much leaner in disk (size and nfiles)
+        # but also muuch slower
+        #idx = BufferedWriter(
+        #    idx_obj,
+        #    period=240,
+        #    limit=10000,
+        #    writerargs=dict(
         idx = idx_obj.writer(
-            # cache size per process
-            limitmb=cfg.obtain('datalad.search.indexercachesize'),
-            # disable parallel indexing for now till #1927 is resolved
-            ## number of processes for indexing
-            #procs=multiprocessing.cpu_count(),
-            ## write separate index segments in each process for speed
-            ## asks for writer.commit(optimize=True)
-            #multisegment=True,
-        )
+                # cache size per process
+                #limitmb=cfg.obtain('datalad.search.indexercachesize'),
+                # disable parallel indexing for now till #1927 is resolved
+                ## number of processes for indexing
+                #procs=multiprocessing.cpu_count(),
+                ## write separate index segments in each process for speed
+                ## asks for writer.commit(optimize=True)
+                #multisegment=True,
+            )
+        #)
 
         # load metadata of the base dataset and what it knows about all its subdatasets
         # (recursively)
@@ -414,7 +448,8 @@ class _WhooshSearch(_Search):
                 old_ds_rpath)
 
         lgr.debug("Committing index")
-        idx.commit(optimize=True)
+        #idx.close()
+        idx.commit()
         pbar.finish()
 
         # "timestamp" the search index to allow for automatic invalidation
@@ -538,12 +573,42 @@ class _BlobSearch(_WhooshSearch):
         )
 
 
+def isnumeric(val):
+    #if isinstance(val, int):
+    #    return int
+    #elif isinstance(val, float):
+    if val in (None, True, False):
+        return str
+    elif isinstance(val, (int, float)):
+        return float
+    #try:
+    #    int(val)
+    #    return int
+    #except (TypeError, ValueError):
+    try:
+        float(val)
+        return float
+    except (TypeError, ValueError):
+        return str
+    #return None
+
+
 class _AutofieldSearch(_WhooshSearch):
     _mode_label = 'autofield'
     _default_documenttype = 'all'
 
     def _meta2doc(self, meta):
-        return _meta2autofield_dict(meta, val2str=True, schema=self.schema)
+        return _meta2autofield_dict(
+            meta,
+            val2str=True,
+            schema=self.schema,
+            # only fill in values from unique report if the
+            # search index consists of dataset records only
+            # if files are in it too, the field types for
+            # records with numeric values would conflict the
+            # type in the dataset field (list of numerics -> string)
+            # otherwise
+            consider_ucn=self.documenttype == 'datasets')
 
     def _mk_schema(self, dsinfo):
         from whoosh import fields as wf
@@ -581,16 +646,51 @@ class _AutofieldSearch(_WhooshSearch):
                 aps=[dict(path=self.ds.path, type='dataset')],
                 recursive=True):
             meta = res.get('metadata', {})
+            #if res['path'].endswith('/tmp/hotnewstuff/dbic/QA'):
+            #    import pdb; pdb.set_trace()
             # no stringification of values for speed, we do not need/use the
             # actual values at this point, only the keys
             idxd = _meta2autofield_dict(meta, val2str=False)
 
+            #if res['path'].endswith('dicoms/dartmouth-phantoms/PHANTOM1_3'):
+            #    import pdb; pdb.set_trace()
+            #if 'bids.participant.age(years)' in idxd:
+            #    import pdb; pdb.set_trace()
+
             for k in idxd:
-                schema_fields[k] = wf.TEXT(stored=False,
-                                           analyzer=SimpleAnalyzer())
+                #if '.age' in k:
+                #    import pdb; pdb.set_trace()
+                cur_field = schema_fields.get(k, None)
+                if cur_field == str:
+                    # we know this field and it isn't specialized, done
+                    continue
+                field_cfg = str
+                val = idxd[k]
+                if cur_field in (None, int, float):
+                    types = set(isnumeric(v) for v in val) \
+                        if (self.documenttype in ('files', 'all') and
+                            isinstance(val, (WasUniqueValDict, WasUniqueValList))) \
+                        else set([isnumeric(val)])
+                    if types in (set((int, float)), set((float,))):
+                        field_cfg = float
+                    elif types == set((int,)):
+                        field_cfg = int
+                schema_fields[k] = field_cfg
             pbar.update(1, increment=True)
         pbar.finish()
 
+        # create schema fields
+        count = 0
+        for k, v in schema_fields.items():
+            if isinstance(v, type) and v in (int, float):
+                schema_fields[k] = wf.NUMERIC(v)
+                print(k, v)
+                count += 1
+            else:
+                schema_fields[k] = wf.TEXT(
+                    stored=False,
+                    analyzer=SimpleAnalyzer())
+        print(len(schema_fields), count)
         self.schema = wf.Schema(**schema_fields)
 
     def _mk_parser(self):
