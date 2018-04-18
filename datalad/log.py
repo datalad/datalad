@@ -182,6 +182,10 @@ class ProgressHandler(logging.Handler):
             self.pbars[pid].update(
                 update,
                 increment=getattr(record, 'dlm_progress_increment', False))
+            # Check for an updated label.
+            label = getattr(record, 'dlm_progress_label', None)
+            if label is not None:
+                self.pbars[pid].set_desc(label)
 
 
 class NoProgressLog(logging.Filter):
