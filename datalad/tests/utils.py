@@ -892,13 +892,30 @@ def skip_if_on_windows(func):
 
 
 @optional_args
-def skip_if(func, cond=True, msg=None):
+def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
+
+    Parameters
+    ----------
+    cond: bool
+      condition on which to skip
+    msg: str
+      message to print if skipping
+    method: str
+      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
+      just proceeding and simply not calling the decorated function.
+      This is particularly meant to be used, when decorating single assertions
+      in a test with method='pass' in order to not skip the entire test, but
+      just that assertion.
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
-            raise SkipTest(msg if msg else "condition was True")
+            if method == 'raise':
+                raise SkipTest(msg if msg else "condition was True")
+            elif method == 'pass':
+                print(msg if msg else "condition was True")
+                return
         return func(*args, **kwargs)
     return newfunc
 
@@ -945,7 +962,8 @@ def probe_known_failure(func):
     return newfunc
 
 
-def skip_known_failure(func):
+@optional_args
+def skip_known_failure(func, method='raise'):
     """Test decorator allowing to skip a test that is known to fail
 
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
@@ -954,7 +972,8 @@ def skip_known_failure(func):
     from datalad import cfg
 
     @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
-             msg="Skip test known to fail")
+             msg="Skip test known to fail",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -1025,7 +1044,8 @@ def known_failure_direct_mode(func):
 # ### ###
 
 
-def skip_v6(func):
+@optional_args
+def skip_v6(func, method='raise'):
     """Skips tests if datalad is configured to use v6 mode
     (DATALAD_REPO_VERSION=6)
     """
@@ -1033,14 +1053,15 @@ def skip_v6(func):
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
 
-def skip_direct_mode(func):
+@optional_args
+def skip_direct_mode(func, method='raise'):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
     """
@@ -1048,7 +1069,8 @@ def skip_direct_mode(func):
     from datalad import cfg
 
     @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run")
+             msg="Skip test in direct mode test run",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
