@@ -154,6 +154,81 @@ class ColorFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
+class ProgressHandler(logging.Handler):
+    from datalad.ui import ui
+
+    def __init__(self):
+        super(self.__class__, self).__init__()
+        self.pbars = {}
+
+    def emit(self, record):
+        from datalad.ui import ui
+        pid = getattr(record, 'dlm_progress')
+        update = getattr(record, 'dlm_progress_update', None)
+        if pid not in self.pbars:
+            # this is new
+            pbar = ui.get_progressbar(
+                label=getattr(record, 'dlm_progress_label', ''),
+                unit=getattr(record, 'dlm_progress_unit', ''),
+                total=getattr(record, 'dlm_progress_total', None))
+            self.pbars[pid] = pbar
+        elif update is None:
+            # not an update -> done
+            # TODO if the other logging that is happening is less frontpage
+            # we may want to actually "print" the completion message
+            self.pbars.pop(pid).finish()
+        else:
+            # an update
+            self.pbars[pid].update(
+                update,
+                increment=getattr(record, 'dlm_progress_increment', False))
+            # Check for an updated label.
+            label = getattr(record, 'dlm_progress_label', None)
+            if label is not None:
+                self.pbars[pid].set_desc(label)
+
+
+class NoProgressLog(logging.Filter):
+    def filter(self, record):
+        return not hasattr(record, 'dlm_progress')
+
+
+class OnlyProgressLog(logging.Filter):
+    def filter(self, record):
+        return hasattr(record, 'dlm_progress')
+
+
+def log_progress(lgrcall, pid, *args, **kwargs):
+    """Helper to emit a log message on the progress of some process
+
+    Parameters
+    ----------
+    lgrcall : callable
+      Something like lgr.debug or lgr.info
+    pid : str
+      Some kind of ID for the process the progress is reported on.
+    *args : str
+      Log message, and potential arguments
+    total : int
+      Max progress quantity of the process.
+    label : str
+      Process description. Should be very brief, goes in front of progress bar
+      on the same line.
+    unit : str
+      Progress report unit. Should be very brief, goes after the progress bar
+      on the same line.
+    update : int
+      To which quantity to advance the progress.
+    incremental : bool
+      If set, `update` is interpreted as an incremental value, not absolute.
+    """
+    d = dict(
+        {'dlm_progress_{}'.format(n): v for n, v in kwargs.items()
+         if v},
+        dlm_progress=pid)
+    lgrcall(*args, extra=d)
+
+
 class LoggerHelper(object):
     """Helper to establish and control a Logger"""
 
@@ -269,7 +344,16 @@ class LoggerHelper(object):
         #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
+        if is_interactive():
+            phandler = ProgressHandler()
+            # progress only when interactive
+            phandler.addFilter(OnlyProgressLog())
+            # no stream logs of progress messages when interactive
+            loghandler.addFilter(NoProgressLog())
+            self.lgr.addHandler(phandler)
+
         self.set_level()  # set default logging level
         return self.lgr
+
 
 lgr = LoggerHelper().get_initialized_logger()
