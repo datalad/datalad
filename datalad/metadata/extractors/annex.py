@@ -12,6 +12,7 @@ from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.annexmeta')
+from datalad.log import log_progress
 
 from datalad.support.annexrepo import AnnexRepo
 # use main version as core version
@@ -24,7 +25,20 @@ class MetadataExtractor(BaseMetadataExtractor):
         return {}
 
     def _get_content_metadata(self):
+        log_progress(
+            lgr.info,
+            'extractorannex',
+            'Start annex metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='Annex metadata extraction',
+            unit=' Files',
+        )
         if not isinstance(self.ds.repo, AnnexRepo):
+            log_progress(
+                lgr.info,
+                'extractorannex',
+                'Done annex metadata extraction from %s', self.ds
+            )
             return
 
         valid_paths = None
@@ -35,6 +49,17 @@ class MetadataExtractor(BaseMetadataExtractor):
             if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
+            log_progress(
+                lgr.info,
+                'extractorannex',
+                'Extracted annex metadata from %s', file,
+                update=1,
+                increment=True)
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
                     for k, v in meta.items()}
             yield (file, meta)
+        log_progress(
+            lgr.info,
+            'extractorannex',
+            'Done annex metadata extraction from %s', self.ds
+        )

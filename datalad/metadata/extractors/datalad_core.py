@@ -108,7 +108,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             log_progress(
                 lgr.info,
                 'extractordataladcore',
-                'Extract core metadata from %s', file,
+                'Extracted core metadata from %s', file,
                 update=1,
                 increment=True)
             # pull out proper (public) URLs
