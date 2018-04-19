@@ -33,8 +33,10 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import slow
 
 
+@slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -126,6 +128,7 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
+@slow  # 20.6910s
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

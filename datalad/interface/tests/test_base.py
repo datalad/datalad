@@ -36,7 +36,7 @@ def _new_args(**kwargs):
         **updated(
             dict(
                 common_on_failure=None,  # ['ignore', 'continue', 'stop']
-                common_report_status=None,  # ['success', 'failure', 'ok', 'notneeded', 'impossible', 'error']
+                common_report_status=None,  # ['all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error']
                 common_report_type=None,  # ['dataset', 'file']
             ),
             kwargs
@@ -102,9 +102,12 @@ def test_get_result_filter_arg_vs_config():
         assert cargs is not None
         with patch_config({"datalad.runtime.report-status": v}):
             ccfg = f(_new_args())
+            ccfg_none = f(_new_args(common_report_status="all"))
         # cannot compare directly but at least could verify based on repr
         print("%s -> %s" % (v, repr(cargs)))
         eq_(repr(cargs), repr(ccfg))
+        # and if 'all' - none filter
+        eq_(None, ccfg_none)
 
         # and we overload the "error" in config
         with patch_config({"datalad.runtime.report-status": "error"}):

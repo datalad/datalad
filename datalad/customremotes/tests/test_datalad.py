@@ -17,6 +17,7 @@ from ...support.exceptions import CommandError
 from ...downloaders.tests.utils import get_test_providers
 from ..datalad import DataladAnnexCustomRemote
 
+
 @with_tempfile()
 @skip_if_no_network
 def check_basic_scenario(direct, url, d):
@@ -57,21 +58,17 @@ def check_basic_scenario(direct, url, d):
 
 # unfortunately with_tree etc decorators aren't generators friendly thus
 # this little adapters to test both on local and s3 urls
+@with_direct
 @with_tree(tree={'3versions-allversioned.txt': "somefile"})
 @serve_path_via_http
-def check_basic_scenario_local_url(direct, p, local_url):
+def test_basic_scenario_local_url(direct, p, local_url):
     check_basic_scenario(direct, "%s3versions-allversioned.txt" % local_url)
 
 
-def check_basic_scenario_s3(direct):
+@with_direct
+def test_basic_scenario_s3(direct):
     check_basic_scenario(direct, 's3://datalad-test0-versioned/3versions-allversioned.txt')
 
-
-def test_basic_scenario():
-    for test in check_basic_scenario_local_url, :#check_basic_scenario_s3:
-        yield test, False
-        if not on_windows:
-            yield test, True
 
 
 from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario

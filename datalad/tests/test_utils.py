@@ -51,6 +51,7 @@ from ..utils import get_dataset_root
 from ..utils import better_wraps
 from ..utils import path_startswith
 from ..utils import path_is_subpath
+from ..utils import dlabspath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
@@ -76,7 +77,7 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode
+    known_failure_direct_mode, skip_if
 )
 
 
@@ -797,6 +798,23 @@ def test_probe_known_failure():
         not_failing()
 
 
+def test_skip_if():
+
+    def dummy():
+        raise AssertionError
+
+    assert_raises(AssertionError, dummy)
+    # if cond is False, call the decorated function:
+    assert_raises(AssertionError, skip_if(cond=False, method='raise')(dummy))
+    # raises SkipTest if cond is True
+    assert_raises(SkipTest, skip_if(cond=True, method='raise')(dummy))
+    # but with method 'pass', there is neither SkipTest nor AssertionError.
+    # Instead the function call is just skipped:
+    skip_if(cond=True, method='pass')(dummy)
+    # But if condition is False, the original function is still called:
+    assert_raises(AssertionError, skip_if(cond=False, method='pass')(dummy))
+
+
 def test_skip_known_failure():
 
     # Note: we can't test the switch "datalad.tests.knownfailures.skip"
@@ -961,4 +979,22 @@ def test_line_profile():
         assert_equal(f(3), 4)
         assert_equal(cmo.err, '')
         assert_in('i = j + 1  # xyz', cmo.out)
+
+
+@with_tempfile(mkdir=True)
+def test_dlabspath(path):
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    opath = opj(path, "origin")
+    os.makedirs(opath)
+    lpath = opj(path, "linked")
+    os.symlink('origin', lpath)
+    for d in opath, lpath:
+        # regardless under which directory, all results should not resolve
+        # anything
+        eq_(d, dlabspath(d))
+        # in the root of ds
+        with chpwd(d):
+            eq_(dlabspath("bu"), opj(d, "bu"))
+            eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
+            eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
 

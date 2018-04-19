@@ -119,6 +119,27 @@ def test_add_files(path):
 
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
+def test_update_known_submodule(path):
+    def get_baseline(p):
+        ds = Dataset(p).create()
+        sub = ds.create('sub', save=False)
+        # subdataset saw another commit after becoming a submodule
+        ok_clean_git(ds.path, index_modified=['sub'])
+        return ds
+    # attempt one
+    ds = get_baseline(opj(path, 'wo_ref'))
+    with chpwd(ds.path):
+        add('.', recursive=True)
+    ok_clean_git(ds.path)
+
+    # attempt two, same as above but call add via reference dataset
+    ds = get_baseline(opj(path, 'w_ref'))
+    ds.add('.', recursive=True)
+    ok_clean_git(ds.path)
+
+
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_add_recursive(path):
     # make simple hierarchy
     parent = Dataset(path).create()

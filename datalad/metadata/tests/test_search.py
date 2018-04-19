@@ -21,23 +21,15 @@ from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
-from datalad.tests.utils import assert_str_equal
 from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
-from datalad.tests.utils import skip_if
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
 from datalad.metadata import search as search_mod
-try:
-    from datalad.metadata.extractors.tests.test_bids import bids_template
-except (ImportError, SkipTest):
-    # pybids might be absent which would preclude this import
-    bids_template = None
 
 from ..search import _listdict2dictlist
 from ..search import _meta2autofield_dict
@@ -181,22 +173,17 @@ def test_search_non_dataset(tdir):
     assert_in("datalad create --force", str(cme.exception))
 
 
-@skip_if(not bids_template, "No bids_template (probably no pybids installed)")
-@with_tree(bids_template)
+@with_tempfile(mkdir=True)
 def test_within_ds_file_search(path):
     try:
-        import nibabel
         import mutagen
     except ImportError:
         raise SkipTest
     ds = Dataset(path).create(force=True)
-    ds.config.add('datalad.metadata.nativetype', 'nifti1', where='dataset')
     ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
     makedirs(opj(path, 'stim'))
     for src, dst in (
-            ('audio.mp3', opj('stim', 'stim1.mp3')),
-            ('nifti1.nii.gz', opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz')),
-            ('nifti1.nii.gz', opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'))):
+            ('audio.mp3', opj('stim', 'stim1.mp3')),):
         copy(
             opj(dirname(dirname(__file__)), 'tests', 'data', src),
             opj(path, dst))
@@ -205,7 +192,7 @@ def test_within_ds_file_search(path):
     ok_clean_git(ds.path)
     # basic sanity check on the metadata structure of the dataset
     dsmeta = ds.metadata('.', reporton='datasets')[0]['metadata']
-    for src in ('audio', 'bids', 'nifti1'):
+    for src in ('audio',):
         # something for each one
         assert_in(src, dsmeta)
         # each src declares its own context
@@ -236,51 +223,9 @@ audio.music-channels
 audio.music-sample_rate
 audio.name
 audio.tracknumber
-bids.BIDSVersion
-bids.author
-bids.citation
-bids.conformsto
-bids.description
-bids.fundedby
-bids.license
-bids.modality
-bids.name
-bids.participant.age(years)
-bids.participant.gender
-bids.participant.handedness
-bids.participant.hearing_problems_current
-bids.participant.id
-bids.participant.language
-bids.subject
-bids.task
-bids.type
 datalad_core.id
 datalad_core.refcommit
 id
-nifti1.cal_max
-nifti1.cal_min
-nifti1.datatype
-nifti1.description
-nifti1.dim
-nifti1.freq_axis
-nifti1.intent
-nifti1.magic
-nifti1.phase_axis
-nifti1.pixdim
-nifti1.qform_code
-nifti1.sform_code
-nifti1.sizeof_hdr
-nifti1.slice_axis
-nifti1.slice_duration
-nifti1.slice_end
-nifti1.slice_order
-nifti1.slice_start
-nifti1.spatial_resolution(mm)
-nifti1.t_unit
-nifti1.temporal_spacing(s)
-nifti1.toffset
-nifti1.vox_offset
-nifti1.xyz_unit
 parentds
 path
 type
@@ -300,25 +245,11 @@ type
              'mp3',
              opj('stim', 'stim1.mp3'),
              'meta', 'mp3'),
-            # multi word query implies AND
-            ('textblob',
-             ['bold', 'male'],
-             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
-             'meta', 'male'),
             # report which field matched with auto-field
             ('autofield',
              'mp3',
              opj('stim', 'stim1.mp3'),
              'audio.format', 'mp3'),
-            ('autofield',
-             'female',
-             opj('sub-03', 'func', 'sub-03_task-other_bold.nii.gz'),
-             'bids.participant.gender', 'female'),
-            # autofield multi-word query is also AND
-            ('autofield',
-             ['bids.type:bold', 'bids.participant.id:01'],
-             opj('sub-01', 'func', 'sub-01_task-some_bold.nii.gz'),
-             'bids.type', 'bold'),
             # XXX next one is not supported by current text field analyser
             # decomposes the mime type in [mime, audio, mp3]
             # ('autofield',

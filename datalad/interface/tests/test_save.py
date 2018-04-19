@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from datalad.tests.utils import known_failure_direct_mode
 
 import os
+from os.path import pardir
 from os.path import join as opj
 from datalad.utils import chpwd
 
@@ -24,9 +25,12 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import DeprecatedError, IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
+from datalad.api import create
+from datalad.api import add
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_equal
@@ -34,6 +38,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
+from datalad.tests.utils import skip_v6
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -47,10 +52,6 @@ def test_save(path):
 
     ds.repo.add("new_file.tst", git=True)
     ok_(ds.repo.dirty)
-
-    # no all_changes any longer
-    with assert_raises(DeprecatedError):
-        ds.save("add a new file", all_changes=True)
 
     ds.save("add a new file")
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
@@ -331,3 +332,125 @@ def test_subdataset_save(path):
             save(path='sub', super_datasets=True))
     # save super must not cause untracked content to be commited!
     ok_clean_git(parent.path, untracked=['untracked'])
+
+
+@with_tempfile(mkdir=True)
+def test_symlinked_relpath(path):
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    os.makedirs(opj(path, "origin"))
+    dspath = opj(path, "linked")
+    os.symlink('origin', dspath)
+    ds = Dataset(dspath).create()
+    create_tree(dspath, {
+        "mike1": 'mike1',  # will be added from topdir
+        "later": "later",  # later from within subdir
+        "d": {
+            "mike2": 'mike2', # to be added within subdir
+        }
+    })
+
+    # in the root of ds
+    with chpwd(dspath):
+        ds.repo.add("mike1", git=True)
+        ds.save("committing", path="./mike1")
+
+    # Let's also do in subdirectory
+    with chpwd(opj(dspath, 'd')):
+        ds.repo.add("mike2", git=True)
+        ds.save("committing", path="./mike2")
+
+        later = opj(pardir, "later")
+        ds.repo.add(later, git=True)
+        ds.save("committing", path=later)
+
+    skip_v6(method='pass')(ok_clean_git)(dspath)
+
+
+# two subdatasets not possible in direct mode
+@known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
+def test_bf1886(path):
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
+    ok_clean_git(parent.path)
+    # create a symlink pointing down to the subdataset, and add it
+    os.symlink('sub', opj(parent.path, 'down'))
+    parent.add('down')
+    ok_clean_git(parent.path)
+    # now symlink pointing up
+    os.makedirs(opj(parent.path, 'subdir', 'subsubdir'))
+    os.symlink(opj(pardir, 'sub'), opj(parent.path, 'subdir', 'up'))
+    parent.add(opj('subdir', 'up'))
+    ok_clean_git(parent.path)
+    # now symlink pointing 2xup, as in #1886
+    os.symlink(opj(pardir, pardir, 'sub'), opj(parent.path, 'subdir', 'subsubdir', 'upup'))
+    parent.add(opj('subdir', 'subsubdir', 'upup'))
+    ok_clean_git(parent.path)
+    # simulatenously add a subds and a symlink pointing to it
+    # create subds, but don't register it
+    sub2 = create(opj(parent.path, 'sub2'))
+    os.symlink(
+        opj(pardir, pardir, 'sub2'),
+        opj(parent.path, 'subdir', 'subsubdir', 'upup2'))
+    parent.add(['sub2', opj('subdir', 'subsubdir', 'upup2')])
+    ok_clean_git(parent.path)
+    # full replication of #1886: the above but be in subdir of symlink
+    # with no reference dataset
+    sub3 = create(opj(parent.path, 'sub3'))
+    os.symlink(
+        opj(pardir, pardir, 'sub3'),
+        opj(parent.path, 'subdir', 'subsubdir', 'upup3'))
+    # need to use absolute paths
+    with chpwd(opj(parent.path, 'subdir', 'subsubdir')):
+        add([opj(parent.path, 'sub3'),
+             opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
+    # here is where we need to disagree with the repo in #1886
+    # we would not expect that `add` registers sub3 as a subdataset
+    # of parent, because no reference dataset was given and the
+    # command cannot decide (with the current semantics) whether
+    # it should "add anything in sub3 to sub3" or "add sub3 to whatever
+    # sub3 is in"
+    ok_clean_git(parent.path, untracked=['sub3/'])
+
+
+@with_tree({
+    '1': '',
+    '2': '',
+    '3': ''})
+def test_gh2043p1(path):
+    # this tests documents the interim agreement on what should happen
+    # in the case documented in gh-2043
+    ds = Dataset(path).create(force=True)
+    ds.add('1')
+    ok_clean_git(ds.path, untracked=['2', '3'])
+    ds.unlock('1')
+    ok_clean_git(ds.path, index_modified=['1'], untracked=['2', '3'])
+    # save(.) should recommit unlocked file, and not touch anything else
+    # this tests the second issue in #2043
+    with chpwd(path):
+        # only save modified bits by default
+        save('.')  #  because the first arg is the dataset
+    # state of the file (unlocked/locked) is committed as well, and the
+    # test doesn't lock the file again
+    skip_v6(method='pass')(ok_clean_git)(ds.path, untracked=['2', '3'])
+    with chpwd(path):
+        # but when a path is given, anything that matches this path
+        # untracked or not is added/saved
+        save(path='.')
+    # state of the file (unlocked/locked) is committed as well, and the
+    # test doesn't lock the file again
+    skip_v6(method='pass')(ok_clean_git)(ds.path)
+
+
+@with_tree({
+    'staged': 'staged',
+    'untracked': 'untracked'})
+def test_bf2043p2(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('staged', save=False)
+    ok_clean_git(ds.path, head_modified=['staged'], untracked=['untracked'])
+    # plain save does not commit untracked content
+    # this tests the second issue in #2043
+    with chpwd(path):
+        save()
+    ok_clean_git(ds.path, untracked=['untracked'])

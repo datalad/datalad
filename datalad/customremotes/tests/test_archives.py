@@ -34,13 +34,15 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
+@with_direct
 @with_tree(
     tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
           ('simple.txt', '123'),
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
 @with_tempfile()
-def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
+def test_basic_scenario(direct, d, d2):
+    fn_archive, fn_extracted = fn_archive_obscure, fn_extracted_obscure
     annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
@@ -154,15 +156,6 @@ def test_get_git_environ_adjusted():
     # test import of sys_env if no environment passed to function
     sys_env = gitrunner.get_git_environ_adjusted()
     assert_equal(sys_env["PWD"], os.environ.get("PWD"))
-
-
-def test_basic_scenario():
-    yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
-    if not on_windows:
-        yield check_basic_scenario, 'a.tar.gz', 'simple.txt', True
-    #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure, False
-    #yield check_basic_scenario, fn_archive_obscure, 'simple.txt', False
-    yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure, False
 
 
 def test_no_rdflib_loaded():

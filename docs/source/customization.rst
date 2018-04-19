@@ -36,7 +36,6 @@ overview of plugins included in this DataLad release.
 
    add_readme
    addurls
-   bids2scidata
    export_archive
    export_to_figshare
    extract_metadata
@@ -202,7 +201,7 @@ Writing your own extensions
 ===========================
 
 A good starting point for implementing a new extension is the "helloworld" demo extension
-available at https://github.com/datalad/datalad-module-template. This repository can be cloned
+available at https://github.com/datalad/datalad-extension-template. This repository can be cloned
 and adjusted to suit one's needs. It includes:
 
 - a basic Python package setup

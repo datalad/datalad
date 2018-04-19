@@ -236,7 +236,7 @@ class Add(Interface):
                 ap['type'] = 'dataset'
             if recursive and \
                     (ap.get('raw_input', False) or
-                     ap.get('state', None) in ('modified', 'untracked')) and \
+                     ap.get('state', None) in ('added', 'modified', 'untracked')) and \
                     (ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
                 # this was an actually requested input path, or a path that was found
                 # modified by path annotation, based on an input argument

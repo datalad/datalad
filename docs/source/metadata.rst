@@ -50,15 +50,6 @@ package to extract essential metadata from a range of audio file formats.  For
 the most common metadata properties a constrained vocabulary, based on the
 `Music Ontology <http://purl.org/ontology/mo/>`_ is employed.
 
-Brain Imaging Data Structure (``bids``)
----------------------------------------
-
-DataLad has basic support for extraction of metadata from the `BIDS
-<http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
-Support is focused on dataset-level metadata, and participant information.
-At present, there is no standardized vocabulary for BIDS, instead
-field names are based on the conventions in the standard description.
-
 datacite.org compliant datasets (``datacite``)
 ----------------------------------------------
 
@@ -152,15 +143,6 @@ The following fields are supported:
 Metadata keys used by this extractor are defined in DataLad's own constrained
 vocabulary.
 
-Digital Imaging and Communications in Medicine (``dicom``)
-----------------------------------------------------------
-
-Metadata can be extracted from any standard DICOM file. The extractor yields
-file-based metadata, and a dataset-level description that identifies individual
-image series. For each image series, all metadata are reported that are
-invariant across individual images in a series. The extractor uses an
-incomplete DICOM vocabulary from http://semantic-dicom.org
-
 Friction-less data packages (``frictionless_datapackage``)
 ----------------------------------------------------------
 
@@ -181,13 +163,6 @@ Various image/photo formats (``image``)
 Standard image metadata is extractor using the `Pillow package
 <https://github.com/python-pillow/Pillow>`_. Core metadata is available using
 an adhoc vocabulary defined by the extractor.
-
-Neuroimaging data exchange format (``nifti1``)
-----------------------------------------------
-
-NIfTI-1 metadata is extracted from the header of individual files. Virtually
-all header information is reported, except for header extensions.  An
-adhoc-vocabulary is used, as no standard vocabulary is available.
 
 Extensible Metadata Platform (``xmp``)
 --------------------------------------

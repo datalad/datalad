@@ -64,6 +64,10 @@ from . import _TEMP_PATHS_GENERATED
 _TEMP_PATHS_CLONES = set()
 
 
+# Additional indicators
+on_travis = bool(os.environ.get('TRAVIS', False))
+
+
 # additional shortcuts
 neq_ = assert_not_equal
 nok_ = assert_false
@@ -204,8 +208,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     Note
     ----
     Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only and are ignored otherwise!
-    Implementation is yet to do!
+    in pure git or indirect mode annex only. If they are given, no
+    test of modification of known repo content is performed.
 
     Parameters
     ----------
@@ -259,15 +263,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     if annex and r.is_direct_mode():
         if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not quite valid "
-                        "concepts in direct mode! Looking for any change "
-                        "(staged or not) instead.")
-            status = r.get_status(untracked=False, submodules=not ignore_submodules)
-            modified = []
-            for s in status:
-                modified.extend(status[s])
-            eq_(sorted(head_modified + index_modified),
-                sorted(f for f in modified))
+            lgr.warning("head_modified and index_modified are not supported "
+                        "for direct mode repositories!")
         else:
             ok_(not r.is_dirty(untracked_files=not untracked,
                                submodules=not ignore_submodules))
@@ -895,13 +892,30 @@ def skip_if_on_windows(func):
 
 
 @optional_args
-def skip_if(func, cond=True, msg=None):
+def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
+
+    Parameters
+    ----------
+    cond: bool
+      condition on which to skip
+    msg: str
+      message to print if skipping
+    method: str
+      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
+      just proceeding and simply not calling the decorated function.
+      This is particularly meant to be used, when decorating single assertions
+      in a test with method='pass' in order to not skip the entire test, but
+      just that assertion.
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
-            raise SkipTest(msg if msg else "condition was True")
+            if method == 'raise':
+                raise SkipTest(msg if msg else "condition was True")
+            elif method == 'pass':
+                print(msg if msg else "condition was True")
+                return
         return func(*args, **kwargs)
     return newfunc
 
@@ -948,7 +962,8 @@ def probe_known_failure(func):
     return newfunc
 
 
-def skip_known_failure(func):
+@optional_args
+def skip_known_failure(func, method='raise'):
     """Test decorator allowing to skip a test that is known to fail
 
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
@@ -957,7 +972,8 @@ def skip_known_failure(func):
     from datalad import cfg
 
     @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
-             msg="Skip test known to fail")
+             msg="Skip test known to fail",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -1028,7 +1044,8 @@ def known_failure_direct_mode(func):
 # ### ###
 
 
-def skip_v6(func):
+@optional_args
+def skip_v6(func, method='raise'):
     """Skips tests if datalad is configured to use v6 mode
     (DATALAD_REPO_VERSION=6)
     """
@@ -1036,14 +1053,15 @@ def skip_v6(func):
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
 
-def skip_direct_mode(func):
+@optional_args
+def skip_direct_mode(func, method='raise'):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
     """
@@ -1051,7 +1069,8 @@ def skip_direct_mode(func):
     from datalad import cfg
 
     @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run")
+             msg="Skip test in direct mode test run",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -1286,12 +1305,13 @@ def ignore_nose_capturing_stdout(func):
 
     @make_decorator(func)
     def newfunc(*args, **kwargs):
+        import io
         try:
             func(*args, **kwargs)
-        except AttributeError as e:
+        except (AttributeError, io.UnsupportedOperation) as e:
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
-            if message.find('StringIO') > -1 and message.find('fileno') > -1:
+            if re.search('^(.*StringIO.*)?fileno', message):
                 raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
@@ -1405,6 +1425,28 @@ def with_testsui(t, responses=None, interactive=True):
     return newfunc
 
 with_testsui.__test__ = False
+
+
+@optional_args
+def with_direct(func):
+    """To test functions under both direct and indirect mode
+
+    Unlike fancy generators would just fail on the first failure
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows or on_travis:
+            # since on windows would become indirect anyways
+            # on travis -- we have a dedicated matrix run
+            # which would select one or another based on config
+            # if we specify None
+            directs = [None]
+        else:
+            # otherwise we assume that we have to test both modes
+            directs = [True, False]
+        for direct in directs:
+            func(*(args + (direct,)), **kwargs)
+    return newfunc
 
 
 def assert_no_errors_logged(func, skip_re=None):

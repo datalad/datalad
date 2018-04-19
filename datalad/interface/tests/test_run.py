@@ -43,11 +43,13 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
+from datalad.tests.utils import slow
 
 
 @with_tempfile(mkdir=True)
@@ -108,6 +110,7 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@slow  # 17.1880s
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
@@ -520,6 +523,31 @@ def test_new_or_modified(path):
     assert_false(list(apfiles(new_or_modified(ds, "HEAD"))))
     eq_(set(apfiles(new_or_modified(ds, "HEAD~"))),
         {"to_modify", "d/to_modify"})
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_rerun_script(path):
+    ds = Dataset(path).create()
+    ds.run("echo a >foo")
+    ds.run("echo b >bar")
+
+    script_file = opj(path, "commands.sh")
+
+    ds.rerun(script=script_file)
+    ok_exists(script_file)
+    with open(script_file) as sf:
+        lines = sf.readlines()
+        assert_in("echo b >bar\n", lines)
+        assert_not_in("echo a >foo\n", lines)
+
+    ds.rerun(since="", script=script_file)
+    with open(script_file) as sf:
+        lines = sf.readlines()
+        assert_in("echo b >bar\n", lines)
+        assert_in("echo a >foo\n", lines)
 
 
 @with_tempfile(mkdir=True)

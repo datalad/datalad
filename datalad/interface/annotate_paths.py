@@ -20,6 +20,7 @@ from os import curdir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
+from os.path import islink
 from os.path import dirname
 from os.path import pardir
 from os.path import normpath
@@ -590,9 +591,9 @@ class AnnotatePaths(Interface):
                 path_props['type'] = \
                     path_props.get(
                         'type',
-                        'dataset' if GitRepo.is_valid_repo(path) else 'directory')
+                        'dataset' if not islink(path) and GitRepo.is_valid_repo(path) else 'directory')
                 # this could contain all types of additional content
-                containing_dir = path
+                containing_dir = path if not islink(path) else normpath(opj(path, pardir))
             else:
                 if lexists(path):
                     path_props['type'] = 'file'

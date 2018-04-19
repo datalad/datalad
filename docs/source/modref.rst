@@ -49,6 +49,18 @@ Metadata handling
    api.aggregate_metadata
    api.search
 
+
+Reproducible execution
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.run
+   api.rerun
+
+
 Plumbing commands
 -----------------
 
@@ -91,7 +103,6 @@ with DataLad.
 
    add_readme
    addurls
-   bids2scidata
    export_archive
    export_to_figshare
    extract_metadata
