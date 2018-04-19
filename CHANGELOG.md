@@ -22,6 +22,8 @@ This release is a major leap forward in metadata support.
   - Metadata extractor types are no longer auto-guessed and must be
     explicitly specified in `datalad.metadata.nativetype` config
     (could contain multiple values)
+  - Neuroimaging metadata support has been moved into a dedicated extenson:
+    https://github.com/datalad/datalad-neuroimaging
 - `export_tarball` plugin has been generalized to `export_archive` and
   can now also generate ZIP archives.
 
@@ -33,8 +35,8 @@ A number of fixes did not make it into 0.9.x series:
 
 ### Enhancements and new features
 
-- Reduced startup latency by only importing commands necessary for a particular
-  command line call.
+- Support for DataLad extension that can contribute API components from 3rd-party sources,
+  incl. commands, metadata extractors, and test case implementations
 - Metadata (everything has changed!)
   - Metadata extraction and aggregation is now supported for datasets and individual
     files.
@@ -52,11 +54,19 @@ A number of fixes did not make it into 0.9.x series:
   - New configuration option `datalad.metadata.store-aggregate-content` to enable
     the storage of aggregated metadata for dataset content (i.e. file-based metadata)
     in contrast to just metadata describing a dataset as a whole.
-- `search` was completely reimplemented
+- `search` was completely reimplemented, it offer three different modes now:
+  - 'egrep' (default): expression matching in a plain string version of metadata
+  - 'textblob': search a text version of all metadata using a fully featured
+     query language (fast indexing, good for keyword search)
+  - 'autofield': search an auto-generated index that preserves individual fields
+     of metadata that can be represented in a tabular structure (substantial
+     indexing cost, enables the most detailed queries of all modes)
 - New plugins:
   - export_to_figshare
   - extract_metadata
 - add_readme makes use of available metadata
+- Reduced startup latency by only importing commands necessary for a particular
+  command line call.
 
 ## 0.9.4 (??? ??, 2018) -- will be better than ever
 
