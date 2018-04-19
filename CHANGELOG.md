@@ -61,12 +61,24 @@ A number of fixes did not make it into the 0.9.x series:
   - 'autofield': search an auto-generated index that preserves individual fields
      of metadata that can be represented in a tabular structure (substantial
      indexing cost, enables the most detailed queries of all modes)
-- New plugins:
+- New extensions:
+  - addurls, an extension for creating a dataset (and possibly subdatasets)
+    from a list of URLs.
   - export_to_figshare
   - extract_metadata
 - add_readme makes use of available metadata
+- By default the wtf extension now hides sensitive information, which can be
+  included in the output by passing `--senstive=some` or `--senstive=all`.
 - Reduced startup latency by only importing commands necessary for a particular
   command line call.
+- `datalad create -d <parent> --nosave` now registers subdatasets, when possible.
+- `datalad run` now provides a way for the caller to save the result when a
+  command has a non-zero exit status.
+- `datalad rerun` now has a `--script` option that can be used to extract
+  previous commands into a file.
+- A DataLad Singularity container is now available on
+  [Singularity Hub](https://singularity-hub.org/collections/667).
+- More casts have been embedded in the [use case section of the documentation](http://docs.datalad.org/en/docs/usecases/index.html).
 
 ## 0.9.4 (??? ??, 2018) -- will be better than ever
 
