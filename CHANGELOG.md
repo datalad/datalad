@@ -22,14 +22,14 @@ This release is a major leap forward in metadata support.
   - Metadata extractor types are no longer auto-guessed and must be
     explicitly specified in `datalad.metadata.nativetype` config
     (could contain multiple values)
-  - Neuroimaging metadata support has been moved into a dedicated extenson:
+  - Neuroimaging metadata support has been moved into a dedicated extension:
     https://github.com/datalad/datalad-neuroimaging
 - `export_tarball` plugin has been generalized to `export_archive` and
   can now also generate ZIP archives.
 
 ### Fixes
 
-A number of fixes did not make it into 0.9.x series:
+A number of fixes did not make it into the 0.9.x series:
 
 - Dynamic configuration overrides via the `-c` option were not in effect.
 
@@ -48,13 +48,13 @@ A number of fixes did not make it into 0.9.x series:
     `metadata --get-aggregates`
   - New configuration option `datalad.metadata.maxfieldsize` to exclude too large
     metadata fields from aggregation.
-  - Metadata extraction does not longer guess the type of metadata. A new
+  - The type of metadata is no longer guessed during metadata extraction. A new
     configuration option `datalad.metadata.nativetype` was introduced to enable
     one or more particular metadata extractors for a dataset.
   - New configuration option `datalad.metadata.store-aggregate-content` to enable
     the storage of aggregated metadata for dataset content (i.e. file-based metadata)
     in contrast to just metadata describing a dataset as a whole.
-- `search` was completely reimplemented, it offer three different modes now:
+- `search` was completely reimplemented. It offers three different modes now:
   - 'egrep' (default): expression matching in a plain string version of metadata
   - 'textblob': search a text version of all metadata using a fully featured
      query language (fast indexing, good for keyword search)
