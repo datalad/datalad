@@ -189,21 +189,23 @@ class Rerun(Interface):
                 message="cannot rerun history with merge commits")
             return
 
-        def revision_with_info(rev):
-            record = {"hexsha": rev}
-            subj, info = get_commit_runinfo(ds.repo, rev)
+        revs = [{"hexsha": hexsha,
+                 "message": ds.repo.repo.git.show(
+                     hexsha, "--format=%B", "--no-patch")}
+                for hexsha in ds.repo.repo.git.rev_list(
+                        "--reverse", revrange, "--").split()]
+
+        for rev in revs:
+            try:
+                subj, info = get_run_info(rev["message"])
+            except ValueError as exc:
+                yield dict(err_info, status='error',
+                           message="Error on {}'s message: {}".format(
+                               rev["hexsha"], exc_str(exc)))
+                return
             if info is not None:
-                record["run_subject"] = subj
-                record["run_info"] = info
-            return record
-
-        ids = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
-
-        try:
-            revs = list(map(revision_with_info, ids))
-        except ValueError as exc:
-            yield dict(err_info, status='error', message=exc_str(exc))
-            return
+                rev["run_info"] = info
+                rev["run_subject"] = subj
 
         if since is not None and since.strip() == "":
             # For --since='', drop any leading commits that don't have
@@ -300,17 +302,26 @@ class Rerun(Interface):
                     yield r
 
 
-def get_commit_runinfo(repo, commit="HEAD"):
-    """Return message and run record from a commit message
+def get_run_info(message):
+    """Extract run information from `message`
 
-    If none found - returns None, None; if anything goes wrong - throws
-    ValueError with the message describing the issue
+    Parameters
+    ----------
+    message : str
+        A commit message.
+
+    Returns
+    -------
+    A tuple with the command's subject line and a dict with run information.
+    Both these values are None if `message` doesn't have a run command.
+
+    Raises
+    ------
+    A ValueError if the information in `message` is invalid.
     """
-    commit_msg = repo.repo.git.show(commit, "--format=%B", "--no-patch")
     cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
-    runinfo = re.match(cmdrun_regex, commit_msg,
-                       re.MULTILINE | re.DOTALL)
+    runinfo = re.match(cmdrun_regex, message, re.MULTILINE | re.DOTALL)
     if not runinfo:
         return None, None
 
@@ -324,9 +335,7 @@ def get_commit_runinfo(repo, commit="HEAD"):
             '%s' % exc_str(e)
         )
     if 'cmd' not in runinfo:
-        raise ValueError(
-            "{} looks like a run commit but does not have a command".format(
-                repo.repo.git.rev_parse("--short", commit)))
+        raise ValueError("Looks like a run commit but does not have a command")
     return rec_subj, runinfo
 
 

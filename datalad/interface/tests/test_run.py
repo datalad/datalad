@@ -31,8 +31,9 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
-from datalad.interface.rerun import get_commit_runinfo, new_or_modified
+from datalad.interface.rerun import get_run_info, new_or_modified
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
@@ -240,11 +241,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_commit_runinfo(ds.repo, "HEAD")
+        _, info = get_run_info(ds.repo.repo.head.commit.message)
         assert info["chain"] == commits
 
     ds.rerun(revision="first-run")
-    _, info = get_commit_runinfo(ds.repo, "HEAD")
+    _, info = get_run_info(ds.repo.repo.head.commit.message)
     assert info["chain"] == commits[:1]
 
 
@@ -454,7 +455,7 @@ def test_rerun_subdir(path):
         run("touch test.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
-    rec_msg, runinfo = get_commit_runinfo(ds.repo)
+    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -469,7 +470,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
-    rec_msg, runinfo = get_commit_runinfo(ds.repo)
+    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -550,10 +551,10 @@ def test_rerun_script(path):
         assert_in("echo a >foo\n", lines)
 
 
-@with_tempfile(mkdir=True)
-def test_rerun_commit_message_check(path):
-    ds = Dataset(path).create()
-    ds.repo.commit(options=["--allow-empty"], msg="""\
+def test_rerun_commit_message_check():
+    assert_raises(ValueError,
+                  get_run_info,
+                  """\
 [DATALAD RUNCMD] no command
 
 === Do not change lines below ===
@@ -563,7 +564,9 @@ def test_rerun_commit_message_check(path):
 }
 ^^^ Do not change lines above ^^^""")
 
-    ds.repo.commit(options=["--allow-empty"], msg="""\
+    assert_raises(ValueError,
+                  get_run_info,
+                  """\
 [DATALAD RUNCMD] junk json
 
 === Do not change lines below ===
@@ -574,7 +577,7 @@ def test_rerun_commit_message_check(path):
 }
 ^^^ Do not change lines above ^^^""")
 
-    ds.repo.commit(options=["--allow-empty"], msg="""\
+    subject, info = get_run_info("""\
 [DATALAD RUNCMD] fine
 
 === Do not change lines below ===
@@ -584,10 +587,6 @@ def test_rerun_commit_message_check(path):
  "exit": 0
 }
 ^^^ Do not change lines above ^^^""")
-
-    assert_raises(ValueError,
-                  get_commit_runinfo, ds.repo, "HEAD~2")
-    assert_raises(ValueError,
-                  get_commit_runinfo, ds.repo, "HEAD~")
-
-    get_commit_runinfo(ds.repo, "HEAD")
+    eq_(subject, "fine\n\n")
+    assert_dict_equal(info,
+                      {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
