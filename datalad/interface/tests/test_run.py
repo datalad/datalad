@@ -22,6 +22,9 @@ from datalad.tests.utils import (
 from os.path import join as opj
 from os.path import relpath
 from os import mkdir
+from six.moves import StringIO
+from mock import patch
+
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
@@ -549,6 +552,12 @@ def test_rerun_script(path):
         lines = sf.readlines()
         assert_in("echo b >bar\n", lines)
         assert_in("echo a >foo\n", lines)
+
+    # --script=- writes to stdout.
+    with patch("sys.stdout", new_callable=StringIO) as cmout:
+        ds.rerun(script="-")
+        assert_in("echo b >bar",
+                  cmout.getvalue().splitlines())
 
 
 def test_rerun_commit_message_check():
