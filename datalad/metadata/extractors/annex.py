@@ -37,7 +37,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             log_progress(
                 lgr.info,
                 'extractorannex',
-                'Done annex metadata extraction from %s', self.ds
+                'Finished annex metadata extraction from %s', self.ds
             )
             return
 
@@ -61,5 +61,5 @@ class MetadataExtractor(BaseMetadataExtractor):
         log_progress(
             lgr.info,
             'extractorannex',
-            'Done annex metadata extraction from %s', self.ds
+            'Finished annex metadata extraction from %s', self.ds
         )

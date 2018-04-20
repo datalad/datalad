@@ -99,7 +99,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         log_progress(
             lgr.info,
             'extractorxmp',
-            'Done XMP metadata extraction from %s', self.ds
+            'Finished XMP metadata extraction from %s', self.ds
         )
         return {
             '@context': context,

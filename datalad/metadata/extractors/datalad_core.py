@@ -92,7 +92,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             log_progress(
                 lgr.info,
                 'extractordataladcore',
-                'Done core metadata extraction from %s', self.ds
+                'Finished core metadata extraction from %s', self.ds
             )
             return
         valid_paths = None
@@ -122,5 +122,5 @@ class MetadataExtractor(BaseMetadataExtractor):
         log_progress(
             lgr.info,
             'extractordataladcore',
-            'Done core metadata extraction from %s', self.ds
+            'Finished core metadata extraction from %s', self.ds
         )
