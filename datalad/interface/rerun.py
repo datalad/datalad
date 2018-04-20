@@ -303,7 +303,7 @@ def get_commit_runinfo(repo, commit="HEAD"):
     If none found - returns None, None; if anything goes wrong - throws
     ValueError with the message describing the issue
     """
-    commit_msg = repo.repo.git.show(commit, "--format=%s%n%n%b", "--no-patch")
+    commit_msg = repo.repo.git.show(commit, "--format=%B", "--no-patch")
     cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
     runinfo = re.match(cmdrun_regex, commit_msg,
