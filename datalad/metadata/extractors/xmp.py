@@ -15,6 +15,7 @@ import re
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.xmp')
+from datalad.log import log_progress
 
 from libxmp.utils import file_to_dict
 from datalad.metadata.definitions import vocabulary_id
@@ -31,8 +32,23 @@ class MetadataExtractor(BaseMetadataExtractor):
             return {}, []
         context = {}
         contentmeta = []
+        log_progress(
+            lgr.info,
+            'extractorxmp',
+            'Start XMP metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='XMP metadata extraction',
+            unit=' Files',
+        )
         for f in self.paths:
-            info = file_to_dict(opj(self.ds.path, f))
+            absfp = opj(self.ds.path, f)
+            log_progress(
+                lgr.info,
+                'extractorxmp',
+                'Extract XMP metadata from %s', absfp,
+                update=1,
+                increment=True)
+            info = file_to_dict(absfp)
             if not info:
                 # got nothing, likely nothing there
                 # TODO check if this is an XMP sidecar file, parse that, and assign metadata
@@ -80,6 +96,11 @@ class MetadataExtractor(BaseMetadataExtractor):
 
             contentmeta.append((f, meta))
 
+        log_progress(
+            lgr.info,
+            'extractorxmp',
+            'Finished XMP metadata extraction from %s', self.ds
+        )
         return {
             '@context': context,
         }, \

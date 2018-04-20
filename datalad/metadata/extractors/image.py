@@ -11,6 +11,7 @@
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.image')
+from datalad.log import log_progress
 
 from PIL import Image
 from datalad.metadata.extractors.base import BaseMetadataExtractor
@@ -57,13 +58,27 @@ class MetadataExtractor(BaseMetadataExtractor):
         if not content:
             return {}, []
         contentmeta = []
+        log_progress(
+            lgr.info,
+            'extractorimage',
+            'Start image metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='image metadata extraction',
+            unit=' Files',
+        )
         for f in self.paths:
-            fpath = opj(self.ds.path, f)
+            absfp = opj(self.ds.path, f)
+            log_progress(
+                lgr.info,
+                'extractorimage',
+                'Extract image metadata from %s', absfp,
+                update=1,
+                increment=True)
             try:
-                img = Image.open(fpath)
+                img = Image.open(absfp)
             except Exception as e:
                 lgr.debug("Image metadata extractor failed to load %s: %s",
-                          fpath, exc_str(e))
+                          absfp, exc_str(e))
                 continue
             meta = {
                 'type': 'dctype:Image',
@@ -76,6 +91,11 @@ class MetadataExtractor(BaseMetadataExtractor):
                     if not (hasattr(v, '__len__') and not len(v))}
             contentmeta.append((f, meta))
 
+        log_progress(
+            lgr.info,
+            'extractorimage',
+            'Finished image metadata extraction from %s', self.ds
+        )
         return {
             '@context': vocabulary,
         }, \
