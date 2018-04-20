@@ -336,7 +336,7 @@ def get_run_info(message):
         )
     if 'cmd' not in runinfo:
         raise ValueError("Looks like a run commit but does not have a command")
-    return rec_subj, runinfo
+    return rec_subj.rstrip(), runinfo
 
 
 def new_or_modified(dataset, revision="HEAD"):

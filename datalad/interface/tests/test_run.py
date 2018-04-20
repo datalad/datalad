@@ -587,6 +587,6 @@ def test_rerun_commit_message_check():
  "exit": 0
 }
 ^^^ Do not change lines above ^^^""")
-    eq_(subject, "fine\n\n")
+    eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
