@@ -12,7 +12,6 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from collections import namedtuple
 from itertools import dropwhile
 import json
 import re
@@ -190,11 +189,13 @@ class Rerun(Interface):
                 message="cannot rerun history with merge commits")
             return
 
-        Revision = namedtuple("Revision", ["id", "message", "info"])
-
         def revision_with_info(rev):
+            record = {"hexsha": rev}
             msg, info = get_commit_runinfo(ds.repo, rev)
-            return Revision(rev, msg, info)
+            if info is not None:
+                record["run_message"] = msg
+                record["run_info"] = info
+            return record
 
         ids = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
 
@@ -207,10 +208,10 @@ class Rerun(Interface):
         if since is not None and since.strip() == "":
             # For --since='', drop any leading commits that don't have
             # a run command.
-            revs = list(dropwhile(lambda r: r.info is None, revs))
+            revs = list(dropwhile(lambda r: "run_info" not in r, revs))
 
         if script:
-            commands = (r.info["cmd"] for r in revs if r.info is not None)
+            commands = (r["run_info"]["cmd"] for r in revs if "run_info" in r)
             with open(script, 'w') as ofh:
                 header = """\
 #!/bin/sh
@@ -237,7 +238,7 @@ class Rerun(Interface):
                 # contains merges, we know that, regardless of if and how
                 # --since is specified, the effective value for --since is
                 # the parent of the first revision.
-                onto = revs[0].id + "^"
+                onto = revs[0]["hexsha"] + "^"
                 if not commit_exists(ds, onto):
                     # This is unlikely to happen in the wild because it
                     # means that the first commit is a datalad run commit.
@@ -257,43 +258,45 @@ class Rerun(Interface):
                 ds.repo.checkout(start_point, options=checkout_options)
 
             for rev in revs:
-                if not rev.info:
+                hexsha = rev["hexsha"]
+                if "run_info" not in rev:
                     pick = False
                     try:
                         ds.repo.repo.git.merge_base("--is-ancestor",
-                                                    rev.id, "HEAD")
+                                                    hexsha, "HEAD")
                     except GitCommandError:
                         # Revision is NOT an ancestor of HEAD.
                         pick = True
 
-                    shortrev = ds.repo.repo.git.rev_parse("--short", rev.id)
+                    shortrev = ds.repo.repo.git.rev_parse("--short", hexsha)
                     err_msg = "no command for {} found; {}".format(
                         shortrev,
                         "cherry picking" if pick else "skipping")
                     yield dict(err_info, status='ok', message=err_msg)
 
                     if pick:
-                        ds.repo.repo.git.cherry_pick(rev.id)
+                        ds.repo.repo.git.cherry_pick(hexsha)
                     continue
 
+                run_info = rev["run_info"]
                 # Keep a "rerun" trail.
-                if "chain" in rev.info:
-                    rev.info["chain"].append(rev.id)
+                if "chain" in run_info:
+                    run_info["chain"].append(hexsha)
                 else:
-                    rev.info["chain"] = [rev.id]
+                    run_info["chain"] = [hexsha]
 
                 # now we have to find out what was modified during the
                 # last run, and enable re-modification ideally, we would
                 # bring back the entire state of the tree with #1424, but
                 # we limit ourself to file addition/not-in-place-modification
                 # for now
-                for r in ds.unlock(new_or_modified(ds, rev.id),
+                for r in ds.unlock(new_or_modified(ds, hexsha),
                                    return_type='generator', result_xfm=None):
                     yield r
 
-                for r in run_command(rev.info['cmd'],
-                                     ds, message or rev.message,
-                                     rerun_info=rev.info):
+                for r in run_command(run_info['cmd'],
+                                     ds, message or rev["run_message"],
+                                     rerun_info=run_info):
                     yield r
 
 
