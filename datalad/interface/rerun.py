@@ -191,9 +191,9 @@ class Rerun(Interface):
 
         def revision_with_info(rev):
             record = {"hexsha": rev}
-            msg, info = get_commit_runinfo(ds.repo, rev)
+            subj, info = get_commit_runinfo(ds.repo, rev)
             if info is not None:
-                record["run_message"] = msg
+                record["run_subject"] = subj
                 record["run_info"] = info
             return record
 
@@ -295,7 +295,7 @@ class Rerun(Interface):
                     yield r
 
                 for r in run_command(run_info['cmd'],
-                                     ds, message or rev["run_message"],
+                                     ds, message or rev["run_subject"],
                                      rerun_info=run_info):
                     yield r
 
@@ -314,7 +314,7 @@ def get_commit_runinfo(repo, commit="HEAD"):
     if not runinfo:
         return None, None
 
-    rec_msg, runinfo = runinfo.groups()
+    rec_subj, runinfo = runinfo.groups()
 
     try:
         runinfo = json.loads(runinfo)
@@ -327,7 +327,7 @@ def get_commit_runinfo(repo, commit="HEAD"):
         raise ValueError(
             "{} looks like a run commit but does not have a command".format(
                 repo.repo.git.rev_parse("--short", commit)))
-    return rec_msg, runinfo
+    return rec_subj, runinfo
 
 
 def new_or_modified(dataset, revision="HEAD"):
