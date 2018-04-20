@@ -214,7 +214,6 @@ class Rerun(Interface):
             revs = list(dropwhile(lambda r: "run_info" not in r, revs))
 
         if script:
-            commands = (r["run_info"]["cmd"] for r in revs if "run_info" in r)
             ofh = sys.stdout if script.strip() == "-" else open(script, "w")
             header = """\
 #!/bin/sh
@@ -223,14 +222,22 @@ class Rerun(Interface):
 #
 #   datalad rerun --script={script}{since} {revision}
 #
-# in {path}\n\n"""
+# in {path}\n"""
             ofh.write(header.format(
                 script=script,
                 since="" if since is None else " --since=" + since,
                 revision=ds.repo.repo.git.rev_parse(revision),
                 path=ds.path))
 
-            for cmd in commands:
+            for rev in revs:
+                if "run_info" not in rev:
+                    continue
+
+                ofh.write(
+                    "\n" + "".join("# " + ln
+                                   for ln in rev["message"].splitlines(True)))
+
+                cmd = rev["run_info"]["cmd"]
                 if isinstance(cmd, list):
                     cmd = " ".join(cmd)
                 ofh.write(cmd + "\n")
