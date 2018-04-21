@@ -537,6 +537,7 @@ def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo", message='FOO')
     ds.run("echo b >bar", message='BAR')
+    bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")
 
@@ -547,6 +548,7 @@ def test_rerun_script(path):
         assert_in("echo b >bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
+        assert_in("# (record: {})\n".format(bar_hexsha), lines)
         assert_not_in("echo a >foo\n", lines)
 
     ds.rerun(since="", script=script_file)

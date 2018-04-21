@@ -247,6 +247,9 @@ class Rerun(Interface):
                 ofh.write(
                     "\n" + "".join("# " + ln
                                    for ln in msg.splitlines(True)))
+                commit_descr = ds.repo.describe(rev['hexsha'])
+                ofh.write('# (record: {})\n'.format(
+                    commit_descr if commit_descr else rev['hexsha']))
 
                 if isinstance(cmd, list):
                     cmd = " ".join(cmd)
