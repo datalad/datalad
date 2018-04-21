@@ -236,17 +236,13 @@ class Rerun(Interface):
                     continue
 
                 cmd = rev["run_info"]["cmd"]
-                msg = rev['message']
-                # cut json record
-                msg = msg[:msg.find('\n=== Do not change lines below ===\n')]
-                # cut RUN message marker
-                if msg.startswith('[DATALAD RUNCMD]'):
-                    msg = msg[16:].lstrip()
-                if msg.strip() == _format_cmd_shorty(cmd):
+                msg = rev["run_message"]
+                if msg == _format_cmd_shorty(cmd):
                     msg = ''
                 ofh.write(
                     "\n" + "".join("# " + ln
-                                   for ln in msg.splitlines(True)))
+                                   for ln in msg.splitlines(True)) +
+                    "\n")
                 commit_descr = ds.repo.describe(rev['hexsha'])
                 ofh.write('# (record: {})\n'.format(
                     commit_descr if commit_descr else rev['hexsha']))
