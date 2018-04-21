@@ -199,7 +199,7 @@ class Rerun(Interface):
 
         for rev in revs:
             try:
-                subj, info = get_run_info(rev["message"])
+                msg, info = get_run_info(rev["message"])
             except ValueError as exc:
                 yield dict(err_info, status='error',
                            message="Error on {}'s message: {}".format(
@@ -207,7 +207,7 @@ class Rerun(Interface):
                 return
             if info is not None:
                 rev["run_info"] = info
-                rev["run_subject"] = subj
+                rev["run_message"] = msg
 
         if since is not None and since.strip() == "":
             # For --since='', drop any leading commits that don't have
@@ -320,7 +320,7 @@ class Rerun(Interface):
                     yield r
 
                 for r in run_command(run_info['cmd'],
-                                     ds, message or rev["run_subject"],
+                                     ds, message or rev["run_message"],
                                      rerun_info=run_info):
                     yield r
 
@@ -335,8 +335,8 @@ def get_run_info(message):
 
     Returns
     -------
-    A tuple with the command's subject line and a dict with run information.
-    Both these values are None if `message` doesn't have a run command.
+    A tuple with the command's message and a dict with run information. Both
+    these values are None if `message` doesn't have a run command.
 
     Raises
     ------
@@ -348,7 +348,7 @@ def get_run_info(message):
     if not runinfo:
         return None, None
 
-    rec_subj, runinfo = runinfo.groups()
+    rec_msg, runinfo = runinfo.groups()
 
     try:
         runinfo = json.loads(runinfo)
@@ -359,7 +359,7 @@ def get_run_info(message):
         )
     if 'cmd' not in runinfo:
         raise ValueError("Looks like a run commit but does not have a command")
-    return rec_subj.rstrip(), runinfo
+    return rec_msg.rstrip(), runinfo
 
 
 def new_or_modified(dataset, revision="HEAD"):
