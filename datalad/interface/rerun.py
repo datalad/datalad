@@ -233,9 +233,15 @@ class Rerun(Interface):
                 if "run_info" not in rev:
                     continue
 
+                msg = rev['message']
+                # cut json record
+                msg = msg[:msg.find('\n=== Do not change lines below ===\n')]
+                # cut RUN message marker
+                if msg.startswith('[DATALAD RUNCMD]'):
+                    msg = msg[16:].lstrip()
                 ofh.write(
                     "\n" + "".join("# " + ln
-                                   for ln in rev["message"].splitlines(True)))
+                                   for ln in msg.splitlines(True)))
 
                 cmd = rev["run_info"]["cmd"]
                 if isinstance(cmd, list):

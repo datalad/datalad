@@ -546,7 +546,7 @@ def test_rerun_script(path):
         lines = sf.readlines()
         assert_in("echo b >bar\n", lines)
         # The commit message is there too.
-        assert_in("# [DATALAD RUNCMD] echo b >bar\n", lines)
+        assert_in("# echo b >bar\n", lines)
         assert_not_in("echo a >foo\n", lines)
 
     ds.rerun(since="", script=script_file)
