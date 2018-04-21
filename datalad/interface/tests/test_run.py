@@ -535,8 +535,8 @@ def test_new_or_modified(path):
 @known_failure_direct_mode  #FIXME
 def test_rerun_script(path):
     ds = Dataset(path).create()
-    ds.run("echo a >foo")
-    ds.run("echo b >bar")
+    ds.run("echo a >foo", message='FOO')
+    ds.run("echo b >bar", message='BAR')
 
     script_file = opj(path, "commands.sh")
 
@@ -546,7 +546,7 @@ def test_rerun_script(path):
         lines = sf.readlines()
         assert_in("echo b >bar\n", lines)
         # The commit message is there too.
-        assert_in("# echo b >bar\n", lines)
+        assert_in("# BAR\n", lines)
         assert_not_in("echo a >foo\n", lines)
 
     ds.rerun(since="", script=script_file)

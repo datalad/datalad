@@ -25,6 +25,7 @@ from datalad.interface.diff import Diff
 from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
+from datalad.interface.run import _format_cmd_shorty
 
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
@@ -234,17 +235,19 @@ class Rerun(Interface):
                 if "run_info" not in rev:
                     continue
 
+                cmd = rev["run_info"]["cmd"]
                 msg = rev['message']
                 # cut json record
                 msg = msg[:msg.find('\n=== Do not change lines below ===\n')]
                 # cut RUN message marker
                 if msg.startswith('[DATALAD RUNCMD]'):
                     msg = msg[16:].lstrip()
+                if msg.strip() == _format_cmd_shorty(cmd):
+                    msg = ''
                 ofh.write(
                     "\n" + "".join("# " + ln
                                    for ln in msg.splitlines(True)))
 
-                cmd = rev["run_info"]["cmd"]
                 if isinstance(cmd, list):
                     cmd = " ".join(cmd)
                 ofh.write(cmd + "\n")
