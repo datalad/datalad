@@ -222,11 +222,12 @@ class Rerun(Interface):
 #
 #   datalad rerun --script={script}{since} {revision}
 #
-# in {path}\n"""
+# in {ds}{path}\n"""
             ofh.write(header.format(
                 script=script,
                 since="" if since is None else " --since=" + since,
                 revision=ds.repo.repo.git.rev_parse(revision),
+                ds='dataset {} at '.format(ds.id) if ds.id else '',
                 path=ds.path))
 
             for rev in revs:
