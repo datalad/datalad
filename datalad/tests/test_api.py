@@ -25,7 +25,7 @@ def test_basic_setup():
     # random pick of something that should be there
     assert_true(hasattr(api, 'install'))
     assert_true(hasattr(api, 'test'))
-    assert_true(hasattr(api, 'crawl'))
+    assert_true(hasattr(api, 'create'))
     # make sure all helper utilities do not pollute the namespace
     # and we end up only with __...__ attributes
     assert_false(list(filter(lambda s: s.startswith('_') and not re.match('__.*__', s), dir(api))))

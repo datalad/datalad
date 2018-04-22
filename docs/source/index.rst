@@ -32,14 +32,6 @@ Commands and API
    modref
    config
 
-Automated data distributions
-============================
-
-.. toctree::
-   :maxdepth: 2
-
-   crawler/index
-
 Extension modules
 =================
 
