@@ -267,8 +267,12 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             lgr.warning("head_modified and index_modified are not supported "
                         "for direct mode repositories!")
         else:
-            ok_(not r.is_dirty(untracked_files=not untracked,
-                               submodules=not ignore_submodules))
+            test_untracked = not untracked
+            test_submodules = not ignore_submodules
+            ok_(not r.is_dirty(untracked_files=test_untracked,
+                               submodules=test_submodules),
+                msg="Repo unexpectly dirty (tested for: untracked({}), submodules({})".format(
+                    test_untracked, test_submodules))
     else:
         repo = r.repo
 

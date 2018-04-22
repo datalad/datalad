@@ -1,0 +1,57 @@
+build: false
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+
+init:
+  - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH% %MINICONDA%"
+  # this will display login RDP info for the build VM, but if the build VM should block
+  # see on_finish below instead
+  #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  #- "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy matplotlib pytest pandas"
+  - "conda create -q -n test-environment python=%PYTHON_VERSION%"
+  - activate test-environment
+  - mkdir resources
+  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  # extract git annex into the system Git installation path
+  - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  # info on how python is ticking
+  - python -c "import sys; print(sys.path)"
+  # when something works we can go full
+  #- pip install -e ".[full]"
+  - pip install "."
+  # fixup
+  # ATM datalad does not pull in colorama, which is needed for color output
+  # on windows
+  - pip install colorama
+
+test_script:
+  # establish baseline, if annex doesn't work, we are not even trying
+  #- git annex test
+  # run tests on installed module, not source tree files
+  - mkdir -p __testhome__
+  - cd __testhome__
+  # report basic info
+  - git version
+  - git annex version
+  # first sign of life
+  - datalad wtf
+  # and now this...
+  #- python -m nose -s -v datalad.distribution.tests.test_create
+
+#after_test:
+#  - bash <(curl -s https://codecov.io/bash)
+
+on_finish:
+  # enable the next to let the build VM block for up to 60min to log in via RDP and debug
+  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
