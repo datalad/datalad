@@ -41,6 +41,15 @@ from datalad.utils import getpwd
 lgr = logging.getLogger('datalad.interface.run')
 
 
+def _format_cmd_shorty(cmd):
+    """Get short string representation from a cmd argument list"""
+    cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
+    cmd_shorty = '{}{}'.format(
+        cmd_shorty[:40],
+        '...' if len(cmd_shorty) > 40 else '')
+    return cmd_shorty
+
+
 @build_doc
 class Run(Interface):
     """Run an arbitrary command and record its impact on a dataset.
@@ -198,12 +207,8 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
         run_info['pwd'] = rel_pwd
 
     # compose commit message
-    cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = '{}{}'.format(
-        cmd_shorty[:40],
-        '...' if len(cmd_shorty) > 40 else '')
     msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
-        message if message is not None else cmd_shorty,
+        message if message is not None else _format_cmd_shorty(cmd),
         json.dumps(run_info, indent=1), sort_keys=True, ensure_ascii=False, encoding='utf-8')
 
     if not rerun_info and cmd_exitcode:
