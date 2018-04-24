@@ -477,7 +477,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 
 
 @optional_args
-def progress(fn, label="Total", unit=" Files"):
+def with_result_progress(fn, label="Total", unit=" Files"):
     """Wrap a progress bar, with status counts, around a function.
 
     Parameters
@@ -540,7 +540,7 @@ def progress(fn, label="Total", unit=" Files"):
     return wrapped
 
 
-@progress("Adding URLs")
+@with_result_progress("Adding URLs")
 def add_urls(rows, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
@@ -582,7 +582,7 @@ def add_urls(rows, ifexists=None, options=None):
                                   status="ok")
 
 
-@progress("Adding metadata")
+@with_result_progress("Adding metadata")
 def add_meta(rows):
     """Call `git annex metadata --set` using information in `rows`.
     """
