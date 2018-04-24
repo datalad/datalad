@@ -56,6 +56,7 @@ from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 
 
+from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.metadata')
 
 aggregate_layout_version = 1
@@ -436,11 +437,30 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
     extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
-    lgr.info('Engage metadata extractors: %s', types)
+
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Start metadata extraction from %s', ds,
+        total=len(types),
+        label='Metadata extraction',
+        unit=' extractors',
+    )
     for mtype in types:
         mtype_key = mtype
+        log_progress(
+            lgr.info,
+            'metadataextractors',
+            'Engage %s metadata extractor', mtype_key,
+            update=1,
+            increment=True)
         if mtype_key not in extractors:
             # we said that we want to fail, rather then just moan about less metadata
+            log_progress(
+                lgr.error,
+                'metadataextractors',
+                'Failed %s metadata extraction from %s', mtype_key, ds,
+            )
             raise ValueError(
                 'Enable metadata extractor %s is not available in this installation',
                 mtype_key)
@@ -448,6 +468,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             extractor_cls = extractors[mtype_key].load()
             extractor = extractor_cls(ds, paths=paths)
         except Exception as e:
+            log_progress(
+                lgr.error,
+                'metadataextractors',
+                'Failed %s metadata extraction from %s', mtype_key, ds,
+            )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
                 "broken dataset configuration (%s)?: %s",
@@ -467,6 +492,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             lgr.error('Failed to get dataset metadata ({}): {}'.format(
                 mtype, exc_str(e)))
             if cfg.get('datalad.runtime.raiseonerror'):
+                log_progress(
+                    lgr.error,
+                    'metadataextractors',
+                    'Failed %s metadata extraction from %s', mtype_key, ds,
+                )
                 raise
             errored = True
             # if we dont get global metadata we do not want content metadata
@@ -564,6 +594,12 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 # (inflated number of keys, inflated storage, inflated search index, ...)
                 if v is None or (v and not v == {''})}
             dsmeta['datalad_unique_content_properties'] = ucp
+
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Finished metadata extraction from %s', ds,
+    )
 
     # always identify the effective vocabulary - JSON-LD style
     if context:

@@ -1620,8 +1620,8 @@ class GitRepo(RepoInterface):
                 raise RemoteNotAvailableError(name,
                                               cmd="git remote remove",
                                               msg="No such remote",
-                                              stdout=out,
-                                              stderr=err)
+                                              stdout=e.stdout,
+                                              stderr=e.stderr)
             else:
                 raise e
 

@@ -930,7 +930,10 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
     # Inherit filters
-    swallow_handler.filters = sum([h.filters for h in old_handlers], [])
+    from datalad.log import ProgressHandler
+    swallow_handler.filters = sum([h.filters for h in old_handlers
+                                   if not isinstance(h, ProgressHandler)],
+                                  [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers

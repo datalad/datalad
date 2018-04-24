@@ -77,7 +77,7 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode
+    known_failure_direct_mode, skip_if
 )
 
 
@@ -796,6 +796,23 @@ def test_probe_known_failure():
         # if probing is disabled it should just fail/pass as is:
         assert_raises(AssertionError, failing)
         not_failing()
+
+
+def test_skip_if():
+
+    def dummy():
+        raise AssertionError
+
+    assert_raises(AssertionError, dummy)
+    # if cond is False, call the decorated function:
+    assert_raises(AssertionError, skip_if(cond=False, method='raise')(dummy))
+    # raises SkipTest if cond is True
+    assert_raises(SkipTest, skip_if(cond=True, method='raise')(dummy))
+    # but with method 'pass', there is neither SkipTest nor AssertionError.
+    # Instead the function call is just skipped:
+    skip_if(cond=True, method='pass')(dummy)
+    # But if condition is False, the original function is still called:
+    assert_raises(AssertionError, skip_if(cond=False, method='pass')(dummy))
 
 
 def test_skip_known_failure():
