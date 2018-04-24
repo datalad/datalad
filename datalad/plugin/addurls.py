@@ -477,7 +477,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
 
 
 @optional_args
-def progress(fn, label="Total", unit="Files"):
+def progress(fn, label="Total", unit=" Files"):
     """Wrap a progress bar, with status counts, around a function.
 
     Parameters
@@ -515,7 +515,7 @@ def progress(fn, label="Total", unit="Files"):
         label = base_label
         log_progress(lgr.info, pid,
                      "%s: starting", label,
-                     total=len(items), label=label, unit=" " + unit)
+                     total=len(items), label=label, unit=unit)
 
         results = []
         for res in fn(items, **kwargs):
