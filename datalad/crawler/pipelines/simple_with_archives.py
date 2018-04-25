@@ -38,6 +38,7 @@ def pipeline(url=None,
              backend='MD5E',
              add_archive_leading_dir=False,
              annex=None,
+             add_annex_to_incoming_pipeline=False,
              incoming_pipeline=None):
     """Pipeline to crawl/annex a simple web page with some tarballs on it
     
@@ -48,9 +49,6 @@ def pipeline(url=None,
 
     if not isinstance(leading_dirs_depth, int):
         leading_dirs_depth = int(leading_dirs_depth)
-
-    if not tarballs:
-        raise NotImplementedError("yet to simplify for no tarballs case")
 
     lgr.info("Creating a pipeline to crawl data files from %s", url)
     if annex is None:
@@ -82,6 +80,8 @@ def pipeline(url=None,
     else:
         # no URL -- nothing to crawl -- but then should have been provided
         assert incoming_pipeline
+        if add_annex_to_incoming_pipeline:
+            incoming_pipeline.append(annex)
 
 
     # TODO: we could just extract archives processing setup into a separate pipeline template
