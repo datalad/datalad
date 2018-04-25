@@ -161,6 +161,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
     #      generating new data (common case) will be just fine already
 
     # we have a clean dataset, let's run things
+    exc = None
     cmd_exitcode = None
     runner = Runner(cwd=pwd)
     try:
@@ -180,6 +181,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
     except CommandError as e:
         # strip our own info from the exception. The original command output
         # went to stdout/err -- we just have to exitcode in the same way
+        exc = e
         cmd_exitcode = e.code
 
         if rerun_info and rerun_info.get("exit", 0) != cmd_exitcode:
@@ -189,7 +191,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
             # TODO add the ability to `git reset --hard` the dataset tree on failure
             # we know that we started clean, so we could easily go back, needs gh-1424
             # to be able to do it recursively
-            raise CommandError(code=cmd_exitcode)
+            raise exc
 
     lgr.info("== Command exit (modification check follows) =====")
 
@@ -219,7 +221,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
                  "If this is expected, you can save the changes with "
                  "'datalad save -r -F%s .'",
                  msg_path)
-        raise CommandError(code=cmd_exitcode)
+        raise exc
     else:
         for r in ds.add('.', recursive=True, message=msg):
             yield r
