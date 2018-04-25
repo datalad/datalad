@@ -176,6 +176,23 @@ setup_kwargs = setup_entry_points(
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
     })
 
+# normal entrypoints for the rest
+# a bit of a dance needed, as on windows the situation is different
+entry_points = setup_kwargs.get('entry_points', {})
+entry_points.update({
+    'datalad.metadata.extractors': [
+        'annex=datalad.metadata.extractors.annex:MetadataExtractor',
+        'audio=datalad.metadata.extractors.audio:MetadataExtractor',
+        'datacite=datalad.metadata.extractors.datacite:MetadataExtractor',
+        'datalad_core=datalad.metadata.extractors.datalad_core:MetadataExtractor',
+        'datalad_rfc822=datalad.metadata.extractors.datalad_rfc822:MetadataExtractor',
+        'exif=datalad.metadata.extractors.exif:MetadataExtractor',
+        'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
+        'image=datalad.metadata.extractors.image:MetadataExtractor',
+        'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
+    ]})
+setup_kwargs['entry_points'] = entry_points
+
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
@@ -195,17 +212,5 @@ setup(
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
-    entry_points={
-        'datalad.metadata.extractors': [
-            'annex=datalad.metadata.extractors.annex:MetadataExtractor',
-            'audio=datalad.metadata.extractors.audio:MetadataExtractor',
-            'datacite=datalad.metadata.extractors.datacite:MetadataExtractor',
-            'datalad_core=datalad.metadata.extractors.datalad_core:MetadataExtractor',
-            'datalad_rfc822=datalad.metadata.extractors.datalad_rfc822:MetadataExtractor',
-            'exif=datalad.metadata.extractors.exif:MetadataExtractor',
-            'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
-            'image=datalad.metadata.extractors.image:MetadataExtractor',
-            'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
-        ]},
     **setup_kwargs
 )
