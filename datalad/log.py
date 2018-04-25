@@ -15,7 +15,9 @@ import logging.handlers
 
 from os.path import basename, dirname
 
-from .utils import is_interactive
+from collections import defaultdict
+
+from .utils import is_interactive, optional_args
 from .support import ansi_colors as colors
 
 __all__ = ['ColorFormatter']
@@ -227,6 +229,70 @@ def log_progress(lgrcall, pid, *args, **kwargs):
          if v},
         dlm_progress=pid)
     lgrcall(*args, extra=d)
+
+
+@optional_args
+def with_result_progress(fn, label="Total", unit=" Files"):
+    """Wrap a progress bar, with status counts, around a function.
+
+    Parameters
+    ----------
+    fn : generator function
+        This function should accept a collection of items as a
+        positional argument and any number of keyword arguments.  After
+        processing each item in the collection, it should yield a status
+        dict.
+    label, unit : str
+        Passed to log.log_progress.
+
+    Returns
+    -------
+    A variant of `fn` that shows a progress bar.  Note that the wrapped
+    function is not a generator function; the status dicts will be
+    returned as a list.
+    """
+    # FIXME: This emulates annexrepo.ProcessAnnexProgressIndicators.  It'd be
+    # nice to rewire things so that it could be used directly.
+
+    def count_str(count, verb, omg=False):
+        if count:
+            msg = "{:d} {}".format(count, verb)
+            if omg:
+                msg = colors.color_word(msg, colors.RED)
+            return msg
+
+    pid = str(fn)
+    base_label = label
+
+    def wrapped(items, **kwargs):
+        counts = defaultdict(int)
+
+        label = base_label
+        log_progress(lgr.info, pid,
+                     "%s: starting", label,
+                     total=len(items), label=label, unit=unit)
+
+        results = []
+        for res in fn(items, **kwargs):
+            counts[res["status"]] += 1
+            count_strs = (count_str(*args)
+                          for args in [(counts["notneeded"], "skipped", False),
+                                       (counts["error"], "failed", True)])
+            if counts["notneeded"] or counts["error"]:
+                label = "{} ({})".format(
+                    base_label,
+                    ", ".join(filter(None, count_strs)))
+
+            log_progress(
+                lgr.error if res["status"] == "error" else lgr.info,
+                pid,
+                "%s: processed result%s", base_label,
+                " for " + res["path"] if "path" in res else "",
+                label=label, update=1, increment=True)
+            results.append(res)
+        log_progress(lgr.info, pid, "%s: done", base_label)
+        return results
+    return wrapped
 
 
 class LoggerHelper(object):
