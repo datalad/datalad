@@ -626,11 +626,7 @@ class GitRunner(Runner):
                 alongside = False
             else:
                 annex_path = os.path.dirname(os.path.realpath(annex_fpath))
-                if on_windows:
-                    # just bundled installations so git should be taken from annex
-                    alongside = True
-                else:
-                    alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+                alongside = os.path.lexists(os.path.join(annex_path, 'git'))
             GitRunner._GIT_PATH = annex_path if alongside else ''
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
                        "string)", GitRunner._GIT_PATH)
