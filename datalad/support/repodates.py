@@ -125,23 +125,23 @@ def annex_dates(repo, all_objects=True):
         yield hexsha, search_annex_timestamps(content), fname
 
 
-def log_dates(repo, refs=None):
+def log_dates(repo, revs=None):
     """Get log timestamps.
 
     Parameters
     ----------
     repo : GitRepo
-    refs : list, optional
-        Extract timestamps from these refs.  If unspecified, all local branches
-        are used.
+    revs : list, optional
+        Extract timestamps from commit objects that are reachable from these
+        revisions.
 
     Returns
     -------
     A generator object that returns a tuple with the commit hexsha, author
     timestamp, and committer timestamp.
     """
-    refs = refs or ["--branches"]
-    for line in repo.repo.git.log(*refs, format="%H %at %ct").splitlines():
+    revs = revs or ["--branches"]
+    for line in repo.repo.git.log(*revs, format="%H %at %ct").splitlines():
         hexsha, author_timestamp, committer_timestamp = line.split()
         yield hexsha, int(author_timestamp), int(committer_timestamp)
 
