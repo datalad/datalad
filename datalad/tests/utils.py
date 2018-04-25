@@ -27,6 +27,7 @@ from six import string_types
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
+from contextlib import contextmanager
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -1507,6 +1508,17 @@ def patch_config(vars):
     """
     from datalad import cfg
     return patch.dict(cfg._store, vars)
+
+
+@contextmanager
+def set_date(timestamp):
+    git_ts = "@{} +0000".format(timestamp)
+    with patch.dict("os.environ",
+                    {"GIT_COMMITTER_DATE": git_ts,
+                     "GIT_AUTHOR_DATE": git_ts,
+                     "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
+                     "DATALAD_FAKE__DATES": "0"}):
+        yield
 
 
 #

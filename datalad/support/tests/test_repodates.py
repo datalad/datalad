@@ -7,7 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from contextlib import contextmanager
 from mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
@@ -15,18 +14,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.repodates import check_dates
 from datalad.tests.utils import assert_equal, assert_false, \
     assert_in, assert_not_in, assert_raises, eq_, ok_, \
-    with_tempfile, with_tree
-
-
-@contextmanager
-def set_date(timestamp):
-    git_ts = "@{} +0000".format(timestamp)
-    with patch.dict("os.environ",
-                    {"GIT_COMMITTER_DATE": git_ts,
-                     "GIT_AUTHOR_DATE": git_ts,
-                     "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
-                     "DATALAD_FAKE__DATES": "0"}):
-        yield
+    set_date, with_tempfile, with_tree
 
 
 @with_tempfile(mkdir=True)
