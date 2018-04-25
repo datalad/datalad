@@ -1512,6 +1512,13 @@ def patch_config(vars):
 
 @contextmanager
 def set_date(timestamp):
+    """Temporarily override environment variables for git/git-annex dates.
+
+    Parameters
+    ----------
+    timestamp : int
+        Unix timestamp.
+    """
     git_ts = "@{} +0000".format(timestamp)
     with patch.dict("os.environ",
                     {"GIT_COMMITTER_DATE": git_ts,
