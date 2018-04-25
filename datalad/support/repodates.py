@@ -152,7 +152,8 @@ def log_dates(repo, revs=None):
             return None
         raise e
 
-def check_dates(repo, timestamp=None, which="newer", annex=True):
+
+def check_dates(repo, timestamp=None, which="newer", revs=None, annex=True):
     """Search for dates in `repo` that are newer than `timestamp`.
 
     This examines commit logs of local branches and the content of blobs in the
@@ -166,6 +167,10 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
         Unix timestamp.  It defaults to a day before now.
     which : {"newer", "older"}
         Whether to return timestamps that are newer or older than `timestamp`.
+    revs : list, optional
+        Search for commit timestamps in commits that are area reachable from
+        these revisions. Any revision-specification allowed by `git log` can be
+        used, including things like `--all`. Defaults to all local branches.
     annex : {True, "tree", False}, optional
         If True, search the content of all blobs in the git-annex branch.  If
         "tree", search only the blobs that are in the tree of the tip of the
@@ -191,7 +196,7 @@ def check_dates(repo, timestamp=None, which="newer", annex=True):
     results = {}
 
     lgr.debug("Checking dates in logs")
-    for hexsha, a_timestamp, c_timestamp in log_dates(repo):
+    for hexsha, a_timestamp, c_timestamp in log_dates(repo, revs=revs):
         if cmp_fn(a_timestamp, timestamp) or cmp_fn(c_timestamp, timestamp):
             results[hexsha] = {"type": "commit",
                                "author-timestamp": a_timestamp,
