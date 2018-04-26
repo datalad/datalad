@@ -16,7 +16,8 @@ from datalad.api import create, Dataset
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.tests.test_repodates import set_date
 from datalad.tests.utils import assert_dict_equal, assert_false, assert_in, \
-    assert_raises, eq_, ok_, create_tree, with_tempfile, with_tree
+    assert_raises, eq_, ok_, create_tree, skip_if_no_module, \
+    with_tempfile, with_tree
 from datalad.utils import chpwd, swallow_logs, swallow_outputs
 
 from datalad.plugin import check_dates
@@ -34,6 +35,8 @@ def test_check_dates_invalid_repo(path):
 
 
 def test_check_dates_invalid_date():
+    skip_if_no_module("dateutil")
+
     with swallow_outputs() as cmo:
         assert_raises(IncompleteResultsError,
                       check_dates.CheckDates.__call__,
@@ -47,6 +50,8 @@ def test_check_dates_invalid_date():
 
 @with_tempfile(mkdir=True)
 def test_check_dates(path):
+    skip_if_no_module("dateutil")
+
     ref_ts = 1218182889  # Fri, 08 Aug 2008 04:08:09 -0400
     refdate = "@{}".format(ref_ts)
 

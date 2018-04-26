@@ -19,6 +19,7 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
+from datalad.support.exceptions import MissingExternalDependency
 
 __docformat__ = "restructuredtext"
 
@@ -34,24 +35,19 @@ def _git_repos(paths):
 
 def _parse_date(date):
     if date.startswith("@"):  # unix timestamp
-        def fn(date):
-            return date[1:]
+        timestamp = int(date[1:])
     else:
         try:
             import dateutil.parser
-
-            def fn(date):
-                return dateutil.parser.parse(date).timestamp()
         except ImportError:
-            from email.utils import parsedate_to_datetime
+            raise MissingExternalDependency(
+                "python-dateutil",
+                msg="This package is required to parse non-timestamp dates")
 
-            def fn(date):
-                try:
-                    return parsedate_to_datetime(date).timestamp()
-                except TypeError:
-                    # Provide a more consistent and clearer error message.
-                    raise ValueError("Date must be in RFC 2822 format")
-    return int(fn(date))
+        from calendar import timegm
+        # Note: datetime.timestamp isn't available in Python 2.
+        timestamp = timegm(dateutil.parser.parse(date).utctimetuple())
+    return timestamp
 
 
 @build_doc
@@ -106,11 +102,10 @@ class CheckDates(Interface):
         reference_date=Parameter(
             args=("-D", "--reference-date"),
             metavar="DATE",
-            doc="""Compare dates to this date. The value should be in a format like '15 May
-            2009 17:58:28 +0300' (i.e, RFC 2822 format). However, if dateutil
-            is installed, any format recognized by its parser can be used. If
-            the value starts with "@", it will be treated as a unix
-            timestamp.""",
+            doc="""Compare dates to this date. If dateutil is installed, this
+            value can be any format that its parser recognized. Otherwise, it
+            should be a unix timestamp that starts with a "@". The default
+            value corresponds to 01 Jan, 2018 00:00:00 -0000.""",
             constraints=EnsureStr()),
         revs=Parameter(
             args=("--rev",),
@@ -144,7 +139,7 @@ class CheckDates(Interface):
     @staticmethod
     @eval_results
     def __call__(paths,
-                 reference_date="01 Jan 2018 00:00:00 -0000",
+                 reference_date="@1514764800",
                  revs=None,
                  annex="all",
                  no_tags=False,

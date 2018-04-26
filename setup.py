@@ -86,6 +86,7 @@ requires = {
     ],
     'misc': [
         'pyperclip',         # clipboard manipulations
+        'python-dateutil',   # add support for more date formats to check_dates
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
