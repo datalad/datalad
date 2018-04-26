@@ -32,10 +32,19 @@ def test_check_dates(path):
         ar.add("foo")
         ar.commit("add foo")
         foo_commit = ar.get_hexsha()
+        ar.commit("add foo")
+        ar.tag("foo-tag", "tag before refdate")
+        # We can't use ar.get_tags because that returns the commit's hexsha,
+        # not the tag's.
+        foo_tag = ar.repo.git.rev_parse("foo-tag")
+        # Make a lightweight tag to make sure `tag_dates` doesn't choke on it.
+        ar.tag("light")
     with set_date(refdate + 1):
         ar.add("bar")
         ar.commit("add bar")
         bar_commit = ar.get_hexsha()
+        ar.tag("bar-tag", "tag after refdate")
+        bar_tag = ar.repo.git.rev_parse("bar-tag")
     with set_date(refdate + 2):
         # Drop an annexed file so that we have more blobs in the git-annex
         # branch than its current tree.
@@ -48,9 +57,11 @@ def test_check_dates(path):
         if which == "newer":
             assert_in(bar_commit, result)
             assert_not_in(foo_commit, result)
+            assert_in(bar_tag, result)
         elif which == "older":
             assert_in(foo_commit, result)
             assert_not_in(bar_commit, result)
+            assert_in(foo_tag, result)
         results[which] = result
 
     ok_(any(x.get("filename") == "uuid.log"

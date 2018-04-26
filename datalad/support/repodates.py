@@ -125,6 +125,31 @@ def annex_dates(repo, all_objects=True):
         yield hexsha, search_annex_timestamps(content), fname
 
 
+def tag_dates(repo, pattern=""):
+    """Get timestamps for annotated tags.
+
+    Parameters
+    ----------
+    repo : GitRepo
+    pattern : str
+        Limit the tags by this pattern. It will be appended to 'refs/tags'
+        argument passed to `git for-each-ref`.
+
+    Returns
+    -------
+    A generator object that returns a tuple with the tag hexsha and timestamp.
+    """
+    lines = repo.repo.git.for_each_ref(
+        "refs/tags/" + pattern,
+        format="%(objectname) %(taggerdate:raw)").splitlines()
+    for line in lines:
+        fields = line.split()
+        if len(fields) != 3:
+            # There's not a tagger date. It's not an annotated tag.
+            continue
+        yield fields[0], int(fields[1])
+
+
 def log_dates(repo, revs=None):
     """Get log timestamps.
 
@@ -153,7 +178,8 @@ def log_dates(repo, revs=None):
         raise e
 
 
-def check_dates(repo, timestamp=None, which="newer", revs=None, annex=True):
+def check_dates(repo, timestamp=None, which="newer", revs=None,
+                annex=True, tags=True):
     """Search for dates in `repo` that are newer than `timestamp`.
 
     This examines commit logs of local branches and the content of blobs in the
@@ -175,6 +201,8 @@ def check_dates(repo, timestamp=None, which="newer", revs=None, annex=True):
         If True, search the content of all blobs in the git-annex branch.  If
         "tree", search only the blobs that are in the tree of the tip of the
         git-annex branch.  If False, do not search git-annex blobs.
+    tags : bool, optional
+        Whether to check dates the dates of annotated tags.
 
     Returns
     -------
@@ -201,6 +229,13 @@ def check_dates(repo, timestamp=None, which="newer", revs=None, annex=True):
             results[hexsha] = {"type": "commit",
                                "author-timestamp": a_timestamp,
                                "committer-timestamp": c_timestamp}
+
+    if tags:
+        lgr.debug("Checking dates of annotated tags")
+        for hexsha, tag_timestamp in tag_dates(repo):
+            if cmp_fn(tag_timestamp, timestamp):
+                results[hexsha] = {"type": "tag",
+                                   "timestamp": tag_timestamp}
 
     if annex and "git-annex" in repo.get_branches():
         all_objects = annex != "tree"
