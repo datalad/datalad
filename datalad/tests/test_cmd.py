@@ -318,7 +318,7 @@ s
 п
 """
     out_bytes = out.encode('utf-8')
-    target = u"s\nп\n".encode('utf-8')
+    target = u"s{ls}п{ls}".format(ls=os.linesep).encode('utf-8')
     args = ['stdout', None, False, False]
     #  probably #2185
     eq_(runner._process_remaining_output(None, out_bytes, *args), target)
