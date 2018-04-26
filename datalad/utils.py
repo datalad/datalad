@@ -28,7 +28,6 @@ from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
-from six import PY2
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -42,10 +41,17 @@ from os.path import split as psplit
 import posixpath
 
 
-from six import text_type, binary_type, string_types
+from six import PY2, text_type, binary_type, string_types
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
+
+
+if PY2:
+    unicode_srctypes = string_types
+else:
+    unicode_srctypes = string_types + (bytes,)
+
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -579,6 +585,34 @@ def assure_bool(s):
         else:
             raise ValueError("Do not know how to treat %r as a boolean" % s)
     return bool(s)
+
+
+def as_unicode(val, cast_types=object):
+    """Given an arbitrary value, would try to obtain unicode value of it
+    
+    For unicode it would return original value, for python2 str or python3
+    bytes it would use assure_unicode, for None - an empty (unicode) string,
+    and for any other type (see `cast_types`) - would apply the unicode 
+    constructor.  If value is not an instance of `cast_types`, TypeError
+    is thrown
+    
+    Parameters
+    ----------
+    cast_types: type
+      Which types to cast to unicode by providing to constructor
+    """
+    if val is None:
+        return u''
+    elif isinstance(val, text_type):
+        return val
+    elif isinstance(val, unicode_srctypes):
+        return assure_unicode(val)
+    elif isinstance(val, cast_types):
+        return text_type(val)
+    else:
+        raise TypeError(
+            "Value %r is not of any of known or provided %s types"
+            % (val, cast_types))
 
 
 def unique(seq, key=None):

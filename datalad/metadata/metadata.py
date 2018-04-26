@@ -51,6 +51,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import assure_list
 from datalad.utils import path_is_subpath, path_startswith
+from datalad.utils import as_unicode
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
@@ -619,7 +620,7 @@ def _unique_value_key(x):
              for k in sorted(x)]
     # we need to force str, because sorted in PY3 refuses to compare
     # any heterogeneous type combinations, such as str/int, tuple(int)/tuple(str)
-    return str(x)
+    return as_unicode(x)
 
 
 def _val2hashable(val):
