@@ -173,9 +173,8 @@ def log_dates(repo, revs=None):
     except GitCommandError as e:
         # With some Git versions, calling `git log --{all,branches,remotes}` in
         # a repo with no commits may signal an error.
-        if "does not have any commits yet" in e.stderr:
-            return None
-        raise e
+        if "does not have any commits yet" not in e.stderr:
+            raise e
 
 
 def check_dates(repo, timestamp=None, which="newer", revs=None,
