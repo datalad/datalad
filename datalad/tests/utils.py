@@ -178,12 +178,14 @@ def create_tree(path, tree, archives_leading_dir=True):
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
-            #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, text_type):
-            #    import pydb; pydb.debugger()
-            with open(full_name, 'w') as f:
-                if PY2 and isinstance(load, text_type):
+            if PY2:
+                open_kwargs = {'mode': "w"}
+                if isinstance(load, text_type):
                     load = load.encode('utf-8')
+            else:
+                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
+
+            with open(full_name, **open_kwargs) as f:
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
