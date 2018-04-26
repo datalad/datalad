@@ -17,13 +17,12 @@ lgr = logging.getLogger('datalad.metadata.search')
 
 import os
 import re
+from functools import partial
 from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
 from six import reraise
-from six import string_types
-from six import PY3
 from six import iteritems
 from time import time
 
@@ -41,7 +40,7 @@ from datalad.support.constraints import EnsureInt
 
 from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.utils import assure_list, assure_iter
+from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
 from datalad.utils import assure_unicode
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
@@ -49,20 +48,9 @@ from datalad.dochelpers import single_or_plural
 from datalad.dochelpers import exc_str
 from datalad.metadata.metadata import query_aggregated_metadata
 
-if PY3:
-    unicode_srctypes = string_types + (bytes,)
-    str_contructor = str
-else:
-    unicode_srctypes = string_types
-    str_contructor = unicode
-
-
-def _any2unicode(val):
-    if val is None:
-        return u''
-    return str_contructor(val) \
-        if isinstance(val, (int, float, tuple, list, dict)) \
-        else assure_unicode(val)
+# TODO: consider using plain as_unicode, without restricting
+# the types?
+_any2unicode = partial(as_unicode, cast_types=(int, float, tuple, list, dict))
 
 
 def _listdict2dictlist(lst):
@@ -554,7 +542,6 @@ class _AutofieldSearch(_WhooshSearch):
 
     def _mk_schema(self, dsinfo):
         from whoosh import fields as wf
-        from whoosh.analysis import StandardAnalyzer
         from whoosh.analysis import SimpleAnalyzer
 
         # haven for terms that have been found to be undefined
