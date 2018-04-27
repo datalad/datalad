@@ -83,8 +83,9 @@ def test_check_dates(path):
 
     # paths=None defaults to the current directory.
     with chpwd(path):
-        assert_dict_equal(newer[0],
-                          call(paths=None, reference_date=refdate)[0])
+        assert_dict_equal(
+            newer[0]["report"],
+            call(paths=None, reference_date=refdate)[0]["report"])
 
     # Only commit type is present when annex='none'.
     newer_noannex = call([path], reference_date=refdate, annex="none")
