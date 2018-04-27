@@ -65,7 +65,7 @@ def test_check_dates(path):
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:
         check_dates.CheckDates.__call__(
-            [],
+            [repo0],
             reference_date=refdate,
             return_type="list")
         assert_in("report", json.loads(cmo.out).keys())
