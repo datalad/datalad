@@ -828,7 +828,7 @@ class Search(Interface):
     metadata records. By default, only datasets are included in this index, hence
     the indexing is usually completed within a few seconds, even for hundreds
     of datasets. This mode uses its own query language (not regular expressions)
-    that is similar to other search engines. It supports logical conjunctions,
+    that is similar to other search engines. It supports logical conjunctions
     and fuzzy search terms. More information on this is available from the Whoosh
     project (search engine implementation):
 
@@ -841,22 +841,22 @@ class Search(Interface):
 
     Importantly, search hits are scored and reported in order of descending
     relevance, hence limiting the number of search results is more meaningful
-    that in the 'egrep' mode and can also reduce the query duration.
+    than in the 'egrep' mode and can also reduce the query duration.
 
     Examples:
 
-      Search for (what happens to be) two authors, regardless of in
-      which order those names appear in the metadata::
+      Search for (what happens to be) two authors, regardless of the order in
+      which those names appear in the metadata::
 
         % datalad search --mode textblob halchenko haxby
 
       Fuzzy search when you only have an approximate idea what you are looking
-      for, or how it is spelled::
+      for or how it is spelled::
 
         % datalad search --mode textblob haxbi~
 
       Very fuzzy search, when you are basically only confident about the first
-      to characters and how it sounds approximately (or more precisely: allow
+      two characters and how it sounds approximately (or more precisely: allow
       for three edits and require matching of the first two characters)::
 
         % datalad search --mode textblob haksbi~3/2
@@ -874,7 +874,7 @@ class Search(Interface):
     datasets and individual fields, hence it can grow very quickly into
     a huge structure that can easily take an hour or more to build and require
     more than a GB of storage. However, limiting it to documents on datasets
-    (see above), retains the enhanced expressiveness of queries while
+    (see above) retains the enhanced expressiveness of queries while
     dramatically reducing the resource demands.
 
     Examples:
