@@ -1510,7 +1510,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # explicitly use git-add with --update instead of git-annex-add
             # TODO: This might still need some work, when --update AND files
             # are specified!
-            if self.is_direct_mode():
+            if self.is_direct_mode() and not files:
                 self.GIT_DIRECT_MODE_PROXY = True
             try:
                 return_list = super(AnnexRepo, self).add(
@@ -1524,7 +1524,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                            _datalad_msg=_datalad_msg,
                                            update=update)
             finally:
-                if self.is_direct_mode():
+                if self.is_direct_mode() and not files:
                     # don't accidentally cause other git calls to be done
                     # via annex-proxy
                     self.GIT_DIRECT_MODE_PROXY = False

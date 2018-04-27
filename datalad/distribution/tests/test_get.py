@@ -422,7 +422,6 @@ def test_autoresolve_multiple_datasets(src, path):
 @slow  # 20 sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_autoresolve_recurse_subdatasets(src, path):
 
     origin = Dataset(src).create()
@@ -450,7 +449,6 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
 @slow  # 92sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_recurse_existing(src, path):
     origin_ds = _make_dataset_hierarchy(src)
 
@@ -493,7 +491,6 @@ def test_recurse_existing(src, path):
 @slow  # 33sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_in_unavailable_subdataset(src, path):
     _make_dataset_hierarchy(src)
     root = install(
