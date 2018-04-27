@@ -55,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.utils import assure_unicode, assure_bytes
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
@@ -3426,7 +3427,7 @@ class BatchedAnnex(object):
             # according to the internet wisdom there is no easy way with subprocess
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
-            process.stdin.write(entry)  # .encode())
+            process.stdin.write(assure_bytes(entry))
             process.stdin.flush()
             lgr.log(5, "Done sending.")
             still_alive, stderr = self._check_process(restart=False)
@@ -3436,7 +3437,8 @@ class BatchedAnnex(object):
             #       it is just a "get"er - we could resend it few times
             # We are expecting a single line output
             # TODO: timeouts etc
-            stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
+            stdout = assure_unicode(self.output_proc(process.stdout)) \
+                if not process.stdout.closed else None
             if stderr:
                 lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)

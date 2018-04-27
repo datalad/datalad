@@ -32,7 +32,9 @@ from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows, get_tempfile_kwargs, assure_unicode
+from .utils import (
+    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes
+)
 from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
@@ -343,7 +345,7 @@ class Runner(object):
             line = log_(assure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = line.encode('utf-8')
+                line = assure_bytes(line)
         if line:
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
@@ -416,7 +418,7 @@ class Runner(object):
 
         Returns
         -------
-        (stdout, stderr)
+        (stdout, stderr) - bytes!
 
         Raises
         ------
@@ -657,8 +659,11 @@ class GitRunner(Runner):
         return git_env
 
     def run(self, cmd, env=None, *args, **kwargs):
-        return super(GitRunner, self).run(
+        out, err = super(GitRunner, self).run(
             cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+        # All communication here will be returned as unicode
+        # TODO: do that instead within the super's run!
+        return assure_unicode(out), assure_unicode(err)
 
 
 # ####
