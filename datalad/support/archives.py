@@ -28,7 +28,7 @@ import string
 import random
 
 from .locking import lock_if_check_fails
-from ..utils import any_re_search
+from ..utils import any_re_search, assure_bytes
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -225,7 +225,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(realpath(archive).encode()).hexdigest()[:10]
+    archive_cached = hashlib.md5(assure_bytes(realpath(archive))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -423,7 +423,7 @@ class ExtractedArchive(object):
         # we need to extract the archive
         # TODO: extract to _tmp and then move in a single command so we
         # don't end up picking up broken pieces
-        lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+        lgr.debug(u"Extracting {self._archive} under {path}".format(**locals()))
         if exists(path):
             lgr.debug(
                 "Previous extracted (but probably not fully) cached archive "
@@ -449,7 +449,7 @@ class ExtractedArchive(object):
 
     # TODO: remove?
     #def has_file_ready(self, afile):
-    #    lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
+    #    lgr.debug(u"Checking file {afile} from archive {archive}".format(**locals()))
     #    return exists(self.get_extracted_filename(afile))
 
     def get_extracted_filename(self, afile):
@@ -516,7 +516,7 @@ class ExtractedArchive(object):
         return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
-        lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
+        lgr.debug(u"Requested file {afile} from archive {self._archive}".format(**locals()))
         # TODO: That could be a good place to provide "compatibility" layer if
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back

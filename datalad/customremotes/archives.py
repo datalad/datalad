@@ -357,7 +357,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 #  https://github.com/wummel/patool/issues/20
                 # so
                 pwd = getpwd()
-                lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+                lgr.debug(u"Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, path)
                 self.send('TRANSFER-SUCCESS', cmd, key)

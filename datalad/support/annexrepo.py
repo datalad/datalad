@@ -37,7 +37,7 @@ from subprocess import Popen, PIPE
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from six import string_types
+from six import string_types, PY2
 from six import iteritems
 from six.moves import filter
 from git import InvalidGitRepositoryError
@@ -3427,7 +3427,7 @@ class BatchedAnnex(object):
             # according to the internet wisdom there is no easy way with subprocess
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
-            process.stdin.write(assure_bytes(entry))
+            process.stdin.write(assure_bytes(entry) if PY2 else entry)
             process.stdin.flush()
             lgr.log(5, "Done sending.")
             still_alive, stderr = self._check_process(restart=False)

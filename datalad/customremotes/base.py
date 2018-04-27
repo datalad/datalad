@@ -480,6 +480,9 @@ class AnnexCustomRemote(object):
         else:
             self.send("PREPARE-SUCCESS")
 
+        self.debug("Encodings: filesystem %s, default %s"
+                   % (sys.getfilesystemencoding(), sys.getdefaultencoding()))
+
     def req_EXPORTSUPPORTED(self):
         self.send(
             'EXPORTSUPPORTED-SUCCESS'
