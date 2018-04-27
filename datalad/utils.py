@@ -865,7 +865,12 @@ def swallow_outputs():
 
         if file in (oldout, olderr, sys.stdout, sys.stderr):
             # we mock
-            sys.stdout.write(sep.join(args) + end)
+            try:
+                sys.stdout.write(sep.join(args) + end)
+            except UnicodeEncodeError as exc:
+                lgr.error(
+                    "Failed to write to mocked stdout, got %s, continue as it "
+                    "didn't happen",  exc)
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
