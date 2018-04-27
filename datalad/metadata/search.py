@@ -494,7 +494,7 @@ class _WhooshSearch(_Search):
 
 
 class _BlobSearch(_WhooshSearch):
-    _mode_label = 'default'
+    _mode_label = 'textblob'
     _default_documenttype = 'datasets'
 
     def _meta2doc(self, meta):
@@ -527,10 +527,14 @@ class _BlobSearch(_WhooshSearch):
         from whoosh import qparser as qparse
 
         # use whoosh default query parser for now
-        self.parser = qparse.QueryParser(
+        parser = qparse.QueryParser(
             "meta",
             schema=self.idx_obj.schema
         )
+        parser.add_plugin(qparse.FuzzyTermPlugin())
+        parser.remove_plugin_class(qparse.PhrasePlugin)
+        parser.add_plugin(qparse.SequencePlugin())
+        self.parser = parser
 
 
 class _AutofieldSearch(_WhooshSearch):
@@ -747,62 +751,166 @@ class _EGrepSearch(_Search):
 
 @build_doc
 class Search(Interface):
-    """Search a dataset's metadata.
+    """Search dataset metadata
 
-    Search capabilities depend on the amount and nature of metadata available
-    in a dataset. This can include metadata about a dataset as a whole, or
-    metadata on dataset content (e.g. one or more files). One dataset can also
-    contain metadata from multiple subdatasets (see the 'aggregate-metadata'
-    command), in which case a search can discover any dataset or any file in
-    of these datasets.
+    DataLad can search metadata extracted from a dataset and/or aggregated into
+    a superdataset (see the `aggregate-metadata` command). This makes it
+    possible to discover datasets, or individual files in a dataset even when
+    they are not available locally.
 
-    *Search modes*
+    Ultimately DataLad metadata are a graph of linked data structures. However,
+    this command does not (yet) support queries that can exploit all information
+    stored in the metadata. At the moment three search modes are implemented that
+    represent different trade-offs between the expressiveness of a query and
+    the computational and storage resources required to execute a query.
 
-    WRITE ME
+    - egrep (default)
 
-    A search index is automatically built from the available metadata of any
-    dataset or file, and a schema for this index is generated dynamically, too.
-    Consequently, the search index will be tailored to data provided in a
-    particular collection of datasets.
+    - textblob
 
-    Metadata fields (and possibly also values) are typically defined terms from
-    a controlled vocabulary. Field names are accessible via the --show-keys
-    flag.
+    - autofield
 
-    DataLad's search is built on the Python package 'Whoosh', which provides
-    a powerful query language. Links to a description of the language and
-    particular feature can be found below.
-
-    Here are a few examples. Basic search::
-
-      % datalad search searchterm
-
-    Search for a file::
-
-      % datalad search searchterm type:file
-
-
-    *Performance considerations*
-
-    For dataset collections with many files (100k+) generating a comprehensive
-    search index comprised of documents for datasets and individual files can
-    take a considerable amount of time. If this becomes an issue, search index
-    generation can be limited to a particular type of document (see the
-    'metadata --reporton' option for possible values). The per-mode configuration
-    setting 'datalad.search.index-<mode>-documenttype' will be queried on
-    search index generation. It is recommended to place an appropriate
-    configuration into a dataset's configuration file (.datalad/config)::
+    An alternative default mode can be configured by tuning the
+    configuration variable 'datalad.search.default-mode'::
 
       [datalad "search"]
-        index-default-documenttype = datasets
+        default-mode = egrep
 
-    .. seealso::
+    Each search mode has its own default configuration for what kind of
+    documents to query. The respective default can be changed via configuration
+    variables::
+
+      [datalad "search"]
+        index-<mode_name>-documenttype = (all|datasets|files)
+
+
+    *Mode: egrep*
+
+    This search mode is completely ignorant of the metadata structure, and
+    simply performs matching of a search pattern against a flat
+    string-representation of metadata. This mode is advantageous when the
+    query is simple and the metadata structure is irrelevant. Moreover,
+    this mode does not require a search index, hence results can be reported
+    without an initial latency for building a search index when the underlying
+    metadata has changed (e.g. due to a dataset update). By default, this
+    search mode only considers datasets and does not investigate records
+    for individual files for speed reasons.
+
+    Search results are reported in the order in which they were discovered.
+
+    Examples:
+
+      Query for (what happens to be) an author::
+
+        % datalad search haxby
+
+      Queries are case-insensitive and can be regular expressions. The
+      following queries for datasets with (what happens to be) two
+      particular authors::
+
+        % datalad search halchenko.*haxby
+
+      However, this search mode performs NO analysis of the metadata content.
+      Therefore queries can easily fail to match. For example, the above
+      query implicitly assumes that authors are listed in alphabetical order.
+      If that is the case (which may or may not be true), the following query
+      would yield NO hits::
+
+        % datalad search haxby.*halchenko
+
+      The ``textblob`` search mode represents an alternative that is more
+      robust in such cases.
+
+    *Mode: textblob*
+
+    This search mode is very similar to the ``egrep`` mode, but with a few key
+    differences. A search index is built from the string-representation of
+    metadata records. By default, only datasets are included in this index, hence
+    the indexing is usually completed within a few seconds, even for hundreds
+    of datasets. This mode uses its own query language (not regular expressions)
+    that is similar to other search engines. It supports logical conjunctions,
+    and fuzzy search terms. More information on this is available from the Whoosh
+    project (search engine implementation):
+
       - Description of the Whoosh query language:
         http://whoosh.readthedocs.io/en/latest/querylang.html)
+
       - Description of a number of query language customizations that are
-        enabled in DataLad, such as, querying multiple fields by default and
-        fuzzy term matching:
+        enabled in DataLad, such as, fuzzy term matching:
         http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations
+
+    Importantly, search hits are scored and reported in order of descending
+    relevance, hence limiting the number of search results is more meaningful
+    that in the 'egrep' mode and can also reduce the query duration.
+
+    Examples:
+
+      Search for (what happens to be) two authors, regardless of in
+      which order those names appear in the metadata::
+
+        % datalad search --mode textblob halchenko haxby
+
+      Fuzzy search when you only have an approximate idea what you are looking
+      for, or how it is spelled::
+
+        % datalad search --mode textblob haxbi~
+
+      Very fuzzy search, when you are basically only confident about the first
+      to characters and how it sounds approximately (or more precisely: allow
+      for three edits and require matching of the first two characters)::
+
+        % datalad search --mode textblob haksbi~3/2
+
+      Combine fuzzy search with logical constructs::
+
+        % datalad search --mode textblob 'haxbi~ AND (hanke OR halchenko)'
+
+
+    *Mode: autofield*
+
+    This mode is similar to the 'textblob' mode, but builds a vastly more
+    detailed search index that represents individual metadata variables as
+    individual fields. By default, this search index includes records for
+    datasets and individual fields, hence it can grow very quickly into
+    a huge structure that can easily take an hour or more to build and require
+    more than a GB of storage. However, limiting it to documents on datasets
+    (see above), retains the enhanced expressiveness of queries while
+    dramatically reducing the resource demands.
+
+    Examples:
+
+      List names of search index fields (auto-discovered from the set of
+      indexed datasets)::
+
+        % datalad search --mode autofield --show-keys name
+
+      Fuzzy search for datasets with an author that is specified in a particular
+      metadata field::
+
+        % datalad search --mode autofield bids.author:haxbi~ type:dataset
+
+      Search for individual files that carry a particular description
+      prefix in their 'nifti1' metadata::
+
+        % datalad search --mode autofield nifti1.description:FSL* type:file
+
+
+    *Reporting*
+
+    Search hits are returned as standard DataLad results. On the command line
+    the '--output-format' (or '-f') option can be used to tweak results for
+    further processing.
+
+    Examples:
+
+      Format search hits as a JSON stream (one hit per line)::
+
+        % datalad -f json search haxby
+
+      Custom formatting: which terms matched the query of particular
+      results. Useful for investigating fuzzy search results::
+
+        $ datalad -f '{path}: {query_matched}' search --mode autofield bids.author:haxbi~
     """
     _params_ = dict(
         dataset=Parameter(
@@ -815,18 +923,15 @@ class Search(Interface):
             args=("query",),
             metavar='QUERY',
             nargs="*",
-            doc="""search query using the Whoosh query language (see link to
-            detailed description above). For simple queries, any number of search
-            terms can be given as a list[CMD: (space-separated) CMD], and the
-            query will return all hits that match all terms (AND) in any combination
-            of fields (OR)."""),
+            doc="""query string, supported syntax and features depends on the
+            selected search mode (see documentation)"""),
         force_reindex=Parameter(
             args=("--reindex",),
             dest='force_reindex',
             action='store_true',
             doc="""force rebuilding the search index, even if no change in the
-            dataset's state has been detected. This is mostly useful for
-            developing new metadata support extensions."""),
+            dataset's state has been detected, for example, when the index
+            documenttype configuration has changed."""),
         max_nresults=Parameter(
             args=("--max-nresults",),
             doc="""maxmimum number of search results to report. Setting this
@@ -843,7 +948,7 @@ class Search(Interface):
             args=("--full-record", '-f'),
             action='store_true',
             doc="""If set, return the full metadata record for each search hit.
-            Depending on the search mode this might require additonal queries.
+            Depending on the search mode this might require additional queries.
             By default, only data that is available to the respective search modes
             is returned. This always includes essential information, such as the
             path and the type."""),
@@ -852,9 +957,9 @@ class Search(Interface):
             choices=('name', 'short', 'full'),
             default=None,
             doc="""if given, a list of known search keys is shown. If 'name' -
-            only the name is printed one per line. If 'short' or 'full' - 
-            statistics (in how many datasets, and unique values) are printed.
-            'short' truncates the listing of unique values.
+            only the name is printed one per line. If 'short' or 'full',
+            statistics (in how many datasets, and how many unique values) are
+            printed. 'short' truncates the listing of unique values.
             No other action is performed (except for reindexing), even if other
             arguments are given. Each key is accompanied by a term definition in
             parenthesis (TODO). In most cases a definition is given in the form
