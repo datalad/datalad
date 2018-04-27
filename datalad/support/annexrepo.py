@@ -110,6 +110,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20160923 -- --json-progress for get
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
+    # 6.20180416 -- annex handles unicode filenames more uniformly
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 

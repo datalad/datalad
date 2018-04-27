@@ -625,7 +625,7 @@ class AggregateMetaData(Interface):
             action='store_true',
             doc="""If set, all information on metadata records of subdatasets
             that have not been (re-)aggregated in this run will be kept unchanged.
-            This is sueful when (re-)aggregation only a subset of a dataset hierarchy,
+            This is useful when (re-)aggregation only a subset of a dataset hierarchy,
             for example, because not all subdatasets are locally available."""),
         save=nosave_opt,
     )
