@@ -765,17 +765,19 @@ class Search(Interface):
     the computational and storage resources required to execute a query.
 
     - egrep (default)
+
     - textblob
+
     - autofield
 
-    An alternative default mode can be configured by reconfiguration the
+    An alternative default mode can be configured by tuning the
     configuration variable 'datalad.search.default-mode'::
 
       [datalad "search"]
         default-mode = egrep
 
     Each search mode has its own default configuration for what kind of
-    documents to query. The respective default can changed via configuration
+    documents to query. The respective default can be changed via configuration
     variables::
 
       [datalad "search"]
@@ -812,7 +814,7 @@ class Search(Interface):
       Therefore queries can easily fail to match. For example, the above
       query implicitly assumes that authors are listed in alphabetical order.
       If that is the case (which may or may not be true), the following query
-      would yields NO hits::
+      would yield NO hits::
 
         % datalad search haxby.*halchenko
 
@@ -832,6 +834,7 @@ class Search(Interface):
 
       - Description of the Whoosh query language:
         http://whoosh.readthedocs.io/en/latest/querylang.html)
+
       - Description of a number of query language customizations that are
         enabled in DataLad, such as, fuzzy term matching:
         http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations
@@ -871,7 +874,7 @@ class Search(Interface):
     datasets and individual fields, hence it can grow very quickly into
     a huge structure that can easily take an hour or more to build and require
     more than a GB of storage. However, limiting it to documents on datasets
-    (see above), retains the enhances expressiveness of queries while
+    (see above), retains the enhanced expressiveness of queries while
     dramatically reducing the resource demands.
 
     Examples:
