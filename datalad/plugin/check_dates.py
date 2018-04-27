@@ -46,7 +46,12 @@ def _parse_date(date):
 
         from calendar import timegm
         # Note: datetime.timestamp isn't available in Python 2.
-        timestamp = timegm(dateutil.parser.parse(date).utctimetuple())
+        try:
+            timestamp = timegm(dateutil.parser.parse(date).utctimetuple())
+        except TypeError as exc:
+            # Make older dateutil versions return a consistent error for
+            # invalid dates.
+            raise ValueError(exc)
     return timestamp
 
 
