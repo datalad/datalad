@@ -12,12 +12,11 @@ import json
 import logging
 import os
 
-from datalad.api import create, Dataset
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.tests.test_repodates import set_date
 from datalad.tests.utils import assert_dict_equal, assert_false, assert_in, \
-    assert_raises, eq_, ok_, create_tree, skip_if_no_module, \
-    with_tempfile, with_tree
+    assert_raises, eq_, ok_, skip_if_no_module, with_tree
 from datalad.utils import chpwd, swallow_logs, swallow_outputs
 
 from datalad.plugin import check_dates
@@ -48,7 +47,7 @@ def test_check_dates_invalid_date():
     assert_in('"status": "error"', out)
 
 
-@with_tempfile(mkdir=True)
+@with_tree(tree={"repo": {"a": "a"}})
 def test_check_dates(path):
     skip_if_no_module("dateutil")
 
@@ -57,9 +56,8 @@ def test_check_dates(path):
 
     repo = os.path.join(path, "repo")
     with set_date(ref_ts + 5000):
-        create(repo)
-        create_tree(repo, {"a": "a"})
-        Dataset(repo).add(".")
+        ar = AnnexRepo(repo)
+        ar.add(".", commit=True)
 
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:
