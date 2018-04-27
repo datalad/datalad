@@ -521,11 +521,13 @@ class AggregateMetaData(Interface):
     one has to enable one or more metadata extractor for a dataset. DataLad
     supports a number of common metadata standards, such as the Exchangeable
     Image File Format (EXIF), Adobe's Extensible Metadata Platform (XMP), and
-    various audio file metadata systems like ID3. In addition, a number of
-    scientific metadata standards are supported, like DICOM, BIDS, or datacite.
-    Some metadata extractors depend on particular 3rd-party software. The list of
-    metadata extractors available to a particular DataLad installation is reported
-    by the 'wtf' command ('datalad wtf').
+    various audio file metadata systems like ID3. DataLad extension packages
+    can provide metadata data extractors for additional metadata sources. For
+    example, the neuroimaging extension provides extractors for scientific
+    (meta)data standards like BIDS, DICOM, and NIfTI1.  Some metadata
+    extractors depend on particular 3rd-party software. The list of metadata
+    extractors available to a particular DataLad installation is reported by
+    the 'wtf' command ('datalad wtf').
 
     Enabling a metadata extractor for a dataset is done by adding its name to the
     'datalad.metadata.nativetype' configuration variable -- typically in the
@@ -534,6 +536,10 @@ class AggregateMetaData(Interface):
       [datalad "metadata"]
         nativetype = exif
         nativetype = xmp
+
+    If an enabled metadata extractor is not available in a particular DataLad
+    installation, metadata extraction will not succeed in order to avoid
+    inconsistent aggregation results.
 
     Enabling multiple extractors is supported. In this case, metadata are
     extracted by each extractor individually, and stored alongside each other.
