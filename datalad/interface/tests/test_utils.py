@@ -309,7 +309,6 @@ def test_result_filter():
 
 @with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_discover_ds_trace(path, otherdir):
     ds = make_demo_hierarchy_datasets(
         path,

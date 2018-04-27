@@ -231,7 +231,6 @@ def test_rerun_onto(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_chain(path):
     ds = Dataset(path).create()
@@ -301,7 +300,6 @@ def test_rerun_just_one_commit(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -393,7 +391,6 @@ def test_rerun_branch(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -413,7 +410,6 @@ def test_rerun_cherry_pick(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
@@ -434,7 +430,6 @@ def test_rerun_outofdate_tree(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
@@ -532,7 +527,6 @@ def test_new_or_modified(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo", message='FOO')
