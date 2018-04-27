@@ -56,10 +56,9 @@ def test_check_dates(path):
     refdate = "@{}".format(ref_ts)
 
     repo = os.path.join(path, "repo")
-    create(repo)
-    create_tree(repo, {"a": "a"})
-
     with set_date(ref_ts + 5000):
+        create(repo)
+        create_tree(repo, {"a": "a"})
         Dataset(repo).add(".")
 
     # The standard renderer outputs json.
