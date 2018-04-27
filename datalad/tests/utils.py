@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -1371,19 +1371,25 @@ def dump_graph(graph, flatten=False):
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
-    " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
-    " \"';a&b&cd `| ",
-    " \"';abcd `| ",
-    " \"';abcd | ",
-    " \"';abcd ",
-    " ;abcd ",
-    " ;abcd",
-    " ab cd ",
-    " ab cd",
-    "a",
-    " abc d.dat ",
-    "abc d.dat ",  # they all should at least support spaces and dots
+    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
+    u" \"';a&b&c `| ",
+    u" \"';abc `| ",
+    u" \"';abc | ",
+    u" \"';abc ",
+    u" ;abc ",
+    u" ;abc",
+    u" ab c ",
+    u" ab c",
+    u"ac",
+    u" ab .datc ",
+    u"ab .datc ",  # they all should at least support spaces and dots
 )
+UNICODE_FILENAME = u"ΔЙקم๗あ"
+# Prepend the list with unicode names first
+OBSCURE_FILENAMES = tuple(
+    f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
+) + OBSCURE_FILENAMES
+
 
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir):
