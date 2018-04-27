@@ -55,17 +55,17 @@ def test_check_dates(path):
     ref_ts = 1218182889  # Fri, 08 Aug 2008 04:08:09 -0400
     refdate = "@{}".format(ref_ts)
 
-    repo0 = os.path.join(path, "repo0")
-    create(repo0)
-    create_tree(repo0, {"a": "a"})
+    repo = os.path.join(path, "repo")
+    create(repo)
+    create_tree(repo, {"a": "a"})
 
     with set_date(ref_ts + 5000):
-        Dataset(repo0).add(".")
+        Dataset(repo).add(".")
 
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:
         check_dates.CheckDates.__call__(
-            [repo0],
+            [repo],
             reference_date=refdate,
             return_type="list")
         assert_in("report", json.loads(cmo.out).keys())
@@ -76,7 +76,7 @@ def test_check_dates(path):
     ok_(newer[0]["report"]["objects"])
 
     # There are no older objects to find.
-    older = call([repo0], reference_date=refdate, older=True)
+    older = call([repo], reference_date=refdate, older=True)
     assert_false(older[0]["report"]["objects"])
 
     # We can pass the date in RFC 2822 format.
