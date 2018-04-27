@@ -525,6 +525,19 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
+def assure_bytes(s, encoding='utf-8'):
+    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  "utf-8" is the default
+    """
+    if not isinstance(s, text_type):
+        return s
+    return s.encode(encoding)
+
+
 def assure_unicode(s, encoding=None, confidence=None):
     """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
 
@@ -641,6 +654,21 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+def map_items(func, v):
+    """A helper to apply `func` to all elements (keys and values) within dict
+
+    No type checking of values passed to func is done, so `func`
+    should be resilient to values which it should not handle
+
+    Initial usecase - apply_recursive(url_fragment, assure_unicode)
+    """
+    # map all elements within item
+    return v.__class__(
+        item.__class__(map(func, item))
+        for item in v.items()
+    )
 
 
 def generate_chunks(container, size):
