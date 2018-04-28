@@ -45,9 +45,10 @@ Metadata handling
 .. autosummary::
    :toctree: generated
 
+   api.search
    api.metadata
    api.aggregate_metadata
-   api.search
+   api.extract_metadata
 
 
 Reproducible execution
@@ -105,7 +106,6 @@ with DataLad.
    addurls
    export_archive
    export_to_figshare
-   extract_metadata
    no_annex
    wtf
 

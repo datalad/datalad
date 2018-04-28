@@ -6,12 +6,24 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""run one or more metadata extractors on a dataset or file(s)"""
+"""Run one or more metadata extractors on a dataset or file(s)"""
 
 __docformat__ = 'restructuredtext'
 
+from os import curdir
+from os.path import join as opj
+
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.interface.results import get_status_dict
+from datalad.interface.utils import eval_results
+from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import EnsureDataset
+from datalad.distribution.dataset import require_dataset
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureNone, EnsureStr
+from datalad.metadata.metadata import _get_metadata
+from datalad.metadata.metadata import _get_metadatarelevant_paths
 
 
 @build_doc
@@ -32,13 +44,6 @@ class ExtractMetadata(Interface):
 
         $ datalad extract-metadata --type xmp Downloads/freshfromtheweb.pdf
     """
-
-    from datalad.support.param import Parameter
-    from datalad.distribution.dataset import datasetmethod
-    from datalad.interface.utils import eval_results
-    from datalad.distribution.dataset import EnsureDataset
-    from datalad.distribution.subdatasets import Subdatasets
-    from datalad.support.constraints import EnsureNone, EnsureStr
 
     _params_ = dict(
         types=Parameter(
@@ -66,13 +71,6 @@ class ExtractMetadata(Interface):
     @datasetmethod(name='extract_metadata')
     @eval_results
     def __call__(types, files=None, dataset=None):
-        from os import curdir
-        from os.path import join as opj
-        from datalad.interface.results import get_status_dict
-        from datalad.distribution.dataset import require_dataset
-        from datalad.metadata.metadata import _get_metadata
-        from datalad.metadata.metadata import _get_metadatarelevant_paths
-
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
                                   check_installed=not files)
@@ -108,5 +106,3 @@ class ExtractMetadata(Interface):
             if dataset:
                 res['parentds'] = dataset.path
             yield res
-
-__datalad_plugin__ = ExtractMetadata

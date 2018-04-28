@@ -52,6 +52,8 @@ _group_metadata = (
          'metadata'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
+        ('datalad.metadata.extract_metadata', 'ExtractMetadata',
+         'extract-metadata', 'extract_metadata'),
     ])
 
 _group_misc = (
