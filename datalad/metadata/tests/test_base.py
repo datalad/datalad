@@ -31,6 +31,8 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import ok_
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
@@ -221,3 +223,18 @@ def test_get_aggregates_fails(path):
     ds = Dataset(path).create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')
     assert_result_count(res, 1, path=ds.path, status='impossible')
+
+
+@with_tree({'dummy': 'content'})
+@with_tempfile(mkdir=True)
+def test_bf2458(src, dst):
+    ds = Dataset(src).create(force=True)
+    ds.add('.', to_git=False)
+
+    # no clone (empty) into new dst
+    clone = install(source=ds.path, path=dst)
+    # content is not here
+    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+    # check that plain metadata access does not `get` stuff
+    clone.metadata('.')
+    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
