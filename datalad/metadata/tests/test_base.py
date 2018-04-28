@@ -31,6 +31,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -225,6 +226,11 @@ def test_get_aggregates_fails(path):
     assert_result_count(res, 1, path=ds.path, status='impossible')
 
 
+# XXX MIH knows of no way to test if the content of a file is NOT
+# available in a local clone that works in direct mode
+# tried whereis() -- no output
+# is_under_annex -- also fails
+@known_failure_direct_mode
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):
@@ -233,8 +239,10 @@ def test_bf2458(src, dst):
 
     # no clone (empty) into new dst
     clone = install(source=ds.path, path=dst)
+    # XXX whereis says nothing in direct mode
     # content is not here
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
     # check that plain metadata access does not `get` stuff
     clone.metadata('.')
+    # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
