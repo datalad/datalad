@@ -44,6 +44,7 @@ Metadata handling
    generated/man/datalad-search
    generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
+   generated/man/datalad-extract-metadata
 
 Reproducible execution
 ======================
@@ -79,7 +80,6 @@ Plugin commands
    generated/man/datalad-addurls
    generated/man/datalad-export-archive
    generated/man/datalad-export-to-figshare
-   generated/man/datalad-extract-metadata
    generated/man/datalad-no-annex
    generated/man/datalad-wtf
 

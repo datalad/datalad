@@ -38,7 +38,6 @@ overview of plugins included in this DataLad release.
    addurls
    export_archive
    export_to_figshare
-   extract_metadata
    no_annex
    wtf
 
