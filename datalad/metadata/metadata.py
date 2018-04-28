@@ -257,11 +257,16 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 if ((reporton is None and qap.get('type', None) == 'file') or
                     reporton in ('files', 'all')) else tuple())
         )
+        # in case there was no metadata provider, we do not want to start
+        # downloading everything: see https://github.com/datalad/datalad/issues/2458
+        objfiles.difference_update([None])
         lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
-        get(path=[dict(path=opj(agg_base_path, of), parentds=ds.path, type='file')
-                  for of in objfiles if of],
-            dataset=ds,
-            result_renderer='disabled')
+        if objfiles:
+            get(path=[dict(path=opj(agg_base_path, of),
+                           parentds=ds.path, type='file')
+                      for of in objfiles if of],
+                dataset=ds,
+                result_renderer='disabled')
         for qap in to_query:
             # info about the dataset that contains the query path
             dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
