@@ -1310,6 +1310,21 @@ def test_annex_get_annexed_files(path):
     eq_(set(repo.get_annexed_files(with_content_only=True)),
         {"b.txt", "c.py", "d"})
 
+    eq_(set(repo.get_annexed_files(patterns=["*.txt"])),
+        {"a.txt", "b.txt"})
+    eq_(set(repo.get_annexed_files(with_content_only=True,
+                                   patterns=["*.txt"])),
+        {"b.txt"})
+
+    eq_(set(repo.get_annexed_files(patterns=["*.txt", "*.py"])),
+        {"a.txt", "b.txt", "c.py"})
+
+    eq_(set(repo.get_annexed_files()),
+        set(repo.get_annexed_files(patterns=["*"])))
+
+    eq_(set(repo.get_annexed_files(with_content_only=True)),
+        set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
+
 
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_annex_remove(path):
