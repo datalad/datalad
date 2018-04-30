@@ -2553,6 +2553,15 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def get_annexed_files(self, with_content_only=False):
         """Get a list of files in annex
+
+        Parameters
+        ----------
+        with_content_only : bool, optional
+            Only list files whose content is present.
+
+        Returns
+        -------
+        A list of file names
         """
         args = [] if with_content_only else ['--include', "*"]
         out, err = self._run_annex_command('find', annex_options=args)
