@@ -404,7 +404,11 @@ def test_rerun_cherry_pick(path):
     for onto, text in [("HEAD", "skipping"), ("prerun", "cherry picking")]:
         results = ds.rerun(since="prerun", onto=onto)
         assert_in_results(results, status='ok', path=ds.path)
-        assert any(r.get("message", "").endswith(text) for r in results)
+
+        messages = (r.get("message", "") for r in results)
+        # Message may be a tuple.
+        messages = (m for m in messages if hasattr(m, "endswith"))
+        assert any(m.endswith(text) for m in messages)
 
 
 @ignore_nose_capturing_stdout
