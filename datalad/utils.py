@@ -28,6 +28,7 @@ from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from itertools import tee
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -641,6 +642,32 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+def partition(items, predicate=bool):
+    """Partition `items` by `predicate`.
+
+    Parameters
+    ----------
+    items : iterable
+    predicate : callable
+        A function that will be mapped over each element in `items`. The
+        elements will partitioned based on whether the return value is false or
+        true.
+
+    Returns
+    -------
+    A tuple with two generators, the first for 'false' items and the second for
+    'true' ones.
+
+    Notes
+    -----
+    Taken from Peter Otten's snippet posted at
+    https://nedbatchelder.com/blog/201306/filter_a_list_into_two_parts.html
+    """
+    a, b = tee((predicate(item), item) for item in items)
+    return ((item for pred, item in a if not pred),
+            (item for pred, item in b if pred))
 
 
 def generate_chunks(container, size):
