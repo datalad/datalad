@@ -70,6 +70,11 @@ class Rerun(Interface):
         % # now on verify branch
         % datalad diff --revision=master..
         % git log --oneline --left-right --cherry-pick master...
+
+    .. note::
+      Currently the "onto" feature only sets the working tree of the current
+      dataset to a previous state. The working trees of any subdatasets remain
+      unchanged.
     """
     _params_ = dict(
         revision=Parameter(
