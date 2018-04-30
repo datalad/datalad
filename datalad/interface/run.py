@@ -31,12 +31,14 @@ from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
 
 from datalad.distribution.add import Add
+from datalad.distribution.get import Get
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
+from datalad.utils import partition
 
 lgr = logging.getLogger('datalad.interface.run')
 
@@ -78,6 +80,20 @@ class Run(Interface):
             working directory. If a dataset is given, the command will be
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
+        inputs=Parameter(
+            args=("--input",),
+            dest="inputs",
+            metavar=("PATH"),
+            action='append',
+            doc="""A dependency for the run. Before running the command, the
+            content of this file will be retrieved. If the value doesn't match
+            any known annex file, it will be treated as a glob and passed to
+            :command:`git annex find --include=`. The value should be specified
+            relative to the top-level directory of the current dataset. Using
+            '*' for this value means "all current annex files". Note: This
+            operation currently only considers the current dataset, not any
+            subdatasets. [CMD: This option can be given more than once.
+            CMD]"""),
         message=save_message_opt,
         rerun=Parameter(
             args=('--rerun',),
@@ -94,6 +110,7 @@ class Run(Interface):
     def __call__(
             cmd=None,
             dataset=None,
+            inputs=None,
             message=None,
             rerun=False):
         if rerun:
@@ -106,14 +123,27 @@ class Run(Interface):
                 yield r
         else:
             if cmd:
-                for r in run_command(cmd, dataset, message):
+                for r in run_command(cmd, dataset, inputs, message):
                     yield r
             else:
                 lgr.warning("No command given")
 
 
+def _resolve_inputs(dset, inputs):
+    """Expand --include globs in `inputs` to file names.
+    """
+    globs, file_inputs = partition(
+        inputs,
+        lambda f: dset.repo.is_under_annex([f], batch=True)[0])
+    globs, file_inputs = list(globs), list(file_inputs)
+
+    glob_inputs = dset.repo.get_annexed_files(patterns=globs) if globs else []
+
+    return file_inputs + glob_inputs
+
+
 # This helper function is used to add the rerun_info argument.
-def run_command(cmd, dataset=None, message=None, rerun_info=None):
+def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -139,6 +169,15 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
         purpose='tracking outcomes of a command')
     # not needed ATM
     #refds_path = ds.path
+
+    if inputs is None:
+        inputs = []
+    else:
+        inputs = _resolve_inputs(ds, inputs)
+        if not inputs:
+            lgr.warning("No matching files found for --input")
+        for res in ds.get(inputs):
+            yield res
 
     # delayed imports
     from datalad.cmd import Runner
@@ -203,6 +242,7 @@ def run_command(cmd, dataset=None, message=None, rerun_info=None):
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
+        'inputs': inputs
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information

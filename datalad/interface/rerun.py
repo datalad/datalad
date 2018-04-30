@@ -321,7 +321,9 @@ class Rerun(Interface):
                     yield r
 
                 for r in run_command(run_info['cmd'],
-                                     ds, message or rev["run_message"],
+                                     ds,
+                                     run_info.get("inputs", []),
+                                     message or rev["run_message"],
                                      rerun_info=run_info):
                     yield r
 

@@ -54,6 +54,7 @@ from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
+from datalad.tests.utils import with_testrepos
 
 
 @with_tempfile(mkdir=True)
@@ -560,6 +561,57 @@ def test_rerun_script(path):
         ds.rerun(script="-")
         assert_in("echo b >bar",
                   cmout.getvalue().splitlines())
+
+
+@slow  # ~10s
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_testrepos('basic_annex', flavors=['clone'])
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_run_inputs(path):
+    ds = Dataset(path)
+
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
+
+    # If we specify test-annex.dat as an input, it will be retrieved before the
+    # run.
+    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"])
+
+    ok_clean_git(ds.path)
+    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("doubled.dat"))
+
+    # Rerunning the commit will also get the input file.
+    ds.repo.drop("test-annex.dat", options=["--force"])
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    ds.rerun()
+    ok_(ds.repo.file_has_content("test-annex.dat"))
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run("touch dummy", inputs=["*.not-an-extension"])
+        assert_in("No matching files found for --input", cml.out)
+
+    # Test different combinations of globs and explicit files.
+    inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
+    create_tree(ds.path, {i: i for i in inputs})
+
+    ds.add(".")
+    ds.repo.copy_to(inputs, remote="origin")
+    ds.repo.drop(inputs, options=["--force"])
+
+    test_cases = [(["*.dat"], ["a.dat", "b.dat"]),
+                  (["*.dat", "c.txt"], ["a.dat", "b.dat", "c.txt"]),
+                  (["*"], inputs)]
+
+    for idx, (inputs_arg, expected_present) in enumerate(test_cases):
+        assert_false(any(ds.repo.file_has_content(i) for i in inputs))
+
+        ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+        ok_(all(ds.repo.file_has_content(f) for f in expected_present))
+
+        ds.repo.drop(inputs, options=["--force"])
 
 
 def test_rerun_commit_message_check():
