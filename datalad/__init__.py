@@ -160,6 +160,26 @@ def setup_package():
 
 def teardown_package():
     import os, sys
+    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
+
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    print(ev.dumps(query=True))
+    print("Obscure filename: str=%s repr=%r"
+            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    print("Encodings: default=%r filesystem=%r"
+            % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
+    envs = []
+    for var, val in os.environ.items():
+        if (
+                var.startswith('PYTHON') or
+                var.startswith('LC_') or
+                var.startswith('GIT_') or
+                var in ('LANG', 'LANGUAGE', 'PATH')
+        ):
+            envs.append("%s=%r" % (var, val))
+    print("Environment: %s" % " ".join(envs))
+
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
@@ -173,7 +193,6 @@ def teardown_package():
             os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
-    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
     if len(_TEMP_PATHS_GENERATED):
         msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
     else:
@@ -189,12 +208,5 @@ def teardown_package():
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
-    lgr.debug("Printing versioning information collected so far")
-    from datalad.support.external_versions import external_versions as ev
-    print(ev.dumps(query=True))
-    print("Obscure filename: str=%s repr=%r"
-            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
-    print("Encodings: default=%r filesystem=%r"
-            % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
 
 lgr.log(5, "Done importing main __init__")
