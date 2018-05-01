@@ -1385,7 +1385,13 @@ OBSCURE_FILENAMES = (
     u"ab .datc ",  # they all should at least support spaces and dots
 )
 UNICODE_FILENAME = u"ΔЙקم๗あ"
+# OSX is exciting -- some I guess FS might be encoding differently from decoding
+# so Й might get recoded
+# (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
 if sys.getfilesystemencoding().lower() == 'utf-8':
+    if on_osx:
+        # TODO: figure it really out
+        UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
