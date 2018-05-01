@@ -32,7 +32,7 @@ cfg = ConfigManager()
 
 from .log import lgr
 import atexit
-from datalad.utils import on_windows
+from datalad.utils import on_windows, get_encoding_info, get_envvars_info
 
 if not on_windows:
     lgr.log(5, "Instantiating ssh manager")
@@ -159,7 +159,7 @@ def setup_package():
 
 
 def teardown_package():
-    import os, sys
+    import os
     from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
 
     lgr.debug("Printing versioning information collected so far")
@@ -167,18 +167,10 @@ def teardown_package():
     print(ev.dumps(query=True))
     print("Obscure filename: str=%s repr=%r"
             % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
-    print("Encodings: default=%r filesystem=%r"
-            % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
-    envs = []
-    for var, val in os.environ.items():
-        if (
-                var.startswith('PYTHON') or
-                var.startswith('LC_') or
-                var.startswith('GIT_') or
-                var in ('LANG', 'LANGUAGE', 'PATH')
-        ):
-            envs.append("%s=%r" % (var, val))
-    print("Environment: %s" % " ".join(envs))
+    def print_dict(d):
+        return " ".join("%s=%r" % v for v in d.items())
+    print("Encodings: %s" % print_dict(get_encoding_info()))
+    print("Environment: %s" % print_dict(get_envvars_info()))
 
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return

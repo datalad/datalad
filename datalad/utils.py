@@ -1642,3 +1642,27 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
 
 lgr.log(5, "Done importing datalad.utils")
 
+
+def get_encoding_info():
+    """Return a dictionary with various encoding/locale information"""
+    import sys, locale
+    from collections import OrderedDict
+    return OrderedDict([
+        ('default', sys.getdefaultencoding()),
+        ('filesystem', sys.getfilesystemencoding()),
+        ('locale.prefered', locale.getpreferredencoding()),
+    ])
+
+
+def get_envvars_info():
+    from collections import OrderedDict
+    envs = []
+    for var, val in os.environ.items():
+        if (
+                var.startswith('PYTHON') or
+                var.startswith('LC_') or
+                var.startswith('GIT_') or
+                var in ('LANG', 'LANGUAGE', 'PATH')
+        ):
+            envs.append((var, val))
+    return OrderedDict(envs)
