@@ -108,7 +108,7 @@ class CheckDates(Interface):
             args=("-D", "--reference-date"),
             metavar="DATE",
             doc="""Compare dates to this date. If dateutil is installed, this
-            value can be any format that its parser recognized. Otherwise, it
+            value can be any format that its parser recognizes. Otherwise, it
             should be a unix timestamp that starts with a "@". The default
             value corresponds to 01 Jan, 2018 00:00:00 -0000.""",
             constraints=EnsureStr()),
