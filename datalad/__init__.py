@@ -159,7 +159,7 @@ def setup_package():
 
 
 def teardown_package():
-    import os
+    import os, sys
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
@@ -192,6 +192,9 @@ def teardown_package():
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
-    print("Obscure filename: str=%s  repr=%r" % (OBSCURE_FILENAME, OBSCURE_FILENAME))
+    print("Obscure filename: str=%s repr=%r"
+            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    print("Encodings: default=%r filesystem=%r"
+            % (sys.getdefaultencoding(), sys.getfilesystemencoding()))
 
 lgr.log(5, "Done importing main __init__")
