@@ -1385,7 +1385,7 @@ OBSCURE_FILENAMES = (
     u"ab .datc ",  # they all should at least support spaces and dots
 )
 UNICODE_FILENAME = u"ΔЙקم๗あ"
-if sys.getdefaultencoding() not in ('ascii',):
+if sys.getfilesystemencoding().lower() == 'utf-8':
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
@@ -1412,6 +1412,9 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+OBSCURE_FILENAME = get_most_obscure_supported_name()
 
 
 @optional_args
