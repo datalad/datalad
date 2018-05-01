@@ -173,7 +173,7 @@ def teardown_package():
             os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
-    from datalad.tests.utils import rmtemp
+    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
     if len(_TEMP_PATHS_GENERATED):
         msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
     else:
@@ -192,5 +192,6 @@ def teardown_package():
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
+    print("Obscure filename: str=%s  repr=%r" % (OBSCURE_FILENAME, OBSCURE_FILENAME))
 
 lgr.log(5, "Done importing main __init__")
