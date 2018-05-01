@@ -1385,10 +1385,11 @@ OBSCURE_FILENAMES = (
     u"ab .datc ",  # they all should at least support spaces and dots
 )
 UNICODE_FILENAME = u"ΔЙקم๗あ"
-# Prepend the list with unicode names first
-OBSCURE_FILENAMES = tuple(
-    f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
-) + OBSCURE_FILENAMES
+if sys.getdefaultencoding() not in ('ascii',):
+    # Prepend the list with unicode names first
+    OBSCURE_FILENAMES = tuple(
+        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
+    ) + OBSCURE_FILENAMES
 
 
 @with_tempfile(mkdir=True)
