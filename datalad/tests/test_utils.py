@@ -11,7 +11,7 @@
 
 """
 
-import os
+import os, os.path as op
 import shutil
 import sys
 import logging
@@ -55,7 +55,7 @@ from ..utils import dlabspath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
-from ..utils import import_modules
+from ..utils import import_modules, import_module_from_file
 
 from ..support.annexrepo import AnnexRepo
 
@@ -975,6 +975,52 @@ def test_read_csv_lines_one_column(infile):
             {u'h1': u'v2'},
         ]
     )
+
+
+def _get_testm_tree(ind):
+    """Generate a fake package with submodules
+
+    We need to increment index for different tests since otherwise e.g.
+    import_modules fails to import submodule if first import_module_from_file
+    imports that one
+    """
+    return {
+        'dltestm%d' % ind: {
+            '__init__.py': '',
+            'dlsub1': {'__init__.py': 'var = 1'},
+            'dlsub2.py': 'var = 2'}
+    }
+
+@with_tree(tree=_get_testm_tree(1))
+def test_import_modules(topdir):
+    try:
+        sys.path.append(topdir)
+        mods = import_modules(['dlsub1', 'bogus'], 'dltestm1')
+    finally:
+        sys.path.pop(sys.path.index(topdir))
+    eq_(len(mods), 1)
+    eq_(mods[0].__name__, 'dltestm1.dlsub1')
+
+
+@with_tree(tree=_get_testm_tree(2))
+def test_import_module_from_file(topdir):
+    with assert_raises(AssertionError):
+        # we support only submodule files ending with .py ATM. TODO
+        import_module_from_file(op.join(topdir, 'dltestm2', 'dlsub1'))
+
+    dlsub2_path = op.join(topdir, 'dltestm2', 'dlsub2.py')
+    mod = import_module_from_file(dlsub2_path)
+    eq_(mod.__name__, 'dlsub2')  # we are not asking to import as submod of the dltestm1
+    assert_in('dlsub2', sys.modules)
+
+    try:
+        sys.path.append(topdir)
+        import dltestm2
+        mod = import_module_from_file(dlsub2_path, pkg=dltestm2)
+        eq_(mod.__name__, 'dltestm2.dlsub2')
+        assert_in('dltestm2.dlsub2', sys.modules)
+    finally:
+        sys.path.pop(sys.path.index(topdir))
 
 
 def test_import_modules_fail():

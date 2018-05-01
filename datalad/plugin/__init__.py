@@ -16,17 +16,19 @@ import logging
 from glob import glob
 from os.path import join as opj, basename, dirname
 
+import datalad
 from datalad import cfg
 from datalad.dochelpers import exc_str
 
 lgr = logging.getLogger('datalad.plugin')
 
+BUILTIN_PLUGINS_PATH = dirname(__file__)
 magic_plugin_symbol = '__datalad_plugin__'
 
 
 def _get_plugins():
     locations = (
-        dirname(__file__),
+        BUILTIN_PLUGINS_PATH,
         cfg.obtain('datalad.locations.system-plugins'),
         cfg.obtain('datalad.locations.user-plugins'))
     for plugindir in locations:
@@ -37,7 +39,7 @@ def _get_plugins():
 def _load_plugin(filepath, fail=True):
     from datalad.utils import import_module_from_file
     try:
-        mod = import_module_from_file(filepath)
+        mod = import_module_from_file(filepath, pkg=datalad)
     except Exception as e:
         # any exception means full stop
         raise ValueError('plugin at {} is broken: {}'.format(

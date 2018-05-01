@@ -1529,12 +1529,12 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 yield dict(zip(header, row_unicode))
 
 
-def import_modules(mods, pkg, msg="Failed to import {module}", log=lgr.debug):
+def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug):
     """Helper to import a list of modules without failing if N/A
 
     Parameters
     ----------
-    mods: list of str
+    modnames: list of str
       List of module names to import
     pkg: str
       Package under which to import
@@ -1546,56 +1546,66 @@ def import_modules(mods, pkg, msg="Failed to import {module}", log=lgr.debug):
     """
     from importlib import import_module
     _globals = globals()
-    for mod in mods:
+    mods_loaded = []
+    for modname in modnames:
         try:
-            _globals[mod] = import_module(
-                '.{}'.format(mod),
+            _globals[modname] = mod = import_module(
+                '.{}'.format(modname),
                 pkg)
+            mods_loaded.append(mod)
         except Exception as exc:
             from datalad.dochelpers import exc_str
             log((msg + ': {exception}').format(
-                module=mod, package=pkg, exception=exc_str(exc)))
+                module=modname, package=pkg, exception=exc_str(exc)))
+    return mods_loaded
 
 
-def import_module_from_file(modpath, log=lgr.debug):
+def import_module_from_file(modpath, pkg=None, log=lgr.debug):
     """Import provided module given a path
 
     TODO:
     - RF/make use of it in pipeline.py which has similar logic
     - join with import_modules above?
+
+    Parameters
+    ----------
+    pkg: module, optional
+       If provided, and modpath is under pkg.__path__, relative import will be
+       used
     """
     assert(modpath.endswith('.py'))  # for now just for .py files
-    dirname_ = dirname(modpath)
+
+    log("Importing %s" % modpath)
+
+    modname = basename(modpath)[:-3]
+    relmodpath = None
+    if pkg:
+        for pkgpath in pkg.__path__:
+            if path_is_subpath(modpath, pkgpath):
+                # for now relying on having .py extension -- assertion above
+                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace('/', '.')
+                break
 
     try:
-        log("Importing %s" % modpath)
-        sys.path.insert(0, dirname_)
-        modname = basename(modpath)[:-3]
-        if not "TODO":  # dirname_ == opj(dirname(__file__), 'pipelines'):
-            # to allow for relative imports within datalad codebase so
-            # it could be more efficient (e.g. if already loaded) and just "kosher"
-            # In principle, with basic filesystem traversal (go up until no __init__.py)
-            # could potentially be generalized to any.  BUT also should first verify
-            # that the top level package is importable, and if not -- import just as
-            # any other file with the logic below:
-
-            # figure out where under datalad module it is if possible and use that
-            datalad_subpath = "datalad.plugin"  # e.g.
-            mod = __import__(datalad_subpath + '.%s' % modname,
-                             fromlist=[datalad_subpath])
+        if relmodpath:
+            from importlib import import_module
+            mod = import_module(relmodpath, pkg.__name__)
         else:
-            mod = __import__(modname, level=0)
-        return mod
+            dirname_ = dirname(modpath)
+            try:
+                sys.path.insert(0, dirname_)
+                mod = __import__(modname, level=0)
+            finally:
+                if dirname_ in sys.path:
+                    sys.path.pop(sys.path.index(dirname_))
+                else:
+                    log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
     except Exception as e:
         from datalad.dochelpers import exc_str
         raise RuntimeError(
             "Failed to import module from %s: %s" % (modpath, exc_str(e)))
-    finally:
-        if dirname_ in sys.path:
-            sys.path.pop(sys.path.index(dirname_))
-        else:
-            log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
 
+    return mod
 
 lgr.log(5, "Done importing datalad.utils")
 
