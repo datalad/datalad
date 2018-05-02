@@ -16,6 +16,7 @@ import time
 
 from six import string_types
 
+from datalad.log import log_progress
 from datalad.support.gitrepo import GitRepo, GitCommandError
 
 lgr = logging.getLogger('datalad.repodates')
@@ -41,15 +42,25 @@ def branch_blobs(repo, branch):
     lines = git.rev_list(branch, objects=True).splitlines()
     # Trees and blobs have an associated path printed.
     objects = (ln.split() for ln in lines)
-    blob_trees = (obj for obj in objects if len(obj) == 2)
+    blob_trees = [obj for obj in objects if len(obj) == 2]
 
+    num_objects = len(blob_trees)
+
+    log_progress(lgr.info, "repodates_branch_blobs",
+                 "Checking %d objects", num_objects,
+                 label="Checking objects", total=num_objects, unit=" objects")
     # This is inefficient.  It makes a git call for each object, some of which
     # aren't even blobs.  We could instead use 'git cat-file --batch'.
     for obj, fname in blob_trees:
+        log_progress(lgr.info, "repodates_branch_blobs",
+                     "Checking %s", obj,
+                     increment=True, update=1)
         try:
             yield obj, git.cat_file("blob", obj), fname
         except GitCommandError:  # The object was a tree.
             continue
+    log_progress(lgr.info, "repodates_branch_blobs",
+                 "Finished checking %d objects", num_objects)
 
 
 def branch_blobs_in_tree(repo, branch):
@@ -69,13 +80,25 @@ def branch_blobs_in_tree(repo, branch):
     """
     seen_blobs = set()
     git = repo.repo.git
-    tree_lines = git.ls_tree(branch, z=True, r=True)
-    if tree_lines:
-        for line in tree_lines.strip("\0").split("\0"):
+    out = git.ls_tree(branch, z=True, r=True)
+    if out:
+        lines = out.strip("\0").split("\0")
+        num_lines = len(lines)
+        log_progress(lgr.info,
+                     "repodates_blobs_in_tree",
+                     "Checking %d objects in git-annex tree", num_lines,
+                     label="Checking objects", total=num_lines,
+                     unit=" objects")
+        for line in lines:
             _, obj_type, obj, fname = line.split()
+            log_progress(lgr.info, "repodates_blobs_in_tree",
+                         "Checking %s", obj,
+                         increment=True, update=1)
             if obj_type == "blob" and obj not in seen_blobs:
                 yield obj, git.cat_file("blob", obj), fname
             seen_blobs.add(obj)
+        log_progress(lgr.info, "repodates_branch_blobs",
+                     "Finished checking %d blobs", num_lines)
 
 
 # In uuid.log, timestamps look like "timestamp=1523283745.683191724s" and occur
