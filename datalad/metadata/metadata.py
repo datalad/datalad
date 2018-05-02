@@ -247,11 +247,28 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                               path_is_subpath(sub, rpath)]
             to_query.extend(matching_subds)
 
+        to_query_available = []
+        for qap in to_query:
+            if qap['metaprovider'] not in agginfos:
+                res = get_status_dict(
+                    status='impossible',
+                    path=qap['path'],
+                    message=(
+                        'Dataset at %s contains no aggregated metadata on this path',
+                        qap['metaprovider']),
+                )
+                res.update(res, **kwargs)
+                if 'type' in qap:
+                    res['type'] = qap['type']
+                yield res
+            else:
+                to_query_available.append(qap)
+
         # one heck of a beast to get the set of filenames for all metadata objects that are
         # required to be present to fulfill this query
         objfiles = set(
             agginfos.get(qap['metaprovider'], {}).get(t, None)
-            for qap in to_query
+            for qap in to_query_available
             for t in ('dataset_info',) + \
             (('content_info',)
                 if ((reporton is None and qap.get('type', None) == 'file') or
@@ -267,7 +284,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                       for of in objfiles if of],
                 dataset=ds,
                 result_renderer='disabled')
-        for qap in to_query:
+        for qap in to_query_available:
             # info about the dataset that contains the query path
             dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
             res_tmpl = get_status_dict()
@@ -857,22 +874,6 @@ class Metadata(Interface):
                 pcontent = content_by_ds.get(to_query, [])
                 pcontent.append(ap)
                 content_by_ds[to_query] = pcontent
-
-        # test for datasets that will be queried, but have never been aggregated
-        # TODO add option, even even by default, re-aggregate metadata prior query
-        # if it was found to be outdated.
-        # This is superior to re-aggregation upon manipulation, as manipulation
-        # can happen in a gazzilon ways and may even be incremental over multiple
-        # steps where intermediate re-aggregation is pointless and wasteful
-        to_aggregate = [d for d in content_by_ds
-                        if not exists(opj(d, agginfo_relpath))]
-        if to_aggregate:
-            lgr.warning(
-                'Metadata query results might be incomplete, initial '
-                'metadata aggregation was not yet performed in %s at: %s',
-                single_or_plural(
-                    'dataset', 'datasets', len(to_aggregate), include_count=True),
-                to_aggregate)
 
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
