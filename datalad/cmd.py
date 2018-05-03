@@ -25,7 +25,7 @@ import tempfile
 from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type, text_type
-from os.path import abspath, isabs, pathsep, exists
+from .support import path as op
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
@@ -93,7 +93,7 @@ def _cleanup_output(stream, std):
     if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
         if not stream.closed:
             stream.close()
-        if exists(stream.name):
+        if op.exists(stream.name):
             os.unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
@@ -627,8 +627,8 @@ class GitRunner(Runner):
                 # not sure how to live further anyways! ;)
                 alongside = False
             else:
-                annex_path = os.path.dirname(os.path.realpath(annex_fpath))
-                alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+                annex_path = op.dirname(op.realpath(annex_fpath))
+                alongside = op.lexists(op.join(annex_path, 'git'))
             GitRunner._GIT_PATH = annex_path if alongside else ''
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
                        "string)", GitRunner._GIT_PATH)
@@ -642,15 +642,15 @@ class GitRunner(Runner):
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
         if GitRunner._GIT_PATH:
-            git_env['PATH'] = pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+            git_env['PATH'] = op.pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
                 else GitRunner._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
             if var:                                    # if env variable set
-                if not isabs(var):                     # and it's a relative path
-                    git_env[varstring] = abspath(var)  # to absolute path
+                if not op.isabs(var):                   # and it's a relative path
+                    git_env[varstring] = op.abspath(var)  # to absolute path
                     lgr.log(9, "Updated %s to %s", varstring, git_env[varstring])
 
         if 'GIT_SSH_COMMAND' not in git_env:
@@ -674,15 +674,15 @@ class GitRunner(Runner):
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load
     """
-    dst_dir = os.path.dirname(dst)
-    if not os.path.exists(dst_dir):
+    dst_dir = op.dirname(dst)
+    if not op.exists(dst_dir):
         os.makedirs(dst_dir)
-    if os.path.lexists(dst):
+    if op.lexists(dst):
         lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
-    src_realpath = os.path.realpath(src)
+    src_realpath = op.realpath(src)
 
     try:
         os.link(src_realpath, dst)

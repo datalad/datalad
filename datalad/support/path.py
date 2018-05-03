@@ -32,7 +32,14 @@ def _get_unicode_robust_version(f):
     return wrapped
 
 
+abspath = op.abspath
+dirname = op.dirname
 exists = _get_unicode_robust_version(op.exists)
 isdir = _get_unicode_robust_version(op.isdir)
 isabs = _get_unicode_robust_version(op.isabs)
 join = op.join
+lexists = _get_unicode_robust_version(op.lexists)
+normpath = op.normpath
+pathsep = op.pathsep
+relpath = op.relpath
+realpath = _get_unicode_robust_version(op.realpath)
