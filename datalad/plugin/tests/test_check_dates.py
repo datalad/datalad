@@ -12,6 +12,7 @@ import json
 import logging
 import os
 
+from datalad.api import check_dates
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.tests.test_repodates import set_date
@@ -19,11 +20,7 @@ from datalad.tests.utils import assert_dict_equal, assert_false, assert_in, \
     assert_raises, eq_, ok_, skip_if_no_module, with_tree
 from datalad.utils import chpwd, swallow_logs, swallow_outputs
 
-from datalad.plugin import check_dates
-
-call = partial(check_dates.CheckDates.__call__,
-               result_renderer="disabled",
-               return_type="list")
+call = partial(check_dates, result_renderer="disabled", return_type="list")
 
 
 @with_tree(tree={"invalid": {".git": {}}})
@@ -38,8 +35,7 @@ def test_check_dates_invalid_date():
 
     with swallow_outputs() as cmo:
         assert_raises(IncompleteResultsError,
-                      check_dates.CheckDates.__call__,
-                      [],
+                      check_dates, [],
                       reference_date="not a valid date",
                       return_type="list")
         out = cmo.out
@@ -61,10 +57,9 @@ def test_check_dates(path):
 
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:
-        check_dates.CheckDates.__call__(
-            [repo],
-            reference_date=refdate,
-            return_type="list")
+        check_dates([repo],
+                    reference_date=refdate,
+                    return_type="list")
         assert_in("report", json.loads(cmo.out).keys())
 
     # We find the newer objects.
