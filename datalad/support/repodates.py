@@ -97,7 +97,7 @@ def branch_blobs_in_tree(repo, branch):
             if obj_type == "blob" and obj not in seen_blobs:
                 yield obj, git.cat_file("blob", obj), fname
             seen_blobs.add(obj)
-        log_progress(lgr.info, "repodates_branch_blobs",
+        log_progress(lgr.info, "repodates_blobs_in_tree",
                      "Finished checking %d blobs", num_lines)
 
 
