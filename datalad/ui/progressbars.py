@@ -85,9 +85,9 @@ try:
         # Newer versions seems to behave more consistently so do not require
         # those settings
         _default_pbar_params = \
-            dict(smoothing=0, miniters=1, mininterval=0) \
+            dict(smoothing=0, miniters=1, mininterval=0.1) \
             if external_versions['tqdm'] < '4.10.0' \
-            else dict(mininterval=0)
+            else dict(mininterval=0.1)
 
         def __init__(self, label='', fill_text=None,
                      total=None, unit='B', out=sys.stdout, leave=False):
