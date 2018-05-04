@@ -114,7 +114,7 @@ DataLad can be queried for information about known datasets. Doing a first searc
 query, datalad automatically offers assistence to obtain a :term:`superdataset` first.
 The superdataset is a lightweight container that contains meta information about known datasets but does not contain actual data itself. 
 
-For example, we might want to look for dataset that were funded by, or acknowledge the US National Science Foundation (NSF)::
+For example, we might want to look for datasets that were funded by, or acknowledge the US National Science Foundation (NSF)::
 
   ~ % datalad search NSF
   No DataLad dataset found at current location
