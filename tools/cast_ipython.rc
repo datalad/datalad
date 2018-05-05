@@ -1,0 +1,16 @@
+# This file contains ipython configuration variables to be used for generating
+# asciinema demos to guarantee consistent appearance.
+
+# make a fake temporary home dir and go into it
+SCREENCAST_HOME=~/demo
+if [ ! -e "$SCREENCAST_HOME" ]; then
+    mkdir -p ${SCREENCAST_HOME} || {
+        echo "FAILED to create $SCREENCAST_HOME" >&2
+        exit 1;  # we need demo directory!
+    }
+fi
+cd $SCREENCAST_HOME
+ipython
+
+# cleanup at the end
+trap "cd ; rm -rf ~/demo > /dev/null 2>&1" EXIT
