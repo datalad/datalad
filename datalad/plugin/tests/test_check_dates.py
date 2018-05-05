@@ -57,9 +57,12 @@ def test_check_dates(path):
 
     # The standard renderer outputs json.
     with swallow_outputs() as cmo:
-        check_dates([repo],
-                    reference_date=refdate,
-                    return_type="list")
+        # Set level to WARNING to avoid the progress bar when
+        # DATALAD_TESTS_UI_BACKEND=console.
+        with swallow_logs(new_level=logging.WARNING):
+            check_dates([repo],
+                        reference_date=refdate,
+                        return_type="list")
         assert_in("report", json.loads(cmo.out).keys())
 
     # We find the newer objects.
