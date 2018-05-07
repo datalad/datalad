@@ -90,9 +90,9 @@ class Run(Interface):
             any known annex file, it will be treated as a glob and passed to
             :command:`git annex find --include=`. The value should be specified
             relative to the top-level directory of the current dataset. Using
-            '*' for this value means "all current annex files". Note: This
-            operation currently only considers the current dataset, not any
-            subdatasets. [CMD: This option can be given more than once.
+            '*' for this value means "all current annex files". Note: Globbing
+            currently only considers the current dataset, not any subdatasets.
+            [CMD: This option can be given more than once.
             CMD]"""),
         message=save_message_opt,
         rerun=Parameter(
