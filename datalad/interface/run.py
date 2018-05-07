@@ -190,7 +190,7 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
 
     if inputs is None:
         inputs = []
-    else:
+    elif inputs:
         inputs = _resolve_files(ds, inputs)
         if not inputs:
             lgr.warning("No matching files found for --input")
