@@ -123,7 +123,8 @@ class Run(Interface):
                 yield r
         else:
             if cmd:
-                for r in run_command(cmd, dataset, inputs, message):
+                for r in run_command(cmd, dataset=dataset,
+                                     inputs=inputs, message=message):
                     yield r
             else:
                 lgr.warning("No command given")
