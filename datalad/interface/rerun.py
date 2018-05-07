@@ -323,6 +323,7 @@ class Rerun(Interface):
                 for r in run_command(run_info['cmd'],
                                      dataset=ds,
                                      inputs=run_info.get("inputs", []),
+                                     outputs=run_info.get("outputs", []),
                                      message=message or rev["run_message"],
                                      rerun_info=run_info):
                     yield r

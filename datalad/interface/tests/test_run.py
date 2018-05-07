@@ -569,7 +569,7 @@ def test_rerun_script(path):
 @with_testrepos('basic_annex', flavors=['clone'])
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
-def test_run_inputs(path):
+def test_run_inputs_outputs(path):
     ds = Dataset(path)
 
     assert_false(ds.repo.file_has_content("test-annex.dat"))
@@ -612,6 +612,28 @@ def test_run_inputs(path):
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
 
         ds.repo.drop(inputs, options=["--force"])
+
+    # --output will unlock files that are present.
+    ds.repo.get("a.dat")
+    ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), "a.dat appended\n")
+
+    # --output will remove files that are not present.
+    ds.repo.drop("a.dat", options=["--force"])
+    ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), " appended\n")
+
+    # --input can be combined with --output.
+    ds.repo.repo.git.reset("--hard", "HEAD~2")
+    ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), "a.dat appended\n")
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run("echo blah", outputs=["*.not-an-extension"])
+        assert_in("No matching files found for --output", cml.out)
 
 
 def test_rerun_commit_message_check():

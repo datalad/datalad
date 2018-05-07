@@ -35,6 +35,7 @@ from datalad.distribution.get import Get
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.interface.unlock import Unlock
 
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
@@ -101,6 +102,16 @@ class Run(Interface):
             currently only considers the current dataset, not any subdatasets.
             [CMD: This option can be given more than once.
             CMD]"""),
+        outputs=Parameter(
+            args=("--output",),
+            dest="outputs",
+            metavar=("PATH"),
+            action='append',
+            doc="""Prepare this file to be an output file of the command. If
+            the content of this file is present, unlock the file. Otherwise,
+            remove it. Globs are treated in the same way described for [PY:
+            `inputs` PY][CMD: --input CMD]. [CMD: This option can be given more
+            than once. CMD]"""),
         message=save_message_opt,
         rerun=Parameter(
             args=('--rerun',),
@@ -118,6 +129,7 @@ class Run(Interface):
             cmd=None,
             dataset=None,
             inputs=None,
+            outputs=None,
             message=None,
             rerun=False):
         if rerun:
@@ -131,7 +143,8 @@ class Run(Interface):
         else:
             if cmd:
                 for r in run_command(cmd, dataset=dataset,
-                                     inputs=inputs, message=message):
+                                     inputs=inputs, outputs=outputs,
+                                     message=message):
                     yield r
             else:
                 lgr.warning("No command given")
@@ -148,7 +161,8 @@ def _resolve_files(dset, globs_or_files):
 
 
 # This helper function is used to add the rerun_info argument.
-def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
+def run_command(cmd, dataset=None, inputs=None, outputs=None,
+                message=None, rerun_info=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -198,6 +212,37 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
         else:
             for res in ds.get(inputs):
                 yield res
+
+    if outputs is None:
+        outputs = []
+    elif outputs:
+        if not rerun_info:
+            outputs = _resolve_files(ds, outputs)
+        if not outputs:
+            lgr.warning("No matching files found for --output")
+        else:
+            # Remove files that are already unlocked so that the _partition
+            # call doesn't label them as outputs_missing.
+            outputs_ = filter(
+                lambda f: ds.repo.is_under_annex([f], batch=True)[0],
+                outputs)
+            outputs_missing, outputs_present = _partition(
+                outputs_,
+                lambda f: ds.repo.file_has_content([f], batch=True)[0])
+
+            if outputs_present:
+                for res in ds.unlock(outputs_present):
+                    yield res
+
+            if outputs_missing:
+                for removed in ds.repo.remove(outputs_missing):
+                    yield get_status_dict(
+                        "run",
+                        status="ok",
+                        ds=ds,
+                        type="file",
+                        path=removed,
+                        message=("Removed file"))
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
@@ -249,7 +294,8 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': inputs
+        'inputs': inputs,
+        'outputs': outputs
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
