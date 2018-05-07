@@ -175,15 +175,6 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
     # not needed ATM
     #refds_path = ds.path
 
-    if inputs is None:
-        inputs = []
-    else:
-        inputs = _resolve_files(ds, inputs)
-        if not inputs:
-            lgr.warning("No matching files found for --input")
-        for res in ds.get(inputs):
-            yield res
-
     # delayed imports
     from datalad.cmd import Runner
 
@@ -196,6 +187,15 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
             message=('unsaved modifications present, '
                      'cannot detect changes by command'))
         return
+
+    if inputs is None:
+        inputs = []
+    else:
+        inputs = _resolve_files(ds, inputs)
+        if not inputs:
+            lgr.warning("No matching files found for --input")
+        for res in ds.get(inputs):
+            yield res
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
