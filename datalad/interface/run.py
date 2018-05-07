@@ -195,8 +195,9 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
             inputs = _resolve_files(ds, inputs)
         if not inputs:
             lgr.warning("No matching files found for --input")
-        for res in ds.get(inputs):
-            yield res
+        else:
+            for res in ds.get(inputs):
+                yield res
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
