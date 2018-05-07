@@ -130,17 +130,15 @@ class Run(Interface):
                 lgr.warning("No command given")
 
 
-def _resolve_inputs(dset, inputs):
-    """Expand --include globs in `inputs` to file names.
+def _resolve_files(dset, globs_or_files):
+    """Expand --include globs in `globs_or_files` to file names.
     """
-    globs, file_inputs = partition(
-        inputs,
+    globs, files = partition(
+        globs_or_files,
         lambda f: dset.repo.is_under_annex([f], batch=True)[0])
-    globs, file_inputs = list(globs), list(file_inputs)
-
-    glob_inputs = dset.repo.get_annexed_files(patterns=globs) if globs else []
-
-    return file_inputs + glob_inputs
+    globs, files = list(globs), list(files)
+    globbed = dset.repo.get_annexed_files(patterns=globs) if globs else []
+    return files + globbed
 
 
 # This helper function is used to add the rerun_info argument.
@@ -174,7 +172,7 @@ def run_command(cmd, dataset=None, inputs=None, message=None, rerun_info=None):
     if inputs is None:
         inputs = []
     else:
-        inputs = _resolve_inputs(ds, inputs)
+        inputs = _resolve_files(ds, inputs)
         if not inputs:
             lgr.warning("No matching files found for --input")
         for res in ds.get(inputs):
