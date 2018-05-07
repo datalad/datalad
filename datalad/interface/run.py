@@ -52,6 +52,13 @@ def _format_cmd_shorty(cmd):
     return cmd_shorty
 
 
+def _partition(items, predicate=bool):
+    """Like utils.partition, but return a tuple of lists, not generators.
+    """
+    no, yes = partition(items, predicate)
+    return list(no), list(yes)
+
+
 @build_doc
 class Run(Interface):
     """Run an arbitrary command and record its impact on a dataset.
@@ -133,10 +140,9 @@ class Run(Interface):
 def _resolve_files(dset, globs_or_files):
     """Expand --include globs in `globs_or_files` to file names.
     """
-    globs, files = partition(
+    globs, files = _partition(
         globs_or_files,
         lambda f: dset.repo.is_under_annex([f], batch=True)[0])
-    globs, files = list(globs), list(files)
     globbed = dset.repo.get_annexed_files(patterns=globs) if globs else []
     return files + globbed
 
