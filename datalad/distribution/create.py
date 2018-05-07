@@ -166,6 +166,12 @@ class Create(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
+        fake_dates=Parameter(
+            args=('--fake-dates',),
+            action='store_true',
+            doc="""Configure the repository to use fake dates. The date for a
+            new commit will be set to one second later than the latest commit
+            in the repository. This can be used to anonymize dates."""),
     )
 
     @staticmethod
@@ -185,7 +191,8 @@ class Create(Interface):
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None,
-            text_no_annex=None
+            text_no_annex=None,
+            fake_dates=False
     ):
 
         # two major cases
@@ -313,7 +320,8 @@ class Create(Interface):
                 tbds.path,
                 url=None,
                 create=True,
-                git_opts=git_opts)
+                git_opts=git_opts,
+                fake_dates=fake_dates)
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", tbds.path)
@@ -326,7 +334,8 @@ class Create(Interface):
                 description=description,
                 git_opts=git_opts,
                 annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts
+                annex_init_opts=annex_init_opts,
+                fake_dates=fake_dates
             )
 
             if text_no_annex:

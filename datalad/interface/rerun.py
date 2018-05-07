@@ -296,7 +296,9 @@ class Rerun(Interface):
                     yield dict(err_info, status='ok', message=err_msg)
 
                     if pick:
-                        ds.repo.repo.git.cherry_pick(hexsha)
+                        ds.repo._git_custom_command(
+                            None, ["git", "cherry-pick", hexsha],
+                            check_fake_dates=True)
                     continue
 
                 run_info = rev["run_info"]

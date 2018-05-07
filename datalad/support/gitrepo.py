@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 import logging
 import re
 import shlex
+import time
 import os
 from os import linesep
 from os.path import join as opj
@@ -483,7 +484,7 @@ class GitRepo(RepoInterface):
     # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, repo=None, **kwargs):
+                 git_opts=None, repo=None, fake_dates=False, **kwargs):
         """Creates representation of git repository at `path`.
 
         Can also be used to create a git repository at `path`.
@@ -602,6 +603,11 @@ class GitRepo(RepoInterface):
             self.inode = os.stat(self.realpath).st_ino
         else:
             self.inode = None
+
+        if fake_dates:
+            self.configure_fake_dates()
+        # Set by fake_dates_enabled to cache config value across this instance.
+        self._fake_dates_enabled = None
 
     @property
     def repo(self):
@@ -1001,6 +1007,63 @@ class GitRepo(RepoInterface):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
+    def configure_fake_dates(self):
+        """Configure repository to use fake dates.
+        """
+        lgr.debug("Enabling fake dates")
+        self.config.set("datalad.fake-dates", "true")
+
+    @property
+    def fake_dates_enabled(self):
+        """Is the repository configured to use fake dates?
+        """
+        if self._fake_dates_enabled is None:
+            self._fake_dates_enabled = \
+                self.config.getbool('datalad', 'fake-dates', default=False)
+        return self._fake_dates_enabled
+
+    def add_fake_dates(self, env):
+        """Add fake dates to `env`.
+
+        Parameters
+        ----------
+        env : dict or None
+            Environment variables.
+
+        Returns
+        -------
+        A dict (copied from env), with date-related environment
+        variables for git and git-annex set.
+        """
+        env = (env if env is not None else os.environ).copy()
+        # Note: Use _git_custom_command here rather than repo.git.for_each_ref
+        # so that we use annex-proxy in direct mode.
+        last_date = self._git_custom_command(
+            None,
+            ["git", "for-each-ref", "--count=1",
+             "--sort=-committerdate", "--format=%(committerdate:raw)",
+             "refs/heads"])[0].strip()
+
+        if last_date:
+            # Drop the "contextual" timezone, leaving the unix timestamp.  We
+            # avoid :unix above because it wasn't introduced until Git v2.9.4.
+            last_date = last_date.split()[0]
+            seconds = int(last_date)
+        else:
+            seconds = self.config.obtain("datalad.fake-dates-start")
+        seconds_new = seconds + 1
+        date = "@{} +0000".format(seconds_new)
+
+        lgr.debug("Setting date to %s",
+                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
+                                time.gmtime(seconds_new)))
+
+        env["GIT_AUTHOR_DATE"] = date
+        env["GIT_COMMITTER_DATE"] = date
+        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
+
+        return env
+
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):
         """Commit changes to git.
@@ -1064,7 +1127,8 @@ class GitRepo(RepoInterface):
 
         try:
             self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True)
+                                     expect_stderr=True, expect_fail=True,
+                                     check_fake_dates=True)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1469,7 +1533,8 @@ class GitRepo(RepoInterface):
     def _git_custom_command(self, files, cmd_str,
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
-                            shell=None, expect_fail=False):
+                            shell=None, expect_fail=False,
+                            check_fake_dates=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1502,6 +1567,9 @@ class GitRepo(RepoInterface):
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
         from .exceptions import GitIgnoreError
+
+        if check_fake_dates and self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
 
         try:
             out, err = self.cmd_call_wrapper.run(
@@ -1887,6 +1955,7 @@ class GitRepo(RepoInterface):
             options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
+            check_fake_dates=True,
             **kwargs
         )
 
@@ -2137,7 +2206,8 @@ class GitRepo(RepoInterface):
         if message:
             options += ['-m', message]
         self._git_custom_command(
-            '', ['git', 'tag'] + options + [str(tag)]
+            '', ['git', 'tag'] + options + [str(tag)],
+            check_fake_dates=True
         )
 
     def get_tags(self, output=None):

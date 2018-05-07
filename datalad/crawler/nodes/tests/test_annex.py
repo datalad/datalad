@@ -100,8 +100,9 @@ def _test_annex_file(mode, topdir, topurl, outdir):
 
     # addurl is batched, and we haven't forced annex flushing so there should
     # be a batched process
-    assert_equal(len(annex.repo._batched), 1)
-    assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
+    if not annex.repo.fake_dates_enabled:
+        assert_equal(len(annex.repo._batched), 1)
+        assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
     # if we finalize, it should flush batched annexes and commit
     list(annex.finalize()({}))
     assert(lexists(tfile))

@@ -178,7 +178,7 @@ def test_rerun_onto(path):
     grow_file = opj(path, "grows")
 
     ds.run('echo static-content > static')
-    ds.repo.repo.git.tag("static")
+    ds.repo.tag("static")
     ds.run('echo x$(cat grows) > grows')
     ds.rerun()
     eq_('xx\n', open(grow_file).read())
@@ -238,7 +238,7 @@ def test_rerun_chain(path):
 
     grow_file = opj(path, "grows")
     ds.run('echo x$(cat grows) > grows')
-    ds.repo.repo.git.tag("first-run")
+    ds.repo.tag("first-run")
 
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
@@ -342,7 +342,7 @@ def test_run_failure(path):
 def test_rerun_branch(path):
     ds = Dataset(path).create()
 
-    ds.repo.repo.git.tag("prerun")
+    ds.repo.tag("prerun")
 
     outfile = opj(path, "run-file")
 
@@ -395,7 +395,7 @@ def test_rerun_branch(path):
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
 
-    ds.repo.repo.git.tag("prerun")
+    ds.repo.tag("prerun")
     ds.run('echo abc > runfile')
     with open(opj(path, "nonrun-file"), "w") as f:
         f.write("foo")
@@ -434,7 +434,7 @@ def test_rerun_outofdate_tree(path):
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
-    ds.repo.repo.git.tag("ambig")
+    ds.repo.tag("ambig")
     # Don't fail when "ambig" refers to both a file and revision.
     ds.rerun(since="", revision="ambig", branch="rerun")
     eq_(len(ds.repo.repo.git.rev_list("rerun").split()),

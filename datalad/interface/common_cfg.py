@@ -89,6 +89,21 @@ definitions = {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
     },
+    'datalad.fake-dates': {
+        'ui': ('yesno', {
+               'title': 'Fake (anonymize) dates',
+               'text': 'Should the dates in the logs be faked?'}),
+        'destination': 'local',
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.fake-dates-start': {
+        'ui': ('question', {
+            'title': 'Initial fake date',
+            'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.'}),
+        'type': EnsureInt(),
+        'default': 1112911993,
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),

@@ -104,6 +104,7 @@ with DataLad.
 
    add_readme
    addurls
+   check_dates
    export_archive
    export_to_figshare
    no_annex

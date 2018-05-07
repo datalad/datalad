@@ -78,6 +78,7 @@ Plugin commands
 
    generated/man/datalad-add-readme
    generated/man/datalad-addurls
+   generated/man/datalad-check-dates
    generated/man/datalad-export-archive
    generated/man/datalad-export-to-figshare
    generated/man/datalad-no-annex

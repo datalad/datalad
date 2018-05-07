@@ -349,3 +349,20 @@ def test_create_text_no_annex(path):
     ds.add(['t', 'b'])
     ok_file_under_git(path, 't', annexed=False)
     ok_file_under_git(path, 'b', annexed=True)
+
+
+@with_tempfile(mkdir=True)
+def test_create_fake_dates(path):
+    ds = create(path, fake_dates=True)
+
+    ok_(ds.config.getbool("datalad", "fake-dates"))
+    ok_(ds.repo.fake_dates_enabled)
+
+    # Another instance detects the fake date configuration.
+    ok_(Dataset(path).repo.fake_dates_enabled)
+
+    first_commit = ds.repo.repo.commit(
+        ds.repo.repo.git.rev_list("--reverse", "--all").split()[0])
+
+    eq_(ds.config.obtain("datalad.fake-dates-start") + 1,
+        first_commit.committed_date)

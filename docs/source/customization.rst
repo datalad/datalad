@@ -36,6 +36,7 @@ overview of plugins included in this DataLad release.
 
    add_readme
    addurls
+   check_dates
    export_archive
    export_to_figshare
    no_annex

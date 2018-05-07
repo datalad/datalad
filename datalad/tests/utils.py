@@ -27,6 +27,7 @@ from six import string_types
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
+from contextlib import contextmanager
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -822,6 +823,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
@@ -832,6 +834,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
+                # The is_explicit_path check is needed because it may be a URL,
+                # but check_dates needs a local path or GitRepo object.
+                if fake_dates and is_explicit_path(uri):
+                    from ..support.repodates import check_dates
+                    assert_false(
+                        check_dates(uri, annex="tree")["objects"])
                 if uri in _TEMP_PATHS_CLONES:
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
@@ -1500,6 +1508,24 @@ def patch_config(vars):
     """
     from datalad import cfg
     return patch.dict(cfg._store, vars)
+
+
+@contextmanager
+def set_date(timestamp):
+    """Temporarily override environment variables for git/git-annex dates.
+
+    Parameters
+    ----------
+    timestamp : int
+        Unix timestamp.
+    """
+    git_ts = "@{} +0000".format(timestamp)
+    with patch.dict("os.environ",
+                    {"GIT_COMMITTER_DATE": git_ts,
+                     "GIT_AUTHOR_DATE": git_ts,
+                     "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
+                     "DATALAD_FAKE__DATES": "0"}):
+        yield
 
 
 #
