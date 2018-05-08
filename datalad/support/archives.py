@@ -18,9 +18,9 @@ assert(external_versions["patoolib"] >= "1.7")
 
 import os
 import tempfile
-from os.path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
-from os.path import sep as opsep
-from os.path import realpath
+from .path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
+from .path import sep as opsep
+from .path import realpath
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
