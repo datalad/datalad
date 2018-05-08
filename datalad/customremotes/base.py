@@ -17,7 +17,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, realpath, dirname, lexists
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse

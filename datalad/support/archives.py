@@ -133,6 +133,8 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         os.makedirs(dir_)
 
     with swallow_outputs() as cmo:
+        archive = assure_bytes(archive)
+        dir_ = assure_bytes(dir_)
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path

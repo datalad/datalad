@@ -27,6 +27,7 @@ from ..support.locking import lock_if_check_fails
 from ..support.path import exists
 from ..utils import getpwd
 from ..utils import unique
+from ..utils import assure_bytes
 from .base import AnnexCustomRemote
 from .main import main as super_main
 
@@ -226,6 +227,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 # if for testing we want to force getting the archive extracted
                 # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
                 efile = self.cache[akey_path].get_extracted_filename(afile)
+                efile = assure_bytes(efile)
 
                 if exists(efile):
                     size = os.stat(efile).st_size
