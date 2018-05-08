@@ -2064,7 +2064,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 log_online=True, log_stderr=False,
                 **kwargs
             )
-            assert len(out_json) == 1, "should always be a single-time list"
+            if len(out_json) != 1:
+                raise AssertionError(
+                    "should always be a single-item list, Got: %s"
+                    % str(out_json))
             # Make the output's structure match bcmd's.
             out_json = out_json[0]
             # Don't capture stderr, since download progress provided by wget uses
