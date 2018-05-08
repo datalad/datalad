@@ -2060,7 +2060,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                           "because fake dates are enabled")
             out_json = self._run_annex_command_json(
                 'addurl',
-                opts=options + ['--file=%s' % file_] + [url],
+                opts=options + [assure_bytes('--file=%s' % file_)] + [url],
                 log_online=True, log_stderr=False,
                 **kwargs
             )
