@@ -3,6 +3,8 @@ import os
 
 from contextlib import contextmanager
 
+from .path import exists
+
 import logging
 lgr = logging.getLogger('datalad.locking')
 
@@ -95,6 +97,6 @@ def lock_if_check_fails(
     finally:
         if lock.acquired:
             lgr.debug("Releasing lock %s", lock_filename)
-            if os.path.exists(lock_filename):
+            if exists(lock_filename):
                 os.unlink(lock_filename)
             lock.release()
