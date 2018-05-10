@@ -224,10 +224,12 @@ def annexjson2result(d, ds, **kwargs):
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     # avoid meaningless standard messages
-    if 'note' in d and (
-            d['note'] != 'checksum...' and
-            not d['note'].startswith('checking file')):
-        res['message'] = translate_annex_notes.get(d['note'], d['note'])
+    if 'note' in d:
+        note = "; ".join(ln for ln in d['note'].splitlines()
+                         if ln != 'checksum...'
+                         and not ln.startswith('checking file'))
+        if note:
+            res['message'] = translate_annex_notes.get(note, note)
     return res
 
 
