@@ -88,8 +88,6 @@ Miscellaneous commands
    :toctree: generated
 
    api.add_archive_content
-   api.crawl
-   api.crawl_init
    api.test
 
 Plugins
@@ -139,16 +137,6 @@ Configuration management
    :toctree: generated
 
    config
-
-Crawler
-=======
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   crawler.base
-   crawler.pipeline
 
 Test infrastructure
 ===================

@@ -85,7 +85,7 @@ Downloading DataLad's canonical superdataset
 --------------------------------------------
 
 DataLad's canonical :term:`superdataset` provides an automated collection of datasets
-from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
+from various portals and sites. The argument ``///`` can be used 
 as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
