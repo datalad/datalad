@@ -110,7 +110,7 @@ nosave_opt = Parameter(
     args=("--nosave",),
     dest='save',
     action="store_false",
-    doc="""by default all modifications to a dataset are immediately saved. Given
+    doc="""by default all modifications to a dataset are immediately saved. Giving
     this option will disable this behavior.""")
 
 save_message_opt = Parameter(
