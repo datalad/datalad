@@ -113,7 +113,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, or
+      Power-user info: This command uses :command:`git annex add` or
       :command:`git add` to incorporate new dataset content.
     """
 

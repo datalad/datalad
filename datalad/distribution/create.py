@@ -82,7 +82,7 @@ class Create(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git init`, and
+      Power-user info: This command uses :command:`git init` and
       :command:`git annex init` to prepare the new dataset. Registering to a
       superdataset is performed via a :command:`git submodule add` operation
       in the discovered superdataset.
@@ -112,7 +112,7 @@ class Create(Interface):
             args=("-d", "--dataset"),
             metavar='PATH',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is give, a new subdataset will be created in it.""",
+            a dataset is given, a new subdataset will be created in it.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
