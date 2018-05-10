@@ -94,14 +94,15 @@ class Run(Interface):
             metavar=("PATH"),
             action='append',
             doc="""A dependency for the run. Before running the command, the
-            content of this file will be retrieved. If the value doesn't match
-            any known annex file, it will be treated as a glob and passed to
-            :command:`git annex find --include=`. The value should be specified
-            relative to the top-level directory of the current dataset. Using
-            '*' for this value means "all current annex files". Note: Globbing
-            currently only considers the current dataset, not any subdatasets.
-            [CMD: This option can be given more than once.
-            CMD]"""),
+            content of this file will be retrieved. A value of "." means "run
+            :command:`datalad get .`", and any other values given are ignored.
+            If the value doesn't match any known annex file, it will be treated
+            as a glob and passed to :command:`git annex find --include=`. The
+            value should be specified relative to the top-level directory of
+            the current dataset. Using '*' for this value means "all current
+            annex files". Note: Globbing currently only considers the current
+            dataset, not any subdatasets. [CMD: This option can be given more
+            than once. CMD]"""),
         outputs=Parameter(
             args=("--output",),
             dest="outputs",
@@ -204,6 +205,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
 
     if inputs is None:
         inputs = []
+    elif any(i.strip() == "." for i in inputs):
+        inputs = ["."]
+        for res in ds.get(inputs):
+            yield res
     elif inputs:
         if not rerun_info:
             inputs = _resolve_files(ds, inputs)

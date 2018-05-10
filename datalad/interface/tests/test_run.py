@@ -613,6 +613,19 @@ def test_run_inputs_outputs(path):
 
         ds.repo.drop(inputs, options=["--force"])
 
+    # --input=. runs "datalad get ."
+    ds.run("touch dot-dummy", inputs=["."])
+    eq_(ds.repo.get_annexed_files(),
+        ds.repo.get_annexed_files(with_content_only=True))
+    # On rerun, we get all files, even those that weren't in the tree at the
+    # time of the run.
+    create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
+    ds.add(".")
+    ds.repo.copy_to(["after-dot-run"], remote="origin")
+    ds.repo.drop(["after-dot-run"], options=["--force"])
+    ds.rerun("HEAD^")
+    ds.repo.file_has_content("after-dot-run")
+
     # --output will unlock files that are present.
     ds.repo.get("a.dat")
     ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
