@@ -1,5 +1,5 @@
-DataLad |---| data management and distribution suite: Documentation
-*******************************************************************
+DataLad |---| data management and publication multitool: Documentation
+**********************************************************************
 
 .. toctree::
    :maxdepth: 1
@@ -32,9 +32,13 @@ Commands and API
    modref
    config
 
-Extension modules
-=================
+Extension packages
+==================
 
+DataLad can be customized and additional functionality can be integrated via
+extensions.  Each extension provides its own documentation:
+
+- `Crawling web resources and automated data distributions <http://docs.datalad.org/projects/crawler>`_
 - `Neuroimaging data and workflows <http://docs.datalad.org/projects/neuroimaging>`_
 
 
