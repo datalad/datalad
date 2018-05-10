@@ -32,6 +32,7 @@ from datalad.support.param import Parameter
 
 from datalad.distribution.add import Add
 from datalad.distribution.get import Get
+from datalad.distribution.remove import Remove
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
@@ -226,28 +227,16 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
         if not outputs:
             lgr.warning("No matching files found for --output")
         else:
-            # Remove files that are already unlocked so that the _partition
-            # call doesn't label them as outputs_missing.
-            outputs_ = filter(
-                lambda f: ds.repo.is_under_annex([f], batch=True)[0],
-                outputs)
-            outputs_missing, outputs_present = _partition(
-                outputs_,
-                lambda f: ds.repo.file_has_content([f], batch=True)[0])
-
-            if outputs_present:
-                for res in ds.unlock(outputs_present):
-                    yield res
-
-            if outputs_missing:
-                for removed in ds.repo.remove(outputs_missing):
-                    yield get_status_dict(
-                        "run",
-                        status="ok",
-                        ds=ds,
-                        type="file",
-                        path=removed,
-                        message=("Removed file"))
+            for res in ds.unlock(outputs, on_failure="ignore"):
+                if res["status"] == "impossible":
+                    if "no content" in res["message"]:
+                        for rem_res in ds.remove(res["path"],
+                                                 check=False, save=False):
+                            yield rem_res
+                        continue
+                    elif "path does not exist" in res["message"]:
+                        continue
+                yield res
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd

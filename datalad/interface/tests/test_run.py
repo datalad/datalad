@@ -648,6 +648,12 @@ def test_run_inputs_outputs(path):
         ds.run("echo blah", outputs=["*.not-an-extension"])
         assert_in("No matching files found for --output", cml.out)
 
+    ds.create('sub')
+    ds.run("echo sub_orig >sub/subfile")
+    ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
+    ds.drop("sub/subfile", check=False)
+    ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
+
 
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
