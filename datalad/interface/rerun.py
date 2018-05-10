@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import dropwhile
 import json
+import os
 import re
 import sys
 
@@ -316,14 +317,15 @@ class Rerun(Interface):
                 # bring back the entire state of the tree with #1424, but
                 # we limit ourself to file addition/not-in-place-modification
                 # for now
-                for r in ds.unlock(new_or_modified(ds, hexsha),
-                                   return_type='generator', result_xfm=None):
-                    yield r
+                auto_outputs = (os.path.relpath(ap["path"], ds.path)
+                                for ap in new_or_modified(ds, hexsha))
+                outputs = run_info.get("outputs", [])
+                auto_outputs = [p for p in auto_outputs if p not in outputs]
 
                 for r in run_command(run_info['cmd'],
                                      dataset=ds,
                                      inputs=run_info.get("inputs", []),
-                                     outputs=run_info.get("outputs", []),
+                                     outputs=outputs + auto_outputs,
                                      message=message or rev["run_message"],
                                      rerun_info=run_info):
                     yield r

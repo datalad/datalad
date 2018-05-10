@@ -283,7 +283,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs,
-        'outputs': outputs
+        # Get outputs from the rerun_info because rerun adds new/modified files
+        # to the outputs argument.
+        'outputs': rerun_info["outputs"] if rerun_info else outputs
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
