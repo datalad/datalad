@@ -90,6 +90,22 @@ def test_call_from_parser_default_args():
         eq_(val, ["nothing is", "magical"])
 
 
+def test_call_from_parser_result_filter():
+    class DummyOne(Interface):
+        @staticmethod
+        def __call__(**kwargs):
+            yield kwargs
+
+    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
+        # call_from_parser doesn't add result_filter to the keyword arguments
+        # unless a CLI option sets it to a non-None value.
+        assert_not_in("result_filter",
+                      DummyOne.call_from_parser(_new_args())[0])
+        assert_in("result_filter",
+                  DummyOne.call_from_parser(
+                      _new_args(common_report_type="dataset"))[0])
+
+
 def test_get_result_filter_arg_vs_config():
     # just tests that we would be obtaining the same constraints via
     # cmdline argument or via config variable.  With cmdline overloading
