@@ -489,7 +489,7 @@ def test_new_or_modified(path):
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
-    ds.repo.add(".", commit=True)
+    ds.add(".")
     assert_false(ds.repo.dirty)
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
     # Diffing doesn't fail when the branch contains a single commit.
@@ -501,7 +501,7 @@ def test_new_or_modified(path):
 
     with open(opj(path, "to_add"), "w") as f:
         f.write("content5")
-    ds.repo.add(["to_add"], commit=True)
+    ds.repo.add(["to_add"])
     ds.repo.commit("add one, remove another")
 
     eq_(list(apfiles(new_or_modified(ds, "HEAD"))),
@@ -512,7 +512,7 @@ def test_new_or_modified(path):
         f.write("updated 1")
     with open(opj(path, "d/to_modify"), "w") as f:
         f.write("updated 2")
-    ds.repo.add(["to_modify", "d/to_modify"], commit=True)
+    ds.add(["to_modify", "d/to_modify"])
 
     eq_(set(apfiles(new_or_modified(ds, "HEAD"))),
         {"to_modify", "d/to_modify"})
