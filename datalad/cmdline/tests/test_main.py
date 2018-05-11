@@ -90,14 +90,14 @@ def test_help_np():
     # but order is still not guaranteed (dict somewhere)! TODO
     # see https://travis-ci.org/datalad/datalad/jobs/80519004
     # thus testing sets
-    assert_equal(set(sections),
-                 {'Commands for dataset operations',
-                  'Commands for metadata handling',
-                  'Miscellaneous commands',
-                  'General information',
-                  'Global options',
-                  'Plumbing commands',
-                  'Plugins'})
+    for s in {'Commands for dataset operations',
+              'Commands for metadata handling',
+              'Miscellaneous commands',
+              'General information',
+              'Global options',
+              'Plumbing commands',
+              'Plugins'}:
+        assert_in(s, sections)
 
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
