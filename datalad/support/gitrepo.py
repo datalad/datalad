@@ -890,45 +890,47 @@ class GitRepo(RepoInterface):
         # instead of options to the git executable => rename for consistency
 
         # needs to be True - see docstring:
+        # XXX why is this done? this is add() of GitRepo, there is not even a
+        # question
         assert(git)
 
         files = _remove_empty_items(files)
         out = []
 
-        if files or git_options or update:
-            try:
-                # without --verbose git 2.9.3  add does not return anything
-                add_out = self._git_custom_command(
-                    files,
-                    ['git', 'add'] + assure_list(git_options) +
-                    to_options(update=update) + ['--verbose']
-                )
-                # get all the entries
-                out = self._process_git_get_output(*add_out)
-                # Note: as opposed to git cmdline, force is True by default in
-                #       gitpython, which would lead to add things, that are
-                #       ignored or excluded otherwise
-                # 2. Note: There is an issue with globbing (like adding '.'),
-                #       which apparently doesn't care for 'force' and therefore
-                #       adds '.git/...'. May be it's expanded at the wrong
-                #       point in time or sth. like that.
-                # For now, use direct call to git add.
-                #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
-                #                      force=False)
-                # TODO: May be make use of 'fprogress'-option to indicate
-                # progress
-                # But then, we don't have it for git-annex add, anyway.
-                #
-                # TODO: Is write=True a reasonable way to do it?
-                # May be should not write until success of operation is
-                # confirmed?
-                # What's best in case of a list of files?
-            except OSError as e:
-                lgr.error("add: %s" % e)
-                raise
-
-        else:
+        if not (files or git_options or update):
             lgr.warning("add was called with empty file list and no options.")
+            return out
+
+        try:
+            # without --verbose git 2.9.3  add does not return anything
+            add_out = self._git_custom_command(
+                files,
+                ['git', 'add'] + assure_list(git_options) +
+                to_options(update=update) + ['--verbose']
+            )
+            # get all the entries
+            out = self._process_git_get_output(*add_out)
+            # Note: as opposed to git cmdline, force is True by default in
+            #       gitpython, which would lead to add things, that are
+            #       ignored or excluded otherwise
+            # 2. Note: There is an issue with globbing (like adding '.'),
+            #       which apparently doesn't care for 'force' and therefore
+            #       adds '.git/...'. May be it's expanded at the wrong
+            #       point in time or sth. like that.
+            # For now, use direct call to git add.
+            #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
+            #                      force=False)
+            # TODO: May be make use of 'fprogress'-option to indicate
+            # progress
+            # But then, we don't have it for git-annex add, anyway.
+            #
+            # TODO: Is write=True a reasonable way to do it?
+            # May be should not write until success of operation is
+            # confirmed?
+            # What's best in case of a list of files?
+        except OSError as e:
+            lgr.error("add: %s" % e)
+            raise
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
         # currently simulating similar return value, assuming success
