@@ -153,6 +153,20 @@ matrix:
     - DATALAD_TESTS_SSH=1
     - _DL_CRON=1
 
+  - python: 3.5
+    # test with extension datalad-crawler
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-crawler
+    - TESTS_TO_PERFORM=datalad_crawler
+    - NOSE_SELECTION_OP=
+
+  - python: 3.5
+    # test with extension datalad-neuroimaging
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-neuroimaging
+    - TESTS_TO_PERFORM=datalad_neuroimaging
+    - NOSE_SELECTION_OP=
+
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
@@ -232,6 +246,7 @@ install:
 script:
   # Test installation system-wide
   - sudo pip install .
+  - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
