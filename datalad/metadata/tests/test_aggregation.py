@@ -19,10 +19,10 @@ from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
@@ -116,9 +116,9 @@ def test_aggregate_query(path):
     ds = Dataset(path).create(force=True)
     # no magic change to actual dataset metadata due to presence of
     # aggregated metadata
-    res = ds.metadata(reporton='datasets')
+    res = ds.metadata(reporton='datasets', on_failure='ignore')
     assert_result_count(res, 1)
-    _assert_metadata_empty(res[0]['metadata'])
+    assert_not_in('metadata', res[0])
     # but we can now ask for metadata of stuff that is unknown on disk
     res = ds.metadata(opj('sub', 'deep', 'some'), reporton='datasets')
     assert_result_count(res, 1)
