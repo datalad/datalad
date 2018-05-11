@@ -259,7 +259,8 @@ script:
       --logging-level=INFO
       $TESTS_TO_PERFORM
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  - if [ $DATALAD_TESTS_SSH != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
+  # Also: don't run it in extension builds
+  - if [ $DATALAD_TESTS_SSH != 1 || ! -z "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
       echo "skipping due spaces in $TMPDIR";
     else
       $NOSE_WRAPPER ../tools/testing/run_doc_examples;
