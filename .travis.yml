@@ -268,7 +268,7 @@ script:
   - cd ..
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
-  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 -a -n "${BUILD_DATALAD_EXTENSION:-}" ]; then
+  - if [ "${DATALAD_LOG_LEVEL:-}" != 2 -a -z "${BUILD_DATALAD_EXTENSION:-}" ]; then
        PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest;
     fi
   # Run javascript tests
