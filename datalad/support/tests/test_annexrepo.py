@@ -1302,7 +1302,8 @@ def test_annex_drop(src, dst):
 @with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
 def test_annex_get_annexed_files(path):
     repo = AnnexRepo(path)
-    repo.add(".", commit=True)
+    repo.add(".")
+    repo.commit()
     eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
 
     repo.drop("a.txt", options=["--force"])
