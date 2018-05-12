@@ -419,7 +419,6 @@ class Add(Interface):
             added = ds.repo.add(
                 list(torepoadd.keys()),
                 git=to_git if is_annex else True,
-                commit=False,
                 **add_kw
             )
             for a in added:

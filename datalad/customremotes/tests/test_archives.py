@@ -52,8 +52,10 @@ def test_basic_scenario(direct, d, d2):
     assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
-    annex.add(fn_archive, commit=True, msg="Added tarball")
-    annex.add(fn_extracted, commit=True, msg="Added the load file")
+    annex.add(fn_archive)
+    annex.commit(msg="Added tarball")
+    annex.add(fn_extracted)
+    annex.commit(msg="Added the load file")
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)
@@ -129,7 +131,8 @@ def test_basic_scenario(direct, d, d2):
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
-    annex.add('a.tar.gz', commit=True)
+    annex.add('a.tar.gz')
+    annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
     fpath = opj(topdir, 'a', 'd', fn_inarchive_obscure)
 

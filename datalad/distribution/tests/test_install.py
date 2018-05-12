@@ -133,7 +133,8 @@ def test_get_git_url_from_source():
 @with_tempfile
 def _test_guess_dot_git(annex, path, url, tdir):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
-    repo.add('file.txt', commit=True, git=not annex)
+    repo.add('file.txt', git=not annex)
+    repo.commit()
 
     # we need to prepare to be served via http, otherwise it must fail
     with swallow_logs() as cml:
