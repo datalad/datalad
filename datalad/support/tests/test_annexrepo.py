@@ -546,7 +546,8 @@ def __test_get_md5s(path):
     # was used just to generate above dict
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = [basename(f) for f in find_files('.*', path)]
-    annex.add(files, commit=True)
+    annex.add(files)
+    annex.commit()
     print({f: annex.get_file_key(f) for f in files})
 
 
