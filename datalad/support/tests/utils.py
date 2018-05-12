@@ -17,7 +17,8 @@ def check_repo_deals_with_inode_change(class_, path, temp_store):
     repo = class_(path, create=True)
     with open(opj(path, "testfile.txt"), "w") as f:
         f.write("whatever")
-    repo.add("testfile.txt", commit=True, msg="some load")
+    repo.add("testfile.txt")
+    repo.commit(msg="some load")
 
     # requesting HEAD info from
     hexsha = repo.repo.head.object.hexsha

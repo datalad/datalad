@@ -1385,8 +1385,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return expected_files, fetch_files
 
     @normalize_paths
-    def add(self, files, git=None, backend=None, options=None, commit=False,
-            msg=None,
+    def add(self, files, git=None, backend=None, options=None,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False,
             update=False):
@@ -1398,11 +1397,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           list of paths to add to the annex
         git: bool
           if True, add to git instead of annex.
-        commit: bool
-          whether or not to directly commit
-        msg: str
-          commit message in case `commit=True`. A default message, containing
-          the list of files that were added, is created by default.
         backend:
         options:
         update: bool
@@ -1520,10 +1514,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             try:
                 return_list = super(AnnexRepo, self).add(
                                            files,
-                                           # Note: committing is dealed with
-                                           # later on
-                                           commit=False,
-                                           msg=msg,
                                            git=True,
                                            git_options=git_options,
                                            _datalad_msg=_datalad_msg,
@@ -1546,19 +1536,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 expect_stderr=True
             ))
 
-        if commit:
-            if msg is None:
-                # TODO: centralize JSON handling
-                if isinstance(return_list, list):
-                    file_list = [d['file'] for d in return_list if d['success']]
-                elif isinstance(return_list, dict):
-                    file_list = [return_list['file']] \
-                        if return_list['success'] else []
-                else:
-                    raise ValueError("Unexpected return type: %s" %
-                                     type(return_list))
-                msg = self._get_added_files_commit_msg(file_list)
-            self.commit(msg, _datalad_msg=_datalad_msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
 
     def proxy(self, git_cmd, **kwargs):

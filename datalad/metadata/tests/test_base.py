@@ -198,7 +198,7 @@ def test_ignore_nondatasets(path):
         return meta
 
     ds = Dataset(path).create()
-    meta = _kill_time(ds.metadata(reporton='datasets'))
+    meta = _kill_time(ds.metadata(reporton='datasets', on_failure='ignore'))
     n_subm = 0
     # placing another repo in the dataset has no effect on metadata
     for cls, subpath in ((GitRepo, 'subm'), (AnnexRepo, 'annex_subm')):
@@ -209,11 +209,11 @@ def test_ignore_nondatasets(path):
         r.add('test')
         r.commit('some')
         assert_true(Dataset(subm_path).is_installed())
-        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
         ds.add(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
-        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
 
 
@@ -243,6 +243,6 @@ def test_bf2458(src, dst):
     # content is not here
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
     # check that plain metadata access does not `get` stuff
-    clone.metadata('.')
+    clone.metadata('.', on_failure='ignore')
     # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
