@@ -260,15 +260,15 @@ script:
       $TESTS_TO_PERFORM
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
   # Also: don't run it in extension builds
-  - if [ $DATALAD_TESTS_SSH != 1 || ! -z "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
-      echo "skipping due spaces in $TMPDIR";
+  - if [ ${DATALAD_TESTS_SSH:-0} != 1 -o -n "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
+      echo "Testing examples is disabled by configuration";
     else
       $NOSE_WRAPPER ../tools/testing/run_doc_examples;
     fi
   - cd ..
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
-  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then
+  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 -a -n "${BUILD_DATALAD_EXTENSION:-}" ]; then
        PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest;
     fi
   # Run javascript tests
