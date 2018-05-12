@@ -659,6 +659,16 @@ def test_run_inputs_outputs(path):
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
 
 
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_run_inputs_no_annex_repo(path):
+    ds = Dataset(path).create(no_annex=True)
+    # Running --input in a plain Git repo doesn't fail.
+    ds.run("touch dummy", inputs=["*"])
+    ok_exists(opj(ds.path, "dummy"))
+    ds.rerun()
+
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
                   get_run_info,

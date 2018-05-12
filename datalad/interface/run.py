@@ -26,6 +26,7 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
@@ -148,6 +149,9 @@ class Run(Interface):
 def _resolve_files(dset, globs_or_files):
     """Expand --include globs in `globs_or_files` to file names.
     """
+    if not isinstance(dset.repo, AnnexRepo):
+        return []
+
     globs, files = partition(
         globs_or_files,
         lambda f: dset.repo.is_under_annex([f], batch=True)[0])
