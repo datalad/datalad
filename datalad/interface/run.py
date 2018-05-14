@@ -148,6 +148,15 @@ class Run(Interface):
 
 def _resolve_files(dset, globs_or_files):
     """Expand --include globs in `globs_or_files` to file names.
+
+    Parameters
+    ----------
+    dset : GitRepo
+    globs_or_files : iterable
+
+    Returns
+    -------
+    List of paths, with globs expanded.
     """
     if not isinstance(dset.repo, AnnexRepo):
         return []
