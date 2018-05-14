@@ -150,11 +150,14 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # 1. the latest commit that changed any file for which we could have native metadata
     refcommit = _get_latest_refcommit(aggfrom_ds, subds_relpaths)
     objid = refcommit if refcommit else ''
-    # 2, our own dataset-global metadata
-    dsmetafile = opj(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json')
-    if exists(dsmetafile):
-        objid += md5(open(dsmetafile, 'r').read().encode()).hexdigest()
+    # 2, our own dataset-global metadata and the dataset config
+    for tfile in (
+            opj(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json'),
+            opj(aggfrom_ds.path, '.datalad', 'config')):
+        if exists(tfile):
+            objid += md5(open(tfile, 'r').read().encode()).hexdigest()
     # 3. potential annex-based metadata
+    # XXX TODO shouldn't this be the annex extractor?
     if isinstance(aggfrom_ds, AnnexRepo) and \
             aggfrom_ds.config.obtain(
                 'datalad.metadata.aggregate-content-datalad-core',
