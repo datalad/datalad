@@ -617,6 +617,15 @@ def test_run_inputs_outputs(path):
 
         ds.repo.drop(inputs, options=["--force"])
 
+    # --input can be passed a subdirectory.
+    create_tree(ds.path, {"subdir": {"a": "subdir a",
+                                     "b": "subdir b"}})
+    ds.add("subdir")
+    ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
+    ds.repo.drop("subdir", options=["--force"])
+    ds.run("touch subdir-dummy", inputs=[opj(ds.path, "subdir")])
+    ok_(all(ds.repo.file_has_content(opj("subdir", f)) for f in ["a", "b"]))
+
     # --input=. runs "datalad get ."
     ds.run("touch dot-dummy", inputs=["."])
     eq_(ds.repo.get_annexed_files(),

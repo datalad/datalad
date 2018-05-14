@@ -17,6 +17,7 @@ import json
 from argparse import REMAINDER
 from os.path import join as opj
 from os.path import curdir
+from os.path import isdir
 from os.path import normpath
 from os.path import relpath
 
@@ -158,12 +159,14 @@ def _resolve_files(dset, globs_or_files):
     -------
     List of paths, with globs expanded.
     """
+    maybe_globs, dirs = partition(globs_or_files,
+                                  lambda p: isdir(opj(dset.path, p)))
     globs, files = partition(
-        globs_or_files,
+        maybe_globs,
         lambda f: dset.repo.is_under_annex([f], batch=True)[0])
     globs, files = list(globs), list(files)
     globbed = dset.repo.get_annexed_files(patterns=globs) if globs else []
-    return files + globbed
+    return list(dirs) + files + globbed
 
 
 # This helper function is used to add the rerun_info argument.
