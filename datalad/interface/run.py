@@ -151,16 +151,13 @@ def _resolve_files(dset, globs_or_files):
 
     Parameters
     ----------
-    dset : GitRepo
+    dset : AnnexRepo
     globs_or_files : iterable
 
     Returns
     -------
     List of paths, with globs expanded.
     """
-    if not isinstance(dset.repo, AnnexRepo):
-        return []
-
     globs, files = partition(
         globs_or_files,
         lambda f: dset.repo.is_under_annex([f], batch=True)[0])
@@ -195,6 +192,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
     ds = require_dataset(
         dataset, check_installed=True,
         purpose='tracking outcomes of a command')
+    is_annex = isinstance(ds.repo, AnnexRepo)
+
     # not needed ATM
     #refds_path = ds.path
 
@@ -211,7 +210,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
                      'cannot detect changes by command'))
         return
 
-    if inputs is None:
+    if inputs is None or not is_annex:
         inputs = []
     elif any(i.strip() == "." for i in inputs):
         inputs = ["."]
@@ -226,7 +225,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
             for res in ds.get(inputs):
                 yield res
 
-    if outputs is None:
+    if outputs is None or not is_annex:
         outputs = []
     elif outputs:
         if not rerun_info:
