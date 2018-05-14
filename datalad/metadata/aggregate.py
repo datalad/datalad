@@ -27,21 +27,23 @@ from os.path import normpath
 from hashlib import md5
 import shutil
 
+# API commands we need
+from datalad.distribution.get import Get
+from datalad.distribution.remove import Remove
+from datalad.distribution.subdatasets import Subdatasets
+from datalad.interface.unlock import Unlock
+
 import datalad
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.save import Save
-from datalad.interface.unlock import Unlock
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
-from datalad.distribution.get import Get
-from datalad.distribution.remove import Remove
-from datalad.distribution.subdatasets import Subdatasets
 from datalad.metadata.metadata import agginfo_relpath
 from datalad.metadata.metadata import exclude_from_metadata
 from datalad.metadata.metadata import get_metadata_type
@@ -59,7 +61,6 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 
-from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
 
