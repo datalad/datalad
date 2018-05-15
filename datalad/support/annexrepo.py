@@ -3503,11 +3503,9 @@ class ProcessAnnexProgressIndicators(object):
             # so above didn't help!
             # use warnings not lgr.warn since we apparently swallow stuff
             # upstairs!  Also it would take care about issuing it only once
-            import warnings
-            warnings.warn(
-                "Got negative diff for progressbar. old_value=%r, new_value=%r"
-                " no more warnings should come for this one and we will not update"
-                " until values start to make sense" % (old_value, new_value))
+            lgr.debug(
+                "Got negative diff for progressbar. old_value=%r, new_value=%r",
+                old_value, new_value)
             return
         if self.total_pbar:
             self.total_pbar.update(diff, increment=True)
