@@ -42,6 +42,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
+from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
 from datalad.utils import partition
@@ -152,15 +153,16 @@ class Run(Interface):
                 lgr.warning("No command given")
 
 
-def _expand_globs(patterns, root_path="", warn=True):
+def _expand_globs(patterns, pwd, warn=True):
     patterns, dots = partition(patterns, lambda i: i.strip() == ".")
     expanded = ["."] if list(dots) else []
-    for pattern in patterns:
-        hits = glob(pattern)
-        if hits:
-            expanded.extend([opj(root_path, p) for p in hits])
-        elif warn:
-            lgr.warning("No matching files found for %s", pattern)
+    with chpwd(pwd):
+        for pattern in patterns:
+            hits = glob(pattern)
+            if hits:
+                expanded.extend(hits)
+            elif warn:
+                lgr.warning("No matching files found for %s", pattern)
     return expanded
 
 
@@ -210,7 +212,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if inputs is None:
         inputs = []
     elif inputs:
-        inputs_expanded = _expand_globs(inputs, root_path=rel_pwd)
+        inputs_expanded = _expand_globs(inputs, pwd)
         if inputs_expanded:
             for res in ds.get(inputs_expanded):
                 yield res
@@ -220,8 +222,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if outputs is None:
         outputs = []
     elif outputs:
-        outputs_expanded = _expand_globs(outputs, root_path=rel_pwd,
-                                         warn=not rerun_info)
+        outputs_expanded = _expand_globs(outputs, pwd, warn=not rerun_info)
         if outputs_expanded:
             for res in ds.unlock(outputs_expanded, on_failure="ignore"):
                 if res["status"] == "impossible":
