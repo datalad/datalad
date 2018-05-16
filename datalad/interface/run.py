@@ -152,14 +152,14 @@ class Run(Interface):
                 lgr.warning("No command given")
 
 
-def _expand_globs(patterns, root_path=""):
+def _expand_globs(patterns, root_path="", warn=True):
     patterns, dots = partition(patterns, lambda i: i.strip() == ".")
     expanded = ["."] if list(dots) else []
     for pattern in patterns:
         hits = glob(pattern)
         if hits:
             expanded.extend([opj(root_path, p) for p in hits])
-        else:
+        elif warn:
             lgr.warning("No matching files found for %s", pattern)
     return expanded
 
@@ -220,7 +220,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if outputs is None:
         outputs = []
     elif outputs:
-        outputs_expanded = _expand_globs(outputs, root_path=rel_pwd)
+        outputs_expanded = _expand_globs(outputs, root_path=rel_pwd,
+                                         warn=not rerun_info)
         if outputs_expanded:
             for res in ds.unlock(outputs_expanded, on_failure="ignore"):
                 if res["status"] == "impossible":
