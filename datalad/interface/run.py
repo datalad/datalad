@@ -201,19 +201,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
     if inputs is None:
         inputs = []
     elif inputs:
-        if not rerun_info:
-            inputs = _expand_globs(inputs, root_path=rel_pwd)
-        if inputs:
-            for res in ds.get(inputs):
+        inputs_expanded = _expand_globs(inputs, root_path=rel_pwd)
+        if inputs_expanded:
+            for res in ds.get(inputs_expanded):
                 yield res
 
     if outputs is None:
         outputs = []
     elif outputs:
-        if not rerun_info:
-            outputs = _expand_globs(outputs, root_path=rel_pwd)
-        if outputs:
-            for res in ds.unlock(outputs, on_failure="ignore"):
+        outputs_expanded = _expand_globs(outputs, root_path=rel_pwd)
+        if outputs_expanded:
+            for res in ds.unlock(outputs_expanded, on_failure="ignore"):
                 if res["status"] == "impossible":
                     if "no content" in res["message"]:
                         for rem_res in ds.remove(res["path"],
