@@ -29,6 +29,9 @@ This release is a major leap forward in metadata support.
     subdatasets.
   - Neuroimaging metadata support has been moved into a dedicated extension:
     https://github.com/datalad/datalad-neuroimaging
+- Crawler
+  - moved into a dedicated extension:
+    https://github.com/datalad/datalad-crawler
 - `export_tarball` plugin has been generalized to `export_archive` and
   can now also generate ZIP archives.
 - By default a dataset X is now only considered to be a super-dataset of
