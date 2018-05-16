@@ -82,7 +82,7 @@ class Create(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git init`, and
+      Power-user info: This command uses :command:`git init` and
       :command:`git annex init` to prepare the new dataset. Registering to a
       superdataset is performed via a :command:`git submodule add` operation
       in the discovered superdataset.
@@ -112,7 +112,7 @@ class Create(Interface):
             args=("-d", "--dataset"),
             metavar='PATH',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is give, a new subdataset will be created in it.""",
+            a dataset is given, a new subdataset will be created in it.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
@@ -314,6 +314,9 @@ class Create(Interface):
             yield path
             return
 
+        # stuff that we create and want to have tracked with git (not annex)
+        add_to_git = []
+
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
             GitRepo(
@@ -342,6 +345,7 @@ class Create(Interface):
                 git_attributes_file = opj(tbds.path, '.gitattributes')
                 with open(git_attributes_file, 'a') as f:
                     f.write('* annex.largefiles=(not(mimetype=text/*))\n')
+                # TODO just use add_to_git and avoid separate commit
                 tbrepo.add([git_attributes_file], git=True)
                 tbrepo.commit(
                     "Instructed annex to add text files to git",
@@ -373,6 +377,8 @@ class Create(Interface):
             tbds.id if tbds.id is not None else uuid_id,
             where='dataset')
 
+        add_to_git.append('.datalad')
+
         # make sure that v6 annex repos never commit content under .datalad
         with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
             # TODO this will need adjusting, when annex'ed aggregate metadata
@@ -383,10 +389,15 @@ class Create(Interface):
             gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
                 cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
 
+        # prevent git annex from ever annexing .git* stuff (gh-1597)
+        with open(opj(tbds.path, '.gitattributes'), 'a') as gitattr:
+            gitattr.write('.git* annex.largefiles=nothing\n')
+        add_to_git.append('.gitattributes')
+
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
         # but cannot until we have a first commit
-        tbds.add('.datalad', to_git=True, save=save,
+        tbds.add(add_to_git, to_git=True, save=save,
                  message='[DATALAD] new dataset')
 
         # the next only makes sense if we saved the created dataset,

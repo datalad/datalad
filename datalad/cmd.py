@@ -11,7 +11,7 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
-
+import time
 import subprocess
 import sys
 import logging
@@ -298,10 +298,17 @@ class Runner(object):
             # in another thread http://codereview.stackexchange.com/a/17959
             # current problem is that if there is no output on stderr
             # it stalls
+            # Monitor if anything was output and if nothing, sleep a bit
+            stdout_, stderr_ = None, None
             if log_stdout_:
-                stdout += self._process_one_line(*stdout_args)
+                stdout_ = self._process_one_line(*stdout_args)
+                stdout += stdout_
             if log_stderr_:
-                stderr += self._process_one_line(*stderr_args)
+                stderr_ = self._process_one_line(*stderr_args)
+                stderr += stderr_
+            if not (stdout_ or stderr_):
+                # no output was generated, so sleep a tiny bit
+                time.sleep(0.001)
 
         # Handle possible remaining output
         stdout_, stderr_ = proc.communicate()

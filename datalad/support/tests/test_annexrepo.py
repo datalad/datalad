@@ -546,7 +546,8 @@ def __test_get_md5s(path):
     # was used just to generate above dict
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = [basename(f) for f in find_files('.*', path)]
-    annex.add(files, commit=True)
+    annex.add(files)
+    annex.commit()
     print({f: annex.get_file_key(f) for f in files})
 
 
@@ -556,7 +557,8 @@ def test_dropkey(batch, direct, path):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
     files = list(tree1_md5e_keys)
-    annex.add(files, commit=True)
+    annex.add(files)
+    annex.commit()
     # drop one key
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # drop multiple
@@ -768,7 +770,8 @@ def test_AnnexRepo_add_to_annex(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename, commit=True, msg="Added another file to annex.")
+    repo.add(filename)
+    repo.commit(msg="Added another file to annex.")
     # known to annex:
     ok_(repo.get_file_key(filename))
     ok_(repo.file_has_content(filename))
@@ -806,8 +809,8 @@ def test_AnnexRepo_add_to_git(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename, git=True, commit=True,
-             msg="Added another file to annex.")
+    repo.add(filename, git=True)
+    repo.commit(msg="Added another file to annex.")
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
 
@@ -1870,7 +1873,8 @@ def _test_status(ar):
     eq_(stat, ar.get_status())
 
     # add to subrepo
-    sub.add('fourth', commit=True, msg="birther mod init'ed")
+    sub.add('fourth')
+    sub.commit(msg="birther mod init'ed")
     stat['untracked'].remove(opj('submod', 'fourth'))
 
     if ar.get_active_branch().endswith('(unlocked)') and \

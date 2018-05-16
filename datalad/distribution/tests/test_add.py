@@ -386,3 +386,36 @@ def test_add_mimetypes(path):
     # But we should be able to force adding file to annex when desired
     ds.add('file2.txt', to_git=False)
     ok_file_under_git(path, 'file2.txt', annexed=True)
+
+
+@with_tempfile(mkdir=True)
+def test_gh1597_simpler(path):
+    ds = Dataset(path).create()
+    # same goes for .gitattributes
+    with open(opj(ds.path, '.gitignore'), 'a') as f:
+        f.write('*.swp\n')
+    ds.add('.gitignore')
+    ok_clean_git(ds.path)
+    ok_file_under_git(ds.path, '.gitignore', annexed=False)
+
+
+# Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree
+@known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
+def test_gh1597(path):
+    ds = Dataset(path).create()
+    sub = ds.create('sub', save=False)
+    # only staged at this point, but known, and not annexed
+    ok_file_under_git(ds.path, '.gitmodules', annexed=False)
+    res = ds.subdatasets()
+    assert_result_count(res, 1, path=sub.path)
+    # now modify .gitmodules with another command
+    ds.subdatasets(contains=sub.path, set_property=[('this', 'that')])
+    ok_clean_git(ds.path, index_modified=['sub'])
+    # now modify low-level
+    with open(opj(ds.path, '.gitmodules'), 'a') as f:
+        f.write('\n')
+    ok_clean_git(ds.path, index_modified=['.gitmodules', 'sub'])
+    ds.add('.gitmodules')
+    # must not come under annex mangement
+    ok_file_under_git(ds.path, '.gitmodules', annexed=False)

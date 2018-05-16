@@ -325,9 +325,10 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True, _datalad_msg=True)
+        repo.add(file_repo_path)
     else:
-        repo.add(file_repo_path, git=True, _datalad_msg=True)
+        repo.add(file_repo_path, git=True)
+    repo.commit(_datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 

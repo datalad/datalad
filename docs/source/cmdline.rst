@@ -63,8 +63,6 @@ Miscellaneous commands
 
    generated/man/datalad-add-archive-content
    generated/man/datalad-clean
-   generated/man/datalad-crawl
-   generated/man/datalad-crawl-init
    generated/man/datalad-download-url
    generated/man/datalad-ls
    generated/man/datalad-test

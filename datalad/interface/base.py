@@ -413,7 +413,12 @@ class Interface(object):
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
-            kwargs['result_filter'] = cls._get_result_filter(args)
+            res_filter = cls._get_result_filter(args)
+            if res_filter is not None:
+                # Don't add result_filter if it's None because then
+                # eval_results can't distinguish between --report-{status,type}
+                # not specified via the CLI and None passed via the Python API.
+                kwargs['result_filter'] = res_filter
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):

@@ -144,12 +144,14 @@ def test_update_fetch_all(src, remote_1, remote_2):
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
         f.write("some file load")
-    rmt1.add("first.txt", commit=True)
+    rmt1.add("first.txt")
+    rmt1.commit()
     # TODO: Modify an already present file!
 
     with open(opj(remote_2, "second.txt"), "w") as f:
         f.write("different file load")
-    rmt2.add("second.txt", git=True, commit=True, msg="Add file to git.")
+    rmt2.add("second.txt", git=True)
+    rmt2.commit(msg="Add file to git.")
 
     # Let's init some special remote which we couldn't really update/fetch
     if not os.environ.get('DATALAD_TESTS_DATALADREMOTE'):

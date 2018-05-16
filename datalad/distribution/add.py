@@ -113,7 +113,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, or
+      Power-user info: This command uses :command:`git annex add` or
       :command:`git add` to incorporate new dataset content.
     """
 
@@ -419,7 +419,6 @@ class Add(Interface):
             added = ds.repo.add(
                 list(torepoadd.keys()),
                 git=to_git if is_annex else True,
-                commit=False,
                 **add_kw
             )
             for a in added:

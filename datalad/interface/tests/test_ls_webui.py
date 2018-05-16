@@ -22,6 +22,8 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
+# needed below as bound dataset method
+from datalad.api import add
 
 
 def test_machinesize():
@@ -60,7 +62,8 @@ def test_fs_traverse(topdir):
     AnnexRepo(opj(topdir, 'annexdir'), create=True)
     GitRepo(opj(topdir, 'gitdir'), create=True)
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
-    annex.add(opj(topdir, 'dir'), commit=True)
+    annex.add(opj(topdir, 'dir'))
+    annex.commit()
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
 
     # traverse file system in recursive and non-recursive modes
@@ -145,9 +148,11 @@ def test_ls_json(topdir):
     subdirds.add('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
-    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)              # commit to git to init git repo
-    annex.add(opj(topdir, 'dir', 'subgit'), commit=True)                        # add the non-dataset git repo to annex
-    annex.add(opj(topdir, 'dir'), commit=True)                                  # add to annex (links)
+    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'))              # commit to git to init git repo
+    git.commit()
+    annex.add(opj(topdir, 'dir', 'subgit'))                        # add the non-dataset git repo to annex
+    annex.add(opj(topdir, 'dir'))                                  # add to annex (links)
+    annex.commit()
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])  # broken-link
 
     meta_dir = opj('.git', 'datalad', 'metadata')

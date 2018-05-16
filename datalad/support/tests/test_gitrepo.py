@@ -139,7 +139,8 @@ def test_GitRepo_add(src, path):
     assert_raises(AssertionError, gr.add, filename, git=None)
 
     # include committing:
-    added2 = gr.add(filename, commit=True, msg="Add two files.")
+    added2 = gr.add(filename)
+    gr.commit(msg="Add two files.")
     assert_equal(added2, {'success': True, 'file': filename})
 
     assert_in(filename, gr.get_indexed_files(),
@@ -1046,7 +1047,8 @@ def test_get_missing(path):
         f.write('some')
     with open(opj(path, 'deep', 'test2'), 'w') as f:
         f.write('some more')
-    repo.add('.', commit=True)
+    repo.add('.')
+    repo.commit()
     ok_clean_git(path, annex=False)
     os.unlink(opj(path, 'test1'))
     eq_(repo.get_missing_files(), ['test1'])

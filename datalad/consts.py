@@ -15,12 +15,6 @@ from os.path import expanduser
 
 # directory containing prepared metadata of a dataset repository:
 HANDLE_META_DIR = ".datalad"
-CRAWLER_META_DIR = join(HANDLE_META_DIR, 'crawl')
-CRAWLER_META_CONFIG_FILENAME = 'crawl.cfg'
-CRAWLER_META_CONFIG_PATH = join(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
-CRAWLER_META_VERSIONS_DIR = join(CRAWLER_META_DIR, 'versions')
-# TODO: RENAME THIS UGLINESS?
-CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
 
 # Make use of those in datalad.metadata
 METADATA_DIR = join(HANDLE_META_DIR, 'meta')

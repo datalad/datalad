@@ -155,6 +155,20 @@ matrix:
     - DATALAD_TESTS_SSH=1
     - _DL_CRON=1
 
+  - python: 3.5
+    # test with extension datalad-crawler
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-crawler
+    - TESTS_TO_PERFORM=datalad_crawler
+    - NOSE_SELECTION_OP=
+
+  - python: 3.5
+    # test with extension datalad-neuroimaging
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-neuroimaging
+    - TESTS_TO_PERFORM=datalad_neuroimaging
+    - NOSE_SELECTION_OP=
+
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
@@ -234,6 +248,7 @@ install:
 script:
   # Test installation system-wide
   - sudo pip install .
+  - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
@@ -246,15 +261,16 @@ script:
       --logging-level=INFO
       $TESTS_TO_PERFORM
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  - if [ $DATALAD_TESTS_SSH != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
-      echo "skipping due spaces in $TMPDIR";
+  # Also: don't run it in extension builds
+  - if [ ${DATALAD_TESTS_SSH:-0} != 1 -o -n "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
+      echo "Testing examples is disabled by configuration";
     else
       $NOSE_WRAPPER ../tools/testing/run_doc_examples;
     fi
   - cd ..
   # Generate documentation and run doctests
   # but do only when we do not have obnoxious logging turned on -- something screws up sphinx on travis
-  - if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then
+  - if [ "${DATALAD_LOG_LEVEL:-}" != 2 -a -z "${BUILD_DATALAD_EXTENSION:-}" ]; then
        PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest;
     fi
   # Run javascript tests

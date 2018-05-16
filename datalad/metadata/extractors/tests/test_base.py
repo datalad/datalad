@@ -8,9 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test all extractors at a basic level"""
 
+from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
-from datalad.metadata import extractors
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
@@ -23,17 +23,17 @@ def check_api(no_annex, path):
     ds.add('.')
     ok_clean_git(ds.path)
     processed_extractors = []
-    for p in dir(extractors):
-        if p.startswith('_') or p in ('tests', 'base'):
-            continue
-        processed_extractors.append(p)
+
+    for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
+        processed_extractors.append(extractor_ep.name)
         # we need to be able to query for metadata, even if there is none
         # from any extractor
-        extractor = getattr(extractors, p).MetadataExtractor(
+        extractor_cls = extractor_ep.load()
+        extractor = extractor_cls(
             ds, paths=['file.dat'])
         meta = extractor.get_metadata(
-                dataset=True,
-                content=True)
+            dataset=True,
+            content=True)
         # we also get something for the dataset and something for the content
         # even if any of the two is empty
         assert_equal(len(meta), 2)
@@ -45,7 +45,7 @@ def check_api(no_annex, path):
         cm = dict(contentmeta)
         # datalad_core does provide some (not really) information about our
         # precious file
-        if p == 'datalad_core':
+        if extractor_ep.name == 'datalad_core':
             assert 'file.dat' in cm
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"

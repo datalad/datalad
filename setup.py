@@ -77,9 +77,6 @@ requires = {
     'downloaders-extra': [
         'requests_ftp',
     ],
-    'crawl': [
-        'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
-    ],
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have

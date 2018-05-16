@@ -34,6 +34,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AccessDeniedError
 from datalad.support.exceptions import AccessFailedError
 from datalad.support.exceptions import RemoteNotAvailableError
+from datalad.support.exceptions import DownloadError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -496,19 +497,26 @@ def _configure_remote(
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
+                exc = None
                 if not ds.config.obtain(
                         'remote.{}.annex-ignore'.format(name),
                         default=False,
                         valtype=EnsureBool(),
                         store=False):
                     ds.repo.enable_remote(name)
-            except CommandError as exc:
+            except (CommandError, DownloadError) as exc:
                 # TODO yield
-                # this is unlikely to ever happen, now done for AnnexRepo instances
-                # only
-                lgr.info("Failed to enable annex remote %s, "
-                         "could be a pure git" % name)
+                # this is unlikely to ever happen, now done for AnnexRepo
+                # instances only
+                # Note: CommandError happens with git-annex
+                # 6.20180416+gitg86b18966f-1~ndall+1 (prior 6.20180510, from
+                # which starts to fail with AccessFailedError) if URL is bogus,
+                # so enableremote fails. E.g. as "tested" in test_siblings
+                lgr.info(
+                    "Failed to enable annex remote %s, could be a pure git "
+                    "or not accessible", name)
                 lgr.debug("Exception was: %s" % exc_str(exc))
+
             if as_common_datasrc:
                 ri = RI(url)
                 if isinstance(ri, URL) and ri.scheme in ('http', 'https'):

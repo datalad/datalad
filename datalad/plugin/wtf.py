@@ -84,6 +84,7 @@ class WTF(Interface):
         from datalad.api import metadata
         from datalad.support.external_versions import external_versions
         from datalad.dochelpers import exc_str
+        from datalad.interface.results import success_status_map
         import os
         import platform as pl
         import json
@@ -160,8 +161,8 @@ Metadata
         elif ds and ds.is_installed() and ds.id:
             ds_meta = metadata(
                 dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata',
-                result_renderer='disabled')
+                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
+                result_renderer='disabled', on_failure='ignore')
             if ds_meta:
                 ds_meta = [dm['metadata'] for dm in ds_meta]
                 if len(ds_meta) == 1:

@@ -145,8 +145,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
-                    commit=True, msg="Modified.")
+    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+               message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
@@ -202,8 +202,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
-                    commit=True, msg="Modified.")
+    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+               message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
