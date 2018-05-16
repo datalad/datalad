@@ -38,8 +38,13 @@ def _generate_extension_api():
 
     for entry_point in iter_entry_points('datalad.extensions'):
         try:
-            lgr.debug('Loading entrypoint %s from datalad.extensions', entry_point.name)
+            lgr.debug(
+                'Loading entrypoint %s from datalad.extensions for API building',
+                entry_point.name)
             grp_descr, interfaces = entry_point.load()
+            lgr.debug(
+                'Loaded entrypoint %s from datalad.extensions',
+                entry_point.name)
         except Exception as e:
             lgr.warning('Failed to load entrypoint %s: %s', entry_point.name, exc_str(e))
             continue
