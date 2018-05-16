@@ -214,7 +214,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     elif inputs:
         inputs_expanded = _expand_globs(inputs, pwd)
         if inputs_expanded:
-            for res in ds.get(inputs_expanded):
+            for res in ds.get(inputs_expanded, on_failure="ignore"):
                 yield res
             if expand in ["inputs", "both"]:
                 inputs = inputs_expanded
