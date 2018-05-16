@@ -15,6 +15,7 @@ import logging
 import json
 
 from argparse import REMAINDER
+from glob import glob
 from os.path import join as opj
 from os.path import curdir
 from os.path import isdir
@@ -91,24 +92,19 @@ class Run(Interface):
             action='append',
             doc="""A dependency for the run. Before running the command, the
             content of this file will be retrieved. A value of "." means "run
-            :command:`datalad get .`", and any other values given are ignored.
-            If the value doesn't match any known annex file, it will be treated
-            as a glob and passed to :command:`git annex find --include=`. The
-            value should be specified relative to the top-level directory of
-            the current dataset. Using '*' for this value means "all current
-            annex files". Note: Globbing currently only considers the current
-            dataset, not any subdatasets. [CMD: This option can be given more
-            than once. CMD]"""),
+            :command:`datalad get .`". The value can also be a glob. [CMD: This
+            option can be given more than once. CMD]"""),
         outputs=Parameter(
             args=("--output",),
             dest="outputs",
             metavar=("PATH"),
             action='append',
-            doc="""Prepare this file to be an output file of the command. If
-            the content of this file is present, unlock the file. Otherwise,
-            remove it. Globs are treated in the same way described for [PY:
-            `inputs` PY][CMD: --input CMD]. [CMD: This option can be given more
-            than once. CMD]"""),
+            doc="""Prepare this file to be an output file of the command. A
+            value of "." means "run :command:`datalad unlock .`" (and will fail
+            if some content isn't present). For any other value, if the content
+            of this file is present, unlock the file. Otherwise, remove it. The
+            value can also be a glob. [CMD: This option can be given more than
+            once. CMD]"""),
         message=save_message_opt,
         rerun=Parameter(
             args=('--rerun',),
@@ -147,26 +143,16 @@ class Run(Interface):
                 lgr.warning("No command given")
 
 
-def _resolve_files(dset, globs_or_files):
-    """Expand --include globs in `globs_or_files` to file names.
-
-    Parameters
-    ----------
-    dset : AnnexRepo
-    globs_or_files : iterable
-
-    Returns
-    -------
-    List of paths, with globs expanded.
-    """
-    maybe_globs, dirs = partition(globs_or_files,
-                                  lambda p: isdir(opj(dset.path, p)))
-    globs, files = partition(
-        maybe_globs,
-        lambda f: dset.repo.is_under_annex([f], batch=True)[0])
-    globs, files = list(globs), list(files)
-    globbed = dset.repo.get_annexed_files(patterns=globs) if globs else []
-    return list(dirs) + files + globbed
+def _expand_globs(patterns, root_path=""):
+    patterns, dots = partition(patterns, lambda i: i.strip() == ".")
+    expanded = ["."] if list(dots) else []
+    for pattern in patterns:
+        hits = glob(pattern)
+        if hits:
+            expanded.extend([opj(root_path, p) for p in hits])
+        else:
+            lgr.warning("No matching files found for %s", pattern)
+    return expanded
 
 
 # This helper function is used to add the rerun_info argument.
@@ -195,7 +181,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
     ds = require_dataset(
         dataset, check_installed=True,
         purpose='tracking outcomes of a command')
-    is_annex = isinstance(ds.repo, AnnexRepo)
 
     # not needed ATM
     #refds_path = ds.path
@@ -213,29 +198,21 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
                      'cannot detect changes by command'))
         return
 
-    if inputs is None or not is_annex:
+    if inputs is None:
         inputs = []
-    elif any(i.strip() == "." for i in inputs):
-        inputs = ["."]
-        for res in ds.get(inputs):
-            yield res
     elif inputs:
         if not rerun_info:
-            inputs = _resolve_files(ds, inputs)
-        if not inputs:
-            lgr.warning("No matching files found for --input")
-        else:
+            inputs = _expand_globs(inputs, root_path=rel_pwd)
+        if inputs:
             for res in ds.get(inputs):
                 yield res
 
-    if outputs is None or not is_annex:
+    if outputs is None:
         outputs = []
     elif outputs:
         if not rerun_info:
-            outputs = _resolve_files(ds, outputs)
-        if not outputs:
-            lgr.warning("No matching files found for --output")
-        else:
+            outputs = _expand_globs(outputs, root_path=rel_pwd)
+        if outputs:
             for res in ds.unlock(outputs, on_failure="ignore"):
                 if res["status"] == "impossible":
                     if "no content" in res["message"]:
