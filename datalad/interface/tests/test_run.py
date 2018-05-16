@@ -617,7 +617,8 @@ def test_run_inputs_outputs(path):
 
             ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
             ok_(all(ds.repo.file_has_content(f) for f in expected_present))
-
+            # Globs are stored unexpanded by default.
+            assert_in(inputs_arg[0], ds.repo.repo.head.commit.message)
             ds.repo.drop(inputs, options=["--force"])
 
         # --input can be passed a subdirectory.
@@ -670,6 +671,11 @@ def test_run_inputs_outputs(path):
         ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
         ds.drop("sub/subfile", check=False)
         ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
+
+        # --input/--output globs can be stored in expanded form.
+        ds.run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
+        assert_in("a.dat", ds.repo.repo.head.commit.message)
+        assert_in("b.dat", ds.repo.repo.head.commit.message)
 
 
 @ignore_nose_capturing_stdout

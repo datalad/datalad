@@ -29,6 +29,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
@@ -105,6 +106,12 @@ class Run(Interface):
             of this file is present, unlock the file. Otherwise, remove it. The
             value can also be a glob. [CMD: This option can be given more than
             once. CMD]"""),
+        expand=Parameter(
+            args=("--expand",),
+            metavar=("WHICH"),
+            doc="""Expand globs when storing inputs and/or outputs in the
+            commit message.""",
+            constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
         message=save_message_opt,
         rerun=Parameter(
             args=('--rerun',),
@@ -123,6 +130,7 @@ class Run(Interface):
             dataset=None,
             inputs=None,
             outputs=None,
+            expand=None,
             message=None,
             rerun=False):
         if rerun:
@@ -137,6 +145,7 @@ class Run(Interface):
             if cmd:
                 for r in run_command(cmd, dataset=dataset,
                                      inputs=inputs, outputs=outputs,
+                                     expand=expand,
                                      message=message):
                     yield r
             else:
@@ -156,7 +165,7 @@ def _expand_globs(patterns, root_path=""):
 
 
 # This helper function is used to add the rerun_info argument.
-def run_command(cmd, dataset=None, inputs=None, outputs=None,
+def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=None, rerun_info=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
@@ -205,6 +214,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
         if inputs_expanded:
             for res in ds.get(inputs_expanded):
                 yield res
+            if expand in ["inputs", "both"]:
+                inputs = inputs_expanded
 
     if outputs is None:
         outputs = []
@@ -221,6 +232,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None,
                     elif "path does not exist" in res["message"]:
                         continue
                 yield res
+            if expand in ["outputs", "both"]:
+                outputs = outputs_expanded
 
     # anticipate quoted compound shell commands
     cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
