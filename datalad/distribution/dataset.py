@@ -505,3 +505,6 @@ def require_dataset(dataset, check_installed=True, purpose=None):
                          "{0}.".format(dataset.path))
 
     return dataset
+
+
+lgr.log(5, "Done importing dataset")
