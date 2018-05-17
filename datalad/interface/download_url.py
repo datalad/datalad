@@ -71,6 +71,12 @@ class DownloadURL(Interface):
                 "In case of multiple URLs provided, must point to a directory.  Otherwise current "
                 "directory is used",
             constraints=EnsureStr() | EnsureNone()),
+        archive=Parameter(
+            args=("--archive",),
+            action="store_true",
+            doc="""pass the downloaded files to [CMD: :command:`datalad
+            add-archive-content --delete` CMD][PY: add_archive_content(...,
+            delete=True) PY]"""),
         save=nosave_opt,
         message=save_message_opt
     )
@@ -79,7 +85,7 @@ class DownloadURL(Interface):
     @datasetmethod(name="download_url")
     @eval_results
     def __call__(urls, dataset=None, path=None, overwrite=False,
-                 save=True, message=None):
+                 archive=False, save=True, message=None):
         from ..downloaders.providers import Providers
 
         try:
@@ -162,3 +168,8 @@ url:
                                      key, path_urls[path]])
                         else:
                             lgr.warning("Key not found for %s", path)
+
+                    if archive:
+                        from datalad.api import add_archive_content
+                        for path in annex_paths:
+                            add_archive_content(path, annex=ds.repo, delete=True)

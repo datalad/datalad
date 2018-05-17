@@ -97,3 +97,12 @@ def test_download_url_dataset(toppath, topurl, path):
 
     ds.download_url([opj(topurl, "file3.txt")], save=False)
     assert_false(ds.repo.file_has_content("file3.txt"))
+
+
+@with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_download_url_archive(toppath, topurl, path):
+    ds = Dataset(path).create()
+    ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)
+    ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
