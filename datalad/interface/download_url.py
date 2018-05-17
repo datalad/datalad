@@ -80,12 +80,10 @@ class DownloadURL(Interface):
 
         urls = assure_list_from_str(urls)
 
-        if len(urls) > 1:
-            if path:
-                if not(isdir(path)):
-                    raise ValueError(
-                        "When specifying multiple urls, --path should point to "
-                        "an existing directory. Got %r" % path)
+        if len(urls) > 1 and path and not isdir(path):
+            raise ValueError(
+                "When specifying multiple urls, --path should point to "
+                "an existing directory. Got %r" % path)
         if not path:
             path = curdir
 
