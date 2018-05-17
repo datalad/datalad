@@ -35,7 +35,7 @@ class DownloadURL(Interface):
     """Download content
 
     It allows for a uniform download interface to various supported URL
-    schemes, re-using or asking for authentication detail maintained by
+    schemes, re-using or asking for authentication details maintained by
     datalad.
 
     Examples:
