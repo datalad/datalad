@@ -12,14 +12,16 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 from os.path import join as opj
 
-from ...api import download_url
-from ...tests.utils import eq_, assert_cwd_unchanged, assert_in, \
-    assert_message, assert_raises,  assert_result_count, with_tempfile
+from ...api import download_url, Dataset
+from ...utils import chpwd
+from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
+    assert_in, assert_false, assert_message, assert_result_count, \
+    with_tempfile
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
-from ...tests.utils import swallow_outputs
 
 
 def test_download_url_exceptions():
@@ -43,20 +45,55 @@ def test_download_url_exceptions():
 @with_tempfile(mkdir=True)
 def test_download_url_return(toppath, topurl, outdir):
     files = ['file1.txt', 'file2.txt']
-    urls = [topurl + f for f in files]
+    urls = [opj(topurl, f) for f in files]
     outfiles = [opj(outdir, f) for f in files]
 
-    out1 = download_url(urls[0], path=outdir)
+    out1 = download_url(urls[0], path=outdir, save=False)
     assert_result_count(out1, 1)
     eq_(out1[0]['path'], outfiles[0])
 
     # can't overwrite
-    out2 = download_url(urls, path=outdir, on_failure='ignore')
+    out2 = download_url(urls, path=outdir, on_failure='ignore', save=False)
     assert_result_count(out2, 1, status='error')
     assert_in('file1.txt already exists', out2[0]['message'])
     assert_result_count(out2, 1, status='ok')  # only 2nd one
     eq_(out2[1]['path'], outfiles[1])
 
-    out3 = download_url(urls, path=outdir, overwrite=True, on_failure='ignore')
+    out3 = download_url(urls, path=outdir, overwrite=True,
+                        on_failure='ignore', save=False)
     assert_result_count(out3, 2, status='ok')
     eq_([r['path'] for r in out3], outfiles)
+
+
+@with_tree(tree=[
+    ('file1.txt', 'abc'),
+    ('file2.txt', 'def'),
+    ('file3.txt', 'ghi'),
+])
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_download_url_dataset(toppath, topurl, path):
+    # Non-dataset directory.
+    file1_fullpath = opj(path, "file1.txt")
+    with chpwd(path):
+        download_url(opj(topurl, "file1.txt"))
+        ok_exists(file1_fullpath)
+    os.remove(file1_fullpath)
+
+    files_tosave = ['file1.txt', 'file2.txt']
+    urls_tosave = [opj(topurl, f) for f in files_tosave]
+
+    ds = Dataset(path).create()
+
+    # By default, files are saved when called in a dataset.
+    ds.download_url(urls_tosave)
+    for fname in files_tosave:
+        ok_(ds.repo.file_has_content(fname))
+
+    eq_(ds.repo.get_urls("file1.txt"),
+        [urls_tosave[0]])
+    eq_(ds.repo.get_urls("file2.txt"),
+        [urls_tosave[1]])
+
+    ds.download_url([opj(topurl, "file3.txt")], save=False)
+    assert_false(ds.repo.file_has_content("file3.txt"))
