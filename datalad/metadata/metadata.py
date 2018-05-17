@@ -25,8 +25,6 @@ from collections import OrderedDict
 from collections import Mapping
 from six import binary_type, string_types
 
-from pkg_resources import iter_entry_points
-
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
@@ -459,6 +457,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
+    from pkg_resources import iter_entry_points  # delayed heavy import
     extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
 
     log_progress(
