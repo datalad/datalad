@@ -237,7 +237,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     } if not force_extraction else False
 
     if not metafound:
-        lgr.info('FULLEXTRACT')
+        lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
         # no metadata found -> extract
         # this places metadata dump files into the configured
         # target dataset and lists them in `to_save`, as well
@@ -257,13 +257,13 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     # that we found
     # simple case: the target dataset has all the records already:
     if all(d is agginto_ds for s, d in metafound.items()):
-        lgr.error('UNCHANGED')
+        lgr.debug('Sticking with up-to-date metadata for %s', aggfrom_ds)
         # no change, use old record from the target dataset
         db[aggfrom_ds.path] = old_agginfo
         # no error
         return False
     else:
-        lgr.info('MVFORMSOURCE')
+        lgr.debug('Reusing previously extracted metadata for %s', aggfrom_ds)
         # we need to move the metadata dump(s) into the target dataset
         objrelpaths = {
             label: op.join(
