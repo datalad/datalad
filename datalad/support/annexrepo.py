@@ -2035,9 +2035,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             if batch:
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
+            files_opt = '--file=%s' % file_
+            if PY2:
+                files_opt = assure_bytes(files_opt)
             out_json = self._run_annex_command_json(
                 'addurl',
-                opts=options + [assure_bytes('--file=%s' % file_)] + [url],
+                opts=options + [files_opt] + [url],
                 log_online=True, log_stderr=False,
                 **kwargs
             )
