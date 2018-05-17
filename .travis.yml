@@ -205,7 +205,8 @@ before_install:
         exit 0;
       fi
     fi
-  - sleep 60   # TEMP -- to spot diff
+  # Life was so fast that we needed a slow down
+  # - sleep 60   # TEMP -- to spot diff
   # Just in case we need to check if nfs is there etc
   - sudo lsmod
   # The ultimate one-liner setup for NeuroDebian repository
