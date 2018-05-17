@@ -72,7 +72,7 @@ def check_basic_xnat_interface(url, project, subjects):
     projects_public = nitrc.get_projects(limit='public')
     import json
     print json.dumps(projects_public, indent=2)
-    assert len(projects_public) < len(projects)
+    assert len(projects_public) <= len(projects)
     assert not set(projects_public).difference(projects)
     eq_(set(projects),
         set(nitrc.get_projects(limit=PROJECT_ACCESS_TYPES)))
