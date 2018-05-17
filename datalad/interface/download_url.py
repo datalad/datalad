@@ -20,7 +20,8 @@ from os.path import isdir, curdir
 
 from .base import Interface
 from ..interface.base import build_doc
-from ..ui import ui
+from ..interface.results import get_status_dict
+from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
 from ..dochelpers import exc_str
 from ..support.param import Parameter
@@ -42,8 +43,6 @@ class DownloadURL(Interface):
 
       $ datalad download-url http://example.com/file.dat s3://bucket/file2.dat
     """
-    # XXX prevent common args from being added to the docstring
-    _no_eval_results = True
 
     _params_ = dict(
         urls=Parameter(
@@ -55,10 +54,6 @@ class DownloadURL(Interface):
             args=("-o", "--overwrite"),
             action="store_true",
             doc="""flag to overwrite it if target file exists"""),
-        stop_on_failure=Parameter(
-            args=("-x", "--stop-on-failure"),
-            action="store_true",
-            doc="""flag to stop subsequent downloads upon first failure to download"""),
         path=Parameter(
             args=("-O", "--path"),
             doc="path (filename or directory path) where to store downloaded file(s).  "
@@ -67,43 +62,49 @@ class DownloadURL(Interface):
             constraints=EnsureStr() | EnsureNone())
     )
 
+    @eval_results
     @staticmethod
-    def __call__(urls, path=None, overwrite=False, stop_on_failure=False):
-        """
-        Returns
-        -------
-        list of str
-          downloaded successfully files
-        """
-
+    def __call__(urls, path=None, overwrite=False):
         from ..downloaders.providers import Providers
+
+        common_report = {"action": "download_url"}
 
         urls = assure_list_from_str(urls)
 
         if len(urls) > 1 and path and not isdir(path):
-            raise ValueError(
-                "When specifying multiple urls, --path should point to "
-                "an existing directory. Got %r" % path)
+            yield get_status_dict(
+                status="error",
+                message=(
+                    "When specifying multiple urls, --path should point to "
+                    "an existing directory. Got %r", path),
+                type="file",
+                path=path,
+                **common_report)
+            return
         if not path:
             path = curdir
 
         # TODO setup fancy ui.progressbars doing this in parallel and reporting overall progress
         # in % of urls which were already downloaded
         providers = Providers.from_config_files()
-        downloaded_paths, failed_urls = [], []
+        downloaded_paths = []
         for url in urls:
             # somewhat "ugly"
             # providers.get_provider(url).get_downloader(url).download(url, path=path)
             # for now -- via sugaring
             try:
                 downloaded_path = providers.download(url, path=path, overwrite=overwrite)
-                downloaded_paths.append(downloaded_path)
-                # ui.message("%s -> %s" % (url, downloaded_path))
             except Exception as e:
-                failed_urls.append(url)
-                ui.error(exc_str(e))
-                if stop_on_failure:
-                    break
-        if failed_urls:
-            raise RuntimeError("%d url(s) failed to download" % len(failed_urls))
-        return downloaded_paths
+                yield get_status_dict(
+                    status="error",
+                    message=exc_str(e),
+                    type="file",
+                    path=path,
+                    **common_report)
+            else:
+                downloaded_paths.append(downloaded_path)
+                yield get_status_dict(
+                    status="ok",
+                    type="file",
+                    path=downloaded_path,
+                    **common_report)

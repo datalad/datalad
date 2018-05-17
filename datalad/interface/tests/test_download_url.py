@@ -15,22 +15,23 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 
 from ...api import download_url
-from ...tests.utils import eq_, assert_cwd_unchanged, assert_raises, \
-    with_tempfile
+from ...tests.utils import eq_, assert_cwd_unchanged, assert_in, \
+    assert_message, assert_raises,  assert_result_count, with_tempfile
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
 from ...tests.utils import swallow_outputs
 
 
 def test_download_url_exceptions():
-    assert_raises(ValueError, download_url, ['url1', 'url2'], path=__file__)
+    res0 = download_url(['url1', 'url2'], path=__file__, on_failure='ignore')
+    assert_result_count(res0, 1, status='error')
+    assert_message('When specifying multiple urls, --path should point to '
+                   'an existing directory. Got %r',
+                   res0)
 
-    # is not in effect somehow :-/ TODO: investigate!
-    with swallow_outputs() as cmo:
-        # bogus urls can't be downloaded any ways
-        with assert_raises(RuntimeError) as cm:
-            download_url('http://example.com/bogus')
-        eq_(str(cm.exception), "1 url(s) failed to download")
+    res1 = download_url('http://example.com/bogus', on_failure='ignore')
+    assert_result_count(res1, 1, status='error')
+    assert_in('http://example.com/bogus', res1[0]['message'])
 
 
 @assert_cwd_unchanged
@@ -45,16 +46,17 @@ def test_download_url_return(toppath, topurl, outdir):
     urls = [topurl + f for f in files]
     outfiles = [opj(outdir, f) for f in files]
 
-    with swallow_outputs() as cmo:
-        out1 = download_url(urls[0], path=outdir)
-    eq_(out1, outfiles[:1])
+    out1 = download_url(urls[0], path=outdir)
+    assert_result_count(out1, 1)
+    eq_(out1[0]['path'], outfiles[0])
 
     # can't overwrite
-    with assert_raises(RuntimeError), \
-        swallow_outputs() as cmo:
-        out2 = download_url(urls, path=outdir)
-        eq_(out2, outfiles[1:])  # only 2nd one
+    out2 = download_url(urls, path=outdir, on_failure='ignore')
+    assert_result_count(out2, 1, status='error')
+    assert_in('file1.txt already exists', out2[0]['message'])
+    assert_result_count(out2, 1, status='ok')  # only 2nd one
+    eq_(out2[1]['path'], outfiles[1])
 
-    with swallow_outputs() as cmo:
-        out3 = download_url(urls, path=outdir, overwrite=True)
-    eq_(out3, outfiles)
+    out3 = download_url(urls, path=outdir, overwrite=True, on_failure='ignore')
+    assert_result_count(out3, 2, status='ok')
+    eq_([r['path'] for r in out3], outfiles)
