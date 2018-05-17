@@ -81,3 +81,9 @@ _group_plumbing = (
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
         ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
+
+# Some known extensions and their commands to suggest whenever lookup fails
+_known_extension_commands = {
+    'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-neuroimaging': ('bids2scidata',)
+}

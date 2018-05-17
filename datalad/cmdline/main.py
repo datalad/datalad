@@ -238,8 +238,21 @@ def setup_parser(
             known_commands = get_commands_from_groups(interface_groups)
 
         if unparsed_arg not in known_commands:
+            # check if might be coming from known extensions
+            from ..interface import _known_extension_commands
+            extension_commands = {
+                c: e
+                for e, commands in _known_extension_commands.items()
+                for c in commands
+            }
+            hint = None
+            if unparsed_arg in extension_commands:
+                hint = "Command %s is provided by (not installed) extension %s," \
+                       " which you can install with your package manager or pip" \
+                      % (unparsed_arg, extension_commands[unparsed_arg])
             fail_with_short_help(
                 parser,
+                hint=hint,
                 provided=unparsed_arg,
                 known=known_commands.keys()
             )
@@ -328,7 +341,10 @@ def setup_parser(
         return parser
 
 
-def fail_with_short_help(parser, msg=None, known=None, provided=None,
+def fail_with_short_help(parser,
+                         msg=None,
+                         known=None, provided=None,
+                         hint=None,
                          exit_code=1,
                          what="command"):
     """Generic helper to fail
@@ -348,6 +364,8 @@ def fail_with_short_help(parser, msg=None, known=None, provided=None,
         if suggestions:
             sys.stderr.write(" Did you mean %s?\n" % " or ".join(suggestions))
         sys.stderr.write(" All known %ss: %s\n" % (what, ", ".join(sorted(known))))
+    if hint:
+        sys.stderr.write("Hint: %s\n" % hint)
     raise SystemExit(exit_code)
 
 
