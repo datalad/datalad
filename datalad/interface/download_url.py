@@ -19,7 +19,7 @@ __docformat__ = 'restructuredtext'
 from os.path import isdir, curdir
 
 from .base import Interface
-from datalad.interface.base import build_doc
+from ..interface.base import build_doc
 from ..ui import ui
 from ..utils import assure_list_from_str
 from ..dochelpers import exc_str
