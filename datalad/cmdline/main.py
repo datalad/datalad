@@ -71,7 +71,6 @@ def setup_parser(
         cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
-
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
@@ -192,59 +191,42 @@ def setup_parser(
     #                    help="""level of verbosity of console output. By default
     #                         only warnings and errors are printed.""")
 
-    # auto detect all available interfaces and generate a function-based
-    # API from them
-    # cmdlineargs = set(cmdlineargs) if cmdlineargs else set()
-    interface_groups = get_interface_groups()
-    interface_groups.append(('plugins', 'Plugins', _get_plugins()))
-
-    def fail_with_short_help(msg=None, known=None, provided=None, what="command"):
-        if msg:
-            sys.stderr.write(msg + '\n')
-        if not known:
-            # just to appear in print_usage also consistent with --help output
-            parser.add_argument("command [command-opts]")
-            parser.print_usage(file=sys.stderr)
-        else:
-            sys.stderr.write("Unknown %s %s.\n" % (what, provided,))
-            import difflib
-            suggestions = difflib.get_close_matches(provided, known)
-            if suggestions:
-                sys.stderr.write(" Did you mean %s?\n" % " or ".join(suggestions))
-            sys.stderr.write(" All known %ss: %s\n" % (what, ", ".join(sorted(known))))
-        raise SystemExit(1)
-
-    def get_commands_from_groups(groups):
-        return {
-            get_cmdline_command_name(_intfspec): _intfspec
-            for _, _, _interfaces in groups
-            for _intfspec in _interfaces
-        }
-
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
     need_single_subparser = False if return_subparsers else None
+    fail_handler = (lambda *a, **kw: True) if return_subparsers else fail_with_short_help
     try:
         parsed_args, unparsed_args = parser._parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
         if not unparsed_args:
-            raise InsufficientArgumentsError() # just to get our summary
+            fail_handler(parser, msg="too few arguments", exit_code=2)
+        lgr.debug("Command line args 1st pass. Parsed: %s Unparsed: %s",
+                  parsed_args, unparsed_args)
     except Exception as exc:
         lgr.debug("Early parsing failed with %s", exc_str(exc))
-        fail_with_short_help()
+        fail_handler(parser)
         need_single_subparser = False
+
+
+    interface_groups = get_interface_groups()
+    # TODO: see if we could retain "generator" for plugins
+    # ATM we need to make it explicit so we could check the command(s) below
+    # It could at least follow the same destiny as extensions so we would
+    # just do more iterative "load ups"
+    interface_groups.append(('plugins', 'Plugins', list(_get_plugins())))
 
     # First unparsed could be either unknown option to top level "datalad"
     # or a command. Among unknown could be --help/--help-np which would
     # need to be dealt with
-    lgr.debug("Command line args 1st pass. Parsed: %s Unparsed: %s",
-              parsed_args, unparsed_args)
-    unparsed_arg = unparsed_args[0]
-    if unparsed_arg in ('--help', '--help-np', '-h'):
+    unparsed_arg = unparsed_args[0] if unparsed_args else None
+    if need_single_subparser is not None \
+            or unparsed_arg in ('--help', '--help-np', '-h'):
         need_single_subparser = False
         add_entrypoints_to_interface_groups(interface_groups)
     elif unparsed_arg.startswith('-'):  # unknown option
-        fail_with_short_help(msg="Unknown option %s" % unparsed_arg)
+        fail_with_short_help(parser,
+                             msg="unrecognized argument %s" % unparsed_arg,
+                             exit_code=2)
         # if we could get a list of options known to parser,
         # we could suggest them
         # known=get_all_options(parser), provided=unparsed_arg)
@@ -257,6 +239,7 @@ def setup_parser(
 
         if unparsed_arg not in known_commands:
             fail_with_short_help(
+                parser,
                 provided=unparsed_arg,
                 known=known_commands.keys()
             )
@@ -283,6 +266,8 @@ def setup_parser(
                 # plugin
                 _intf = _load_plugin(_intfspec[1]['file'], fail=False)
                 if _intf is None:
+                    # TODO:  add doc why we could skip this one... makes this
+                    # loop harder to extract into a dedicated function
                     continue
             else:
                 # turn the interface spec into an instance
@@ -343,6 +328,29 @@ def setup_parser(
         return parser
 
 
+def fail_with_short_help(parser, msg=None, known=None, provided=None,
+                         exit_code=1,
+                         what="command"):
+    """Generic helper to fail
+    with short help possibly hinting on what was intended if `known`
+    were provided
+    """
+    if msg:
+        sys.stderr.write("error: %s\n" % msg)
+    if not known:
+        # just to appear in print_usage also consistent with --help output
+        parser.add_argument("command [command-opts]")
+        parser.print_usage(file=sys.stderr)
+    else:
+        sys.stderr.write("Unknown %s %s.\n" % (what, provided,))
+        import difflib
+        suggestions = difflib.get_close_matches(provided, known)
+        if suggestions:
+            sys.stderr.write(" Did you mean %s?\n" % " or ".join(suggestions))
+        sys.stderr.write(" All known %ss: %s\n" % (what, ", ".join(sorted(known))))
+    raise SystemExit(exit_code)
+
+
 def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
                                      parser_description):
     from ..interface.base import dedent_docstring
@@ -380,6 +388,16 @@ def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
     return detailed_description
 
 
+def get_commands_from_groups(groups):
+    """Get a dictionary of command: interface_spec"""
+    from ..interface.base import get_cmdline_command_name
+    return {
+        get_cmdline_command_name(_intfspec): _intfspec
+        for _, _, _interfaces in groups
+        for _intfspec in _interfaces
+    }
+
+
 def add_entrypoints_to_interface_groups(interface_groups):
     lgr.debug("Loading entrypoints")
     from pkg_resources import iter_entry_points  # delay expensive import
@@ -398,8 +416,9 @@ def add_entrypoints_to_interface_groups(interface_groups):
 
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
+    args = args or sys.argv
     # PYTHON_ARGCOMPLETE_OK
-    parser = setup_parser(args or sys.argv)
+    parser = setup_parser(args)
     try:
         import argcomplete
         argcomplete.autocomplete(parser)
@@ -407,7 +426,8 @@ def main(args=None):
         pass
 
     # parse cmd args
-    cmdlineargs, unparsed_args = parser.parse_known_args(args)
+    lgr.debug("Parsing known args among %s", repr(args))
+    cmdlineargs, unparsed_args = parser.parse_known_args(args[1:])
     has_func = hasattr(cmdlineargs, 'func') and cmdlineargs.func is not None
     if unparsed_args:
         if has_func and cmdlineargs.func.__self__.__name__ != 'Export':

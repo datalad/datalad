@@ -51,8 +51,8 @@ def run_main(args, exit_code=0, expect_stderr=False):
     with patch('sys.stderr', new_callable=StringIO) as cmerr:
         with patch('sys.stdout', new_callable=StringIO) as cmout:
             with assert_raises(SystemExit) as cm:
-                main(args)
-            assert_equal(cm.exception.code, exit_code)  # exit code must be 0
+                main(["datalad"] + list(args))
+            assert_equal(cm.exception.code, exit_code)
             stdout = cmout.getvalue()
             stderr = cmerr.getvalue()
             if expect_stderr is False:
@@ -123,7 +123,7 @@ def test_usage_on_insufficient_args():
 
 
 def test_subcmd_usage_on_unknown_args():
-    stdout, stderr = run_main(['get', '--murks'], exit_code=1)
+    stdout, stderr = run_main(['get', '--murks'], exit_code=1, expect_stderr=True)
     in_('get', stdout)
 
 
@@ -143,7 +143,7 @@ def check_incorrect_option(opts, err_str):
     # checked to meet its constraints.
     # But sys.argv[0] actually isn't used by main at all. It simply doesn't
     # matter what's in there. The only thing important to pass here is `opts`.
-    stdout, stderr = run_main(('datalad',) + opts, expect_stderr=True, exit_code=2)
+    stdout, stderr = run_main(opts, expect_stderr=True, exit_code=2)
     out = stdout + stderr
     assert_in("usage: ", out)
     assert_re_in(err_str, out, match=False)
@@ -151,11 +151,11 @@ def check_incorrect_option(opts, err_str):
 
 def test_incorrect_options():
     # apparently a bit different if following a good one so let's do both
-    err_invalid = "error: (invalid|too few arguments|unrecognized arguments)"
+    err_invalid = "error: (invalid|too few arguments|unrecognized argument)"
     yield check_incorrect_option, ('--buga',), err_invalid
     yield check_incorrect_option, ('--dbg', '--buga'), err_invalid
 
-    err_insufficient = err_invalid # "specify"
+    err_insufficient = err_invalid  # "specify"
     yield check_incorrect_option, ('--dbg',), err_insufficient
     yield check_incorrect_option, tuple(), err_insufficient
 
