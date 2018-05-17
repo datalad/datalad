@@ -40,7 +40,7 @@ class DownloadURL(Interface):
 
     Examples:
 
-      $ datalad download http://example.com/file.dat s3://bucket/file2.dat
+      $ datalad download-url http://example.com/file.dat s3://bucket/file2.dat
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
