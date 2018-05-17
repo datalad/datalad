@@ -194,7 +194,8 @@ def setup_parser(
     # Before doing anything additional and possibly expensive see may be that
     # we have got the command already
     need_single_subparser = False if return_subparsers else None
-    fail_handler = (lambda *a, **kw: True) if return_subparsers else fail_with_short_help
+    fail_handler = (lambda *a, **kw: True) \
+        if return_subparsers else fail_with_short_help
     try:
         parsed_args, unparsed_args = parser._parse_known_args(
             cmdlineargs[1:], argparse.Namespace())
@@ -247,14 +248,13 @@ def setup_parser(
             }
             hint = None
             if unparsed_arg in extension_commands:
-                hint = "Command %s is provided by (not installed) extension %s," \
-                       " which you can install with your package manager or pip" \
+                hint = "Command %s is provided by (not installed) extension %s." \
                       % (unparsed_arg, extension_commands[unparsed_arg])
             fail_with_short_help(
                 parser,
                 hint=hint,
                 provided=unparsed_arg,
-                known=known_commands.keys()
+                known=list(known_commands.keys()) + list(extension_commands.keys())
             )
         if need_single_subparser is None:
             need_single_subparser = unparsed_arg
@@ -341,31 +341,41 @@ def setup_parser(
         return parser
 
 
-def fail_with_short_help(parser,
+def fail_with_short_help(parser=None,
                          msg=None,
                          known=None, provided=None,
                          hint=None,
                          exit_code=1,
-                         what="command"):
+                         what="command",
+                         out=None):
     """Generic helper to fail
     with short help possibly hinting on what was intended if `known`
     were provided
     """
+    out = out or sys.stderr
     if msg:
-        sys.stderr.write("error: %s\n" % msg)
+        out.write("error: %s\n" % msg)
     if not known:
-        # just to appear in print_usage also consistent with --help output
-        parser.add_argument("command [command-opts]")
-        parser.print_usage(file=sys.stderr)
+        if parser:
+            # just to appear in print_usage also consistent with --help output
+            parser.add_argument("command [command-opts]")
+            parser.print_usage(file=out)
     else:
-        sys.stderr.write("Unknown %s %s.\n" % (what, provided,))
-        import difflib
-        suggestions = difflib.get_close_matches(provided, known)
-        if suggestions:
-            sys.stderr.write(" Did you mean %s?\n" % " or ".join(suggestions))
-        sys.stderr.write(" All known %ss: %s\n" % (what, ", ".join(sorted(known))))
+        out.write(
+            "datalad: Unknown %s %r.  See 'datalad --help'.\n\n"
+            % (what, provided,))
+        if provided not in known:
+            import difflib
+            suggestions = difflib.get_close_matches(provided, known)
+            if suggestions:
+                out.write(
+                    "Did you mean one of these?\n        %s\n"
+                    % "\n        ".join(suggestions))
+        # Too noisy
+        # sys.stderr.write(" All known %ss: %s\n"
+        #                   % (what, ", ".join(sorted(known))))
     if hint:
-        sys.stderr.write("Hint: %s\n" % hint)
+        out.write("Hint: %s\n" % hint)
     raise SystemExit(exit_code)
 
 
