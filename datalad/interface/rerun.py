@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import dropwhile
 import json
+import os
 import re
 import sys
 
@@ -70,6 +71,11 @@ class Rerun(Interface):
         % # now on verify branch
         % datalad diff --revision=master..
         % git log --oneline --left-right --cherry-pick master...
+
+    .. note::
+      Currently the "onto" feature only sets the working tree of the current
+      dataset to a previous state. The working trees of any subdatasets remain
+      unchanged.
     """
     _params_ = dict(
         revision=Parameter(
@@ -313,12 +319,16 @@ class Rerun(Interface):
                 # bring back the entire state of the tree with #1424, but
                 # we limit ourself to file addition/not-in-place-modification
                 # for now
-                for r in ds.unlock(new_or_modified(ds, hexsha),
-                                   return_type='generator', result_xfm=None):
-                    yield r
+                auto_outputs = (os.path.relpath(ap["path"], ds.path)
+                                for ap in new_or_modified(ds, hexsha))
+                outputs = run_info.get("outputs", [])
+                auto_outputs = [p for p in auto_outputs if p not in outputs]
 
                 for r in run_command(run_info['cmd'],
-                                     ds, message or rev["run_message"],
+                                     dataset=ds,
+                                     inputs=run_info.get("inputs", []),
+                                     outputs=outputs + auto_outputs,
+                                     message=message or rev["run_message"],
                                      rerun_info=run_info):
                     yield r
 

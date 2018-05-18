@@ -2542,11 +2542,35 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self, with_content_only=False):
+    def get_annexed_files(self, with_content_only=False, patterns=None):
         """Get a list of files in annex
+
+        Parameters
+        ----------
+        with_content_only : bool, optional
+            Only list files whose content is present.
+        patterns : list, optional
+            Globs to pass to annex's `--include=`. Files that match any of
+            these will be returned (i.e., they'll be separated by `--or`).
+
+        Returns
+        -------
+        A list of file names
         """
-        # TODO: Review!!
-        args = [] if with_content_only else ['--include', "*"]
+        if not patterns:
+            args = [] if with_content_only else ['--include', "*"]
+        else:
+            if len(patterns) == 1:
+                args = ['--include', patterns[0]]
+            else:
+                args = ['-(']
+                for pat in patterns[:-1]:
+                    args.extend(['--include', pat, "--or"])
+                args.extend(['--include', patterns[-1]])
+                args.append('-)')
+
+            if with_content_only:
+                args.extend(['--in', 'here'])
         out, err = self._run_annex_command('find', annex_options=args)
         # TODO: JSON
         return out.splitlines()
