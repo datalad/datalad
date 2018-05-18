@@ -61,7 +61,7 @@ def _format_cmd_shorty(cmd):
 
 @build_doc
 class Run(Interface):
-    """Run an arbitrary command and record its impact on a dataset.
+    """Run an arbitrary shell command and record its impact on a dataset.
 
     It is recommended to craft the command such that it can run in the root
     directory of the dataset that the command will be recorded in. However,
@@ -78,7 +78,7 @@ class Run(Interface):
         cmd=Parameter(
             args=("cmd",),
             nargs=REMAINDER,
-            metavar='SHELL COMMAND',
+            metavar='COMMAND',
             doc="command for execution"),
         dataset=Parameter(
             args=("-d", "--dataset"),
