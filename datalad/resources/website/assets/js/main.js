@@ -134,10 +134,11 @@ function set_cached(item, key, value) {
 }
 
 /**
- * Create installation RI
- * @return {string} RI to install current dataset from
+ * Get global URL for the current dataset containing the directory.
+ * Current loc is the one with URL containing path in the query
+ * @return {string} URL to top of current dataset
  */
-function uri2installri(shorten) {
+function get_dataset_global_url() {
   // TODO -- RF to centralize common logic with bread2crumbs
   var href = loc().href;
   var rawCrumbs = href.split('/');
@@ -146,7 +147,8 @@ function uri2installri(shorten) {
   var dir = getParameterByName('dir', href);
   var topurl = href.replace(/\?.*/, '').replace(/\/$/, '')
 
-  if (has_cached(dir, "install_url")) return get_cached(dir, "install_url");
+  if (has_cached(dir, "dataset_url"))
+    return get_cached(dir, "dataset_url");
 
   if (has_cached(dir, "type")
       && ((ntCache[dir].type == 'git') || (ntCache[dir].type == 'annex'))) {
@@ -170,11 +172,21 @@ function uri2installri(shorten) {
         }
       }
   }
+  if (ri)
+    set_cached(dir, "dataset_url", ri);
+  return ri;
+}
+
+/**
+ * Create installation RI
+ * @return {string} RI to install current dataset from
+ */
+function get_install_ri() {
+  var ri = get_dataset_global_url();
   // possible shortcuts
-  if (shorten && ri) {
+  if (ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
-    set_cached(dir, "install_url", ri);
   }
   return ri;
 }
@@ -442,7 +454,7 @@ function directory(jQuery, md5) {
   jQuery('#content').prepend('<table id="directory" class="display"></table>');
 
   // add HOWTO install
-  var ri = uri2installri(true);
+  var ri = get_install_ri();
   if (ri) {
     jQuery('#installation').prepend(
         '<P style="margin-top: 0px;">To install this dataset in your current directory use</P>' +
@@ -513,9 +525,10 @@ function directory(jQuery, md5) {
       // possibly present the README.md at the bottom of the page
       if (data.name === 'README.md' && data.type === 'file') {
         // Render and embed the content of that file
+        // TODO: may be we should cache the rendering as well??
         var converter = new showdown.Converter();
         jQuery.ajax({
-          url: uri2installri(false) + '/' + data.path,
+          url: get_dataset_global_url() + '/' + data.path,
           dataType: 'text',
           success: function(data) {
             jQuery('#file_content').append(converter.makeHtml(data));
