@@ -531,7 +531,7 @@ function directory(jQuery, md5) {
           url: get_dataset_global_url() + '/' + data.path,
           dataType: 'text',
           success: function(data) {
-            jQuery('#file_content').append(converter.makeHtml(data));
+            jQuery('#README').append(converter.makeHtml(data));
           }
         });
       }
