@@ -10,6 +10,12 @@ var stored = sessionStorage['ntCache'];
 var stored = localStorage['ntCache'];
 if (stored) ntCache = JSON.parse(stored);
 
+/* Markdown converter */
+showdown.setOption('simplifiedAutoLink', true);
+showdown.setOption('ghCodeBlocks', true);
+showdown.setOption('ghCompatibleHeaderId', true);
+var converter = new showdown.Converter();
+
 /**
  * check if url exists
  * @param {string} url url to test for existence
@@ -526,7 +532,6 @@ function directory(jQuery, md5) {
       if (data.name === 'README.md' && data.type === 'file') {
         // Render and embed the content of that file
         // TODO: may be we should cache the rendering as well??
-        var converter = new showdown.Converter();
         jQuery.ajax({
           url: get_dataset_global_url() + '/' + data.path,
           dataType: 'text',
