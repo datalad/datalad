@@ -22,6 +22,7 @@ from os.path import split, abspath, basename, join as opj, realpath, relpath, \
 from datalad.consts import METADATA_DIR, METADATA_FILENAME
 from datalad.distribution.dataset import Dataset
 from datalad.interface.ls import FsModel, lgr, GitModel
+from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import safe_print, with_pathsep
 
 
@@ -207,6 +208,14 @@ def fs_traverse(path, repo, parent=None,
     """
     subdatasets = subdatasets or []
     fs = fs_extract(path, repo, basepath=basepath or path)
+    dataset = Dataset(repo.path)
+    submodules = {sm.path: sm
+                  for sm in repo.get_submodules()}
+    # TODO:  some submodules might not even have a local empty directory
+    # (git doesn't care about those), so us relying on listdir here and
+    # for _traverse_handle_subds might not work out.
+    # E.g. create-sibling --ui true ... --existing=reconfigure
+    #  causes removal of those empty ones on the remote end
     if isdir(path):                     # if node is a directory
         children = [fs.copy()]          # store its info in its children dict too  (Yarik is not sure why, but I guess for .?)
         # ATM seems some pieces still rely on having this duplication, so left as is
@@ -232,13 +241,18 @@ def fs_traverse(path, repo, parent=None,
             # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
             if is_subdataset:
+                node_relpath = relpath(nodepath, repo.path)
                 subds = _traverse_handle_subds(
-                    relpath(nodepath, repo.path),
-                    Dataset(repo.path),
+                    node_relpath,
+                    dataset,
                     recurse_datasets=recurse_datasets,
                     recurse_directories=recurse_directories,
                     json=json
                 )
+                # Enhance it with external url if available
+                submod_url = submodules[node_relpath].url
+                if submod_url and is_datalad_compat_ri(submod_url):
+                    subds['url'] = submod_url
                 children.append(subds)
             elif not ignored(nodepath):
                 # if recursive, create info dictionary (within) each child node too
@@ -399,6 +413,8 @@ def _traverse_handle_subds(
             # the same drill as if not installed
             lgr.warning("%s is installed but no meta-data yet", subds)
             subfs = handle_not_installed()
+    # add URL field
+
     return subfs
 
 

@@ -500,6 +500,9 @@ function directory(jQuery, md5) {
         if (data.tags) {
           orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
         }
+        if (data.url) {
+          orig = orig + "&nbsp;<a href='" + data.url + "'><div id='img_external_link'/></a>";
+        }
         jQuery('td', row).eq(0).html(orig);
       }
       if (data.name === '..')
