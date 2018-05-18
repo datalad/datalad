@@ -206,8 +206,8 @@ function updateParamOrPath(nextUrl, type, currentState) {
  */
 function clickHandler(data, url) {
   // don't do anything for broken links
-  if (data.type === 'link-broken')
-    return {next: '', type: 'none'};
+  if (data.type === 'link-broken' || data.type === 'uninitialized')
+    return data.url ? {next: data.url, type: 'assign'} : {next: '', type: 'none'};
   // get directory parameter
   var dir = getParameterByName('dir', url);
   // which direction to move, up or down the path ?
