@@ -25,11 +25,11 @@ td.file { color: #67CDDC; }
 .command-option { font-family: monospace; font-weight: bold; color: darkgray; }
 
 #img_external_link {
-    background-image: url("../images/external-link-symbol.png");
+    background-image: url("../images/external-link-symbol.svg");
     background-repeat: no-repeat;
     display: inline-block;
-    width: 1em;
-    height: 1em;
+    width: 0.7em;
+    height: 0.7em;
     margin: 0;
     padding: 0;
 }
