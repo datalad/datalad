@@ -101,7 +101,7 @@ function getParameterByName(name, url) {
  * @return {array} html linkified breadcrumbs array
  */
 function bread2crumbs(jQuery, md5) {
-  var rawCrumbs = loc().href.replace(/\/$/, '').split('/');  // split, remove trailing '/'
+  var rawCrumbs = loc().href.replace(/#.*/, '').replace(/\/$/, '').split('/');  // split, remove trailing '/'
   var spanClass = '<span class="dir">';
   var crumbs = [];
   for (var index = 2; index < rawCrumbs.length; index++) {
