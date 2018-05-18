@@ -11,8 +11,10 @@ import hashlib
 import json as js
 import logging
 from genericpath import exists
-from nose.tools import assert_equal, assert_raises, assert_in, assert_false, \
-    assert_not_in
+from datalad.tests.utils import (
+    assert_equal, assert_raises, assert_in, assert_false,
+    assert_not_in, ok_startswith
+)
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -22,7 +24,13 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
-
+# for bindmounts
+import datalad.distribution.add
+import datalad.distribution.install
+import datalad.distribution.create
+import datalad.distribution.drop
+import datalad.distribution.subdatasets
+import datalad.interface.diff
 
 def test_machinesize():
     assert_equal(1.0, machinesize(1))
@@ -131,27 +139,27 @@ def test_fs_traverse(topdir):
           '.hidden': {'.hidden_file': '123'}})
 def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
-    dsj = Dataset(topdir)
+    ds = Dataset(topdir)
     # create some file and commit it
-    with open(opj(dsj.path, 'subdsfile.txt'), 'w') as f:
+    with open(opj(ds.path, 'subdsfile.txt'), 'w') as f:
         f.write('123')
-    dsj.add(path='subdsfile.txt')
-    dsj.save("Hello!", version_tag=1)
+    ds.add(path='subdsfile.txt')
+    ds.save("Hello!", version_tag=1)
 
     # add a subdataset
-    dsj.install('subds', source=topdir)
+    ds.install('subds', source=topdir)
 
-    subdirds = dsj.create(_path_('dir/subds2'), force=True)
+    subdirds = ds.create(_path_('dir/subds2'), force=True)
     subdirds.add('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
-    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)              # commit to git to init git repo
-    annex.add(opj(topdir, 'dir', 'subgit'), commit=True)                        # add the non-dataset git repo to annex
-    annex.add(opj(topdir, 'dir'), commit=True)                                  # add to annex (links)
-    annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])  # broken-link
+    git.add('fgit.txt', commit=True)              # commit to git to init git repo
+    # annex.add doesn't add submodule, so using ds.add
+    ds.add(opj('dir', 'subgit'))                        # add the non-dataset git repo to annex
+    ds.add('dir')                                  # add to annex (links)
+    ds.drop(opj('dir', 'subdir', 'file2.txt'), check=False)  # broken-link
 
     meta_dir = opj('.git', 'datalad', 'metadata')
-    meta_path = opj(topdir, meta_dir)
 
     def get_metahash(*path):
         if not path:
@@ -175,10 +183,12 @@ def test_ls_json(topdir):
 
                 #with swallow_logs(), swallow_outputs():
                 dsj = _ls_json(
-                    topdir, json=state,
+                    topdir,
+                    json=state,
                     all_=all_,
                     recursive=recursive
                 )
+                ok_startswith(dsj['tags'], '1-')
 
                 exists_post = exists(subds_metapath)
                 # print("%s %s -> %s" % (state, exists_prior, exists_post))
