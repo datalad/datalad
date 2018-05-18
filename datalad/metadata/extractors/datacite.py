@@ -10,8 +10,7 @@
 """
 
 import re
-from os.path import join as opj
-from os.path import lexists
+import os.path as op
 from collections import OrderedDict
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.datacite')
@@ -73,12 +72,16 @@ def _process_tree(tree, nstag):
 
 
 class MetadataExtractor(BaseMetadataExtractor):
-    _core_metadata_filename = opj('.datalad', 'meta.datacite.xml')
-
     def _get_dataset_metadata(self):
-        fname = opj(self.ds.path, self._core_metadata_filename)
-        if not lexists(fname):
+        cannonical = op.join(self.ds.path, '.datalad', 'meta.datacite.xml')
+
+        # look for the first matching filename and go with it
+        fname = [cannonical] if op.lexists(cannonical) else \
+            [op.join(self.ds.path, f) for f in self.paths
+             if op.basename(f) == 'meta.datacite.xml']
+        if not fname or not op.lexists(fname[0]):
             return {}
+        fname = fname[0]
         # those namespaces are a b.ch
         # TODO: avoid reading file twice
         namespaces = dict([

@@ -9,15 +9,14 @@
 """Test datacite metadata extractor """
 
 from simplejson import dumps
-from datalad.distribution.dataset import Dataset
 from datalad.metadata.extractors.datacite import MetadataExtractor
+from datalad.metadata.metadata import _get_metadatarelevant_paths
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import assert_raises
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.api import create
 
 
-@with_tree(tree={'.datalad': {'meta.datacite.xml': """\
+xml_content = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <resource xmlns="http://datacite.org/schema/kernel-2.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://datacite.org/schema/kernel-2.2 http://schema.datacite.org/meta/kernel-2.2/metadata.xsd">
 	<identifier identifierType="DOI">10.6080/K0QN64NG</identifier>
@@ -60,14 +59,22 @@ from datalad.support.exceptions import IncompleteResultsError
 	    <relatedIdentifier relatedIdentifierType="DOI" relationType="IsDocumentedBy">10.1016/j.cub.2011.08.031</relatedIdentifier>
 	</relatedIdentifiers>
 </resource>
-"""}})
-def test_get_metadata(path):
-    from datalad.api import create
-    ds = create(path, force=True)
-    meta = MetadataExtractor(ds, [])._get_dataset_metadata()
-    assert_equal(
-        dumps(meta, sort_keys=True, indent=2),
-        """\
+"""
+
+
+@with_tree(tree={'.datalad': {'meta.datacite.xml': xml_content}})
+@with_tree(tree={'elsewhere': {'meta.datacite.xml': xml_content}})
+def test_get_metadata(path1, path2):
+    for p in (path1, path2):
+        print('PATH')
+        ds = create(p, force=True)
+        ds.add('.')
+        meta = MetadataExtractor(
+                ds,
+                _get_metadatarelevant_paths(ds, []))._get_dataset_metadata()
+        assert_equal(
+            dumps(meta, sort_keys=True, indent=2),
+            """\
 {
   "author": [
     "Last1, First1",
