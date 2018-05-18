@@ -33,3 +33,11 @@ td.file { color: #67CDDC; }
     margin: 0;
     padding: 0;
 }
+
+#file_content {
+    border: 1px solid #ddd;
+    background-color: #f9f9f9;
+    padding: 1em;
+    padding-top: 0;
+    margin-top: 1em;
+}

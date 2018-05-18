@@ -137,7 +137,7 @@ function set_cached(item, key, value) {
  * Create installation RI
  * @return {string} RI to install current dataset from
  */
-function uri2installri() {
+function uri2installri(shorten) {
   // TODO -- RF to centralize common logic with bread2crumbs
   var href = loc().href;
   var rawCrumbs = href.split('/');
@@ -171,11 +171,11 @@ function uri2installri() {
       }
   }
   // possible shortcuts
-  if (ri) {
+  if (shorten && ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
+    set_cached(dir, "install_url", ri);
   }
-  set_cached(dir, "install_url", ri);
   return ri;
 }
 
@@ -296,6 +296,7 @@ function nodeJson(jQuery, md5, parent, top, nodeurl) {
 
   // else return required info for parent row from parent metadata json
   var nodeJson_ = {};
+
   jQuery.ajax({
     url: nodeMetaUrl,
     dataType: 'json',
@@ -441,7 +442,7 @@ function directory(jQuery, md5) {
   jQuery('#content').prepend('<table id="directory" class="display"></table>');
 
   // add HOWTO install
-  var ri = uri2installri();
+  var ri = uri2installri(true);
   if (ri) {
     jQuery('#installation').prepend(
         '<P style="margin-top: 0px;">To install this dataset in your current directory use</P>' +
@@ -509,6 +510,18 @@ function directory(jQuery, md5) {
         jQuery('td', row).eq(2).html('');
       for (var i = 0; i < 4; i++)  // attach css based on node-type to visible columns of each row
         jQuery('td', row).eq(i).addClass(data.type);
+      // possibly present the README.md at the bottom of the page
+      if (data.name === 'README.md' && data.type === 'file') {
+        // Render and embed the content of that file
+        var converter = new showdown.Converter();
+        jQuery.ajax({
+          url: uri2installri(false) + '/' + data.path,
+          dataType: 'text',
+          success: function(data) {
+            jQuery('#file_content').append(converter.makeHtml(data));
+          }
+        });
+      }
     },
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {
