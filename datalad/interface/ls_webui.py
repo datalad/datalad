@@ -241,7 +241,9 @@ def fs_traverse(path, repo, parent=None,
             # TODO:  it might be a subdir which is non-initialized submodule!
             # if not ignored, append child node info to current nodes dictionary
             if is_subdataset:
-                node_relpath = relpath(nodepath, repo.path)
+                # repo.path is real, so we are doomed (for now at least)
+                # to resolve nodepath as well to get relpath for it
+                node_relpath = relpath(realpath(nodepath), repo.path)
                 subds = _traverse_handle_subds(
                     node_relpath,
                     dataset,
