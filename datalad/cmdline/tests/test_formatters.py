@@ -83,6 +83,7 @@ def test_cmdline_example_to_rst():
     assert_not_in('shame', out_text)  # no SKIP'ed
     assert_not_in('#', out_text)      # no comments
 
+
 def test_parser_access():
     parsers = setup_parser(['datalad'], return_subparsers=True)
     # we have a bunch
