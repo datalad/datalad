@@ -167,6 +167,13 @@ matrix:
     - TESTS_TO_PERFORM=datalad_neuroimaging
     - NOSE_SELECTION_OP=
 
+  - python: 3.5
+    # test with extension datalad-container
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-container
+    - TESTS_TO_PERFORM=datalad_container
+    - NOSE_SELECTION_OP=
+
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
@@ -242,6 +249,7 @@ install:
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit
+  - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:
   # Test installation system-wide
