@@ -145,7 +145,7 @@ class DownloadURL(Interface):
 [DATALAD] Download URLs
 
 path: {}
-url:
+URLs:
   {}""".format(path, "\n  ".join(urls))
 
             for r in ds.add(downloaded_paths, message=msg):
