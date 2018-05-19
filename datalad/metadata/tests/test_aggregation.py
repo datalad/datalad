@@ -63,6 +63,11 @@ def test_basic_aggregate(path):
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.add('.', recursive=True)
     ok_clean_git(base.path)
+    # we will first aggregate the middle dataset on its own, this will
+    # serve as a smoke test for the reuse of metadata objects later on
+    sub.aggregate_metadata()
+    base.save()
+    ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     direct_meta = base.metadata(recursive=True, return_type='list')
