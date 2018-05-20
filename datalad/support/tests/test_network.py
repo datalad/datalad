@@ -390,6 +390,8 @@ def test_is_url():
 
 # TODO: RF with test_is_url to avoid duplication
 def test_is_datalad_compat_ri():
+    ok_(is_datalad_compat_ri('ssh://user:passw@host/path'))
+    ok_(is_datalad_compat_ri('http://example.com'))
     ok_(is_datalad_compat_ri('file://localhost/some'))
     ok_(is_datalad_compat_ri('///localhost/some'))
     nok_(is_datalad_compat_ri('relative'))
