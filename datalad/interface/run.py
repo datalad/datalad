@@ -166,15 +166,19 @@ def _expand_globs(patterns, pwd, warn=True):
     return expanded
 
 
-# This helper function is used to add the rerun_info argument.
-def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, rerun_info=None):
-    rel_pwd = rerun_info.get('pwd') if rerun_info else None
-    if rel_pwd and dataset:
-        # recording is relative to the dataset
-        pwd = normpath(opj(dataset.path, rel_pwd))
-        rel_pwd = relpath(pwd, dataset.path)
-    elif dataset:
+def get_command_pwds(dataset):
+    """Return the directory for the command.
+
+    Parameters
+    ----------
+    dataset : Dataset
+
+    Returns
+    -------
+    A tuple, where the first item is the absolute path of the pwd and the
+    second is the pwd relative to the dataset's path.
+    """
+    if dataset:
         pwd = dataset.path
         rel_pwd = curdir
     else:
@@ -188,6 +192,18 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         else:
             rel_pwd = pwd  # and leave handling on deciding either we
                            # deal with it or crash to checks below
+    return pwd, rel_pwd
+
+# This helper function is used to add the rerun_info argument.
+def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
+                message=None, rerun_info=None):
+    rel_pwd = rerun_info.get('pwd') if rerun_info else None
+    if rel_pwd and dataset:
+        # recording is relative to the dataset
+        pwd = normpath(opj(dataset.path, rel_pwd))
+        rel_pwd = relpath(pwd, dataset.path)
+    else:
+        pwd, rel_pwd = get_command_pwds(dataset)
 
     ds = require_dataset(
         dataset, check_installed=True,
