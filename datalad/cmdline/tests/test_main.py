@@ -10,6 +10,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import skip_if_on_windows
 
 
 import re
@@ -160,6 +161,7 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
+@skip_if_on_windows
 def test_script_shims():
     runner = Runner()
     for script in [
