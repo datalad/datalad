@@ -11,8 +11,11 @@ import hashlib
 import json as js
 import logging
 from genericpath import exists
-from nose.tools import assert_equal, assert_raises, assert_in, assert_false, \
-    assert_not_in
+from datalad.tests.utils import (
+    assert_equal, assert_raises, assert_in, assert_false,
+    assert_not_in, ok_startswith,
+    serve_path_via_http,
+)
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -24,6 +27,8 @@ from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
 # needed below as bound dataset method
 from datalad.api import add
+
+from datalad.cmd import Runner
 
 
 def test_machinesize():
@@ -132,31 +137,44 @@ def test_fs_traverse(topdir):
                   'subgit': {'fgit.txt': '123'},
                   'subds2': {'file': '124'}},
           '.hidden': {'.hidden_file': '123'}})
-def test_ls_json(topdir):
+@serve_path_via_http
+def test_ls_json(topdir, topurl):
     annex = AnnexRepo(topdir, create=True)
-    dsj = Dataset(topdir)
+    ds = Dataset(topdir)
     # create some file and commit it
-    with open(opj(dsj.path, 'subdsfile.txt'), 'w') as f:
+    with open(opj(ds.path, 'subdsfile.txt'), 'w') as f:
         f.write('123')
-    dsj.add(path='subdsfile.txt')
-    dsj.save("Hello!", version_tag=1)
+    ds.add(path='subdsfile.txt')
+    ds.save("Hello!", version_tag=1)
 
     # add a subdataset
-    dsj.install('subds', source=topdir)
+    ds.install('subds', source=topdir)
 
-    subdirds = dsj.create(_path_('dir/subds2'), force=True)
+    subdirds = ds.create(_path_('dir/subds2'), force=True)
     subdirds.add('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
-    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'))              # commit to git to init git repo
+    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'))                           # commit to git to init git repo
     git.commit()
-    annex.add(opj(topdir, 'dir', 'subgit'))                        # add the non-dataset git repo to annex
-    annex.add(opj(topdir, 'dir'))                                  # add to annex (links)
-    annex.commit()
+    annex.add(opj(topdir, 'dir', 'subgit'))                                     # add the non-dataset git repo to annex
+    annex.add(opj(topdir, 'dir'))                                               # add to annex (links)
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])  # broken-link
+    annex.commit()
 
+    git.add('fgit.txt')              # commit to git to init git repo
+    git.commit()
+    # annex.add doesn't add submodule, so using ds.add
+    ds.add(opj('dir', 'subgit'))                        # add the non-dataset git repo to annex
+    ds.add('dir')                                  # add to annex (links)
+    ds.drop(opj('dir', 'subdir', 'file2.txt'), check=False)  # broken-link
+
+    # register "external" submodule  by installing and uninstalling it
+    ext_url = topurl + '/dir/subgit/.git'
+    # need to make it installable via http
+    Runner()('git update-server-info', cwd=opj(topdir, 'dir', 'subgit'))
+    ds.install(opj('dir', 'subgit_ext'), source=ext_url)
+    ds.uninstall(opj('dir', 'subgit_ext'))
     meta_dir = opj('.git', 'datalad', 'metadata')
-    meta_path = opj(topdir, meta_dir)
 
     def get_metahash(*path):
         if not path:
@@ -180,10 +198,12 @@ def test_ls_json(topdir):
 
                 #with swallow_logs(), swallow_outputs():
                 dsj = _ls_json(
-                    topdir, json=state,
+                    topdir,
+                    json=state,
                     all_=all_,
                     recursive=recursive
                 )
+                ok_startswith(dsj['tags'], '1-')
 
                 exists_post = exists(subds_metapath)
                 # print("%s %s -> %s" % (state, exists_prior, exists_post))
@@ -226,6 +246,9 @@ def test_ls_json(topdir):
                     dir_nodes = {x['name']: x for x in dirj['nodes']}
                     # it should be present in the subdir meta
                     assert_in('subds2', dir_nodes)
+                    assert_not_in('url_external', dir_nodes['subds2'])
+                    assert_in('subgit_ext', dir_nodes)
+                    assert_equal(dir_nodes['subgit_ext']['url'], ext_url)
                 # and not in topds
                 assert_not_in('subds2', topds_nodes)
 
