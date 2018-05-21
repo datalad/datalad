@@ -555,12 +555,13 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 maxsize=max_fieldsize,
                 blacklist=blacklist)
 
+            if not meta:
+                continue
+
             # assign
             # only ask each metadata extractor once, hence no conflict possible
             loc_dict = contentmeta.get(loc, {})
-            if meta:
-                # do not store empty stuff
-                loc_dict[mtype_key] = meta
+            loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
             if ds.config.obtain(
