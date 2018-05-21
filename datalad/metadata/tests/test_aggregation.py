@@ -63,6 +63,11 @@ def test_basic_aggregate(path):
     subsub = base.create(opj('sub', 'subsub'), force=True)
     base.add('.', recursive=True)
     ok_clean_git(base.path)
+    # we will first aggregate the middle dataset on its own, this will
+    # serve as a smoke test for the reuse of metadata objects later on
+    sub.aggregate_metadata()
+    base.save()
+    ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     direct_meta = base.metadata(recursive=True, return_type='list')
@@ -164,7 +169,7 @@ def test_reaggregate_with_unavailable_objects(path):
     ok_clean_git(base.path)
     # now re-aggregate, the state hasn't changed, so the file names will
     # be the same
-    base.aggregate_metadata(recursive=True, update_mode='all')
+    base.aggregate_metadata(recursive=True, update_mode='all', force_extraction=True)
     eq_(all(base.repo.file_has_content(objs)), True)
     # and there are no new objects
     eq_(
@@ -340,8 +345,8 @@ def test_partial_aggregation(path):
     # from-scratch aggregation kills datasets that where not listed
     ds.aggregate_metadata(path='sub1', incremental=False)
     res = ds.metadata(get_aggregates=True)
-    assert_result_count(res, 2)
-    assert_result_count(res, 0, path=sub2.path)
+    assert_result_count(res, 3)
+    assert_result_count(res, 1, path=sub2.path)
     # now reaggregated in full
     ds.aggregate_metadata(recursive=True)
     # make change in sub1

@@ -15,6 +15,7 @@ import logging
 import os
 from os import makedirs
 from os import listdir
+import os.path as op
 from os.path import join as opj
 from os.path import dirname
 from os.path import relpath
@@ -22,10 +23,15 @@ from os.path import isabs
 from os.path import exists
 from os.path import lexists
 from os.path import curdir
-from os.path import normpath
 
 from hashlib import md5
 import shutil
+
+# API commands we need
+from datalad.distribution.get import Get
+from datalad.distribution.remove import Remove
+from datalad.distribution.subdatasets import Subdatasets
+from datalad.interface.unlock import Unlock
 
 import datalad
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -33,15 +39,11 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.save import Save
-from datalad.interface.unlock import Unlock
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
-from datalad.distribution.get import Get
-from datalad.distribution.remove import Remove
-from datalad.distribution.subdatasets import Subdatasets
 from datalad.metadata.metadata import agginfo_relpath
 from datalad.metadata.metadata import exclude_from_metadata
 from datalad.metadata.metadata import get_metadata_type
@@ -59,7 +61,6 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 
-from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
 
@@ -133,7 +134,7 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     return hits
 
 
-def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
+def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extraction):
     """Dump metadata from a dataset into object in the metadata store of another
 
     Info on the metadata objects is placed into a DB dict under the
@@ -150,11 +151,14 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     # 1. the latest commit that changed any file for which we could have native metadata
     refcommit = _get_latest_refcommit(aggfrom_ds, subds_relpaths)
     objid = refcommit if refcommit else ''
-    # 2, our own dataset-global metadata
-    dsmetafile = opj(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json')
-    if exists(dsmetafile):
-        objid += md5(open(dsmetafile, 'r').read().encode()).hexdigest()
+    # 2, our own dataset-global metadata and the dataset config
+    for tfile in (
+            opj(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json'),
+            opj(aggfrom_ds.path, '.datalad', 'config')):
+        if exists(tfile):
+            objid += md5(open(tfile, 'r').read().encode()).hexdigest()
     # 3. potential annex-based metadata
+    # XXX TODO shouldn't this be the annex extractor?
     if isinstance(aggfrom_ds, AnnexRepo) and \
             aggfrom_ds.config.obtain(
                 'datalad.metadata.aggregate-content-datalad-core',
@@ -177,6 +181,9 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
             'Dump metadata of %s into %s',
             aggfrom_ds, agginto_ds)
 
+    # check if we already have in store what we are about to create
+    old_agginfo = db.get(aggfrom_ds.path, {})
+
     agginfo = {}
     # dataset global
     if aggfrom_ds.id:
@@ -186,16 +193,130 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
     db[aggfrom_ds.path] = agginfo
 
     if not objid:
-        dsmeta = contentmeta = None
         # this is no error, there is simply no metadata whatsoever
         return False
 
-    # if there is any chance for metadata
-    # obtain metadata for dataset and content
+    # shorten to MD5sum
+    objid = md5(objid.encode()).hexdigest()
+
+    # assemble info on the metadata extraction and storage
+    #               label  type      targetds    storage method
+    metasources = {'ds': {'type': 'dataset', 'targetds': agginto_ds, 'dumper': json_py.dump}}
+    # do not store content metadata if either the source or the target dataset
+    # do not want it
+    # TODO this AND was an OR before (wrong), misses a test
+    if aggfrom_ds.config.obtain(
+            'datalad.metadata.store-aggregate-content',
+            default=True,
+            valtype=EnsureBool()) and \
+            agginto_ds.config.obtain(
+                'datalad.metadata.store-aggregate-content',
+                default=True,
+                valtype=EnsureBool()):
+            metasources['cn'] = {
+                'type': 'content',
+                'targetds': agginto_ds,
+                'dumper': json_py.dump2xzstream}
+
+    # check if we have the extracted metadata for this state already
+    # either in the source or in the destination dataset
+    metafound = {
+        s: d
+        # look in targetds last to not have to move things
+        # unnecessarily
+        for d in (aggfrom_ds, agginto_ds)
+        for s in metasources
+        # important to test for lexists() as we do not need to
+        # or want to `get()` metadata files for this test
+        # info on identity is sufficient
+        if op.lexists(
+            op.join(
+                d.path,
+                dirname(agginfo_relpath),
+                _get_obj_location(objid, s)))
+    } if not force_extraction else False
+
+    if not metafound:
+        lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
+        # no metadata found -> extract
+        # this places metadata dump files into the configured
+        # target dataset and lists them in `to_save`, as well
+        # as updates the `db` record for `aggfrom_ds`
+        return _extract_metadata(
+            agginto_ds,
+            aggfrom_ds,
+            db,
+            to_save,
+            objid,
+            metasources,
+            refcommit,
+            subds_relpaths)
+
+    # we did not actually run an extraction, so we need to
+    # assemble an aggregation record from the existing pieces
+    # that we found
+    # simple case: the target dataset has all the records already:
+    if all(d is agginto_ds for s, d in metafound.items()):
+        lgr.debug('Sticking with up-to-date metadata for %s', aggfrom_ds)
+        # no change, use old record from the target dataset
+        db[aggfrom_ds.path] = old_agginfo
+        # no error
+        return False
+    else:
+        lgr.debug('Reusing previously extracted metadata for %s', aggfrom_ds)
+        # we need to move the metadata dump(s) into the target dataset
+        objrelpaths = {
+            label: op.join(
+                dirname(agginfo_relpath),
+                _get_obj_location(objid, label))
+            for label in metafound
+        }
+        # make sure all the to-be-moved metadata records are present
+        # locally
+        aggfrom_ds.get(
+            # prep annotated path records to speed up the call
+            path=[dict(path=op.join(aggfrom_ds.path, p),
+                       parentds=aggfrom_ds.path,
+                       type='file')
+                  for p in objrelpaths],
+            result_renderer='disabled')
+
+        # actually copy dump files
+        for objrelpath in objrelpaths.values():
+            objpath = op.join(agginto_ds.path, objrelpath)
+            objdir = dirname(objpath)
+            if not exists(objdir):
+                makedirs(objdir)
+            # XXX TODO once we have a command that can copy/move files
+            # from one dataset to another including file availability
+            # info, this should be used here
+            shutil.copyfile(
+                op.join(aggfrom_ds.path, objrelpath),
+                objpath)
+            # mark for saving
+            to_save.append(dict(
+                path=objpath,
+                parentds=agginto_ds.path,
+                type='file'))
+
+        # lastly get 'self' aggregation record from source dataset and
+        # use in target dataset
+        db[aggfrom_ds.path] = _load_agginfo_db(aggfrom_ds.path)[aggfrom_ds.path]
+        return False
+
+
+def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, refcommit, subds_relpaths):
+    # we will replace any conflicting info on this dataset with fresh stuff
+    agginfo = db.get(aggfrom_ds.path, {})
+    # paths to extract from
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
+    # get extractors to engage from source dataset
     nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
+    # store esssential extraction config in dataset record
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
+
+    # perform the actual extraction
     dsmeta, contentmeta, errored = _get_metadata(
         aggfrom_ds,
         nativetypes,
@@ -205,6 +326,11 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
         content_meta=None,
         paths=relevant_paths)
 
+    meta = {
+        'ds': dsmeta,
+        'cn': (dict(contentmeta[k], path=k) for k in sorted(contentmeta))
+    }
+
     # inject the info which commmit we are describing into the core metadata
     # this is done here in order to avoid feeding it all the way down
     coremeta = dsmeta.get('datalad_core', {})
@@ -213,36 +339,16 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
         coremeta['version'] = version
     coremeta['refcommit'] = refcommit
     dsmeta['datalad_core'] = coremeta
-    # shorten to MD5sum
-    objid = md5(objid.encode()).hexdigest()
 
-    metasources = [('ds', 'dataset', dsmeta, agginto_ds, json_py.dump)]
-
-    # do not store content metadata if either the source or the target dataset
-    # do not want it
-    if aggfrom_ds.config.obtain(
-            'datalad.metadata.store-aggregate-content',
-            default=True,
-            valtype=EnsureBool()) or \
-            agginto_ds.config.obtain(
-                'datalad.metadata.store-aggregate-content',
-                default=True,
-                valtype=EnsureBool()):
-        metasources.append((
-            'cn',
-            'content',
-            # sort by path key to get deterministic dump content
-            (dict(contentmeta[k], path=k) for k in sorted(contentmeta)),
-            agginto_ds,
-            json_py.dump2xzstream))
 
     # for both types of metadata
-    for label, mtype, meta, dest, store in metasources:
-        if not meta:
+    for label, props in metasources.items():
+        dest = props['targetds']
+        if not meta[label]:
             continue
         # only write to disk if there is something
         objrelpath = _get_obj_location(objid, label)
-        if store is json_py.dump2xzstream:
+        if props['dumper'] is json_py.dump2xzstream:
             objrelpath += '.xz'
         # place metadata object into the source dataset
         objpath = opj(dest.path, dirname(agginfo_relpath), objrelpath)
@@ -256,13 +362,16 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save):
             dest.repo.remove(objpath)
         # TODO actually dump a compressed file when annexing is possible
         # to speed up on-demand access
-        store(meta, objpath)
+        props['dumper'](meta[label], objpath)
         # stage for dataset.save()
         to_save.append(dict(path=objpath, type='file'))
 
         # important to use abspath here, needs to be rewritten relative to
         # all receiving datasets
-        agginfo['{}_info'.format(mtype)] = objpath
+        agginfo['{}_info'.format(props['type'])] = objpath
+
+    # overwrite existing info with stuff from just finished extraction
+    db[aggfrom_ds.path] = agginfo
 
     return errored
 
@@ -370,12 +479,13 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     ds = Dataset(ds_path)
     # location info of aggregate metadata
     # aggregate.json
-    agginfo_fpath = opj(ds.path, agginfo_relpath)
+    agginfo_fpath = opj(ds_path, agginfo_relpath)
     # base path in which aggregate.json and objects is located
     agg_base_path = dirname(agginfo_fpath)
     # load existing aggregate info dict
+    # makes sure all file/dataset paths become absolute
     # TODO take from cache, once used in _get_dsinfo_from_aggmetadata()
-    ds_agginfos = _load_json_object(agginfo_fpath)
+    ds_agginfos = _load_agginfo_db(ds_path)
     # object locations referenced initially
     objlocs_was = set(ai[k]
                       for ai in ds_agginfos.values()
@@ -384,7 +494,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     # track which objects need to be copied (each item is a from/to tuple
     objs2copy = []
     # for each subdataset (any depth level)
-    procds_paths = [ds_path] + subds_paths
+    procds_paths = [ds.path] + subds_paths
     for dpath in procds_paths:
         ds_dbinfo = agginfo_db.get(dpath, {}).copy()
         # relative path of the currect dataset within the dataset we are updating
@@ -402,21 +512,25 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
                 continue
             # XXX needs to change when layout of object store is changed
             # current is ./datalad/metadata/objects/{hash}/{hash}
-            target_objrelpath = opj(*objloc.split(os.sep)[-3:])
+            target_objpath = op.join(agg_base_path, *objloc.split(os.sep)[-3:])
             # make sure we copy the file from its current location to where it is
             # needed in this dataset
-            target_objpath = opj(agg_base_path, target_objrelpath)
-            objs2copy.append((objloc, target_objpath))
+            objs2copy.append((
+                # this needs to turn into an absolute path
+                # `dpath` will be relative to the reference dataset
+                #op.normpath(op.join(ds.path, dpath, dirname(agginfo_relpath), objloc)),
+                objloc,
+                target_objpath))
             # now build needed local relpath
-            ds_dbinfo[loclabel] = target_objrelpath
+            ds_dbinfo[loclabel] = target_objpath
         # (re)assign in case record is new
-        ds_agginfos[drelpath] = ds_dbinfo
+        ds_agginfos[dpath] = ds_dbinfo
     # remove all entries for which we did not (no longer) have a corresponding
     # subdataset to take care of
     if not incremental:
         ds_agginfos = {k: v
                        for k, v in ds_agginfos.items()
-                       if normpath(opj(ds_path, k)) in procds_paths}
+                       if k in procds_paths}
     # set of metadata objects now referenced
     objlocs_is = set(
         ai[k]
@@ -432,14 +546,13 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     #      mattered (hopefully not that reflog is used somehow)
     objs2remove = []
     for obj in objlocs_was.difference(objlocs_is):
-        obj_path = opj(agg_base_path, obj)
-        if lexists(obj_path):
-            objs2remove.append(obj_path)
+        if lexists(obj):
+            objs2remove.append(obj)
         else:
             # not really a warning, we don't need it anymore, it is already gone
             lgr.debug(
                 "To-be-deleted metadata object not found, skip deletion (%s)",
-                obj_path
+                obj
             )
 
     # secretly remove obsolete object files, not really a result from a
@@ -461,14 +574,17 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             # is already committed
             to_save.append(dict(path=ds_path, type='dataset', staged=True))
 
+    objs2copy = [(f, t) for f, t in objs2copy if f != t]
     # must copy object files to local target destination
     # make sure those objects are present
     # use the reference dataset to resolve paths, as they might point to
     # any location in the dataset tree
-    Dataset(refds_path).get([f for f, t in objs2copy], result_renderer='disabled')
+    Dataset(refds_path).get(
+        [f for f, t in objs2copy],
+        result_renderer='disabled')
     for copy_from, copy_to in objs2copy:
-        if copy_to == copy_from:
-            continue
+        copy_from = op.join(agg_base_path, copy_from)
+        copy_to = op.join(agg_base_path, copy_to)
         target_dir = dirname(copy_to)
         if not exists(target_dir):
             makedirs(target_dir)
@@ -494,7 +610,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     if not ds_agginfos:
         return
 
-    json_py.dump(ds_agginfos, agginfo_fpath)
+    _store_agginfo_db(ds_path, ds_agginfos)
     ds.add(agginfo_fpath, save=False, to_git=True,
            result_renderer=None, return_type=list)
     # queue for save, and mark as staged
@@ -502,6 +618,32 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
         dict(path=agginfo_fpath, type='file', staged=True))
 
     # FIXME look for empty object dirs and remove them
+
+
+def _load_agginfo_db(ds_path):
+    return {
+        # paths in DB on disk are always relative
+        # make absolute to ease processing during aggregation
+        op.normpath(op.join(ds_path, p)):
+        {k: op.normpath(op.join(ds_path, op.dirname(agginfo_relpath), v)) if k in location_keys else v
+         for k, v in props.items()}
+        for p, props in _load_json_object(opj(ds_path, agginfo_relpath)).items()
+    }
+
+
+def _store_agginfo_db(ds_path, db):
+    # base path in which aggregate.json and objects is located
+    agg_base_path = dirname(op.join(ds_path, agginfo_relpath))
+    # make DB paths on disk always relative
+    json_py.dump(
+        {
+            op.relpath(p, start=ds_path):
+            {k: op.relpath(v, start=agg_base_path) if k in location_keys else v
+             for k, v in props.items()}
+            for p, props in db.items()
+        },
+        op.join(ds_path, agginfo_relpath)
+    )
 
 
 @build_doc
@@ -625,8 +767,14 @@ class AggregateMetaData(Interface):
             action='store_true',
             doc="""If set, all information on metadata records of subdatasets
             that have not been (re-)aggregated in this run will be kept unchanged.
-            This is sueful when (re-)aggregation only a subset of a dataset hierarchy,
+            This is useful when (re-)aggregation only a subset of a dataset hierarchy,
             for example, because not all subdatasets are locally available."""),
+        force_extraction=Parameter(
+            args=('--force-extraction',),
+            action='store_true',
+            doc="""If set, all enabled extractors will be engaged regardless of
+            whether change detection indicates that metadata has already been
+            extracted for a given dataset state."""),
         save=nosave_opt,
     )
 
@@ -640,6 +788,7 @@ class AggregateMetaData(Interface):
             recursion_limit=None,
             update_mode='target',
             incremental=False,
+            force_extraction=False,
             save=True):
         refds_path = Interface.get_refds_path(dataset)
 
@@ -650,7 +799,8 @@ class AggregateMetaData(Interface):
         path = assure_list(path)
         path.append(ds.path)
 
-        agginfo_db = {}
+        agginfo_db = _load_agginfo_db(ds.path)
+
         to_save = []
         to_aggregate = set()
         for ap in AnnotatePaths.__call__(
@@ -720,11 +870,12 @@ class AggregateMetaData(Interface):
                 # generated objects into the aggregated or reference dataset,
                 # and put info into DB to get the distributed to all datasets
                 # that need to be updated
-                errored = _extract_metadata(
+                errored = _dump_extracted_metadata(
                     ds,
                     Dataset(aggsrc),
                     agginfo_db,
-                    to_save)
+                    to_save,
+                    force_extraction)
                 if errored:
                     yield get_status_dict(
                         status='error',
@@ -790,7 +941,7 @@ class AggregateMetaData(Interface):
         for res in Save.__call__(
                 path=to_save,
                 dataset=refds_path,
-                message='[DATALAD] dataset aggregate metadata update',
+                message='[DATALAD] Dataset aggregate metadata update',
                 return_type='generator',
                 result_xfm=None,
                 result_filter=None,
