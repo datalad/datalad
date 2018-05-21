@@ -25,7 +25,7 @@ from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
 from ..distribution.dataset import require_dataset
 from ..dochelpers import exc_str
-from ..support.annexrepo import AnnexRepo
+from ..support.annexrepo import AnnexRepo, AnnexBatchCommandError
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..support.exceptions import NoDatasetArgumentFound
@@ -156,17 +156,15 @@ URLs:
                                    ds.repo.is_under_annex(downloaded_paths))
                                if annexed]
                 if annex_paths:
-                    keys = assure_list_from_str(
-                        ds.repo.get_file_key(annex_paths))
-                    for key, path in zip(keys, annex_paths):
-                        if key:
-                            # TODO: Add a registerurl method to annexrepo?
-                            # export_to_figshare also uses it.
-                            ds.repo._annex_custom_command(
-                                [], ["git", "annex", "registerurl",
-                                     key, path_urls[path]])
-                        else:
-                            lgr.warning("Key not found for %s", path)
+                    for path in annex_paths:
+                        try:
+                            # The file is already present. This is just to
+                            # register the URL.
+                            ds.repo.add_url_to_file(path, path_urls[path],
+                                                    batch=True)
+                        except AnnexBatchCommandError as exc:
+                            lgr.warning("Registering %s with %s failed: %s",
+                                        path, path_urls[path], exc_str(exc))
 
                     if archive:
                         from datalad.api import add_archive_content
