@@ -814,9 +814,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
-
     @wraps(t)
     def newfunc(*arg, **kw):
+        if on_windows:
+            raise SkipTest("Testrepo setup is broken on Windows")
+
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1041,7 +1043,7 @@ def known_failure_direct_mode(func):
 
     from datalad import cfg
 
-    direct = cfg.obtain("datalad.repo.direct")
+    direct = cfg.obtain("datalad.repo.direct") or on_windows
     if direct:
 
         @known_failure
