@@ -205,9 +205,8 @@ def setup_parser(
                   parsed_args, unparsed_args)
     except Exception as exc:
         lgr.debug("Early parsing failed with %s", exc_str(exc))
-        fail_handler(parser)
         need_single_subparser = False
-
+        unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
 
     interface_groups = get_interface_groups()
     # TODO: see if we could retain "generator" for plugins
