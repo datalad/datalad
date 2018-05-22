@@ -167,6 +167,15 @@ def test_rerun(path, nodspath):
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
     eq_('xxxxxxxxxx\n', open(probe_path).read())
+
+    # We can get back a report of what would happen rather than actually
+    # rerunning anything.
+    report = ds.rerun(since="", report=True, return_type="list")
+    # Nothing changed.
+    eq_('xxxxxxxxxx\n', open(probe_path).read())
+    assert_result_count(report, 1, rerun_action="cherry pick or skip")
+    report[-1]["commit"] == ds.repo.get_hexsha()
+
     # If a file is dropped, we remove it instead of unlocking it.
     ds.drop(probe_path, check=False)
     ds.rerun()
@@ -317,6 +326,11 @@ def test_rerun_just_one_commit(path):
     # run command.
     ds.repo.commit(msg="empty", options=["--allow-empty"])
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
+
+    # --dry-run propagates the error.
+    assert_raises(IncompleteResultsError,
+                  ds.rerun, since="", onto="",
+                  report=True, return_type="list")
 
 
 @ignore_nose_capturing_stdout

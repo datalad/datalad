@@ -126,7 +126,8 @@ class Rerun(Interface):
             args=("--script",),
             metavar="FILE",
             doc="""extract the commands into [CMD: FILE CMD][PY: this file PY]
-            rather than rerunning.  Use - to write to stdout instead.""",
+            rather than rerunning. Use - to write to stdout instead. [CMD: This
+            option implies --report. CMD]""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -136,10 +137,12 @@ class Rerun(Interface):
             directory. If a dataset is given, the command will be
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
-        # TODO
-        # --list-commands
-        #   go through the history and report any recorded command. this info
-        #   could be used to unlock the associated output files for a rerun
+        report=Parameter(
+            args=("--report",),
+            action="store_true",
+            doc="""Don't actually re-execute anything, just display what would
+            be done. [CMD: Note: If you give this option, you most likely want
+            to set --output-format to 'json' or 'json_pp'. CMD]"""),
     )
 
     @staticmethod
@@ -152,7 +155,8 @@ class Rerun(Interface):
             branch=None,
             message=None,
             onto=None,
-            script=None):
+            script=None,
+            report=False):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -160,7 +164,7 @@ class Rerun(Interface):
 
         lgr.debug('rerunning command output underneath %s', ds)
 
-        if script is None and ds.repo.dirty:
+        if script is None and not report and ds.repo.dirty:
             yield get_status_dict(
                 'run',
                 ds=ds,
@@ -286,54 +290,97 @@ class Rerun(Interface):
                     checkout_options = ["--detach"]
                 ds.repo.checkout(start_point, options=checkout_options)
 
-            for rev in revs:
-                hexsha = rev["hexsha"]
-                if "run_info" not in rev:
-                    pick = False
-                    try:
-                        ds.repo.repo.git.merge_base("--is-ancestor",
-                                                    hexsha, "HEAD")
-                    except GitCommandError:
-                        # Revision is NOT an ancestor of HEAD.
-                        pick = True
+            results = _rerun_as_results(ds, revs, message)
+            handler = _report if report else _rerun
+            for res in handler(ds, results):
+                yield res
 
-                    shortrev = ds.repo.repo.git.rev_parse("--short", hexsha)
-                    err_msg = "no command for {} found; {}".format(
-                        shortrev,
-                        "cherry picking" if pick else "skipping")
-                    yield dict(err_info, status='ok', message=err_msg)
 
-                    if pick:
-                        ds.repo._git_custom_command(
-                            None, ["git", "cherry-pick", hexsha],
-                            check_fake_dates=True)
-                    continue
+def _rerun_as_results(dset, revs, message):
+    """Represent the rerun as result records.
 
-                run_info = rev["run_info"]
-                # Keep a "rerun" trail.
-                if "chain" in run_info:
-                    run_info["chain"].append(hexsha)
-                else:
-                    run_info["chain"] = [hexsha]
+    In the standard case, the information in these results will be used to
+    actually re-execute the commands.
+    """
+    for rev in revs:
+        hexsha = rev["hexsha"]
+        res = get_status_dict(
+            "run",
+            ds=dset,
+            commit=hexsha,
+            status="ok")
 
-                # now we have to find out what was modified during the
-                # last run, and enable re-modification ideally, we would
-                # bring back the entire state of the tree with #1424, but
-                # we limit ourself to file addition/not-in-place-modification
-                # for now
-                auto_outputs = (os.path.relpath(ap["path"], ds.path)
-                                for ap in new_or_modified(
-                                        diff_revision(ds, hexsha)))
-                outputs = run_info.get("outputs", [])
-                auto_outputs = [p for p in auto_outputs if p not in outputs]
+        if "run_info" in rev:
+            res["rerun_action"] = "run"
+            # This is the original message from the run commit.
+            res["run_message"] = rev["run_message"]
+            # This is the overriding message, if any, passed to this rerun.
+            res["rerun_message"] = message
+        else:
+            res["rerun_action"] = "cherry pick or skip"
+            yield res
+            continue
 
-                for r in run_command(run_info['cmd'],
-                                     dataset=ds,
-                                     inputs=run_info.get("inputs", []),
-                                     outputs=outputs + auto_outputs,
-                                     message=message or rev["run_message"],
-                                     rerun_info=run_info):
-                    yield r
+        res["diff"] = diff_revision(dset, hexsha)
+        res["run_info"] = rev["run_info"]
+        yield res
+
+
+def _rerun(dset, results):
+    for res in results:
+        hexsha = res["commit"]
+        if "run_info" not in res:
+            pick = False
+            try:
+                dset.repo.repo.git.merge_base("--is-ancestor",
+                                              hexsha, "HEAD")
+            except GitCommandError:
+                # Revision is NOT an ancestor of HEAD.
+                pick = True
+
+            shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+            res["message"] = "no command for {} found; {}".format(
+                shortrev,
+                "cherry picking" if pick else "skipping")
+            res["rerun_action"] = "pick" if pick else "skip"
+
+            if pick:
+                dset.repo._git_custom_command(
+                    None, ["git", "cherry-pick", hexsha],
+                    check_fake_dates=True)
+            yield res
+        else:
+            run_info = res["run_info"]
+
+            # Keep a "rerun" trail.
+            if "chain" in run_info:
+                run_info["chain"].append(hexsha)
+            else:
+                run_info["chain"] = [hexsha]
+
+            # now we have to find out what was modified during the last run,
+            # and enable re-modification ideally, we would bring back the
+            # entire state of the tree with #1424, but we limit ourself to file
+            # addition/not-in-place-modification for now
+            auto_outputs = (os.path.relpath(ap["path"], dset.path)
+                            for ap in new_or_modified(res["diff"]))
+            outputs = run_info.get("outputs", [])
+            auto_outputs = [p for p in auto_outputs if p not in outputs]
+            message = res["rerun_message"] or res["run_message"]
+            for r in run_command(run_info['cmd'],
+                                 dataset=dset,
+                                 inputs=run_info.get("inputs", []),
+                                 outputs=outputs + auto_outputs,
+                                 message=message,
+                                 rerun_info=run_info):
+                yield r
+
+
+def _report(_, results):
+    for res in results:
+        if "run_info" in res:
+            res["diff"] = list(res["diff"])
+        yield res
 
 
 def get_run_info(message):
