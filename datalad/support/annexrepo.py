@@ -1459,7 +1459,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     if re.match(
                             r'.*This operation must be run in a work tree.*git status.*failed in submodule',
                             e.stderr,
-                            re.MULTILINE | re.DOTALL):
+                            re.MULTILINE | re.DOTALL | re.IGNORECASE):
 
                         lgr.warning(
                             "Known bug in direct mode."
