@@ -28,6 +28,8 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
 from datalad.interface.run import _format_cmd_shorty
 
+from datalad.consts import PRE_INIT_COMMIT_SHA
+
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
@@ -388,9 +390,7 @@ def new_or_modified(dataset, revision="HEAD"):
     else:
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
-        #             git hash-object -t tree /dev/null
-        empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-        revrange = "{}..{}".format(empty_tree, revision)
+        revrange = "{}..{}".format(PRE_INIT_COMMIT_SHA, revision)
     diff = dataset.diff(recursive=True,
                         revision=revrange,
                         return_type='generator', result_renderer=None)
