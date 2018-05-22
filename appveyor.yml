@@ -56,7 +56,7 @@ test_script:
   - python -m nose -s -v datalad.cmdline
   # nothing runs here
   #- python -m nose -s -v datalad.customremotes
-  - python -m nose -s -v datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_dataset_config datalad.distribution.tests.test_siblings
+  - python -m nose -s -v datalad.distribution.tests.test_create datalad.distribution.tests.test_create_github datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_dataset_config datalad.distribution.tests.test_siblings datalad.distribution.tests.test_update datalad.distribution.tests.test_dataset datalad.distribution.tests.test_install datalad.distribution.tests.test_publish datalad.distribution.tests.test_subdataset
   - python -m nose -s -v datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
   - python -m nose -s -v datalad.interface.tests.test_base datalad.interface.tests.test_clean datalad.interface.tests.test_docs datalad.interface.tests.test_ls
   - python -m nose -s -v datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_datacite_xml datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
