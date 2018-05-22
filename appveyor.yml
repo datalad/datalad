@@ -52,9 +52,19 @@ test_script:
   # first sign of life
   - datalad wtf
   # and now this... [keep appending tests that should work!!]
-  # this is not good!
-  # - python -m nose -s -v datalad.plugin
-  - python -m nose -s -v datalad.cmdline datalad.tests.test_api datalad.tests.test_base datalad.ui
+  # one call per datalad component for now -- to better see what is being tested
+  - python -m nose -s -v datalad.cmdline
+  # nothing runs here
+  #- python -m nose -s -v datalad.customremotes
+  - python -m nose -s -v datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_dataset_config datalad.distribution.tests.test_siblings
+  - python -m nose -s -v datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
+  - python -m nose -s -v datalad.interface.tests.test_base datalad.interface.tests.test_clean datalad.interface.tests.test_docs datalad.interface.tests.test_ls
+  - python -m nose -s -v datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_datacite_xml datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
+  # nothing runs here
+  #- python -m nose -s -v datalad.plugin
+  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions
+  - python -m nose -s -v datalad.tests.test_api datalad.tests.test_base
+  - python -m nose -s -v datalad.ui
 
 #after_test:
 #  - bash <(curl -s https://codecov.io/bash)
