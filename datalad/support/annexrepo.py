@@ -639,10 +639,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     list(self._run_annex_command_json(
                         'status', opts=options, expect_stderr=False))
         except CommandError as e:
-            if submodules and \
-               "fatal: " \
-               "This operation must be run in a work tree" in e.stderr and \
-               "failed in submodule" in e.stderr:
+            if submodules and AnnexRepo._is_annex_work_tree_message(e.stderr):
                 lgr.debug("git-annex-status failed probably due to submodule in"
                           " direct mode. Trying to workaround.")
                 # try again, ignoring submodules:
@@ -1456,11 +1453,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return super(AnnexRepo, self).add(
                         files, git_options=_git_options, update=update)
                 except CommandError as e:
-                    if re.match(
-                            r'.*This operation must be run in a work tree.*git status.*failed in submodule',
-                            e.stderr,
-                            re.MULTILINE | re.DOTALL | re.IGNORECASE):
-
+                    if AnnexRepo._is_annex_work_tree_message(e.stderr):
                         lgr.warning(
                             "Known bug in direct mode."
                             "We can't use --dry-run when there are submodules in "
@@ -2751,8 +2744,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                               careless=careless, files=files)
             except CommandError as e:
                 if self.is_direct_mode() and \
-                   "fatal: This operation must be run in a work tree" in \
-                   e.stderr:
+                    AnnexRepo._is_annex_work_tree_message(e.stderr):
                     lgr.debug("Commit failed. "
                               "Trying to commit via git-annex-proxy.")
                     self.commit(msg, options, _datalad_msg=_datalad_msg,
@@ -3245,6 +3237,13 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files=files):
             yield jsn
 
+    @staticmethod
+    def _is_annex_work_tree_message(out):
+        return re.match(
+            r'.*This operation must be run in a work tree.*'
+            r'git status.*failed in submodule',
+            out,
+            re.MULTILINE | re.DOTALL | re.IGNORECASE)
 
 # TODO: Why was this commented out?
 # @auto_repr
