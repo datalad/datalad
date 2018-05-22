@@ -1610,7 +1610,7 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
         for pkgpath in pkg.__path__:
             if path_is_subpath(modpath, pkgpath):
                 # for now relying on having .py extension -- assertion above
-                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace('/', '.')
+                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace(sep, '.')
                 break
 
     try:

@@ -10,6 +10,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import skip_if_on_windows
 
 
 import re
@@ -160,6 +161,7 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
+@skip_if_on_windows
 def test_script_shims():
     runner = Runner()
     for script in [
@@ -196,7 +198,12 @@ def test_cfg_override(path):
         # ensure that this is not a dataset's cfg manager
         assert_not_in('datalad.dataset.id', out)
         # env var
-        out, err = Runner()('DATALAD_DUMMY=this datalad wtf -s some', shell=True)
+        from datalad.utils import on_windows
+        if on_windows:
+            cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
+        else:
+            cmd_str = 'DATALAD_DUMMY=this datalad wtf -s some'
+        out, err = Runner()(cmd_str, shell=True)
         assert_in('datalad.dummy: this', out)
         # cmdline arg
         out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
@@ -211,7 +218,11 @@ def test_cfg_override(path):
         # ensure that this is a dataset's cfg manager
         assert_in('datalad.dataset.id', out)
         # env var
-        out, err = Runner()('DATALAD_DUMMY=this datalad wtf -s some', shell=True)
+        if on_windows:
+            cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
+        else:
+            cmd_str = 'DATALAD_DUMMY=this datalad wtf -s some'
+        out, err = Runner()(cmd_str, shell=True)
         assert_in('datalad.dummy: this', out)
         # cmdline arg
         out, err = Runner()('datalad -c datalad.dummy=this wtf -s some', shell=True)
