@@ -1041,7 +1041,7 @@ def known_failure_direct_mode(func):
 
     from datalad import cfg
 
-    direct = cfg.obtain("datalad.repo.direct")
+    direct = cfg.obtain("datalad.repo.direct") or on_windows
     if direct:
 
         @known_failure
