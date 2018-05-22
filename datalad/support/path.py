@@ -26,9 +26,12 @@ def _get_unicode_robust_version(f):
             return f(*args, **kwargs)
         except UnicodeEncodeError:
             return f(assure_bytes(*args, **kwargs))
-    wrapped.__doc__ = f.__doc__ + \
-        "\n\nThis wrapper around original function would encode forcefully " \
-        "to utf-8 if initial invocation fails"
+    doc = getattr(f, '__doc__', None)
+    # adjust only if __doc__ is not completely absent (None)
+    if doc is not None:
+        wrapped.__doc__ = doc + \
+            "\n\nThis wrapper around original function would encode forcefully " \
+            "to utf-8 if initial invocation fails"
     return wrapped
 
 
