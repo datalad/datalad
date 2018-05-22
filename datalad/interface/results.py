@@ -28,7 +28,7 @@ from datalad.distribution.dataset import Dataset
 
 
 lgr = logging.getLogger('datalad.interface.results')
-
+lgr.log(5, "Importing datalad.interface.results")
 
 # which status is a success , which is failure
 success_status_map = {
@@ -369,3 +369,6 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 status=noinfo_status, type='file',
                 message=noinfo_file_msg,
                 **common_report)
+
+
+lgr.log(5, "Done importing datalad.interface.results")

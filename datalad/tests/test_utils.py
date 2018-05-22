@@ -41,6 +41,7 @@ from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
@@ -577,6 +578,21 @@ def test_unique():
                key=itemgetter(1)), [(1, 2), (1, 3)])
 
 
+def test_partition():
+    def fn(*args, **kwargs):
+        left, right = partition(*args, **kwargs)
+        return list(left), list(right)
+
+    eq_(fn([False, True, False]),
+        ([False, False], [True]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x > 4),
+        ([1, 4], [5, 10]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x < 0),
+        ([1, 5, 4, 10], []))
+
+
 def test_path_():
     eq_(_path_('a'), 'a')
     if on_windows:
@@ -775,7 +791,7 @@ def test_safe_print():
     """Just to test that we are getting two attempts to print"""
 
     called = [0]
-    
+
     def _print(s):
         assert_equal(s, "bua")
         called[0] += 1

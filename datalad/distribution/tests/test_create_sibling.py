@@ -17,7 +17,7 @@ import os
 from os import chmod
 import stat
 import re
-from os.path import join as opj, exists
+from os.path import join as opj, exists, basename
 from six import text_type
 
 from ..dataset import Dataset
@@ -183,7 +183,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         target_description = AnnexRepo(target_path, create=False).get_description()
         assert_not_equal(target_description, None)
         assert_not_equal(target_description, target_path)
-        ok_endswith(target_description, target_path)
+        # on yoh's laptop TMPDIR is under HOME, so things start to become
+        # tricky since then target_path is shortened and we would need to know
+        # remote $HOME.  To not over-complicate and still test, test only for
+        # the basename of the target_path
+        ok_endswith(target_description, basename(target_path))
     # now, with force and correct url, which is also used to determine
     # target_dir
     # Note: on windows absolute path is not url conform. But this way it's easy
@@ -447,6 +451,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     ssh = ssh_manager.get_connection('localhost')
     remote_home, err = ssh('pwd')
     assert not err
+    remote_home = remote_home.rstrip('\n')
     dst_relpath = os.path.relpath(dst_path, remote_home)
     url = 'localhost:%s' % dst_relpath
     ds = Dataset(src_path).create()

@@ -383,9 +383,8 @@ class Create(Interface):
         with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
             # TODO this will need adjusting, when annex'ed aggregate metadata
             # comes around
-            gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
-            gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')
-            gitattr.write('** annex.largefiles=nothing\n')
+            gitattr.write('config annex.largefiles=nothing\n')
+            gitattr.write('metadata/aggregate* annex.largefiles=nothing\n')
             gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
                 cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
 

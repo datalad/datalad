@@ -641,10 +641,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     list(self._run_annex_command_json(
                         'status', opts=options, expect_stderr=False))
         except CommandError as e:
-            if submodules and \
-               "fatal: " \
-               "This operation must be run in a work tree" in e.stderr and \
-               "failed in submodule" in e.stderr:
+            if submodules and AnnexRepo._is_annex_work_tree_message(e.stderr):
                 lgr.debug("git-annex-status failed probably due to submodule in"
                           " direct mode. Trying to workaround.")
                 # try again, ignoring submodules:
@@ -1458,11 +1455,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return super(AnnexRepo, self).add(
                         files, git_options=_git_options, update=update)
                 except CommandError as e:
-                    if re.match(
-                            r'.*This operation must be run in a work tree.*git status.*failed in submodule',
-                            e.stderr,
-                            re.MULTILINE | re.DOTALL):
-
+                    if AnnexRepo._is_annex_work_tree_message(e.stderr):
                         lgr.warning(
                             "Known bug in direct mode."
                             "We can't use --dry-run when there are submodules in "
@@ -2550,11 +2543,35 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self, with_content_only=False):
+    def get_annexed_files(self, with_content_only=False, patterns=None):
         """Get a list of files in annex
+
+        Parameters
+        ----------
+        with_content_only : bool, optional
+            Only list files whose content is present.
+        patterns : list, optional
+            Globs to pass to annex's `--include=`. Files that match any of
+            these will be returned (i.e., they'll be separated by `--or`).
+
+        Returns
+        -------
+        A list of file names
         """
-        # TODO: Review!!
-        args = [] if with_content_only else ['--include', "*"]
+        if not patterns:
+            args = [] if with_content_only else ['--include', "*"]
+        else:
+            if len(patterns) == 1:
+                args = ['--include', patterns[0]]
+            else:
+                args = ['-(']
+                for pat in patterns[:-1]:
+                    args.extend(['--include', pat, "--or"])
+                args.extend(['--include', patterns[-1]])
+                args.append('-)')
+
+            if with_content_only:
+                args.extend(['--in', 'here'])
         out, err = self._run_annex_command('find', annex_options=args)
         # TODO: JSON
         return out.splitlines()
@@ -2735,8 +2752,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                               careless=careless, files=files)
             except CommandError as e:
                 if self.is_direct_mode() and \
-                   "fatal: This operation must be run in a work tree" in \
-                   e.stderr:
+                    AnnexRepo._is_annex_work_tree_message(e.stderr):
                     lgr.debug("Commit failed. "
                               "Trying to commit via git-annex-proxy.")
                     self.commit(msg, options, _datalad_msg=_datalad_msg,
@@ -3229,6 +3245,13 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files=files):
             yield jsn
 
+    @staticmethod
+    def _is_annex_work_tree_message(out):
+        return re.match(
+            r'.*This operation must be run in a work tree.*'
+            r'git status.*failed in submodule',
+            out,
+            re.MULTILINE | re.DOTALL | re.IGNORECASE)
 
 # TODO: Why was this commented out?
 # @auto_repr

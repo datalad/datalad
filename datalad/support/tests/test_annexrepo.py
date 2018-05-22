@@ -1330,6 +1330,34 @@ def test_annex_drop(src, dst):
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
 
 
+@with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
+def test_annex_get_annexed_files(path):
+    repo = AnnexRepo(path)
+    repo.add(".")
+    repo.commit()
+    eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
+
+    repo.drop("a.txt", options=["--force"])
+    eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
+    eq_(set(repo.get_annexed_files(with_content_only=True)),
+        {"b.txt", "c.py", "d"})
+
+    eq_(set(repo.get_annexed_files(patterns=["*.txt"])),
+        {"a.txt", "b.txt"})
+    eq_(set(repo.get_annexed_files(with_content_only=True,
+                                   patterns=["*.txt"])),
+        {"b.txt"})
+
+    eq_(set(repo.get_annexed_files(patterns=["*.txt", "*.py"])),
+        {"a.txt", "b.txt", "c.py"})
+
+    eq_(set(repo.get_annexed_files()),
+        set(repo.get_annexed_files(patterns=["*"])))
+
+    eq_(set(repo.get_annexed_files(with_content_only=True)),
+        set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
+
+
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_annex_remove(path):
     repo = AnnexRepo(path, create=False)

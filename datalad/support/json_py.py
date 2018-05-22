@@ -16,6 +16,8 @@ import codecs
 from os.path import dirname
 from os.path import exists
 from os import makedirs
+import os
+import os.path as op
 
 # wrapped below
 from simplejson import load as jsonload
@@ -76,6 +78,12 @@ def dump2stream(obj, fname, compressed=False):
 
     _open = LZMAFile if compressed else open
 
+    indir = dirname(fname)
+
+    if op.lexists(fname):
+        os.remove(fname)
+    elif indir and not exists(indir):
+        makedirs(indir)
     with _open(fname, mode='wb') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:

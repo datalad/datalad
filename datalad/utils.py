@@ -28,6 +28,7 @@ from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from itertools import tee
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -669,6 +670,32 @@ def map_items(func, v):
         item.__class__(map(func, item))
         for item in v.items()
     )
+
+
+def partition(items, predicate=bool):
+    """Partition `items` by `predicate`.
+
+    Parameters
+    ----------
+    items : iterable
+    predicate : callable
+        A function that will be mapped over each element in `items`. The
+        elements will partitioned based on whether the return value is false or
+        true.
+
+    Returns
+    -------
+    A tuple with two generators, the first for 'false' items and the second for
+    'true' ones.
+
+    Notes
+    -----
+    Taken from Peter Otten's snippet posted at
+    https://nedbatchelder.com/blog/201306/filter_a_list_into_two_parts.html
+    """
+    a, b = tee((predicate(item), item) for item in items)
+    return ((item for pred, item in a if not pred),
+            (item for pred, item in b if pred))
 
 
 def generate_chunks(container, size):
@@ -1616,7 +1643,7 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
         for pkgpath in pkg.__path__:
             if path_is_subpath(modpath, pkgpath):
                 # for now relying on having .py extension -- assertion above
-                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace('/', '.')
+                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace(sep, '.')
                 break
 
     try:

@@ -1,0 +1,74 @@
+build: false
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+      DATALAD_TESTS_SSH: 0
+
+cache:
+  # cache the pip cache
+  - C:\Users\appveyor\AppData\Local\pip\Cache -> appveyor.yml
+
+init:
+  - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH% %MINICONDA%"
+  # this will display login RDP info for the build VM, but if the build VM should block
+  # see on_finish below instead
+  #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  #- "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy matplotlib pytest pandas"
+  - "conda create -q -n test-environment python=%PYTHON_VERSION%"
+  - activate test-environment
+  - mkdir resources
+  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  # extract git annex into the system Git installation path
+  - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  # info on how python is ticking
+  - python -c "import sys; print(sys.path)"
+  # when something works we can go full
+  #- pip install -e ".[full]"
+  - pip install ".[tests]"
+  # fixup
+  # ATM datalad does not pull in colorama, which is needed for color output
+  # on windows
+  - pip install colorama
+
+test_script:
+  # establish baseline, if annex doesn't work, we are not even trying
+  #- git annex test
+  # run tests on installed module, not source tree files
+  - mkdir -p __testhome__
+  - cd __testhome__
+  # report basic info
+  - git version
+  - git annex version
+  # first sign of life
+  - datalad wtf
+  # and now this... [keep appending tests that should work!!]
+  # one call per datalad component for now -- to better see what is being tested
+  - python -m nose -s -v datalad.cmdline
+  # nothing runs here
+  #- python -m nose -s -v datalad.customremotes
+  - python -m nose -s -v datalad.distribution.tests.test_create datalad.distribution.tests.test_create_github datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_dataset_config datalad.distribution.tests.test_siblings datalad.distribution.tests.test_update datalad.distribution.tests.test_dataset datalad.distribution.tests.test_install datalad.distribution.tests.test_publish datalad.distribution.tests.test_subdataset
+  - python -m nose -s -v datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
+  - python -m nose -s -v datalad.interface.tests.test_base datalad.interface.tests.test_clean datalad.interface.tests.test_docs datalad.interface.tests.test_ls
+  - python -m nose -s -v datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_datacite_xml datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
+  # nothing runs here
+  #- python -m nose -s -v datalad.plugin
+  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions
+  - python -m nose -s -v datalad.tests.test_api datalad.tests.test_base
+  - python -m nose -s -v datalad.ui
+
+#after_test:
+#  - bash <(curl -s https://codecov.io/bash)
+
+on_finish:
+  # enable the next to let the build VM block for up to 60min to log in via RDP and debug
+  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

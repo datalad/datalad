@@ -178,12 +178,14 @@ def create_tree(path, tree, archives_leading_dir=True):
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
-            #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, text_type):
-            #    import pydb; pydb.debugger()
-            with open(full_name, 'w') as f:
-                if PY2 and isinstance(load, text_type):
+            if PY2:
+                open_kwargs = {'mode': "w"}
+                if isinstance(load, text_type):
                     load = load.encode('utf-8')
+            else:
+                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
+
+            with open(full_name, **open_kwargs) as f:
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
@@ -267,8 +269,12 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             lgr.warning("head_modified and index_modified are not supported "
                         "for direct mode repositories!")
         else:
-            ok_(not r.is_dirty(untracked_files=not untracked,
-                               submodules=not ignore_submodules))
+            test_untracked = not untracked
+            test_submodules = not ignore_submodules
+            ok_(not r.is_dirty(untracked_files=test_untracked,
+                               submodules=test_submodules),
+                msg="Repo unexpectly dirty (tested for: untracked({}), submodules({})".format(
+                    test_untracked, test_submodules))
     else:
         repo = r.repo
 
@@ -808,9 +814,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
-
     @wraps(t)
     def newfunc(*arg, **kw):
+        if on_windows:
+            raise SkipTest("Testrepo setup is broken on Windows")
+
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -1035,7 +1043,7 @@ def known_failure_direct_mode(func):
 
     from datalad import cfg
 
-    direct = cfg.obtain("datalad.repo.direct")
+    direct = cfg.obtain("datalad.repo.direct") or on_windows
     if direct:
 
         @known_failure

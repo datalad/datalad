@@ -27,6 +27,7 @@ magic_plugin_symbol = '__datalad_plugin__'
 
 
 def _get_plugins():
+    lgr.debug("Discovering plugins")
     locations = (
         BUILTIN_PLUGINS_PATH,
         cfg.obtain('datalad.locations.system-plugins'),

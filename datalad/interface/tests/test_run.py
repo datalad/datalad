@@ -54,6 +54,7 @@ from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
+from datalad.tests.utils import with_testrepos
 
 
 @with_tempfile(mkdir=True)
@@ -156,6 +157,10 @@ def test_rerun(path, nodspath):
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
     eq_('xxxxxxxxxx\n', open(probe_path).read())
+    # If a file is dropped, we remove it instead of unlocking it.
+    ds.drop(probe_path, check=False)
+    ds.rerun()
+    eq_('x\n', open(probe_path).read())
     # If the history to rerun has a merge commit, we abort.
     ds.repo.checkout("HEAD~3", options=["-b", "topic"])
     with open(opj(path, "topic-file"), "w") as f:
@@ -404,7 +409,11 @@ def test_rerun_cherry_pick(path):
     for onto, text in [("HEAD", "skipping"), ("prerun", "cherry picking")]:
         results = ds.rerun(since="prerun", onto=onto)
         assert_in_results(results, status='ok', path=ds.path)
-        assert any(r.get("message", "").endswith(text) for r in results)
+
+        messages = (r.get("message", "") for r in results)
+        # Message may be a tuple.
+        messages = (m for m in messages if hasattr(m, "endswith"))
+        assert any(m.endswith(text) for m in messages)
 
 
 @ignore_nose_capturing_stdout
@@ -557,6 +566,125 @@ def test_rerun_script(path):
         assert_in("echo b >bar",
                   cmout.getvalue().splitlines())
 
+
+@slow  # ~10s
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_testrepos('basic_annex', flavors=['clone'])
+@known_failure_direct_mode  #FIXME
+@known_failure_v6  #FIXME
+def test_run_inputs_outputs(path):
+    ds = Dataset(path)
+
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
+
+    # If we specify test-annex.dat as an input, it will be retrieved before the
+    # run.
+    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"])
+
+    ok_clean_git(ds.path)
+    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("doubled.dat"))
+
+    # Rerunning the commit will also get the input file.
+    ds.repo.drop("test-annex.dat", options=["--force"])
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    ds.rerun()
+    ok_(ds.repo.file_has_content("test-annex.dat"))
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run("touch dummy", inputs=["*.not-an-extension"])
+        assert_in("No matching files found for *.not-an-extension",
+                  cml.out)
+
+    # Test different combinations of globs and explicit files.
+    inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
+    create_tree(ds.path, {i: i for i in inputs})
+
+    ds.add(".")
+    ds.repo.copy_to(inputs, remote="origin")
+    ds.repo.drop(inputs, options=["--force"])
+
+    test_cases = [(["*.dat"], ["a.dat", "b.dat"]),
+                  (["*.dat", "c.txt"], ["a.dat", "b.dat", "c.txt"]),
+                  (["*"], inputs)]
+
+    for idx, (inputs_arg, expected_present) in enumerate(test_cases):
+        assert_false(any(ds.repo.file_has_content(i) for i in inputs))
+
+        ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+        ok_(all(ds.repo.file_has_content(f) for f in expected_present))
+        # Globs are stored unexpanded by default.
+        assert_in(inputs_arg[0], ds.repo.repo.head.commit.message)
+        ds.repo.drop(inputs, options=["--force"])
+
+    # --input can be passed a subdirectory.
+    create_tree(ds.path, {"subdir": {"a": "subdir a",
+                                     "b": "subdir b"}})
+    ds.add("subdir")
+    ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
+    ds.repo.drop("subdir", options=["--force"])
+    ds.run("touch subdir-dummy", inputs=[opj(ds.path, "subdir")])
+    ok_(all(ds.repo.file_has_content(opj("subdir", f)) for f in ["a", "b"]))
+
+    # --input=. runs "datalad get ."
+    ds.run("touch dot-dummy", inputs=["."])
+    eq_(ds.repo.get_annexed_files(),
+        ds.repo.get_annexed_files(with_content_only=True))
+    # On rerun, we get all files, even those that weren't in the tree at the
+    # time of the run.
+    create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
+    ds.add(".")
+    ds.repo.copy_to(["after-dot-run"], remote="origin")
+    ds.repo.drop(["after-dot-run"], options=["--force"])
+    ds.rerun("HEAD^")
+    ds.repo.file_has_content("after-dot-run")
+
+    # --output will unlock files that are present.
+    ds.repo.get("a.dat")
+    ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), "a.dat appended\n")
+
+    # --output will remove files that are not present.
+    ds.repo.drop("a.dat", options=["--force"])
+    ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), " appended\n")
+
+    # --input can be combined with --output.
+    ds.repo.repo.git.reset("--hard", "HEAD~2")
+    ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
+    with open(opj(path, "a.dat")) as fh:
+        eq_(fh.read(), "a.dat appended\n")
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run("echo blah", outputs=["*.not-an-extension"])
+        assert_in("No matching files found for *.not-an-extension",
+                  cml.out)
+
+    ds.create('sub')
+    ds.run("echo sub_orig >sub/subfile")
+    ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
+    ds.drop("sub/subfile", check=False)
+    ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
+
+    # --input/--output globs can be stored in expanded form.
+    ds.run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
+    assert_in("a.dat", ds.repo.repo.head.commit.message)
+    assert_in("b.dat", ds.repo.repo.head.commit.message)
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+def test_run_inputs_no_annex_repo(path):
+    ds = Dataset(path).create(no_annex=True)
+    # Running --input in a plain Git repo doesn't fail.
+    ds.run("touch dummy", inputs=["*"])
+    ok_exists(opj(ds.path, "dummy"))
+    ds.rerun()
 
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
