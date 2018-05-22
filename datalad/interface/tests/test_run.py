@@ -34,7 +34,8 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
-from datalad.interface.rerun import get_run_info, new_or_modified
+from datalad.interface.rerun import get_run_info
+from datalad.interface.rerun import diff_revision, new_or_modified
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tempfile
@@ -489,9 +490,9 @@ def test_rerun_subdir(path):
                  "to_modify": "content3",
                  "unchanged": "content4"})
 def test_new_or_modified(path):
-    def apfiles(aps):
-        for ap in aps:
-            yield relpath(ap["path"], path)
+    def get_new_or_modified(*args, **kwargs):
+        return [relpath(ap["path"], path)
+                for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
     ds = Dataset(path).create(force=True, no_annex=True)
 
@@ -502,7 +503,7 @@ def test_new_or_modified(path):
     assert_false(ds.repo.dirty)
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
     # Diffing doesn't fail when the branch contains a single commit.
-    assert_in("to_modify", apfiles(new_or_modified(ds, "HEAD")))
+    assert_in("to_modify", get_new_or_modified(ds, "HEAD"))
 
     # New files are detected, deletions are not.
     ds.repo.remove(["to_remove"])
@@ -513,7 +514,7 @@ def test_new_or_modified(path):
     ds.repo.add(["to_add"])
     ds.repo.commit("add one, remove another")
 
-    eq_(list(apfiles(new_or_modified(ds, "HEAD"))),
+    eq_(get_new_or_modified(ds, "HEAD"),
         ["to_add"])
 
     # Modifications are detected.
@@ -523,13 +524,13 @@ def test_new_or_modified(path):
         f.write("updated 2")
     ds.add(["to_modify", "d/to_modify"])
 
-    eq_(set(apfiles(new_or_modified(ds, "HEAD"))),
+    eq_(set(get_new_or_modified(ds, "HEAD")),
         {"to_modify", "d/to_modify"})
 
     # Non-HEAD revisions work.
     ds.repo.commit("empty", options=["--allow-empty"])
-    assert_false(list(apfiles(new_or_modified(ds, "HEAD"))))
-    eq_(set(apfiles(new_or_modified(ds, "HEAD~"))),
+    assert_false(get_new_or_modified(ds, "HEAD"))
+    eq_(set(get_new_or_modified(ds, "HEAD~")),
         {"to_modify", "d/to_modify"})
 
 

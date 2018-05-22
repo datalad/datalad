@@ -322,7 +322,8 @@ class Rerun(Interface):
                 # we limit ourself to file addition/not-in-place-modification
                 # for now
                 auto_outputs = (os.path.relpath(ap["path"], ds.path)
-                                for ap in new_or_modified(ds, hexsha))
+                                for ap in new_or_modified(
+                                        diff_revision(ds, hexsha)))
                 outputs = run_info.get("outputs", [])
                 auto_outputs = [p for p in auto_outputs if p not in outputs]
 
@@ -372,7 +373,7 @@ def get_run_info(message):
     return rec_msg.rstrip(), runinfo
 
 
-def new_or_modified(dataset, revision="HEAD"):
+def diff_revision(dataset, revision="HEAD"):
     """Yield files that have been added or modified in `revision`.
 
     Parameters
@@ -395,6 +396,13 @@ def new_or_modified(dataset, revision="HEAD"):
                         revision=revrange,
                         return_type='generator', result_renderer=None)
     for r in diff:
+        yield r
+
+
+def new_or_modified(diff_results):
+    """Filter diff result records to those for new or modified files.
+    """
+    for r in diff_results:
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r
