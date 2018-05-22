@@ -32,6 +32,7 @@ from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
+from ..utils import assure_unicode
 
 
 URI_PREFIX = "dl"
@@ -115,14 +116,14 @@ send () {
         if exists(_file):
             lgr.debug("Commenting out previous entries")
             # comment out all the past entries
-            with open(_file) as f:
-                entries = f.readlines()
+            with open(_file, 'rb') as f:
+                entries = list(map(assure_unicode, f.readlines()))
             for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
-            with open(_file, 'w') as f:
-                f.write(''.join(entries))
+            with open(_file, 'wb') as f:
+                f.write(u''.join(entries).encode('utf-8'))
             return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
