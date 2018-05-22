@@ -29,6 +29,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import skip_if_on_windows
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 
@@ -149,6 +150,7 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
+@skip_if_on_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch
