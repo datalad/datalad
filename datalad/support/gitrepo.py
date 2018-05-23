@@ -54,7 +54,8 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
-
+from datalad.utils import assert_no_open_files
+from ..utils import assure_unicode
 
 # imports from same module:
 from .external_versions import external_versions
@@ -748,6 +749,7 @@ class GitRepo(RepoInterface):
         try:
             if hasattr(self, 'repo') and exists(self.path) \
                     and self.repo is not None:
+                assert_no_open_files(self.path)
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
                 self.repo.git.clear_cache()

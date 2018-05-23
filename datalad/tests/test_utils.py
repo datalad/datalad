@@ -1078,3 +1078,13 @@ def test_dlabspath(path):
             eq_(dlabspath("bu"), opj(d, "bu"))
             eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+
+
+from ..utils import get_open_files
+
+@with_tree({'1': 'content', 'd': {'2': 'more'}})
+def test_get_open_files(p):
+    eq_(get_open_files(p), {})
+    f1 = opj(p, '1')
+    with open(f1) as f:
+        eq_(get_open_files(p, log_open=40), {f1: os.getpid()})

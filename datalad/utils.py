@@ -316,6 +316,61 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
         os.unlink(path)
 
 
+def get_open_files(path, log_open=False):
+    """Get open files under a path
+
+    Parameters
+    ----------
+    path : str
+      File or directory to check for open files under
+    log_open : bool or int
+      If set - logger level to use
+
+    Returns
+    -------
+    dict
+      path : pid
+
+    """
+    from .cmd import Runner
+    runner = Runner()
+    # The beast exits with 1 if no open files, so we need to just ignore
+    # "failed" run I guess if err is empty
+    from .support.exceptions import CommandError
+    try:
+        out, err = runner.run(
+            ['lsof', '-Fn', '+D', path],
+            log_stderr='offline',
+        )
+    except CommandError as exc:
+        out, err = exc.stdout, exc.stderr
+        if err:
+            raise
+    pid = None
+    files = {}
+    for l in out.splitlines():
+        marker, content = l[0], l[1:]
+        if marker == 'p':
+            pid = int(content)
+        elif marker == 'n':
+            files[content] = pid
+    if files and log_open:
+        lgr.log(log_open, "Open files under %s: %s", path, files)
+    return files
+
+
+_assert_no_open_files_cfg = os.environ.get('DATALAD_ASSERT_NO_OPEN_FILES')
+if _assert_no_open_files_cfg:
+    def assert_no_open_files(path):
+        files = get_open_files(path, log_open=40)
+        if _assert_no_open_files_cfg == 'assert':
+            assert not files
+        # otherwise we would just issue that error message in the log
+else:
+    def assert_no_open_files(*args, **kwargs):
+        pass
+
+
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
 
@@ -327,6 +382,8 @@ def rmtemp(f, *args, **kwargs):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
         lgr.log(5, "Removing temp file: %s" % f)
+        # Check for open files
+        assert_no_open_files(f)
         # Can also be a directory
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
