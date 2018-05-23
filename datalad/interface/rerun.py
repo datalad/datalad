@@ -173,10 +173,10 @@ class Rerun(Interface):
                          'cannot detect changes by command'))
             return
 
-        err_info = get_status_dict('run', ds=ds)
         if not ds.repo.get_hexsha():
-            yield dict(
-                err_info, status='impossible',
+            yield get_status_dict(
+                'run', ds=ds,
+                status='impossible',
                 message='cannot rerun command, nothing recorded')
             return
 
