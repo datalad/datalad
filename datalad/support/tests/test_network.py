@@ -399,6 +399,7 @@ def test_is_datalad_compat_ri():
     nok_(is_datalad_compat_ri(123))
 
 
+@skip_if_on_windows
 def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a'), 'file:///a')
     eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
