@@ -76,11 +76,7 @@ def test_basic_scenario(direct, d, d2):
         archive_file=fn_archive,
         file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
 
-    try:
-        annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
-    finally:
-        with open(_path_(annex.path, '.git/bin/git-annex-remote-datalad-archive')) as f:
-            print(f.read())
+    annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
     annex.drop(fn_extracted)
 
     list_of_remotes = annex.whereis(fn_extracted, output='descriptions')
@@ -137,12 +133,7 @@ def test_annex_get_from_subdir(topdir):
     annex = AnnexRepo(topdir, init=True)
     annex.add('a.tar.gz')
     annex.commit()
-    try:
-        add_archive_content('a.tar.gz', annex=annex, delete=True)
-    finally:
-        with open(_path_(annex.path, '.git/bin/git-annex-remote-datalad-archive')) as f:
-            print(f.read())
-
+    add_archive_content('a.tar.gz', annex=annex, delete=True)
     fpath = opj(topdir, 'a', 'd', fn_inarchive_obscure)
 
     with chpwd(opj(topdir, 'a', 'd')):
