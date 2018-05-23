@@ -203,25 +203,7 @@ class Rerun(Interface):
                 message="cannot rerun history with merge commits")
             return
 
-        revs = [{"hexsha": hexsha,
-                 "message": ds.repo.repo.git.show(
-                     hexsha, "--format=%B", "--no-patch")}
-                for hexsha in ds.repo.repo.git.rev_list(
-                        "--reverse", revrange, "--").split()]
-
-        for rev in revs:
-            try:
-                msg, info = get_run_info(rev["message"])
-            except ValueError as exc:
-                yield dict(err_info, status='error',
-                           message="Error on {}'s message: {}".format(
-                               rev["hexsha"], exc_str(exc)))
-                return
-            if info is not None:
-                rev["run_info"] = info
-                rev["run_message"] = msg
-
-        results = _rerun_as_results(ds, revs, since, branch, onto, message)
+        results = _rerun_as_results(ds, revrange, since, branch, onto, message)
         if script:
             handler = _get_script_handler(script, since, revision)
         elif report:
@@ -233,24 +215,49 @@ class Rerun(Interface):
             yield res
 
 
-def _rerun_as_results(dset, revs, since, branch, onto, message):
+def _revs_as_results(dset, revs):
+    for rev in revs:
+        res = get_status_dict("run", ds=dset, commit=rev)
+        full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
+        try:
+            msg, info = get_run_info(full_msg)
+        except ValueError as exc:
+            # Recast the error so the message includes the revision.
+            raise ValueError(
+                "Error on {}'s message: {}".format(rev, exc_str(exc)))
+
+        if info is not None:
+            res["run_info"] = info
+            res["run_message"] = msg
+        yield dict(res, status="ok")
+
+
+def _rerun_as_results(dset, revrange, since, branch, onto, message):
     """Represent the rerun as result records.
 
     In the standard case, the information in these results will be used to
     actually re-execute the commands.
     """
+    revs = dset.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+    try:
+        results = _revs_as_results(dset, revs)
+    except ValueError as exc:
+        yield get_status_dict("run", status="error", message=exc_str(exc))
+        return
 
     if since is not None and since.strip() == "":
         # For --since='', drop any leading commits that don't have
         # a run command.
-        revs = list(dropwhile(lambda r: "run_info" not in r, revs))
+        results = list(dropwhile(lambda r: "run_info" not in r, results))
+    else:
+        results = list(results)
 
     if onto is not None and onto.strip() == "":
         # Special case: --onto='' is the value of --since. Because we're
         # currently aborting if the revision list contains merges, we know
         # that, regardless of if and how --since is specified, the effective
         # value for --since is the parent of the first revision.
-        onto = revs[0]["hexsha"] + "^"
+        onto = results[0]["commit"] + "^"
         if not commit_exists(dset, onto):
             # This is unlikely to happen in the wild because it means that the
             # first commit is a datalad run commit. Just abort rather than
@@ -270,27 +277,14 @@ def _rerun_as_results(dset, revs, since, branch, onto, message):
             rerun_action="checkout",
             status="ok")
 
-    for rev in revs:
-        hexsha = rev["hexsha"]
-        res = get_status_dict(
-            "run",
-            ds=dset,
-            commit=hexsha,
-            status="ok")
-
-        if "run_info" in rev:
+    for res in results:
+        if "run_info" in res:
             res["rerun_action"] = "run"
-            # This is the original message from the run commit.
-            res["run_message"] = rev["run_message"]
+            res["diff"] = diff_revision(dset, res["commit"])
             # This is the overriding message, if any, passed to this rerun.
             res["rerun_message"] = message
         else:
             res["rerun_action"] = "cherry pick or skip"
-            yield res
-            continue
-
-        res["diff"] = diff_revision(dset, hexsha)
-        res["run_info"] = rev["run_info"]
         yield res
 
 
