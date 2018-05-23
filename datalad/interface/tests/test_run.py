@@ -327,6 +327,10 @@ def test_rerun_just_one_commit(path):
     ds.repo.commit(msg="empty", options=["--allow-empty"])
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
 
+    # --script propagates the error.
+    with swallow_outputs():
+        assert_raises(IncompleteResultsError,
+                      ds.rerun, since="", onto="", script="-")
     # --dry-run propagates the error.
     assert_raises(IncompleteResultsError,
                   ds.rerun, since="", onto="",

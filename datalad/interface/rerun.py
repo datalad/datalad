@@ -221,38 +221,7 @@ class Rerun(Interface):
                 rev["run_info"] = info
                 rev["run_message"] = msg
 
-        if since is not None and since.strip() == "":
-            # For --since='', drop any leading commits that don't have
-            # a run command.
-            revs = list(dropwhile(lambda r: "run_info" not in r, revs))
-
-        if onto is not None and onto.strip() == "":
-            # Special case: --onto='' is the value of --since.
-            # Because we're currently aborting if the revision list
-            # contains merges, we know that, regardless of if and how
-            # --since is specified, the effective value for --since is
-            # the parent of the first revision.
-            onto = revs[0]["hexsha"] + "^"
-            if not commit_exists(ds, onto):
-                # This is unlikely to happen in the wild because it
-                # means that the first commit is a datalad run commit.
-                # Just abort rather than trying to checkout on orphan
-                # branch or something like that.
-                yield get_status_dict(
-                    "run", ds=ds, status="error",
-                    message="Commit for --onto does not exist.")
-                return
-
-        if not (report or script):
-            if branch or onto:
-                start_point = onto or "HEAD"
-                if branch:
-                    checkout_options = ["-b", branch]
-                else:
-                    checkout_options = ["--detach"]
-                ds.repo.checkout(start_point, options=checkout_options)
-
-        results = _rerun_as_results(ds, revs, message)
+        results = _rerun_as_results(ds, revs, since, branch, onto, message)
         if script:
             handler = _get_script_handler(script, since, revision)
         elif report:
@@ -264,12 +233,43 @@ class Rerun(Interface):
             yield res
 
 
-def _rerun_as_results(dset, revs, message):
+def _rerun_as_results(dset, revs, since, branch, onto, message):
     """Represent the rerun as result records.
 
     In the standard case, the information in these results will be used to
     actually re-execute the commands.
     """
+
+    if since is not None and since.strip() == "":
+        # For --since='', drop any leading commits that don't have
+        # a run command.
+        revs = list(dropwhile(lambda r: "run_info" not in r, revs))
+
+    if onto is not None and onto.strip() == "":
+        # Special case: --onto='' is the value of --since. Because we're
+        # currently aborting if the revision list contains merges, we know
+        # that, regardless of if and how --since is specified, the effective
+        # value for --since is the parent of the first revision.
+        onto = revs[0]["hexsha"] + "^"
+        if not commit_exists(dset, onto):
+            # This is unlikely to happen in the wild because it means that the
+            # first commit is a datalad run commit. Just abort rather than
+            # trying to checkout on orphan branch or something like that.
+            yield get_status_dict(
+                "run", ds=dset, status="error",
+                message="Commit for --onto does not exist.")
+            return
+
+    if branch or onto:
+        start_point = onto or "HEAD"
+        yield get_status_dict(
+            "run",
+            ds=dset,
+            commit=start_point,
+            branch=branch,
+            rerun_action="checkout",
+            status="ok")
+
     for rev in revs:
         hexsha = rev["hexsha"]
         res = get_status_dict(
@@ -296,8 +296,19 @@ def _rerun_as_results(dset, revs, message):
 
 def _rerun(dset, results):
     for res in results:
-        hexsha = res["commit"]
-        if "run_info" not in res:
+        if res["status"] != "ok":
+            yield res
+            return
+
+        if res.get("rerun_action") == "checkout":
+            if res.get("branch"):
+                checkout_options = ["-b", res["branch"]]
+            else:
+                checkout_options = ["--detach"]
+            dset.repo.checkout(res["commit"],
+                               options=checkout_options)
+        elif "run_info" not in res:
+            hexsha = res["commit"]
             pick = False
             try:
                 dset.repo.repo.git.merge_base("--is-ancestor",
@@ -318,6 +329,7 @@ def _rerun(dset, results):
                     check_fake_dates=True)
             yield res
         else:
+            hexsha = res["commit"]
             run_info = res["run_info"]
 
             # Keep a "rerun" trail.
@@ -371,6 +383,10 @@ def _get_script_handler(script, since, revision):
             path=dset.path))
 
         for res in results:
+            if res["status"] != "ok":
+                yield res
+                return
+
             if "run_info" not in res:
                 continue
 
