@@ -28,7 +28,7 @@ import string
 import random
 
 from .locking import lock_if_check_fails
-from ..utils import any_re_search
+from ..utils import any_re_search, rmdir
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -169,7 +169,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
-            os.rmdir(widow_dir)
+            rmdir(widow_dir)
     elif leading_directories is None:
         pass   # really do nothing
     else:

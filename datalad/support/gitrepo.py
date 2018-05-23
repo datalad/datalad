@@ -749,7 +749,6 @@ class GitRepo(RepoInterface):
         try:
             if hasattr(self, 'repo') and exists(self.path) \
                     and self.repo is not None:
-                assert_no_open_files(self.path)
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
                 self.repo.git.clear_cache()

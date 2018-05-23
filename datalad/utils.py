@@ -308,6 +308,9 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     if chmod_files == 'auto':
         chmod_files = on_windows
 
+    # Check for open files
+    assert_no_open_files(path)
+
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
@@ -315,6 +318,11 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
         # just remove the symlink
         os.unlink(path)
 
+
+def rmdir(path, *args, **kwargs):
+    """os.rmdir with our optional checking for open files"""
+    assert_no_open_files(path)
+    os.rmdir(path)
 
 def get_open_files(path, log_open=False):
     """Get open files under a path
@@ -365,6 +373,14 @@ if _assert_no_open_files_cfg:
         files = get_open_files(path, log_open=40)
         if _assert_no_open_files_cfg == 'assert':
             assert not files
+        elif files:
+            if _assert_no_open_files_cfg == 'pdb':
+                import pdb
+                pdb.set_trace()
+            elif _assert_no_open_files_cfg == 'epdb':
+                import epdb
+                epdb.serve()
+            pass
         # otherwise we would just issue that error message in the log
 else:
     def assert_no_open_files(*args, **kwargs):
@@ -382,8 +398,6 @@ def rmtemp(f, *args, **kwargs):
             lgr.debug("Path %s does not exist, so can't be removed" % f)
             return
         lgr.log(5, "Removing temp file: %s" % f)
-        # Check for open files
-        assert_no_open_files(f)
         # Can also be a directory
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
@@ -395,6 +409,8 @@ def rmtemp(f, *args, **kwargs):
             # or any other exception is thrown then if except
             # statement has WindowsError in it -- NameError
             exceptions = (OSError, WindowsError) if on_windows else OSError
+            # Check for open files
+            assert_no_open_files(f)
             for i in range(50):
                 try:
                     os.unlink(f)
