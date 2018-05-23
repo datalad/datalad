@@ -350,10 +350,15 @@ def _rerun(dset, results):
                 yield r
 
 
-def _report(_, results):
+def _report(dset, results):
     for res in results:
         if "run_info" in res:
             res["diff"] = list(res["diff"])
+            # Add extra information that is useful in the report but not needed
+            # for the rerun.
+            out = dset.repo.repo.git.show(
+                "--no-patch", "--format=%an%x00%aI", res["commit"])
+            res["author"], res["date"] = out.split("\0")
         yield res
 
 
