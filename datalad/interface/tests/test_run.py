@@ -31,7 +31,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError
+from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
 from datalad.interface.rerun import get_run_info
@@ -171,6 +171,13 @@ def test_rerun(path, nodspath):
     ds.repo.merge("topic")
     ok_clean_git(ds.path)
     assert_raises(IncompleteResultsError, ds.rerun)
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_empty_branch(path):
+    GitRepo(path, create=True)
+    ds = Dataset(path)
+    assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
 @ignore_nose_capturing_stdout
