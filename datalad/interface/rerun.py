@@ -391,7 +391,14 @@ def _get_script_handler(script, since, revision):
             ofh.write(cmd + "\n")
         if ofh is not sys.stdout:
             ofh.close()
-        yield None
+
+        if ofh is sys.stdout:
+            yield None
+        else:
+            yield get_status_dict(
+                "run", ds=dset, status="ok",
+                path=script,
+                message=("Script written to %s", script))
 
     return fn
 
