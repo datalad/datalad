@@ -173,7 +173,7 @@ def test_rerun(path, nodspath):
     report = ds.rerun(since="", report=True, return_type="list")
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
-    assert_result_count(report, 1, rerun_action="cherry pick or skip")
+    assert_result_count(report, 1, rerun_action="skip")
     report[-1]["commit"] == ds.repo.get_hexsha()
 
     # If a file is dropped, we remove it instead of unlocking it.

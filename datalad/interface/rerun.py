@@ -267,8 +267,8 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
                 message="Commit for --onto does not exist.")
             return
 
+    start_point = onto or "HEAD"
     if branch or onto:
-        start_point = onto or "HEAD"
         yield get_status_dict(
             "run",
             ds=dset,
@@ -277,14 +277,31 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             rerun_action="checkout",
             status="ok")
 
+    def rev_is_ancestor(rev):
+        try:
+            dset.repo.repo.git.merge_base("--is-ancestor", rev, start_point)
+        except GitCommandError:
+            # Revision is NOT an ancestor of the starting point.
+            return False
+        return True
+
+    # We want to skip revs before the starting point and pick those after.
+    to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
+
     for res in results:
+        hexsha = res["commit"]
         if "run_info" in res:
             res["rerun_action"] = "run"
-            res["diff"] = diff_revision(dset, res["commit"])
+            res["diff"] = diff_revision(dset, hexsha)
             # This is the overriding message, if any, passed to this rerun.
             res["rerun_message"] = message
         else:
-            res["rerun_action"] = "cherry pick or skip"
+            pick = hexsha in to_pick
+            res["rerun_action"] = "pick" if pick else "skip"
+            shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+            res["message"] = "no command for {} found; {}".format(
+                shortrev,
+                "cherry picking" if pick else "skipping")
         yield res
 
 
@@ -294,33 +311,20 @@ def _rerun(dset, results):
             yield res
             return
 
-        if res.get("rerun_action") == "checkout":
+        rerun_action = res.get("rerun_action")
+        if rerun_action == "skip":
+            yield res
+        elif rerun_action == "checkout":
             if res.get("branch"):
                 checkout_options = ["-b", res["branch"]]
             else:
                 checkout_options = ["--detach"]
             dset.repo.checkout(res["commit"],
                                options=checkout_options)
-        elif "run_info" not in res:
-            hexsha = res["commit"]
-            pick = False
-            try:
-                dset.repo.repo.git.merge_base("--is-ancestor",
-                                              hexsha, "HEAD")
-            except GitCommandError:
-                # Revision is NOT an ancestor of HEAD.
-                pick = True
-
-            shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
-            res["message"] = "no command for {} found; {}".format(
-                shortrev,
-                "cherry picking" if pick else "skipping")
-            res["rerun_action"] = "pick" if pick else "skip"
-
-            if pick:
-                dset.repo._git_custom_command(
-                    None, ["git", "cherry-pick", hexsha],
-                    check_fake_dates=True)
+        elif rerun_action == "pick":
+            dset.repo._git_custom_command(
+                None, ["git", "cherry-pick", res["commit"]],
+                check_fake_dates=True)
             yield res
         else:
             hexsha = res["commit"]
