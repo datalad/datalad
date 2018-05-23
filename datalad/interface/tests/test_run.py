@@ -21,7 +21,7 @@ from datalad.tests.utils import (
 
 from os.path import join as opj
 from os.path import relpath
-from os import mkdir
+from os import mkdir, remove
 from six.moves import StringIO
 from mock import patch
 
@@ -142,6 +142,15 @@ def test_rerun(path, nodspath):
     ok_clean_git(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
+
+    # Rerun fails with a dirty repo.
+    dirt = opj(path, "dirt")
+    with open(dirt, "w") as fh:
+        fh.write("")
+    assert_status('impossible', ds.rerun(on_failure="ignore"))
+    remove(dirt)
+    ok_clean_git(ds.path)
+
     # Make a non-run commit.
     with open(opj(path, "nonrun-file"), "w") as f:
         f.write("foo")
