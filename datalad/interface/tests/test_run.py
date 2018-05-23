@@ -546,8 +546,8 @@ def test_new_or_modified(path):
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
-    ds.run("echo a >foo", message='FOO')
-    ds.run("echo b >bar", message='BAR')
+    ds.run("echo a >foo")
+    ds.run(["touch", "bar"], message='BAR')
     bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")
@@ -556,7 +556,7 @@ def test_rerun_script(path):
     ok_exists(script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("echo b >bar\n", lines)
+        assert_in("touch bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
         assert_in("# (record: {})\n".format(bar_hexsha), lines)
@@ -565,13 +565,15 @@ def test_rerun_script(path):
     ds.rerun(since="", script=script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("echo b >bar\n", lines)
+        assert_in("touch bar\n", lines)
+        # Automatic commit messages aren't included.
+        assert_not_in("# echo a >foo\n", lines)
         assert_in("echo a >foo\n", lines)
 
     # --script=- writes to stdout.
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-")
-        assert_in("echo b >bar",
+        assert_in("touch bar",
                   cmout.getvalue().splitlines())
 
 
