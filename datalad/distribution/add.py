@@ -13,6 +13,7 @@
 import logging
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 from os.path import normpath
@@ -70,7 +71,7 @@ def _discover_subdatasets_recursively(
         return
     if not isdir(top):
         return
-    if GitRepo.is_valid_repo(top):
+    if not op.islink(top) and GitRepo.is_valid_repo(top):
         if top in discovered:
             # this was found already, assume everything beneath it too
             return
