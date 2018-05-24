@@ -1987,6 +1987,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         If annex knows `file` already,
         records that it can be downloaded from `url`.
 
+        Note: Consider using the higher-level `download_url` instead.
+
         Parameters
         ----------
         file_: str
