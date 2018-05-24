@@ -57,6 +57,8 @@ from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
 from ..utils import import_modules, import_module_from_file
+from ..utils import get_open_files
+
 
 from ..support.annexrepo import AnnexRepo
 
@@ -1080,11 +1082,12 @@ def test_dlabspath(path):
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
 
 
-from ..utils import get_open_files
-
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
 def test_get_open_files(p):
     eq_(get_open_files(p), {})
     f1 = opj(p, '1')
     with open(f1) as f:
-        eq_(get_open_files(p, log_open=40), {f1: os.getpid()})
+        # since lsof does not care about PWD env var etc, paths
+        # will not contain symlinks, we better realpath them
+        # all before comparison
+        eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
