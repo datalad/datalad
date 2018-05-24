@@ -12,6 +12,8 @@
 from datalad.tests.utils import known_failure_direct_mode
 
 import logging
+import os
+import os.path as op
 from os.path import join as opj
 
 from datalad.api import create
@@ -32,6 +34,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import create_tree
 from datalad.utils import chpwd
 
@@ -417,3 +420,14 @@ def test_gh1597(path):
     ds.add('.gitmodules')
     # must not come under annex mangement
     ok_file_under_git(ds.path, '.gitmodules', annexed=False)
+
+
+@skip_if_on_windows  # no POSIX symlinks
+@with_tempfile()
+def test_bf2541(path):
+    ds = create(path)
+    subds = ds.create('sub')
+    ok_clean_git(ds.path)
+    os.symlink('sub', op.join(ds.path, 'symlink'))
+    with chpwd(ds.path):
+        res = add('.', recursive=True)
