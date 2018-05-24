@@ -431,3 +431,4 @@ def test_bf2541(path):
     os.symlink('sub', op.join(ds.path, 'symlink'))
     with chpwd(ds.path):
         res = add('.', recursive=True)
+    ok_clean_git(ds.path)
