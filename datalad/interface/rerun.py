@@ -50,6 +50,29 @@ class Rerun(Interface):
     then re-execute the command in the recorded path (if it was inside
     the dataset). Afterwards, all modifications will be saved.
 
+    *Report mode*
+
+    || REFLOW >>
+    When called with [CMD: --report CMD][PY: report=True PY], this command
+    reports information about what would be re-executed as a series of records.
+    There will be a record for each revision in the specified revision range.
+    Each of these will have one of the following "rerun_action" values:
+    << REFLOW ||
+
+      - run: the revision has a recorded command that would be re-executed
+      - skip: the revision does not have a recorded command and would be
+        skipped
+      - pick: the revision does not have a recorded command and would be cherry
+        picked
+
+    The decision to skip rather than cherry pick a revision is based on whether
+    the revision would be reachable from HEAD at the time of execution.
+
+    In addition, when a starting point other than HEAD is specified, there is a
+    rerun_action value "checkout", in which case the record includes
+    information about the revision the would be checked out before rerunning
+    any commands.
+
     Examples:
 
       Re-execute the command from the previous commit::
