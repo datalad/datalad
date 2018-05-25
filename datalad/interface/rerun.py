@@ -311,26 +311,34 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     # We want to skip revs before the starting point and pick those after.
     to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
 
+    def skip_or_pick(hexsha, result, msg):
+        pick = hexsha in to_pick
+        result["rerun_action"] = "pick" if pick else "skip"
+        shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+        result["message"] = (
+            "%s %s; %s",
+            shortrev, msg, "cherry picking" if pick else "skipping")
+
     for res in results:
         hexsha = res["commit"]
         if "run_info" in res:
-            res["rerun_action"] = "run"
-            res["diff"] = diff_revision(dset, hexsha)
-            # This is the overriding message, if any, passed to this rerun.
-            res["rerun_message"] = message
+            rerun_dsid = res["run_info"].get("dsid")
+            if rerun_dsid is not None and rerun_dsid != dset.id:
+                skip_or_pick(hexsha, res, "was ran from a different dataset")
+                res["status"] = "impossible"
+            else:
+                res["rerun_action"] = "run"
+                res["diff"] = diff_revision(dset, hexsha)
+                # This is the overriding message, if any, passed to this rerun.
+                res["rerun_message"] = message
         else:
-            pick = hexsha in to_pick
-            res["rerun_action"] = "pick" if pick else "skip"
-            shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
-            res["message"] = "no command for {} found; {}".format(
-                shortrev,
-                "cherry picking" if pick else "skipping")
+            skip_or_pick(hexsha, res, "does not have a command")
         yield res
 
 
 def _rerun(dset, results):
     for res in results:
-        if res["status"] != "ok":
+        if res["status"] == "error":
             yield res
             return
 
@@ -380,12 +388,13 @@ def _rerun(dset, results):
 def _report(dset, results):
     for res in results:
         if "run_info" in res:
-            res["diff"] = list(res["diff"])
-            # Add extra information that is useful in the report but not needed
-            # for the rerun.
-            out = dset.repo.repo.git.show(
-                "--no-patch", "--format=%an%x00%aI", res["commit"])
-            res["author"], res["date"] = out.split("\0")
+            if res["status"] != "impossible":
+                res["diff"] = list(res["diff"])
+                # Add extra information that is useful in the report but not
+                # needed for the rerun.
+                out = dset.repo.repo.git.show(
+                    "--no-patch", "--format=%an%x00%aI", res["commit"])
+                res["author"], res["date"] = out.split("\0")
         yield res
 
 

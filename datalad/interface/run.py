@@ -310,6 +310,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
         run_info['pwd'] = rel_pwd
+    if ds.id:
+        run_info["dsid"] = ds.id
 
     # compose commit message
     msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(

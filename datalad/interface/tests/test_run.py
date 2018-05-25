@@ -143,6 +143,12 @@ def test_rerun(path, nodspath):
     # ran twice now
     eq_('xx\n', open(probe_path).read())
 
+    # Rerunning from a subdataset skips the command.
+    assert_result_count(
+        sub.rerun(return_type="list", on_failure="ignore"),
+        1, status="impossible", action="run", rerun_action="skip")
+    eq_('xx\n', open(probe_path).read())
+
     # Rerun fails with a dirty repo.
     dirt = opj(path, "dirt")
     with open(dirt, "w") as fh:
