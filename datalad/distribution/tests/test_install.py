@@ -884,6 +884,7 @@ def test_install_from_tilda(opath, tpath):
 @with_tempfile(mkdir=True)
 def test_install_subds_from_another_remote(topdir):
     # https://github.com/datalad/datalad/issues/1905
+    from datalad.support.network import PathRI
     with chpwd(topdir):
         origin_ = 'origin'
         clone1_ = 'clone1'
@@ -892,7 +893,7 @@ def test_install_subds_from_another_remote(topdir):
         origin = create(origin_, no_annex=True)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
-        clone1.create_sibling('ssh://localhost%s/%s' % (getpwd(), clone2_), name=clone2_)
+        clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
         clone1.publish(to=clone2_)

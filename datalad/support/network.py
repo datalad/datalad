@@ -48,6 +48,17 @@ from datalad.support.cache import lru_cache
 # import requests
 
 
+def is_windows_path(path):
+    win_split = win_splitdrive(path)
+    # Note, that ntpath.splitdrive also deals with UNC paths. In that case
+    # the "drive" wouldn't be a windows drive letter followed by a colon
+    if win_split[0] and win_split[1] and \
+            win_split[0].endswith(":") and len(win_split[0]) == 2:
+        # seems to be a windows path
+        return True
+    return False
+
+
 def get_response_disposition_filename(s):
     """Given a string s as from HTTP Content-Disposition field in the response
     return possibly present filename if any
@@ -291,10 +302,7 @@ def _guess_ri_cls(ri):
         'file': PathRI,
         'datalad': DataLadRI
     }
-    # go in exotic mode if this is an absolute windows path
-    win_split = win_splitdrive(ri)
-    # we need a drive and a path, otherwise this could be a false positive
-    if win_split[0] and win_split[1]:
+    if is_windows_path(ri):
         # OMG we got something from windows
         lgr.log(5, "Detected file ri")
         return TYPES['file']
@@ -671,6 +679,14 @@ class PathRI(RI):
     @property
     def localpath(self):
         return self.path
+
+    @property
+    def posixpath(self):
+        if is_windows_path(self.path):
+            win_split = win_splitdrive(self.path)
+            return "/" + win_split[0][0] + win_split[1].replace('\\', '/')
+        else:
+            return self.path
 
 
 class RegexBasedURLMixin(object):

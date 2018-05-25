@@ -83,8 +83,9 @@ def test_invalid_call(origin, tdir):
 @with_tempfile
 def test_smth_about_not_supported(p1, p2):
     source = Dataset(p1).create()
+    from datalad.support.network import PathRI
     source.create_sibling(
-        'ssh://localhost' + p2,
+        'ssh://localhost' + PathRI(p2).posixpath,
         name='target1')
     # source.publish(to='target1')
     with chpwd(p1):
