@@ -54,7 +54,7 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
-
+from ..utils import assure_unicode
 
 # imports from same module:
 from .external_versions import external_versions
@@ -945,8 +945,9 @@ class GitRepo(RepoInterface):
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
+        from datalad.utils import assure_unicode
         return [{u'file': f, u'success': True}
-                for f in re.findall("'(.*)'[\n$]", stdout)]
+                for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):

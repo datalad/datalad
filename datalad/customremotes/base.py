@@ -17,7 +17,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, realpath, dirname, lexists
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -32,6 +32,7 @@ from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
+from ..utils import assure_unicode
 
 
 URI_PREFIX = "dl"
@@ -115,14 +116,14 @@ send () {
         if exists(_file):
             lgr.debug("Commenting out previous entries")
             # comment out all the past entries
-            with open(_file) as f:
-                entries = f.readlines()
+            with open(_file, 'rb') as f:
+                entries = list(map(assure_unicode, f.readlines()))
             for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
-            with open(_file, 'w') as f:
-                f.write(''.join(entries))
+            with open(_file, 'wb') as f:
+                f.write(u''.join(entries).encode('utf-8'))
             return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
@@ -449,7 +450,7 @@ class AnnexCustomRemote(object):
                 method(*req_load)
             except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
-                           % (req, req_load, e))
+                           % (req, req_load, exc_str(e)))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s" % format_exc())
 
@@ -479,6 +480,9 @@ class AnnexCustomRemote(object):
                        "PREPARE-FAILURE")
         else:
             self.send("PREPARE-SUCCESS")
+
+        self.debug("Encodings: filesystem %s, default %s"
+                   % (sys.getfilesystemencoding(), sys.getdefaultencoding()))
 
     def req_EXPORTSUPPORTED(self):
         self.send(

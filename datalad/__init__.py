@@ -32,7 +32,7 @@ cfg = ConfigManager()
 
 from .log import lgr
 import atexit
-from datalad.utils import on_windows
+from datalad.utils import on_windows, get_encoding_info, get_envvars_info
 
 if not on_windows:
     lgr.log(5, "Instantiating ssh manager")
@@ -160,6 +160,18 @@ def setup_package():
 
 def teardown_package():
     import os
+    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
+
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    print(ev.dumps(query=True))
+    print("Obscure filename: str=%s repr=%r"
+            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    def print_dict(d):
+        return " ".join("%s=%r" % v for v in d.items())
+    print("Encodings: %s" % print_dict(get_encoding_info()))
+    print("Environment: %s" % print_dict(get_envvars_info()))
+
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
@@ -173,7 +185,6 @@ def teardown_package():
             os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
-    from datalad.tests.utils import rmtemp
     if len(_TEMP_PATHS_GENERATED):
         msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
     else:
@@ -189,8 +200,5 @@ def teardown_package():
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
-    lgr.debug("Printing versioning information collected so far")
-    from datalad.support.external_versions import external_versions as ev
-    print(ev.dumps(query=True))
 
 lgr.log(5, "Done importing main __init__")
