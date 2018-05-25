@@ -718,6 +718,7 @@ def test_run_inputs_no_annex_repo(path):
     ok_exists(opj(ds.path, "dummy"))
     ds.rerun()
 
+
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
                   get_run_info,

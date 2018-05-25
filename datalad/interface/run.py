@@ -18,7 +18,6 @@ from argparse import REMAINDER
 from glob import glob
 from os.path import join as opj
 from os.path import curdir
-from os.path import isdir
 from os.path import normpath
 from os.path import relpath
 
@@ -28,7 +27,6 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
@@ -193,6 +191,7 @@ def get_command_pwds(dataset):
             rel_pwd = pwd  # and leave handling on deciding either we
                            # deal with it or crash to checks below
     return pwd, rel_pwd
+
 
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
