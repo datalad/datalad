@@ -62,6 +62,15 @@ THE SOFTWARE.
 """
 
 
+class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
+    # Don't accept abbreviations for long options. With py3.5 and above, we
+    # could just use allow_abbrev=False.
+    #
+    # See https://bugs.python.org/issue14910#msg204678
+    def _get_option_tuples(self, option_string):
+        return []
+
+
 # TODO:  OPT look into making setup_parser smarter to become faster
 # Now it seems to take up to 200ms to do all the parser setup
 # even though it might not be necessary to know about all the commands etc.
@@ -78,7 +87,7 @@ def setup_parser(
     # setup cmdline args parser
     parts = {}
     # main parser
-    parser = argparse.ArgumentParser(
+    parser = ArgumentParserDisableAbbrev(
         # cannot use '@' because we need to input JSON-LD properties (which might come wit @ prefix)
         # MH: question, do we need this at all?
         fromfile_prefix_chars=':',

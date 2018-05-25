@@ -27,6 +27,7 @@ from datalad.metadata.definitions import version as vocabulary_version
 
 class MetadataExtractor(BaseMetadataExtractor):
     _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
+    _unique_exclude = {"url"}
 
     def _get_dataset_metadata(self):
         """

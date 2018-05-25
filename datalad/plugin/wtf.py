@@ -57,6 +57,9 @@ class WTF(Interface):
     @datasetmethod(name='wtf')
     @eval_results
     def __call__(dataset=None, sensitive=None, clipboard=None):
+        from datalad import get_encoding_info
+        from datalad import get_envvars_info
+
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         ds = None
@@ -116,6 +119,10 @@ DataLad
 System
 ======
 {system}
+
+Locale/Encoding
+===============
+{loc}
 
 Environment
 ===========
@@ -188,10 +195,8 @@ Metadata
                            _t2s(pl.mac_ver()),
                            _t2s(pl.win32_ver())]).rstrip())
             ], indent=True),
-            env=_format_dict([
-                (k, v) for k, v in os.environ.items()
-                if k.startswith('PYTHON') or k.startswith('GIT') or k.startswith('DATALAD')
-            ], fmt="{}={!r}"),
+            loc=_format_dict(get_encoding_info(), indent=True),  # , fmt="{}={!r}"),
+            env=_format_dict(get_envvars_info(), fmt="{}={!r}"),
             dataset='' if not ds else dataset_template.format(
                 basic=_format_dict([
                     ('path', ds.path),

@@ -37,7 +37,7 @@ from subprocess import Popen, PIPE
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from six import string_types
+from six import string_types, PY2
 from six import iteritems
 from six.moves import filter
 from git import InvalidGitRepositoryError
@@ -55,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.utils import assure_unicode, assure_bytes
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
@@ -110,6 +111,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20160923 -- --json-progress for get
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
+    # 6.20180416 -- annex handles unicode filenames more uniformly
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
@@ -1440,7 +1442,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
                 return self._process_git_get_output(
-                    linesep.join(["'{}'".format(p) for p in paths]))
+                    linesep.join(["'{}'".format(p.encode('utf-8')) for p in paths]))
             else:
                 # Note: if a path involves a submodule in direct mode, while we
                 # are not in direct mode at current level, we might still fail.
@@ -2026,13 +2028,19 @@ class AnnexRepo(GitRepo, RepoInterface):
             if batch:
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
+            files_opt = '--file=%s' % file_
+            if PY2:
+                files_opt = assure_bytes(files_opt)
             out_json = self._run_annex_command_json(
                 'addurl',
-                opts=options + ['--file=%s' % file_] + [url],
+                opts=options + [files_opt] + [url],
                 log_online=True, log_stderr=False,
                 **kwargs
             )
-            assert len(out_json) == 1, "should always be a single-time list"
+            if len(out_json) != 1:
+                raise AssertionError(
+                    "should always be a single-item list, Got: %s"
+                    % str(out_json))
             # Make the output's structure match bcmd's.
             out_json = out_json[0]
             # Don't capture stderr, since download progress provided by wget uses
@@ -3425,7 +3433,7 @@ class BatchedAnnex(object):
             # according to the internet wisdom there is no easy way with subprocess
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
-            process.stdin.write(entry)  # .encode())
+            process.stdin.write(assure_bytes(entry) if PY2 else entry)
             process.stdin.flush()
             lgr.log(5, "Done sending.")
             still_alive, stderr = self._check_process(restart=False)
@@ -3435,7 +3443,8 @@ class BatchedAnnex(object):
             #       it is just a "get"er - we could resend it few times
             # We are expecting a single line output
             # TODO: timeouts etc
-            stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
+            stdout = assure_unicode(self.output_proc(process.stdout)) \
+                if not process.stdout.closed else None
             if stderr:
                 lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)

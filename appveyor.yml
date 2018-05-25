@@ -62,7 +62,7 @@ test_script:
   - python -m nose -s -v datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_datacite_xml datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822
   # nothing runs here
   #- python -m nose -s -v datalad.plugin
-  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions
+  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions datalad.support.tests.test_network
   - python -m nose -s -v datalad.tests.test_api datalad.tests.test_base
   - python -m nose -s -v datalad.ui
 

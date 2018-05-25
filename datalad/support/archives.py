@@ -18,9 +18,9 @@ assert(external_versions["patoolib"] >= "1.7")
 
 import os
 import tempfile
-from os.path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
-from os.path import sep as opsep
-from os.path import realpath
+from .path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
+from .path import sep as opsep
+from .path import realpath
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
@@ -28,7 +28,7 @@ import string
 import random
 
 from .locking import lock_if_check_fails
-from ..utils import any_re_search, rmdir
+from ..utils import any_re_search, assure_bytes, rmdir
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -63,6 +63,7 @@ from ..cmd import Runner
 from ..consts import ARCHIVES_TEMP_DIR
 from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
+from ..utils import assure_unicode
 
 from ..utils import on_windows
 
@@ -132,6 +133,8 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         os.makedirs(dir_)
 
     with swallow_outputs() as cmo:
+        archive = assure_bytes(archive)
+        dir_ = assure_bytes(dir_)
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
@@ -225,7 +228,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(realpath(archive).encode()).hexdigest()[:10]
+    archive_cached = hashlib.md5(assure_bytes(realpath(archive))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -423,7 +426,7 @@ class ExtractedArchive(object):
         # we need to extract the archive
         # TODO: extract to _tmp and then move in a single command so we
         # don't end up picking up broken pieces
-        lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+        lgr.debug(u"Extracting {self._archive} under {path}".format(**locals()))
         if exists(path):
             lgr.debug(
                 "Previous extracted (but probably not fully) cached archive "
@@ -442,14 +445,14 @@ class ExtractedArchive(object):
         # rotree(path)
         assert (exists(path))
         # create a stamp
-        with open(self.stamp_path, 'w') as f:
-            f.write(self._archive)
+        with open(self.stamp_path, 'wb') as f:
+            f.write(assure_bytes(self._archive))
         # assert that stamp mtime is not older than archive's directory
         assert (self.is_extracted)
 
     # TODO: remove?
     #def has_file_ready(self, afile):
-    #    lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
+    #    lgr.debug(u"Checking file {afile} from archive {archive}".format(**locals()))
     #    return exists(self.get_extracted_filename(afile))
 
     def get_extracted_filename(self, afile):
@@ -466,7 +469,7 @@ class ExtractedArchive(object):
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
-                yield opj(root, name)[path_len:]
+                yield assure_unicode(opj(root, name)[path_len:])
 
     def get_leading_directory(self, depth=None, consider=None, exclude=None):
         """Return leading directory of the content within archive
@@ -516,7 +519,7 @@ class ExtractedArchive(object):
         return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
-        lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
+        lgr.debug(u"Requested file {afile} from archive {self._archive}".format(**locals()))
         # TODO: That could be a good place to provide "compatibility" layer if
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back

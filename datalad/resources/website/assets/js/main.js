@@ -10,6 +10,12 @@ var stored = sessionStorage['ntCache'];
 var stored = localStorage['ntCache'];
 if (stored) ntCache = JSON.parse(stored);
 
+/* Markdown converter */
+showdown.setOption('simplifiedAutoLink', true);
+showdown.setOption('ghCodeBlocks', true);
+showdown.setOption('ghCompatibleHeaderId', true);
+var converter = new showdown.Converter();
+
 /**
  * check if url exists
  * @param {string} url url to test for existence
@@ -101,7 +107,7 @@ function getParameterByName(name, url) {
  * @return {array} html linkified breadcrumbs array
  */
 function bread2crumbs(jQuery, md5) {
-  var rawCrumbs = loc().href.replace(/\/$/, '').split('/');  // split, remove trailing '/'
+  var rawCrumbs = loc().href.replace(/#.*/, '').replace(/\/$/, '').split('/');  // split, remove trailing '/'
   var spanClass = '<span class="dir">';
   var crumbs = [];
   for (var index = 2; index < rawCrumbs.length; index++) {
@@ -134,10 +140,11 @@ function set_cached(item, key, value) {
 }
 
 /**
- * Create installation RI
- * @return {string} RI to install current dataset from
+ * Get global URL for the current dataset containing the directory.
+ * Current loc is the one with URL containing path in the query
+ * @return {string} URL to top of current dataset
  */
-function uri2installri() {
+function get_dataset_global_url() {
   // TODO -- RF to centralize common logic with bread2crumbs
   var href = loc().href;
   var rawCrumbs = href.split('/');
@@ -146,7 +153,8 @@ function uri2installri() {
   var dir = getParameterByName('dir', href);
   var topurl = href.replace(/\?.*/, '').replace(/\/$/, '')
 
-  if (has_cached(dir, "install_url")) return get_cached(dir, "install_url");
+  if (has_cached(dir, "dataset_url"))
+    return get_cached(dir, "dataset_url");
 
   if (has_cached(dir, "type")
       && ((ntCache[dir].type == 'git') || (ntCache[dir].type == 'annex'))) {
@@ -170,12 +178,22 @@ function uri2installri() {
         }
       }
   }
+  if (ri)
+    set_cached(dir, "dataset_url", ri);
+  return ri;
+}
+
+/**
+ * Create installation RI
+ * @return {string} RI to install current dataset from
+ */
+function get_install_ri() {
+  var ri = get_dataset_global_url();
   // possible shortcuts
   if (ri) {
     ri = ri.replace('http://localhost:8080', '//');   // for local debugging
     ri = ri.replace('http://datasets.datalad.org', '//');   // for deployment
   }
-  set_cached(dir, "install_url", ri);
   return ri;
 }
 
@@ -206,8 +224,8 @@ function updateParamOrPath(nextUrl, type, currentState) {
  */
 function clickHandler(data, url) {
   // don't do anything for broken links
-  if (data.type === 'link-broken')
-    return {next: '', type: 'none'};
+  if (data.type === 'link-broken' || data.type === 'uninitialized')
+    return data.url ? {next: data.url, type: 'assign'} : {next: '', type: 'none'};
   // get directory parameter
   var dir = getParameterByName('dir', url);
   // which direction to move, up or down the path ?
@@ -296,6 +314,7 @@ function nodeJson(jQuery, md5, parent, top, nodeurl) {
 
   // else return required info for parent row from parent metadata json
   var nodeJson_ = {};
+
   jQuery.ajax({
     url: nodeMetaUrl,
     dataType: 'json',
@@ -441,7 +460,7 @@ function directory(jQuery, md5) {
   jQuery('#content').prepend('<table id="directory" class="display"></table>');
 
   // add HOWTO install
-  var ri = uri2installri();
+  var ri = get_install_ri();
   if (ri) {
     jQuery('#installation').prepend(
         '<P style="margin-top: 0px;">To install this dataset in your current directory use</P>' +
@@ -500,12 +519,27 @@ function directory(jQuery, md5) {
         if (data.tags) {
           orig = orig + "&nbsp;<span class='gittag'>@" + data.tags + "</span>";
         }
+        if (data.url) {
+          orig = orig + "&nbsp;<a href='" + data.url + "'><div id='img_external_link'/></a>";
+        }
         jQuery('td', row).eq(0).html(orig);
       }
       if (data.name === '..')
         jQuery('td', row).eq(2).html('');
       for (var i = 0; i < 4; i++)  // attach css based on node-type to visible columns of each row
         jQuery('td', row).eq(i).addClass(data.type);
+      // possibly present the README.md at the bottom of the page
+      if (data.name === 'README.md' && data.type === 'file') {
+        // Render and embed the content of that file
+        // TODO: may be we should cache the rendering as well??
+        jQuery.ajax({
+          url: get_dataset_global_url() + '/' + data.path,
+          dataType: 'text',
+          success: function(data) {
+            jQuery('#README').append(converter.makeHtml(data));
+          }
+        });
+      }
     },
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {

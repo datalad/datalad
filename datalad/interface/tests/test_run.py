@@ -21,7 +21,7 @@ from datalad.tests.utils import (
 
 from os.path import join as opj
 from os.path import relpath
-from os import mkdir
+from os import mkdir, remove
 from six.moves import StringIO
 from mock import patch
 
@@ -31,10 +31,11 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError
+from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
-from datalad.interface.rerun import get_run_info, new_or_modified
+from datalad.interface.rerun import get_run_info
+from datalad.interface.rerun import diff_revision, new_or_modified
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tempfile
@@ -141,6 +142,15 @@ def test_rerun(path, nodspath):
     ok_clean_git(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
+
+    # Rerun fails with a dirty repo.
+    dirt = opj(path, "dirt")
+    with open(dirt, "w") as fh:
+        fh.write("")
+    assert_status('impossible', ds.rerun(on_failure="ignore"))
+    remove(dirt)
+    ok_clean_git(ds.path)
+
     # Make a non-run commit.
     with open(opj(path, "nonrun-file"), "w") as f:
         f.write("foo")
@@ -157,6 +167,15 @@ def test_rerun(path, nodspath):
     # Or --since= to run all reachable commits.
     ds.rerun(since="")
     eq_('xxxxxxxxxx\n', open(probe_path).read())
+
+    # We can get back a report of what would happen rather than actually
+    # rerunning anything.
+    report = ds.rerun(since="", report=True, return_type="list")
+    # Nothing changed.
+    eq_('xxxxxxxxxx\n', open(probe_path).read())
+    assert_result_count(report, 1, rerun_action="skip")
+    report[-1]["commit"] == ds.repo.get_hexsha()
+
     # If a file is dropped, we remove it instead of unlocking it.
     ds.drop(probe_path, check=False)
     ds.rerun()
@@ -170,6 +189,13 @@ def test_rerun(path, nodspath):
     ds.repo.merge("topic")
     ok_clean_git(ds.path)
     assert_raises(IncompleteResultsError, ds.rerun)
+
+
+@with_tempfile(mkdir=True)
+def test_rerun_empty_branch(path):
+    GitRepo(path, create=True)
+    ds = Dataset(path)
+    assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
 @ignore_nose_capturing_stdout
@@ -301,6 +327,15 @@ def test_rerun_just_one_commit(path):
     ds.repo.commit(msg="empty", options=["--allow-empty"])
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
 
+    # --script propagates the error.
+    with swallow_outputs():
+        assert_raises(IncompleteResultsError,
+                      ds.rerun, since="", onto="", script="-")
+    # --dry-run propagates the error.
+    assert_raises(IncompleteResultsError,
+                  ds.rerun, since="", onto="",
+                  report=True, return_type="list")
+
 
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
@@ -406,14 +441,9 @@ def test_rerun_cherry_pick(path):
         f.write("foo")
     ds.add("nonrun-file")
 
-    for onto, text in [("HEAD", "skipping"), ("prerun", "cherry picking")]:
+    for onto, action in [("HEAD", "skip"), ("prerun", "pick")]:
         results = ds.rerun(since="prerun", onto=onto)
-        assert_in_results(results, status='ok', path=ds.path)
-
-        messages = (r.get("message", "") for r in results)
-        # Message may be a tuple.
-        messages = (m for m in messages if hasattr(m, "endswith"))
-        assert any(m.endswith(text) for m in messages)
+        assert_in_results(results, status='ok', rerun_action=action)
 
 
 @ignore_nose_capturing_stdout
@@ -489,9 +519,9 @@ def test_rerun_subdir(path):
                  "to_modify": "content3",
                  "unchanged": "content4"})
 def test_new_or_modified(path):
-    def apfiles(aps):
-        for ap in aps:
-            yield relpath(ap["path"], path)
+    def get_new_or_modified(*args, **kwargs):
+        return [relpath(ap["path"], path)
+                for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
     ds = Dataset(path).create(force=True, no_annex=True)
 
@@ -502,7 +532,7 @@ def test_new_or_modified(path):
     assert_false(ds.repo.dirty)
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
     # Diffing doesn't fail when the branch contains a single commit.
-    assert_in("to_modify", apfiles(new_or_modified(ds, "HEAD")))
+    assert_in("to_modify", get_new_or_modified(ds, "HEAD"))
 
     # New files are detected, deletions are not.
     ds.repo.remove(["to_remove"])
@@ -513,7 +543,7 @@ def test_new_or_modified(path):
     ds.repo.add(["to_add"])
     ds.repo.commit("add one, remove another")
 
-    eq_(list(apfiles(new_or_modified(ds, "HEAD"))),
+    eq_(get_new_or_modified(ds, "HEAD"),
         ["to_add"])
 
     # Modifications are detected.
@@ -523,13 +553,13 @@ def test_new_or_modified(path):
         f.write("updated 2")
     ds.add(["to_modify", "d/to_modify"])
 
-    eq_(set(apfiles(new_or_modified(ds, "HEAD"))),
+    eq_(set(get_new_or_modified(ds, "HEAD")),
         {"to_modify", "d/to_modify"})
 
     # Non-HEAD revisions work.
     ds.repo.commit("empty", options=["--allow-empty"])
-    assert_false(list(apfiles(new_or_modified(ds, "HEAD"))))
-    eq_(set(apfiles(new_or_modified(ds, "HEAD~"))),
+    assert_false(get_new_or_modified(ds, "HEAD"))
+    eq_(set(get_new_or_modified(ds, "HEAD~")),
         {"to_modify", "d/to_modify"})
 
 
@@ -538,8 +568,8 @@ def test_new_or_modified(path):
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
-    ds.run("echo a >foo", message='FOO')
-    ds.run("echo b >bar", message='BAR')
+    ds.run("echo a >foo")
+    ds.run(["touch", "bar"], message='BAR')
     bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")
@@ -548,7 +578,7 @@ def test_rerun_script(path):
     ok_exists(script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("echo b >bar\n", lines)
+        assert_in("touch bar\n", lines)
         # The commit message is there too.
         assert_in("# BAR\n", lines)
         assert_in("# (record: {})\n".format(bar_hexsha), lines)
@@ -557,13 +587,15 @@ def test_rerun_script(path):
     ds.rerun(since="", script=script_file)
     with open(script_file) as sf:
         lines = sf.readlines()
-        assert_in("echo b >bar\n", lines)
+        assert_in("touch bar\n", lines)
+        # Automatic commit messages aren't included.
+        assert_not_in("# echo a >foo\n", lines)
         assert_in("echo a >foo\n", lines)
 
     # --script=- writes to stdout.
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-")
-        assert_in("echo b >bar",
+        assert_in("touch bar",
                   cmout.getvalue().splitlines())
 
 

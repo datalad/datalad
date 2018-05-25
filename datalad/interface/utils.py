@@ -484,6 +484,12 @@ def _process_results(
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
             continue
+
+        if PY2:
+            for k, v in res.items():
+                if isinstance(v, unicode):
+                    res[k] = v.encode('utf-8')
+
         actsum = action_summary.get(res['action'], {})
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
@@ -562,6 +568,12 @@ def _process_results(
                          res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
+
+        if PY2:
+            for k, v in res.items():
+                if isinstance(v, str):
+                    res[k] = v.decode('utf-8')
+
         if result_xfm:
             res = result_xfm(res)
             if res is None:

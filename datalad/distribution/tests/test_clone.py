@@ -17,7 +17,7 @@ from datalad.tests.utils import (
     slow
 )
 
-
+import os
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -25,7 +25,6 @@ from os.path import basename
 from os.path import dirname
 from os import mkdir
 from os import chmod
-from os import geteuid
 
 from mock import patch
 
@@ -33,7 +32,7 @@ from datalad.api import create
 from datalad.api import clone
 from datalad.utils import chpwd
 from datalad.utils import _path_
-from datalad.utils import rmtree
+from datalad.utils import on_windows
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -58,7 +57,6 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_if
 
 from ..dataset import Dataset
@@ -333,8 +331,7 @@ def test_clone_isnt_a_smartass(origin_path, path):
     eq_(cloned.subdatasets(), [])
 
 
-@skip_if_on_windows
-@skip_if(not geteuid(), "Will fail under super-user")
+@skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
     pdir = _path_(tdir, 'protected')

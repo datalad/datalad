@@ -58,8 +58,7 @@ from ..utils import generate_chunks
 from ..utils import disable_logger
 from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
-
-
+from ..utils import map_items
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -1091,3 +1090,22 @@ def test_get_open_files(p):
         # will not contain symlinks, we better realpath them
         # all before comparison
         eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+
+
+def test_map_items():
+    def add10(x):
+        return x + 10
+    eq_(map_items(add10, {2: 3}), {12: 13})
+
+    class Custom(object):
+        """For testing with custom items possibly of varying length etc"""
+        def __init__(self, items):
+            self._items = list(items)
+
+        def items(self):
+            return self._items
+
+    c = Custom([(1,), (2, 3), (4, 5, 6)])
+    c_mapped = map_items(add10, c)
+    assert type(c) is type(c_mapped)
+    eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
