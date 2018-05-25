@@ -34,13 +34,10 @@ from .log import lgr
 import atexit
 from datalad.utils import on_windows, get_encoding_info, get_envvars_info
 
-if not on_windows:
-    lgr.log(5, "Instantiating ssh manager")
-    from .support.sshconnector import SSHManager
-    ssh_manager = SSHManager()
-    atexit.register(ssh_manager.close, allow_fail=False)
-else:
-    ssh_manager = None
+lgr.log(5, "Instantiating ssh manager")
+from .support.sshconnector import SSHManager
+ssh_manager = SSHManager()
+atexit.register(ssh_manager.close, allow_fail=False)
 
 try:
     # this will fix the rendering of ANSI escape sequences
