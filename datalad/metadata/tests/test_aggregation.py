@@ -26,6 +26,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import skip_if_on_windows
 
 
 def _assert_metadata_empty(meta):
@@ -179,6 +180,7 @@ def test_reaggregate_with_unavailable_objects(path):
 
 
 # this is for gh-1987
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree=_dataset_hierarchy_template)
 @skip_direct_mode  #FIXME

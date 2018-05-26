@@ -612,11 +612,6 @@ def test_setup():
 
 
 def test_skip_ssh():
-    # no ssh testing on Windows ATM
-    with patch.object(utils, 'on_windows', return_value=True):
-        with assert_raises(SkipTest):
-            skip_ssh(lambda: False)()
-
     with patch_config({'datalad.tests.ssh': False}):
         with assert_raises(SkipTest):
             skip_ssh(lambda: False)()

@@ -32,6 +32,7 @@ from datalad.api import install
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
+from datalad.utils import on_windows
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -63,6 +64,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import put_file_under_git
 from datalad.tests.utils import integration
 from datalad.tests.utils import slow
@@ -859,8 +861,13 @@ def test_install_subds_with_space(opath, tpath):
     ds.create('sub ds')
     # works even now, boring
     # install(tpath, source=opath, recursive=True)
-    # do via ssh!
-    install(tpath, source="localhost:" + opath, recursive=True)
+    if on_windows:
+        # on windows we cannot simply prepend localhost: to a path
+        # and get a working sshurl...
+        install(tpath, source=opath, recursive=True)
+    else:
+        # do via ssh!
+        install(tpath, source="localhost:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
@@ -879,11 +886,13 @@ def test_install_from_tilda(opath, tpath):
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @usecase
 @with_tempfile(mkdir=True)
 def test_install_subds_from_another_remote(topdir):
     # https://github.com/datalad/datalad/issues/1905
+    from datalad.support.network import PathRI
     with chpwd(topdir):
         origin_ = 'origin'
         clone1_ = 'clone1'
@@ -892,7 +901,7 @@ def test_install_subds_from_another_remote(topdir):
         origin = create(origin_, no_annex=True)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
-        clone1.create_sibling('ssh://localhost%s/%s' % (getpwd(), clone2_), name=clone2_)
+        clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
 
         # print("Creating clone2")
         clone1.publish(to=clone2_)

@@ -337,7 +337,8 @@ def rmtemp(f, *args, **kwargs):
             # WindowsError is not known on Linux, and if IOError
             # or any other exception is thrown then if except
             # statement has WindowsError in it -- NameError
-            exceptions = (OSError, WindowsError) if on_windows else OSError
+            # also see gh-2533
+            exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
             for i in range(50):
                 try:
                     os.unlink(f)

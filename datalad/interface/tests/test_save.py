@@ -22,7 +22,7 @@ from datalad.utils import chpwd
 from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.exceptions import DeprecatedError, IncompleteResultsError
+from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
 from datalad.api import create
@@ -39,6 +39,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import skip_v6
+from datalad.tests.utils import skip_if_on_windows
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -334,6 +335,7 @@ def test_subdataset_save(path):
     ok_clean_git(parent.path, untracked=['untracked'])
 
 
+@skip_if_on_windows  # gh-2536
 @with_tempfile(mkdir=True)
 def test_symlinked_relpath(path):
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
