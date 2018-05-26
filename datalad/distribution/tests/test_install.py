@@ -32,6 +32,7 @@ from datalad.api import install
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
+from datalad.utils import on_windows
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -860,8 +861,13 @@ def test_install_subds_with_space(opath, tpath):
     ds.create('sub ds')
     # works even now, boring
     # install(tpath, source=opath, recursive=True)
-    # do via ssh!
-    install(tpath, source="localhost:" + opath, recursive=True)
+    if on_windows:
+        # on windows we cannot simply prepend localhost: to a path
+        # and get a working sshurl...
+        install(tpath, source=opath, recursive=True)
+    else:
+        # do via ssh!
+        install(tpath, source="localhost:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
