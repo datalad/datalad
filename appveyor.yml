@@ -39,6 +39,8 @@ install:
   # ATM datalad does not pull in colorama, which is needed for color output
   # on windows
   - pip install colorama
+  - git config --global user.email "test@appveyor.land"
+  - git config --global user.name "Appveyor Almighty"
 
 test_script:
   # establish baseline, if annex doesn't work, we are not even trying
