@@ -24,6 +24,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_is_instance
+from datalad.tests.utils import skip_if_on_windows
 
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
@@ -63,6 +64,7 @@ def test_ssh_get_connection():
     manager.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
@@ -99,6 +101,7 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path) == existed_before)
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_manager_close():
 
@@ -155,6 +158,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
+@skip_if_on_windows  # our test setup has no `scp` command
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
@@ -197,6 +201,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     ssh.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
@@ -205,6 +210,7 @@ def test_ssh_compound_cmds():
     ssh.close()  # so we get rid of the possibly lingering connections
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_git_props():
     remote_url = 'ssh://localhost'
