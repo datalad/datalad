@@ -63,6 +63,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import put_file_under_git
 from datalad.tests.utils import integration
 from datalad.tests.utils import slow
@@ -879,6 +880,7 @@ def test_install_from_tilda(opath, tpath):
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @usecase
 @with_tempfile(mkdir=True)
