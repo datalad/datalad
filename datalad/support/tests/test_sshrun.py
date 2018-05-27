@@ -16,6 +16,7 @@ from mock import patch
 from datalad.api import sshrun
 from datalad.cmd import Runner
 from datalad.cmdline.main import main
+from datalad.utils import on_windows
 
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh
@@ -42,11 +43,15 @@ def test_exit_code():
 @with_tempfile(content="123magic")
 def test_no_stdin_swallow(fname):
     # will relay actual exit code on CommandError
-    cmd = ['datalad', 'sshrun', 'localhost', 'cat']
+    cmd = ['datalad', 'sshrun', 'localhost']
+    cmd.append('type' if on_windows else 'cat')
 
     out, err = Runner().run(cmd, stdin=open(fname))
     assert_equal(out.rstrip(), '123magic')
 
+    if on_windows:
+        # type has no -n flag
+        return
     # test with -n switch now, which we could place even at the end
     out, err = Runner().run(cmd + ['-n'], stdin=open(fname))
     assert_equal(out, '')
