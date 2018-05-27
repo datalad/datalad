@@ -27,6 +27,23 @@ install:
   - "conda create -q -n test-environment python=%PYTHON_VERSION%"
   - activate test-environment
   - mkdir resources
+  # OpenSSH server setup
+  - appveyor DownloadFile https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.6.1.0p1-Beta/OpenSSH-Win32.zip -FileName resources\openssh.zip
+  - 7z x -o"resources" resources\openssh.zip
+  # install
+  - powershell.exe -ExecutionPolicy Bypass -File resources\OpenSSH-Win32\install-sshd.ps1
+  # configure service
+  - powershell.exe New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+  # keys in default place
+  - ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
+  # authorize access with these keys
+  - copy C:\Users\appveyor\.ssh\id_rsa.pub c:\Users\appveyor\.ssh\authorized_keys
+  - copy tools\ci\appveyor_ssh_config c:\Users\appveyor\.ssh\config
+  # fire up service
+  - net start sshd
+  # test login
+  - ssh -v localhost exit
+  # git annex setup
   - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
   # extract git annex into the system Git installation path
   - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
@@ -46,7 +63,7 @@ test_script:
   # establish baseline, if annex doesn't work, we are not even trying
   #- git annex test
   # run tests on installed module, not source tree files
-  - mkdir -p __testhome__
+  - mkdir __testhome__
   - cd __testhome__
   # report basic info
   - git version

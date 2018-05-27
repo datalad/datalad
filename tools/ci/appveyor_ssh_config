@@ -1,0 +1,2 @@
+Host localhost
+	StrictHostKeyChecking no
