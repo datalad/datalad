@@ -30,6 +30,7 @@ from .utils import lgr
 from ..utils import assure_unicode
 
 from .utils import local_testrepo_flavors
+from datalad.tests.utils import skip_if_on_windows
 
 
 @ignore_nose_capturing_stdout
@@ -221,6 +222,7 @@ def check_runner_heavy_output(log_online):
         assert not ret[0], "all messages went into `logged`"
 
 
+@skip_if_on_windows  # much too slow to finish in any reaosnable time on windows
 def test_runner_heavy_output():
     for log_online in [False, True]:
         yield check_runner_heavy_output, log_online

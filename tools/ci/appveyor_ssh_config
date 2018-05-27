@@ -1,0 +1,5 @@
+Host localhost
+	StrictHostKeyChecking no
+
+Host datalad-test
+	StrictHostKeyChecking no
