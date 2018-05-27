@@ -27,6 +27,9 @@ install:
   - "conda create -q -n test-environment python=%PYTHON_VERSION%"
   - activate test-environment
   - mkdir resources
+  # define test host alias
+  - echo. >> %SYSTEMROOT%\System32\drivers\etc\hosts
+  - echo.127.0.0.1  datalad-test >> %SYSTEMROOT%\System32\drivers\etc\hosts
   # OpenSSH server setup
   - appveyor DownloadFile https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.6.1.0p1-Beta/OpenSSH-Win32.zip -FileName resources\openssh.zip
   - 7z x -o"resources" resources\openssh.zip
@@ -43,6 +46,7 @@ install:
   - net start sshd
   # test login
   - ssh -v localhost exit
+  - ssh datalad-test exit
   # git annex setup
   - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
   # extract git annex into the system Git installation path
