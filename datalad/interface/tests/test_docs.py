@@ -34,6 +34,16 @@ demo_doc = """\
     << REFLOW ||
     << CMDLINE ||
 
+    || REFLOW >>
+    a
+    b
+    << REFLOW ||
+    not
+       reflowed
+    || REFLOW >>
+    c
+    << REFLOW ||
+
     || PYTHON >>
 
     || REFLOW >>
@@ -86,6 +96,8 @@ def test_alter_interface_docs_for_api():
     assert_not_in('CMD', alt)
     assert_not_in('PY', alt)
     assert_not_in('REFLOW', alt)
+    assert_in('a b', alt)
+    assert_in('not\n   reflowed', alt)
     assert_in("Some Python-only bits Multiline!", alt)
 
     altpd = alter_interface_docs_for_api(demo_paramdoc)
@@ -104,6 +116,8 @@ def test_alter_interface_docs_for_cmdline():
     assert_not_in('PY', alt)
     assert_not_in('CMD', alt)
     assert_not_in('REFLOW', alt)
+    assert_in('a b', alt)
+    assert_in('not\n   reflowed', alt)
     assert_in("Something for the cmdline only Multiline!", alt)
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
