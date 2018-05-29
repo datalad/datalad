@@ -235,6 +235,19 @@ class GlobbedPaths(object):
         return self._maybe_dot + self._paths["patterns"]
 
 
+def _unlock_or_remove(dset, paths):
+    for res in dset.unlock(paths, on_failure="ignore"):
+        if res["status"] == "impossible":
+            if "no content" in res["message"]:
+                for rem_res in dset.remove(res["path"],
+                                           check=False, save=False):
+                    yield rem_res
+                continue
+            elif "path does not exist" in res["message"]:
+                continue
+        yield res
+
+
 def get_command_pwds(dataset):
     """Return the directory for the command.
 
@@ -305,15 +318,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                            expand=expand in ["outputs", "both"],
                            warn=not rerun_info)
     if outputs:
-        for res in ds.unlock(outputs.expand(full=True), on_failure="ignore"):
-            if res["status"] == "impossible":
-                if "no content" in res["message"]:
-                    for rem_res in ds.remove(res["path"],
-                                             check=False, save=False):
-                        yield rem_res
-                    continue
-                elif "path does not exist" in res["message"]:
-                    continue
+        for res in _unlock_or_remove(ds, outputs.expand(full=True)):
             yield res
 
     # anticipate quoted compound shell commands
