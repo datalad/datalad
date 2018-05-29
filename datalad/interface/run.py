@@ -40,6 +40,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
+from datalad.utils import assure_bytes
 from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
@@ -324,7 +325,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
         json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False))
-    msg = msg.encode("utf-8")
+    msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:
         msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
