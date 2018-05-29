@@ -314,9 +314,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
 
     # compose commit message
-    msg = u'[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
+    msg = u"""\
+[DATALAD RUNCMD] {}
+
+=== Do not change lines below ===
+{}
+^^^ Do not change lines above ^^^
+"""
+    msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)).encode("utf-8")
+        json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False))
+    msg = msg.encode("utf-8")
 
     if not rerun_info and cmd_exitcode:
         msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
