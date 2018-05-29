@@ -48,6 +48,7 @@ from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
 from datalad.utils import partition
+from datalad.utils import SequenceFormatter
 
 lgr = logging.getLogger('datalad.interface.run')
 
@@ -75,6 +76,18 @@ class Run(Interface):
 
     If the given command errors, a `CommandError` exception with the same exit
     code will be raised, and no modifications will be saved.
+
+    *Command format*
+
+
+    || REFLOW >>
+    The command supports using placeholders "{inputs}" and "{outputs}" for the
+    values specified by [CMD: --input and --output CMD][PY: `inputs` and
+    `outputs` PY]. If multiple values are specified, the values will be joined
+    by a space. The order of the values will match that order from the command
+    line, with any globs expanded in alphabetical order (like bash). Individual
+    values can be accessed with an integer index (e.g., "{inputs[0]}").
+    << REFLOW ||
     """
     _params_ = dict(
         cmd=Parameter(
@@ -328,14 +341,21 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         else:
             cmd = " ".join(shlex_quote(c) for c in cmd)
 
+    # It's OK if these are false positives; at the worst, we do some
+    # unnecessary work.
+    inputs_placeholder = "{inputs" in cmd
+    outputs_placeholder = "{outputs" in cmd
+
     inputs = GlobbedPaths(inputs, pwd=pwd,
-                          expand=expand in ["inputs", "both"])
+                          expand=expand in ["inputs", "both"],
+                          sort=inputs_placeholder)
     if inputs:
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
             yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"],
+                           sort=outputs_placeholder,
                            warn=not rerun_info)
     if outputs:
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
@@ -349,6 +369,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
+    if inputs_placeholder or outputs_placeholder:
+        sfmt = SequenceFormatter()
+        cmd_expanded = sfmt.format(cmd,
+                                   inputs=inputs.expand(dot=False),
+                                   outputs=outputs.expand(dot=False))
+    else:
+        cmd_expanded = cmd
+
     # TODO do our best to guess which files to unlock based on the command string
     #      in many cases this will be impossible (but see rerun). however,
     #      generating new data (common case) will be just fine already
@@ -360,7 +388,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
-            cmd,
+            cmd_expanded,
             # immediate output
             log_online=True,
             # not yet sure what we should do with the command output

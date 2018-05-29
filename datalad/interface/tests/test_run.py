@@ -44,6 +44,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_exists
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
@@ -740,6 +741,28 @@ def test_run_inputs_no_annex_repo(path):
     ds.run("touch dummy", inputs=["*"])
     ok_exists(opj(ds.path, "dummy"))
     ds.rerun()
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@known_failure_v6  #FIXME
+@with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c"})
+def test_placeholders(path):
+    ds = Dataset(path).create(force=True)
+    ds.add(".")
+    ds.run("echo {inputs} >{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
+    ok_file_has_content(opj(path, "c.out"), "a.in b.in\n")
+
+    hexsha_before = ds.repo.get_hexsha()
+    ds.rerun()
+    eq_(hexsha_before, ds.repo.get_hexsha())
+
+    ds.run("echo {inputs[0]} >getitem", inputs=["*.in"])
+    ok_file_has_content(opj(path, "getitem"), "a.in\n")
+
+    # Double brackets can be used to escape placeholders.
+    ds.run("touch {{inputs}}", inputs=["*.in"])
+    ok_exists(opj(path, "{inputs}"))
 
 
 @with_tree(tree={"1.txt": "",
