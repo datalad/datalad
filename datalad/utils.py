@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import string
 import wrapt
 
 from copy import copy as shallow_copy
@@ -1694,3 +1695,38 @@ def get_envvars_info():
         ):
             envs.append((var, val))
     return OrderedDict(envs)
+
+
+# This class is modified from Snakemake (v5.1.4)
+class SequenceFormatter(string.Formatter):
+    """string.Formatter subclass with special behavior for sequences.
+
+    This class delegates formatting of individual elements to another
+    formatter object. Non-list objects are formatted by calling the
+    delegate formatter's "format_field" method. List-like objects
+    (list, tuple, set, frozenset) are formatted by formatting each
+    element of the list according to the specified format spec using
+    the delegate formatter and then joining the resulting strings with
+    a separator (space by default).
+    """
+
+    def __init__(self, separator=" ", element_formatter=string.Formatter(),
+                 *args, **kwargs):
+        self.separator = separator
+        self.element_formatter = element_formatter
+
+    def format_element(self, elem, format_spec):
+        """Format a single element
+
+        For sequences, this is called once for each element in a
+        sequence. For anything else, it is called on the entire
+        object. It is intended to be overridden in subclases.
+        """
+        return self.element_formatter.format_field(elem, format_spec)
+
+    def format_field(self, value, format_spec):
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return self.separator.join(self.format_element(v, format_spec)
+                                       for v in value)
+        else:
+            return self.format_element(value, format_spec)
