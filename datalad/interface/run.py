@@ -279,7 +279,7 @@ def get_command_pwds(dataset):
 
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, rerun_info=None):
+                message=None, rerun_info=None, rerun_outputs=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -319,6 +319,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                            warn=not rerun_info)
     if outputs:
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
+            yield res
+
+    if rerun_outputs is not None:
+        # These are files we need to unlock/remove for a rerun that aren't
+        # included in the explicit outputs. Unlike inputs/outputs, these are
+        # full paths, so we can pass them directly to unlock.
+        assert all(map(isabs, rerun_outputs))
+        for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
     # anticipate quoted compound shell commands
@@ -372,9 +380,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
-        # Get outputs from the rerun_info because rerun adds new/modified files
-        # to the outputs argument.
-        'outputs': rerun_info["outputs"] if rerun_info else outputs.paths,
+        'outputs': outputs.paths,
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
