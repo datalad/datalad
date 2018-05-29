@@ -102,6 +102,10 @@ def test_basics(path, nodspath):
         res = ds.run('touch empty', message='NOOP_TEST')
         assert_status('notneeded', res)
         eq_(last_state, ds.repo.get_hexsha())
+        # We can also run the command via a single-item list because this is
+        # what the CLI interface passes in for quoted commands.
+        res = ds.run(['touch empty'], message='NOOP_TEST')
+        assert_status('notneeded', res)
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \

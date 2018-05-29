@@ -22,6 +22,8 @@ from os.path import normpath
 from os.path import relpath
 from os.path import isabs
 
+from six.moves import shlex_quote
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -329,8 +331,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    # anticipate quoted compound shell commands
-    cmd = cmd[0] if isinstance(cmd, list) and len(cmd) == 1 else cmd
+    if isinstance(cmd, list):
+        if len(cmd) == 1:
+            # This is either a quoted compound shell command or a simple
+            # one-item command. Pass it as is.
+            cmd = cmd[0]
+        else:
+            cmd = " ".join(shlex_quote(c) for c in cmd)
 
     # TODO do our best to guess which files to unlock based on the command string
     #      in many cases this will be impossible (but see rerun). however,
