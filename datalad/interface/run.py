@@ -314,13 +314,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
 
     # compose commit message
-    msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
+    msg = u'[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        json.dumps(run_info, indent=1), sort_keys=True, ensure_ascii=False, encoding='utf-8')
+        json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)).encode("utf-8")
 
     if not rerun_info and cmd_exitcode:
         msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
-        with open(msg_path, "w") as ofh:
+        with open(msg_path, "wb") as ofh:
             ofh.write(msg)
         lgr.info("The command had a non-zero exit code. "
                  "If this is expected, you can save the changes with "
