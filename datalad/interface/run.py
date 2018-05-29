@@ -310,6 +310,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      'cannot detect changes by command'))
         return
 
+    if isinstance(cmd, list):
+        if len(cmd) == 1:
+            # This is either a quoted compound shell command or a simple
+            # one-item command. Pass it as is.
+            cmd = cmd[0]
+        else:
+            cmd = " ".join(shlex_quote(c) for c in cmd)
+
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
     if inputs:
@@ -330,14 +338,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         assert all(map(isabs, rerun_outputs))
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
-
-    if isinstance(cmd, list):
-        if len(cmd) == 1:
-            # This is either a quoted compound shell command or a simple
-            # one-item command. Pass it as is.
-            cmd = cmd[0]
-        else:
-            cmd = " ".join(shlex_quote(c) for c in cmd)
 
     # TODO do our best to guess which files to unlock based on the command string
     #      in many cases this will be impossible (but see rerun). however,
