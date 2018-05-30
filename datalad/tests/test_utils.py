@@ -1085,11 +1085,21 @@ def test_dlabspath(path):
 def test_get_open_files(p):
     eq_(get_open_files(p), {})
     f1 = opj(p, '1')
+    subd = opj(p, 'd')
     with open(f1) as f:
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
         # all before comparison
         eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+
+    assert not get_open_files(subd)
+    # if we start a process within that directory, should get informed
+    from subprocess import Popen
+    proc = Popen(['cat'], cwd=subd)
+    eq_(get_open_files(p), {op.realpath(subd): proc.pid})
+    eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
+    proc.terminate()
+    assert not get_open_files(subd)
 
 
 def test_map_items():

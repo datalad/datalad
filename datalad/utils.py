@@ -324,6 +324,7 @@ def rmdir(path, *args, **kwargs):
     assert_no_open_files(path)
     os.rmdir(path)
 
+
 def get_open_files(path, log_open=False):
     """Get open files under a path
 
