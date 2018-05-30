@@ -34,6 +34,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
+from datalad.interface.run import GlobbedPaths
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
 from datalad.tests.utils import assert_raises
@@ -635,7 +636,7 @@ def test_run_inputs_outputs(path):
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["*.not-an-extension"])
-        assert_in("No matching files found for *.not-an-extension",
+        assert_in("No matching files found for '*.not-an-extension'",
                   cml.out)
 
     # Test different combinations of globs and explicit files.
@@ -707,7 +708,7 @@ def test_run_inputs_outputs(path):
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("echo blah", outputs=["*.not-an-extension"])
-        assert_in("No matching files found for *.not-an-extension",
+        assert_in("No matching files found for '*.not-an-extension'",
                   cml.out)
 
     ds.create('sub')
@@ -735,6 +736,42 @@ def test_run_inputs_no_annex_repo(path):
     ds.run("touch dummy", inputs=["*"])
     ok_exists(opj(ds.path, "dummy"))
     ds.rerun()
+
+
+@with_tree(tree={"1.txt": "",
+                 "2.dat": "",
+                 "3.txt": ""})
+def test_globbedpaths(path):
+    for patterns, expected in [
+            (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
+            (["*.txt"], {"1.txt", "3.txt"})]:
+        gp = GlobbedPaths(patterns, pwd=path)
+        eq_(set(gp.expand()), expected)
+        eq_(set(gp.expand(full=True)),
+            {opj(path, p) for p in expected})
+
+    # Full patterns still get returned as relative to pwd.
+    gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
+    eq_(gp.expand(), ["2.dat"])
+
+    # "." gets special treatment.
+    gp = GlobbedPaths([".", "*.dat"], pwd=path)
+    eq_(set(gp.expand()), {"2.dat", "."})
+    gp = GlobbedPaths(["."], pwd=path, expand=False)
+    eq_(gp.expand(), ["."])
+    eq_(gp.paths, ["."])
+
+    # glob expansion for paths property is determined by expand argument.
+    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
+        gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
+        eq_(gp.paths, expected)
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        GlobbedPaths(["not here"], pwd=path).expand()
+        assert_in("No matching files found for 'not here'", cml.out)
+        GlobbedPaths(["also not"], pwd=path, warn=False).expand()
+        assert_not_in("No matching files found for 'also not'", cml.out)
 
 
 def test_rerun_commit_message_check():
