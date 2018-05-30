@@ -341,28 +341,24 @@ def get_open_files(path, log_open=False):
       path : pid
 
     """
-    from .cmd import Runner
-    runner = Runner()
-    # The beast exits with 1 if no open files, so we need to just ignore
-    # "failed" run I guess if err is empty
-    from .support.exceptions import CommandError
-    try:
-        out, err = runner.run(
-            ['lsof', '-Fn', '+D', path],
-            log_stderr='offline',
-        )
-    except CommandError as exc:
-        out, err = exc.stdout, exc.stderr
-        if err:
-            raise
-    pid = None
+    # Original idea: https://stackoverflow.com/a/11115521/1265472
+    import psutil
     files = {}
-    for l in out.splitlines():
-        marker, content = l[0], l[1:]
-        if marker == 'p':
-            pid = int(content)
-        elif marker == 'n':
-            files[content] = pid
+    for proc in psutil.process_iter():
+        try:
+            open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
+            for p in open_paths:
+                # note: could be done more efficiently so we do not
+                # renormalize path over and over again etc
+                if path_startswith(p, path):
+                    files[p] = proc.pid
+        # Catch a race condition where a process ends
+        # before we can examine its files
+        except psutil.NoSuchProcess:
+            pass
+        except psutil.AccessDenied:
+            pass
+
     if files and log_open:
         lgr.log(log_open, "Open files under %s: %s", path, files)
     return files
