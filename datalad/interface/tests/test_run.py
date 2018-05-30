@@ -668,6 +668,12 @@ def test_run_inputs_outputs(path):
     ds.run("touch subdir-dummy", inputs=[opj(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(opj("subdir", f)) for f in ["a", "b"]))
 
+    # Inputs are specified relative the a dataset's subdirectory.
+    ds.repo.drop(opj("subdir", "a"), options=["--force"])
+    with chpwd(opj(path, "subdir")):
+        run("touch subdir-dummy1", inputs=["a"])
+    ok_(ds.repo.file_has_content(opj("subdir", "a")))
+
     # --input=. runs "datalad get ."
     ds.run("touch dot-dummy", inputs=["."])
     eq_(ds.repo.get_annexed_files(),

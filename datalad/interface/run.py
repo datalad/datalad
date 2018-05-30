@@ -226,12 +226,26 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      'cannot detect changes by command'))
         return
 
+    def get_abspaths(pwd_paths):
+        """Get absolute paths of inputs and outputs.
+
+        These are relative the commands working directory. Make them absolute
+        so that get/unlock can those that are relative to a dataset
+        subdirectory.
+        """
+        if pwd_paths[0] == ["."]:
+            maybe_dot = ["."]
+            pwd_paths = pwd_paths[1:]
+        else:
+            maybe_dot = []
+        return maybe_dot + [opj(ds.path, rel_pwd, p) for p in pwd_paths]
+
     if inputs is None:
         inputs = []
     elif inputs:
         inputs_expanded = _expand_globs(inputs, pwd)
         if inputs_expanded:
-            for res in ds.get(inputs_expanded, on_failure="ignore"):
+            for res in ds.get(get_abspaths(inputs_expanded), on_failure="ignore"):
                 yield res
             if expand in ["inputs", "both"]:
                 inputs = inputs_expanded
@@ -241,7 +255,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     elif outputs:
         outputs_expanded = _expand_globs(outputs, pwd, warn=not rerun_info)
         if outputs_expanded:
-            for res in ds.unlock(outputs_expanded, on_failure="ignore"):
+            for res in ds.unlock(get_abspaths(outputs_expanded),
+                                 on_failure="ignore"):
                 if res["status"] == "impossible":
                     if "no content" in res["message"]:
                         for rem_res in ds.remove(res["path"],
