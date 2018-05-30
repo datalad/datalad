@@ -468,7 +468,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        record_id if sidecar else record)
+        '"{}"'.format(record_id) if sidecar else record)
     msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:
