@@ -303,11 +303,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': [relpath(p, start=ds.path) if isabs(p) else p for p in inputs],
+        'inputs': [relpath(p, start=pwd) if isabs(p) else p for p in inputs],
         # Get outputs from the rerun_info because rerun adds new/modified files
         # to the outputs argument.
         'outputs': rerun_info["outputs"]
-        if rerun_info else [relpath(p, start=ds.path) if isabs(p) else p for p in outputs]
+        if rerun_info else [relpath(p, start=pwd) if isabs(p) else p for p in outputs]
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
