@@ -20,6 +20,7 @@ from os.path import join as opj
 from os.path import curdir
 from os.path import normpath
 from os.path import relpath
+from os.path import isabs
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -303,10 +304,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': inputs,
+        'inputs': [relpath(p, start=pwd) if isabs(p) else p for p in inputs],
         # Get outputs from the rerun_info because rerun adds new/modified files
         # to the outputs argument.
-        'outputs': rerun_info["outputs"] if rerun_info else outputs
+        'outputs': rerun_info["outputs"]
+        if rerun_info else [relpath(p, start=pwd) if isabs(p) else p for p in outputs]
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information

@@ -715,6 +715,10 @@ def test_run_inputs_outputs(path):
     assert_in("a.dat", ds.repo.repo.head.commit.message)
     assert_in("b.dat", ds.repo.repo.head.commit.message)
 
+    res = ds.rerun(report=True, return_type='item-or-list')
+    eq_(res["run_info"]['inputs'], ["a.dat"])
+    eq_(res["run_info"]['outputs'], ["b.dat"])
+
 
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
