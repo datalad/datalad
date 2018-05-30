@@ -51,10 +51,14 @@ Package: datalad
 Architecture: all
 Section: science
 Depends:
- python-datalad (= ${binary:Version}),
- python-argcomplete,
+ python3-datalad (= ${binary:Version}),
+ python3-argcomplete,
  ${misc:Depends},
  ${python:Depends}
+Suggests:
+ datalad-containers,
+ datalad-crawler,
+ datalad-neuroimaging,
 Description: data files management and distribution platform
  DataLad is a data management and distribution platform providing
  access to a wide range of data resources already available online.
@@ -73,6 +77,33 @@ Description: data files management and distribution platform
  .
  This package provides the command line tools.  Install without
  Recommends if you need only core functionality.
+
+Package: datalad-complete
+Architecture: all
+Section: science
+Depends:
+ datalad (= ${binary:Version}),
+ datalad-containers,
+ datalad-crawler,
+ datalad-neuroimaging,
+Description: data files management and distribution platform
+ DataLad is a data management and distribution platform providing
+ access to a wide range of data resources already available online.
+ Using git-annex as its backend for data logistics it provides following
+ facilities built-in or available through additional extensions
+ .
+  - command line and Python interfaces for manipulation of collections of
+    datasets (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get)
+  - extract, aggregate, and search through various sources of metadata
+    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
+    support)
+  - crawl web sites to automatically prepare and update git-annex
+    repositories with content from online websites, S3, etc (install
+    datalad-crawler)
+ .
+ This meta-package provides the most complete installation of DataLad
+ and its extensions.
 
 Package: python-datalad
 Architecture: all
@@ -117,6 +148,69 @@ Recommends:
 Suggests:
  python-bs4,
  python-numpy,
+Description: data files management and distribution platform
+ DataLad is a data management and distribution platform providing
+ access to a wide range of data resources already available online.
+ Using git-annex as its backend for data logistics it provides following
+ facilities built-in or available through additional extensions
+ .
+  - command line and Python interfaces for manipulation of collections of
+    datasets (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get)
+  - extract, aggregate, and search through various sources of metadata
+    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
+    support)
+  - crawl web sites to automatically prepare and update git-annex
+    repositories with content from online websites, S3, etc (install
+    datalad-crawler)
+ .
+ This package installs the module for Python 2, and Recommends install
+ all dependencies necessary for searching and managing datasets, publishing,
+ and testing.  If you need base functionality, install without Recommends.
+
+Package: python3-datalad
+Architecture: all
+Section: python
+Provides: ${python3:Provides}
+Depends:
+ git-annex (>= 6.20180509~) | git-annex-standalone (>= 6.20180509~),
+ patool,
+ python3-appdirs,
+ python3-fasteners,
+ python3-git (>= 2.1.6~),
+ python3-github,
+ python3-humanize,
+ python3-iso8601,
+ python3-keyrings.alt | python3-keyring (<=8),
+ python3-secretstorage | python3-keyring (<<9.2),
+ python3-keyring,
+ python3-mock,
+ python3-msgpack,
+ python3-pil,
+ python3-requests,
+ python3-simplejson,
+ python3-six (>= 1.8.0~),
+ python3-tqdm,
+ python3-wrapt,
+ ${misc:Depends},
+ ${python3:Depends}
+Recommends:
+ python3-duecredit,
+ python3-exif,
+ python3-jsmin,
+ python3-html5lib,
+ python3-httpretty,
+ python3-libxmp,
+ python3-lzma,
+ python3-mutagen,
+ python3-nose,
+ python3-pyperclip,
+ python3-requests-ftp,
+ python3-vcr,
+ python3-whoosh,
+Suggests:
+ python3-bs4,
+ python3-numpy,
  datalad-containers,
  datalad-crawler,
  datalad-neuroimaging,
