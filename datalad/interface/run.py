@@ -18,9 +18,9 @@ from argparse import REMAINDER
 from glob import glob
 from os.path import join as opj
 from os.path import curdir
-from os.path import isdir
 from os.path import normpath
 from os.path import relpath
+from os.path import isabs
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -28,7 +28,6 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
@@ -42,6 +41,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
+from datalad.utils import assure_bytes
 from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
@@ -194,6 +194,7 @@ def get_command_pwds(dataset):
                            # deal with it or crash to checks below
     return pwd, rel_pwd
 
+
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=None, rerun_info=None):
@@ -303,23 +304,34 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'cmd': cmd,
         'exit': cmd_exitcode if cmd_exitcode is not None else 0,
         'chain': rerun_info["chain"] if rerun_info else [],
-        'inputs': inputs,
+        'inputs': [relpath(p, start=pwd) if isabs(p) else p for p in inputs],
         # Get outputs from the rerun_info because rerun adds new/modified files
         # to the outputs argument.
-        'outputs': rerun_info["outputs"] if rerun_info else outputs
+        'outputs': rerun_info["outputs"]
+        if rerun_info else [relpath(p, start=pwd) if isabs(p) else p for p in outputs]
     }
     if rel_pwd is not None:
         # only when inside the dataset to not leak information
         run_info['pwd'] = rel_pwd
+    if ds.id:
+        run_info["dsid"] = ds.id
 
     # compose commit message
-    msg = '[DATALAD RUNCMD] {}\n\n=== Do not change lines below ===\n{}\n^^^ Do not change lines above ^^^'.format(
+    msg = u"""\
+[DATALAD RUNCMD] {}
+
+=== Do not change lines below ===
+{}
+^^^ Do not change lines above ^^^
+"""
+    msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        json.dumps(run_info, indent=1), sort_keys=True, ensure_ascii=False, encoding='utf-8')
+        json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False))
+    msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:
         msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
-        with open(msg_path, "w") as ofh:
+        with open(msg_path, "wb") as ofh:
             ofh.write(msg)
         lgr.info("The command had a non-zero exit code. "
                  "If this is expected, you can save the changes with "

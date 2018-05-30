@@ -63,6 +63,11 @@ def resolve_path(path, ds=None):
     -------
     Absolute path
     """
+    # first make sure it's actually a valid path:
+    from datalad.support.network import PathRI
+    if not isinstance(RI(path), PathRI):
+        raise ValueError("%s is not a valid path" % path)
+
     path = expandpath(path, force_absolute=False)
     if is_explicit_path(path):
         # normalize path consistently between two (explicit and implicit) cases

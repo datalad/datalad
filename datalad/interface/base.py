@@ -99,7 +99,7 @@ def alter_interface_docs_for_api(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| CMDLINE \>\>.*\<\< CMDLINE \|\|',
+        '\|\| CMDLINE \>\>.*?\<\< CMDLINE \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -115,12 +115,12 @@ def alter_interface_docs_for_api(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| PYTHON \>\>(.*)\<\< PYTHON \|\|',
+        '\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -136,7 +136,7 @@ def alter_interface_docs_for_cmdline(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| PYTHON \>\>.*\<\< PYTHON \|\|',
+        '\|\| PYTHON \>\>.*?\<\< PYTHON \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -152,7 +152,7 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| CMDLINE \>\>(.*)\<\< CMDLINE \|\|',
+        '\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -188,7 +188,7 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -317,8 +317,7 @@ class Interface(object):
 
     _OLDSTYLE_COMMANDS = (
         'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-        'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move', 'SSHRun',
-        'Test')
+        'CreateTestDataset', 'Export', 'Ls', 'Move', 'SSHRun', 'Test')
 
     @classmethod
     def setup_parser(cls, parser):

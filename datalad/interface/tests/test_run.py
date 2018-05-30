@@ -143,6 +143,14 @@ def test_rerun(path, nodspath):
     # ran twice now
     eq_('xx\n', open(probe_path).read())
 
+    # Rerunning from a subdataset skips the command.
+    _, sub_info = get_run_info(sub.repo.repo.head.commit.message)
+    eq_(ds.id, sub_info["dsid"])
+    assert_result_count(
+        sub.rerun(return_type="list", on_failure="ignore"),
+        1, status="impossible", action="run", rerun_action="skip")
+    eq_('xx\n', open(probe_path).read())
+
     # Rerun fails with a dirty repo.
     dirt = opj(path, "dirt")
     with open(dirt, "w") as fh:
@@ -707,6 +715,10 @@ def test_run_inputs_outputs(path):
     assert_in("a.dat", ds.repo.repo.head.commit.message)
     assert_in("b.dat", ds.repo.repo.head.commit.message)
 
+    res = ds.rerun(report=True, return_type='item-or-list')
+    eq_(res["run_info"]['inputs'], ["a.dat"])
+    eq_(res["run_info"]['outputs'], ["b.dat"])
+
 
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
@@ -717,6 +729,7 @@ def test_run_inputs_no_annex_repo(path):
     ds.run("touch dummy", inputs=["*"])
     ok_exists(opj(ds.path, "dummy"))
     ds.rerun()
+
 
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
