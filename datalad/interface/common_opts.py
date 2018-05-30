@@ -110,7 +110,7 @@ nosave_opt = Parameter(
     args=("--nosave",),
     dest='save',
     action="store_false",
-    doc="""by default all modifications to a dataset are immediately saved. Given
+    doc="""by default all modifications to a dataset are immediately saved. Giving
     this option will disable this behavior.""")
 
 save_message_opt = Parameter(
@@ -132,7 +132,7 @@ reckless_opt = Parameter(
 jobs_opt = Parameter(
     args=("-J", "--jobs"),
     metavar="NJOBS",
-    default=None,
+    default='auto',
     constraints=EnsureInt() | EnsureNone() | EnsureChoice('auto'),
     doc="""how many parallel jobs (where possible) to use.""")
 
@@ -232,6 +232,29 @@ with_plugin_opt = Parameter(
     PY][CMD: This option can be given more than once to run multiple plugins
     in the order in which they are given. CMD]""")
 
+merge_native_opt = Parameter(
+    args=('--merge-native',),
+    metavar='MODE',
+    doc="""merge procedure to use when a dataset provides
+    native metadata in some format. Such a dataset has to
+    indicate the type of native metadata via its
+    configuration setting ``datalad.metadata.nativetype``.
+    Multiple different types of metadata are supported. Merging
+    is performed in the order in which they are configured.
+    Custom DataLad metadata always takes precedence over
+    native metadata. Merge procedure modes are semantically
+    identical to the corresponding manipulation arguments of
+    [PY: `metadata()` PY][CMD: the 'metadata' command CMD].
+    Setting the mode to 'none' disables merging of native
+    metadata.""",
+    constraints=EnsureChoice('init', 'add', 'reset', 'none'))
+
+reporton_opt = Parameter(
+    args=('--reporton',),
+    metavar='TYPE',
+    doc="""choose on what type result to report on: 'datasets',
+    'files', 'all' (both datasets and files), or 'none' (no report).""",
+    constraints=EnsureChoice('all', 'datasets', 'files', 'none'))
 # define parameters to be used by eval_results to tune behavior
 # Note: This is done outside eval_results in order to be available when building
 # docstrings for the decorated functions

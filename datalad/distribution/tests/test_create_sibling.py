@@ -17,7 +17,7 @@ import os
 from os import chmod
 import stat
 import re
-from os.path import join as opj, exists
+from os.path import join as opj, exists, basename
 from six import text_type
 
 from ..dataset import Dataset
@@ -50,6 +50,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import slow
+from datalad.tests.utils import skip_if_on_windows
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import InsufficientArgumentsError
 
@@ -135,6 +136,7 @@ def test_invalid_call(path):
                 'bogus'))
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -183,7 +185,11 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         target_description = AnnexRepo(target_path, create=False).get_description()
         assert_not_equal(target_description, None)
         assert_not_equal(target_description, target_path)
-        ok_endswith(target_description, target_path)
+        # on yoh's laptop TMPDIR is under HOME, so things start to become
+        # tricky since then target_path is shortened and we would need to know
+        # remote $HOME.  To not over-complicate and still test, test only for
+        # the basename of the target_path
+        ok_endswith(target_description, basename(target_path))
     # now, with force and correct url, which is also used to determine
     # target_dir
     # Note: on windows absolute path is not url conform. But this way it's easy
@@ -297,6 +303,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_set_equal(modified_files, ok_modified_files)
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @slow  # 53.8496s
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -369,6 +376,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -414,6 +422,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub')).is_installed())
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -434,6 +443,7 @@ def test_failon_no_permissions(src_path, target_path):
         sshurl="ssh://localhost" + opj(target_path, 'ds'))
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -447,6 +457,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     ssh = ssh_manager.get_connection('localhost')
     remote_home, err = ssh('pwd')
     assert not err
+    remote_home = remote_home.rstrip('\n')
     dst_relpath = os.path.relpath(dst_path, remote_home)
     url = 'localhost:%s' % dst_relpath
     ds = Dataset(src_path).create()
@@ -489,6 +500,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     eq_(len(logs_post), len(logs_prior) + 1)
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(suffix="target")
@@ -543,6 +555,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 def test_target_ssh_inherit():
     # TODO: waits for resolution on
     #   https://github.com/datalad/datalad/issues/1274

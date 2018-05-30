@@ -7,32 +7,53 @@
 Customization and extension of functionality
 ********************************************
 
-DataLad provides numerous commands that cover many use cases. However, there will
-always be a demand for further customization at a particular site, or for an
-individual user. DataLad addresses this need by providing a generic plugin
-interface.
+DataLad provides numerous commands that cover many use cases. However, there
+will always be a demand for further customization or extensions of built-in
+functionality at a particular site, or for an individual user. DataLad
+addresses this need with two mechanisms:
 
-First of all, DataLad plugins can be executed via the :ref:`man_datalad-plugin`
-command. This allows for executing arbitrary plugins (on particular dataset)
-at any point in time.
+- Plugins_
+- `Extension packages`_
 
-In addition, DataLad can be configured to run any number of plugins prior or
-after particular commands. For example, it is possible to execute a plugin
-each time DataLad has created a dataset to configure it so that all files
-that are added to its ``code/`` subdirectory will always be managed directly
-with Git and not be put into the dataset's annex. In order to achieve this,
-adjust your Git configuration in the following way::
+Plugins are a quick'n'dirty way to implement a single additional command with very
+little overhead. They are, however, not the method of choice for extending particular
+Datalad functionality, such as metadata extractor, or providing entire command suites
+for a specialized purpose. For all these scenarios extension packages are the
+recommended method.
 
-  git config --global --add datalad.create.run-after 'no_annex pattern=code/**'
 
-This will cause DataLad to run the ``no_annex`` plugin to add the given pattern
-to the dataset's ``.gitattribute`` file, which in turn instructs git annex to
-send any matching files directly to Git. The same functionality is available
-for ad-hoc adjustments via the ``--run-after`` option supported by most
-commands.
+Plugins
+^^^^^^^
 
-Analog to ``--run-after`` DataLad also supports ``--run-before`` to execute
-plugins prior a command.
+A number of plugins are shipped with DataLad. This includes plugins which
+operate on a particular dataset, but also general functionality that can be
+used outside the context of a specific dataset. The following table provides an
+overview of plugins included in this DataLad release.
+
+.. currentmodule:: datalad.plugin
+.. autosummary::
+   :toctree: generated
+
+   add_readme
+   addurls
+   check_dates
+   export_archive
+   export_to_figshare
+   no_annex
+   wtf
+
+
+In previous versions of DataLad, plugins were invoked differently than regular
+DataLad commands, but they can now be called like any other command. The
+``wtf`` plugin, for example, is exposed as
+
+.. code-block:: shell
+
+   % datalad wtf
+
+
+Plugin detection
+================
 
 DataLad will discover plugins at three locations:
 
@@ -66,35 +87,67 @@ with DataLad, and enables users to adjust a site-wide configuration.
 Writing own plugins
 ===================
 
-Plugins are written in Python. In order for DataLad to be able to find
-them, plugins need to be placed in one of the supported locations described
-above. Plugin file names have to have a '.py' extensions and must not start
-with an underscore ('_').
+The best way to go about writing your own plugin, is to have a look at the
+`source code of those include in DataLad
+<https://github.com/datalad/datalad/tree/master/datalad/plugin>`_. Writing
+a plugin a rather simple when following the following rules.
 
-Plugin source files must define a function named::
+Language and location
+---------------------
 
-  dlplugin
+Plugins are written in Python. In order for DataLad to be able to find them,
+plugins need to be placed in one of the supported locations described above.
+Plugin file names have to have a '.py' extensions and must not start with an
+underscore ('_').
 
-This function is executed as the plugin. It can have any number of
-arguments (positional, or keyword arguments with defaults), or none at
-all. All arguments, except ``dataset`` must expect any value to
-be a string.
+Skeleton of a plugin
+--------------------
 
-The plugin function must be self-contained, i.e. all needed imports
-of definitions must be done within the body of the function.
+The basic structure of a plugin looks like this::
 
-The doc string of the plugin function is displayed when the plugin
-documentation is requested. The first line in a plugin file that starts
-with triple double-quotes will be used as the plugin short description
-(this will typically be the docstring of the module file). This short
-description is displayed as the plugin synopsis in the plugin overview
-list.
+    from datalad.interface.base import build_doc, Interface
 
-Plugin functions must yield their results as a Python generator. Results are
-DataLad status dictionaries. There are no constraints on the number of results,
-or the number and nature of result properties. However, conventions exists and
-must be followed for compatibility with the result evaluation and rendering
-performed by DataLad.
+
+    @build_doc
+    class MyPlugin(Interface):
+        """Help message description (parameters will be added automatically)"""
+        from datalad.distribution.dataset import datasetmethod, EnsureDataset
+        from datalad.interface.utils import eval_results
+        from datalad.support.constraints import EnsureNone
+        from datalad.support.param import Parameter
+
+        _params_ = dict(
+            dataset=Parameter(
+                args=("-d", "--dataset"),
+                doc=""""specify the dataset to report on.
+                no dataset is given, an attempt is made to identify the dataset
+                based on the current working directory.""",
+                constraints=EnsureDataset() | EnsureNone()))
+
+        @staticmethod
+        @datasetmethod(name='my-plugin')
+        @eval_results
+        def __call__(dataset):
+            # Do things and yield status dicts.
+            pass
+
+
+    __datalad_plugin__ = MyPlugin
+
+In this example, the plugin is called ``my-plugin``. Any number of parameters
+can be added by extending both the ``_params_`` dictionary and the signature of
+``__call__``. The help message for the plugin command is generated using the
+docstring of the plugin class and the `_params_` dictionary.
+
+
+Expected behavior
+-----------------
+
+The plugin's ``__call__`` method must yield its results as a Python generator.
+Results are DataLad status dictionaries. There are no constraints on the number
+of results, or the number and nature of result properties. However, conventions
+exists and must be followed for compatibility with the result evaluation and
+rendering performed by DataLad.
 
 The following property keys must exist:
 
@@ -118,3 +171,47 @@ The following keys should exists if possible:
     string message annotating the result, particularly important for
     non-ok results. This can be a tuple with 'logging'-style string
     expansion.
+
+
+Extension packages
+^^^^^^^^^^^^^^^^^^
+
+As the name suggests, an extension package is a proper Python package.
+Consequently, there is a significant amount of boilerplate code involved in the
+creation of a new Datalad extension. However, this overhead enables a number of
+useful features for extension developers:
+
+- extensions can provide any number of additional commands that can be grouped into
+  labeled command suites, and are automatically exposed via the standard DataLad commandline
+  and Python API
+- extensions can define `entry_points` for any number of additional metadata extractors
+  that become automatically available to DataLad
+- extensions can define `entry_points` for their test suites, such that the standard `datalad test`
+  command will automatically run these tests in addition to the tests shipped with Datalad core
+
+
+Using an extension
+==================
+
+A DataLad extension is a standard Python package. Beyond installation of the package there is
+no additional setup required.
+
+
+Writing your own extensions
+===========================
+
+A good starting point for implementing a new extension is the "helloworld" demo extension
+available at https://github.com/datalad/datalad-extension-template. This repository can be cloned
+and adjusted to suit one's needs. It includes:
+
+- a basic Python package setup
+- simple demo command implementation
+- Travis test setup
+
+A more complex extension setup can be seen in the DataLad Neuroimaging
+extension: https://github.com/datalad/datalad-neuroimaging, including additional metadata extractors,
+test suite registration, and a sphinx-based documentation setup for a DataLad extension.
+
+As a DataLad extension is a standard Python package, an extension should declare
+dependencies on an appropriate DataLad version, and possibly other extensions
+via the standard mechanisms.

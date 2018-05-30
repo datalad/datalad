@@ -81,7 +81,12 @@ def _test_progress_bar(backend, len, increment):
         if not (increment and x == 0):
             # do not increment on 0
             pb.update(x if not increment else 1, increment=increment)
-        out.flush()  # needed atm
+        #out.flush()  # needed atm... no longer?
+        # Progress bar is having 0.1 sec between updates by default, so
+        # we could either sleep:
+        #import time; time.sleep(0.1)
+        # or just force the refresh
+        pb.refresh()
         pstr = out.getvalue()
         if backend not in ('annex-remote', 'silent'):  # no str repr
             ok_startswith(pstr.lstrip('\r'), 'label:')

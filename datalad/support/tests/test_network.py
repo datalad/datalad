@@ -390,6 +390,8 @@ def test_is_url():
 
 # TODO: RF with test_is_url to avoid duplication
 def test_is_datalad_compat_ri():
+    ok_(is_datalad_compat_ri('ssh://user:passw@host/path'))
+    ok_(is_datalad_compat_ri('http://example.com'))
     ok_(is_datalad_compat_ri('file://localhost/some'))
     ok_(is_datalad_compat_ri('///localhost/some'))
     nok_(is_datalad_compat_ri('relative'))
@@ -397,6 +399,7 @@ def test_is_datalad_compat_ri():
     nok_(is_datalad_compat_ri(123))
 
 
+@skip_if_on_windows
 def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a'), 'file:///a')
     eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')

@@ -1,4 +1,5 @@
 # ex: set sts=4 ts=4 sw=4 noet:
+# -*- coding: utf-8 -*-
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
@@ -12,6 +13,8 @@
 from datalad.tests.utils import known_failure_direct_mode
 
 import logging
+import os
+import os.path as op
 from os.path import join as opj
 
 from datalad.api import create
@@ -32,7 +35,9 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import create_tree
+from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.utils import chpwd
 
 from ..dataset import Dataset
@@ -62,7 +67,7 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'test1.dat': 'test file 1',
                       'test2.dat': 'test file 2',
                       'dir': {'testindir': 'someother',
-                              'testindir2': 'none'},
+                              OBSCURE_FILENAME: 'none'},
                       'dir2': {'testindir3': 'someother3'}})
 
 
@@ -75,7 +80,7 @@ def test_add_files(path):
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
     test_list_3 = ['test1.dat', 'test2.dat']
-    test_list_4 = [opj('dir', 'testindir'), opj('dir', 'testindir2')]
+    test_list_4 = [opj('dir', 'testindir'), opj('dir', OBSCURE_FILENAME)]
     all_files = test_list_1 + test_list_2 + test_list_3 + test_list_4
     unstaged = set(all_files)
     staged = set()
@@ -115,6 +120,27 @@ def test_add_files(path):
         eq_(staged, indexed)
         ok_(unstaged.isdisjoint(annexed))
         ok_(unstaged.isdisjoint(indexed))
+
+
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
+def test_update_known_submodule(path):
+    def get_baseline(p):
+        ds = Dataset(p).create()
+        sub = ds.create('sub', save=False)
+        # subdataset saw another commit after becoming a submodule
+        ok_clean_git(ds.path, index_modified=['sub'])
+        return ds
+    # attempt one
+    ds = get_baseline(opj(path, 'wo_ref'))
+    with chpwd(ds.path):
+        add('.', recursive=True)
+    ok_clean_git(ds.path)
+
+    # attempt two, same as above but call add via reference dataset
+    ds = get_baseline(opj(path, 'w_ref'))
+    ds.add('.', recursive=True)
+    ok_clean_git(ds.path)
 
 
 @with_tempfile(mkdir=True)
@@ -182,10 +208,10 @@ def test_add_dirty_tree(path):
     # added to git, so parsed git output record
     assert_result_count(
         added2, 1,
-        path=opj(ds.path, 'dir', 'testindir2'), action='add',
+        path=opj(ds.path, 'dir', OBSCURE_FILENAME), action='add',
         message='non-large file; adding content to git repository',
         status='ok')
-    assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+    assert_in(OBSCURE_FILENAME, Dataset(opj(path, 'dir')).repo.get_indexed_files())
     ok_clean_git(ds.path)
 
     # We used to fail to add to pure git repository, but now it should all be
@@ -363,3 +389,48 @@ def test_add_mimetypes(path):
     # But we should be able to force adding file to annex when desired
     ds.add('file2.txt', to_git=False)
     ok_file_under_git(path, 'file2.txt', annexed=True)
+
+
+@with_tempfile(mkdir=True)
+def test_gh1597_simpler(path):
+    ds = Dataset(path).create()
+    # same goes for .gitattributes
+    with open(opj(ds.path, '.gitignore'), 'a') as f:
+        f.write('*.swp\n')
+    ds.add('.gitignore')
+    ok_clean_git(ds.path)
+    ok_file_under_git(ds.path, '.gitignore', annexed=False)
+
+
+# Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree
+@known_failure_direct_mode  #FIXME
+@with_tempfile(mkdir=True)
+def test_gh1597(path):
+    ds = Dataset(path).create()
+    sub = ds.create('sub', save=False)
+    # only staged at this point, but known, and not annexed
+    ok_file_under_git(ds.path, '.gitmodules', annexed=False)
+    res = ds.subdatasets()
+    assert_result_count(res, 1, path=sub.path)
+    # now modify .gitmodules with another command
+    ds.subdatasets(contains=sub.path, set_property=[('this', 'that')])
+    ok_clean_git(ds.path, index_modified=['sub'])
+    # now modify low-level
+    with open(opj(ds.path, '.gitmodules'), 'a') as f:
+        f.write('\n')
+    ok_clean_git(ds.path, index_modified=['.gitmodules', 'sub'])
+    ds.add('.gitmodules')
+    # must not come under annex mangement
+    ok_file_under_git(ds.path, '.gitmodules', annexed=False)
+
+
+@skip_if_on_windows  # no POSIX symlinks
+@with_tempfile()
+def test_bf2541(path):
+    ds = create(path)
+    subds = ds.create('sub')
+    ok_clean_git(ds.path)
+    os.symlink('sub', op.join(ds.path, 'symlink'))
+    with chpwd(ds.path):
+        res = add('.', recursive=True)
+    ok_clean_git(ds.path)

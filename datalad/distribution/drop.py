@@ -122,7 +122,7 @@ class Drop(Interface):
     interpreted relative to this dataset.
 
     Recursion into subdatasets needs to be explicitly enabled, while recursion
-    in subdirectories within a dataset as always done automatically. An
+    in subdirectories within a dataset is always done automatically. An
     optional recursion limit is applied relative to each given input path.
 
     By default, the availability of at least one remote copy is verified,

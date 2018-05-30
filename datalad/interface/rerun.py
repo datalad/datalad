@@ -12,17 +12,23 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from collections import namedtuple
 from itertools import dropwhile
 import json
+import os
 import re
+import sys
 
 from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
+from datalad.interface.diff import Diff
+from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
+from datalad.interface.run import _format_cmd_shorty
+
+from datalad.consts import PRE_INIT_COMMIT_SHA
 
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
@@ -44,49 +50,77 @@ class Rerun(Interface):
     then re-execute the command in the recorded path (if it was inside
     the dataset). Afterwards, all modifications will be saved.
 
+    *Report mode*
+
+    || REFLOW >>
+    When called with [CMD: --report CMD][PY: report=True PY], this command
+    reports information about what would be re-executed as a series of records.
+    There will be a record for each revision in the specified revision range.
+    Each of these will have one of the following "rerun_action" values:
+    << REFLOW ||
+
+      - run: the revision has a recorded command that would be re-executed
+      - skip: the revision does not have a recorded command and would be
+        skipped
+      - pick: the revision does not have a recorded command and would be cherry
+        picked
+
+    The decision to skip rather than cherry pick a revision is based on whether
+    the revision would be reachable from HEAD at the time of execution.
+
+    In addition, when a starting point other than HEAD is specified, there is a
+    rerun_action value "checkout", in which case the record includes
+    information about the revision the would be checked out before rerunning
+    any commands.
+
     Examples:
 
-        Re-execute the command from the previous commit.
+      Re-execute the command from the previous commit::
 
-        $ datalad rerun
+        % datalad rerun
 
-        Re-execute any commands in the last five commits.
+      Re-execute any commands in the last five commits::
 
-        $ datalad rerun --since=HEAD~5
+        % datalad rerun --since=HEAD~5
 
-        Do the same as above, but re-execute the commands on top of
-        HEAD~5 in a detached state.
+      Do the same as above, but re-execute the commands on top of
+      HEAD~5 in a detached state::
 
-        $ datalad rerun --onto= --since=HEAD~5
+        % datalad rerun --onto= --since=HEAD~5
 
-        Re-execute all previous commands and compare the old and new
-        results.
+      Re-execute all previous commands and compare the old and new
+      results::
 
-        $ # on master branch
-        $ datalad rerun --branch=verify --since=
-        $ # now on verify branch
-        $ datalad diff --revision=master..
-        $ git log --oneline --left-right --cherry-pick master...
+        % # on master branch
+        % datalad rerun --branch=verify --since=
+        % # now on verify branch
+        % datalad diff --revision=master..
+        % git log --oneline --left-right --cherry-pick master...
+
+    .. note::
+      Currently the "onto" feature only sets the working tree of the current
+      dataset to a previous state. The working trees of any subdatasets remain
+      unchanged.
     """
     _params_ = dict(
         revision=Parameter(
             args=("revision",),
             metavar="REVISION",
             nargs="?",
-            doc="""rerun command(s) in REVISION. By default, the
-            command from this commit will be executed, but the --since
-            option can be used to construct a revision range.""",
+            doc="""rerun command(s) in `revision`. By default, the command from
+            this commit will be executed, but [CMD: --since CMD][PY: `since`
+            PY] can be used to construct a revision range.""",
             default="HEAD",
             constraints=EnsureStr()),
         since=Parameter(
             args=("--since",),
-            doc="""If SINCE is a commit-ish, the commands from all
-            commits that are reachable from REVISION but not SINCE
-            will be re-executed (in other words, the commands in `git
-            log SINCE..REVISION`). If SINCE is an empty string, it is
-            set to the parent of the first commit that contains a
-            recorded command (i.e., all commands in `git log REVISION`
-            will be re-executed).""",
+            doc="""If `since` is a commit-ish, the commands from all commits
+            that are reachable from `revision` but not `since` will be
+            re-executed (in other words, the commands in :command:`git log
+            SINCE..REVISION`). If SINCE is an empty string, it is set to the
+            parent of the first commit that contains a recorded command (i.e.,
+            all commands in :command:`git log REVISION` will be
+            re-executed).""",
             constraints=EnsureStr() | EnsureNone()),
         branch=Parameter(
             metavar="NAME",
@@ -96,13 +130,13 @@ class Rerun(Interface):
         onto=Parameter(
             metavar="base",
             args=("--onto",),
-            doc="""start point for rerunning the commands. If not
-            specified, commands are executed at HEAD. This option can
-            be used to specify an alternative start point, which will
-            be checked out with the branch name specified by --branch
-            or in a detached state otherwise. As a special case, an
-            empty value for this option means to use the commit
-            specified by --since.""",
+            doc="""start point for rerunning the commands. If not specified,
+            commands are executed at HEAD. This option can be used to specify
+            an alternative start point, which will be checked out with the
+            branch name specified by [CMD: --branch CMD][PY: `branch` PY] or in
+            a detached state otherwise. As a special case, an empty value for
+            this option means to use the commit specified by [CMD: --since
+            CMD][PY: `since` PY].""",
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m", "--message",),
@@ -110,6 +144,13 @@ class Rerun(Interface):
             doc="""use MESSAGE for the reran commit rather than the
             recorded commit message.  In the case of a multi-commit
             rerun, all the reran commits will have this message.""",
+            constraints=EnsureStr() | EnsureNone()),
+        script=Parameter(
+            args=("--script",),
+            metavar="FILE",
+            doc="""extract the commands into [CMD: FILE CMD][PY: this file PY]
+            rather than rerunning. Use - to write to stdout instead. [CMD: This
+            option implies --report. CMD]""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -119,10 +160,12 @@ class Rerun(Interface):
             directory. If a dataset is given, the command will be
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
-        # TODO
-        # --list-commands
-        #   go through the history and report any recorded command. this info
-        #   could be used to unlock the associated output files for a rerun
+        report=Parameter(
+            args=("--report",),
+            action="store_true",
+            doc="""Don't actually re-execute anything, just display what would
+            be done. [CMD: Note: If you give this option, you most likely want
+            to set --output-format to 'json' or 'json_pp'. CMD]"""),
     )
 
     @staticmethod
@@ -134,7 +177,9 @@ class Rerun(Interface):
             dataset=None,
             branch=None,
             message=None,
-            onto=None):
+            onto=None,
+            script=None,
+            report=False):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -142,10 +187,7 @@ class Rerun(Interface):
 
         lgr.debug('rerunning command output underneath %s', ds)
 
-        from datalad.tests.utils import ok_clean_git
-        try:
-            ok_clean_git(ds.path)
-        except AssertionError:
+        if script is None and not report and ds.repo.dirty:
             yield get_status_dict(
                 'run',
                 ds=ds,
@@ -154,10 +196,10 @@ class Rerun(Interface):
                          'cannot detect changes by command'))
             return
 
-        err_info = get_status_dict('run', ds=ds)
         if not ds.repo.get_hexsha():
-            yield dict(
-                err_info, status='impossible',
+            yield get_status_dict(
+                'run', ds=ds,
+                status='impossible',
                 message='cannot rerun command, nothing recorded')
             return
 
@@ -184,99 +226,254 @@ class Rerun(Interface):
                 message="cannot rerun history with merge commits")
             return
 
-        Revision = namedtuple("Revision", ["id", "message", "info"])
+        results = _rerun_as_results(ds, revrange, since, branch, onto, message)
+        if script:
+            handler = _get_script_handler(script, since, revision)
+        elif report:
+            handler = _report
+        else:
+            handler = _rerun
 
-        def revision_with_info(rev):
-            msg, info = get_commit_runinfo(ds.repo, rev)
-            return Revision(rev, msg, info)
+        for res in handler(ds, results):
+            yield res
 
-        ids = ds.repo.repo.git.rev_list("--reverse", revrange, "--").split()
 
+def _revs_as_results(dset, revs):
+    for rev in revs:
+        res = get_status_dict("run", ds=dset, commit=rev)
+        full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
         try:
-            revs = list(map(revision_with_info, ids))
+            msg, info = get_run_info(full_msg)
         except ValueError as exc:
-            yield dict(err_info, status='error', message=exc_str(exc))
+            # Recast the error so the message includes the revision.
+            raise ValueError(
+                "Error on {}'s message: {}".format(rev, exc_str(exc)))
+
+        if info is not None:
+            res["run_info"] = info
+            res["run_message"] = msg
+        yield dict(res, status="ok")
+
+
+def _rerun_as_results(dset, revrange, since, branch, onto, message):
+    """Represent the rerun as result records.
+
+    In the standard case, the information in these results will be used to
+    actually re-execute the commands.
+    """
+    revs = dset.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+    try:
+        results = _revs_as_results(dset, revs)
+    except ValueError as exc:
+        yield get_status_dict("run", status="error", message=exc_str(exc))
+        return
+
+    if since is not None and since.strip() == "":
+        # For --since='', drop any leading commits that don't have
+        # a run command.
+        results = list(dropwhile(lambda r: "run_info" not in r, results))
+    else:
+        results = list(results)
+
+    if onto is not None and onto.strip() == "":
+        # Special case: --onto='' is the value of --since. Because we're
+        # currently aborting if the revision list contains merges, we know
+        # that, regardless of if and how --since is specified, the effective
+        # value for --since is the parent of the first revision.
+        onto = results[0]["commit"] + "^"
+        if not commit_exists(dset, onto):
+            # This is unlikely to happen in the wild because it means that the
+            # first commit is a datalad run commit. Just abort rather than
+            # trying to checkout on orphan branch or something like that.
+            yield get_status_dict(
+                "run", ds=dset, status="error",
+                message="Commit for --onto does not exist.")
             return
 
-        if since is not None and since.strip() == "":
-            # For --since='', drop any leading commits that don't have
-            # a run command.
-            revs = list(dropwhile(lambda r: r.info is None, revs))
+    start_point = onto or "HEAD"
+    if branch or onto:
+        yield get_status_dict(
+            "run",
+            ds=dset,
+            commit=start_point,
+            branch=branch,
+            rerun_action="checkout",
+            status="ok")
 
-        if onto is not None and onto.strip() == "":
-            # Special case: --onto='' is the value of --since.
-            # Because we're currently aborting if the revision list
-            # contains merges, we know that, regardless of if and how
-            # --since is specified, the effective value for --since is
-            # the parent of the first revision.
-            onto = revs[0].id + "^"
-            if not commit_exists(ds, onto):
-                # This is unlikely to happen in the wild because it
-                # means that the first commit is a datalad run commit.
-                # Just abort rather than trying to checkout on orphan
-                # branch or something like that.
-                yield get_status_dict(
-                    "run", ds=ds, status="error",
-                    message="Commit for --onto does not exist.")
-                return
+    def rev_is_ancestor(rev):
+        try:
+            dset.repo.repo.git.merge_base("--is-ancestor", rev, start_point)
+        except GitCommandError:
+            # Revision is NOT an ancestor of the starting point.
+            return False
+        return True
 
-        if branch or onto:
-            start_point = onto or "HEAD"
-            if branch:
-                checkout_options = ["-b", branch]
+    # We want to skip revs before the starting point and pick those after.
+    to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
+
+    def skip_or_pick(hexsha, result, msg):
+        pick = hexsha in to_pick
+        result["rerun_action"] = "pick" if pick else "skip"
+        shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+        result["message"] = (
+            "%s %s; %s",
+            shortrev, msg, "cherry picking" if pick else "skipping")
+
+    for res in results:
+        hexsha = res["commit"]
+        if "run_info" in res:
+            rerun_dsid = res["run_info"].get("dsid")
+            if rerun_dsid is not None and rerun_dsid != dset.id:
+                skip_or_pick(hexsha, res, "was ran from a different dataset")
+                res["status"] = "impossible"
+            else:
+                res["rerun_action"] = "run"
+                res["diff"] = diff_revision(dset, hexsha)
+                # This is the overriding message, if any, passed to this rerun.
+                res["rerun_message"] = message
+        else:
+            skip_or_pick(hexsha, res, "does not have a command")
+        yield res
+
+
+def _rerun(dset, results):
+    for res in results:
+        if res["status"] == "error":
+            yield res
+            return
+
+        rerun_action = res.get("rerun_action")
+        if rerun_action == "skip":
+            yield res
+        elif rerun_action == "checkout":
+            if res.get("branch"):
+                checkout_options = ["-b", res["branch"]]
             else:
                 checkout_options = ["--detach"]
-            ds.repo.checkout(start_point, options=checkout_options)
-
-        for rev in revs:
-            if not rev.info:
-                pick = False
-                try:
-                    ds.repo.repo.git.merge_base("--is-ancestor", rev.id, "HEAD")
-                except GitCommandError:  # Revision is NOT an ancestor of HEAD.
-                    pick = True
-
-                shortrev = ds.repo.repo.git.rev_parse("--short", rev.id)
-                err_msg = "no command for {} found; {}".format(
-                    shortrev,
-                    "cherry picking" if pick else "skipping")
-                yield dict(err_info, status='ok', message=err_msg)
-
-                if pick:
-                    ds.repo.repo.git.cherry_pick(rev.id)
-                continue
+            dset.repo.checkout(res["commit"],
+                               options=checkout_options)
+        elif rerun_action == "pick":
+            dset.repo._git_custom_command(
+                None, ["git", "cherry-pick", res["commit"]],
+                check_fake_dates=True)
+            yield res
+        else:
+            hexsha = res["commit"]
+            run_info = res["run_info"]
 
             # Keep a "rerun" trail.
-            if "chain" in rev.info:
-                rev.info["chain"].append(rev.id)
+            if "chain" in run_info:
+                run_info["chain"].append(hexsha)
             else:
-                rev.info["chain"] = [rev.id]
+                run_info["chain"] = [hexsha]
 
-            # now we have to find out what was modified during the
-            # last run, and enable re-modification ideally, we would
-            # bring back the entire state of the tree with #1424, but
-            # we limit ourself to file addition/not-in-place-modification
-            # for now
-            for r in ds.unlock(new_or_modified(ds, rev.id),
-                               return_type='generator', result_xfm=None):
+            # now we have to find out what was modified during the last run,
+            # and enable re-modification ideally, we would bring back the
+            # entire state of the tree with #1424, but we limit ourself to file
+            # addition/not-in-place-modification for now
+            auto_outputs = (os.path.relpath(ap["path"], dset.path)
+                            for ap in new_or_modified(res["diff"]))
+            outputs = run_info.get("outputs", [])
+            auto_outputs = [p for p in auto_outputs if p not in outputs]
+            message = res["rerun_message"] or res["run_message"]
+            for r in run_command(run_info['cmd'],
+                                 dataset=dset,
+                                 inputs=run_info.get("inputs", []),
+                                 outputs=outputs + auto_outputs,
+                                 message=message,
+                                 rerun_info=run_info):
                 yield r
 
-            for r in run_command(rev.info['cmd'], ds, message or rev.message,
-                                 rerun_info=rev.info):
-                yield r
+
+def _report(dset, results):
+    for res in results:
+        if "run_info" in res:
+            if res["status"] != "impossible":
+                res["diff"] = list(res["diff"])
+                # Add extra information that is useful in the report but not
+                # needed for the rerun.
+                out = dset.repo.repo.git.show(
+                    "--no-patch", "--format=%an%x00%aI", res["commit"])
+                res["author"], res["date"] = out.split("\0")
+        yield res
 
 
-def get_commit_runinfo(repo, commit="HEAD"):
-    """Return message and run record from a commit message
+def _get_script_handler(script, since, revision):
+    ofh = sys.stdout if script.strip() == "-" else open(script, "w")
 
-    If none found - returns None, None; if anything goes wrong - throws
-    ValueError with the message describing the issue
+    def fn(dset, results):
+        header = """\
+#!/bin/sh
+#
+# This file was generated by running (the equivalent of)
+#
+#   datalad rerun --script={script}{since} {revision}
+#
+# in {ds}{path}\n"""
+        ofh.write(header.format(
+            script=script,
+            since="" if since is None else " --since=" + since,
+            revision=dset.repo.repo.git.rev_parse(revision),
+            ds='dataset {} at '.format(dset.id) if dset.id else '',
+            path=dset.path))
+
+        for res in results:
+            if res["status"] != "ok":
+                yield res
+                return
+
+            if "run_info" not in res:
+                continue
+
+            cmd = res["run_info"]["cmd"]
+            msg = res["run_message"]
+            if msg == _format_cmd_shorty(cmd):
+                msg = ''
+            ofh.write(
+                "\n" + "".join("# " + ln
+                               for ln in msg.splitlines(True)) +
+                "\n")
+            commit_descr = dset.repo.describe(res["commit"])
+            ofh.write('# (record: {})\n'.format(
+                commit_descr if commit_descr else res["commit"]))
+
+            if isinstance(cmd, list):
+                cmd = " ".join(cmd)
+            ofh.write(cmd + "\n")
+        if ofh is not sys.stdout:
+            ofh.close()
+
+        if ofh is sys.stdout:
+            yield None
+        else:
+            yield get_status_dict(
+                "run", ds=dset, status="ok",
+                path=script,
+                message=("Script written to %s", script))
+
+    return fn
+
+
+def get_run_info(message):
+    """Extract run information from `message`
+
+    Parameters
+    ----------
+    message : str
+        A commit message.
+
+    Returns
+    -------
+    A tuple with the command's message and a dict with run information. Both
+    these values are None if `message` doesn't have a run command.
+
+    Raises
+    ------
+    A ValueError if the information in `message` is invalid.
     """
-    commit_msg = repo.repo.git.show(commit, "--format=%s%n%n%b", "--no-patch")
     cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
-    runinfo = re.match(cmdrun_regex, commit_msg,
-                       re.MULTILINE | re.DOTALL)
+    runinfo = re.match(cmdrun_regex, message, re.MULTILINE | re.DOTALL)
     if not runinfo:
         return None, None
 
@@ -290,13 +487,11 @@ def get_commit_runinfo(repo, commit="HEAD"):
             '%s' % exc_str(e)
         )
     if 'cmd' not in runinfo:
-        raise ValueError(
-            "{} looks like a run commit but does not have a command".format(
-                repo.repo.git.rev_parse("--short", commit)))
-    return rec_msg, runinfo
+        raise ValueError("Looks like a run commit but does not have a command")
+    return rec_msg.rstrip(), runinfo
 
 
-def new_or_modified(dataset, revision="HEAD"):
+def diff_revision(dataset, revision="HEAD"):
     """Yield files that have been added or modified in `revision`.
 
     Parameters
@@ -314,13 +509,18 @@ def new_or_modified(dataset, revision="HEAD"):
     else:
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
-        #             git hash-object -t tree /dev/null
-        empty_tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-        revrange = "{}..{}".format(empty_tree, revision)
+        revrange = "{}..{}".format(PRE_INIT_COMMIT_SHA, revision)
     diff = dataset.diff(recursive=True,
                         revision=revrange,
                         return_type='generator', result_renderer=None)
     for r in diff:
+        yield r
+
+
+def new_or_modified(diff_results):
+    """Filter diff result records to those for new or modified files.
+    """
+    for r in diff_results:
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r

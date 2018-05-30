@@ -22,6 +22,9 @@ A DataLad :term:`dataset` is a Git repository that may or may not have a data
 :term:`annex` that is used to manage data referenced in a dataset. In practice,
 most DataLad datasets will come with an annex.
 
+Dataset nesting
+---------------
+
 Datasets can contain other datasets (:term:`subdataset`\s), which can in turn
 contain subdatasets, and so on. There is no limit to the depth of nesting
 datasets. Each dataset in such a hierarchy has its own annex and its own
@@ -30,23 +33,31 @@ subdataset, and information on where it can be obtained. This is a powerful yet
 lightweight mechanism for combining multiple individual datasets for a specific
 purpose, such as the combination of source code repositories with other
 resources for a tailored application. In many cases DataLad can work with a
-hierarchy of datasets just as if it were a single dataset.
+hierarchy of datasets just as if it were a single dataset. Here is a demo:
+
+.. include:: basics_nesteddatasets.rst.in
+   :start-after: Let's create a dataset
+   :end-before:  ___________________________
+
+
+Dataset collections
+-------------------
 
 A superdataset can also be seen as a curated collection of datasets, for example,
-for a certain data modality, a field of science, a certain author, or some
-all from one project (maybe the resource for a movie production). The lightweight
+for a certain data modality, a field of science, a certain author, or from
+one project (maybe the resource for a movie production). This lightweight
 coupling between super and subdatasets enables scenarios where individual datasets
 are maintained by a disjoint set of people, and the dataset collection itself can
 be curated by a completely independent entity. Any individual dataset can be
 part of any number of such collections.
 
-Benefitting from Git's support for workflows based on decentralized "clones" of
+Benefiting from Git's support for workflows based on decentralized "clones" of
 a repository, DataLad's datasets can be (re-)published to a new location
 without loosing the connection between the "original" and the new "copy". This
 is extremely useful for collaborative work, but also in more mundane scenarios
 such as data backup, or temporary deployment fo a dataset on a compute cluster,
 or in the cloud.  Using git-annex, data can also get synchronized across
-different location of a dataset (:term:`sibling`\s in DataLad terminology).
+different locations of a dataset (:term:`sibling`\s in DataLad terminology).
 Using metadata tags, it is even possible to configure different levels of
 desired data redundancy across the network of dataset, or to prevent
 publication of sensitive data to publicly accessible repositories. Individual
@@ -54,6 +65,13 @@ datasets in a hierarchy of (sub)datasets need not be stored at the same location
 Continuing with an earlier example, it is possible to post a curated
 collection of datasets, as a superdataset, on Github, while the actual datasets
 live on different servers all around the world.
+
+Basic command line usage
+========================
+
+.. include:: basics_cmdline.rst.in
+   :end-before:  ___________________________
+
 
 API principles
 ==============
@@ -67,7 +85,7 @@ Downloading DataLad's canonical superdataset
 --------------------------------------------
 
 DataLad's canonical :term:`superdataset` provides an automated collection of datasets
-from various portals and sites (see :ref:`chap_crawler`). The argument ``///`` can be used 
+from various portals and sites. The argument ``///`` can be used 
 as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
@@ -105,7 +123,7 @@ Finally, DataLad supports SSH login style resource identifiers, such as ``me@loc
 --------------------
 
 All commands which operate with/on datasets (practically all commands) have a
-``dataset`` argument (``-d`` or ``--dataset`` in command line) which takes a
+``dataset`` argument (``-d`` or ``--dataset`` for the command line API) which takes a
 path to the dataset that the command should operate on. If a dataset is
 identified this way then any relative path that is provided as an argument to
 the command will be interpreted as being relative to the topmost directory of that
@@ -147,22 +165,21 @@ might differ;
   (files).  So result of rerunning the same ``get`` command should report that
   nothing new was installed or fetched.  It **fetches** data files by default.
 
-In how both commands operate on provided paths, it could be said that
-``install == get -n``, and ``install -g == get``.  But ``install`` also has ability to
+In how both commands operate on provided paths, it could be said that ``install
+== get -n``, and ``install -g == get``.  But ``install`` also has ability to
 install new datasets from remote locations given their URLs (e.g.,
 ``http://datasets.datalad.org/`` for our super-dataset) and SSH targets (e.g.,
 ``[login@]host:path``) if they are provided as the argument to its call or
-explicitly as ``--source`` option.  If ``datalad install --source URL DESTINATION`` (command
-line example) is used, then dataset from URL gets installed under PATH. In case of
-``datalad install URL`` invocation, PATH is taken from the last name within URL similar to
-how ``git clone`` does it.  If former specification allows to specify only a single
-URL and a PATH at a time, later one can take multiple remote locations from which
-datasets could be installed.
+explicitly as ``--source`` option.  If ``datalad install --source URL
+DESTINATION`` (command line example) is used, then dataset from URL gets
+installed under PATH. In case of ``datalad install URL`` invocation, PATH is
+taken from the last name within URL similar to how ``git clone`` does it.  If
+former specification allows to specify only a single URL and a PATH at a time,
+later one can take multiple remote locations from which datasets could be
+installed.
 
 So, as a rule of thumb -- if you want to install from external URL or fetch a
 sub-dataset without downloading data files stored under annex -- use ``install``.
 In Python API ``install`` is also to be used when you want to receive in output the
 corresponding Dataset object to operate on, and be able to use it even if you
-rerun the script.
-If you would like to fetch data (possibly while installing any necessary to be
-installed sub-dataset to get to the file) -- use ``get``.
+rerun the script. In all other cases, use ``get``.

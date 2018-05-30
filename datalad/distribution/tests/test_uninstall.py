@@ -461,6 +461,7 @@ def test_remove_nowhining(path):
 
 
 @usecase
+@known_failure_v6  # https://github.com/datalad/datalad/pull/2391#issuecomment-379414293
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 @use_cassette('test_remove_recursive_2')

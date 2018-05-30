@@ -23,10 +23,12 @@ import gc
 import glob
 import wrapt
 
+from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from itertools import tee
 
 from os.path import sep as dirsep
 from os.path import commonprefix
@@ -40,10 +42,17 @@ from os.path import split as psplit
 import posixpath
 
 
-from six import text_type, binary_type, string_types
+from six import PY2, text_type, binary_type, string_types
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
+
+
+if PY2:
+    unicode_srctypes = string_types
+else:
+    unicode_srctypes = string_types + (bytes,)
+
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -328,7 +337,8 @@ def rmtemp(f, *args, **kwargs):
             # WindowsError is not known on Linux, and if IOError
             # or any other exception is thrown then if except
             # statement has WindowsError in it -- NameError
-            exceptions = (OSError, WindowsError) if on_windows else OSError
+            # also see gh-2533
+            exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
             for i in range(50):
                 try:
                     os.unlink(f)
@@ -431,6 +441,33 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
+def assure_iter(s, cls, copy=False, iterate=True):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    cls: class
+      Which iterable class to assure
+    copy: bool, optional
+      If correct iterable is passed, it would generate its shallow copy
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
+    """
+
+    if isinstance(s, cls):
+        return s if not copy else shallow_copy(s)
+    elif isinstance(s, text_type):
+        return cls((s,))
+    elif iterate and hasattr(s, '__iter__'):
+        return cls(s)
+    elif s is None:
+        return cls()
+    else:
+        return cls((s,))
+
+
 def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -443,17 +480,7 @@ def assure_list(s, copy=False, iterate=True):
       If it is not a list, but something iterable (but not a text_type)
       iterate over it.
     """
-
-    if isinstance(s, list):
-        return s if not copy else s[:]
-    elif isinstance(s, text_type):
-        return [s]
-    elif iterate and hasattr(s, '__iter__'):
-        return list(s)
-    elif s is None:
-        return []
-    else:
-        return [s]
+    return assure_iter(s, list, copy=copy, iterate=iterate)
 
 
 def assure_list_from_str(s, sep='\n'):
@@ -500,9 +527,62 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
-def assure_unicode(s, encoding='utf-8'):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
-    return s.decode(encoding) if isinstance(s, binary_type) else s
+def assure_bytes(s, encoding='utf-8'):
+    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  "utf-8" is the default
+    """
+    if not isinstance(s, text_type):
+        return s
+    return s.encode(encoding)
+
+
+def assure_unicode(s, encoding=None, confidence=None):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  If None, "utf-8" is tried, and then if not a valid
+      UTF-8, encoding will be guessed
+    confidence: float, optional
+      A value between 0 and 1, so if guessing of encoding is of lower than
+      specified confidence, ValueError is raised
+    """
+    if not isinstance(s, binary_type):
+        return s
+    if encoding is None:
+        # Figure out encoding, defaulting to 'utf-8' which is our common
+        # target in contemporary digital society
+        try:
+            return s.decode('utf-8')
+        except UnicodeDecodeError as exc:
+            from .dochelpers import exc_str
+            lgr.debug("Failed to decode a string as utf-8: %s", exc_str(exc))
+        # And now we could try to guess
+        from chardet import detect
+        enc = detect(s)
+        denc = enc.get('encoding', None)
+        if denc:
+            denc_confidence = enc.get('confidence', 0)
+            if confidence is not None and  denc_confidence < confidence:
+                raise ValueError(
+                    "Failed to auto-detect encoding with high enough "
+                    "confidence. Highest confidence was %s for %s"
+                    % (denc_confidence, denc)
+                )
+            return s.decode(denc)
+        else:
+            raise ValueError(
+                "Could not decode value as utf-8, or to guess its encoding: %s"
+                % repr(s)
+            )
+    else:
+        return s.decode(encoding)
+
 
 def assure_bool(s):
     """Convert value into boolean following convention for strings
@@ -520,6 +600,34 @@ def assure_bool(s):
         else:
             raise ValueError("Do not know how to treat %r as a boolean" % s)
     return bool(s)
+
+
+def as_unicode(val, cast_types=object):
+    """Given an arbitrary value, would try to obtain unicode value of it
+    
+    For unicode it would return original value, for python2 str or python3
+    bytes it would use assure_unicode, for None - an empty (unicode) string,
+    and for any other type (see `cast_types`) - would apply the unicode 
+    constructor.  If value is not an instance of `cast_types`, TypeError
+    is thrown
+    
+    Parameters
+    ----------
+    cast_types: type
+      Which types to cast to unicode by providing to constructor
+    """
+    if val is None:
+        return u''
+    elif isinstance(val, text_type):
+        return val
+    elif isinstance(val, unicode_srctypes):
+        return assure_unicode(val)
+    elif isinstance(val, cast_types):
+        return text_type(val)
+    else:
+        raise TypeError(
+            "Value %r is not of any of known or provided %s types"
+            % (val, cast_types))
 
 
 def unique(seq, key=None):
@@ -548,6 +656,47 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+def map_items(func, v):
+    """A helper to apply `func` to all elements (keys and values) within dict
+
+    No type checking of values passed to func is done, so `func`
+    should be resilient to values which it should not handle
+
+    Initial usecase - apply_recursive(url_fragment, assure_unicode)
+    """
+    # map all elements within item
+    return v.__class__(
+        item.__class__(map(func, item))
+        for item in v.items()
+    )
+
+
+def partition(items, predicate=bool):
+    """Partition `items` by `predicate`.
+
+    Parameters
+    ----------
+    items : iterable
+    predicate : callable
+        A function that will be mapped over each element in `items`. The
+        elements will partitioned based on whether the return value is false or
+        true.
+
+    Returns
+    -------
+    A tuple with two generators, the first for 'false' items and the second for
+    'true' ones.
+
+    Notes
+    -----
+    Taken from Peter Otten's snippet posted at
+    https://nedbatchelder.com/blog/201306/filter_a_list_into_two_parts.html
+    """
+    a, b = tee((predicate(item), item) for item in items)
+    return ((item for pred, item in a if not pred),
+            (item for pred, item in b if pred))
 
 
 def generate_chunks(container, size):
@@ -744,7 +893,12 @@ def swallow_outputs():
 
         if file in (oldout, olderr, sys.stdout, sys.stderr):
             # we mock
-            sys.stdout.write(sep.join(args) + end)
+            try:
+                sys.stdout.write(sep.join(args) + end)
+            except UnicodeEncodeError as exc:
+                lgr.error(
+                    "Failed to write to mocked stdout, got %s, continue as it "
+                    "didn't happen",  exc)
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
@@ -871,7 +1025,10 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
     # Inherit filters
-    swallow_handler.filters = sum([h.filters for h in old_handlers], [])
+    from datalad.log import ProgressHandler
+    swallow_handler.filters = sum([h.filters for h in old_handlers
+                                   if not isinstance(h, ProgressHandler)],
+                                  [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
@@ -1029,6 +1186,21 @@ class chpwd(object):
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
+def dlabspath(path, norm=False):
+    """Symlinks-in-the-cwd aware abspath
+
+    os.path.abspath relies on os.getcwd() which would not know about symlinks
+    in the path
+
+    TODO: we might want to norm=True by default to match behavior of
+    os .path.abspath?
+    """
+    if not isabs(path):
+        # if not absolute -- relative to pwd
+        path = opj(getpwd(), path)
+    return normpath(path) if norm else path
+
+
 def with_pathsep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
@@ -1042,9 +1214,7 @@ def get_path_prefix(path, pwd=None):
     assumed
     """
     pwd = pwd or getpwd()
-    if not isabs(path):
-        # if not absolute -- relative to pwd
-        path = opj(getpwd(), path)
+    path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
     common = commonprefix((path_, pwd_))
@@ -1191,7 +1361,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
     if on_windows:
-        return opj(*map(lambda x: x.split('/'), p))
+        return opj(*map(lambda x: opj(*x.split('/')), p))
     else:
         # Assume that all others as POSIX compliant so nothing to be done
         return opj(*p)
@@ -1343,5 +1513,184 @@ def safe_print(s):
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
+#
+# IO Helpers
+#
+
+def open_r_encdetect(fname, readahead=1000):
+    """Return a file object in read mode with auto-detected encoding
+
+    This is helpful when dealing with files of unknown encoding.
+
+    Parameters
+    ----------
+    readahead: int, optional
+      How many bytes to read for guessing the encoding type.  If
+      negative - full file will be read
+    """
+    from chardet import detect
+    import io
+    # read some bytes from the file
+    with open(fname, 'rb') as f:
+        head = f.read(readahead)
+    enc = detect(head)
+    denc = enc.get('encoding', None)
+    lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
+              denc,
+              fname,
+              enc.get('confidence', 'unknown'))
+    return io.open(fname, encoding=denc)
+
+
+def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
+    """A generator of dict records from a CSV/TSV
+
+    Automatically guesses the encoding for each record to convert to UTF-8
+
+    Parameters
+    ----------
+    fname: str
+      Filename
+    dialect: str, optional
+      Dialect to specify to csv.reader. If not specified -- guessed from
+      the file, if fails to guess, "excel-tab" is assumed
+    readahead: int, optional
+      How many bytes to read from the file to guess the type
+    **kwargs
+      Passed to `csv.reader`
+    """
+    import csv
+    if dialect is None:
+        with open(fname) as tsvfile:
+            # add robustness, use a sniffer
+            try:
+                dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
+            except Exception as exc:
+                from .dochelpers import exc_str
+                lgr.warning(
+                    'Could not determine file-format, assuming TSV: %s',
+                    exc_str(exc)
+                )
+                dialect = 'excel-tab'
+
+    with open(fname, 'rb' if PY2 else 'r') as tsvfile:
+        # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+        csv_reader = csv.reader(
+            tsvfile,
+            dialect=dialect,
+            **kwargs
+        )
+        header = None
+        for row in csv_reader:
+            # decode UTF-8 back to Unicode, cell by cell:
+            row_unicode = map(assure_unicode, row)
+            if header is None:
+                header = list(row_unicode)
+            else:
+                yield dict(zip(header, row_unicode))
+
+
+def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug):
+    """Helper to import a list of modules without failing if N/A
+
+    Parameters
+    ----------
+    modnames: list of str
+      List of module names to import
+    pkg: str
+      Package under which to import
+    msg: str, optional
+      Message template for .format() to log at DEBUG level if import fails.
+      Keys {module} and {package} will be provided and ': {exception}' appended
+    log: callable, optional
+      Logger call to use for logging messages
+    """
+    from importlib import import_module
+    _globals = globals()
+    mods_loaded = []
+    for modname in modnames:
+        try:
+            _globals[modname] = mod = import_module(
+                '.{}'.format(modname),
+                pkg)
+            mods_loaded.append(mod)
+        except Exception as exc:
+            from datalad.dochelpers import exc_str
+            log((msg + ': {exception}').format(
+                module=modname, package=pkg, exception=exc_str(exc)))
+    return mods_loaded
+
+
+def import_module_from_file(modpath, pkg=None, log=lgr.debug):
+    """Import provided module given a path
+
+    TODO:
+    - RF/make use of it in pipeline.py which has similar logic
+    - join with import_modules above?
+
+    Parameters
+    ----------
+    pkg: module, optional
+       If provided, and modpath is under pkg.__path__, relative import will be
+       used
+    """
+    assert(modpath.endswith('.py'))  # for now just for .py files
+
+    log("Importing %s" % modpath)
+
+    modname = basename(modpath)[:-3]
+    relmodpath = None
+    if pkg:
+        for pkgpath in pkg.__path__:
+            if path_is_subpath(modpath, pkgpath):
+                # for now relying on having .py extension -- assertion above
+                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace(sep, '.')
+                break
+
+    try:
+        if relmodpath:
+            from importlib import import_module
+            mod = import_module(relmodpath, pkg.__name__)
+        else:
+            dirname_ = dirname(modpath)
+            try:
+                sys.path.insert(0, dirname_)
+                mod = __import__(modname, level=0)
+            finally:
+                if dirname_ in sys.path:
+                    sys.path.pop(sys.path.index(dirname_))
+                else:
+                    log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
+    except Exception as e:
+        from datalad.dochelpers import exc_str
+        raise RuntimeError(
+            "Failed to import module from %s: %s" % (modpath, exc_str(e)))
+
+    return mod
+
 lgr.log(5, "Done importing datalad.utils")
 
+
+def get_encoding_info():
+    """Return a dictionary with various encoding/locale information"""
+    import sys, locale
+    from collections import OrderedDict
+    return OrderedDict([
+        ('default', sys.getdefaultencoding()),
+        ('filesystem', sys.getfilesystemencoding()),
+        ('locale.prefered', locale.getpreferredencoding()),
+    ])
+
+
+def get_envvars_info():
+    from collections import OrderedDict
+    envs = []
+    for var, val in os.environ.items():
+        if (
+                var.startswith('PYTHON') or
+                var.startswith('LC_') or
+                var.startswith('GIT_') or
+                var in ('LANG', 'LANGUAGE', 'PATH')
+        ):
+            envs.append((var, val))
+    return OrderedDict(envs)

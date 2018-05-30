@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -23,8 +23,11 @@ import random
 import socket
 from six import PY2, text_type, iteritems
 from six import binary_type
+from six import string_types
 from fnmatch import fnmatch
 import time
+from difflib import unified_diff
+from contextlib import contextmanager
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -60,6 +63,10 @@ from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
+
+
+# Additional indicators
+on_travis = bool(os.environ.get('TRAVIS', False))
 
 
 # additional shortcuts
@@ -171,12 +178,14 @@ def create_tree(path, tree, archives_leading_dir=True):
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
-            #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, text_type):
-            #    import pydb; pydb.debugger()
-            with open(full_name, 'w') as f:
-                if PY2 and isinstance(load, text_type):
+            if PY2:
+                open_kwargs = {'mode': "w"}
+                if isinstance(load, text_type):
                     load = load.encode('utf-8')
+            else:
+                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
+
+            with open(full_name, **open_kwargs) as f:
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
@@ -202,8 +211,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     Note
     ----
     Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only and are ignored otherwise!
-    Implementation is yet to do!
+    in pure git or indirect mode annex only. If they are given, no
+    test of modification of known repo content is performed.
 
     Parameters
     ----------
@@ -257,18 +266,15 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     if annex and r.is_direct_mode():
         if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not quite valid "
-                        "concepts in direct mode! Looking for any change "
-                        "(staged or not) instead.")
-            status = r.get_status(untracked=False, submodules=not ignore_submodules)
-            modified = []
-            for s in status:
-                modified.extend(status[s])
-            eq_(sorted(head_modified + index_modified),
-                sorted(f for f in modified))
+            lgr.warning("head_modified and index_modified are not supported "
+                        "for direct mode repositories!")
         else:
-            ok_(not r.is_dirty(untracked_files=not untracked,
-                               submodules=not ignore_submodules))
+            test_untracked = not untracked
+            test_submodules = not ignore_submodules
+            ok_(not r.is_dirty(untracked_files=test_untracked,
+                               submodules=test_submodules),
+                msg="Repo unexpectly dirty (tested for: untracked({}), submodules({})".format(
+                    test_untracked, test_submodules))
     else:
         repo = r.repo
 
@@ -325,9 +331,10 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True, _datalad_msg=True)
+        repo.add(file_repo_path)
     else:
-        repo.add(file_repo_path, git=True, _datalad_msg=True)
+        repo.add(file_repo_path, git=True)
+    repo.commit(_datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
@@ -519,6 +526,68 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
     httpd.serve_forever()
 
 
+class HTTPPath(object):
+    """Serve the content of a path via an HTTP URL.
+
+    This class can be used as a context manager, in which case it returns the
+    URL.
+
+    Alternatively, the `start` and `stop` methods can be called directly.
+
+    Parameters
+    ----------
+    path : str
+        Directory with content to serve.
+    """
+    def __init__(self, path):
+        self.path = path
+        self.url = None
+        self._env_patch = None
+        self._mproc = None
+
+    def __enter__(self):
+        self.start()
+        return self.url
+
+    def __exit__(self, *args):
+        self.stop()
+
+    def start(self):
+        """Start serving `path` via HTTP.
+        """
+        # There is a problem with Haskell on wheezy trying to
+        # fetch via IPv6 whenever there is a ::1 localhost entry in
+        # /etc/hosts.  Apparently fixing that docker image reliably
+        # is not that straightforward, although see
+        # http://jasonincode.com/customizing-hosts-file-in-docker/
+        # so we just force to use 127.0.0.1 while on wheezy
+        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        hostname = '127.0.0.1'
+
+        queue = multiprocessing.Queue()
+        self._mproc = multiprocessing.Process(
+            target=_multiproc_serve_path_via_http,
+            args=(hostname, self.path, queue))
+        self._mproc.start()
+        port = queue.get(timeout=300)
+        self.url = 'http://{}:{}/'.format(hostname, port)
+        lgr.debug("HTTP: serving %s under %s", self.path, self.url)
+
+        # Such tests don't require real network so if http_proxy settings were
+        # provided, we remove them from the env for the duration of this run
+        env = os.environ.copy()
+        env.pop('http_proxy', None)
+        self._env_patch = patch.dict('os.environ', env, clear=True)
+        self._env_patch.start()
+
+    def stop(self):
+        """Stop serving `path`.
+        """
+        lgr.debug("HTTP: stopping server under %s", self.path)
+        self._env_patch.stop()
+        self._mproc.terminate()
+
+
 @optional_args
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
@@ -537,35 +606,8 @@ def serve_path_via_http(tfunc, *targs):
         else:
             args, path = (), args[0]
 
-        # There is a problem with Haskell on wheezy trying to
-        # fetch via IPv6 whenever there is a ::1 localhost entry in
-        # /etc/hosts.  Apparently fixing that docker image reliably
-        # is not that straightforward, although see
-        # http://jasonincode.com/customizing-hosts-file-in-docker/
-        # so we just force to use 127.0.0.1 while on wheezy
-        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        hostname = '127.0.0.1'
-
-        queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(
-            target=_multiproc_serve_path_via_http,
-            args=(hostname, path, queue))
-        multi_proc.start()
-        port = queue.get(timeout=300)
-        url = 'http://{}:{}/'.format(hostname, port)
-        lgr.debug("HTTP: serving {} under {}".format(path, url))
-
-        try:
-            # Such tests don't require real network so if http_proxy settings were
-            # provided, we remove them from the env for the duration of this run
-            env = os.environ.copy()
-            env.pop('http_proxy', None)
-            with patch.dict('os.environ', env, clear=True):
-                return tfunc(*(args + (path, url)), **kwargs)
-        finally:
-            lgr.debug("HTTP: stopping server under %s" % path)
-            multi_proc.terminate()
-
+        with HTTPPath(path) as url:
+            return tfunc(*(args + (path, url)), **kwargs)
     return newfunc
 
 
@@ -679,9 +721,6 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-    SubmoduleDataset, NestedDataset, InnerSubmodule
-
 _TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
@@ -689,6 +728,9 @@ def _get_testrepos_uris(regex, flavors):
     # we should instantiate those whenever test repos actually asked for
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
+        from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+            SubmoduleDataset, NestedDataset, InnerSubmodule
+
         _basic_annex_test_repo = BasicAnnexTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
         _submodule_annex_test_repo = SubmoduleDataset()
@@ -772,9 +814,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
-
     @wraps(t)
     def newfunc(*arg, **kw):
+        if on_windows:
+            raise SkipTest("Testrepo setup is broken on Windows")
+
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -788,6 +832,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
@@ -798,6 +843,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
+                # The is_explicit_path check is needed because it may be a URL,
+                # but check_dates needs a local path or GitRepo object.
+                if fake_dates and is_explicit_path(uri):
+                    from ..support.repodates import check_dates
+                    assert_false(
+                        check_dates(uri, annex="tree")["objects"])
                 if uri in _TEMP_PATHS_CLONES:
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
@@ -858,13 +909,30 @@ def skip_if_on_windows(func):
 
 
 @optional_args
-def skip_if(func, cond=True, msg=None):
+def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
+
+    Parameters
+    ----------
+    cond: bool
+      condition on which to skip
+    msg: str
+      message to print if skipping
+    method: str
+      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
+      just proceeding and simply not calling the decorated function.
+      This is particularly meant to be used, when decorating single assertions
+      in a test with method='pass' in order to not skip the entire test, but
+      just that assertion.
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
-            raise SkipTest(msg if msg else "condition was True")
+            if method == 'raise':
+                raise SkipTest(msg if msg else "condition was True")
+            elif method == 'pass':
+                print(msg if msg else "condition was True")
+                return
         return func(*args, **kwargs)
     return newfunc
 
@@ -875,11 +943,9 @@ def skip_ssh(func):
     """
     @wraps(func)
     def newfunc(*args, **kwargs):
-        if on_windows:
-            raise SkipTest("SSH currently not available on windows.")
         from datalad import cfg
         test_ssh = cfg.get("datalad.tests.ssh", '')
-        if test_ssh in ('', '0', 'false', 'no'):
+        if not test_ssh or test_ssh in ('0', 'false', 'no'):
             raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
@@ -911,7 +977,8 @@ def probe_known_failure(func):
     return newfunc
 
 
-def skip_known_failure(func):
+@optional_args
+def skip_known_failure(func, method='raise'):
     """Test decorator allowing to skip a test that is known to fail
 
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
@@ -920,7 +987,8 @@ def skip_known_failure(func):
     from datalad import cfg
 
     @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
-             msg="Skip test known to fail")
+             msg="Skip test known to fail",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -973,7 +1041,7 @@ def known_failure_direct_mode(func):
 
     from datalad import cfg
 
-    direct = cfg.obtain("datalad.repo.direct")
+    direct = cfg.obtain("datalad.repo.direct") or on_windows
     if direct:
 
         @known_failure
@@ -991,7 +1059,8 @@ def known_failure_direct_mode(func):
 # ### ###
 
 
-def skip_v6(func):
+@optional_args
+def skip_v6(func, method='raise'):
     """Skips tests if datalad is configured to use v6 mode
     (DATALAD_REPO_VERSION=6)
     """
@@ -999,14 +1068,15 @@ def skip_v6(func):
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
 
-def skip_direct_mode(func):
+@optional_args
+def skip_direct_mode(func, method='raise'):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
     """
@@ -1014,7 +1084,8 @@ def skip_direct_mode(func):
     from datalad import cfg
 
     @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run")
+             msg="Skip test in direct mode test run",
+             method=method)
     @wraps(func)
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
@@ -1118,7 +1189,13 @@ def assert_dict_equal(d1, d2):
     for k in set(d1).intersection(d2):
         same = True
         try:
-            same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
+            if isinstance(d1[k], string_types):
+                # do not compare types for string types to avoid all the hassle
+                # with the distinction of str and unicode in PY3, and simple
+                # test for equality
+                same = bool(d1[k] == d2[k])
+            else:
+                same = type(d1[k]) == type(d2[k]) and bool(d1[k] == d2[k])
         except:  # if comparison or conversion to bool (e.g. with numpy arrays) fails
             same = False
 
@@ -1132,6 +1209,13 @@ def assert_dict_equal(d1, d2):
         raise AssertionError("dicts differ:\n%s" % "\n".join(msgs))
     # do generic comparison just in case we screwed up to detect difference correctly above
     eq_(d1, d2)
+
+
+def assert_str_equal(s1, s2):
+    """Helper to compare two lines"""
+    diff = list(unified_diff(s1.splitlines(), s2.splitlines()))
+    assert not diff, '\n'.join(diff)
+    assert_equal(s1, s2)
 
 
 def assert_status(label, results):
@@ -1236,12 +1320,13 @@ def ignore_nose_capturing_stdout(func):
 
     @make_decorator(func)
     def newfunc(*args, **kwargs):
+        import io
         try:
             func(*args, **kwargs)
-        except AttributeError as e:
+        except (AttributeError, io.UnsupportedOperation) as e:
             # Use args instead of .message which is PY2 specific
             message = e.args[0] if e.args else ""
-            if message.find('StringIO') > -1 and message.find('fileno') > -1:
+            if re.search('^(.*StringIO.*)?fileno', message):
                 raise SkipTest("Triggered nose defect in masking out real stdout")
             else:
                 raise
@@ -1293,19 +1378,32 @@ def dump_graph(graph, flatten=False):
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
-    " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
-    " \"';a&b&cd `| ",
-    " \"';abcd `| ",
-    " \"';abcd | ",
-    " \"';abcd ",
-    " ;abcd ",
-    " ;abcd",
-    " ab cd ",
-    " ab cd",
-    "a",
-    " abc d.dat ",
-    "abc d.dat ",  # they all should at least support spaces and dots
+    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
+    u" \"';a&b&c `| ",
+    u" \"';abc `| ",
+    u" \"';abc | ",
+    u" \"';abc ",
+    u" ;abc ",
+    u" ;abc",
+    u" ab c ",
+    u" ab c",
+    u"ac",
+    u" ab .datc ",
+    u"ab .datc ",  # they all should at least support spaces and dots
 )
+UNICODE_FILENAME = u"ΔЙקم๗あ"
+# OSX is exciting -- some I guess FS might be encoding differently from decoding
+# so Й might get recoded
+# (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
+if sys.getfilesystemencoding().lower() == 'utf-8':
+    if on_osx:
+        # TODO: figure it really out
+        UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    # Prepend the list with unicode names first
+    OBSCURE_FILENAMES = tuple(
+        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
+    ) + OBSCURE_FILENAMES
+
 
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir):
@@ -1327,6 +1425,9 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+OBSCURE_FILENAME = get_most_obscure_supported_name()
 
 
 @optional_args
@@ -1355,6 +1456,28 @@ def with_testsui(t, responses=None, interactive=True):
     return newfunc
 
 with_testsui.__test__ = False
+
+
+@optional_args
+def with_direct(func):
+    """To test functions under both direct and indirect mode
+
+    Unlike fancy generators would just fail on the first failure
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows or on_travis:
+            # since on windows would become indirect anyways
+            # on travis -- we have a dedicated matrix run
+            # which would select one or another based on config
+            # if we specify None
+            directs = [None]
+        else:
+            # otherwise we assume that we have to test both modes
+            directs = [True, False]
+        for direct in directs:
+            func(*(args + (direct,)), **kwargs)
+    return newfunc
 
 
 def assert_no_errors_logged(func, skip_re=None):
@@ -1401,6 +1524,31 @@ def get_datasets_topdir():
 #
 # Context Managers
 #
+
+
+def patch_config(vars):
+    """Patch our config with custom settings. Returns mock.patch cm
+    """
+    from datalad import cfg
+    return patch.dict(cfg._store, vars)
+
+
+@contextmanager
+def set_date(timestamp):
+    """Temporarily override environment variables for git/git-annex dates.
+
+    Parameters
+    ----------
+    timestamp : int
+        Unix timestamp.
+    """
+    git_ts = "@{} +0000".format(timestamp)
+    with patch.dict("os.environ",
+                    {"GIT_COMMITTER_DATE": git_ts,
+                     "GIT_AUTHOR_DATE": git_ts,
+                     "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
+                     "DATALAD_FAKE__DATES": "0"}):
+        yield
 
 
 #

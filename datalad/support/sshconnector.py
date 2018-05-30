@@ -35,7 +35,6 @@ except ImportError:
 
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
-from datalad.utils import not_supported_on_windows
 from datalad.utils import assure_dir
 from datalad.utils import auto_repr
 from datalad.cmd import Runner
@@ -347,9 +346,6 @@ class SSHManager(object):
     """
 
     def __init__(self):
-        not_supported_on_windows("TODO: Make this an abstraction to "
-                                 "interface platform dependent SSH")
-
         self._socket_dir = None
         self._connections = dict()
         # Initialization of prev_connections is happening during initial

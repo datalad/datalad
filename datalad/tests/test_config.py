@@ -64,16 +64,17 @@ def test_something(path, new_home):
 
     assert_true(cfg.has_section('something'))
     assert_false(cfg.has_section('somethingelse'))
-    assert_equal(sorted(cfg.sections()), ['onemore.complicated の beast with.dot', 'something'])
+    assert_equal(sorted(cfg.sections()),
+                 [u'onemore.complicated の beast with.dot', 'something'])
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
     assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
-    assert_equal(cfg.options('onemore.complicated の beast with.dot'), ['findme'])
+    assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
 
     assert_equal(
         sorted(cfg.items()),
-        [('onemore.complicated の beast with.dot.findme', '5.0'),
+        [(u'onemore.complicated の beast with.dot.findme', '5.0'),
          ('something.myint', '3'),
          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
     assert_equal(
@@ -86,7 +87,7 @@ def test_something(path, new_home):
         cfg.get('something.user'),
         ('name=Jane Doe', 'email=jd@example.com'))
     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
-    assert_equal(cfg.getfloat('onemore.complicated の beast with.dot', 'findme'), 5.0)
+    assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
     assert_equal(cfg.getbool('something', 'myint'), True)
     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
@@ -100,7 +101,7 @@ def test_something(path, new_home):
 
     # modification follows
     cfg.add('something.new', 'の')
-    assert_equal(cfg.get('something.new'), 'の')
+    assert_equal(cfg.get('something.new'), u'の')
     # sections are added on demand
     cfg.add('unheard.of', 'fame')
     assert_true(cfg.has_section('unheard.of'))

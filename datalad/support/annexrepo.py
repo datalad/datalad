@@ -37,7 +37,7 @@ from subprocess import Popen, PIPE
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from six import string_types
+from six import string_types, PY2
 from six import iteritems
 from six.moves import filter
 from git import InvalidGitRepositoryError
@@ -55,6 +55,7 @@ from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
+from datalad.utils import assure_unicode, assure_bytes
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
@@ -110,6 +111,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20160923 -- --json-progress for get
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
+    # 6.20180416 -- annex handles unicode filenames more uniformly
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
@@ -117,7 +119,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
-                 repo=None):
+                 repo=None, fake_dates=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -181,7 +183,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
                                             create=create, repo=repo,
-                                            git_opts=git_opts)
+                                            git_opts=git_opts,
+                                            fake_dates=fake_dates)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
@@ -638,10 +641,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     list(self._run_annex_command_json(
                         'status', opts=options, expect_stderr=False))
         except CommandError as e:
-            if submodules and \
-               "fatal: " \
-               "This operation must be run in a work tree" in e.stderr and \
-               "failed in submodule" in e.stderr:
+            if submodules and AnnexRepo._is_annex_work_tree_message(e.stderr):
                 lgr.debug("git-annex-status failed probably due to submodule in"
                           " direct mode. Trying to workaround.")
                 # try again, ignoring submodules:
@@ -1035,10 +1035,14 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         cmd_list += [annex_cmd] + backend + debug + annex_options
 
+        env = kwargs.pop("env", None)
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+
         if files:
             cmd_list += ['--'] + files
         try:
-            return self.cmd_call_wrapper.run(cmd_list, **kwargs)
+            return self.cmd_call_wrapper.run(cmd_list, env=env, **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
@@ -1304,7 +1308,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(fetch_files) != len(files):
-            lgr.info("Actually getting %d files", len(fetch_files))
+            lgr.debug("Actually getting %d files", len(fetch_files))
 
         # options  might be the '--key' which should go last
         options = ['--json-progress'] + options
@@ -1380,8 +1384,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         return expected_files, fetch_files
 
     @normalize_paths
-    def add(self, files, git=None, backend=None, options=None, commit=False,
-            msg=None,
+    def add(self, files, git=None, backend=None, options=None,
             jobs=None,
             git_options=None, annex_options=None, _datalad_msg=False,
             update=False):
@@ -1393,11 +1396,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           list of paths to add to the annex
         git: bool
           if True, add to git instead of annex.
-        commit: bool
-          whether or not to directly commit
-        msg: str
-          commit message in case `commit=True`. A default message, containing
-          the list of files that were added, is created by default.
         backend:
         options:
         update: bool
@@ -1444,7 +1442,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
                 return self._process_git_get_output(
-                    linesep.join(["'{}'".format(p) for p in paths]))
+                    linesep.join(["'{}'".format(p.encode('utf-8')) for p in paths]))
             else:
                 # Note: if a path involves a submodule in direct mode, while we
                 # are not in direct mode at current level, we might still fail.
@@ -1457,11 +1455,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return super(AnnexRepo, self).add(
                         files, git_options=_git_options, update=update)
                 except CommandError as e:
-                    if re.match(
-                            r'.*This operation must be run in a work tree.*git status.*failed in submodule',
-                            e.stderr,
-                            re.MULTILINE | re.DOTALL):
-
+                    if AnnexRepo._is_annex_work_tree_message(e.stderr):
                         lgr.warning(
                             "Known bug in direct mode."
                             "We can't use --dry-run when there are submodules in "
@@ -1510,21 +1504,17 @@ class AnnexRepo(GitRepo, RepoInterface):
             # explicitly use git-add with --update instead of git-annex-add
             # TODO: This might still need some work, when --update AND files
             # are specified!
-            if self.is_direct_mode():
+            if self.is_direct_mode() and not files:
                 self.GIT_DIRECT_MODE_PROXY = True
             try:
                 return_list = super(AnnexRepo, self).add(
                                            files,
-                                           # Note: committing is dealed with
-                                           # later on
-                                           commit=False,
-                                           msg=msg,
                                            git=True,
                                            git_options=git_options,
                                            _datalad_msg=_datalad_msg,
                                            update=update)
             finally:
-                if self.is_direct_mode():
+                if self.is_direct_mode() and not files:
                     # don't accidentally cause other git calls to be done
                     # via annex-proxy
                     self.GIT_DIRECT_MODE_PROXY = False
@@ -1541,19 +1531,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 expect_stderr=True
             ))
 
-        if commit:
-            if msg is None:
-                # TODO: centralize JSON handling
-                if isinstance(return_list, list):
-                    file_list = [d['file'] for d in return_list if d['success']]
-                elif isinstance(return_list, dict):
-                    file_list = [return_list['file']] \
-                        if return_list['success'] else []
-                else:
-                    raise ValueError("Unexpected return type: %s" %
-                                     type(return_list))
-                msg = self._get_added_files_commit_msg(file_list)
-            self.commit(msg, _datalad_msg=_datalad_msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
 
     def proxy(self, git_cmd, **kwargs):
@@ -1835,7 +1812,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # since it is not true for submodules, whose '.git' is a
                     # symlink and being resolved to some
                     # '.git/modules/.../annex/objects'
-                    out.append(exists(target_path) and 'annex/objects' in target_path)
+                    out.append(exists(target_path) and 'annex/objects' in str(target_path))
                 else:
                     out.append(False)
             return out
@@ -1876,7 +1853,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # '.git/modules/.../annex/objects'
                 out.append(
                     islink(filepath)
-                    and 'annex/objects' in realpath(filepath)  # realpath OK
+                    and 'annex/objects' in str(realpath(filepath))  # realpath OK
                 )
             return out
 
@@ -2005,6 +1982,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         If annex knows `file` already,
         records that it can be downloaded from `url`.
 
+        Note: Consider using the higher-level `download_url` instead.
+
         Parameters
         ----------
         file_: str
@@ -2047,13 +2026,25 @@ class AnnexRepo(GitRepo, RepoInterface):
                 " be added under annex", self, file_
             )
             os.unlink(opj(self.path, file_))
-        if not batch:
-            self._run_annex_command(
+        if not batch or self.fake_dates_enabled:
+            if batch:
+                lgr.debug("Not batching addurl call "
+                          "because fake dates are enabled")
+            files_opt = '--file=%s' % file_
+            if PY2:
+                files_opt = assure_bytes(files_opt)
+            out_json = self._run_annex_command_json(
                 'addurl',
-                annex_options=options + ['--file=%s' % file_] + [url],
+                opts=options + [files_opt] + [url],
                 log_online=True, log_stderr=False,
                 **kwargs
             )
+            if len(out_json) != 1:
+                raise AssertionError(
+                    "should always be a single-item list, Got: %s"
+                    % str(out_json))
+            # Make the output's structure match bcmd's.
+            out_json = out_json[0]
             # Don't capture stderr, since download progress provided by wget uses
             # stderr.
         else:
@@ -2082,9 +2073,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not out_json.get('success', False):
                 raise AnnexBatchCommandError(
                     cmd="addurl",
-                    msg="Error, annex reported failure for addurl: %s"
-                    % str(out_json))
-            return out_json
+                    msg="Error, annex reported failure for addurl (url='%s'): %s"
+                    % (url, str(out_json)))
+        return out_json
 
     def add_urls(self, urls, options=None, backend=None, cwd=None,
                  jobs=None,
@@ -2224,7 +2215,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = options[:] if options else []
         options += ['--force']
-        if not batch:
+        if not batch or self.fake_dates_enabled:
+            if batch:
+                lgr.debug("Not batching drop_key call "
+                          "because fake dates are enabled")
             json_objects = self._run_annex_command_json(
                 'dropkey', opts=options, files=keys, expect_stderr=True
             )
@@ -2551,11 +2545,35 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
-    def get_annexed_files(self, with_content_only=False):
+    def get_annexed_files(self, with_content_only=False, patterns=None):
         """Get a list of files in annex
+
+        Parameters
+        ----------
+        with_content_only : bool, optional
+            Only list files whose content is present.
+        patterns : list, optional
+            Globs to pass to annex's `--include=`. Files that match any of
+            these will be returned (i.e., they'll be separated by `--or`).
+
+        Returns
+        -------
+        A list of file names
         """
-        # TODO: Review!!
-        args = [] if with_content_only else ['--include', "*"]
+        if not patterns:
+            args = [] if with_content_only else ['--include', "*"]
+        else:
+            if len(patterns) == 1:
+                args = ['--include', patterns[0]]
+            else:
+                args = ['-(']
+                for pat in patterns[:-1]:
+                    args.extend(['--include', pat, "--or"])
+                args.extend(['--include', patterns[-1]])
+                args.append('-)')
+
+            if with_content_only:
+                args.extend(['--in', 'here'])
         out, err = self._run_annex_command('find', annex_options=args)
         # TODO: JSON
         return out.splitlines()
@@ -2736,14 +2754,13 @@ class AnnexRepo(GitRepo, RepoInterface):
                                               careless=careless, files=files)
             except CommandError as e:
                 if self.is_direct_mode() and \
-                   "fatal: This operation must be run in a work tree" in \
-                   e.stderr:
+                    AnnexRepo._is_annex_work_tree_message(e.stderr):
                     lgr.debug("Commit failed. "
                               "Trying to commit via git-annex-proxy.")
                     self.commit(msg, options, _datalad_msg=_datalad_msg,
                                 careless=careless, files=files, proxy=True)
                 else:
-                    raise 
+                    raise
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
@@ -2841,9 +2858,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                 return False
         else:
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
-            out = self._batched.get(':'.join(annex_cmd), annex_cmd, git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key_)
+            out = self._batched.get(
+                ':'.join(annex_cmd), annex_cmd,
+                git_options=self._GIT_COMMON_OPTIONS,
+                path=self.path)(key_)
             try:
                 return {
+                    # happens on travis in direct/heavy-debug mode, that process
+                    # exits and closes stdout (upon unknown key) before we could
+                    # read it, so we get None as the stdout.
+                    # see https://github.com/datalad/datalad/issues/2330
+                    # but it is associated with an unknown key, and for consistency
+                    # we report False there too, as to ''
+                    None: False,
                     '': False,  # when remote is misspecified ... stderr carries the msg
                     '0': False,
                     '1': True,
@@ -2876,6 +2903,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
             if isinstance(cmd_str, string_types) \
             else cmd_str + files
+
+        if self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
+
         return self.cmd_call_wrapper.run(
             cmd,
             log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
@@ -2994,7 +3025,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return []
 
         if len(copy_files) != len(files):
-            lgr.info("Actually copying %d files", len(copy_files))
+            lgr.debug("Actually copying %d files", len(copy_files))
 
         annex_options = ['--to=%s' % remote, '--json-progress']
         if options:
@@ -3206,12 +3237,23 @@ class AnnexRepo(GitRepo, RepoInterface):
         if recursive:
             args.append('--force')
 
+        # Make sure that batch add/addurl operations are closed so that we can
+        # operate on files that were just added.
+        self.precommit()
+
         for jsn in self._run_annex_command_json(
                 'metadata',
                 args,
                 files=files):
             yield jsn
 
+    @staticmethod
+    def _is_annex_work_tree_message(out):
+        return re.match(
+            r'.*This operation must be run in a work tree.*'
+            r'git status.*failed in submodule',
+            out,
+            re.MULTILINE | re.DOTALL | re.IGNORECASE)
 
 # TODO: Why was this commented out?
 # @auto_repr
@@ -3342,14 +3384,24 @@ class BatchedAnnex(object):
     def _check_process(self, restart=False):
         """Check if the process was terminated and restart if restart
 
+        Returns
+        -------
+        bool
+          True if process was alive.
+        str
+          stderr if any recorded if was terminated
         """
         process = self._process
+        ret = True
+        ret_stderr = None
         if process and process.poll():
             lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
-            self.close()
+            ret_stderr = self.close(return_stderr=True)
+            ret = False
         if self._process is None and restart:
             lgr.warning("Restarting the process due to previous failure")
             self._initialize()
+        return ret, ret_stderr
 
     def __call__(self, cmds):
         """
@@ -3383,18 +3435,20 @@ class BatchedAnnex(object):
             # according to the internet wisdom there is no easy way with subprocess
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
-            process.stdin.write(entry)  # .encode())
+            process.stdin.write(assure_bytes(entry) if PY2 else entry)
             process.stdin.flush()
             lgr.log(5, "Done sending.")
-            # TODO: somehow do catch stderr which might be there or not
-            #stderr = str(process.stderr) if process.stderr.closed else None
-            self._check_process(restart=False)
+            still_alive, stderr = self._check_process(restart=False)
+            # TODO: we might want to handle still_alive, e.g. to allow for
+            #       a number of restarts/resends, but it should be per command
+            #       since for some we cannot just resend the same query. But if
+            #       it is just a "get"er - we could resend it few times
             # We are expecting a single line output
             # TODO: timeouts etc
-            #import pdb; pdb.set_trace()
-            stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
-            #if stderr:
-            #    lgr.warning("Received output in stderr: %r" % stderr)
+            stdout = assure_unicode(self.output_proc(process.stdout)) \
+                if not process.stdout.closed else None
+            if stderr:
+                lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)
             output.append(stdout)
 
@@ -3403,24 +3457,37 @@ class BatchedAnnex(object):
     def __del__(self):
         self.close()
 
-    def close(self):
-        """Close communication and wait for process to terminate"""
+    def close(self, return_stderr=False):
+        """Close communication and wait for process to terminate
+
+        Returns
+        -------
+        str
+          stderr output if return_stderr and stderr file was there.
+          None otherwise
+        """
+        ret = None
         if self._stderr_out:
             # close possibly still open fd
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
         if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
             # remove the file where we kept dumping stderr
             os.unlink(self._stderr_out_fname)
             self._stderr_out_fname = None
         if self._process:
             process = self._process
-            lgr.debug("Closing stdin of %s and waiting process to finish", process)
+            lgr.debug(
+                "Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.stdout.close()
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+        return ret
 
 
 class ProcessAnnexProgressIndicators(object):
@@ -3470,11 +3537,9 @@ class ProcessAnnexProgressIndicators(object):
             # so above didn't help!
             # use warnings not lgr.warn since we apparently swallow stuff
             # upstairs!  Also it would take care about issuing it only once
-            import warnings
-            warnings.warn(
-                "Got negative diff for progressbar. old_value=%r, new_value=%r"
-                " no more warnings should come for this one and we will not update"
-                " until values start to make sense" % (old_value, new_value))
+            lgr.debug(
+                "Got negative diff for progressbar. old_value=%r, new_value=%r",
+                old_value, new_value)
             return
         if self.total_pbar:
             self.total_pbar.update(diff, increment=True)

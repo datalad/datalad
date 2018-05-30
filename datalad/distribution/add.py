@@ -13,6 +13,7 @@
 import logging
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 from os.path import normpath
@@ -70,7 +71,7 @@ def _discover_subdatasets_recursively(
         return
     if not isdir(top):
         return
-    if GitRepo.is_valid_repo(top):
+    if not op.islink(top) and GitRepo.is_valid_repo(top):
         if top in discovered:
             # this was found already, assume everything beneath it too
             return
@@ -113,7 +114,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, or
+      Power-user info: This command uses :command:`git annex add` or
       :command:`git add` to incorporate new dataset content.
     """
 
@@ -236,7 +237,7 @@ class Add(Interface):
                 ap['type'] = 'dataset'
             if recursive and \
                     (ap.get('raw_input', False) or
-                     ap.get('state', None) in ('modified', 'untracked')) and \
+                     ap.get('state', None) in ('added', 'modified', 'untracked')) and \
                     (ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
                 # this was an actually requested input path, or a path that was found
                 # modified by path annotation, based on an input argument
@@ -419,7 +420,6 @@ class Add(Interface):
             added = ds.repo.add(
                 list(torepoadd.keys()),
                 git=to_git if is_annex else True,
-                commit=False,
                 **add_kw
             )
             for a in added:

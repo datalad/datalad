@@ -115,7 +115,7 @@ class Parameter(object):
         doc = self._doc
         if doc is None:
             doc = ''
-        doc.strip()
+        doc = doc.strip()
         if len(doc) and not doc.endswith('.'):
             doc += '.'
         if has_default:

@@ -11,6 +11,8 @@ all: clean test
 clean:
 	$(PYTHON) setup.py clean
 	rm -rf dist build bin
+	-find . -name '*.pyc' -delete
+	-find . -name '__pycache__' -type d -delete
 
 bin:
 	mkdir -p $@
@@ -36,3 +38,21 @@ code-analysis:
 update-changelog:
 	@echo ".. This file is auto-converted from CHANGELOG.md (make update-changelog) -- do not edit\n\nChange log\n**********" > docs/source/changelog.rst
 	pandoc -t rst CHANGELOG.md >> docs/source/changelog.rst
+
+
+render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
+
+docs/source/usecases/simple_provenance_tracking.rst.in: build/casts/simple_provenance_tracking.json
+	tools/cast2rst $^ > $@
+
+docs/source/usecases/reproducible_analysis.rst.in: build/casts/reproducible_analysis.json
+	tools/cast2rst $^ > $@
+
+docs/source/usecases/track_data_from_webpage.rst.in: build/casts/track_data_from_webpage.json
+	tools/cast2rst $^ > $@
+
+docs/source/basics_cmdline.rst.in: build/casts/cmdline_basic_usage.json
+	tools/cast2rst $^ > $@
+
+docs/source/basics_nesteddatasets.rst.in: build/casts/seamless_nested_repos.json
+	tools/cast2rst $^ > $@

@@ -38,7 +38,7 @@ from six.moves.urllib.error import URLError
 
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
-from datalad.utils import assure_dir
+from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
 from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
@@ -46,6 +46,17 @@ from datalad.support.cache import lru_cache
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
+
+
+def is_windows_path(path):
+    win_split = win_splitdrive(path)
+    # Note, that ntpath.splitdrive also deals with UNC paths. In that case
+    # the "drive" wouldn't be a windows drive letter followed by a colon
+    if win_split[0] and win_split[1] and \
+            win_split[0].endswith(":") and len(win_split[0]) == 2:
+        # seems to be a windows path
+        return True
+    return False
 
 
 def get_response_disposition_filename(s):
@@ -179,7 +190,7 @@ def __urlopen_requests(url):
     if isinstance(url, Request):
         url = url.get_full_url()
     from requests import Session
-    return Session().get(url)
+    return Session().get(url, stream=True)
 
 
 def retry_urlopen(url, retries=3):
@@ -291,10 +302,7 @@ def _guess_ri_cls(ri):
         'file': PathRI,
         'datalad': DataLadRI
     }
-    # go in exotic mode if this is an absolute windows path
-    win_split = win_splitdrive(ri)
-    # we need a drive and a path, otherwise this could be a false positive
-    if win_split[0] and win_split[1]:
+    if is_windows_path(ri):
         # OMG we got something from windows
         lgr.log(5, "Detected file ri")
         return TYPES['file']
@@ -484,7 +492,7 @@ class RI(object):
             v = fields.get(f)
             if isinstance(v, dict):
 
-                ev = urlencode(v)
+                ev = urlencode(map_items(assure_bytes, v))
                 # / is reserved char within query
                 if f == 'fragment' and '%2F' not in str(v):
                     # but seems to be ok'ish within the fragment which is
@@ -629,7 +637,7 @@ class URL(RI):
         """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
         if not s:
             return {}
-        out = OrderedDict(parse_qsl(s, 1))
+        out = map_items(assure_unicode, OrderedDict(parse_qsl(s, 1)))
         if not auto_delist:
             return out
         for k in out:
@@ -671,6 +679,14 @@ class PathRI(RI):
     @property
     def localpath(self):
         return self.path
+
+    @property
+    def posixpath(self):
+        if is_windows_path(self.path):
+            win_split = win_splitdrive(self.path)
+            return "/" + win_split[0][0] + win_split[1].replace('\\', '/')
+        else:
+            return self.path
 
 
 class RegexBasedURLMixin(object):

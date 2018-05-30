@@ -68,6 +68,7 @@ class BuildManPage(Command):
         try:
             mod = __import__(mod_name, fromlist=fromlist)
             self._parser = getattr(mod, func_name)(
+                ['datalad'],
                 formatter_class=fmt.ManPageFormatter,
                 return_subparsers=True)
 
@@ -97,12 +98,12 @@ class BuildManPage(Command):
             for cmdname in self._parser:
                 p = self._parser[cmdname]
                 cmdname = "{0}{1}".format(
-                    'datalad-' if cmdname != 'datalad' else '',
+                    'datalad ' if cmdname != 'datalad' else '',
                     cmdname)
                 format = cls(cmdname, ext_sections=sections, version=get_version())
                 formatted = format.format_man_page(p)
                 with open(opj(opath, '{0}.{1}'.format(
-                        cmdname,
+                        cmdname.replace(' ', '-'),
                         ext)),
                         'w') as f:
                     f.write(formatted)
@@ -207,6 +208,86 @@ class BuildConfigInfo(Command):
                         desc_tmpl += 'undocumented\n'
                     v.update(docs)
                     rst.write(_indent(desc_tmpl.format(**v), '    '))
+
+
+class BuildSchema(Command):
+    description = 'Generate DataLad JSON-LD schema.'
+
+    user_options = [
+        ('path=', None, 'output path for schema file'),
+    ]
+
+    def initialize_options(self):
+        self.path = opj('docs', 'source', '_extras')
+
+    def finalize_options(self):
+        if self.path is None:
+            raise DistutilsOptionError('\'path\' option is required')
+        self.path = _path_rel2file(self.path)
+        self.announce('Generating JSON-LD schema file')
+
+    def run(self):
+        from datalad.metadata.definitions import common_defs
+        from datalad.metadata.definitions import version as schema_version
+        import json
+        import shutil
+
+        def _mk_fname(label, version):
+            return '{}{}{}.json'.format(
+                label,
+                '_v' if version else '',
+                version)
+
+        def _defs2context(defs, context_label, vocab_version, main_version=schema_version):
+            opath = opj(
+                self.path,
+                _mk_fname(context_label, vocab_version))
+            odir = dirname(opath)
+            if not os.path.exists(odir):
+                os.makedirs(odir)
+
+            # to become DataLad's own JSON-LD context
+            context = {}
+            schema = {"@context": context}
+            if context_label != 'schema':
+                schema['@vocab'] = 'http://docs.datalad.org/{}'.format(
+                    _mk_fname('schema', main_version))
+            for key, val in defs.items():
+                # git-annex doesn't allow ':', but in JSON-LD we need it for
+                # namespace separation -- let's make '.' in git-annex mean
+                # ':' in JSON-LD
+                key = key.replace('.', ':')
+                definition = val['def']
+                if definition.startswith('http://') or definition.startswith('https://'):
+                    # this is not a URL, hence an @id definitions that points
+                    # to another schema
+                    context[key] = definition
+                    continue
+                # the rest are compound definitions
+                props = {'@id': definition}
+                if 'unit' in val:
+                    props['unit'] = val['unit']
+                if 'descr' in val:
+                    props['description'] = val['descr']
+                context[key] = props
+
+            with open(opath, 'w') as fp:
+                json.dump(
+                    schema,
+                    fp,
+                    ensure_ascii=True,
+                    indent=1,
+                    separators=(', ', ': '),
+                    sort_keys=True)
+            print('schema written to {}'.format(opath))
+
+        # core vocabulary
+        _defs2context(common_defs, 'schema', schema_version)
+
+        # present the same/latest version also as the default
+        shutil.copy(
+            opj(self.path, _mk_fname('schema', schema_version)),
+            opj(self.path, 'schema.json'))
 
 
 def setup_entry_points(entry_points):

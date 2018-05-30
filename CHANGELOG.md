@@ -9,6 +9,118 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.10.0 (??? ??, 2018) -- The Release
+
+This release is a major leap forward in metadata support.
+
+### Major refactoring and deprecations
+
+- Metadata
+  - Prior metadata provided by datasets under `.datalad/meta` is no
+    longer used or supported. Metadata must be reaggregated using 0.10
+    version
+  - Metadata extractor types are no longer auto-guessed and must be
+    explicitly specified in `datalad.metadata.nativetype` config
+    (could contain multiple values)
+  - Metadata aggregation of a dataset hierarchy no longer updates all
+    datasets in the tree with new metadata. Instead, only the target
+    dataset is updated. This behavior can be changed via the --update-mode
+    switch. The new default prevents needless modification of (3rd-party)
+    subdatasets.
+  - Neuroimaging metadata support has been moved into a dedicated extension:
+    https://github.com/datalad/datalad-neuroimaging
+- Crawler
+  - moved into a dedicated extension:
+    https://github.com/datalad/datalad-crawler
+- `export_tarball` plugin has been generalized to `export_archive` and
+  can now also generate ZIP archives.
+- By default a dataset X is now only considered to be a super-dataset of
+  another dataset Y, if Y is also a registered subdataset of X.
+
+### Fixes
+
+A number of fixes did not make it into the 0.9.x series:
+
+- Dynamic configuration overrides via the `-c` option were not in effect.
+- `save` is now more robust with respect to invocation in subdirectories
+  of a dataset.
+- `unlock` now reports correct paths when running in a dataset subdirectory.
+- `get` is more robust to path that contain symbolic links.
+- symlinks to subdatasets of a dataset are now correctly treated as a symlink,
+  and not as a subdataset
+- `add` now correctly saves staged subdataset additions.
+- Running `datalad save` in a dataset no longer adds untracked content to the
+  dataset. In order to add content a path has to be given, e.g. `datalad save .`
+- `wtf` now works reliably with a DataLad that wasn't installed from Git (but,
+  e.g., via pip)
+- More robust URL handling in `simple_with_archives` crawler pipeline.
+
+### Enhancements and new features
+
+- Support for DataLad extension that can contribute API components from 3rd-party sources,
+  incl. commands, metadata extractors, and test case implementations.
+  See https://github.com/datalad/datalad-extension-template for a demo extension.
+- Metadata (everything has changed!)
+  - Metadata extraction and aggregation is now supported for datasets and individual
+    files.
+  - Metadata query via `search` can now discover individual files.
+  - Extracted metadata can now be stored in XZ compressed files, is optionally
+    annexed (when exceeding a configurable size threshold), and obtained on
+    demand (new configuration option `datalad.metadata.create-aggregate-annex-limit`).
+  - Status and availability of aggregated metadata can now be reported via
+    `metadata --get-aggregates`
+  - New configuration option `datalad.metadata.maxfieldsize` to exclude too large
+    metadata fields from aggregation.
+  - The type of metadata is no longer guessed during metadata extraction. A new
+    configuration option `datalad.metadata.nativetype` was introduced to enable
+    one or more particular metadata extractors for a dataset.
+  - New configuration option `datalad.metadata.store-aggregate-content` to enable
+    the storage of aggregated metadata for dataset content (i.e. file-based metadata)
+    in contrast to just metadata describing a dataset as a whole.
+- `search` was completely reimplemented. It offers three different modes now:
+  - 'egrep' (default): expression matching in a plain string version of metadata
+  - 'textblob': search a text version of all metadata using a fully featured
+     query language (fast indexing, good for keyword search)
+  - 'autofield': search an auto-generated index that preserves individual fields
+     of metadata that can be represented in a tabular structure (substantial
+     indexing cost, enables the most detailed queries of all modes)
+- New extensions:
+  - addurls, an extension for creating a dataset (and possibly subdatasets)
+    from a list of URLs.
+  - export_to_figshare
+  - extract_metadata
+- add_readme makes use of available metadata
+- By default the wtf extension now hides sensitive information, which can be
+  included in the output by passing `--senstive=some` or `--senstive=all`.
+- Reduced startup latency by only importing commands necessary for a particular
+  command line call.
+- `datalad create -d <parent> --nosave` now registers subdatasets, when possible.
+- `datalad run` now provides a way for the caller to save the result when a
+  command has a non-zero exit status.
+- `datalad rerun` now has a `--script` option that can be used to extract
+  previous commands into a file.
+- A DataLad Singularity container is now available on
+  [Singularity Hub](https://singularity-hub.org/collections/667).
+- More casts have been embedded in the [use case section of the documentation](http://docs.datalad.org/en/docs/usecases/index.html).
+- `datalad --report-status` has a new value 'all' that can be used to
+  temporarily re-enable reporting that was disable by configuration settings.
+
+## 0.9.4 (??? ??, 2018) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
 
 ## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
 

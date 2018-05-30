@@ -30,6 +30,7 @@ from .utils import lgr
 from ..utils import assure_unicode
 
 from .utils import local_testrepo_flavors
+from datalad.tests.utils import skip_if_on_windows
 
 
 @ignore_nose_capturing_stdout
@@ -41,7 +42,7 @@ def test_runner_dry(tempfile):
     runner = Runner(protocol=dry)
 
     # test dry command call
-    cmd = 'echo Testing dry run > %s' % tempfile
+    cmd = 'echo Testing äöü東 dry run > %s' % tempfile
     with swallow_logs(new_level=9) as cml:
         ret = runner.run(cmd)
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
@@ -65,7 +66,7 @@ def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    cmd = 'echo Testing real run > %r' % tempfile
+    cmd = 'echo Testing äöü東 real run > %r' % tempfile
     ret = runner.run(cmd)
     assert_true(os.path.exists(tempfile),
                 "Run of: %s resulted with non-existing file %s" %
@@ -148,7 +149,7 @@ def test_runner_log_stdout():
     # assertion yet.
 
     runner = Runner(log_outputs=True)
-    cmd_ = ['echo', 'stdout-Message should be logged']
+    cmd_ = ['echo', 'stdout-Message äöü東 should be logged']
     for cmd in [cmd_, ' '.join(cmd_)]:
         # should be identical runs, either as a string or as a list
         kw = {}
@@ -161,16 +162,16 @@ def test_runner_log_stdout():
             if not on_windows:
                 # we can just count on sanity
                 cm.assert_logged("stdout| stdout-"
-                                 "Message should be logged", regex=False)
+                                 "Message äöü東 should be logged", regex=False)
             else:
                 # echo outputs quoted lines for some reason, so relax check
-                ok_("stdout-Message should be logged" in cm.lines[1])
+                ok_("stdout-Message äöü東 should be logged" in cm.lines[1])
 
-    cmd = 'echo stdout-Message should not be logged'
+    cmd = 'echo stdout-Message äöü東 should not be logged'
     with swallow_outputs() as cmo:
         with swallow_logs(new_level=11) as cml:
             ret = runner.run(cmd, log_stdout=False)
-            eq_(cmo.out, "stdout-Message should not be logged\n")
+            eq_(cmo.out, "stdout-Message äöü東 should not be logged\n")
             eq_(cml.out, "")
 
 
@@ -221,6 +222,7 @@ def check_runner_heavy_output(log_online):
         assert not ret[0], "all messages went into `logged`"
 
 
+@skip_if_on_windows  # much too slow to finish in any reaosnable time on windows
 def test_runner_heavy_output():
     for log_online in [False, True]:
         yield check_runner_heavy_output, log_online
@@ -318,7 +320,7 @@ s
 п
 """
     out_bytes = out.encode('utf-8')
-    target = u"sп".encode('utf-8')
+    target = u"s{ls}п{ls}".format(ls=os.linesep).encode('utf-8')
     args = ['stdout', None, False, False]
     #  probably #2185
     eq_(runner._process_remaining_output(None, out_bytes, *args), target)

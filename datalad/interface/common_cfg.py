@@ -31,33 +31,6 @@ definitions = {
         'destination': 'local',
         'type': bool,
     },
-    'datalad.crawl.default_backend': {
-        'ui': ('question', {
-               'title': 'Default annex backend',
-               # XXX we could add choices... but might get out of sync
-               'text': 'Content hashing method to be used by git-annex'}),
-        'destination': 'dataset',
-    },
-    'datalad.crawl.dryrun': {
-        'ui': ('yesno', {
-               'title': 'Crawler dry-run',
-               'text': 'Should the crawler ... I AM NOT QUITE SURE WHAT?'}),
-        'destination': 'local',
-        'type': EnsureBool(),
-    },
-    'datalad.crawl.init_direct': {
-        'ui': ('question', {
-               'title': 'Default annex repository mode',
-               'text': 'Should dataset be initialized in direct mode?'}),
-        'destination': 'global',
-    },
-    'datalad.crawl.pipeline.housekeeping': {
-        'ui': ('yesno', {
-               'title': 'Crawler pipeline house keeping',
-               'text': 'Should the crawler tidy up datasets (git gc, repack, clean)?'}),
-        'destination': 'global',
-        'type': EnsureBool(),
-    },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',
@@ -88,6 +61,21 @@ definitions = {
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+    },
+    'datalad.fake-dates': {
+        'ui': ('yesno', {
+               'title': 'Fake (anonymize) dates',
+               'text': 'Should the dates in the logs be faked?'}),
+        'destination': 'local',
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.fake-dates-start': {
+        'ui': ('question', {
+            'title': 'Initial fake date',
+            'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.'}),
+        'type': EnsureInt(),
+        'default': 1112911993,
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
@@ -216,5 +204,65 @@ definitions = {
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
         'default': 5,
+    },
+    'datalad.metadata.maxfieldsize': {
+        'ui': ('question', {
+               'title': 'Maximum metadata field size',
+               'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
+        'default': 100000,
+        'type': EnsureInt(),
+    },
+    'datalad.metadata.nativetype': {
+        'ui': ('question', {
+               'title': 'Native dataset metadata scheme',
+               'text': 'Set this label to engage a particular metadata extraction parser'}),
+    },
+    'datalad.metadata.store-aggregate-content': {
+        'ui': ('question', {
+               'title': 'Aggregated content metadata storage',
+               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
+    'datalad.search.default-mode': {
+        'ui': ('question', {
+               'title': 'Default search mode',
+               'text': 'Label of the mode to be used by default'}),
+        'type': EnsureChoice('egrep', 'textblob', 'autofield'),  # graph,...
+        'default': 'egrep',
+    },
+    'datalad.search.index-default-documenttype': {
+        'ui': ('question', {
+               'title': 'Type of search index documents',
+               'text': 'Labels of document types to include in a default search index'}),
+        'type': EnsureChoice('all', 'datasets', 'files'),
+        'default': 'datasets',
+    },
+    'datalad.metadata.create-aggregate-annex-limit': {
+        'ui': ('question', {
+               'title': 'Limit configuration annexing aggregated metadata in new dataset',
+               'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
+        'default': 'largerthan=20kb',
+    },
+    'datalad.runtime.raiseonerror': {
+        'ui': ('question', {
+               'title': 'Error behavior',
+               'text': 'Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.runtime.report-status': {
+        'ui': ('question', {
+               'title': 'Command line result reporting behavior',
+               'text': "If set (to other than 'all'), constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
+        'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
+        'default': None,
+    },
+    'datalad.search.indexercachesize': {
+        'ui': ('question', {
+               'title': 'Maximum cache size for search index (per process)',
+               'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
+        'default': 256,
+        'type': EnsureInt(),
     },
 }

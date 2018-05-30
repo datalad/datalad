@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 import logging
 import re
 import shlex
+import time
 import os
 from os import linesep
 from os.path import join as opj
@@ -53,7 +54,7 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
-
+from ..utils import assure_unicode
 
 # imports from same module:
 from .external_versions import external_versions
@@ -483,7 +484,7 @@ class GitRepo(RepoInterface):
     # End Flyweight
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, repo=None, **kwargs):
+                 git_opts=None, repo=None, fake_dates=False, **kwargs):
         """Creates representation of git repository at `path`.
 
         Can also be used to create a git repository at `path`.
@@ -602,6 +603,11 @@ class GitRepo(RepoInterface):
             self.inode = os.stat(self.realpath).st_ino
         else:
             self.inode = None
+
+        if fake_dates:
+            self.configure_fake_dates()
+        # Set by fake_dates_enabled to cache config value across this instance.
+        self._fake_dates_enabled = None
 
     @property
     def repo(self):
@@ -857,7 +863,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True, git_options=None,
+    def add(self, files, git=True, git_options=None,
             _datalad_msg=False, update=False):
         """Adds file(s) to the repository.
 
@@ -865,11 +871,6 @@ class GitRepo(RepoInterface):
         ----------
         files: list
           list of paths to add
-        commit: bool
-          whether or not to directly commit
-        msg: str
-          commit message in case `commit=True`. A default message, containing
-          the list of files that were added, is created by default.
         git: bool
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
@@ -889,50 +890,47 @@ class GitRepo(RepoInterface):
         # instead of options to the git executable => rename for consistency
 
         # needs to be True - see docstring:
+        # XXX why is this done? this is add() of GitRepo, there is not even a
+        # question
         assert(git)
 
         files = _remove_empty_items(files)
         out = []
 
-        if files or git_options or update:
-            try:
-                # without --verbose git 2.9.3  add does not return anything
-                add_out = self._git_custom_command(
-                    files,
-                    ['git', 'add'] + assure_list(git_options) +
-                    to_options(update=update) + ['--verbose']
-                )
-                # get all the entries
-                out = self._process_git_get_output(*add_out)
-                # Note: as opposed to git cmdline, force is True by default in
-                #       gitpython, which would lead to add things, that are
-                #       ignored or excluded otherwise
-                # 2. Note: There is an issue with globbing (like adding '.'),
-                #       which apparently doesn't care for 'force' and therefore
-                #       adds '.git/...'. May be it's expanded at the wrong
-                #       point in time or sth. like that.
-                # For now, use direct call to git add.
-                #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
-                #                      force=False)
-                # TODO: May be make use of 'fprogress'-option to indicate
-                # progress
-                # But then, we don't have it for git-annex add, anyway.
-                #
-                # TODO: Is write=True a reasonable way to do it?
-                # May be should not write until success of operation is
-                # confirmed?
-                # What's best in case of a list of files?
-            except OSError as e:
-                lgr.error("add: %s" % e)
-                raise
-
-        else:
+        if not (files or git_options or update):
             lgr.warning("add was called with empty file list and no options.")
+            return out
 
-        if commit:
-            if msg is None:
-                msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg, _datalad_msg=_datalad_msg)
+        try:
+            # without --verbose git 2.9.3  add does not return anything
+            add_out = self._git_custom_command(
+                files,
+                ['git', 'add'] + assure_list(git_options) +
+                to_options(update=update) + ['--verbose']
+            )
+            # get all the entries
+            out = self._process_git_get_output(*add_out)
+            # Note: as opposed to git cmdline, force is True by default in
+            #       gitpython, which would lead to add things, that are
+            #       ignored or excluded otherwise
+            # 2. Note: There is an issue with globbing (like adding '.'),
+            #       which apparently doesn't care for 'force' and therefore
+            #       adds '.git/...'. May be it's expanded at the wrong
+            #       point in time or sth. like that.
+            # For now, use direct call to git add.
+            #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
+            #                      force=False)
+            # TODO: May be make use of 'fprogress'-option to indicate
+            # progress
+            # But then, we don't have it for git-annex add, anyway.
+            #
+            # TODO: Is write=True a reasonable way to do it?
+            # May be should not write until success of operation is
+            # confirmed?
+            # What's best in case of a list of files?
+        except OSError as e:
+            lgr.error("add: %s" % e)
+            raise
 
         # Make sure return value from GitRepo is consistent with AnnexRepo
         # currently simulating similar return value, assuming success
@@ -947,8 +945,9 @@ class GitRepo(RepoInterface):
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
+        from datalad.utils import assure_unicode
         return [{u'file': f, u'success': True}
-                for f in re.findall("'(.*)'[\n$]", stdout)]
+                for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):
@@ -1000,6 +999,63 @@ class GitRepo(RepoInterface):
     def _get_prefixed_commit_msg(msg):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
+
+    def configure_fake_dates(self):
+        """Configure repository to use fake dates.
+        """
+        lgr.debug("Enabling fake dates")
+        self.config.set("datalad.fake-dates", "true")
+
+    @property
+    def fake_dates_enabled(self):
+        """Is the repository configured to use fake dates?
+        """
+        if self._fake_dates_enabled is None:
+            self._fake_dates_enabled = \
+                self.config.getbool('datalad', 'fake-dates', default=False)
+        return self._fake_dates_enabled
+
+    def add_fake_dates(self, env):
+        """Add fake dates to `env`.
+
+        Parameters
+        ----------
+        env : dict or None
+            Environment variables.
+
+        Returns
+        -------
+        A dict (copied from env), with date-related environment
+        variables for git and git-annex set.
+        """
+        env = (env if env is not None else os.environ).copy()
+        # Note: Use _git_custom_command here rather than repo.git.for_each_ref
+        # so that we use annex-proxy in direct mode.
+        last_date = self._git_custom_command(
+            None,
+            ["git", "for-each-ref", "--count=1",
+             "--sort=-committerdate", "--format=%(committerdate:raw)",
+             "refs/heads"])[0].strip()
+
+        if last_date:
+            # Drop the "contextual" timezone, leaving the unix timestamp.  We
+            # avoid :unix above because it wasn't introduced until Git v2.9.4.
+            last_date = last_date.split()[0]
+            seconds = int(last_date)
+        else:
+            seconds = self.config.obtain("datalad.fake-dates-start")
+        seconds_new = seconds + 1
+        date = "@{} +0000".format(seconds_new)
+
+        lgr.debug("Setting date to %s",
+                  time.strftime("%a %d %b %Y %H:%M:%S +0000",
+                                time.gmtime(seconds_new)))
+
+        env["GIT_AUTHOR_DATE"] = date
+        env["GIT_COMMITTER_DATE"] = date
+        env["GIT_ANNEX_VECTOR_CLOCK"] = str(seconds_new)
+
+        return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
                files=None, date=None):
@@ -1064,7 +1120,8 @@ class GitRepo(RepoInterface):
 
         try:
             self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True)
+                                     expect_stderr=True, expect_fail=True,
+                                     check_fake_dates=True)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1129,6 +1186,22 @@ class GitRepo(RepoInterface):
         stdout = stdout.splitlines()
         assert(len(stdout) == 1)
         return stdout[0]
+
+    @normalize_paths(match_return_type=False)
+    def get_last_commit_hash(self, files):
+        """Return the hash of the last commit the modified any of the given
+        paths"""
+        try:
+            stdout, stderr = self._git_custom_command(
+                files,
+                ['git', 'log', '-n', '1', '--pretty=format:%H'],
+                expect_fail=True)
+            commit = stdout.strip()
+            return commit
+        except CommandError as e:
+            if 'does not have any commits' in e.stderr:
+                return None
+            raise
 
     def get_merge_base(self, treeishes):
         """Get a merge base hexsha
@@ -1453,7 +1526,8 @@ class GitRepo(RepoInterface):
     def _git_custom_command(self, files, cmd_str,
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
-                            shell=None, expect_fail=False):
+                            shell=None, expect_fail=False,
+                            check_fake_dates=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1486,6 +1560,9 @@ class GitRepo(RepoInterface):
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
 
         from .exceptions import GitIgnoreError
+
+        if check_fake_dates and self.fake_dates_enabled:
+            env = self.add_fake_dates(env)
 
         try:
             out, err = self.cmd_call_wrapper.run(
@@ -1536,8 +1613,8 @@ class GitRepo(RepoInterface):
                 raise RemoteNotAvailableError(name,
                                               cmd="git remote remove",
                                               msg="No such remote",
-                                              stdout=out,
-                                              stderr=err)
+                                              stdout=e.stdout,
+                                              stderr=e.stderr)
             else:
                 raise e
 
@@ -1871,6 +1948,7 @@ class GitRepo(RepoInterface):
             options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
+            check_fake_dates=True,
             **kwargs
         )
 
@@ -2121,7 +2199,8 @@ class GitRepo(RepoInterface):
         if message:
             options += ['-m', message]
         self._git_custom_command(
-            '', ['git', 'tag'] + options + [str(tag)]
+            '', ['git', 'tag'] + options + [str(tag)],
+            check_fake_dates=True
         )
 
     def get_tags(self, output=None):
@@ -2158,7 +2237,7 @@ class GitRepo(RepoInterface):
         else:
             return tags
 
-    def describe(self, **kwargs):
+    def describe(self, commitish=None, **kwargs):
         """ Quick and dirty implementation to call git-describe
 
         Parameters:
@@ -2169,10 +2248,13 @@ class GitRepo(RepoInterface):
         """
         # TODO: be more precise what failure to expect when and raise actual
         # errors
+        cmd = ['git', 'describe'] + to_options(**kwargs)
+        if commitish is not None:
+            cmd.append(commitish)
         try:
             describe, outerr = self._git_custom_command(
                 [],
-                ['git', 'describe'] + to_options(**kwargs),
+                cmd,
                 expect_fail=True)
             return describe.strip()
         # TODO: WTF "catch everything"?

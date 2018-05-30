@@ -11,10 +11,7 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
-from datalad.tests.utils import known_failure_direct_mode
-import inspect
-import os
+import os, os.path as op
 import shutil
 import sys
 import logging
@@ -28,10 +25,11 @@ from os.path import dirname, normpath, pardir, basename
 from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
 
-from ..dochelpers import exc_str
 from ..utils import updated
 from os.path import join as opj, abspath, exists
-from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import (
+    rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+)
 from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
@@ -43,6 +41,7 @@ from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
@@ -52,28 +51,36 @@ from ..utils import get_trace
 from ..utils import get_dataset_root
 from ..utils import better_wraps
 from ..utils import path_startswith
+from ..utils import path_is_subpath
+from ..utils import dlabspath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
-
+from ..utils import import_modules, import_module_from_file
+from ..utils import map_items
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
-from datalad.tests.utils import nok_
+from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
+from .utils import as_unicode
 from .utils import assure_bool
+from .utils import assure_iter
 from .utils import assure_list
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
-from .utils import probe_known_failure, skip_known_failure, known_failure, known_failure_v6, known_failure_direct_mode
+from .utils import (
+    probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
+    known_failure_direct_mode, skip_if
+)
 
 
 def test_get_func_kwargs_doc():
@@ -127,7 +134,8 @@ def test_rotree(d):
     # we shouldn't be able to delete anything UNLESS in "crippled" situation:
     # root, or filesystem is FAT etc
     # Theoretically annex should declare FS as crippled when ran as root, but
-    # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
+    # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_
+    # under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
     # so explicit 'or'
     if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)
@@ -163,7 +171,8 @@ def test_swallow_logs(logfile):
         lgr.log(9, "debug1")
         eq_(cm.out, '[Level 9] debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')  # not even visible at level 9
+        # not even visible at level 9
+        eq_(cm.out, '[Level 9] debug1\n[INFO] info\n')
     with swallow_logs(new_level=9, file_=logfile) as cm:
         eq_(cm.out, '')
         lgr.info("next info")
@@ -245,7 +254,6 @@ def _check_setup_exceptionhook(interactive):
         setup_exceptionhook()
         our_exceptionhook = sys.excepthook
         ok_(old_exceptionhook != our_exceptionhook)
-        #out = sys.stdout
         with swallow_logs() as cml, swallow_outputs() as cmo:
             # we need to call our_exceptionhook explicitly b/c nose
             # swallows all Exceptions and hook never gets executed
@@ -255,9 +263,13 @@ def _check_setup_exceptionhook(interactive):
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
             if PY3:
-                # Happens under tox environment but not in manually crafted ones -- not yet sure
-                # what it is about but --dbg does work with python3 so lettting it skip for now
-                raise SkipTest("TODO: Not clear why in PY3 calls cleanup if we try to access the beast")
+                # Happens under tox environment but not in manually crafted
+                # ones -- not yet sure what it is about but --dbg does work
+                # with python3 so lettting it skip for now
+                raise SkipTest(
+                    "TODO: Not clear why in PY3 calls cleanup if we try to "
+                    "access the beast"
+                )
             assert_in('Traceback (most recent call last)', cmo.err)
             assert_in('in _check_setup_exceptionhook', cmo.err)
             if interactive:
@@ -356,7 +368,7 @@ def test_getpwd_symlink(tdir):
 
 def test_auto_repr():
 
-    class withoutrepr:
+    class WithoutReprClass:
         def __init__(self):
             self.a = "does not matter"
 
@@ -365,14 +377,26 @@ def test_auto_repr():
         def __init__(self):
             self.a = 1
             self.b = list(range(100))
-            self.c = withoutrepr()
+            self.c = WithoutReprClass()
             self._c = "protect me"
 
         def some(self):
             return "some"
 
-    assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<withoutrepr>)")
+    assert_equal(
+        repr(buga()),
+        "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<WithoutReprClass>)"
+    )
     assert_equal(buga().some(), "some")
+
+
+def test_assure_iter():
+    s = {1}
+    assert assure_iter(None, set) == set()
+    assert assure_iter(1, set) == s
+    assert assure_iter(1, list) == [1]
+    assert assure_iter(s, set) is s
+    assert assure_iter(s, set, copy=True) is not s
 
 
 def test_assure_list_copy():
@@ -393,12 +417,16 @@ def test_assure_list_from_str():
 def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(''), None)
     assert_equal(assure_dict_from_str({}), None)
+    target_dict = dict(
+        __ac_name='{user}', __ac_password='{password}',
+        cookies_enabled='', submit='Log in'
+    )
+    string = '__ac_name={user}\n__ac_password={password}\nsubmit=Log ' \
+               'in\ncookies_enabled='
+    assert_equal(assure_dict_from_str(string), target_dict)
     assert_equal(assure_dict_from_str(
-            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled='), dict(
-             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
-    assert_equal(assure_dict_from_str(
-        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
-             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+        target_dict),
+        target_dict)
 
 
 def test_assure_bool():
@@ -456,7 +484,7 @@ def test_find_files():
     for f in files3:
         ok_startswith(basename(f), 'test_')
 
-from .utils import with_tree
+
 @with_tree(tree={
     '.git': {
         '1': '2'
@@ -476,20 +504,6 @@ def test_find_files_exclude_vcs(repo):
     files = list(ff)
     assert_equal({basename(f) for f in files}, {'d1', 'git', '.git', '1'})
     assert_in(opj(repo, '.git'), files)
-
-
-def test_line_profile():
-    skip_if_no_module('line_profiler')
-
-    @line_profile
-    def f(j):
-        i = j + 1  # xyz
-        return i
-
-    with swallow_outputs() as cmo:
-        assert_equal(f(3), 4)
-        assert_equal(cmo.err, '')
-        assert_in('i = j + 1  # xyz', cmo.out)
 
 
 def test_not_supported_on_windows():
@@ -558,8 +572,25 @@ def test_unique():
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
 
     # with a key now
-    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
-    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)],
+               key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
+               key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_partition():
+    def fn(*args, **kwargs):
+        left, right = partition(*args, **kwargs)
+        return list(left), list(right)
+
+    eq_(fn([False, True, False]),
+        ([False, False], [True]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x > 4),
+        ([1, 4], [5, 10]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x < 0),
+        ([1, 5, 4, 10], []))
 
 
 def test_path_():
@@ -578,13 +609,17 @@ def test_get_timestamp_suffix():
     try:
         with patch.dict('os.environ', {'TZ': 'GMT'}):
             time.tzset()
-            assert_equal(get_timestamp_suffix(0), '-1970-01-01T00:00:00+0000')  # skynet DOB
-            assert_equal(get_timestamp_suffix(0, prefix="+"), '+1970-01-01T00:00:00+0000')
+            # skynet DOB
+            assert_equal(get_timestamp_suffix(0), '-1970-01-01T00:00:00+0000')
+            assert_equal(get_timestamp_suffix(0, prefix="+"),
+                         '+1970-01-01T00:00:00+0000')
             # yoh found no way to mock things out and didn't want to provide
-            # explicit call to anything to get current time with the timezone, so disabling
-            # this test for now besides that it should return smth sensible ;)
+            # explicit call to anything to get current time with the timezone,
+            # so disabling this test for now besides that it should return smth
+            # sensible ;)
             #with patch.object(time, 'localtime', lambda: 1):
-            #    assert_equal(get_timestamp_suffix(), '-1970-01-01T00:00:01+0000')  # skynet is 1 sec old
+            #    assert_equal(get_timestamp_suffix(),
+            #  '-1970-01-01T00:00:01+0000')  # skynet is 1 sec old
             assert(get_timestamp_suffix().startswith('-'))
     finally:
         time.tzset()
@@ -619,25 +654,58 @@ def test_assure_unicode():
     ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
     ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
     eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    # now, non-utf8
+    # Decoding could be deduced with high confidence when the string is
+    # really encoded in that codepage
+    mom_koi8r = u"мама".encode('koi8-r')
+    eq_(assure_unicode(mom_koi8r), u"мама")
+    eq_(assure_unicode(mom_koi8r, confidence=0.9), u"мама")
+    mom_iso8859 = u'mamá'.encode('iso-8859-1')
+    eq_(assure_unicode(mom_iso8859), u'mamá')
+    eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
+    # but when we mix, it does still guess something allowing to decode:
+    mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
+    ok_(isinstance(assure_unicode(mixedin), text_type))
+    # but should fail if we request high confidence result:
+    with assert_raises(ValueError):
+        assure_unicode(mixedin, confidence=0.9)
+    # For other, non string values, actually just returns original value
+    # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
+    assert assure_unicode(1) is 1
+
+
+def test_as_unicode():
+    eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    eq_(as_unicode(None), u"")
+    eq_(as_unicode(1), u"1")
+    # NOTE: u? is because result is different between PY2 (prefixes unicode repr
+    # while in PY3 is no longer needed!  So aggregation result would differ between
+    # PY2 and PY3
+    # Didn't manage to make it work in PY2
+    #TODO assert_re_in(u'\[1, .s., u?.東.\]', as_unicode([1, "s", u"東"]))
+    eq_(as_unicode("01"), u"01")  # no some kind of conversion/stripping of numerals
+    with assert_raises(TypeError) as cme:
+        as_unicode(1, list)
+    assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
 @with_tempfile(mkdir=True)
-def test_path_prefix(tdir):
+def test_path_prefix(path):
     eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
     # so we are under /d1/d2 so path prefix is ..
     eq_(get_path_prefix('/d1/d2', '/d1/d2/d3'), '..')
     eq_(get_path_prefix('/d1/d2/d3', '/d1/d2'), 'd3')
     # but if outside -- full path
     eq_(get_path_prefix('/d1/d2', '/d1/d20/d3'), '/d1/d2')
-    with chpwd(tdir):
+    with chpwd(path):
         eq_(get_path_prefix('.'), '')
         eq_(get_path_prefix('d1'), 'd1')
-        eq_(get_path_prefix('d1', 'd2'), opj(tdir, 'd1'))
+        eq_(get_path_prefix('d1', 'd2'), opj(path, 'd1'))
         eq_(get_path_prefix('..'), '..')
 
 
 def test_get_trace():
-    assert_raises(ValueError, get_trace, [], 'bumm', 'doesntmatter')
+    assert_raises(ValueError, get_trace, [], 'boom', 'does_not_matter')
     eq_(get_trace([('A', 'B')], 'A', 'A'), None)
     eq_(get_trace([('A', 'B')], 'A', 'B'), [])
     eq_(get_trace([('A', 'B')], 'A', 'C'), None)
@@ -690,17 +758,40 @@ def test_get_dataset_root(path):
 
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
+    ok_(path_startswith('/a/b', '/a/b'))
+    ok_(path_startswith('/a/b', '/a/b/'))
+    ok_(path_startswith('/a/b/', '/a/b'))
     ok_(path_startswith('/a/b', '/'))
     ok_(path_startswith('/aaa/b/c', '/aaa'))
     nok_(path_startswith('/aaa/b/c', '/aa'))
     nok_(path_startswith('/a/b', '/a/c'))
     nok_(path_startswith('/a/b/c', '/a/c'))
+    # must not mix relative and abs
+    assert_raises(ValueError, path_startswith, 'a/b', '/a')
+    assert_raises(ValueError, path_startswith, '/a/b', 'a')
+
+
+def test_path_is_subpath():
+    ok_(path_is_subpath('/a/b', '/a'))
+    ok_(path_is_subpath('/a/b/c', '/a'))
+    nok_(path_is_subpath('/a/b', '/a/b'))
+    nok_(path_is_subpath('/a/b', '/a/b/'))
+    nok_(path_is_subpath('/a/b/', '/a/b'))
+    ok_(path_is_subpath('/a/b', '/'))
+    ok_(path_is_subpath('/aaa/b/c', '/aaa'))
+    nok_(path_is_subpath('/aaa/b/c', '/aa'))
+    nok_(path_is_subpath('/a/b', '/a/c'))
+    nok_(path_is_subpath('/a/b/c', '/a/c'))
+    # must not mix relative and abs
+    assert_raises(ValueError, path_is_subpath, 'a/b', '/a')
+    assert_raises(ValueError, path_is_subpath, '/a/b', 'a')
 
 
 def test_safe_print():
     """Just to test that we are getting two attempts to print"""
 
     called = [0]
+
     def _print(s):
         assert_equal(s, "bua")
         called[0] += 1
@@ -740,6 +831,23 @@ def test_probe_known_failure():
         # if probing is disabled it should just fail/pass as is:
         assert_raises(AssertionError, failing)
         not_failing()
+
+
+def test_skip_if():
+
+    def dummy():
+        raise AssertionError
+
+    assert_raises(AssertionError, dummy)
+    # if cond is False, call the decorated function:
+    assert_raises(AssertionError, skip_if(cond=False, method='raise')(dummy))
+    # raises SkipTest if cond is True
+    assert_raises(SkipTest, skip_if(cond=True, method='raise')(dummy))
+    # but with method 'pass', there is neither SkipTest nor AssertionError.
+    # Instead the function call is just skipped:
+    skip_if(cond=True, method='pass')(dummy)
+    # But if condition is False, the original function is still called:
+    assert_raises(AssertionError, skip_if(cond=False, method='pass')(dummy))
 
 
 def test_skip_known_failure():
@@ -841,3 +949,151 @@ def test_known_failure_direct_mode():
     else:
         # behaves as if it wasn't decorated at all, no matter what
         assert_raises(AssertionError, failing)
+
+
+from datalad.utils import read_csv_lines
+
+
+@with_tempfile(content="h1 h2\nv1 2\nv2 3")
+def test_read_csv_lines_basic(infile):
+    # Just a basic test, next one with unicode
+    gen = read_csv_lines(infile)
+    ok_generator(gen)
+    eq_(
+        list(gen),
+        [
+            {u'h1': u'v1', u'h2': u'2'},
+            {u'h1': u'v2', u'h2': u'3'},
+        ]
+    )
+
+
+@with_tempfile(content=u"h1\th2\nv1\tдата".encode('utf-8'))
+def test_read_csv_lines_tsv_unicode(infile):
+    # Just a basic test, next one with unicode
+    gen = read_csv_lines(infile)
+    ok_generator(gen)
+    eq_(
+        list(gen),
+        [
+            {u'h1': u'v1', u'h2': u'дата'},
+        ]
+    )
+
+
+@with_tempfile(content=u"h1\nv1\nv2")
+def test_read_csv_lines_one_column(infile):
+    # Just a basic test, next one with unicode
+    eq_(
+        list(read_csv_lines(infile)),
+        [
+            {u'h1': u'v1'},
+            {u'h1': u'v2'},
+        ]
+    )
+
+
+def _get_testm_tree(ind):
+    """Generate a fake package with submodules
+
+    We need to increment index for different tests since otherwise e.g.
+    import_modules fails to import submodule if first import_module_from_file
+    imports that one
+    """
+    return {
+        'dltestm%d' % ind: {
+            '__init__.py': '',
+            'dlsub1': {'__init__.py': 'var = 1'},
+            'dlsub2.py': 'var = 2'}
+    }
+
+@with_tree(tree=_get_testm_tree(1))
+def test_import_modules(topdir):
+    try:
+        sys.path.append(topdir)
+        mods = import_modules(['dlsub1', 'bogus'], 'dltestm1')
+    finally:
+        sys.path.pop(sys.path.index(topdir))
+    eq_(len(mods), 1)
+    eq_(mods[0].__name__, 'dltestm1.dlsub1')
+
+
+@with_tree(tree=_get_testm_tree(2))
+def test_import_module_from_file(topdir):
+    with assert_raises(AssertionError):
+        # we support only submodule files ending with .py ATM. TODO
+        import_module_from_file(op.join(topdir, 'dltestm2', 'dlsub1'))
+
+    dlsub2_path = op.join(topdir, 'dltestm2', 'dlsub2.py')
+    mod = import_module_from_file(dlsub2_path)
+    eq_(mod.__name__, 'dlsub2')  # we are not asking to import as submod of the dltestm1
+    assert_in('dlsub2', sys.modules)
+
+    try:
+        sys.path.append(topdir)
+        import dltestm2
+        mod = import_module_from_file(dlsub2_path, pkg=dltestm2)
+        eq_(mod.__name__, 'dltestm2.dlsub2')
+        assert_in('dltestm2.dlsub2', sys.modules)
+    finally:
+        sys.path.pop(sys.path.index(topdir))
+
+
+def test_import_modules_fail():
+    # test that we log failures correctly
+    failures = []
+    import_modules(['bogus'], 'datalad', 'Fail {package}.{module}', failures.append)
+    eq_(len(failures), 1)
+    ok_startswith(failures[0], "Fail datalad.bogus: No module")
+
+
+# Should be the last one since as discovered in NICEMAN might screw up coverage
+def test_line_profile():
+    skip_if_no_module('line_profiler')
+
+    @line_profile
+    def f(j):
+        i = j + 1  # xyz
+        return i
+
+    with swallow_outputs() as cmo:
+        assert_equal(f(3), 4)
+        assert_equal(cmo.err, '')
+        assert_in('i = j + 1  # xyz', cmo.out)
+
+
+@with_tempfile(mkdir=True)
+def test_dlabspath(path):
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    opath = opj(path, "origin")
+    os.makedirs(opath)
+    lpath = opj(path, "linked")
+    os.symlink('origin', lpath)
+    for d in opath, lpath:
+        # regardless under which directory, all results should not resolve
+        # anything
+        eq_(d, dlabspath(d))
+        # in the root of ds
+        with chpwd(d):
+            eq_(dlabspath("bu"), opj(d, "bu"))
+            eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
+            eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+
+
+def test_map_items():
+    def add10(x):
+        return x + 10
+    eq_(map_items(add10, {2: 3}), {12: 13})
+
+    class Custom(object):
+        """For testing with custom items possibly of varying length etc"""
+        def __init__(self, items):
+            self._items = list(items)
+
+        def items(self):
+            return self._items
+
+    c = Custom([(1,), (2, 3), (4, 5, 6)])
+    c_mapped = map_items(add10, c)
+    assert type(c) is type(c_mapped)
+    eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])

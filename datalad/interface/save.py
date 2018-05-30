@@ -107,11 +107,13 @@ def save_dataset(
                    lexists(ap['path'])]
 
     if to_gitadd or save_entire_ds:
-        ds.repo.add(to_gitadd, git=True, commit=False,
+        lgr.debug('Adding files straight to Git at %s: %s', ds, to_gitadd)
+        ds.repo.add(to_gitadd, git=True,
                     # this makes sure that pending submodule updates are added too
                     update=save_entire_ds)
     if to_annexadd:
-        ds.repo.add(to_annexadd, commit=False)
+        lgr.debug('Adding files to annex at %s: %s', ds, to_annexadd)
+        ds.repo.add(to_annexadd)
 
     _datalad_msg = False
     if not message:
@@ -146,25 +148,33 @@ def save_dataset(
 class Save(Interface):
     """Save the current state of a dataset
 
-    Saving the state of a dataset records all changes that have been made
-    to it. This change record is annotated with a user-provided description.
+    Saving the state of a dataset records changes that have been made to it.
+    This change record is annotated with a user-provided description.
     Optionally, an additional tag, such as a version, can be assigned to the
-    saved state. Such tag enables straightforward retrieval of past versions
-    at a later point in time.
+    saved state. Such tag enables straightforward retrieval of past versions at
+    a later point in time.
 
-    || PYTHON >>
-    Returns
-    -------
-    commit or None
-      `None` if nothing was saved, the resulting commit otherwise.
-    << PYTHON ||
+    Examples:
+
+      Save any content underneath the current directory, without altering
+      any potential subdataset (use --recursive for that)::
+
+        % datalad save .
+
+      Save any modification of known dataset content, but leave untracked
+      files (e.g. temporary files) untouched::
+
+        % dataset save -d <path_to_dataset>
+
+      Tag the most recent saved state of a dataset::
+
+        % dataset save -d <path_to_dataset> --version-tag bestyet
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to save. If a dataset is given, but
-            no `files`, the entire dataset will be saved.""",
+            doc=""""specify the dataset to save""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
@@ -174,11 +184,13 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
-        all_changes=Parameter(
-            args=("-a", "--all-changes"),
-            doc="""save all changes (even to not yet added files) of all components
-            in datasets that contain any of the given paths [DEPRECATED!].""",
-            action="store_true"),
+        message_file=Parameter(
+            args=("-F", "--message-file"),
+            doc="""take the commit message from this file. This flag is
+            mutually exclusive with -m.""",
+            constraints=EnsureStr() | EnsureNone()),
+        # switch not functional from cmdline: default True, action=store_true
+        # TODO remove from API? all_updated=False is not used anywhere in the codebase
         all_updated=Parameter(
             args=("-u", "--all-updated"),
             doc="""if no explicit paths are given, save changes of all known
@@ -198,21 +210,29 @@ class Save(Interface):
     @datasetmethod(name='save')
     @eval_results
     def __call__(message=None, path=None, dataset=None,
-                 all_updated=True, all_changes=None, version_tag=None,
-                 recursive=False, recursion_limit=None, super_datasets=False
+                 all_updated=True, version_tag=None,
+                 recursive=False, recursion_limit=None, super_datasets=False,
+                 message_file=None
                  ):
-        if all_changes is not None:
-            from datalad.support.exceptions import DeprecatedError
-            raise DeprecatedError(
-                new="all_updated option where fits and/or datalad add",
-                version="0.5.0",
-                msg="RF: all_changes option passed to the save"
-            )
         if not dataset and not path:
             # we got nothing at all -> save what is staged in the repo in "this" directory?
-            # we verify that there is an actual repo next
-            dataset = abspath(curdir)
+            # make sure we don't treat this as a user-provided '.' argument
+            path = [{'path': abspath(curdir), 'raw_input': False}]
+
         refds_path = Interface.get_refds_path(dataset)
+
+        if message and message_file:
+            yield get_status_dict(
+                'save',
+                status='error',
+                path=refds_path,
+                message="Both a message and message file were specified",
+                logger=lgr)
+            return
+
+        if message_file:
+            with open(message_file) as mfh:
+                message = mfh.read()
 
         to_process = []
         got_nothing = True

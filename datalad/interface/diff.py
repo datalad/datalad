@@ -105,9 +105,12 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # nothing to filter
             paths = None
 
+    from datalad.utils import assure_unicode
+
     for line in stdout.split('\0'):
         if not line:
             continue
+        line = assure_unicode(line)
         if not line.startswith('?? '):
             # nothing untracked, ignore, task of `diff`
             continue
@@ -116,7 +119,8 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # strip state marker
             line[3:])
         norm_apath = normpath(apath)
-        if paths and not any([norm_apath == p or path_startswith(apath, p) for p in paths]):
+        if paths and not any(norm_apath == p or path_startswith(apath, p)
+                             for p in paths):
             # we got a whitelist for paths, don't report any other
             continue
         ap = dict(

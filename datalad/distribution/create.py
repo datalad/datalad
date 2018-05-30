@@ -16,9 +16,9 @@ import uuid
 
 from os import listdir
 from os.path import isdir
-from os.path import relpath
 from os.path import join as opj
 
+from datalad import cfg
 from datalad import _seed
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -39,7 +39,9 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
-from datalad.utils import path_startswith
+
+# required to get the binding of `add` as a dataset method
+from datalad.distribution.add import Add
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -80,7 +82,7 @@ class Create(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git init`, and
+      Power-user info: This command uses :command:`git init` and
       :command:`git annex init` to prepare the new dataset. Registering to a
       superdataset is performed via a :command:`git submodule add` operation
       in the discovered superdataset.
@@ -110,7 +112,7 @@ class Create(Interface):
             args=("-d", "--dataset"),
             metavar='PATH',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is give, a new subdataset will be created in it.""",
+            a dataset is given, a new subdataset will be created in it.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
@@ -157,13 +159,19 @@ class Create(Interface):
             action='append',
             constraints=EnsureStr() | EnsureNone(),
             doc="""Metadata type label. Must match the name of the respective
-            parser implementation in DataLad (e.g. "bids").[CMD:  This option
+            parser implementation in DataLad (e.g. "xmp").[CMD:  This option
             can be given multiple times CMD]"""),
         # TODO could move into cfg_access/permissions plugin
         shared_access=shared_access_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
+        fake_dates=Parameter(
+            args=('--fake-dates',),
+            action='store_true',
+            doc="""Configure the repository to use fake dates. The date for a
+            new commit will be set to one second later than the latest commit
+            in the repository. This can be used to anonymize dates."""),
     )
 
     @staticmethod
@@ -183,7 +191,8 @@ class Create(Interface):
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None,
-            text_no_annex=None
+            text_no_annex=None,
+            fake_dates=False
     ):
 
         # two major cases
@@ -305,13 +314,17 @@ class Create(Interface):
             yield path
             return
 
+        # stuff that we create and want to have tracked with git (not annex)
+        add_to_git = []
+
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
             GitRepo(
                 tbds.path,
                 url=None,
                 create=True,
-                git_opts=git_opts)
+                git_opts=git_opts,
+                fake_dates=fake_dates)
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", tbds.path)
@@ -324,13 +337,15 @@ class Create(Interface):
                 description=description,
                 git_opts=git_opts,
                 annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts
+                annex_init_opts=annex_init_opts,
+                fake_dates=fake_dates
             )
 
             if text_no_annex:
                 git_attributes_file = opj(tbds.path, '.gitattributes')
                 with open(git_attributes_file, 'a') as f:
                     f.write('* annex.largefiles=(not(mimetype=text/*))\n')
+                # TODO just use add_to_git and avoid separate commit
                 tbrepo.add([git_attributes_file], git=True)
                 tbrepo.commit(
                     "Instructed annex to add text files to git",
@@ -362,29 +377,38 @@ class Create(Interface):
             tbds.id if tbds.id is not None else uuid_id,
             where='dataset')
 
+        add_to_git.append('.datalad')
+
         # make sure that v6 annex repos never commit content under .datalad
         with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
-            # TODO this will need adjusting, when annex'ed aggregate meta data
+            # TODO this will need adjusting, when annex'ed aggregate metadata
             # comes around
-            gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
-            gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')
-            gitattr.write('** annex.largefiles=nothing\n')
+            gitattr.write('config annex.largefiles=nothing\n')
+            gitattr.write('metadata/aggregate* annex.largefiles=nothing\n')
+            gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
+                cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
+
+        # prevent git annex from ever annexing .git* stuff (gh-1597)
+        with open(opj(tbds.path, '.gitattributes'), 'a') as gitattr:
+            gitattr.write('.git* annex.largefiles=nothing\n')
+        add_to_git.append('.gitattributes')
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
         # but cannot until we have a first commit
-        tbds.add('.datalad', to_git=True, save=save,
+        tbds.add(add_to_git, to_git=True, save=save,
                  message='[DATALAD] new dataset')
 
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if save and isinstance(dataset, Dataset) and dataset.path != tbds.path:
+        if isinstance(dataset, Dataset) and dataset.path != tbds.path \
+           and tbds.repo.get_hexsha():
             # we created a dataset in another dataset
             # -> make submodule
             for r in dataset.add(
                     tbds.path,
-                    save=True,
+                    save=save,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,

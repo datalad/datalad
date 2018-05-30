@@ -13,6 +13,7 @@
 from nose.tools import assert_is_instance
 
 import os
+
 from datalad.tests.utils import *
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -138,7 +139,8 @@ def test_GitRepo_add(src, path):
     assert_raises(AssertionError, gr.add, filename, git=None)
 
     # include committing:
-    added2 = gr.add(filename, commit=True, msg="Add two files.")
+    added2 = gr.add(filename)
+    gr.commit(msg="Add two files.")
     assert_equal(added2, {'success': True, 'file': filename})
 
     assert_in(filename, gr.get_indexed_files(),
@@ -896,7 +898,8 @@ def test_git_custom_calls(path, path2):
     with assert_raises(GitCommandError) as cm:
         repo._gitpy_custom_call('status', git_options={'C': path2})
     assert_in("-C %s status" % path2, str(cm.exception))
-    assert_in("fatal: Not a git repository", str(cm.exception))
+    assert_re_in("fatal: [Nn]ot a git repository",
+                 str(cm.exception), match=False)
 
     # TODO: How to test 'env'?
 
@@ -1045,7 +1048,8 @@ def test_get_missing(path):
         f.write('some')
     with open(opj(path, 'deep', 'test2'), 'w') as f:
         f.write('some more')
-    repo.add('.', commit=True)
+    repo.add('.')
+    repo.commit()
     ok_clean_git(path, annex=False)
     os.unlink(opj(path, 'test1'))
     eq_(repo.get_missing_files(), ['test1'])
@@ -1222,6 +1226,7 @@ def test_get_git_attributes(path):
 def test_get_tags(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
+    eq_(gr.describe(), None)
 
     # Explicitly override the committer date because tests may set it to a
     # fixed value, but we want to check that the returned tags are sorted by
@@ -1232,10 +1237,15 @@ def test_get_tags(path):
         gr.add('file')
         gr.commit(msg="msg")
         eq_(gr.get_tags(), [])
+        eq_(gr.describe(), None)
 
         gr.tag("nonannotated")
         tags1 = [{'name': 'nonannotated', 'hexsha': gr.get_hexsha()}]
         eq_(gr.get_tags(), tags1)
+        eq_(gr.describe(), None)
+        eq_(gr.describe(tags=True), tags1[0]['name'])
+
+    first_commit = gr.get_hexsha()
 
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Fri, 08 Apr 2005 22:13:13 +0200"}):
@@ -1247,10 +1257,15 @@ def test_get_tags(path):
     gr.tag("annotated", message="annotation")
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
+    eq_(gr.describe(), tags2[1]['name'])
+
+    # compare prev commit
+    eq_(gr.describe(commitish=first_commit), None)
+    eq_(gr.describe(commitish=first_commit, tags=True), tags1[0]['name'])
 
 
 @with_tree(tree={'1': ""})
-def test_get_committed_date(path):
+def test_get_commit_date(path):
     gr = GitRepo(path, create=True)
     assert_equal(gr.get_commit_date(), None)
 
@@ -1269,3 +1284,32 @@ def test_get_committed_date(path):
     gr.checkout(gr.get_hexsha())
     eq_(gr.get_active_branch(), None)
     eq_(date, gr.get_commit_date('master'))
+
+
+@with_tree(tree={"foo": "foo content",
+                 "bar": "bar content"})
+def test_fake_dates(path):
+    gr = GitRepo(path, create=True, fake_dates=True)
+
+    gr.add("foo")
+    gr.commit("commit foo")
+
+    seconds_initial = gr.config.obtain("datalad.fake-dates-start")
+
+    # First commit is incremented by 1 second.
+    eq_(seconds_initial + 1, gr.get_commit_date())
+
+    # The second commit by 2.
+    gr.add("bar")
+    gr.commit("commit bar")
+    eq_(seconds_initial + 2, gr.get_commit_date())
+
+    # If we checkout another branch, its time is still based on the latest
+    # timestamp in any local branch.
+    gr.checkout("other", options=["--orphan"])
+    with open(opj(path, "baz"), "w") as ofh:
+        ofh.write("baz content")
+    gr.add("baz")
+    gr.commit("commit baz")
+    eq_(gr.get_active_branch(), "other")
+    eq_(seconds_initial + 3, gr.get_commit_date())

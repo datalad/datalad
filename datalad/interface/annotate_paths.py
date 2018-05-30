@@ -14,11 +14,13 @@ from collections import defaultdict
 
 import logging
 import textwrap
+from collections import OrderedDict
 
 from os import curdir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
+from os.path import islink
 from os.path import dirname
 from os.path import pardir
 from os.path import normpath
@@ -53,22 +55,6 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
-def annotated2ds_props(annotated):
-    """Return a dict with properties of all datasets in `annotated`.
-
-    Returns
-    -------
-    dict
-    """
-    props = {}
-    for a in annotated:
-        if a.get('type', None) == 'dataset':
-            dp = props.get(a['path'], {})
-            dp.update(a)
-            props[a['path']]
-    return props
-
-
 def annotated2content_by_ds(annotated, refds_path):
     """Helper to convert annotated paths into an old-style content_by_ds dict
 
@@ -94,7 +80,7 @@ def annotated2content_by_ds(annotated, refds_path):
       type as dict values) for all annotated paths that have no associated
       parent dataset (i.e. nondataset paths) -- this list will be empty by
       default, unless `nondataset_path_status` was set to ''."""
-    content_by_ds = defaultdict(list)
+    content_by_ds = OrderedDict()
     ds_props = {}
     nondataset_paths = []
     completed = []
@@ -112,7 +98,7 @@ def annotated2content_by_ds(annotated, refds_path):
         parentds = r.get('parentds', None)
         appendto = []  # what entries, if any, to append r to
         if r.get('type', None) == 'dataset':
-            # to dataset handling first, it is the more complex beast
+            # do dataset handling first, it is the more complex beast
             orig_request = r.get('orig_request', None)
             if parentds is None or refds_path is None or \
                     r.get('process_content', False) or (orig_request and (
@@ -136,6 +122,8 @@ def annotated2content_by_ds(annotated, refds_path):
             appendto += [parentds]
 
         for e in appendto:
+            if e not in content_by_ds:
+                content_by_ds[e] = []
             content_by_ds[e] += [r]
 
     return content_by_ds, ds_props, completed, nondataset_paths
@@ -145,6 +133,7 @@ def yield_recursive(ds, path, action, recursion_limit):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
     # is elsewhere
+    from datalad.distribution.subdatasets import Subdatasets
     for subd_res in ds.subdatasets(
             recursive=True,
             recursion_limit=recursion_limit,
@@ -176,6 +165,8 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
     revision : str
       Commit-ish
     """
+    from datalad.interface.diff import Diff
+
     # TODO needs recursion limit
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
@@ -600,9 +591,9 @@ class AnnotatePaths(Interface):
                 path_props['type'] = \
                     path_props.get(
                         'type',
-                        'dataset' if GitRepo.is_valid_repo(path) else 'directory')
+                        'dataset' if not islink(path) and GitRepo.is_valid_repo(path) else 'directory')
                 # this could contain all types of additional content
-                containing_dir = path
+                containing_dir = path if not islink(path) else normpath(opj(path, pardir))
             else:
                 if lexists(path):
                     path_props['type'] = 'file'
@@ -677,6 +668,7 @@ class AnnotatePaths(Interface):
                     (path_type == 'dataset' and 'registered_subds' not in path_props) or
                     path_type == 'directory' or
                     not lexists(path)):
+                from datalad.distribution.subdatasets import Subdatasets
                 # if the path doesn't exist, or is labeled a directory, or a dataset even
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent

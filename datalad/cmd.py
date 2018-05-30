@@ -11,7 +11,7 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
-
+import time
 import subprocess
 import sys
 import logging
@@ -25,14 +25,16 @@ import tempfile
 from collections import OrderedDict
 from six import PY3, PY2
 from six import string_types, binary_type, text_type
-from os.path import abspath, isabs, pathsep, exists
+from .support import path as op
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows, get_tempfile_kwargs, assure_unicode
+from .utils import (
+    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes
+)
 from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
@@ -91,7 +93,7 @@ def _cleanup_output(stream, std):
     if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
         if not stream.closed:
             stream.close()
-        if exists(stream.name):
+        if op.exists(stream.name):
             os.unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
@@ -296,10 +298,17 @@ class Runner(object):
             # in another thread http://codereview.stackexchange.com/a/17959
             # current problem is that if there is no output on stderr
             # it stalls
+            # Monitor if anything was output and if nothing, sleep a bit
+            stdout_, stderr_ = None, None
             if log_stdout_:
-                stdout += self._process_one_line(*stdout_args)
+                stdout_ = self._process_one_line(*stdout_args)
+                stdout += stdout_
             if log_stderr_:
-                stderr += self._process_one_line(*stderr_args)
+                stderr_ = self._process_one_line(*stderr_args)
+                stderr += stderr_
+            if not (stdout_ or stderr_):
+                # no output was generated, so sleep a tiny bit
+                time.sleep(0.001)
 
         # Handle possible remaining output
         stdout_, stderr_ = proc.communicate()
@@ -327,11 +336,12 @@ class Runner(object):
                 if isinstance(out_, text_type):
                     out_ = out_.encode('utf-8')
                 for line in out_.split(linesep_bytes):
-                    out += self._process_one_line(*pargs, line=line)
+                    out += self._process_one_line(
+                        *pargs, line=line, suf=linesep_bytes)
         return out
 
     def _process_one_line(self, out_type, proc, log_, log_is_callable,
-                          expected=False, line=None):
+                          expected=False, line=None, suf=None):
         if line is None:
             lgr.log(3, "Reading line from %s", out_type)
             line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
@@ -342,16 +352,16 @@ class Runner(object):
             line = log_(assure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = line.encode()
+                line = assure_bytes(line)
         if line:
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
-                self._log_err(line.decode() if PY3 else line,
+                self._log_err(line.decode('utf-8') if PY3 else line,
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
-            return line
+            return (line + suf) if suf else line
         # it was output already directly but for code to work, return ""
         return binary_type()
 
@@ -415,7 +425,7 @@ class Runner(object):
 
         Returns
         -------
-        (stdout, stderr)
+        (stdout, stderr) - bytes!
 
         Raises
         ------
@@ -624,12 +634,8 @@ class GitRunner(Runner):
                 # not sure how to live further anyways! ;)
                 alongside = False
             else:
-                annex_path = os.path.dirname(os.path.realpath(annex_fpath))
-                if on_windows:
-                    # just bundled installations so git should be taken from annex
-                    alongside = True
-                else:
-                    alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+                annex_path = op.dirname(op.realpath(annex_fpath))
+                alongside = op.lexists(op.join(annex_path, 'git'))
             GitRunner._GIT_PATH = annex_path if alongside else ''
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
                        "string)", GitRunner._GIT_PATH)
@@ -643,15 +649,15 @@ class GitRunner(Runner):
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
         if GitRunner._GIT_PATH:
-            git_env['PATH'] = pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+            git_env['PATH'] = op.pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
                 else GitRunner._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
             if var:                                    # if env variable set
-                if not isabs(var):                     # and it's a relative path
-                    git_env[varstring] = abspath(var)  # to absolute path
+                if not op.isabs(var):                   # and it's a relative path
+                    git_env[varstring] = op.abspath(var)  # to absolute path
                     lgr.log(9, "Updated %s to %s", varstring, git_env[varstring])
 
         if 'GIT_SSH_COMMAND' not in git_env:
@@ -660,8 +666,11 @@ class GitRunner(Runner):
         return git_env
 
     def run(self, cmd, env=None, *args, **kwargs):
-        return super(GitRunner, self).run(
+        out, err = super(GitRunner, self).run(
             cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+        # All communication here will be returned as unicode
+        # TODO: do that instead within the super's run!
+        return assure_unicode(out), assure_unicode(err)
 
 
 # ####
@@ -672,15 +681,15 @@ class GitRunner(Runner):
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load
     """
-    dst_dir = os.path.dirname(dst)
-    if not os.path.exists(dst_dir):
+    dst_dir = op.dirname(dst)
+    if not op.exists(dst_dir):
         os.makedirs(dst_dir)
-    if os.path.lexists(dst):
+    if op.lexists(dst):
         lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
-    src_realpath = os.path.realpath(src)
+    src_realpath = op.realpath(src)
 
     try:
         os.link(src_realpath, dst)

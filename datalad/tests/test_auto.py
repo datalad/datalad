@@ -26,6 +26,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from datalad.support.json_py import LZMAFile
 
 try:
     import h5py
@@ -138,6 +139,17 @@ def _test_proxying_open(generate_load, verify_load, repo):
         assert_false(annex2.file_has_content(fpath2_2))
         assert_true(os.path.isfile(fpath2_2))
 
+    # In check_once mode, if we drop it, it wouldn't be considered again
+    annex2.drop(fpath2_2)
+    assert_false(annex2.file_has_content(fpath2_2))
+    with AutomagicIO(check_once=True):
+        verify_load(fpath2_2)
+        assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(os.path.isfile(fpath2_2))
+
+
     # if we override stdout with something not supporting fileno, like tornado
     # does which ruins using get under IPython
     # TODO: we might need to refuse any online logging in other places like that
@@ -203,14 +215,11 @@ def test_proxying_lzma_LZMAFile():
     import lzma
 
     def generate_dat(f):
-        # again https://github.com/datalad/datalad/issues/1930
-        lzma_file = lzma.LZMAFile(f, "w")
-        dir(lzma_file)
-        with lzma_file as f:
+        with LZMAFile(f, "w") as f:
             f.write("123".encode('utf-8'))
 
     def verify_dat(f, mode="r"):
-        with lzma.LZMAFile(f, mode) as f:
+        with LZMAFile(f, mode) as f:
             eq_(f.read().decode('utf-8'), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat

@@ -63,6 +63,8 @@ def cls2cmdlinename(cls):
     return r.sub('\\1-\\2', cls.__name__).lower()
 
 
+# TODO remove
+# only `drop` and `uninstall` are still using this
 def handle_dirty_dataset(ds, mode, msg=None):
     """Detect and treat unsaved changes as instructed by `mode`
 
@@ -133,6 +135,8 @@ def get_tree_roots(paths):
     return roots
 
 
+# TODO remove
+# only `remove` and `uninstall` use this, the uses path `path_is_subpath`
 def path_is_under(values, path=None):
     """Whether a given path is a subdirectory of any of the given test values
 
@@ -164,7 +168,8 @@ def path_is_under(values, path=None):
     return False
 
 
-def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec):
+def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
+                                      spec, includeds=None):
     """Discover the edges and nodes in a dataset tree to given target paths
 
     Parameters
@@ -183,12 +188,20 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
       discovered datasets. Specifically, for each discovered dataset there
       will be in item with its path under the key (path) of the respective
       superdataset.
+    includeds : sequence, optional
+      Any paths given are treated as existing subdatasets, regardless of
+      whether they can be found in the filesystem. Such subdatasets will appear
+      under the key of the closest existing dataset in the `spec`.
 
     Returns
     -------
     None
-      Function calls itself recursively and populates `spec` in-place.
+      Function calls itself recursively and populates `spec` dict in-place.
+      Keys are dataset paths, values are sets of subdataset paths
     """
+    # convert to set for faster lookup
+    includeds = includeds if isinstance(includeds, set) else \
+        set() if includeds is None else set(includeds)
     # this beast walks the directory tree from a given `basepath` until
     # it discovers any of the given `targetpaths`
     # if it finds one, it commits any accummulated trace of visited
@@ -197,29 +210,47 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace, spec
     if valid_repo:
         # we are passing into a new dataset, extend the dataset trace
         current_trace = current_trace + [basepath]
-    if basepath in targetpaths:
-        # found a targetpath, commit the trace
-        for i, p in enumerate(current_trace[:-1]):
-            # TODO RF prepare proper annotated path dicts
-            spec[p] = list(set(spec.get(p, []) + [current_trace[i + 1]]))
-    if not isdir(basepath):
-        # nothing underneath this one -> done
-        return
     # this edge is not done, we need to try to reach any downstream
     # dataset
-    for p in listdir(basepath):
-        if valid_repo and p == '.git':
-            # ignore gitdir to speed things up
-            continue
-        p = opj(basepath, p)
-        if all(t != p and not path_startswith(t, p) for t in targetpaths):
+    undiscovered_ds = set(t for t in targetpaths) # if t != basepath)
+    # whether anything in this directory matched a targetpath
+    filematch = False
+    if isdir(basepath):
+        for p in listdir(basepath):
+            p = opj(basepath, p)
+            if not isdir(p):
+                if p in targetpaths:
+                    filematch = True
+                # we cannot have anything below this one
+                continue
             # OPT listdir might be large and we could have only few items
             # in `targetpaths` -- so traverse only those in spec which have
             # leading dir basepath
-            continue
-        # we need to call this even for non-directories, to be able to match
-        # file target paths
-        discover_dataset_trace_to_targets(p, targetpaths, current_trace, spec)
+            # filter targets matching this downward path
+            downward_targets = set(
+                t for t in targetpaths if path_startswith(t, p))
+            if not downward_targets:
+                continue
+            # remove the matching ones from the "todo" list
+            undiscovered_ds.difference_update(downward_targets)
+            # go one deeper
+            discover_dataset_trace_to_targets(
+                p, downward_targets, current_trace, spec,
+                includeds=includeds if not includeds else includeds.intersection(
+                    downward_targets))
+    undiscovered_ds = [t for t in undiscovered_ds
+                       if includeds and
+                          path_is_subpath(t, current_trace[-1]) and
+                          t in includeds]
+    if filematch or basepath in targetpaths or undiscovered_ds:
+        for i, p in enumerate(current_trace[:-1]):
+            # TODO RF prepare proper annotated path dicts
+            subds = spec.get(p, set())
+            subds.add(current_trace[i + 1])
+            spec[p] = subds
+        if undiscovered_ds:
+            spec[current_trace[-1]] = spec.get(current_trace[-1], set()).union(
+                undiscovered_ds)
 
 
 def eval_results(func):
@@ -289,8 +320,8 @@ def eval_results(func):
                 [i for i in mod.__dict__
                  if type(mod.__dict__[i]) == type and
                  issubclass(mod.__dict__[i], Interface) and
-                 i.lower() == wrapped.__module__.split('.')[-1].replace('_', '')]
-            assert(len(command_class_names) == 1)
+                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('datalad_', '').replace('_', ''))]
+            assert len(command_class_names) == 1, (command_class_names, mod.__name__)
             command_class_name = command_class_names[0]
         else:
             command_class_name = wrapped.__qualname__.split('.')[-2]
@@ -356,25 +387,24 @@ def eval_results(func):
         # generator-style, it may generate an exception if desired,
         # on incomplete results
         def generator_func(*_args, **_kwargs):
-            from datalad.plugin import Plugin
-
             # flag whether to raise an exception
             incomplete_results = []
             # track what actions were performed how many times
             action_summary = {}
 
-            for pluginspec in run_before or []:
-                lgr.debug('Running pre-proc plugin %s', pluginspec)
-                for r in _process_results(
-                        Plugin.__call__(
-                            pluginspec,
-                            dataset=allkwargs.get('dataset', None),
-                            return_type='generator'),
-                        _func_class, action_summary,
-                        on_failure, incomplete_results,
-                        result_renderer, result_xfm, result_filter,
-                        **_kwargs):
-                    yield r
+            # TODO needs replacement plugin is gone
+            #for pluginspec in run_before or []:
+            #    lgr.debug('Running pre-proc plugin %s', pluginspec)
+            #    for r in _process_results(
+            #            Plugin.__call__(
+            #                pluginspec,
+            #                dataset=allkwargs.get('dataset', None),
+            #                return_type='generator'),
+            #            _func_class, action_summary,
+            #            on_failure, incomplete_results,
+            #            result_renderer, result_xfm, result_filter,
+            #            **_kwargs):
+            #        yield r
 
             # process main results
             for r in _process_results(
@@ -384,18 +414,19 @@ def eval_results(func):
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
 
-            for pluginspec in run_after or []:
-                lgr.debug('Running post-proc plugin %s', pluginspec)
-                for r in _process_results(
-                        Plugin.__call__(
-                            pluginspec,
-                            dataset=allkwargs.get('dataset', None),
-                            return_type='generator'),
-                        _func_class, action_summary,
-                        on_failure, incomplete_results,
-                        result_renderer, result_xfm, result_filter,
-                        **_kwargs):
-                    yield r
+            # TODO needs replacement plugin is gone
+            #for pluginspec in run_after or []:
+            #    lgr.debug('Running post-proc plugin %s', pluginspec)
+            #    for r in _process_results(
+            #            Plugin.__call__(
+            #                pluginspec,
+            #                dataset=allkwargs.get('dataset', None),
+            #                return_type='generator'),
+            #            _func_class, action_summary,
+            #            on_failure, incomplete_results,
+            #            result_renderer, result_xfm, result_filter,
+            #            **_kwargs):
+            #        yield r
 
             # result summary before a potential exception
             if result_renderer == 'default' and action_summary and \
@@ -449,10 +480,16 @@ def _process_results(
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
     for res in results:
-        if 'action' not in res:
+        if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
             continue
+
+        if PY2:
+            for k, v in res.items():
+                if isinstance(v, unicode):
+                    res[k] = v.encode('utf-8')
+
         actsum = action_summary.get(res['action'], {})
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
@@ -531,6 +568,12 @@ def _process_results(
                          res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
+
+        if PY2:
+            for k, v in res.items():
+                if isinstance(v, str):
+                    res[k] = v.decode('utf-8')
+
         if result_xfm:
             res = result_xfm(res)
             if res is None:

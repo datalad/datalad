@@ -282,10 +282,15 @@ def test_get_status_from_headers():
 
 class FakeCredential1(UserPassword):
     """Credential to test scenarios."""
-    _fixed_credentials = [
-        {'user': 'testlogin', 'password': 'testpassword'},
-        {'user': 'testlogin2', 'password': 'testpassword2'},
-        {'user': 'testlogin2', 'password': 'testpassword3'}]
+    # to be reusable, and not leak across tests,
+    # we should get _fixed_credentials per instance
+    def __init__(self, *args, **kwargs):
+        super(FakeCredential1, self).__init__(*args, **kwargs)
+        self._fixed_credentials = [
+            {'user': 'testlogin', 'password': 'testpassword'},
+            {'user': 'testlogin2', 'password': 'testpassword2'},
+            {'user': 'testlogin2', 'password': 'testpassword3'}
+        ]
     def is_known(self):
         return True
     def __call__(self):
@@ -379,13 +384,26 @@ def test_auth_but_no_cred(keyring):
     assert_equal(downloader.credential.get('password'), 'testpassword')
 
 
+@with_testsui(responses=['yes'])  # will request to reentry it
+def test_authfail404_interactive():
+    # we will firsts get 'failed' but then real 404 when trying new password
+    check_httpretty_authfail404(['failed', '404'])
+
+
+@with_testsui(interactive=False)  # no interactions -- blow!
+def test_authfail404_noninteractive():
+    # we do not get to the 2nd attempt so just get 'failed'
+    # and exception thrown inside is not emerging all the way here but
+    # caught in the check_
+    check_httpretty_authfail404(['failed'])
+
+
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
 @httpretty.activate
-@with_tempfile(mkdir=True)
 @with_fake_cookies_db
-@with_testsui(responses=['yes'])  # will request to reentry it
-def test_HTMLFormAuthenticator_httpretty_authfail404(d):
+@with_tempfile(mkdir=True)
+def check_httpretty_authfail404(exp_called, d):
     # mimic behavior of nersc which 404s but provides feedback whenever
     # credentials are incorrect.  In our case we should fail properly
     credential = FakeCredential1(name='test', url=None)
@@ -412,7 +430,7 @@ def test_HTMLFormAuthenticator_httpretty_authfail404(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     # first one goes with regular DownloadError -- was 404 with not matching content
     assert_raises(DownloadError, downloader.download, url, path=d)
-    assert_equal(was_called, ['failed', '404'])
+    assert_equal(was_called, exp_called)
 
 
 class FakeCredential2(UserPassword):
@@ -431,7 +449,7 @@ class FakeCredential2(UserPassword):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
-def test_HTMLFormAuthenticator_httpretty_2(d):
+def test_scenario_2(d):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential2(name='test', url=None)

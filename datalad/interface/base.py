@@ -26,8 +26,6 @@ from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.utils import with_pathsep as _with_sep
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
@@ -101,7 +99,7 @@ def alter_interface_docs_for_api(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| CMDLINE \>\>.*\<\< CMDLINE \|\|',
+        '\|\| CMDLINE \>\>.*?\<\< CMDLINE \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -117,12 +115,12 @@ def alter_interface_docs_for_api(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| PYTHON \>\>(.*)\<\< PYTHON \|\|',
+        '\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -138,7 +136,7 @@ def alter_interface_docs_for_cmdline(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| PYTHON \>\>.*\<\< PYTHON \|\|',
+        '\|\| PYTHON \>\>.*?\<\< PYTHON \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -154,7 +152,7 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| CMDLINE \>\>(.*)\<\< CMDLINE \|\|',
+        '\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -190,7 +188,7 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -317,6 +315,10 @@ class Interface(object):
     # mode would fall into the debugger
     _interrupted_exit_code = 1
 
+    _OLDSTYLE_COMMANDS = (
+        'AddArchiveContent', 'CrawlInit', 'Crawl', 'CreateSiblingGithub',
+        'CreateTestDataset', 'Export', 'Ls', 'Move', 'SSHRun', 'Test')
+
     @classmethod
     def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
@@ -390,11 +392,7 @@ class Interface(object):
         # let it run like generator so we can act on partial results quicker
         # TODO remove following condition test when transition is complete and
         # run indented code unconditionally
-        if cls.__name__ not in (
-                'AddArchiveContent', 'AggregateMetaData',
-                'CrawlInit', 'Crawl', 'CreateSiblingGithub',
-                'CreateTestDataset', 'DownloadURL', 'Export', 'Ls', 'Move',
-                'SSHRun', 'Search', 'Test'):
+        if cls.__name__ not in Interface._OLDSTYLE_COMMANDS:
             # set all common args explicitly  to override class defaults
             # that are tailored towards the the Python API
             kwargs['return_type'] = 'generator'
@@ -407,22 +405,19 @@ class Interface(object):
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
                 kwargs['result_renderer'] = \
-                    lambda x, **kwargs: ui.message(args.common_output_format.format(**x))
+                    lambda x, **kwargs: ui.message(args.common_output_format.format(
+                        **{k: {k_.replace(':', '#'): v_ for k_, v_ in v.items()}
+                           if isinstance(v, dict) else v
+                           for k, v in x.items()}))
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options
-            result_filter = None
-            if args.common_report_status:
-                if args.common_report_status == 'success':
-                    result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
-                elif args.common_report_status == 'failure':
-                    result_filter = EnsureKeyChoice('status', ('impossible', 'error'))
-                else:
-                    result_filter = EnsureKeyChoice('status', (args.common_report_status,))
-            if args.common_report_type:
-                tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
-                result_filter = result_filter & tfilt if result_filter else tfilt
-            kwargs['result_filter'] = result_filter
+            res_filter = cls._get_result_filter(args)
+            if res_filter is not None:
+                # Don't add result_filter if it's None because then
+                # eval_results can't distinguish between --report-{status,type}
+                # not specified via the CLI and None passed via the Python API.
+                kwargs['result_filter'] = res_filter
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):
@@ -439,10 +434,34 @@ class Interface(object):
                 raise
 
     @classmethod
+    def _get_result_filter(cls, args):
+        from datalad import cfg
+        result_filter = None
+        if args.common_report_status or 'datalad.runtime.report-status' in cfg:
+            report_status = args.common_report_status or \
+                            cfg.obtain('datalad.runtime.report-status')
+            if report_status == "all":
+                pass  # no filter
+            elif report_status == 'success':
+                result_filter = EnsureKeyChoice('status', ('ok', 'notneeded'))
+            elif report_status == 'failure':
+                result_filter = EnsureKeyChoice('status',
+                                                ('impossible', 'error'))
+            else:
+                result_filter = EnsureKeyChoice('status', (report_status,))
+        if args.common_report_type:
+            tfilt = EnsureKeyChoice('type', tuple(args.common_report_type))
+            result_filter = result_filter & tfilt if result_filter else tfilt
+        return result_filter
+
+    @classmethod
     def get_refds_path(cls, dataset):
         """Return a resolved reference dataset path from a `dataset` argument"""
         # theoretically a dataset could come in as a relative path -> resolve
-        refds_path = dataset.path if isinstance(dataset, Dataset) else dataset
+        if dataset is None:
+            return dataset
+        refds_path = dataset.path if isinstance(dataset, Dataset) \
+            else Dataset(dataset).path
         if refds_path:
             refds_path = resolve_path(refds_path)
         return refds_path

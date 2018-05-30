@@ -305,7 +305,7 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
         if start is not None and not path_is_subpath(subds.path, start):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,
@@ -431,7 +431,7 @@ class Get(Interface):
             #git_opts=None,
             #annex_opts=None,
             #annex_get_opts=None,
-            jobs=None,
+            jobs='auto',
             verbose=False,
     ):
         # IMPLEMENTATION CONCEPT:

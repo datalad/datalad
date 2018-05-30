@@ -34,6 +34,8 @@ from ..support import ansi_colors
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
 
+from datalad.distribution.subdatasets import Subdatasets
+
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import GitRepo
 from datalad.utils import is_interactive

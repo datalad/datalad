@@ -57,6 +57,13 @@ def test_git_config_fixture():
         assert_equal(sorted(check_git_configured()), ['user.email', 'user.name'])
 
 
+def test_no_empty_http_proxy():
+    # in __init__ we might prune http_proxy if it is empty, so it must not be
+    # empty if present
+    assert os.environ.get('http_proxy', 'default')
+    assert os.environ.get('https_proxy', 'default')
+
+
 @with_tree(tree={})
 def test_git_config_warning(path):
     with chpwd(path), \
@@ -65,4 +72,3 @@ def test_git_config_warning(path):
         # no configs in that empty HOME
         assert_equal(check_git_configured(), {})
         assert_in("configure git first", cml.out)
-
