@@ -12,7 +12,7 @@ Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -63,7 +63,7 @@ requires = {
+@@ -71,7 +71,7 @@ requires = {
      ] + pbar_requires,
      'downloaders': [
          'boto',
@@ -21,12 +21,12 @@ Last-Update: 2018-03-03
          'requests>=1.2',
      ] + keyring_requires,
      'downloaders-extra': [
-@@ -84,7 +84,7 @@ requires = {
+@@ -93,7 +93,7 @@ requires = {
          'vcrpy',
      ],
      'metadata': [
 -        'duecredit',
 +        #'duecredit',
          'simplejson',
-         'pyld',  # should be either <0.8 or >= 0.8.2. dunno how to specify for pip
-     ],
+         'whoosh',
+     ] + req_lzma,

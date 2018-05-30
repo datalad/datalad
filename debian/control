@@ -8,14 +8,14 @@ Uploaders:
 Build-Depends:
  debhelper (>= 9),
  dh-python,
- git-annex (>= 6.20170525~) | git-annex-standalone (>= 6.20170525~),
+ git-annex (>= 6.20180509~) | git-annex-standalone (>= 6.20180509~),
  help2man,
  patool,
  python-all,
  python-appdirs,
  python-argcomplete,
  python-boto,
- python-bs4,
+ python-dateutil,
  python-fasteners,
  python-iso8601,
  python-jsmin,
@@ -27,18 +27,22 @@ Build-Depends:
  python-keyrings.alt | python-keyring (<=8),
  python-keyring,
  python-secretstorage | python-keyring (<<9.2),
+ python-libxmp,
+ python-lzma,
  python-mock,
  python-msgpack,
+ python-mutagen,
  python-nose,
- python-tqdm | python-progressbar,
- python-pyld,
+ python-pil,
+ python-pyperclip,
  python-requests,
- python-scrapy,
  python-setuptools,
  python-simplejson,
  python-six (>= 1.8.0~),
+ python-tqdm,
+ python-whoosh,
  python-wrapt,
-Standards-Version: 3.9.8
+Standards-Version: 4.1.4
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
 Vcs-Browser: https://github.com/datalad/datalad/
@@ -47,24 +51,27 @@ Package: datalad
 Architecture: all
 Section: science
 Depends:
- python-argcomplete,
  python-datalad (= ${binary:Version}),
+ python-argcomplete,
  ${misc:Depends},
  ${python:Depends}
-Description: data files crawler and data distribution
- DataLad is a data distribution providing access to a wide range of
- data resources already available online (initially aiming at
- neuroscience domain). Using git-annex as its backend for data
- logistics it provides following facilities
+Description: data files management and distribution platform
+ DataLad is a data management and distribution platform providing
+ access to a wide range of data resources already available online.
+ Using git-annex as its backend for data logistics it provides following
+ facilities built-in or available through additional extensions
  .
-  - crawling of web sites to automatically prepare and update git-annex
-    repositories with content from online websites, S3, etc
-  - command line interface for manipulation of collections of datasets
-    (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get), as well as search within
-	aggregated meta-data
+  - command line and Python interfaces for manipulation of collections of
+    datasets (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get)
+  - extract, aggregate, and search through various sources of metadata
+    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
+    support)
+  - crawl web sites to automatically prepare and update git-annex
+    repositories with content from online websites, S3, etc (install
+    datalad-crawler)
  .
- This package provides the command line tool.  Install without
+ This package provides the command line tools.  Install without
  Recommends if you need only core functionality.
 
 Package: python-datalad
@@ -72,7 +79,7 @@ Architecture: all
 Section: python
 Provides: ${python:Provides}
 Depends:
- git-annex (>= 6.20170525~) | git-annex-standalone (>= 6.20170525~),
+ git-annex (>= 6.20180509~) | git-annex-standalone (>= 6.20180509~),
  patool,
  python-appdirs,
  python-fasteners,
@@ -85,40 +92,50 @@ Depends:
  python-keyring,
  python-mock,
  python-msgpack,
- python-pyld,
+ python-pil,
  python-requests,
- python-tqdm | python-progressbar,
  python-simplejson,
  python-six (>= 1.8.0~),
+ python-tqdm,
  python-wrapt,
  ${misc:Depends},
  ${python:Depends}
 Recommends:
  python-duecredit,
+ python-exif,
  python-jsmin,
  python-html5lib,
  python-httpretty,
+ python-libxmp,
+ python-lzma,
+ python-mutagen,
  python-nose,
- python-numpy,
+ python-pyperclip,
  python-requests-ftp,
- python-scrapy,
  python-vcr,
- python-yaml,
+ python-whoosh,
 Suggests:
- python-bs4
-Description: data files crawler and data distribution (Python 2)
- DataLad is a data distribution providing access to a wide range of
- data resources already available online (initially aiming at
- neuroscience domain). Using git-annex as its backend for data
- logistics it provides following facilities
+ python-bs4,
+ python-numpy,
+ datalad-containers,
+ datalad-crawler,
+ datalad-neuroimaging,
+Description: data files management and distribution platform
+ DataLad is a data management and distribution platform providing
+ access to a wide range of data resources already available online.
+ Using git-annex as its backend for data logistics it provides following
+ facilities built-in or available through additional extensions
  .
-  - crawling of web sites to automatically prepare and update git-annex
-    repositories with content from online websites, S3, etc
-  - command line interface for manipulation of collections of datasets
-    (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get), as well as search within
-	aggregated meta-data
+  - command line and Python interfaces for manipulation of collections of
+    datasets (install, uninstall, update, publish, save, etc.) and
+	separate files/directories (add, get)
+  - extract, aggregate, and search through various sources of metadata
+    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
+    support)
+  - crawl web sites to automatically prepare and update git-annex
+    repositories with content from online websites, S3, etc (install
+    datalad-crawler)
  .
  This package installs the module for Python 2, and Recommends install
- all dependencies necessary for crawling, publishing, and testing.
- If you need base functionality, install without Recommends.
+ all dependencies necessary for searching and managing datasets, publishing,
+ and testing.  If you need base functionality, install without Recommends.
