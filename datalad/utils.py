@@ -1740,8 +1740,6 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
 
     return mod
 
-lgr.log(5, "Done importing datalad.utils")
-
 
 def get_encoding_info():
     """Return a dictionary with various encoding/locale information"""
@@ -1766,3 +1764,5 @@ def get_envvars_info():
         ):
             envs.append((var, val))
     return OrderedDict(envs)
+
+lgr.log(5, "Done importing datalad.utils")
