@@ -88,6 +88,9 @@ class Run(Interface):
     line, with any globs expanded in alphabetical order (like bash). Individual
     values can be accessed with an integer index (e.g., "{inputs[0]}").
     << REFLOW ||
+
+    In addition, "{pwd}" will be replaced with the full path of the current
+    working directory.
     """
     _params_ = dict(
         cmd=Parameter(
