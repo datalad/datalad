@@ -136,12 +136,12 @@ class Run(Interface):
             args=('--sidecar',),
             metavar="yes|no",
             doc="""By default, the configuration variable
-            'datalad.run.record-sidecar' is used to determine whether a record
-            with information on a command execution is not placed into
-            the commit message, but into a separate record file instead
-            (default: off). This option can be used to override the configured
-            behavior on a case-by-case basis. Sidecar files are placed into
-            dataset's '.datalad/runinfo' directory (customizable via the
+            'datalad.run.record-sidecar' determines whether a record with
+            information on a command's execution is placed into a separate
+            record file instead of the commit message (default: off). This
+            option can be used to override the configured behavior on a
+            case-by-case basis. Sidecar files are placed into the dataset's
+            '.datalad/runinfo' directory (customizable via the
             'datalad.run.record-directory' configuration variable).""",
             constraints=EnsureNone() | EnsureBool()),
         rerun=Parameter(
