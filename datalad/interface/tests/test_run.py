@@ -801,13 +801,11 @@ def test_globbedpaths(path):
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
 
-    # We can sort the glob output.
+    # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
     with patch('datalad.interface.run.glob', glob_results.get):
-        gp = GlobbedPaths(["z", "a"], sort=False)
-        eq_(gp.expand(), ["z", "x", "d", "b"])
-        gp = GlobbedPaths(["z", "a"], sort=True)
+        gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.

@@ -179,24 +179,20 @@ class GlobbedPaths(object):
     patterns : list of str
         Call `glob.glob` with each of these patterns. "." is considered as
         datalad's special "." path argument; it is not passed to glob and is
-        always left unexpanded.
+        always left unexpanded. Each set of glob results is sorted
+        alphabetically.
     pwd : str, optional
         Glob in this directory.
     expand : bool, optional
        Whether the `paths` property returns unexpanded or expanded paths.
     warn : bool, optional
         Whether to warn when no glob hits are returned for `patterns`.
-    sort : bool, optional
-        Whether to sort globs results alphabetically. This sorting applies
-        within the results for each item in `patterns`, not across the entire
-        collection of results.
     """
 
-    def __init__(self, patterns, pwd=None, expand=False, warn=True, sort=False):
+    def __init__(self, patterns, pwd=None, expand=False, warn=True):
         self.pwd = pwd or getpwd()
         self._expand = expand
         self._warn = warn
-        self._sort = sort
 
         if patterns is None:
             self._maybe_dot = []
@@ -219,9 +215,7 @@ class GlobbedPaths(object):
             for pattern in self._paths["patterns"]:
                 hits = glob(pattern)
                 if hits:
-                    if self._sort:
-                        hits = list(sorted(hits))
-                    expanded.extend([relpath(h) for h in hits])
+                    expanded.extend([relpath(h) for h in sorted(hits)])
                 elif self._warn:
                     lgr.warning("No matching files found for '%s'", pattern)
         return expanded
@@ -350,15 +344,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     outputs_placeholder = "{outputs" in cmd
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
-                          expand=expand in ["inputs", "both"],
-                          sort=inputs_placeholder)
+                          expand=expand in ["inputs", "both"])
     if inputs:
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
             yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"],
-                           sort=outputs_placeholder,
                            warn=not rerun_info)
     if outputs:
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
@@ -372,14 +364,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    if inputs_placeholder or outputs_placeholder or "{pwd" in cmd:
-        sfmt = SequenceFormatter()
-        cmd_expanded = sfmt.format(cmd,
-                                   pwd=pwd,
-                                   inputs=inputs.expand(dot=False),
-                                   outputs=outputs.expand(dot=False))
-    else:
-        cmd_expanded = cmd
+    sfmt = SequenceFormatter()
+    cmd_expanded = sfmt.format(cmd,
+                               pwd=pwd,
+                               inputs=inputs.expand(dot=False),
+                               outputs=outputs.expand(dot=False))
 
     # TODO do our best to guess which files to unlock based on the command string
     #      in many cases this will be impossible (but see rerun). however,
