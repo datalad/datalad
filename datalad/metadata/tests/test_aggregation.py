@@ -19,6 +19,7 @@ from datalad.distribution.dataset import Dataset
 
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_dict_equal
@@ -177,6 +178,39 @@ def test_reaggregate_with_unavailable_objects(path):
         objs,
         [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
     )
+
+
+@with_tree(tree=_dataset_hierarchy_template)
+@with_tempfile(mkdir=True)
+def test_aggregate_with_unavailable_objects_from_subds(path, target):
+    base = Dataset(opj(path, 'origin')).create(force=True)
+    # force all metadata objects into the annex
+    with open(opj(base.path, '.datalad', '.gitattributes'), 'w') as f:
+        f.write(
+            '** annex.largefiles=nothing\nmetadata/objects/** annex.largefiles=anything\n')
+    sub = base.create('sub', force=True)
+    subsub = base.create(opj('sub', 'subsub'), force=True)
+    base.add('.', recursive=True)
+    ok_clean_git(base.path)
+    base.aggregate_metadata(recursive=True, update_mode='all')
+    ok_clean_git(base.path)
+
+    # now make that a subdataset of a new one, so aggregation needs to get the
+    # metadata objects first:
+    super = Dataset(target).create()
+    super.install("base", source=base.path)
+    ok_clean_git(super.path)
+    clone = Dataset(opj(super.path, "base"))
+    ok_clean_git(clone.path)
+    objpath = opj('.datalad', 'metadata', 'objects')
+    objs = [o for o in sorted(clone.repo.get_annexed_files(with_content_only=False)) if o.startswith(objpath)]
+    eq_(len(objs), 6)
+    eq_(all(clone.repo.file_has_content(objs)), False)
+
+    # now aggregate should get those metadata objects
+    super.aggregate_metadata(recursive=True, update_mode='all',
+                             force_extraction=False)
+    eq_(all(clone.repo.file_has_content(objs)), True)
 
 
 # this is for gh-1987
