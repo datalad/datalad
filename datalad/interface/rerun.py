@@ -15,6 +15,7 @@ import logging
 from itertools import dropwhile
 import json
 import os
+import os.path as op
 import re
 import sys
 
@@ -371,15 +372,19 @@ def _rerun(dset, results):
             # and enable re-modification ideally, we would bring back the
             # entire state of the tree with #1424, but we limit ourself to file
             # addition/not-in-place-modification for now
-            auto_outputs = (os.path.relpath(ap["path"], dset.path)
-                            for ap in new_or_modified(res["diff"]))
+            auto_outputs = (ap["path"] for ap in new_or_modified(res["diff"]))
             outputs = run_info.get("outputs", [])
-            auto_outputs = [p for p in auto_outputs if p not in outputs]
+            outputs_dir = op.join(dset.path, run_info["pwd"])
+            auto_outputs = [p for p in auto_outputs
+                            # run records outputs relative to the "pwd" field.
+                            if op.relpath(p, outputs_dir) not in outputs]
+
             message = res["rerun_message"] or res["run_message"]
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
-                                 outputs=outputs + auto_outputs,
+                                 outputs=outputs,
+                                 rerun_outputs=auto_outputs,
                                  message=message,
                                  rerun_info=run_info):
                 yield r
