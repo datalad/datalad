@@ -203,16 +203,19 @@ class GlobbedPaths(object):
                     lgr.warning("No matching files found for '%s'", pattern)
         return expanded
 
-    def expand(self, full=False):
+    def expand(self, full=False, dot=True):
         """Return paths with the globs expanded.
 
         Parameters
         ----------
         full : bool, optional
             Return full paths rather than paths relative to `pwd`.
+        dot : bool, optional
+            Include the "." pattern if it was specified.
         """
+        maybe_dot = self._maybe_dot if dot else []
         if not self._paths["patterns"]:
-            return self._maybe_dot + []
+            return maybe_dot + []
 
         if "expanded" not in self._paths:
             paths = self._expand_globs()
@@ -224,7 +227,7 @@ class GlobbedPaths(object):
             paths = [opj(self.pwd, p) for p in paths]
             self._paths["expanded_full"] = paths
 
-        return self._maybe_dot + paths
+        return maybe_dot + paths
 
     @property
     def paths(self):

@@ -762,6 +762,7 @@ def test_globbedpaths(path):
     # "." gets special treatment.
     gp = GlobbedPaths([".", "*.dat"], pwd=path)
     eq_(set(gp.expand()), {"2.dat", "."})
+    eq_(gp.expand(dot=False), ["2.dat"])
     gp = GlobbedPaths(["."], pwd=path, expand=False)
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
