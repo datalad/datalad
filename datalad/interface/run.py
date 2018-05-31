@@ -369,9 +369,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    if inputs_placeholder or outputs_placeholder:
+    if inputs_placeholder or outputs_placeholder or "{pwd" in cmd:
         sfmt = SequenceFormatter()
         cmd_expanded = sfmt.format(cmd,
+                                   pwd=pwd,
                                    inputs=inputs.expand(dot=False),
                                    outputs=outputs.expand(dot=False))
     else:
