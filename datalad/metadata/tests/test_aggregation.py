@@ -182,6 +182,7 @@ def test_reaggregate_with_unavailable_objects(path):
 
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
+@skip_direct_mode  #FIXME
 def test_aggregate_with_unavailable_objects_from_subds(path, target):
     base = Dataset(opj(path, 'origin')).create(force=True)
     # force all metadata objects into the annex
