@@ -79,18 +79,18 @@ class Run(Interface):
 
     *Command format*
 
-
     || REFLOW >>
-    The command supports using placeholders "{inputs}" and "{outputs}" for the
-    values specified by [CMD: --input and --output CMD][PY: `inputs` and
-    `outputs` PY]. If multiple values are specified, the values will be joined
-    by a space. The order of the values will match that order from the command
-    line, with any globs expanded in alphabetical order (like bash). Individual
+    A few placeholders are supported in the command via Python format
+    specification. "{pwd}" will be replaced with the full path of the current
+    working directory. "{inputs}" and "{outputs}" represent the values
+    specified by [CMD: --input and --output CMD][PY: `inputs` and `outputs`
+    PY]. If multiple values are specified, the values will be joined by a
+    space. The order of the values will match that order from the command line,
+    with any globs expanded in alphabetical order (like bash). Individual
     values can be accessed with an integer index (e.g., "{inputs[0]}").
     << REFLOW ||
 
-    In addition, "{pwd}" will be replaced with the full path of the current
-    working directory.
+    To escape a brace character, double it (i.e., "{{" or "}}").
     """
     _params_ = dict(
         cmd=Parameter(
