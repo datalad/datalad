@@ -455,8 +455,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
         record_path = op.join(ds.path, record_dir, record_id)
         if not op.lexists(record_path):
-            # go for compression, even for minimal records still 2-3x smaller, despite offset cost
-            dump2stream(record, record_path, compressed=False)
+            # go for compression, even for minimal records not much difference, despite offset cost
+            # wrap in list -- there is just one record
+            dump2stream([run_info], record_path, compressed=True)
 
     # compose commit message
     msg = u"""\

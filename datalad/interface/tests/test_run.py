@@ -583,7 +583,7 @@ def test_new_or_modified(path):
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo")
-    ds.run(["touch", "bar"], message='BAR')
+    ds.run(["touch", "bar"], message='BAR', sidecar=True)
     bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")

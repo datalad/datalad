@@ -34,6 +34,7 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
+from datalad.support.json_py import load_stream
 
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -244,7 +245,7 @@ def _revs_as_results(dset, revs):
         res = get_status_dict("run", ds=dset, commit=rev)
         full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
         try:
-            msg, info = get_run_info(full_msg)
+            msg, info = get_run_info(dset, full_msg)
         except ValueError as exc:
             # Recast the error so the message includes the revision.
             raise ValueError(
@@ -459,7 +460,7 @@ def _get_script_handler(script, since, revision):
     return fn
 
 
-def get_run_info(message):
+def get_run_info(dset, message):
     """Extract run information from `message`
 
     Parameters
@@ -491,6 +492,19 @@ def get_run_info(message):
             'cannot rerun command, command specification is not valid JSON: '
             '%s' % exc_str(e)
         )
+    if not isinstance(runinfo, (list, dict)):
+        # this is a run record ID -> load the beast
+        record_dir = dset.config.get(
+            'datalad.run.record-directory',
+            default=op.join('.datalad', 'runinfo'))
+        record_path = op.join(dset.path, record_dir, runinfo)
+        if not op.lexists(record_path):
+            # too harsh IMHO, but same harshness as few lines further down
+            raise ValueError("Run record sidecar file not found: {}".format(record_path))
+        # TODO `get` the file
+        recs = load_stream(record_path, compressed=True)
+        # TODO check if there is a record
+        runinfo = next(recs)
     if 'cmd' not in runinfo:
         raise ValueError("Looks like a run commit but does not have a command")
     return rec_msg.rstrip(), runinfo
