@@ -345,6 +345,9 @@ def get_open_files(path, log_open=False):
     # Original idea: https://stackoverflow.com/a/11115521/1265472
     import psutil
     files = {}
+    # since the ones returned by psutil would not be aware of symlinks in the
+    # path we should also get realpath for path
+    path = realpath(path)
     for proc in psutil.process_iter():
         try:
             open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
