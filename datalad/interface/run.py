@@ -170,12 +170,17 @@ class GlobbedPaths(object):
        Whether the `paths` property returns unexpanded or expanded paths.
     warn : bool, optional
         Whether to warn when no glob hits are returned for `patterns`.
+    sort : bool, optional
+        Whether to sort globs results alphabetically. This sorting applies
+        within the results for each item in `patterns`, not across the entire
+        collection of results.
     """
 
-    def __init__(self, patterns, pwd=None, expand=False, warn=True):
+    def __init__(self, patterns, pwd=None, expand=False, warn=True, sort=False):
         self.pwd = pwd or getpwd()
         self._expand = expand
         self._warn = warn
+        self._sort = sort
 
         if patterns is None:
             self._maybe_dot = []
@@ -198,6 +203,8 @@ class GlobbedPaths(object):
             for pattern in self._paths["patterns"]:
                 hits = glob(pattern)
                 if hits:
+                    if self._sort:
+                        hits = list(sorted(hits))
                     expanded.extend([relpath(h) for h in hits])
                 elif self._warn:
                     lgr.warning("No matching files found for '%s'", pattern)
