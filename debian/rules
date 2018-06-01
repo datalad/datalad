@@ -14,9 +14,6 @@ export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
 
-export PYBUILD_TEST_ARGS_python2=cd {build_dir}; nosetests
-export PYBUILD_TEST_ARGS_python3=cd {build_dir}; python{version} -m discover
-
 # so tests do not segfault
 export WRAPT_DISABLE_EXTENSIONS=1
 
@@ -28,32 +25,32 @@ clean::
 	-rm -rf bin build .pybuild datalad.egg-info
 	-find . -name '*.pyc' -delete
 
-override_dh_auto_test:
-	# cheap fake of an installed datalad
-	$(MAKE) bin
-	# and leave the rest for dh_python* runs
-	mkdir -p build; \
-	    export HOME=$(CURDIR)/build;  \
-        git config --global user.name "TESTING"; \
-        git config --global user.email "TESTING@example.com"
-#	# Skipping a failing test for now: https://github.com/datalad/datalad/issues/357
-#	# Since pybuild overrides HOME for its own purposes, we will rely on our
-#	# setup_package placing it back into HOME
-#	GIT_HOME=$(CURDIR)/build PATH=$(CURDIR)/bin:$$PATH \
-#	    PYBUILD_TEST_ARGS="-s -v datalad" \
-#	    WRAPT_DISABLE_EXTENSIONS=1 \
-#	    dh_auto_test -- --test-nose
-
-
-override_dh_auto_install:
-	dh_auto_install
-	mkdir -p build/man
-	mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
-	# Building manpages. Overcoming #532 which creates some config file
-	HOME=$(CURDIR)/build python3 setup.py build_manpage
-	# Generating argcomplete helper for bash_completion.d
-	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
-
+## override_dh_auto_test:
+## 	# cheap fake of an installed datalad
+## 	$(MAKE) bin
+## 	# and leave the rest for dh_python* runs
+## 	mkdir -p build; \
+## 	    export HOME=$(CURDIR)/build;  \
+##         git config --global user.name "TESTING"; \
+##         git config --global user.email "TESTING@example.com"
+## #	# Skipping a failing test for now: https://github.com/datalad/datalad/issues/357
+## #	# Since pybuild overrides HOME for its own purposes, we will rely on our
+## #	# setup_package placing it back into HOME
+## #	GIT_HOME=$(CURDIR)/build PATH=$(CURDIR)/bin:$$PATH \
+## #	    PYBUILD_TEST_ARGS="-s -v datalad" \
+## #	    WRAPT_DISABLE_EXTENSIONS=1 \
+## #	    dh_auto_test -- --test-nose
+## 
+## 
+## override_dh_auto_install:
+## 	dh_auto_install
+## 	mkdir -p build/man
+## 	#mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
+## 	# Building manpages. Overcoming #532 which creates some config file
+## 	HOME=$(CURDIR)/build python3 setup.py build_manpage
+## 	# Generating argcomplete helper for bash_completion.d
+## 	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
+## 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
 
