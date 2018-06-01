@@ -345,11 +345,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     cmd = normalize_command(cmd)
 
-    # It's OK if these are false positives; at the worst, we do some
-    # unnecessary work.
-    inputs_placeholder = "{inputs" in cmd
-    outputs_placeholder = "{outputs" in cmd
-
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
     if inputs:
