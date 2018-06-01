@@ -362,7 +362,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # These are files we need to unlock/remove for a rerun that aren't
         # included in the explicit outputs. Unlike inputs/outputs, these are
         # full paths, so we can pass them directly to unlock.
-        assert all(map(isabs, rerun_outputs))
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
