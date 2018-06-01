@@ -746,7 +746,8 @@ def test_run_inputs_no_annex_repo(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @known_failure_v6  #FIXME
-@with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c"})
+@with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
+                 "subdir": {}})
 def test_placeholders(path):
     ds = Dataset(path).create(force=True)
     ds.add(".")
@@ -759,6 +760,16 @@ def test_placeholders(path):
 
     ds.run("echo {inputs[0]} >getitem", inputs=["*.in"])
     ok_file_has_content(opj(path, "getitem"), "a.in\n")
+
+    ds.run("echo {pwd} >expanded-pwd")
+    ok_file_has_content(opj(path, "expanded-pwd"), path,
+                        strip=True)
+
+    subdir_path = opj(path, "subdir")
+    with chpwd(subdir_path):
+        run("echo {pwd} >expanded-pwd")
+    ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
+                        strip=True)
 
     # Double brackets can be used to escape placeholders.
     ds.run("touch {{inputs}}", inputs=["*.in"])
@@ -790,13 +801,11 @@ def test_globbedpaths(path):
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
 
-    # We can sort the glob output.
+    # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
     with patch('datalad.interface.run.glob', glob_results.get):
-        gp = GlobbedPaths(["z", "a"], sort=False)
-        eq_(gp.expand(), ["z", "x", "d", "b"])
-        gp = GlobbedPaths(["z", "a"], sort=True)
+        gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.
