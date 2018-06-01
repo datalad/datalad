@@ -15,7 +15,7 @@ export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
 
 %:
-	dh $@ --with python2,python3 --buildsystem=pybuild
+	dh $@ --with python3,python2 --buildsystem=pybuild
 
 clean::
 	dh_clean
@@ -43,7 +43,7 @@ override_dh_auto_install:
 	mkdir -p build/man
 	mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
 	# Building manpages. Overcoming #532 which creates some config file
-	HOME=$(CURDIR)/build python setup.py build_manpage
+	HOME=$(CURDIR)/build python3 setup.py build_manpage
 	# Generating argcomplete helper for bash_completion.d
 	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
 
