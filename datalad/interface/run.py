@@ -299,6 +299,19 @@ def get_command_pwds(dataset):
     return pwd, rel_pwd
 
 
+def normalize_command(command):
+    """Convert `command` to the string representation.
+    """
+    if isinstance(command, list):
+        if len(command) == 1:
+            # This is either a quoted compound shell command or a simple
+            # one-item command. Pass it as is.
+            command = command[0]
+        else:
+            command = " ".join(shlex_quote(c) for c in command)
+    return command
+
+
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=None, rerun_info=None, rerun_outputs=None):
@@ -330,13 +343,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      'cannot detect changes by command'))
         return
 
-    if isinstance(cmd, list):
-        if len(cmd) == 1:
-            # This is either a quoted compound shell command or a simple
-            # one-item command. Pass it as is.
-            cmd = cmd[0]
-        else:
-            cmd = " ".join(shlex_quote(c) for c in cmd)
+    cmd = normalize_command(cmd)
 
     # It's OK if these are false positives; at the worst, we do some
     # unnecessary work.
