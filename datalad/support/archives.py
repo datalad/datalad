@@ -21,7 +21,7 @@ import tempfile
 from .path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
 from .path import sep as opsep
 from .path import realpath
-from six import next
+from six import next, PY2
 from six.moves.urllib.parse import unquote as urlunquote
 
 import string
@@ -138,8 +138,12 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
+        outdir = unixify_path(dir_)
+        if not PY2:
+            # should be supplied in PY3 to avoid b''
+            outdir = assure_unicode(outdir)
         patoolib._extract_archive(unixify_path(archive),
-                                  outdir=unixify_path(dir_),
+                                  outdir=outdir,
                                   verbosity=100)
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
