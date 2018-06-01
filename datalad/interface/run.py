@@ -371,10 +371,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                                inputs=inputs.expand(dot=False),
                                outputs=outputs.expand(dot=False))
 
-    # TODO do our best to guess which files to unlock based on the command string
-    #      in many cases this will be impossible (but see rerun). however,
-    #      generating new data (common case) will be just fine already
-
     # we have a clean dataset, let's run things
     exc = None
     cmd_exitcode = None
