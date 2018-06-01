@@ -345,11 +345,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     cmd = normalize_command(cmd)
 
-    # It's OK if these are false positives; at the worst, we do some
-    # unnecessary work.
-    inputs_placeholder = "{inputs" in cmd
-    outputs_placeholder = "{outputs" in cmd
-
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
     if inputs:
@@ -367,7 +362,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # These are files we need to unlock/remove for a rerun that aren't
         # included in the explicit outputs. Unlike inputs/outputs, these are
         # full paths, so we can pass them directly to unlock.
-        assert all(map(isabs, rerun_outputs))
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
@@ -376,10 +370,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                                pwd=pwd,
                                inputs=inputs.expand(dot=False),
                                outputs=outputs.expand(dot=False))
-
-    # TODO do our best to guess which files to unlock based on the command string
-    #      in many cases this will be impossible (but see rerun). however,
-    #      generating new data (common case) will be just fine already
 
     # we have a clean dataset, let's run things
     exc = None
