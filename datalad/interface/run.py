@@ -16,6 +16,7 @@ import json
 
 from argparse import REMAINDER
 from glob import glob
+import os.path as op
 from os.path import join as opj
 from os.path import curdir
 from os.path import normpath
@@ -32,8 +33,10 @@ from datalad.interface.common_opts import save_message_opt
 
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureBool
 from datalad.support.exceptions import CommandError
 from datalad.support.param import Parameter
+from datalad.support.json_py import dump2stream
 
 from datalad.distribution.add import Add
 from datalad.distribution.get import Get
@@ -132,6 +135,18 @@ class Run(Interface):
             commit message.""",
             constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
         message=save_message_opt,
+        sidecar=Parameter(
+            args=('--sidecar',),
+            metavar="yes|no",
+            doc="""By default, the configuration variable
+            'datalad.run.record-sidecar' determines whether a record with
+            information on a command's execution is placed into a separate
+            record file instead of the commit message (default: off). This
+            option can be used to override the configured behavior on a
+            case-by-case basis. Sidecar files are placed into the dataset's
+            '.datalad/runinfo' directory (customizable via the
+            'datalad.run.record-directory' configuration variable).""",
+            constraints=EnsureNone() | EnsureBool()),
         rerun=Parameter(
             args=('--rerun',),
             action='store_true',
@@ -151,6 +166,7 @@ class Run(Interface):
             outputs=None,
             expand=None,
             message=None,
+            sidecar=None,
             rerun=False):
         if rerun:
             if cmd:
@@ -165,7 +181,8 @@ class Run(Interface):
                 for r in run_command(cmd, dataset=dataset,
                                      inputs=inputs, outputs=outputs,
                                      expand=expand,
-                                     message=message):
+                                     message=message,
+                                     sidecar=sidecar):
                     yield r
             else:
                 lgr.warning("No command given")
@@ -314,7 +331,7 @@ def normalize_command(command):
 
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, rerun_info=None, rerun_outputs=None):
+                message=None, rerun_info=None, rerun_outputs=None, sidecar=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -423,6 +440,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if ds.id:
         run_info["dsid"] = ds.id
 
+    record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
+    if sidecar or (
+            sidecar is None and
+            ds.config.get('datalad.run.record-sidecar', default=False)):
+        # record ID is hash of record itself
+        from hashlib import md5
+        record_id = md5(record.encode('utf-8')).hexdigest()
+        record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
+        record_path = op.join(ds.path, record_dir, record_id)
+        if not op.lexists(record_path):
+            # go for compression, even for minimal records not much difference, despite offset cost
+            # wrap in list -- there is just one record
+            dump2stream([run_info], record_path, compressed=True)
+
     # compose commit message
     msg = u"""\
 [DATALAD RUNCMD] {}
@@ -433,7 +464,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False))
+        '"{}"'.format(record_id) if sidecar else record)
     msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:

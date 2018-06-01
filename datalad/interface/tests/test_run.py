@@ -150,7 +150,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(sub.repo.repo.head.commit.message)
+    _, sub_info = get_run_info(ds, sub.repo.repo.head.commit.message)
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
@@ -288,11 +288,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_run_info(ds.repo.repo.head.commit.message)
+        _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
         assert info["chain"] == commits
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds.repo.repo.head.commit.message)
+    _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
     assert info["chain"] == commits[:1]
 
 
@@ -506,7 +506,7 @@ def test_rerun_subdir(path):
         run("touch test.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
-    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -521,7 +521,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
-    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -583,7 +583,10 @@ def test_new_or_modified(path):
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo")
-    ds.run(["touch", "bar"], message='BAR')
+    ds.run(["touch", "bar"], message='BAR', sidecar=True)
+    # a run record sidecar file was added with the last commit
+    assert(any(d['path'].startswith(opj(ds.path, '.datalad', 'runinfo'))
+               for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
     bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")
@@ -823,6 +826,7 @@ def test_globbedpaths(path):
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
                   get_run_info,
+                  None,
                   """\
 [DATALAD RUNCMD] no command
 
@@ -835,6 +839,7 @@ def test_rerun_commit_message_check():
 
     assert_raises(ValueError,
                   get_run_info,
+                  None,
                   """\
 [DATALAD RUNCMD] junk json
 
@@ -846,7 +851,9 @@ def test_rerun_commit_message_check():
 }
 ^^^ Do not change lines above ^^^""")
 
-    subject, info = get_run_info("""\
+    subject, info = get_run_info(
+        None,
+        """\
 [DATALAD RUNCMD] fine
 
 === Do not change lines below ===
