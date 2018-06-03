@@ -23,6 +23,7 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.support.constraints import EnsureNone
@@ -53,7 +54,8 @@ def _get_file_match(name, dir):
 
 
 def _get_procedure_implementation(name, ds=None):
-    if ds is not None:
+    ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
+    if ds is not None and ds.is_installed():
         # could be more than one
         dirs = assure_list(ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
@@ -86,10 +88,11 @@ class RunProcedure(Interface):
     DO stuff
     """
     _params_ = dict(
-        name=Parameter(
-            args=("name",),
-            metavar='COMMAND',
-            doc="command for execution"),
+        spec=Parameter(
+            args=("spec",),
+            metavar='NAME [ARGS]',
+            nargs=REMAINDER,
+            doc=""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset to record the command results in.
@@ -97,26 +100,24 @@ class RunProcedure(Interface):
             working directory. If a dataset is given, the command will be
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
-        args=Parameter(
-            args=('args',),
-            nargs=REMAINDER,
-            doc="""anything as string args"""),
     )
 
     @staticmethod
     @datasetmethod(name='run_procedure')
     @eval_results
     def __call__(
-            name=None,
-            dataset=None,
-            args=None):
+            spec,
+            dataset=None):
+        spec = assure_list(spec)
+        name = spec[0]
+        args = spec[1:]
         procedure_file = _get_procedure_implementation(name, ds=dataset)
         if not procedure_file:
             # TODO error result
             raise ValueError("Cannot find procedure with name '%s'", name)
 
         ds = require_dataset(
-            dataset, check_installed=True,
+            dataset, check_installed=False,
             purpose='run a procedure') if dataset else None
 
         cmd_tmpl = _guess_exec(procedure_file)
@@ -128,7 +129,7 @@ class RunProcedure(Interface):
                 cmd=cmd,
                 dataset=ds,
                 # See gh-2593 for discussion on run feature extension
-                #strict=True,
+                #explicit=True,
                 #inputs=None,
                 #outputs=None,
         ):
