@@ -15,7 +15,9 @@ import logging
 
 from glob import iglob
 from argparse import REMAINDER
+import os
 import os.path as op
+import stat
 
 from datalad import cfg
 from datalad.interface.base import Interface
@@ -45,11 +47,12 @@ BUILTIN_PROCEDURES_PATH = op.join(
 
 
 def _get_file_match(name, dir):
-    targets = (('[!_]*.py'), ('[!_]*.sh'))
+    targets = (name, ('[!_]*.py'), ('[!_]*.sh'))
     lgr.debug("Looking for procedure '%s' in '%s'", name, dir)
     for target in targets:
         for m in iglob(op.join(dir, target)):
-            if op.basename(m).startswith('{}.'.format(name)):
+            m_bn = op.basename(m)
+            if m_bn == name or m_bn.startswith('{}.'.format(name)):
                 return m
 
 
@@ -75,7 +78,9 @@ def _get_procedure_implementation(name, ds=None):
 
 def _guess_exec(script_file):
     # TODO check for exec permission and rely on interpreter
-    if script_file.endswith('.sh'):
+    if os.stat(script_file).st_mode & stat.S_IEXEC:
+        return u'"{script}" "{ds}" {args}'
+    elif script_file.endswith('.sh'):
         return u'bash "{script}" "{ds}" {args}'
     elif script_file.endswith('.py'):
         return u'python "{script}" "{ds}" {args}'
@@ -108,7 +113,10 @@ class RunProcedure(Interface):
     def __call__(
             spec,
             dataset=None):
-        spec = assure_list(spec)
+        if not isinstance(spec, (tuple, list)):
+            # maybe coming from config
+            import shlex
+            spec = shlex.split(spec)
         name = spec[0]
         args = spec[1:]
         procedure_file = _get_procedure_implementation(name, ds=dataset)
