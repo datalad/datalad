@@ -91,6 +91,9 @@ def _guess_exec(script_file):
 class RunProcedure(Interface):
     """
     DO stuff
+    datalad.locations.dataset-procedures
+    datalad.locations.user-procedures
+    datalad.locations.system-procedures
     """
     _params_ = dict(
         spec=Parameter(
@@ -119,6 +122,7 @@ class RunProcedure(Interface):
             spec = shlex.split(spec)
         name = spec[0]
         args = spec[1:]
+        print("?????", name, args)
         procedure_file = _get_procedure_implementation(name, ds=dataset)
         if not procedure_file:
             # TODO error result
@@ -132,7 +136,10 @@ class RunProcedure(Interface):
         cmd = cmd_tmpl.format(
             script=procedure_file,
             ds=ds.path if ds else '',
-            args=u' '.join(u'"{}"'.format(a) for a in assure_list(args)) if args else '')
+            args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
+        lgr.debug('Attempt to run procedure {} as: {}'.format(
+            name,
+            cmd))
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,

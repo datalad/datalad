@@ -9,7 +9,7 @@ import os.path as op
 from datalad.distribution.dataset import require_dataset
 
 # bound dataset methods
-import datalad.distribution.save
+import datalad.interface.save
 
 ds = require_dataset(
     sys.argv[1],
@@ -26,9 +26,10 @@ for nt in sys.argv[2:]:
         where='dataset',
         reload=False)
 
-ds.save([dict(
-    path=op.join(ds.path, '.datalad', 'config'),
-    type='file',
-    parentds=ds.path)],
+ds.save(
+    path=[dict(
+        path=op.join(ds.path, '.datalad', 'config'),
+        type='file',
+        parentds=ds.path)],
     message="Configure metadata type(s)",
 )
