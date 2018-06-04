@@ -643,9 +643,8 @@ def test_run_inputs_outputs(path):
     ok_(ds.repo.file_has_content("test-annex.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("touch dummy", inputs=["*.not-an-extension"])
-        assert_in("No matching files found for '*.not-an-extension'",
-                  cml.out)
+        ds.run("touch dummy", inputs=["not-there"])
+        assert_in("Input does not exist: ", cml.out)
 
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
@@ -714,10 +713,9 @@ def test_run_inputs_outputs(path):
     with open(opj(path, "a.dat")) as fh:
         eq_(fh.read(), "a.dat appended\n")
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("echo blah", outputs=["*.not-an-extension"])
-        assert_in("No matching files found for '*.not-an-extension'",
-                  cml.out)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ds.run("echo blah", outputs=["not-there"])
+        assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")

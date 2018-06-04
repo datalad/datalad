@@ -233,8 +233,10 @@ class GlobbedPaths(object):
                 hits = glob(pattern)
                 if hits:
                     expanded.extend([relpath(h) for h in sorted(hits)])
-                elif self._warn:
-                    lgr.warning("No matching files found for '%s'", pattern)
+                else:
+                    if self._warn:
+                        lgr.warning("No matching files found for '%s'", pattern)
+                    expanded.extend([pattern])
         return expanded
 
     def expand(self, full=False, dot=True):
@@ -275,14 +277,33 @@ class GlobbedPaths(object):
 
 
 def _unlock_or_remove(dset, paths):
-    for res in dset.unlock(paths, on_failure="ignore"):
+    """Unlock `paths` if content is present; remove otherwise.
+
+    Parameters
+    ----------
+    dset : Dataset
+    paths : list of string
+        Absolute paths of dataset files.
+
+    Returns
+    -------
+    Generator with result records.
+    """
+    existing = []
+    for path in paths:
+        if op.exists(path) or op.lexists(path):
+            existing.append(path)
+        else:
+            # Avoid unlock's warning because output files may not exist in
+            # common cases (e.g., when rerunning with --onto).
+            lgr.debug("Filtered out non-existing path: %s", path)
+
+    for res in dset.unlock(existing, on_failure="ignore"):
         if res["status"] == "impossible":
             if "no content" in res["message"]:
                 for rem_res in dset.remove(res["path"],
                                            check=False, save=False):
                     yield rem_res
-                continue
-            elif "path does not exist" in res["message"]:
                 continue
         yield res
 
@@ -367,7 +388,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                           expand=expand in ["inputs", "both"])
     if inputs:
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
-            yield res
+            if res.get("state") == "absent":
+                lgr.warning("Input does not exist: %s", res["path"])
+            else:
+                yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"],
