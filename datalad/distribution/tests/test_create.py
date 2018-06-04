@@ -11,6 +11,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import skip_if_on_windows
 
 
 import os
@@ -303,6 +304,7 @@ def test_saving_prior(topdir):
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
 
 
+@skip_if_on_windows  # https://github.com/datalad/datalad/issues/2606
 @with_tempfile(mkdir=True)
 def test_create_withprocedure(path):
     # first without
