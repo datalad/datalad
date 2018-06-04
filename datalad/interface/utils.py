@@ -361,13 +361,15 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_plugin_specs(param_key=None, cfg_key=None):
+        def _get_plugin_specs(param_key=None, cfg_key=None, ds=None):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
                 return spec
 
-            spec = dlcfg.get(cfg_key, None)
+            from datalad.distribution.dataset import Dataset
+            spec = ((ds if isinstance(ds, Dataset) else Dataset(ds)).config \
+                    if ds else dlcfg).get(cfg_key, None)
             if spec is None:
                 return
             elif not isinstance(spec, tuple):
@@ -376,12 +378,15 @@ def eval_results(func):
 
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
+        dataset_arg = allkwargs.get('dataset', None)
         run_before = _get_plugin_specs(
             'run_before',
-            'datalad.{}.run-before'.format(cmdline_name))
+            'datalad.{}.run-before'.format(cmdline_name),
+            ds=dataset_arg)
         run_after = _get_plugin_specs(
             'run_after',
-            'datalad.{}.run-after'.format(cmdline_name))
+            'datalad.{}.run-after'.format(cmdline_name),
+            ds=dataset_arg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -399,7 +404,7 @@ def eval_results(func):
                     for r in _process_results(
                             RunProcedure.__call__(
                                 procspec,
-                                dataset=allkwargs.get('dataset', None),
+                                dataset=dataset_arg,
                                 return_type='generator'),
                             _func_class, action_summary,
                             on_failure, incomplete_results,
@@ -422,7 +427,7 @@ def eval_results(func):
                     for r in _process_results(
                             RunProcedure.__call__(
                                 procspec,
-                                dataset=allkwargs.get('dataset', None),
+                                dataset=dataset_arg,
                                 return_type='generator'),
                             _func_class, action_summary,
                             on_failure, incomplete_results,
