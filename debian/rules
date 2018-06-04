@@ -10,7 +10,7 @@ gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
-export PYBUILD_TEST_ARGS = -s -v -x
+export PYBUILD_TEST_ARGS = -s -v
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
