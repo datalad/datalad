@@ -26,35 +26,32 @@ clean::
 	-rm -rf bin build .pybuild datalad.egg-info
 	-find . -name '*.pyc' -delete
 
-## override_dh_auto_configure:
-## 	# cheap fake of an installed datalad, so we get .egg-info with entry points
-## 	$(MAKE) bin
-## 	dh_auto_configure $@
-
-override_dh_auto_test:
-	# cheap fake of an installed datalad
+override_dh_auto_configure:
+	# cheap fake of an installed datalad, so we get .egg-info with entry points
 	$(MAKE) bin
 	# and leave the rest for dh_python* runs
-#	mkdir -p build; \
-#	    export HOME=$(CURDIR)/build;  \
-#        git config --global user.name "TESTING"; \
-#        git config --global user.email "TESTING@example.com"
-#	# Skipping a failing test for now: https://github.com/datalad/datalad/issues/357
+	mkdir -p build; \
+	    export HOME=$(CURDIR)/build;  \
+        git config --global user.name "TESTING"; \
+        git config --global user.email "TESTING@example.com"
+
+override_dh_auto_test:
 #	# Since pybuild overrides HOME for its own purposes, we will rely on our
 #	# setup_package placing it back into HOME
 	PATH=$(CURDIR)/bin:$$PATH \
 	    dh_auto_test -- --test-nose
-## 
-## 
-## override_dh_auto_install:
-## 	dh_auto_install
-## 	mkdir -p build/man
-## 	#mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
-## 	# Building manpages. Overcoming #532 which creates some config file
-## 	HOME=$(CURDIR)/build python3 setup.py build_manpage
-## 	# Generating argcomplete helper for bash_completion.d
-## 	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
-## 
+
+
+override_dh_auto_install:
+	dh_auto_install
+	mv debian/python3-datalad/usr/bin/* debian/datalad/usr/bin
+	rm -f debian/python*-datalad/usr/bin/*
+	# Building manpages. Overcoming #532 which creates some config file
+	mkdir -p build/man
+	HOME=$(CURDIR)/build python3 setup.py build_manpage
+	# Generating argcomplete helper for bash_completion.d
+	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
+
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
 
