@@ -230,6 +230,6 @@ Description: data files management and distribution platform
     repositories with content from online websites, S3, etc (install
     datalad-crawler)
  .
- This package installs the module for Python 2, and Recommends install
+ This package installs the module for Python 3, and Recommends install
  all dependencies necessary for searching and managing datasets, publishing,
  and testing.  If you need base functionality, install without Recommends.
