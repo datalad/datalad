@@ -58,6 +58,27 @@ definitions = {
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'plugins'),
     },
+    'datalad.locations.system-procedures': {
+        'ui': ('question', {
+               'title': 'System procedure directory',
+               'text': 'Where should datalad search for system procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'procedures'),
+    },
+    'datalad.locations.user-procedures': {
+        'ui': ('question', {
+               'title': 'User procedure directory',
+               'text': 'Where should datalad search for user procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.dataset-procedures': {
+        'ui': ('question', {
+               'title': 'Dataset procedure directory',
+               'text': 'Where should datalad search for dataset procedures (relative to a dataset root)?'}),
+        'destination': 'dataset',
+        'default': opj('.datalad', 'procedures'),
+    },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
