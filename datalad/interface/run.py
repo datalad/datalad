@@ -203,14 +203,11 @@ class GlobbedPaths(object):
         Glob in this directory.
     expand : bool, optional
        Whether the `paths` property returns unexpanded or expanded paths.
-    warn : bool, optional
-        Whether to warn when no glob hits are returned for `patterns`.
     """
 
-    def __init__(self, patterns, pwd=None, expand=False, warn=True):
+    def __init__(self, patterns, pwd=None, expand=False):
         self.pwd = pwd or getpwd()
         self._expand = expand
-        self._warn = warn
 
         if patterns is None:
             self._maybe_dot = []
@@ -235,8 +232,7 @@ class GlobbedPaths(object):
                 if hits:
                     expanded.extend([relpath(h) for h in sorted(hits)])
                 else:
-                    if self._warn:
-                        lgr.warning("No matching files found for '%s'", pattern)
+                    lgr.debug("No matching files found for '%s'", pattern)
                     expanded.extend([pattern])
         return expanded
 
@@ -394,8 +390,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
-                           expand=expand in ["outputs", "both"],
-                           warn=not rerun_info)
+                           expand=expand in ["outputs", "both"])
     if outputs:
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
             yield res
