@@ -814,11 +814,9 @@ def test_globbedpaths(path):
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)
 
-    with swallow_logs(new_level=logging.WARN) as cml:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
         GlobbedPaths(["not here"], pwd=path).expand()
         assert_in("No matching files found for 'not here'", cml.out)
-        GlobbedPaths(["also not"], pwd=path, warn=False).expand()
-        assert_not_in("No matching files found for 'also not'", cml.out)
 
 
 def test_rerun_commit_message_check():
