@@ -10,6 +10,7 @@ gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
+export PYBUILD_TEST_ARGS = -s -v -x
 export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
@@ -18,7 +19,7 @@ export https_proxy=http://127.0.0.1:9/
 export WRAPT_DISABLE_EXTENSIONS=1
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@ --with python2,python3 --buildsystem=pybuild
 
 clean::
 	dh_clean
