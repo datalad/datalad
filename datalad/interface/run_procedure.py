@@ -159,5 +159,7 @@ class RunProcedure(Interface):
                 #explicit=True,
                 #inputs=None,
                 #outputs=None,
+                # pass through here
+                on_failure='ignore',
         ):
             yield r
