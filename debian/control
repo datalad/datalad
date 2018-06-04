@@ -108,33 +108,6 @@ Description: data files management and distribution platform
  This package provides the command line tools.  Install without
  Recommends if you need only core functionality.
 
-Package: datalad-complete
-Architecture: all
-Section: science
-Depends:
- datalad (= ${binary:Version}),
- datalad-containers,
- datalad-crawler,
- datalad-neuroimaging,
-Description: data files management and distribution platform
- DataLad is a data management and distribution platform providing
- access to a wide range of data resources already available online.
- Using git-annex as its backend for data logistics it provides following
- facilities built-in or available through additional extensions
- .
-  - command line and Python interfaces for manipulation of collections of
-    datasets (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get)
-  - extract, aggregate, and search through various sources of metadata
-    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
-    support)
-  - crawl web sites to automatically prepare and update git-annex
-    repositories with content from online websites, S3, etc (install
-    datalad-crawler)
- .
- This meta-package provides the most complete installation of DataLad
- and its extensions.
-
 Package: python-datalad
 Architecture: all
 Section: python
