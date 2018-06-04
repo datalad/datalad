@@ -18,7 +18,7 @@ export https_proxy=http://127.0.0.1:9/
 export WRAPT_DISABLE_EXTENSIONS=1
 
 %:
-	dh $@ --with python2,python3 --buildsystem=pybuild
+	dh $@ --with python3 --buildsystem=pybuild
 
 clean::
 	dh_clean
