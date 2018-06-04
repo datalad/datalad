@@ -368,8 +368,9 @@ def eval_results(func):
                 return spec
 
             from datalad.distribution.dataset import Dataset
-            spec = ((ds if isinstance(ds, Dataset) else Dataset(ds)).config \
-                    if ds else dlcfg).get(cfg_key, None)
+            ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
+            spec = (ds.config if ds and ds.is_installed()
+                    else dlcfg).get(cfg_key, None)
             if spec is None:
                 return
             elif not isinstance(spec, tuple):
