@@ -25,6 +25,11 @@ clean::
 	-rm -rf bin build .pybuild datalad.egg-info
 	-find . -name '*.pyc' -delete
 
+override_dh_auto_configure:
+	# cheap fake of an installed datalad, so we get .egg-info with entry points
+	$(MAKE) bin
+	dh_auto_configure $@
+
 ## override_dh_auto_test:
 ## 	# cheap fake of an installed datalad
 ## 	$(MAKE) bin
