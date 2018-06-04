@@ -331,7 +331,8 @@ def normalize_command(command):
 
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, rerun_info=None, rerun_outputs=None, sidecar=None):
+                message=None, sidecar=None,
+                rerun_info=None, rerun_outputs=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
