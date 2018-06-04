@@ -134,6 +134,12 @@ class Run(Interface):
             doc="""Expand globs when storing inputs and/or outputs in the
             commit message.""",
             constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
+        explicit=Parameter(
+            args=("--explicit",),
+            action="store_true",
+            doc="""Consider the specification of inputs and outputs to be
+            explicit. Don't warn if the repository is dirty, and only save
+            modifications to the listed outputs."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -165,6 +171,7 @@ class Run(Interface):
             inputs=None,
             outputs=None,
             expand=None,
+            explicit=False,
             message=None,
             sidecar=None,
             rerun=False):
@@ -181,6 +188,7 @@ class Run(Interface):
                 for r in run_command(cmd, dataset=dataset,
                                      inputs=inputs, outputs=outputs,
                                      expand=expand,
+                                     explicit=explicit,
                                      message=message,
                                      sidecar=sidecar):
                     yield r
@@ -348,7 +356,7 @@ def normalize_command(command):
 
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, sidecar=None,
+                explicit=False, message=None, sidecar=None,
                 rerun_info=None, rerun_outputs=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
@@ -369,14 +377,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     from datalad.cmd import Runner
 
     lgr.debug('tracking command output underneath %s', ds)
-    if not rerun_info and ds.repo.dirty:  # Rerun already takes care of this.
-        yield get_status_dict(
-            'run',
-            ds=ds,
-            status='impossible',
-            message=('unsaved modifications present, '
-                     'cannot detect changes by command'))
-        return
+
+    if not rerun_info:  # Rerun already takes care of this.
+        # For explicit=True, we probably want to check whether any inputs have
+        # modifications. However, we can't just do is_dirty(..., path=inputs)
+        # because we need to consider subdatasets and untracked files.
+        if not explicit and ds.repo.dirty:
+            yield get_status_dict(
+                'run',
+                ds=ds,
+                status='impossible',
+                message=('unsaved modifications present, '
+                         'cannot detect changes by command'))
+            return
 
     cmd = normalize_command(cmd)
 
@@ -497,5 +510,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                  msg_path)
         raise exc
     else:
-        for r in ds.add('.', recursive=True, message=msg):
-            yield r
+        outputs_to_save = outputs.expand(full=True) if explicit else '.'
+        if outputs_to_save:
+            for r in ds.add(outputs_to_save, recursive=True, message=msg):
+                yield r

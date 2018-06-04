@@ -744,6 +744,54 @@ def test_run_inputs_no_annex_repo(path):
     ds.rerun()
 
 
+@slow  # ~10s
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_testrepos('basic_annex', flavors=['clone'])
+@known_failure_direct_mode  #FIXME
+def test_run_explicit(path):
+    ds = Dataset(path)
+
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
+
+    create_tree(ds.path, {"dirt_untracked": "untracked",
+                          "dirt_modified": "modified"})
+    ds.add("dirt_modified", to_git=True)
+    with open(opj(path, "dirt_modified"), "a") as ofh:
+        ofh.write(", more")
+
+    # We need explicit=True to run with dirty repo.
+    assert_status("impossible",
+                  ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+                         inputs=["test-annex.dat"],
+                         on_failure="ignore"))
+
+    hexsha_initial = ds.repo.get_hexsha()
+    # If we specify test-annex.dat as an input, it will be retrieved before the
+    # run.
+    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"], explicit=True)
+    ok_(ds.repo.file_has_content("test-annex.dat"))
+    # We didn't commit anything because outputs weren't specified.
+    assert_false(ds.repo.file_has_content("doubled.dat"))
+    eq_(hexsha_initial, ds.repo.get_hexsha())
+
+    # If an input doesn't exist, we just show the standard warning.
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.run("ls", inputs=["not-there"], explicit=True)
+        assert_in("Input does not exist: ", cml.out)
+
+    remove(opj(path, "doubled.dat"))
+
+    hexsha_initial = ds.repo.get_hexsha()
+    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"], outputs=["doubled.dat"],
+           explicit=True)
+    ok_(ds.repo.file_has_content("doubled.dat"))
+    ok_(ds.repo.is_dirty(path="dirt_modified"))
+    neq_(hexsha_initial, ds.repo.get_hexsha())
+
+
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @known_failure_v6  #FIXME
