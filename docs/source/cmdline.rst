@@ -54,6 +54,7 @@ Reproducible execution
 
    generated/man/datalad-run
    generated/man/datalad-rerun
+   generated/man/datalad-run-procedure
 
 Miscellaneous commands
 ======================
