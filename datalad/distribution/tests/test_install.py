@@ -15,6 +15,7 @@ from datalad.tests.utils import known_failure_direct_mode
 
 import logging
 import os
+import os.path as op
 
 from os.path import join as opj
 from os.path import isdir
@@ -913,3 +914,18 @@ def test_install_subds_from_another_remote(topdir):
         clone1.update(merge=True, sibling=clone2_)
         # print("Installing within updated dataset -- should be able to install from clone2")
         clone1.install('subds1')
+
+
+# document the "undesired" behavior described in gh-2601
+@with_tempfile()
+def test_relative_submodule_url(path):
+    Dataset(op.join(path, 'origin')).create()
+    ds = Dataset(op.join(path, 'ds')).create()
+    with chpwd(ds.path):
+        ds.install(
+            source=op.join(op.pardir, 'origin'),
+            path='sources')
+    subinfo = ds.subdatasets(return_type='item-or-list')
+    eq_(subinfo['gitmodule_url'],
+        # this is one ugly monster
+        op.join(ds.path, op.pardir, 'origin'))
