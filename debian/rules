@@ -15,6 +15,8 @@ export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
 
+export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/
+
 # so tests do not segfault
 export WRAPT_DISABLE_EXTENSIONS=1
 
@@ -29,8 +31,6 @@ clean::
 override_dh_auto_configure:
 	# cheap fake of an installed datalad, so we get .egg-info with entry points
 	$(MAKE) bin
-	# very ugly hack to overcome the problem that there is no pyliblzma on py3
-	sed -i -n -e '/pyliblzma/d' datalad.egg-info/requires.txt
 	# and leave the rest for dh_python* runs
 	mkdir -p build; \
 	    export HOME=$(CURDIR)/build;  \
