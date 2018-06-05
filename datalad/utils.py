@@ -1575,7 +1575,8 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    with open(fname, 'rb' if PY2 else 'r') as tsvfile:
+    kw = {} if PY2 else dict(encoding='utf-8')
+    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,
