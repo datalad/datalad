@@ -34,6 +34,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import run
+from datalad.interface.run import GlobbedPaths
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
 from datalad.tests.utils import assert_raises
@@ -43,6 +44,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_exists
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
@@ -101,6 +103,10 @@ def test_basics(path, nodspath):
         res = ds.run('touch empty', message='NOOP_TEST')
         assert_status('notneeded', res)
         eq_(last_state, ds.repo.get_hexsha())
+        # We can also run the command via a single-item list because this is
+        # what the CLI interface passes in for quoted commands.
+        res = ds.run(['touch empty'], message='NOOP_TEST')
+        assert_status('notneeded', res)
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
@@ -144,7 +150,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(sub.repo.repo.head.commit.message)
+    _, sub_info = get_run_info(ds, sub.repo.repo.head.commit.message)
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
@@ -282,11 +288,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_run_info(ds.repo.repo.head.commit.message)
+        _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
         assert info["chain"] == commits
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds.repo.repo.head.commit.message)
+    _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
     assert info["chain"] == commits[:1]
 
 
@@ -500,7 +506,7 @@ def test_rerun_subdir(path):
         run("touch test.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
-    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -515,7 +521,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
-    rec_msg, runinfo = get_run_info(ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -577,7 +583,10 @@ def test_new_or_modified(path):
 def test_rerun_script(path):
     ds = Dataset(path).create()
     ds.run("echo a >foo")
-    ds.run(["touch", "bar"], message='BAR')
+    ds.run(["touch", "bar"], message='BAR', sidecar=True)
+    # a run record sidecar file was added with the last commit
+    assert(any(d['path'].startswith(opj(ds.path, '.datalad', 'runinfo'))
+               for d in ds.rerun(report=True, return_type='item-or-list')['diff']))
     bar_hexsha = ds.repo.get_hexsha()
 
     script_file = opj(path, "commands.sh")
@@ -635,7 +644,7 @@ def test_run_inputs_outputs(path):
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["*.not-an-extension"])
-        assert_in("No matching files found for *.not-an-extension",
+        assert_in("No matching files found for '*.not-an-extension'",
                   cml.out)
 
     # Test different combinations of globs and explicit files.
@@ -667,6 +676,12 @@ def test_run_inputs_outputs(path):
     ds.repo.drop("subdir", options=["--force"])
     ds.run("touch subdir-dummy", inputs=[opj(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(opj("subdir", f)) for f in ["a", "b"]))
+
+    # Inputs are specified relative to a dataset's subdirectory.
+    ds.repo.drop(opj("subdir", "a"), options=["--force"])
+    with chpwd(opj(path, "subdir")):
+        run("touch subdir-dummy1", inputs=["a"])
+    ok_(ds.repo.file_has_content(opj("subdir", "a")))
 
     # --input=. runs "datalad get ."
     ds.run("touch dot-dummy", inputs=["."])
@@ -701,7 +716,7 @@ def test_run_inputs_outputs(path):
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("echo blah", outputs=["*.not-an-extension"])
-        assert_in("No matching files found for *.not-an-extension",
+        assert_in("No matching files found for '*.not-an-extension'",
                   cml.out)
 
     ds.create('sub')
@@ -731,9 +746,87 @@ def test_run_inputs_no_annex_repo(path):
     ds.rerun()
 
 
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@known_failure_v6  #FIXME
+@with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
+                 "subdir": {}})
+def test_placeholders(path):
+    ds = Dataset(path).create(force=True)
+    ds.add(".")
+    ds.run("echo {inputs} >{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
+    ok_file_has_content(opj(path, "c.out"), "a.in b.in\n")
+
+    hexsha_before = ds.repo.get_hexsha()
+    ds.rerun()
+    eq_(hexsha_before, ds.repo.get_hexsha())
+
+    ds.run("echo {inputs[0]} >getitem", inputs=["*.in"])
+    ok_file_has_content(opj(path, "getitem"), "a.in\n")
+
+    ds.run("echo {pwd} >expanded-pwd")
+    ok_file_has_content(opj(path, "expanded-pwd"), path,
+                        strip=True)
+
+    subdir_path = opj(path, "subdir")
+    with chpwd(subdir_path):
+        run("echo {pwd} >expanded-pwd")
+    ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
+                        strip=True)
+
+    # Double brackets can be used to escape placeholders.
+    ds.run("touch {{inputs}}", inputs=["*.in"])
+    ok_exists(opj(path, "{inputs}"))
+
+
+@with_tree(tree={"1.txt": "",
+                 "2.dat": "",
+                 "3.txt": ""})
+def test_globbedpaths(path):
+    for patterns, expected in [
+            (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
+            (["*.txt"], {"1.txt", "3.txt"})]:
+        gp = GlobbedPaths(patterns, pwd=path)
+        eq_(set(gp.expand()), expected)
+        eq_(set(gp.expand(full=True)),
+            {opj(path, p) for p in expected})
+
+    # Full patterns still get returned as relative to pwd.
+    gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
+    eq_(gp.expand(), ["2.dat"])
+
+    # "." gets special treatment.
+    gp = GlobbedPaths([".", "*.dat"], pwd=path)
+    eq_(set(gp.expand()), {"2.dat", "."})
+    eq_(gp.expand(dot=False), ["2.dat"])
+    gp = GlobbedPaths(["."], pwd=path, expand=False)
+    eq_(gp.expand(), ["."])
+    eq_(gp.paths, ["."])
+
+    # We can the glob outputs.
+    glob_results = {"z": "z",
+                    "a": ["x", "d", "b"]}
+    with patch('datalad.interface.run.glob', glob_results.get):
+        gp = GlobbedPaths(["z", "a"])
+        eq_(gp.expand(), ["z", "b", "d", "x"])
+
+    # glob expansion for paths property is determined by expand argument.
+    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
+        gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
+        eq_(gp.paths, expected)
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        GlobbedPaths(["not here"], pwd=path).expand()
+        assert_in("No matching files found for 'not here'", cml.out)
+        GlobbedPaths(["also not"], pwd=path, warn=False).expand()
+        assert_not_in("No matching files found for 'also not'", cml.out)
+
+
 def test_rerun_commit_message_check():
     assert_raises(ValueError,
                   get_run_info,
+                  None,
                   """\
 [DATALAD RUNCMD] no command
 
@@ -746,6 +839,7 @@ def test_rerun_commit_message_check():
 
     assert_raises(ValueError,
                   get_run_info,
+                  None,
                   """\
 [DATALAD RUNCMD] junk json
 
@@ -757,7 +851,9 @@ def test_rerun_commit_message_check():
 }
 ^^^ Do not change lines above ^^^""")
 
-    subject, info = get_run_info("""\
+    subject, info = get_run_info(
+        None,
+        """\
 [DATALAD RUNCMD] fine
 
 === Do not change lines below ===

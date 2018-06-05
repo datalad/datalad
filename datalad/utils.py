@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import string
 import wrapt
 
 from copy import copy as shallow_copy
@@ -30,6 +31,7 @@ from time import sleep
 from inspect import getargspec
 from itertools import tee
 
+import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
 from os.path import curdir, basename, exists, realpath, islink, join as opj
@@ -1573,7 +1575,8 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    with open(fname, 'rb' if PY2 else 'r') as tsvfile:
+    kw = {} if PY2 else dict(encoding='utf-8')
+    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,
@@ -1694,3 +1697,121 @@ def get_envvars_info():
         ):
             envs.append((var, val))
     return OrderedDict(envs)
+
+
+# This class is modified from Snakemake (v5.1.4)
+class SequenceFormatter(string.Formatter):
+    """string.Formatter subclass with special behavior for sequences.
+
+    This class delegates formatting of individual elements to another
+    formatter object. Non-list objects are formatted by calling the
+    delegate formatter's "format_field" method. List-like objects
+    (list, tuple, set, frozenset) are formatted by formatting each
+    element of the list according to the specified format spec using
+    the delegate formatter and then joining the resulting strings with
+    a separator (space by default).
+    """
+
+    def __init__(self, separator=" ", element_formatter=string.Formatter(),
+                 *args, **kwargs):
+        self.separator = separator
+        self.element_formatter = element_formatter
+
+    def format_element(self, elem, format_spec):
+        """Format a single element
+
+        For sequences, this is called once for each element in a
+        sequence. For anything else, it is called on the entire
+        object. It is intended to be overridden in subclases.
+        """
+        return self.element_formatter.format_field(elem, format_spec)
+
+    def format_field(self, value, format_spec):
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return self.separator.join(self.format_element(v, format_spec)
+                                       for v in value)
+        else:
+            return self.format_element(value, format_spec)
+
+
+# TODO: eventually we might want to make use of attr module
+class File(object):
+    """Helper for a file entry in the create_tree/@with_tree
+
+    It allows to define additional settings for entries
+    """
+    def __init__(self, name, executable=False):
+        """
+
+        Parameters
+        ----------
+        name : str
+          Name of the file
+        executable: bool, optional
+          Make it executable
+        """
+        self.name = name
+        self.executable = executable
+
+    def __str__(self):
+        return self.name
+
+
+def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
+    """Given an archive `name`, create under `path` with specified `load` tree
+    """
+    from datalad.support.archives import compress_files
+    dirname = file_basename(name)
+    full_dirname = op.join(path, dirname)
+    os.makedirs(full_dirname)
+    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
+    # create archive
+    if archives_leading_dir:
+        compress_files([dirname], name, path=path, overwrite=overwrite)
+    else:
+        compress_files(list(map(op.basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(op.pardir, name),
+                       path=op.join(path, dirname),
+                       overwrite=overwrite)
+    # remove original tree
+    shutil.rmtree(full_dirname)
+
+
+def create_tree(path, tree, archives_leading_dir=True):
+    """Given a list of tuples (name, load) create such a tree
+
+    if load is a tuple itself -- that would create either a subtree or an archive
+    with that content and place it into the tree if name ends with .tar.gz
+    """
+    lgr.log(5, "Creating a tree under %s", path)
+    if not op.exists(path):
+        os.makedirs(path)
+
+    if isinstance(tree, dict):
+        tree = tree.items()
+
+    for file_, load in tree:
+        if isinstance(file_, File):
+            executable = file_.executable
+            name = file_.name
+        else:
+            executable = False
+            name = file_
+        full_name = op.join(path, name)
+        if isinstance(load, (tuple, list, dict)):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
+                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+            else:
+                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+        else:
+            if PY2:
+                open_kwargs = {'mode': "w"}
+                if isinstance(load, text_type):
+                    load = load.encode('utf-8')
+            else:
+                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
+
+            with open(full_name, **open_kwargs) as f:
+                f.write(load)
+        if executable:
+            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)

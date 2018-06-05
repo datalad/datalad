@@ -11,6 +11,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import skip_if_on_windows
 
 
 import os
@@ -303,25 +304,23 @@ def test_saving_prior(topdir):
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
 
 
-# TODO reenable when functionality is back
-# @with_tempfile(mkdir=True)
-# def test_create_withplugin(path):
-#     # first without
-#     ds = create(path)
-#     assert(not lexists(opj(ds.path, 'README.rst')))
-#     ds.remove()
-#     assert(not lexists(ds.path))
-#     # now for reals...
-#     ds = create(
-#         # needs to identify the dataset, otherwise post-proc
-#         # plugin doesn't no what to run on
-#         dataset=path,
-#         run_after=[['add_readme', 'filename=with hole.txt']])
-#     ok_clean_git(path)
-#     # README wil lend up in annex by default
-#     # TODO implement `nice_dataset` plugin to give sensible
-#     # default and avoid that
-#     assert(lexists(opj(ds.path, 'with hole.txt')))
+@skip_if_on_windows  # https://github.com/datalad/datalad/issues/2606
+@with_tempfile(mkdir=True)
+def test_create_withprocedure(path):
+    # first without
+    ds = create(path)
+    assert(not lexists(opj(ds.path, 'README.rst')))
+    ds.remove()
+    assert(not lexists(ds.path))
+    # now for reals...
+    ds = create(
+        # needs to identify the dataset, otherwise post-proc
+        # procedure doesn't know what to run on
+        dataset=path,
+        run_after=[['cfg_metadatatypes', 'xmp', 'datacite']])
+    ok_clean_git(path)
+    ds.config.reload()
+    eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
 
 
 @with_tempfile(mkdir=True)

@@ -15,6 +15,7 @@ import logging
 from itertools import dropwhile
 import json
 import os
+import os.path as op
 import re
 import sys
 
@@ -33,6 +34,7 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
+from datalad.support.json_py import load_stream
 
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -243,7 +245,7 @@ def _revs_as_results(dset, revs):
         res = get_status_dict("run", ds=dset, commit=rev)
         full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
         try:
-            msg, info = get_run_info(full_msg)
+            msg, info = get_run_info(dset, full_msg)
         except ValueError as exc:
             # Recast the error so the message includes the revision.
             raise ValueError(
@@ -371,15 +373,19 @@ def _rerun(dset, results):
             # and enable re-modification ideally, we would bring back the
             # entire state of the tree with #1424, but we limit ourself to file
             # addition/not-in-place-modification for now
-            auto_outputs = (os.path.relpath(ap["path"], dset.path)
-                            for ap in new_or_modified(res["diff"]))
+            auto_outputs = (ap["path"] for ap in new_or_modified(res["diff"]))
             outputs = run_info.get("outputs", [])
-            auto_outputs = [p for p in auto_outputs if p not in outputs]
+            outputs_dir = op.join(dset.path, run_info["pwd"])
+            auto_outputs = [p for p in auto_outputs
+                            # run records outputs relative to the "pwd" field.
+                            if op.relpath(p, outputs_dir) not in outputs]
+
             message = res["rerun_message"] or res["run_message"]
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
-                                 outputs=outputs + auto_outputs,
+                                 outputs=outputs,
+                                 rerun_outputs=auto_outputs,
                                  message=message,
                                  rerun_info=run_info):
                 yield r
@@ -454,7 +460,7 @@ def _get_script_handler(script, since, revision):
     return fn
 
 
-def get_run_info(message):
+def get_run_info(dset, message):
     """Extract run information from `message`
 
     Parameters
@@ -486,6 +492,19 @@ def get_run_info(message):
             'cannot rerun command, command specification is not valid JSON: '
             '%s' % exc_str(e)
         )
+    if not isinstance(runinfo, (list, dict)):
+        # this is a run record ID -> load the beast
+        record_dir = dset.config.get(
+            'datalad.run.record-directory',
+            default=op.join('.datalad', 'runinfo'))
+        record_path = op.join(dset.path, record_dir, runinfo)
+        if not op.lexists(record_path):
+            # too harsh IMHO, but same harshness as few lines further down
+            raise ValueError("Run record sidecar file not found: {}".format(record_path))
+        # TODO `get` the file
+        recs = load_stream(record_path, compressed=True)
+        # TODO check if there is a record
+        runinfo = next(recs)
     if 'cmd' not in runinfo:
         raise ValueError("Looks like a run commit but does not have a command")
     return rec_msg.rstrip(), runinfo

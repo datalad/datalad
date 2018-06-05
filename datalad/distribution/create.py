@@ -390,7 +390,7 @@ class Create(Interface):
 
         # prevent git annex from ever annexing .git* stuff (gh-1597)
         with open(opj(tbds.path, '.gitattributes'), 'a') as gitattr:
-            gitattr.write('.git* annex.largefiles=nothing\n')
+            gitattr.write('**/.git* annex.largefiles=nothing\n')
         add_to_git.append('.gitattributes')
 
         # save everything, we need to do this now and cannot merge with the

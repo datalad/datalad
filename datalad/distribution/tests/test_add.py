@@ -400,6 +400,14 @@ def test_gh1597_simpler(path):
     ds.add('.gitignore')
     ok_clean_git(ds.path)
     ok_file_under_git(ds.path, '.gitignore', annexed=False)
+    # put .gitattributes in some subdir and add all, should also go into Git
+    os.makedirs(op.join(ds.path, 'subdir'))
+    attrfile = op.join(ds.path, 'subdir', '.gitattributes')
+    with open(attrfile, 'a') as f:
+        f.write('# just a comment\n')
+    ds.add('.')
+    ok_clean_git(ds.path)
+    ok_file_under_git(ds.path, op.relpath(attrfile, start=ds.path), annexed=False)
 
 
 # Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree

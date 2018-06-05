@@ -278,7 +278,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
             path=[dict(path=op.join(aggfrom_ds.path, p),
                        parentds=aggfrom_ds.path,
                        type='file')
-                  for p in objrelpaths],
+                  for p in objrelpaths.values()],
             result_renderer='disabled')
 
         # actually copy dump files
