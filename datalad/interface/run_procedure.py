@@ -119,15 +119,13 @@ class RunProcedure(Interface):
 
     Directories identified by the configuration settings
 
-    1. 'datalad.locations.dataset-procedures'
-
-    2. 'datalad.locations.user-procedures' (determined by
-        appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
-        on GNU/Linux systems)
-
-    3. 'datalad.locations.system-procedures' (determined by
-        appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
-        GNU/Linux systems)
+    - 'datalad.locations.dataset-procedures'
+    - 'datalad.locations.user-procedures' (determined by
+      appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
+      on GNU/Linux systems)
+    - 'datalad.locations.system-procedures' (determined by
+      appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
+      GNU/Linux systems)
 
     and subsequently in the 'resources/procedures/' directories of any
     installed extension, and, lastly, of the DataLad installation itself.
@@ -169,8 +167,7 @@ class RunProcedure(Interface):
     a set of metadata types in any newly created dataset can be achieved
     via:
 
-      % datalad -c 'datalad.create.run-after=cfg_metadatatypes xmp image' \
-              create -d mydataset
+      % datalad -c 'datalad.create.run-after=cfg_metadatatypes xmp image' create -d myds
 
     As procedures run on datasets, it is necessary to explicitly identify
     the target dataset via the -d (--dataset) option.

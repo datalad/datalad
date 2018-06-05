@@ -206,7 +206,7 @@ class RSTManPageFormatter(ManPageFormatter):
         title += '\n{0}\n\n'.format('=' * len(prog))
         return title
 
-    def _make_name(self, parser):
+    def _mk_name(self, prog, desc):
         return ''
 
     def _mk_description(self, parser):
