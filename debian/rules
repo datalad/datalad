@@ -15,7 +15,10 @@ export DATALAD_TESTS_NONETWORK = 1
 export http_proxy=http://127.0.0.1:9/
 export https_proxy=http://127.0.0.1:9/
 
-export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/
+# We need to copy .egg-info so entry points are discovered. And also need
+# to generate then per-Python version since some module requirements differ
+export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py develop --install-dir bin/;cp -rp datalad.egg-info {build_dir}/;
+
 
 # so tests do not segfault
 export WRAPT_DISABLE_EXTENSIONS=1
