@@ -4,3 +4,15 @@ W: datalad: package-installs-into-obsolete-dir etc/bash_completion.d/ : ^etc/bas
 W: datalad: package-installs-into-obsolete-dir etc/bash_completion.d/datalad : ^etc/bash_completion.d/ -> usr/share/bash-completion/completions (see also https://bugs.debian.org/776954)
 W: datalad: binary-without-manpage usr/bin/git-annex-remote-datalad
 W: datalad: binary-without-manpage usr/bin/git-annex-remote-datalad-archives
+
+- on 14.04 a number of bdepends are absent
+
+ pbuilder-satisfydepends-dummy : Depends: python-libxmp which is a virtual package.
+                                 Depends: python-pyperclip which is a virtual package.
+                                 Depends: python3-boto which is a virtual package.
+                                 Depends: python3-exif which is a virtual package.
+                                 Depends: python3-httpretty which is a virtual package.
+                                 Depends: python3-libxmp which is a virtual package.
+                                 Depends: python3-mutagen which is a virtual package.
+                                 Depends: python3-pyperclip which is a virtual package.
+
