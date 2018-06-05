@@ -28,7 +28,11 @@ import string
 import random
 
 from .locking import lock_if_check_fails
-from ..utils import any_re_search, assure_bytes, rmdir
+from ..utils import (
+    any_re_search,
+    assure_bytes,
+    rmdir,
+)
 
 import logging
 lgr = logging.getLogger('datalad.files')

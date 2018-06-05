@@ -54,7 +54,6 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
-from datalad.utils import assert_no_open_files
 from ..utils import assure_unicode
 
 # imports from same module:
