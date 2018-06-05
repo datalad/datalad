@@ -1,0 +1,117 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: Disable unicode strings in commands to be executed in tests
+
+As you could see largely it is about executing a command with unicode, or later
+logging it.  Whenvever Python2 seems to do it automagical conversions without blowing up,
+on Python3 I found no reliable way to achieve desired -- logger would not accept bytes,
+but would puke upon attempt to encode unicode into 'ascii', etc
+
+Problems go away if UTF-8 locale is configured and set (instead of C or POSIX)
+
+Last-Update: 2018-06-05
+
+Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_cmd.py
+===================================================================
+--- datalad-0.10.0~rc4+git167-g88f3ea8f.orig/datalad/tests/test_cmd.py
++++ datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_cmd.py
+@@ -42,7 +42,7 @@ def test_runner_dry(tempfile):
+     runner = Runner(protocol=dry)
+ 
+     # test dry command call
+-    cmd = 'echo Testing äöü東 dry run > %s' % tempfile
++    cmd = 'echo Testing nounicode dry run > %s' % tempfile
+     with swallow_logs(new_level=9) as cml:
+         ret = runner.run(cmd)
+         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
+@@ -66,7 +66,7 @@ def test_runner(tempfile):
+ 
+     # test non-dry command call
+     runner = Runner()
+-    cmd = 'echo Testing äöü東 real run > %r' % tempfile
++    cmd = 'echo Testing nounicode real run > %r' % tempfile
+     ret = runner.run(cmd)
+     assert_true(os.path.exists(tempfile),
+                 "Run of: %s resulted with non-existing file %s" %
+@@ -149,7 +149,7 @@ def test_runner_log_stdout():
+     # assertion yet.
+ 
+     runner = Runner(log_outputs=True)
+-    cmd_ = ['echo', 'stdout-Message äöü東 should be logged']
++    cmd_ = ['echo', 'stdout-Message nounicode should be logged']
+     for cmd in [cmd_, ' '.join(cmd_)]:
+         # should be identical runs, either as a string or as a list
+         kw = {}
+@@ -162,16 +162,16 @@ def test_runner_log_stdout():
+             if not on_windows:
+                 # we can just count on sanity
+                 cm.assert_logged("stdout| stdout-"
+-                                 "Message äöü東 should be logged", regex=False)
++                                 "Message nounicode should be logged", regex=False)
+             else:
+                 # echo outputs quoted lines for some reason, so relax check
+-                ok_("stdout-Message äöü東 should be logged" in cm.lines[1])
++                ok_("stdout-Message nounicode should be logged" in cm.lines[1])
+ 
+-    cmd = 'echo stdout-Message äöü東 should not be logged'
++    cmd = 'echo stdout-Message nounicode should not be logged'
+     with swallow_outputs() as cmo:
+         with swallow_logs(new_level=11) as cml:
+             ret = runner.run(cmd, log_stdout=False)
+-            eq_(cmo.out, "stdout-Message äöü東 should not be logged\n")
++            eq_(cmo.out, "stdout-Message nounicode should not be logged\n")
+             eq_(cml.out, "")
+ 
+ 
+Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
+===================================================================
+--- datalad-0.10.0~rc4+git167-g88f3ea8f.orig/datalad/tests/test_config.py
++++ datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
+@@ -38,7 +38,7 @@ user = name=Jane Doe
+ user = email=jd@example.com
+ myint = 3
+ 
+-[onemore "complicated の beast with.dot"]
++[onemore "complicated nounicode beast with.dot"]
+ findme = 5.0
+ """
+ 
+@@ -65,16 +65,16 @@ def test_something(path, new_home):
+     assert_true(cfg.has_section('something'))
+     assert_false(cfg.has_section('somethingelse'))
+     assert_equal(sorted(cfg.sections()),
+-                 [u'onemore.complicated の beast with.dot', 'something'])
++                 [u'onemore.complicated nounicode beast with.dot', 'something'])
+     assert_true(cfg.has_option('something', 'user'))
+     assert_false(cfg.has_option('something', 'us?er'))
+     assert_false(cfg.has_option('some?thing', 'user'))
+     assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
+-    assert_equal(cfg.options(u'onemore.complicated の beast with.dot'), ['findme'])
++    assert_equal(cfg.options(u'onemore.complicated nounicode beast with.dot'), ['findme'])
+ 
+     assert_equal(
+         sorted(cfg.items()),
+-        [(u'onemore.complicated の beast with.dot.findme', '5.0'),
++        [(u'onemore.complicated nounicode beast with.dot.findme', '5.0'),
+          ('something.myint', '3'),
+          ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
+     assert_equal(
+@@ -87,7 +87,7 @@ def test_something(path, new_home):
+         cfg.get('something.user'),
+         ('name=Jane Doe', 'email=jd@example.com'))
+     assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
+-    assert_equal(cfg.getfloat(u'onemore.complicated の beast with.dot', 'findme'), 5.0)
++    assert_equal(cfg.getfloat(u'onemore.complicated nounicode beast with.dot', 'findme'), 5.0)
+     assert_equal(cfg.getint('something', 'myint'), 3)
+     assert_equal(cfg.getbool('something', 'myint'), True)
+     assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
+@@ -100,8 +100,8 @@ def test_something(path, new_home):
+     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
+ 
+     # modification follows
+-    cfg.add('something.new', 'の')
+-    assert_equal(cfg.get('something.new'), u'の')
++    cfg.add('something.new', 'nounicode')
++    assert_equal(cfg.get('something.new'), u'nounicode')
+     # sections are added on demand
+     cfg.add('unheard.of', 'fame')
+     assert_true(cfg.has_section('unheard.of'))

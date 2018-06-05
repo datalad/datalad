@@ -1,2 +1,3 @@
 deb_setup_no_msgpack_and_duecredit
 deb_no_check_for_keyring_in_setup
+deb_no_utf8
