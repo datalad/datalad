@@ -121,11 +121,13 @@ class RunProcedure(Interface):
 
     1. 'datalad.locations.dataset-procedures'
 
-    2. 'datalad.locations.user-procedures' (on a *nix system this defaults
-       to: '$HOME/.config/datalad/procedures')
+    2. 'datalad.locations.user-procedures' (determined by
+        appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
+        on GNU/Linux systems)
 
-    3. 'datalad.locations.system-procedures' (on a *unix system this
-       defaults to '/etc/xdg/datalad/procedures')
+    3. 'datalad.locations.system-procedures' (determined by
+        appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
+        GNU/Linux systems)
 
     and subsequently in the 'resources/procedures/' directories of any
     installed extension, and, lastly, of the DataLad installation itself.
