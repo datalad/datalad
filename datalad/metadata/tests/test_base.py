@@ -9,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test metadata """
 
+import logging
 import os
 
 from os.path import join as opj
@@ -102,7 +103,7 @@ def test_aggregation(path):
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     # before anything aggregated we would get nothing and only a log warning
-    with swallow_logs() as cml:
+    with swallow_logs(new_level=logging.WARNING) as cml:
         assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
     assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
