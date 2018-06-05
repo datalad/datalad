@@ -134,16 +134,16 @@ class RunProcedure(Interface):
     directories to be searched. If a procedure matching a given name is found
     (filename without a possible extension), the search is aborted and this
     implementation will be executed. This makes it possible for individual
-    datasets, users, or machines to override externally provides procedures
+    datasets, users, or machines to override externally provided procedures
     (enabling the implementation of cutomizable processing "hooks").
 
 
     *Procedure implementation*
 
-    Procedures can be any executable. Executables must have the appropriate
-    permissions and, in the case of script, must contain an appropriate
+    A procedure can be any executable. Executables must have the appropriate
+    permissions and, in the case of a script, must contain an appropriate
     "shebang" line. If a procedure is not executable, but its filename ends
-    with '.py' it is automatically executed by the 'python' interpreter
+    with '.py', it is automatically executed by the 'python' interpreter
     (whichever version is available in the present environment). Likewise,
     procedure implementations ending on '.sh' are executed via 'bash'.
 
