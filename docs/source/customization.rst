@@ -188,6 +188,8 @@ useful features for extension developers:
   that become automatically available to DataLad
 - extensions can define `entry_points` for their test suites, such that the standard `datalad test`
   command will automatically run these tests in addition to the tests shipped with Datalad core
+- extensions can ship additional dataset procedures by installing them into a
+  directory ``resources/procedures`` underneath the extension module directory
 
 
 Using an extension
