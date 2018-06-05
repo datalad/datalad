@@ -29,6 +29,8 @@ clean::
 override_dh_auto_configure:
 	# cheap fake of an installed datalad, so we get .egg-info with entry points
 	$(MAKE) bin
+	# very ugly hack to overcome the problem that there is no pyliblzma on py3
+	sed -i -n -e '/pyliblzma/d' datalad.egg-info/requires.txt
 	# and leave the rest for dh_python* runs
 	mkdir -p build; \
 	    export HOME=$(CURDIR)/build;  \
