@@ -70,19 +70,22 @@ class ManPageFormatter(argparse.HelpFormatter):
 
     def _mk_title(self, prog):
         name_version = "\"{0} {1}\"".format(prog, self._version)
-        return '.TH {0} {1} {2} {3}\n'.format(prog, self._section,
-                                              self._today, name_version)
+        return '.TH "{0}" "{1}" "{2}" "{3}"\n'.format(
+            prog, self._section, self._today, name_version)
 
-    def _make_name(self, parser):
+    def _mk_name(self, prog, desc):
         """
         this method is in consitent with others ... it relies on
         distribution
         """
-        return '.SH NAME\n%s \\- %s\n' % (parser.prog,
-                                          parser.description)
+        desc = desc.splitlines()[0] if desc else 'it is in the name'
+        # ensure starting lower case
+        desc = desc[0].lower() + desc[1:]
+        return '.SH NAME\n%s \\- %s\n' % (self._bold(prog), desc)
 
     def _mk_description(self, parser):
         desc = parser.description
+        desc = '\n'.join(desc.splitlines()[1:])
         if not desc:
             return ''
         desc = desc.replace('\n\n', '\n.PP\n')
@@ -113,6 +116,7 @@ class ManPageFormatter(argparse.HelpFormatter):
     def format_man_page(self, parser):
         page = []
         page.append(self._mk_title(self._prog))
+        page.append(self._mk_name(self._prog, parser.description))
         page.append(self._mk_synopsis(parser))
         page.append(self._mk_description(parser))
         page.append(self._mk_options(parser))
