@@ -1094,8 +1094,17 @@ def test_get_open_files(p):
 
     assert not get_open_files(subd)
     # if we start a process within that directory, should get informed
-    from subprocess import Popen
-    proc = Popen(['cat'], cwd=subd)
+    from subprocess import Popen, PIPE
+    from time import time
+    t0 = time()
+    proc = Popen(['python', '-c',
+                  r'import sys; sys.stdout.write("OK\n"); sys.stdout.flush();'
+                  r'import time; time.sleep(10)'],
+                 stdout=PIPE,
+                 cwd=subd)
+    # Assure that it started and we read the OK
+    eq_(proc.stdout.readline().strip(), "OK")
+    assert time() - t0 < 5 # that we were not stuck waiting for process to finish
     eq_(get_open_files(p), {op.realpath(subd): proc.pid})
     eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
     proc.terminate()
