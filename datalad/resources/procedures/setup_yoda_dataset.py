@@ -1,6 +1,6 @@
 """Procedure to apply YODA-compatible default setup to a dataset
 
-This procedure assume a clean dataset that was just created by
+This procedure assumes a clean dataset that was just created by
 `datalad create`.
 """
 
