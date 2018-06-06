@@ -167,6 +167,11 @@ class ProgressHandler(logging.Handler):
         from datalad.ui import ui
         pid = getattr(record, 'dlm_progress')
         update = getattr(record, 'dlm_progress_update', None)
+        # would be an actual message, not used ATM here,
+        # and the record not passed to generic handler ATM
+        # (filtered away by NoProgressLog)
+        # so no final message is printed
+        # msg = record.getMessage()
         if pid not in self.pbars:
             # this is new
             pbar = ui.get_progressbar(

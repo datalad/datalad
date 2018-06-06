@@ -566,29 +566,36 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
         unique_cm = {}
         extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
-        log_progress(
-            lgr.debug,
-            'metadataextractors_loc',
-            'Metadata extraction per location for %s', mtype,
-            # contentmeta_t is a generator... so no cound is known
-            # total=len(contentmeta_t or []),
-            label='Metadata extraction per location',
-            unit=' locations',
-        )
+        # TODO: ATM neuroimaging extractors all provide their own internal
+        #  log_progress but if they are all generators, we could provide generic
+        #  handling of the progress here.  Note also that log message is actually
+        #  seems to be ignored and not used, only the label ;-)
+        # log_progress(
+        #     lgr.debug,
+        #     'metadataextractors_loc',
+        #     'Metadata extraction per location for %s', mtype,
+        #     # contentmeta_t is a generator... so no cound is known
+        #     # total=len(contentmeta_t or []),
+        #     label='Metadata extraction per location',
+        #     unit=' locations',
+        # )
         for loc, meta in contentmeta_t or {}:
-            log_progress(
-                lgr.debug,
-                'metadataextractors_loc',
-                'Consider %s', loc,
-                update=1,
-                increment=True)
+            lgr.log(5, "Analyzing metadata for %s", loc)
+            # log_progress(
+            #     lgr.debug,
+            #     'metadataextractors_loc',
+            #     'ignoredatm',
+            #     label=loc,
+            #     update=1,
+            #     increment=True)
             if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
-                log_progress(
-                    lgr.debug,
-                    'metadataextractors_loc',
-                    'Failed for %s', loc,
-                )
+                # log_progress(
+                #     lgr.debug,
+                #     'metadataextractors_loc',
+                #     'ignoredatm',
+                #     label='Failed for %s' % loc,
+                # )
                 continue
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
@@ -642,10 +649,10 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     vset.add(_val2hashable(v))
                     unique_cm[k] = vset
 
-        log_progress(
-            lgr.debug,
-            'metadataextractors_loc',
-            'Finished metadata extraction across locations for %s', mtype)
+        # log_progress(
+        #     lgr.debug,
+        #     'metadataextractors_loc',
+        #     'Finished metadata extraction across locations for %s', mtype)
 
         if unique_cm:
             # per source storage here too
