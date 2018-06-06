@@ -9,6 +9,8 @@
 """Data providers - bind downloaders and credentials together
 """
 
+import os
+
 from glob import glob
 from logging import getLogger
 from six import iteritems
@@ -26,6 +28,7 @@ from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..utils import assure_list_from_str
 from ..utils import auto_repr
+from ..utils import get_dataset_root
 
 lgr = getLogger('datalad.downloaders.providers')
 
@@ -173,28 +176,44 @@ class Providers(object):
 
     @classmethod
     def from_config_files(cls, files=None, reload=False):
-        """Would load information about related/possible websites requiring authentication from
+        """Loads information about related/possible websites requiring authentication from:
 
-        - codebase (for now) datalad/downloaders/configs/providers.cfg
+        - datalad/downloaders/configs/*.cfg files provided by the codebase
         - current dataset .datalad/providers/
-        - user dir  ~/.config/datalad/providers/
-        - system-wide datalad installation/config /etc/datalad/providers/
+        - Linux style user's config directory:  $XDG_CONFIG_HOME/datalad/providers or ~/.config/datalad/providers/*.cfg by default
+        - Unix style user's home directory: ~/.datalad/providers/*.cfg)
+        - system-wide datalad installation/config: /etc/datalad/providers/*.cfg
 
-        For sample configs look into datalad/downloaders/configs/providers.cfg
+        For sample configs files see datalad/downloaders/configs/providers.cfg
 
-        If files is None, loading is "lazy".  Specify reload=True to force
-        reload.  reset_default_providers could also be used to reset the memoized
-        providers
+        If files is None, loading is cached between calls.  Specify reload=True to force
+        reloading of files from the filesystem.  The class method reset_default_providers
+        can also be called to reset the cached providers.
         """
         # lazy part
         if files is None and cls._DEFAULT_PROVIDERS and not reload:
             return cls._DEFAULT_PROVIDERS
 
         config = SafeConfigParserWithIncludes()
-        # TODO: support all those other paths
         files_orig = files
         if files is None:
+            # Config files from the datalad dist
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
+            if 'HOME' in os.environ:
+                # Linux style config
+                if 'XDG_CONFIG_HOME' in os.environ:
+                    files.extend(glob(pathjoin(os.environ['XDG_CONFIG_HOME'], 'datalad', 'providers', '*.cfg')))
+                else:
+                    files.extend(glob(pathjoin(os.environ['HOME'], '.config', 'datalad', 'providers', '*.cfg')))
+                # Real Unix style config
+                files.extend(glob(pathjoin(os.environ['HOME'], '.datalad', 'providers', '*.cfg')))
+
+                # Dataset config
+                dsroot = get_dataset_root("")
+                if dsroot is not None:
+                    files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
+            # System wide config
+            files.extend(glob("/etc/datalad/providers/*.cfg"))
         config.read(files)
 
         # We need first to load Providers and credentials
