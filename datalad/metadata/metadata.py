@@ -406,9 +406,9 @@ def _query_aggregated_metadata_singlepath(
 
 
 def _filter_metadata_fields(d, maxsize=None, blacklist=None):
-    lgr.debug("Analyzing metadata fields for maxsize=%s with blacklist=%s on "
-              "input with %d entries",
-              maxsize, blacklist, len(d))
+    lgr.log(5, "Analyzing metadata fields for maxsize=%s with blacklist=%s on "
+            "input with %d entries",
+            maxsize, blacklist, len(d))
     orig_keys = set(d.keys())
     if blacklist:
         d = {k: v for k, v in iteritems(d)
