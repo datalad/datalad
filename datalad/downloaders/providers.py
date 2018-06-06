@@ -30,6 +30,8 @@ from ..utils import assure_list_from_str
 from ..utils import auto_repr
 from ..utils import get_dataset_root
 
+from ..interface.common_cfg import dirs
+
 lgr = getLogger('datalad.downloaders.providers')
 
 # dict to bind authentication_type's to authenticator classes
@@ -46,7 +48,6 @@ AUTHENTICATION_TYPES = {
 }
 
 from .credentials import CREDENTIAL_TYPES
-
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -180,9 +181,8 @@ class Providers(object):
 
         - datalad/downloaders/configs/*.cfg files provided by the codebase
         - current dataset .datalad/providers/
-        - Linux style user's config directory:  $XDG_CONFIG_HOME/datalad/providers or ~/.config/datalad/providers/*.cfg by default
-        - Unix style user's home directory: ~/.datalad/providers/*.cfg)
-        - system-wide datalad installation/config: /etc/datalad/providers/*.cfg
+        - User's home directory directory (ie ~/.config/datalad/providers/*.cfg)
+        - system-wide datalad installation/config (ie /etc/datalad/providers/*.cfg)
 
         For sample configs files see datalad/downloaders/configs/providers.cfg
 
@@ -199,21 +199,15 @@ class Providers(object):
         if files is None:
             # Config files from the datalad dist
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
-            if 'HOME' in os.environ:
-                # Linux style config
-                if 'XDG_CONFIG_HOME' in os.environ:
-                    files.extend(glob(pathjoin(os.environ['XDG_CONFIG_HOME'], 'datalad', 'providers', '*.cfg')))
-                else:
-                    files.extend(glob(pathjoin(os.environ['HOME'], '.config', 'datalad', 'providers', '*.cfg')))
-                # Real Unix style config
-                files.extend(glob(pathjoin(os.environ['HOME'], '.datalad', 'providers', '*.cfg')))
+            # User config
+            files.extend(glob(pathjoin(dirs.user_config_dir, 'providers', '*.cfg')))
 
-                # Dataset config
-                dsroot = get_dataset_root("")
-                if dsroot is not None:
-                    files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
-            # System wide config
-            files.extend(glob("/etc/datalad/providers/*.cfg"))
+            # Dataset config
+            dsroot = get_dataset_root("")
+            if dsroot is not None:
+                files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
+            # System config
+            files.extend(glob(pathjoin(dirs.site_config_dir, "providers", "*.cfg")))
         config.read(files)
 
         # We need first to load Providers and credentials
