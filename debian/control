@@ -137,7 +137,6 @@ Depends:
  ${misc:Depends},
  ${python:Depends}
 Recommends:
- python-duecredit,
  python-exif,
  python-jsmin,
  python-html5lib,
@@ -151,6 +150,7 @@ Recommends:
  python-vcr,
  python-whoosh,
 Suggests:
+ python-duecredit,
  python-bs4,
  python-numpy,
 Description: data files management and distribution platform
@@ -200,7 +200,6 @@ Depends:
  ${misc:Depends},
  ${python3:Depends}
 Recommends:
- python3-duecredit,
  python3-exif,
  python3-jsmin,
  python3-html5lib,
@@ -214,6 +213,7 @@ Recommends:
  python3-vcr,
  python3-whoosh,
 Suggests:
+ python3-duecredit,
  python3-bs4,
  python3-numpy,
  datalad-containers,
