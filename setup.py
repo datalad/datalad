@@ -93,7 +93,9 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        'duecredit',
+        # was added in https://github.com/datalad/datalad/pull/1995 without
+        # due investigation, should not be needed until we add duecredit support
+        # 'duecredit',
         'simplejson',
         'whoosh',
     ] + req_lzma,
