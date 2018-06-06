@@ -38,6 +38,7 @@ from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
+from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
@@ -1083,6 +1084,7 @@ def test_dlabspath(path):
 
 @with_tree({'1': 'content', 'd': {'2': 'more'}})
 def test_get_open_files(p):
+    skip_if_no_module('psutil')
     eq_(get_open_files(p), {})
     f1 = opj(p, '1')
     subd = opj(p, 'd')
@@ -1097,13 +1099,13 @@ def test_get_open_files(p):
     from subprocess import Popen, PIPE
     from time import time
     t0 = time()
-    proc = Popen(['python', '-c',
+    proc = Popen([sys.executable, '-c',
                   r'import sys; sys.stdout.write("OK\n"); sys.stdout.flush();'
                   r'import time; time.sleep(10)'],
                  stdout=PIPE,
                  cwd=subd)
     # Assure that it started and we read the OK
-    eq_(proc.stdout.readline().strip(), "OK")
+    eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
     eq_(get_open_files(p), {op.realpath(subd): proc.pid})
     eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
