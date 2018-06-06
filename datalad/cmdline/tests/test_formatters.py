@@ -98,7 +98,7 @@ def test_manpage_formatter():
     for p in parsers:
         mp = fmt.ManPageFormatter(
             p, ext_sections=addonsections).format_man_page(parsers[p])
-        for section in ('SYNOPSIS', 'DESCRIPTION', 'OPTIONS', 'MYTEST'):
+        for section in ('SYNOPSIS', 'NAME', 'OPTIONS', 'MYTEST'):
             assert_in('.SH {0}'.format(section), mp)
         assert_in('uniquedummystring', mp)
 

@@ -93,10 +93,15 @@ def setup_parser(
         fromfile_prefix_chars=':',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-            DataLad provides a unified data distribution with the convenience of git-annex
-            repositories as a backend.  DataLad command line tools allow to manipulate
-            (obtain, create, update, publish, etc.) datasets and their collections."""),
-        epilog='"Control Your Data"',
+            Comprehensive data management solution
+
+            DataLad provides a unified data distribution system built on the Git
+            and Git-annex. DataLad command line tools allow to manipulate (obtain,
+            create, update, publish, etc.) datasets and provide a comprehensive
+            toolbox for joint management of data and code. Compared to Git/annex
+            it primarly extends their functionality to transparently and
+            simultaneously work with multiple inter-related repositories."""),
+        epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False)
     # common options
@@ -158,26 +163,23 @@ def setup_parser(
         of the command; 'continue' works like 'ignore', but an error causes a
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
-    #parser.add_argument(
-    #    '--run-before', dest='common_run_before',
-    #    nargs='+',
-    #    action='append',
-    #    metavar='PLUGINSPEC',
-    #    help="""DataLad plugin to run after the command. PLUGINSPEC is a list
-    #    comprised of a plugin name plus optional `key=value` pairs with arguments
-    #    for the plugin call (see `plugin` command documentation for details).
-    #    This option can be given more than once to run multiple plugins
-    #    in the order in which they were given.
-    #    For running plugins that require a --dataset argument it is important
-    #    to provide the respective dataset as the --dataset argument of the main
-    #    command, if it is not in the list of plugin arguments."""),
-    #parser.add_argument(
-    #    '--run-after', dest='common_run_after',
-    #    nargs='+',
-    #    action='append',
-    #    metavar='PLUGINSPEC',
-    #    help="""Like --run-before, but plugins are executed after the main command
-    #    has finished."""),
+    parser.add_argument(
+        '--run-before', dest='common_run_before',
+        nargs='+',
+        action='append',
+        metavar=('<PROCEDURE NAME>', 'ARGS'),
+        help="""Dataset procedure to run before the main command (see run-procedure
+        command for details). This option can be given more than once to run
+        multiple procedures in the order in which they were given.
+        It is important to specify the target dataset via the --dataset argument
+        of the main command."""),
+    parser.add_argument(
+        '--run-after', dest='common_run_after',
+        nargs='+',
+        action='append',
+        metavar=('<PROCEDURE NAME>', 'ARGS'),
+        help="""Like --run-before, but procedures are executed after the main command
+        has finished."""),
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global

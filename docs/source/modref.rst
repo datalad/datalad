@@ -60,6 +60,7 @@ Reproducible execution
 
    api.run
    api.rerun
+   api.run_procedure
 
 
 Plumbing commands

@@ -361,13 +361,16 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_plugin_specs(param_key=None, cfg_key=None):
+        def _get_plugin_specs(param_key=None, cfg_key=None, ds=None):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
                 return spec
 
-            spec = dlcfg.get(cfg_key, None)
+            from datalad.distribution.dataset import Dataset
+            ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
+            spec = (ds.config if ds and ds.is_installed()
+                    else dlcfg).get(cfg_key, None)
             if spec is None:
                 return
             elif not isinstance(spec, tuple):
@@ -376,12 +379,15 @@ def eval_results(func):
 
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
+        dataset_arg = allkwargs.get('dataset', None)
         run_before = _get_plugin_specs(
             'run_before',
-            'datalad.{}.run-before'.format(cmdline_name))
+            'datalad.{}.run-before'.format(cmdline_name),
+            ds=dataset_arg)
         run_after = _get_plugin_specs(
             'run_after',
-            'datalad.{}.run-after'.format(cmdline_name))
+            'datalad.{}.run-after'.format(cmdline_name),
+            ds=dataset_arg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -392,19 +398,20 @@ def eval_results(func):
             # track what actions were performed how many times
             action_summary = {}
 
-            # TODO needs replacement plugin is gone
-            #for pluginspec in run_before or []:
-            #    lgr.debug('Running pre-proc plugin %s', pluginspec)
-            #    for r in _process_results(
-            #            Plugin.__call__(
-            #                pluginspec,
-            #                dataset=allkwargs.get('dataset', None),
-            #                return_type='generator'),
-            #            _func_class, action_summary,
-            #            on_failure, incomplete_results,
-            #            result_renderer, result_xfm, result_filter,
-            #            **_kwargs):
-            #        yield r
+            if run_before and cmdline_name != 'run-procedure':
+                from datalad.interface.run_procedure import RunProcedure
+                for procspec in run_before:
+                    lgr.debug('Running configured pre-procedure %s', procspec)
+                    for r in _process_results(
+                            RunProcedure.__call__(
+                                procspec,
+                                dataset=dataset_arg,
+                                return_type='generator'),
+                            _func_class, action_summary,
+                            on_failure, incomplete_results,
+                            result_renderer, result_xfm, result_filter,
+                            **_kwargs):
+                        yield r
 
             # process main results
             for r in _process_results(
@@ -414,19 +421,20 @@ def eval_results(func):
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
 
-            # TODO needs replacement plugin is gone
-            #for pluginspec in run_after or []:
-            #    lgr.debug('Running post-proc plugin %s', pluginspec)
-            #    for r in _process_results(
-            #            Plugin.__call__(
-            #                pluginspec,
-            #                dataset=allkwargs.get('dataset', None),
-            #                return_type='generator'),
-            #            _func_class, action_summary,
-            #            on_failure, incomplete_results,
-            #            result_renderer, result_xfm, result_filter,
-            #            **_kwargs):
-            #        yield r
+            if run_after and cmdline_name != 'run-procedure':
+                from datalad.interface.run_procedure import RunProcedure
+                for procspec in run_after:
+                    lgr.debug('Running configured post-procedure %s', procspec)
+                    for r in _process_results(
+                            RunProcedure.__call__(
+                                procspec,
+                                dataset=dataset_arg,
+                                return_type='generator'),
+                            _func_class, action_summary,
+                            on_failure, incomplete_results,
+                            result_renderer, result_xfm, result_filter,
+                            **_kwargs):
+                        yield r
 
             # result summary before a potential exception
             if result_renderer == 'default' and action_summary and \
