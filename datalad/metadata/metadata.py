@@ -25,6 +25,7 @@ from os.path import join as opj
 from collections import OrderedDict
 from collections import Mapping
 from six import binary_type, string_types
+from six import iteritems
 
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -118,7 +119,7 @@ def _load_xz_json_stream(fpath, cache=None):
         cache = {}
     obj = cache.get(
         fpath,
-        {s['path']: {k: v for k, v in s.items() if k != 'path'}
+        {s['path']: {k: v for k, v in iteritems(s) if k != 'path'}
          # take out the 'path' from the payload
          for s in load_xzstream(fpath)} if lexists(fpath) else {})
     cache[fpath] = obj
@@ -405,19 +406,23 @@ def _query_aggregated_metadata_singlepath(
 
 
 def _filter_metadata_fields(d, maxsize=None, blacklist=None):
-    o = d
+    lgr.debug("Analyzing metadata fields for maxsize=%s with blacklist=%s on "
+              "input with %d entries",
+              maxsize, blacklist, len(d))
+    orig_keys = set(d.keys())
     if blacklist:
-        o = {k: v for k, v in o.items()
+        d = {k: v for k, v in iteritems(d)
              if k.startswith('@') or not any(bl.match(k) for bl in blacklist)}
     if maxsize:
-        o = {k: v for k, v in o.items()
+        d = {k: v for k, v in iteritems(d)
              if k.startswith('@') or (len(str(v)
                                       if not isinstance(v, string_types + (binary_type,))
                                       else v) <= maxsize)}
-    if len(d) != len(o):
-        lgr.info('Removed metadata field(s) due to blacklisting and max size settings: %s',
-                 set(d.keys()).difference(o.keys()))
-    return o
+    if len(d) != len(orig_keys):
+        lgr.info(
+            'Removed metadata field(s) due to blacklisting and max size settings: %s',
+            orig_keys.difference(d.keys()))
+    return d
 
 
 def _ok_metadata(meta, mtype, ds, loc):
@@ -561,9 +566,29 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
         unique_cm = {}
         extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
+        log_progress(
+            lgr.debug,
+            'metadataextractors_loc',
+            'Metadata extraction per location for %s', mtype,
+            # contentmeta_t is a generator... so no cound is known
+            # total=len(contentmeta_t or []),
+            label='Metadata extraction per location',
+            unit=' locations',
+        )
         for loc, meta in contentmeta_t or {}:
+            log_progress(
+                lgr.debug,
+                'metadataextractors_loc',
+                'Consider %s', loc,
+                update=1,
+                increment=True)
             if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
+                log_progress(
+                    lgr.debug,
+                    'metadataextractors_loc',
+                    'Failed for %s', loc,
+                )
                 continue
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
@@ -595,7 +620,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     valtype=EnsureBool()):
                 # go through content metadata and inject report of unique keys
                 # and values into `dsmeta`
-                for k, v in meta.items():
+                for k, v in iteritems(meta):
                     if k in dsmeta.get(mtype_key, {}):
                         # if the dataset already has a dedicated idea
                         # about a key, we skip it from the unique list
@@ -617,6 +642,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     vset.add(_val2hashable(v))
                     unique_cm[k] = vset
 
+        log_progress(
+            lgr.debug,
+            'metadataextractors_loc',
+            'Finished metadata extraction across locations for %s', mtype)
+
         if unique_cm:
             # per source storage here too
             ucp = dsmeta.get('datalad_unique_content_properties', {})
@@ -634,7 +664,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     for i in sorted(
                         v,
                         key=_unique_value_key)] if v is not None else None
-                for k, v in unique_cm.items()
+                for k, v in iteritems(unique_cm)
                 # v == None (disable unique, but there was a value at some point)
                 # otherwise we only want actual values, and also no single-item-lists
                 # of a non-value
@@ -718,7 +748,6 @@ class ReadOnlyDict(Mapping):
         return '<%s %r>' % (self.__class__.__name__, self._dict)
 
     def __hash__(self):
-        iteritems = getattr(dict, 'iteritems', dict.items) # py2-3 compatibility
         if self._hash is None:
             h = 0
             for key, value in iteritems(self._dict):
