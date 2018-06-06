@@ -9,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test metadata """
 
+import logging
 import os
 
 from os.path import join as opj
@@ -19,7 +20,7 @@ from datalad.api import aggregate_metadata
 from datalad.api import install
 from datalad.api import search
 from datalad.api import metadata
-from datalad.metadata.metadata import get_metadata_type
+from datalad.metadata.metadata import get_metadata_type, query_aggregated_metadata
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.tests.utils import with_tree, with_tempfile
@@ -34,6 +35,8 @@ from datalad.tests.utils import skip_direct_mode
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_re_in
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
@@ -99,6 +102,10 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
+    # before anything aggregated we would get nothing and only a log warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
+    assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                   where='dataset')
     subds = ds.create('sub', force=True)

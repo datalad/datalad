@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 
+import glob
 import logging
 import re
 import os
@@ -53,16 +54,17 @@ from datalad.utils import as_unicode
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
-
+from datalad.consts import METADATA_DIR, METADATA_FILENAME
 
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.metadata')
 
 aggregate_layout_version = 1
-agginfo_relpath = opj(
+agginfo_relpath_template = opj(
     '.datalad',
     'metadata',
-    'aggregate_v{}.json'.format(aggregate_layout_version))
+    'aggregate_v{}.json')
+agginfo_relpath = agginfo_relpath_template.format(aggregate_layout_version)
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them
@@ -197,6 +199,27 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     info_fpath = opj(ds.path, agginfo_relpath)
     agg_base_path = dirname(info_fpath)
     agginfos = _load_json_object(info_fpath)
+    if not agginfos and not exists(info_fpath):
+        # This dataset does not have aggregated metadata.  Does it have any
+        # other version?
+        info_glob = agginfo_relpath_template.format('*')
+        info_files = glob.glob(info_glob)
+        msg = "Found no aggregated metadata info file %s." \
+              % info_fpath
+        old_metadata_file = opj(ds.path, METADATA_DIR, METADATA_FILENAME)
+        if exists(old_metadata_file):
+            msg += " Found metadata generated with pre-0.10 version of " \
+                   "DataLad, but it will not be used."
+        upgrade_msg = ""
+        if info_files:
+            msg += " Found following info files, which might have been " \
+                   "generated with newer version(s) of datalad: %s." \
+                   % (', '.join(info_files))
+            upgrade_msg = ", upgrade datalad"
+        msg += " You will likely need to either update the dataset from its " \
+               "original location,%s or reaggregate metadata locally." \
+               % upgrade_msg
+        lgr.warning(msg)
 
     # cache once loaded metadata objects for additional lookups
     # TODO possibly supply this cache from outside, if objects could
@@ -275,7 +298,9 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
         # in case there was no metadata provider, we do not want to start
         # downloading everything: see https://github.com/datalad/datalad/issues/2458
         objfiles.difference_update([None])
-        lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
+        lgr.debug(
+            'Verifying/achieving local availability of %i metadata objects',
+            len(objfiles))
         if objfiles:
             get(path=[dict(path=opj(agg_base_path, of),
                            parentds=ds.path, type='file')
