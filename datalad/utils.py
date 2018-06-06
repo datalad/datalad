@@ -1611,6 +1611,11 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
     from importlib import import_module
     _globals = globals()
     mods_loaded = []
+    if pkg and not pkg in sys.modules:
+        # with python 3.5.1 (ok with 3.5.5) somehow kept running into
+        #  Failed to import dlsub1: Parent module 'dltestm1' not loaded
+        # while running the test. Preloading pkg resolved the issue
+        import_module(pkg)
     for modname in modnames:
         try:
             _globals[modname] = mod = import_module(
