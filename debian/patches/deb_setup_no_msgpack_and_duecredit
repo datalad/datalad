@@ -21,12 +21,3 @@ Last-Update: 2018-03-03
          'requests>=1.2',
      ] + keyring_requires,
      'downloaders-extra': [
-@@ -93,7 +93,7 @@ requires = {
-         'vcrpy',
-     ],
-     'metadata': [
--        'duecredit',
-+        #'duecredit',
-         'simplejson',
-         'whoosh',
-     ] + req_lzma,
