@@ -476,6 +476,8 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_LOG_TRACEBACK*:
   Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
+- *DATALAD_LOG_VMEM*:
+  Reports memory utilization (resident/virtual) at every log line, needs `psutil` module
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.

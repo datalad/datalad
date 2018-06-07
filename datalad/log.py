@@ -106,6 +106,37 @@ class TraceBack(object):
         return sftb
 
 
+class MemoryInfo(object):
+    def __init__(self):
+        try:
+            from psutil import Process
+            process = Process(os.getpid())
+            self.memory_info = process.memory_info \
+                if hasattr(process, 'memory_info') \
+                else process.get_memory_info
+        except:
+            self.memory_info = None
+
+
+    def __call__(self):
+        """Return utilization of virtual memory
+
+        Generic implementation using psutil
+        """
+        if not self.memory_info:
+            return "RSS/VMS: N/A"
+        mi = self.memory_info()
+        # in later versions of psutil mi is a named tuple.
+        # but that is not the case on Debian squeeze with psutil 0.1.3
+        rss = mi[0] / 1024
+        vms = mi[1] / 1024
+        vmem = (rss, vms)
+
+        try:
+            return "RSS/VMS: %d/%d kB" % vmem
+        except:
+            return "RSS/VMS: %s" % str(vmem)
+
 # Recipe from http://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
 # by Brandon Thomson
 # Adjusted for automagic determination either coloring is needed and
@@ -123,6 +154,8 @@ class ColorFormatter(logging.Formatter):
         collide = log_env == 'collide'
         limit = 100 if collide else int(log_env) if log_env.isdigit() else 100
         self._tb = TraceBack(collide=collide, limit=limit) if log_env else None
+
+        self._mem = MemoryInfo() if os.environ.get('DATALAD_LOG_VMEM', '') else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False, log_pid=False):
@@ -152,6 +185,8 @@ class ColorFormatter(logging.Formatter):
         if self._tb:
             if not getattr(record, 'notraceback', False):
                 record.msg = self._tb() + "  " + record.msg
+        if self._mem:
+            record.msg = "%s %s" % (self._mem(), record.msg)
 
         return logging.Formatter.format(self, record)
 
