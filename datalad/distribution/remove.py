@@ -19,6 +19,7 @@ from os.path import exists
 from os.path import relpath
 from os.path import pardir
 from os.path import join as opj
+from datalad.utils import rmdir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -254,7 +255,7 @@ class Remove(Interface):
                     if not uninstall_failed and exists(ap['path']):
                         # could be an empty dir in case an already uninstalled subdataset
                         # got removed
-                        os.rmdir(ap['path'])
+                        rmdir(ap['path'])
                 else:
                     # anything that is not a dataset can simply be passed on
                     to_reporemove[ap['path']] = ap

@@ -38,6 +38,7 @@ from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
+from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
@@ -57,6 +58,7 @@ from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
 from ..utils import import_modules, import_module_from_file
+from ..utils import get_open_files
 from ..utils import map_items
 from ..support.annexrepo import AnnexRepo
 
@@ -1078,6 +1080,37 @@ def test_dlabspath(path):
             eq_(dlabspath("bu"), opj(d, "bu"))
             eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+
+
+@with_tree({'1': 'content', 'd': {'2': 'more'}})
+def test_get_open_files(p):
+    skip_if_no_module('psutil')
+    eq_(get_open_files(p), {})
+    f1 = opj(p, '1')
+    subd = opj(p, 'd')
+    with open(f1) as f:
+        # since lsof does not care about PWD env var etc, paths
+        # will not contain symlinks, we better realpath them
+        # all before comparison
+        eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+
+    assert not get_open_files(subd)
+    # if we start a process within that directory, should get informed
+    from subprocess import Popen, PIPE
+    from time import time
+    t0 = time()
+    proc = Popen([sys.executable, '-c',
+                  r'import sys; sys.stdout.write("OK\n"); sys.stdout.flush();'
+                  r'import time; time.sleep(10)'],
+                 stdout=PIPE,
+                 cwd=subd)
+    # Assure that it started and we read the OK
+    eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
+    assert time() - t0 < 5 # that we were not stuck waiting for process to finish
+    eq_(get_open_files(p), {op.realpath(subd): proc.pid})
+    eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
+    proc.terminate()
+    assert not get_open_files(subd)
 
 
 def test_map_items():
