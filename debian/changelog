@@ -1,11 +1,11 @@
-datalad (0.10.0~rc5+git41-g0f540a4b-1) neurodebian-devel; urgency=medium
+datalad (0.10.0~rc5+git45-gd8b6aa97-1) neurodebian-devel; urgency=medium
 
   * New upstream snapshot from 0.10.0.rc5
   * debian/control
     - updated B-Depends/Recommends/Suggests to include new modules for
       extracting meta-data and removed all needed for crawling (split away).
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 06 Jun 2018 22:39:26 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 07 Jun 2018 09:13:08 -0400
 
 datalad (0.9.3-1) unstable; urgency=medium
 
