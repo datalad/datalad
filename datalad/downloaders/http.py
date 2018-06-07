@@ -297,7 +297,7 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
 
 @auto_repr
 class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
-    """Authenticate via HTTP digest authentication
+    """Authenticate via HTTP Authorization header
     """
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
