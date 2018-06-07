@@ -47,6 +47,7 @@ AUTHENTICATION_TYPES = {
     'bearer_token': HTTPBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
     'nda-s3': S3Authenticator,
+    'loris-token': HTTPBearerTokenAuthenticator,
     'xnat': NotImplementedAuthenticator,
     'none': NoneAuthenticator,
 }
