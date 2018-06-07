@@ -296,7 +296,7 @@ def eval_results(func):
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
-        # for result filters and pre/post plugins
+        # for result filters and pre/post procedures
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
         allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
@@ -361,7 +361,7 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_plugin_specs(param_key=None, cfg_key=None, ds=None):
+        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
@@ -380,11 +380,11 @@ def eval_results(func):
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
-        run_before = _get_plugin_specs(
+        run_before = _get_procedure_specs(
             'run_before',
             'datalad.{}.run-before'.format(cmdline_name),
             ds=dataset_arg)
-        run_after = _get_plugin_specs(
+        run_after = _get_procedure_specs(
             'run_after',
             'datalad.{}.run-after'.format(cmdline_name),
             ds=dataset_arg)
