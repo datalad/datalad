@@ -34,7 +34,9 @@ try:
     if PY3:
         raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
-except ImportError:
+except (ImportError, AttributeError):
+    # Attribute Error happens with newer httpretty and older ssl module
+    # https://github.com/datalad/datalad/pull/2623
     class NoHTTPPretty(object):
        __bool__ = __nonzero__ = lambda s: False
        activate = lambda s, t: t
