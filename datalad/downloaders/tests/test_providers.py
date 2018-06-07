@@ -140,6 +140,7 @@ authentication_type = none
 
     # Test that the dataset provider overrides the datalad
     # default
+    owd = os.getcwd()
     os.chdir(dsdir)
     providers = Providers.from_config_files(reload=True)
     provider = providers.get_provider('https://crcns.org/data....')
@@ -160,6 +161,7 @@ authentication_type = none
         assert_equal(provider.name, 'usercrcns')
 
     # Cleanup
+    os.chdir(owd)
     shutil.rmtree(sysdir)
     shutil.rmtree(userdir)
     shutil.rmtree(dsdir)
