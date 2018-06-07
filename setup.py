@@ -101,7 +101,7 @@ requires = {
     ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
-        'mutagen',  # audio metadata
+        'mutagen>=1.36',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
