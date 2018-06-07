@@ -127,7 +127,7 @@ def test_basics(path, nodspath):
 
     real_get = ds.config.get
 
-    def mocked_get(key, default):
+    def mocked_get(key, default=None):
         if key == "datalad.run.record-sidecar":
             return True
         return real_get(key, default)
