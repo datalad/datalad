@@ -8,7 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
+import os
+import shutil
+
 from mock import patch
+from tempfile import mkdtemp
 
 from ..providers import Provider
 from ..providers import Providers
@@ -20,6 +24,8 @@ from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
 
 from ...support.external_versions import external_versions
+from ...interface.common_cfg import dirs
+
 
 def test_Providers_OnStockConfiguration():
     providers = Providers.from_config_files()
@@ -86,3 +92,74 @@ def test_get_downloader_class():
         with assert_raises(RuntimeError) as cmr:
             Provider._get_downloader_class(url)
         assert_in("you need 'requests'", str(cmr.exception))
+
+@patch.multiple("appdirs.AppDirs", site_config_dir=None, user_config_dir=None)
+def test_Providers_from_config__files():
+    """Test configuration file precedence
+
+    Ensure that provider precedence works in the correct order:
+
+        datalad defaults < dataset defaults < system defaults < user defaults
+    """
+
+    # Setup. This would be nice to have a context manager for, but
+    # "with tempdir.TemporaryDirectory" wouldn't work on Python 2.7..
+
+    # Create a fake system directory, user directory, and dataset directory
+    sysdir = mkdtemp("sys", "dataladtest", None)
+    os.mkdir(sysdir + "/providers/", 0o700)
+    userdir = mkdtemp("user", "dataladtest", None)
+    os.mkdir(userdir + "/providers/", 0o700)
+    dsdir = mkdtemp("ds", "dataladtest", None)
+    os.makedirs(dsdir+ "/.datalad/providers/", 0o700)
+    # datalad looks for the .git directory to find the root of the
+    # dataset, not the .datalad directory.
+    os.makedirs(dsdir+ "/.git", 0o700)
+
+    with open(dsdir+"/.datalad/providers/atest.cfg", "w") as f:
+        f.write("""[provider:dscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+        """)
+    with open(sysdir+"/providers/atest2.cfg", "w") as f:
+        f.write("""[provider:syscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+        """)
+    with open(userdir+"/providers/atest3.cfg", "w") as f:
+        f.write("""[provider:usercrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+        """)
+
+    # Test the default, this is an arbitrary provider used from another
+    # test
+    providers = Providers.from_config_files(reload=True)
+    provider = providers.get_provider('https://crcns.org/data....')
+    assert_equal(provider.name, 'crcns')
+
+    # Test that the dataset provider overrides the datalad
+    # default
+    os.chdir(dsdir)
+    providers = Providers.from_config_files(reload=True)
+    provider = providers.get_provider('https://crcns.org/data....')
+    assert_equal(provider.name, 'dscrcns')
+
+    # Test that the system defaults take precedence over the dataset
+    # defaults (we're still within the dsdir)
+    with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
+        providers = Providers.from_config_files(reload=True)
+        provider = providers.get_provider('https://crcns.org/data....')
+        assert_equal(provider.name, 'syscrcns')
+
+    # Test that the user defaults take precedence over the system
+    # defaults
+    with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
+        providers = Providers.from_config_files(reload=True)
+        provider = providers.get_provider('https://crcns.org/data....')
+        assert_equal(provider.name, 'usercrcns')
+
+    # Cleanup
+    shutil.rmtree(sysdir)
+    shutil.rmtree(userdir)
+    shutil.rmtree(dsdir)

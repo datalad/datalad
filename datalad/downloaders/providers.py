@@ -18,6 +18,7 @@ from six import iteritems
 import re
 from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
+from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 
@@ -199,19 +200,28 @@ class Providers(object):
         if files is None:
             # Config files from the datalad dist
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
-            # User config
-            files.extend(glob(pathjoin(dirs.user_config_dir, 'providers', '*.cfg')))
 
             # Dataset config
             dsroot = get_dataset_root("")
             if dsroot is not None:
                 files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
+
             # System config
-            files.extend(glob(pathjoin(dirs.site_config_dir, "providers", "*.cfg")))
+            if dirs.site_config_dir is not None:
+                files.extend(glob(pathjoin(dirs.site_config_dir, "providers", "*.cfg")))
+            # User config
+            if dirs.user_config_dir is not None:
+                files.extend(glob(pathjoin(dirs.user_config_dir, 'providers', '*.cfg')))
+
+
         config.read(files)
 
         # We need first to load Providers and credentials
-        providers = {}
+        # Order matters, because we need to ensure that when
+        # there's a conflict between configuration files declared
+        # at different precedence levels (ie. dataset vs system)
+        # the appropriate precedence config wins.
+        providers = OrderedDict()
         credentials = {}
 
         for section in config.sections():
@@ -296,18 +306,21 @@ class Providers(object):
         """Given a URL returns matching provider
         """
         nproviders = len(self._providers)
-        for i in range(nproviders):
+
+        # Range backwards to ensure that more locally defined
+        # configuration wins in conflicts between url_re
+        for i in range(nproviders-1, -1, -1):
             provider = self._providers[i]
             if not provider.url_res:
                 continue
             for url_re in provider.url_res:
                 if re.match(url_re, url):
-                    if i != 0:
+                    #if i != 0:
                         # place it first
                         # TODO: optimize with smarter datastructures if this becomes a burden
-                        del self._providers[i]
-                        self._providers = [provider] + self._providers
-                        assert(len(self._providers) == nproviders)
+                        #del self._providers[i]
+                        #self._providers = [provider] + self._providers
+                        #assert(len(self._providers) == nproviders)
                     lgr.debug("Returning provider %s for url %s", provider, url)
                     return provider
 
