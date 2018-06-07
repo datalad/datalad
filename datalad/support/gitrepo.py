@@ -993,6 +993,10 @@ class GitRepo(RepoInterface):
         #     #     sys.stderr.write("CLEARING\n")
         #     #     self.repo.git.clear_cache()
         #     self.repo.index.write()
+
+        # Close batched by GitPython git processes etc
+        # Ref: https://github.com/gitpython-developers/GitPython/issues/718
+        self.repo.__del__()
         pass
 
     @staticmethod

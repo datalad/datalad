@@ -310,12 +310,83 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     if chmod_files == 'auto':
         chmod_files = on_windows
 
+    # Check for open files
+    assert_no_open_files(path)
+
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
         os.unlink(path)
+
+
+def rmdir(path, *args, **kwargs):
+    """os.rmdir with our optional checking for open files"""
+    assert_no_open_files(path)
+    os.rmdir(path)
+
+
+def get_open_files(path, log_open=False):
+    """Get open files under a path
+
+    Parameters
+    ----------
+    path : str
+      File or directory to check for open files under
+    log_open : bool or int
+      If set - logger level to use
+
+    Returns
+    -------
+    dict
+      path : pid
+
+    """
+    # Original idea: https://stackoverflow.com/a/11115521/1265472
+    import psutil
+    files = {}
+    # since the ones returned by psutil would not be aware of symlinks in the
+    # path we should also get realpath for path
+    path = realpath(path)
+    for proc in psutil.process_iter():
+        try:
+            open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
+            for p in open_paths:
+                # note: could be done more efficiently so we do not
+                # renormalize path over and over again etc
+                if path_startswith(p, path):
+                    files[p] = proc.pid
+        # Catch a race condition where a process ends
+        # before we can examine its files
+        except psutil.NoSuchProcess:
+            pass
+        except psutil.AccessDenied:
+            pass
+
+    if files and log_open:
+        lgr.log(log_open, "Open files under %s: %s", path, files)
+    return files
+
+
+_assert_no_open_files_cfg = os.environ.get('DATALAD_ASSERT_NO_OPEN_FILES')
+if _assert_no_open_files_cfg:
+    def assert_no_open_files(path):
+        files = get_open_files(path, log_open=40)
+        if _assert_no_open_files_cfg == 'assert':
+            assert not files
+        elif files:
+            if _assert_no_open_files_cfg == 'pdb':
+                import pdb
+                pdb.set_trace()
+            elif _assert_no_open_files_cfg == 'epdb':
+                import epdb
+                epdb.serve()
+            pass
+        # otherwise we would just issue that error message in the log
+else:
+    def assert_no_open_files(*args, **kwargs):
+        pass
 
 
 def rmtemp(f, *args, **kwargs):
@@ -341,6 +412,8 @@ def rmtemp(f, *args, **kwargs):
             # statement has WindowsError in it -- NameError
             # also see gh-2533
             exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
+            # Check for open files
+            assert_no_open_files(f)
             for i in range(50):
                 try:
                     os.unlink(f)
@@ -1611,6 +1684,11 @@ def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug
     from importlib import import_module
     _globals = globals()
     mods_loaded = []
+    if pkg and not pkg in sys.modules:
+        # with python 3.5.1 (ok with 3.5.5) somehow kept running into
+        #  Failed to import dlsub1: Parent module 'dltestm1' not loaded
+        # while running the test. Preloading pkg resolved the issue
+        import_module(pkg)
     for modname in modnames:
         try:
             _globals[modname] = mod = import_module(
@@ -1670,8 +1748,6 @@ def import_module_from_file(modpath, pkg=None, log=lgr.debug):
             "Failed to import module from %s: %s" % (modpath, exc_str(e)))
 
     return mod
-
-lgr.log(5, "Done importing datalad.utils")
 
 
 def get_encoding_info():
@@ -1815,3 +1891,6 @@ def create_tree(path, tree, archives_leading_dir=True):
                 f.write(load)
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+lgr.log(5, "Done importing datalad.utils")

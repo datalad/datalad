@@ -93,13 +93,15 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        'duecredit',
+        # was added in https://github.com/datalad/datalad/pull/1995 without
+        # due investigation, should not be needed until we add duecredit support
+        # 'duecredit',
         'simplejson',
         'whoosh',
     ] + req_lzma,
     'metadata-extra': [
         'PyYAML',  # very optional
-        'mutagen',  # audio metadata
+        'mutagen>=1.36',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
@@ -120,6 +122,7 @@ requires.update({
     'devel-utils': [
         'asv',
         'nose-timer',
+        'psutil',
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome

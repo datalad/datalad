@@ -518,7 +518,8 @@ Refer datalad/config.py for information on how to add these environment variable
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
-
+- *DATALAD_ASSERT_NO_OPEN_FILES*:
+  Instructs internal tests for no open files under paths to be removed. If set to anything, it would log at ERROR level, and if set to "assert", it would raise AssertionError if any is
 
 # Changelog section
 

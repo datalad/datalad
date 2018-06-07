@@ -29,6 +29,11 @@ def check_repo_deals_with_inode_change(class_, path, temp_store):
     old_inode = os.stat(path).st_ino
     shutil.copytree(path, temp_store, symlinks=True)
     # kill original
+    # To make it "clean" we need to stop batched processes to not
+    # have anything holding that path (e.g. on windows)
+    # Unfortunately it is not enough ATM since GitPython also has
+    # cat-file --batched which we need to annihilate I guess
+    repo.precommit()
     rmtree(path)
     assert (not exists(path))
     # recreate

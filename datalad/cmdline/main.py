@@ -93,10 +93,15 @@ def setup_parser(
         fromfile_prefix_chars=':',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-            DataLad provides a unified data distribution with the convenience of git-annex
-            repositories as a backend.  DataLad command line tools allow to manipulate
-            (obtain, create, update, publish, etc.) datasets and their collections."""),
-        epilog='"Control Your Data"',
+            Comprehensive data management solution
+
+            DataLad provides a unified data distribution system built on the Git
+            and Git-annex. DataLad command line tools allow to manipulate (obtain,
+            create, update, publish, etc.) datasets and provide a comprehensive
+            toolbox for joint management of data and code. Compared to Git/annex
+            it primarly extends their functionality to transparently and
+            simultaneously work with multiple inter-related repositories."""),
+        epilog='"Be happy!"',
         formatter_class=formatter_class,
         add_help=False)
     # common options
