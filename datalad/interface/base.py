@@ -384,7 +384,7 @@ class Interface(object):
             # XXX define or better get from elsewhere
             common_opts = ('change_path', 'common_debug', 'common_idebug', 'func',
                            'help', 'log_level', 'logger', 'pbs_runner',
-                           'result_renderer', 'run_before', 'run_after', 'subparser')
+                           'result_renderer', 'proc_pre', 'proc_post', 'subparser')
             argnames = [name for name in dir(args)
                         if not (name.startswith('_') or name in common_opts)]
         kwargs = {k: getattr(args, k) for k in argnames if is_api_arg(k)}
@@ -418,8 +418,8 @@ class Interface(object):
                 # eval_results can't distinguish between --report-{status,type}
                 # not specified via the CLI and None passed via the Python API.
                 kwargs['result_filter'] = res_filter
-            kwargs['run_before'] = args.common_run_before
-            kwargs['run_after'] = args.common_run_after
+            kwargs['proc_pre'] = args.common_proc_pre
+            kwargs['proc_post'] = args.common_proc_post
         try:
             ret = cls.__call__(**kwargs)
             if inspect.isgenerator(ret):

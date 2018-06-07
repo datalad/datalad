@@ -72,15 +72,15 @@ def dlplugin(dataset, noval, withval='test'):
 #    ds = create(dataset=opj(path, 'ds1'))
 #    eq_(sorted(os.listdir(ds.path)), ['.datalad', '.git', '.gitattributes'])
 #    # now we configure a plugin to run twice after `create`
-#    cfg.add('datalad.create.run-after',
+#    cfg.add('datalad.create.proc-post',
 #            'add_readme filename=after1.txt',
 #            where='global')
-#    cfg.add('datalad.create.run-after',
+#    cfg.add('datalad.create.proc-post',
 #            'add_readme filename=after2.txt',
 #            where='global')
 #    # force reload to pick up newly populated .gitconfig
 #    cfg.reload(force=True)
-#    assert_in('datalad.create.run-after', cfg)
+#    assert_in('datalad.create.proc-post', cfg)
 #    # and now we create a dataset and expect the two readme files
 #    # to be part of it
 #    ds = create(dataset=opj(path, 'ds'))
@@ -89,9 +89,9 @@ def dlplugin(dataset, noval, withval='test'):
 #    assert(exists(opj(ds.path, 'after2.txt')))
 #    # cleanup
 #    cfg.unset(
-#        'datalad.create.run-after',
+#        'datalad.create.proc-post',
 #        where='global')
-#    assert_not_in('datalad.create.run-after', cfg)
+#    assert_not_in('datalad.create.proc-post', cfg)
 
 
 @with_tempfile(mkdir=True)
