@@ -34,7 +34,11 @@ def test_download_url_exceptions():
 
     res1 = download_url('http://example.com/bogus', on_failure='ignore')
     assert_result_count(res1, 1, status='error')
-    assert_in('http://example.com/bogus', res1[0]['message'])
+    msg = res1[0]['message']
+    # when running under bogus proxy, on older systems we could get
+    # no URL reported in the message
+    if 'Cannot connect to proxy.' not in msg:
+        assert_in('http://example.com/bogus', msg)
 
 
 @assert_cwd_unchanged
