@@ -441,9 +441,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
-    if sidecar or (
-            sidecar is None and
-            ds.config.get('datalad.run.record-sidecar', default=False)):
+
+    use_sidecar = sidecar or (
+        sidecar is None and
+        ds.config.get('datalad.run.record-sidecar', default=False))
+
+    if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
         record_id = md5(record.encode('utf-8')).hexdigest()
@@ -464,7 +467,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        '"{}"'.format(record_id) if sidecar else record)
+        '"{}"'.format(record_id) if use_sidecar else record)
     msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:
