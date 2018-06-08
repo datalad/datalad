@@ -19,6 +19,7 @@ from datalad.tests.utils import (
     known_failure_v6,
 )
 
+import os.path as op
 from os.path import join as opj
 from os.path import relpath
 from os import mkdir, remove
@@ -510,24 +511,33 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
+@with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
-    ds = Dataset(path).create()
+    # Note: Using with_tree rather than with_tempfile is matters. The latter
+    # calls realpath on the path, which masks a failure in the
+    # TMPDIR="/var/tmp/sym link" test case
+    ds = Dataset(path).create(force=True)
     subdir = opj(path, 'subdir')
-    mkdir(subdir)
     with chpwd(subdir):
         run("touch test.dat")
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+
+    # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
+    # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
+    def ok_file_under_git_kludge(path, basename):
+        ok_file_under_git(opj(op.realpath(path), basename), annexed=True)
+
+    ok_file_under_git_kludge(subdir, "test.dat")
+
     rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
         ds.rerun()
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+    ok_file_under_git_kludge(subdir, "test.dat")
     # and not on top
     assert_raises(AssertionError, ok_file_under_git, opj(ds.path, "test.dat"), annexed=True)
 
@@ -535,7 +545,7 @@ def test_rerun_subdir(path):
     with chpwd(subdir):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
+    ok_file_under_git_kludge(ds.path, "test2.dat")
     rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
@@ -790,6 +800,8 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
+    eq_(get_run_info(ds, ds.repo.repo.head.commit.message)[1]["pwd"],
+        "subdir")
 
     # Double brackets can be used to escape placeholders.
     ds.run("touch {{inputs}}", inputs=["*.in"])

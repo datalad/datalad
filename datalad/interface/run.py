@@ -322,10 +322,15 @@ def get_command_pwds(dataset):
         rel_pwd = curdir
     else:
         # act on the whole dataset if nothing else was specified
-        dataset = get_dataset_root(curdir)
+
         # Follow our generic semantic that if dataset is specified,
         # paths are relative to it, if not -- relative to pwd
         pwd = getpwd()
+        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
+        # repos whose leading paths have a symlinked directory (see the
+        # TMPDIR="/var/tmp/sym link" test case).
+        dataset = get_dataset_root(pwd)
+
         if dataset:
             rel_pwd = relpath(pwd, dataset)
         else:
