@@ -40,8 +40,12 @@ def test_basics(path):
     ds = Dataset(path).create(force=True)
     # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
     # input yet, so manual for now
+    # V6FACT: this leaves the file staged, but not committed
     ds.add('code', to_git=True)
+    # V6FACT: even this leaves it staged
     ds.add('.')
+    # V6FACT: but this finally commits it
+    ds.save()
     # TODO remove above two lines
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
