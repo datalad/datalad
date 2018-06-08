@@ -768,6 +768,10 @@ def test_placeholders(path):
     ok_file_has_content(opj(path, "expanded-pwd"), path,
                         strip=True)
 
+    ds.run("echo {dspath} >expanded-dspath")
+    ok_file_has_content(opj(path, "expanded-dspath"), ds.path,
+                        strip=True)
+
     subdir_path = opj(path, "subdir")
     with chpwd(subdir_path):
         run("echo {pwd} >expanded-pwd")

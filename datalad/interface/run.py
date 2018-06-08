@@ -85,11 +85,12 @@ class Run(Interface):
     || REFLOW >>
     A few placeholders are supported in the command via Python format
     specification. "{pwd}" will be replaced with the full path of the current
-    working directory. "{inputs}" and "{outputs}" represent the values
-    specified by [CMD: --input and --output CMD][PY: `inputs` and `outputs`
-    PY]. If multiple values are specified, the values will be joined by a
-    space. The order of the values will match that order from the command line,
-    with any globs expanded in alphabetical order (like bash). Individual
+    working directory. "{dspath}" will be replaced with the full path of the
+    dataset that run is invoked on. "{inputs}" and "{outputs}" represent the
+    values specified by [CMD: --input and --output CMD][PY: `inputs` and
+    `outputs` PY]. If multiple values are specified, the values will be joined
+    by a space. The order of the values will match that order from the command
+    line, with any globs expanded in alphabetical order (like bash). Individual
     values can be accessed with an integer index (e.g., "{inputs[0]}").
     << REFLOW ||
 
@@ -385,6 +386,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     sfmt = SequenceFormatter()
     cmd_expanded = sfmt.format(cmd,
                                pwd=pwd,
+                               dspath=ds.path,
                                inputs=inputs.expand(dot=False),
                                outputs=outputs.expand(dot=False))
 
