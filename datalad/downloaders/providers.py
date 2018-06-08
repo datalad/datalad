@@ -155,6 +155,7 @@ class Providers(object):
     """
 
     _DEFAULT_PROVIDERS = None
+    _DS_ROOT = None
 
     def __init__(self, providers=None):
         """
@@ -192,7 +193,8 @@ class Providers(object):
         can also be called to reset the cached providers.
         """
         # lazy part
-        if files is None and cls._DEFAULT_PROVIDERS and not reload:
+        dsroot = get_dataset_root("")
+        if files is None and cls._DEFAULT_PROVIDERS and not reload and dsroot==cls._DS_ROOT:
             return cls._DEFAULT_PROVIDERS
 
         config = SafeConfigParserWithIncludes()
@@ -202,9 +204,9 @@ class Providers(object):
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
 
             # Dataset config
-            dsroot = get_dataset_root("")
             if dsroot is not None:
                 files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
+            cls._DS_ROOT = dsroot
 
             # System config
             if dirs.site_config_dir is not None:
@@ -308,7 +310,7 @@ class Providers(object):
 
         # Range backwards to ensure that more locally defined
         # configuration wins in conflicts between url_re
-        for provider in self._providers[::-1]
+        for provider in self._providers[::-1]:
             if not provider.url_res:
                 continue
             for url_re in provider.url_res:
