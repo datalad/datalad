@@ -305,22 +305,14 @@ class Providers(object):
     def get_provider(self, url, only_nondefault=False):
         """Given a URL returns matching provider
         """
-        nproviders = len(self._providers)
 
         # Range backwards to ensure that more locally defined
         # configuration wins in conflicts between url_re
-        for i in range(nproviders-1, -1, -1):
-            provider = self._providers[i]
+        for provider in self._providers[::-1]
             if not provider.url_res:
                 continue
             for url_re in provider.url_res:
                 if re.match(url_re, url):
-                    #if i != 0:
-                        # place it first
-                        # TODO: optimize with smarter datastructures if this becomes a burden
-                        #del self._providers[i]
-                        #self._providers = [provider] + self._providers
-                        #assert(len(self._providers) == nproviders)
                     lgr.debug("Returning provider %s for url %s", provider, url)
                     return provider
 
