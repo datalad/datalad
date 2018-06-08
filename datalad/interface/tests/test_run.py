@@ -795,6 +795,16 @@ def test_placeholders(path):
     ds.run("touch {{inputs}}", inputs=["*.in"])
     ok_exists(opj(path, "{inputs}"))
 
+    # rerun --script expands the placeholders.
+    with patch("sys.stdout", new_callable=StringIO) as cmout:
+        ds.rerun(script="-", since="")
+        script_out = cmout.getvalue()
+        assert_in("echo a.in b.in >c.out", script_out)
+        assert_in("echo {} >expanded-pwd".format(subdir_path),
+                  script_out)
+        assert_in("echo {} >expanded-dspath".format(ds.path),
+                  script_out)
+
 
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
