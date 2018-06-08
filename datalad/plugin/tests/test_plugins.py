@@ -12,33 +12,26 @@
 
 from datalad.tests.utils import known_failure_direct_mode
 
-import os
-import logging
 from os.path import join as opj
-from os.path import exists
-from mock import patch
 
 from datalad.coreapi import create
 from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
-from datalad import cfg
 from datalad.plugin.wtf import _HIDDEN
 
-from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_if, skip_if_no_module
+from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import SkipTest
 
 
@@ -63,35 +56,6 @@ def dlplugin(dataset, noval, withval='test'):
             noval=noval,
             withval=withval))
 '''
-
-
-# TODO bring back when functionality is back
-#@with_tempfile(mkdir=True)
-#def test_plugin_config(path):
-#    # baseline behavior, empty datasets on create
-#    ds = create(dataset=opj(path, 'ds1'))
-#    eq_(sorted(os.listdir(ds.path)), ['.datalad', '.git', '.gitattributes'])
-#    # now we configure a plugin to run twice after `create`
-#    cfg.add('datalad.create.run-after',
-#            'add_readme filename=after1.txt',
-#            where='global')
-#    cfg.add('datalad.create.run-after',
-#            'add_readme filename=after2.txt',
-#            where='global')
-#    # force reload to pick up newly populated .gitconfig
-#    cfg.reload(force=True)
-#    assert_in('datalad.create.run-after', cfg)
-#    # and now we create a dataset and expect the two readme files
-#    # to be part of it
-#    ds = create(dataset=opj(path, 'ds'))
-#    ok_clean_git(ds.path)
-#    assert(exists(opj(ds.path, 'after1.txt')))
-#    assert(exists(opj(ds.path, 'after2.txt')))
-#    # cleanup
-#    cfg.unset(
-#        'datalad.create.run-after',
-#        where='global')
-#    assert_not_in('datalad.create.run-after', cfg)
 
 
 @with_tempfile(mkdir=True)

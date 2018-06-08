@@ -38,6 +38,8 @@ def _new_args(**kwargs):
                 common_on_failure=None,  # ['ignore', 'continue', 'stop']
                 common_report_status=None,  # ['all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error']
                 common_report_type=None,  # ['dataset', 'file']
+                common_proc_pre=None,
+                common_proc_post=None,
             ),
             kwargs
         )

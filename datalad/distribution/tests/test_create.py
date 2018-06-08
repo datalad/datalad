@@ -317,7 +317,7 @@ def test_create_withprocedure(path):
         # needs to identify the dataset, otherwise post-proc
         # procedure doesn't know what to run on
         dataset=path,
-        run_after=[['cfg_metadatatypes', 'xmp', 'datacite']])
+        proc_post=[['cfg_metadatatypes', 'xmp', 'datacite']])
     ok_clean_git(path)
     ds.config.reload()
     eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))

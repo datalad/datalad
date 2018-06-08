@@ -157,9 +157,9 @@ class RunProcedure(Interface):
     On execution of any commands, DataLad inspects two additional
     configuration settings:
 
-    - 'datalad.<name>.run-before'
+    - 'datalad.<name>.proc-pre'
 
-    - 'datalad.<name>.run-after'
+    - 'datalad.<name>.proc-post'
 
     where '<name>' is the name of a DataLad command. Using this mechanism
     DataLad can be instructed to run one or more procedures before or
@@ -167,7 +167,7 @@ class RunProcedure(Interface):
     a set of metadata types in any newly created dataset can be achieved
     via:
 
-      % datalad -c 'datalad.create.run-after=cfg_metadatatypes xmp image' create -d myds
+      % datalad -c 'datalad.create.proc-post=cfg_metadatatypes xmp image' create -d myds
 
     As procedures run on datasets, it is necessary to explicitly identify
     the target dataset via the -d (--dataset) option.

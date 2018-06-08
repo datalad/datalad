@@ -164,7 +164,7 @@ def setup_parser(
         non-zero exit code; 'stop' halts on first failure and yields non-zero exit
         code. A failure is any result with status 'impossible' or 'error'.""")
     parser.add_argument(
-        '--run-before', dest='common_run_before',
+        '--proc-pre', dest='common_proc_pre',
         nargs='+',
         action='append',
         metavar=('<PROCEDURE NAME>', 'ARGS'),
@@ -174,17 +174,17 @@ def setup_parser(
         It is important to specify the target dataset via the --dataset argument
         of the main command."""),
     parser.add_argument(
-        '--run-after', dest='common_run_after',
+        '--proc-post', dest='common_proc_post',
         nargs='+',
         action='append',
         metavar=('<PROCEDURE NAME>', 'ARGS'),
-        help="""Like --run-before, but procedures are executed after the main command
+        help="""Like --proc-pre, but procedures are executed after the main command
         has finished."""),
     parser.add_argument(
         '--cmd', dest='_', action='store_true',
         help="""syntactical helper that can be used to end the list of global
         command line options before the subcommand label. Options like
-        --run-before can take an arbitrary number of arguments and may require
+        --proc-pre can take an arbitrary number of arguments and may require
         to be followed by a single --cmd in order to enable identification
         of the subcommand.""")
 
