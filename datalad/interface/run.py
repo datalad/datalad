@@ -347,6 +347,31 @@ def normalize_command(command):
     return command
 
 
+def format_command(command, **kwds):
+    """Plug in placeholders in `command`.
+
+    Parameters
+    ----------
+    command : str or list
+
+    `kwds` is passed to the `format` call. `inputs` and `outputs` are converted
+    to GlobbedPaths if necessary.
+
+    Returns
+    -------
+    formatted command (str)
+    """
+    command = normalize_command(command)
+    sfmt = SequenceFormatter()
+
+    for name in ["inputs", "outputs"]:
+        io_val = kwds.pop(name, None)
+        if not isinstance(io_val, GlobbedPaths):
+            io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
+        kwds[name] = io_val.expand(dot=False)
+    return sfmt.format(command, **kwds)
+
+
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 message=None, rerun_info=None, rerun_outputs=None, sidecar=None):
@@ -402,12 +427,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    sfmt = SequenceFormatter()
-    cmd_expanded = sfmt.format(cmd,
-                               pwd=pwd,
-                               dspath=ds.path,
-                               inputs=inputs.expand(dot=False),
-                               outputs=outputs.expand(dot=False))
+    cmd_expanded = format_command(cmd,
+                                  pwd=pwd,
+                                  dspath=ds.path,
+                                  inputs=inputs,
+                                  outputs=outputs)
 
     # we have a clean dataset, let's run things
     exc = None
