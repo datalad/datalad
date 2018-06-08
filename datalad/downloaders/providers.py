@@ -9,8 +9,6 @@
 """Data providers - bind downloaders and credentials together
 """
 
-import os
-
 from glob import glob
 from logging import getLogger
 from six import iteritems

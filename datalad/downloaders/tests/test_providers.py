@@ -8,8 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
-import os
-
 from mock import patch
 from tempfile import mkdtemp
 
