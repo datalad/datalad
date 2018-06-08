@@ -56,12 +56,12 @@ def test_logging_to_a_file(dst):
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
     # (...)? is added to swallow possible traceback logs
-    regex = "\[ERROR\](\s+\S+\s*)? "
+    regex = "\[ERROR\]"
     if EnsureBool()(cfg.get('datalad.log.timestamp', False)):
         regex = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
     if EnsureBool()(cfg.get('datalad.log.vmem', False)):
-        regex += 'RSS/VMS: \S+/\S+ \S+\s*'
-    regex += msg
+        regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
+    regex += "(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)
 
 
