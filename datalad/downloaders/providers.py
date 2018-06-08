@@ -211,6 +211,7 @@ class Providers(object):
             # System config
             if dirs.site_config_dir is not None:
                 files.extend(glob(pathjoin(dirs.site_config_dir, "providers", "*.cfg")))
+
             # User config
             if dirs.user_config_dir is not None:
                 files.extend(glob(pathjoin(dirs.user_config_dir, 'providers', '*.cfg')))

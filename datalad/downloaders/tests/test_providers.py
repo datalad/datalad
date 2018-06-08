@@ -9,7 +9,6 @@
 """Tests for data providers"""
 
 import os
-import shutil
 
 from mock import patch
 from tempfile import mkdtemp
@@ -22,6 +21,7 @@ from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
+from ...tests.utils import with_tree
 
 from ...support.external_versions import external_versions
 from ...interface.common_cfg import dirs
@@ -93,8 +93,27 @@ def test_get_downloader_class():
             Provider._get_downloader_class(url)
         assert_in("you need 'requests'", str(cmr.exception))
 
+@with_tree(tree={
+  'providers': {'atest.cfg':"""\
+[provider:syscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}})
+@with_tree(tree={
+  'providers': {'atestwithothername.cfg':"""\
+[provider:usercrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}})
+@with_tree(tree={
+  '.datalad': {'providers': {'atest.cfg':"""\
+[provider:dscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}},
+   '.git': { "HEAD" : ""}})
 @patch.multiple("appdirs.AppDirs", site_config_dir=None, user_config_dir=None)
-def test_Providers_from_config__files():
+def test_Providers_from_config__files(sysdir, userdir, dsdir):
     """Test configuration file precedence
 
     Ensure that provider precedence works in the correct order:
@@ -102,35 +121,6 @@ def test_Providers_from_config__files():
         datalad defaults < dataset defaults < system defaults < user defaults
     """
 
-    # Setup. This would be nice to have a context manager for, but
-    # "with tempdir.TemporaryDirectory" wouldn't work on Python 2.7..
-
-    # Create a fake system directory, user directory, and dataset directory
-    sysdir = mkdtemp("sys", "dataladtest", None)
-    os.mkdir(sysdir + "/providers/", 0o700)
-    userdir = mkdtemp("user", "dataladtest", None)
-    os.mkdir(userdir + "/providers/", 0o700)
-    dsdir = mkdtemp("ds", "dataladtest", None)
-    os.makedirs(dsdir+ "/.datalad/providers/", 0o700)
-    # datalad looks for the .git directory to find the root of the
-    # dataset, not the .datalad directory.
-    os.makedirs(dsdir+ "/.git", 0o700)
-
-    with open(dsdir+"/.datalad/providers/atest.cfg", "w") as f:
-        f.write("""[provider:dscrcns]
-url_re = https?://crcns\.org/.*
-authentication_type = none
-        """)
-    with open(sysdir+"/providers/atest2.cfg", "w") as f:
-        f.write("""[provider:syscrcns]
-url_re = https?://crcns\.org/.*
-authentication_type = none
-        """)
-    with open(userdir+"/providers/atest3.cfg", "w") as f:
-        f.write("""[provider:usercrcns]
-url_re = https?://crcns\.org/.*
-authentication_type = none
-        """)
 
     # Test the default, this is an arbitrary provider used from another
     # test
@@ -162,6 +152,3 @@ authentication_type = none
 
     # Cleanup
     os.chdir(owd)
-    shutil.rmtree(sysdir)
-    shutil.rmtree(userdir)
-    shutil.rmtree(dsdir)
