@@ -16,6 +16,7 @@ from tempfile import mkdtemp
 from ..providers import Provider
 from ..providers import Providers
 from ..providers import HTTPDownloader
+from ...utils import chpwd
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
@@ -121,7 +122,6 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
         datalad defaults < dataset defaults < system defaults < user defaults
     """
 
-
     # Test the default, this is an arbitrary provider used from another
     # test
     providers = Providers.from_config_files(reload=True)
@@ -130,25 +130,21 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
 
     # Test that the dataset provider overrides the datalad
     # default
-    owd = os.getcwd()
-    os.chdir(dsdir)
-    providers = Providers.from_config_files(reload=True)
-    provider = providers.get_provider('https://crcns.org/data....')
-    assert_equal(provider.name, 'dscrcns')
-
-    # Test that the system defaults take precedence over the dataset
-    # defaults (we're still within the dsdir)
-    with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
+    with chpwd(dsdir):
         providers = Providers.from_config_files(reload=True)
         provider = providers.get_provider('https://crcns.org/data....')
-        assert_equal(provider.name, 'syscrcns')
+        assert_equal(provider.name, 'dscrcns')
 
-    # Test that the user defaults take precedence over the system
-    # defaults
-    with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
-        providers = Providers.from_config_files(reload=True)
-        provider = providers.get_provider('https://crcns.org/data....')
-        assert_equal(provider.name, 'usercrcns')
+        # Test that the system defaults take precedence over the dataset
+        # defaults (we're still within the dsdir)
+        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
+            providers = Providers.from_config_files(reload=True)
+            provider = providers.get_provider('https://crcns.org/data....')
+            assert_equal(provider.name, 'syscrcns')
 
-    # Cleanup
-    os.chdir(owd)
+        # Test that the user defaults take precedence over the system
+        # defaults
+        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
+            providers = Providers.from_config_files(reload=True)
+            provider = providers.get_provider('https://crcns.org/data....')
+            assert_equal(provider.name, 'usercrcns')
