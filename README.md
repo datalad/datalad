@@ -26,9 +26,9 @@ to DataLad. In order to install DataLad customized for a particular domain, one
 can simply install an extension directly, and DataLad itself will be
 automatically installed with it. Here is a list of known extensions:
 
-- [tracking web resources and automated data distributions](https://github.com/datalad/datalad-crawler) [![GitHub release](https://img.shields.io/github/release/datalad/datalad-crawler.svg)](https://GitHub.com/datalad/datalad-crawler/releases/)
-- [neuroimaging research data and workflows](https://github.com/datalad/datalad-neuroimaging) [![GitHub release](https://img.shields.io/github/release/datalad/datalad-neuroimaging.svg)](https://GitHub.com/datalad/datalad-neuroimaging/releases/)
-- [support for containerized computational environments](https://github.com/datalad/datalad-container) [![GitHub release](https://img.shields.io/github/release/datalad/datalad-container.svg)](https://GitHub.com/datalad/datalad-container/releases/)
+- [tracking web resources and automated data distributions](https://github.com/datalad/datalad-crawler) [![crawler release](https://img.shields.io/github/release/datalad/datalad-crawler.svg)](https://GitHub.com/datalad/datalad-crawler/releases/)
+- [neuroimaging research data and workflows](https://github.com/datalad/datalad-neuroimaging) [![neuroimaging release](https://img.shields.io/github/release/datalad/datalad-neuroimaging.svg)](https://GitHub.com/datalad/datalad-neuroimaging/releases/)
+- [support for containerized computational environments](https://github.com/datalad/datalad-container) [![container release](https://img.shields.io/github/release/datalad/datalad-container.svg)](https://GitHub.com/datalad/datalad-container/releases/)
 
 - [webapp support](https://github.com/datalad/datalad-webapp) [tech demo]
 
