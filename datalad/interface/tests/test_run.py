@@ -121,6 +121,21 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+    # Simple sidecar message checks.
+    ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
+    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+
+    real_get = ds.config.get
+
+    def mocked_get(key, default=None):
+        if key == "datalad.run.record-sidecar":
+            return True
+        return real_get(key, default)
+
+    with patch.object(ds.config, "get", mocked_get):
+        ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+
 
 @slow  # 17.1880s
 @ignore_nose_capturing_stdout
@@ -766,6 +781,10 @@ def test_placeholders(path):
 
     ds.run("echo {pwd} >expanded-pwd")
     ok_file_has_content(opj(path, "expanded-pwd"), path,
+                        strip=True)
+
+    ds.run("echo {dspath} >expanded-dspath")
+    ok_file_has_content(opj(path, "expanded-dspath"), ds.path,
                         strip=True)
 
     subdir_path = opj(path, "subdir")

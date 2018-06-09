@@ -85,11 +85,12 @@ class Run(Interface):
     || REFLOW >>
     A few placeholders are supported in the command via Python format
     specification. "{pwd}" will be replaced with the full path of the current
-    working directory. "{inputs}" and "{outputs}" represent the values
-    specified by [CMD: --input and --output CMD][PY: `inputs` and `outputs`
-    PY]. If multiple values are specified, the values will be joined by a
-    space. The order of the values will match that order from the command line,
-    with any globs expanded in alphabetical order (like bash). Individual
+    working directory. "{dspath}" will be replaced with the full path of the
+    dataset that run is invoked on. "{inputs}" and "{outputs}" represent the
+    values specified by [CMD: --input and --output CMD][PY: `inputs` and
+    `outputs` PY]. If multiple values are specified, the values will be joined
+    by a space. The order of the values will match that order from the command
+    line, with any globs expanded in alphabetical order (like bash). Individual
     values can be accessed with an integer index (e.g., "{inputs[0]}").
     << REFLOW ||
 
@@ -385,6 +386,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     sfmt = SequenceFormatter()
     cmd_expanded = sfmt.format(cmd,
                                pwd=pwd,
+                               dspath=ds.path,
                                inputs=inputs.expand(dot=False),
                                outputs=outputs.expand(dot=False))
 
@@ -441,9 +443,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info["dsid"] = ds.id
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
-    if sidecar or (
-            sidecar is None and
-            ds.config.get('datalad.run.record-sidecar', default=False)):
+
+    use_sidecar = sidecar or (
+        sidecar is None and
+        ds.config.get('datalad.run.record-sidecar', default=False))
+
+    if use_sidecar:
         # record ID is hash of record itself
         from hashlib import md5
         record_id = md5(record.encode('utf-8')).hexdigest()
@@ -464,7 +469,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 """
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
-        '"{}"'.format(record_id) if sidecar else record)
+        '"{}"'.format(record_id) if use_sidecar else record)
     msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:

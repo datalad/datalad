@@ -296,7 +296,7 @@ def eval_results(func):
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
-        # for result filters and pre/post plugins
+        # for result filters and pre/post procedures
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
         allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
@@ -361,7 +361,7 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_plugin_specs(param_key=None, cfg_key=None, ds=None):
+        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
@@ -380,13 +380,13 @@ def eval_results(func):
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
-        run_before = _get_plugin_specs(
-            'run_before',
-            'datalad.{}.run-before'.format(cmdline_name),
+        proc_pre = _get_procedure_specs(
+            'proc_pre',
+            'datalad.{}.proc-pre'.format(cmdline_name),
             ds=dataset_arg)
-        run_after = _get_plugin_specs(
-            'run_after',
-            'datalad.{}.run-after'.format(cmdline_name),
+        proc_post = _get_procedure_specs(
+            'proc_post',
+            'datalad.{}.proc-post'.format(cmdline_name),
             ds=dataset_arg)
 
         # this internal helper function actually drives the command
@@ -398,9 +398,9 @@ def eval_results(func):
             # track what actions were performed how many times
             action_summary = {}
 
-            if run_before and cmdline_name != 'run-procedure':
+            if proc_pre and cmdline_name != 'run-procedure':
                 from datalad.interface.run_procedure import RunProcedure
-                for procspec in run_before:
+                for procspec in proc_pre:
                     lgr.debug('Running configured pre-procedure %s', procspec)
                     for r in _process_results(
                             RunProcedure.__call__(
@@ -421,9 +421,9 @@ def eval_results(func):
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
 
-            if run_after and cmdline_name != 'run-procedure':
+            if proc_post and cmdline_name != 'run-procedure':
                 from datalad.interface.run_procedure import RunProcedure
-                for procspec in run_after:
+                for procspec in proc_post:
                     lgr.debug('Running configured post-procedure %s', procspec)
                     for r in _process_results(
                             RunProcedure.__call__(

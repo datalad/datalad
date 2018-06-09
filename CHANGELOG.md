@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.10.0 (??? ??, 2018) -- The Release
+## 0.10.0 (Jun 09, 2018) -- The Release
 
 This release is a major leap forward in metadata support.
 
@@ -104,22 +104,6 @@ A number of fixes did not make it into the 0.9.x series:
 - More casts have been embedded in the [use case section of the documentation](http://docs.datalad.org/en/docs/usecases/index.html).
 - `datalad --report-status` has a new value 'all' that can be used to
   temporarily re-enable reporting that was disable by configuration settings.
-
-## 0.9.4 (??? ??, 2018) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
-
-### Fixes
-
-?
-
-### Enhancements and new features
-
-?
 
 
 ## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
