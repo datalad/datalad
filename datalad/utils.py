@@ -1403,7 +1403,6 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     filename = {False: tempfile.mktemp,
                 True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-    filename = realpath(filename)
 
     if content:
         with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
