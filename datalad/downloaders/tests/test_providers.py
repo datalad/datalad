@@ -9,17 +9,22 @@
 """Tests for data providers"""
 
 from mock import patch
+from tempfile import mkdtemp
 
 from ..providers import Provider
 from ..providers import Providers
 from ..providers import HTTPDownloader
+from ...utils import chpwd
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
+from ...tests.utils import with_tree
 
 from ...support.external_versions import external_versions
+from ...interface.common_cfg import dirs
+
 
 def test_Providers_OnStockConfiguration():
     providers = Providers.from_config_files()
@@ -86,3 +91,58 @@ def test_get_downloader_class():
         with assert_raises(RuntimeError) as cmr:
             Provider._get_downloader_class(url)
         assert_in("you need 'requests'", str(cmr.exception))
+
+@with_tree(tree={
+  'providers': {'atest.cfg':"""\
+[provider:syscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}})
+@with_tree(tree={
+  'providers': {'atestwithothername.cfg':"""\
+[provider:usercrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}})
+@with_tree(tree={
+  '.datalad': {'providers': {'atest.cfg':"""\
+[provider:dscrcns]
+url_re = https?://crcns\.org/.*
+authentication_type = none
+"""}},
+   '.git': { "HEAD" : ""}})
+@patch.multiple("appdirs.AppDirs", site_config_dir=None, user_config_dir=None)
+def test_Providers_from_config__files(sysdir, userdir, dsdir):
+    """Test configuration file precedence
+
+    Ensure that provider precedence works in the correct order:
+
+        datalad defaults < dataset defaults < system defaults < user defaults
+    """
+
+    # Test the default, this is an arbitrary provider used from another
+    # test
+    providers = Providers.from_config_files(reload=True)
+    provider = providers.get_provider('https://crcns.org/data....')
+    assert_equal(provider.name, 'crcns')
+
+    # Test that the dataset provider overrides the datalad
+    # default
+    with chpwd(dsdir):
+        providers = Providers.from_config_files(reload=True)
+        provider = providers.get_provider('https://crcns.org/data....')
+        assert_equal(provider.name, 'dscrcns')
+
+        # Test that the system defaults take precedence over the dataset
+        # defaults (we're still within the dsdir)
+        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=None):
+            providers = Providers.from_config_files(reload=True)
+            provider = providers.get_provider('https://crcns.org/data....')
+            assert_equal(provider.name, 'syscrcns')
+
+        # Test that the user defaults take precedence over the system
+        # defaults
+        with patch.multiple("appdirs.AppDirs", site_config_dir=sysdir, user_config_dir=userdir):
+            providers = Providers.from_config_files(reload=True)
+            provider = providers.get_provider('https://crcns.org/data....')
+            assert_equal(provider.name, 'usercrcns')
