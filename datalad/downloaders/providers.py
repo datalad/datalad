@@ -16,6 +16,7 @@ from six import iteritems
 import re
 from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
+from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 
@@ -26,6 +27,9 @@ from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..utils import assure_list_from_str
 from ..utils import auto_repr
+from ..utils import get_dataset_root
+
+from ..interface.common_cfg import dirs
 
 lgr = getLogger('datalad.downloaders.providers')
 
@@ -43,7 +47,6 @@ AUTHENTICATION_TYPES = {
 }
 
 from .credentials import CREDENTIAL_TYPES
-
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -150,6 +153,7 @@ class Providers(object):
     """
 
     _DEFAULT_PROVIDERS = None
+    _DS_ROOT = None
 
     def __init__(self, providers=None):
         """
@@ -173,32 +177,52 @@ class Providers(object):
 
     @classmethod
     def from_config_files(cls, files=None, reload=False):
-        """Would load information about related/possible websites requiring authentication from
+        """Loads information about related/possible websites requiring authentication from:
 
-        - codebase (for now) datalad/downloaders/configs/providers.cfg
+        - datalad/downloaders/configs/*.cfg files provided by the codebase
         - current dataset .datalad/providers/
-        - user dir  ~/.config/datalad/providers/
-        - system-wide datalad installation/config /etc/datalad/providers/
+        - User's home directory directory (ie ~/.config/datalad/providers/*.cfg)
+        - system-wide datalad installation/config (ie /etc/datalad/providers/*.cfg)
 
-        For sample configs look into datalad/downloaders/configs/providers.cfg
+        For sample configs files see datalad/downloaders/configs/providers.cfg
 
-        If files is None, loading is "lazy".  Specify reload=True to force
-        reload.  reset_default_providers could also be used to reset the memoized
-        providers
+        If files is None, loading is cached between calls.  Specify reload=True to force
+        reloading of files from the filesystem.  The class method reset_default_providers
+        can also be called to reset the cached providers.
         """
         # lazy part
-        if files is None and cls._DEFAULT_PROVIDERS and not reload:
+        dsroot = get_dataset_root("")
+        if files is None and cls._DEFAULT_PROVIDERS and not reload and dsroot==cls._DS_ROOT:
             return cls._DEFAULT_PROVIDERS
 
         config = SafeConfigParserWithIncludes()
-        # TODO: support all those other paths
         files_orig = files
         if files is None:
+            # Config files from the datalad dist
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
+
+            # Dataset config
+            if dsroot is not None:
+                files.extend(glob(pathjoin(dsroot, '.datalad', 'providers', '*.cfg')))
+            cls._DS_ROOT = dsroot
+
+            # System config
+            if dirs.site_config_dir is not None:
+                files.extend(glob(pathjoin(dirs.site_config_dir, "providers", "*.cfg")))
+
+            # User config
+            if dirs.user_config_dir is not None:
+                files.extend(glob(pathjoin(dirs.user_config_dir, 'providers', '*.cfg')))
+
+
         config.read(files)
 
         # We need first to load Providers and credentials
-        providers = {}
+        # Order matters, because we need to ensure that when
+        # there's a conflict between configuration files declared
+        # at different precedence levels (ie. dataset vs system)
+        # the appropriate precedence config wins.
+        providers = OrderedDict()
         credentials = {}
 
         for section in config.sections():
@@ -282,19 +306,14 @@ class Providers(object):
     def get_provider(self, url, only_nondefault=False):
         """Given a URL returns matching provider
         """
-        nproviders = len(self._providers)
-        for i in range(nproviders):
-            provider = self._providers[i]
+
+        # Range backwards to ensure that more locally defined
+        # configuration wins in conflicts between url_re
+        for provider in self._providers[::-1]:
             if not provider.url_res:
                 continue
             for url_re in provider.url_res:
                 if re.match(url_re, url):
-                    if i != 0:
-                        # place it first
-                        # TODO: optimize with smarter datastructures if this becomes a burden
-                        del self._providers[i]
-                        self._providers = [provider] + self._providers
-                        assert(len(self._providers) == nproviders)
                     lgr.debug("Returning provider %s for url %s", provider, url)
                     return provider
 
