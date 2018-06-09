@@ -3,6 +3,13 @@
 # (http://datalad.org) using DataLad's latest development state at the
 # time the container is built.
 #
+# Changelog
+# ---------
+# 0.10.rc5
+#  - Pre-release
+#
+#######################################################################
+
 
 Bootstrap:docker
 From:neurodebian:latest

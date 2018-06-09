@@ -135,6 +135,12 @@ class Run(Interface):
             doc="""Expand globs when storing inputs and/or outputs in the
             commit message.""",
             constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
+        explicit=Parameter(
+            args=("--explicit",),
+            action="store_true",
+            doc="""Consider the specification of inputs and outputs to be
+            explicit. Don't warn if the repository is dirty, and only save
+            modifications to the listed outputs."""),
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
@@ -166,6 +172,7 @@ class Run(Interface):
             inputs=None,
             outputs=None,
             expand=None,
+            explicit=False,
             message=None,
             sidecar=None,
             rerun=False):
@@ -182,6 +189,7 @@ class Run(Interface):
                 for r in run_command(cmd, dataset=dataset,
                                      inputs=inputs, outputs=outputs,
                                      expand=expand,
+                                     explicit=explicit,
                                      message=message,
                                      sidecar=sidecar):
                     yield r
@@ -203,14 +211,11 @@ class GlobbedPaths(object):
         Glob in this directory.
     expand : bool, optional
        Whether the `paths` property returns unexpanded or expanded paths.
-    warn : bool, optional
-        Whether to warn when no glob hits are returned for `patterns`.
     """
 
-    def __init__(self, patterns, pwd=None, expand=False, warn=True):
+    def __init__(self, patterns, pwd=None, expand=False):
         self.pwd = pwd or getpwd()
         self._expand = expand
-        self._warn = warn
 
         if patterns is None:
             self._maybe_dot = []
@@ -234,8 +239,9 @@ class GlobbedPaths(object):
                 hits = glob(pattern)
                 if hits:
                     expanded.extend([relpath(h) for h in sorted(hits)])
-                elif self._warn:
-                    lgr.warning("No matching files found for '%s'", pattern)
+                else:
+                    lgr.debug("No matching files found for '%s'", pattern)
+                    expanded.extend([pattern])
         return expanded
 
     def expand(self, full=False, dot=True):
@@ -276,14 +282,33 @@ class GlobbedPaths(object):
 
 
 def _unlock_or_remove(dset, paths):
-    for res in dset.unlock(paths, on_failure="ignore"):
+    """Unlock `paths` if content is present; remove otherwise.
+
+    Parameters
+    ----------
+    dset : Dataset
+    paths : list of string
+        Absolute paths of dataset files.
+
+    Returns
+    -------
+    Generator with result records.
+    """
+    existing = []
+    for path in paths:
+        if op.exists(path) or op.lexists(path):
+            existing.append(path)
+        else:
+            # Avoid unlock's warning because output files may not exist in
+            # common cases (e.g., when rerunning with --onto).
+            lgr.debug("Filtered out non-existing path: %s", path)
+
+    for res in dset.unlock(existing, on_failure="ignore"):
         if res["status"] == "impossible":
             if "no content" in res["message"]:
                 for rem_res in dset.remove(res["path"],
                                            check=False, save=False):
                     yield rem_res
-                continue
-            elif "path does not exist" in res["message"]:
                 continue
         yield res
 
@@ -305,10 +330,15 @@ def get_command_pwds(dataset):
         rel_pwd = curdir
     else:
         # act on the whole dataset if nothing else was specified
-        dataset = get_dataset_root(curdir)
+
         # Follow our generic semantic that if dataset is specified,
         # paths are relative to it, if not -- relative to pwd
         pwd = getpwd()
+        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
+        # repos whose leading paths have a symlinked directory (see the
+        # TMPDIR="/var/tmp/sym link" test case).
+        dataset = get_dataset_root(pwd)
+
         if dataset:
             rel_pwd = relpath(pwd, dataset)
         else:
@@ -330,9 +360,35 @@ def normalize_command(command):
     return command
 
 
+def format_command(command, **kwds):
+    """Plug in placeholders in `command`.
+
+    Parameters
+    ----------
+    command : str or list
+
+    `kwds` is passed to the `format` call. `inputs` and `outputs` are converted
+    to GlobbedPaths if necessary.
+
+    Returns
+    -------
+    formatted command (str)
+    """
+    command = normalize_command(command)
+    sfmt = SequenceFormatter()
+
+    for name in ["inputs", "outputs"]:
+        io_val = kwds.pop(name, None)
+        if not isinstance(io_val, GlobbedPaths):
+            io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
+        kwds[name] = io_val.expand(dot=False)
+    return sfmt.format(command, **kwds)
+
+
 # This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                message=None, rerun_info=None, rerun_outputs=None, sidecar=None):
+                explicit=False, message=None, sidecar=None,
+                rerun_info=None, rerun_outputs=None):
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -352,14 +408,19 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     from datalad.cmd import Runner
 
     lgr.debug('tracking command output underneath %s', ds)
-    if not rerun_info and ds.repo.dirty:  # Rerun already takes care of this.
-        yield get_status_dict(
-            'run',
-            ds=ds,
-            status='impossible',
-            message=('unsaved modifications present, '
-                     'cannot detect changes by command'))
-        return
+
+    if not rerun_info:  # Rerun already takes care of this.
+        # For explicit=True, we probably want to check whether any inputs have
+        # modifications. However, we can't just do is_dirty(..., path=inputs)
+        # because we need to consider subdatasets and untracked files.
+        if not explicit and ds.repo.dirty:
+            yield get_status_dict(
+                'run',
+                ds=ds,
+                status='impossible',
+                message=('unsaved modifications present, '
+                         'cannot detect changes by command'))
+            return
 
     cmd = normalize_command(cmd)
 
@@ -367,11 +428,13 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                           expand=expand in ["inputs", "both"])
     if inputs:
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
-            yield res
+            if res.get("state") == "absent":
+                lgr.warning("Input does not exist: %s", res["path"])
+            else:
+                yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
-                           expand=expand in ["outputs", "both"],
-                           warn=not rerun_info)
+                           expand=expand in ["outputs", "both"])
     if outputs:
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
             yield res
@@ -383,12 +446,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    sfmt = SequenceFormatter()
-    cmd_expanded = sfmt.format(cmd,
-                               pwd=pwd,
-                               dspath=ds.path,
-                               inputs=inputs.expand(dot=False),
-                               outputs=outputs.expand(dot=False))
+    cmd_expanded = format_command(cmd,
+                                  pwd=pwd,
+                                  dspath=ds.path,
+                                  inputs=inputs,
+                                  outputs=outputs)
 
     # we have a clean dataset, let's run things
     exc = None
@@ -482,5 +544,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                  msg_path)
         raise exc
     else:
-        for r in ds.add('.', recursive=True, message=msg):
-            yield r
+        outputs_to_save = outputs.expand(full=True) if explicit else '.'
+        if outputs_to_save:
+            for r in ds.add(outputs_to_save, recursive=True, message=msg):
+                yield r
