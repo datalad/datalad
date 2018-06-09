@@ -19,6 +19,7 @@ from datalad.tests.utils import (
     known_failure_v6,
 )
 
+import os.path as op
 from os.path import join as opj
 from os.path import relpath
 from os import mkdir, remove
@@ -510,24 +511,33 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
+@with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
-    ds = Dataset(path).create()
+    # Note: Using with_tree rather than with_tempfile is matters. The latter
+    # calls realpath on the path, which masks a failure in the
+    # TMPDIR="/var/tmp/sym link" test case
+    ds = Dataset(path).create(force=True)
     subdir = opj(path, 'subdir')
-    mkdir(subdir)
     with chpwd(subdir):
         run("touch test.dat")
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+
+    # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
+    # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
+    def ok_file_under_git_kludge(path, basename):
+        ok_file_under_git(opj(op.realpath(path), basename), annexed=True)
+
+    ok_file_under_git_kludge(subdir, "test.dat")
+
     rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
         ds.rerun()
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(subdir, "test.dat"), annexed=True)
+    ok_file_under_git_kludge(subdir, "test.dat")
     # and not on top
     assert_raises(AssertionError, ok_file_under_git, opj(ds.path, "test.dat"), annexed=True)
 
@@ -535,7 +545,7 @@ def test_rerun_subdir(path):
     with chpwd(subdir):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
-    ok_file_under_git(opj(ds.path, "test2.dat"), annexed=True)
+    ok_file_under_git_kludge(ds.path, "test2.dat")
     rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
@@ -658,9 +668,8 @@ def test_run_inputs_outputs(path):
     ok_(ds.repo.file_has_content("test-annex.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("touch dummy", inputs=["*.not-an-extension"])
-        assert_in("No matching files found for '*.not-an-extension'",
-                  cml.out)
+        ds.run("touch dummy", inputs=["not-there"])
+        assert_in("Input does not exist: ", cml.out)
 
     # Test different combinations of globs and explicit files.
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
@@ -729,10 +738,9 @@ def test_run_inputs_outputs(path):
     with open(opj(path, "a.dat")) as fh:
         eq_(fh.read(), "a.dat appended\n")
 
-    with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("echo blah", outputs=["*.not-an-extension"])
-        assert_in("No matching files found for '*.not-an-extension'",
-                  cml.out)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ds.run("echo blah", outputs=["not-there"])
+        assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.create('sub')
     ds.run("echo sub_orig >sub/subfile")
@@ -792,10 +800,22 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
+    eq_(get_run_info(ds, ds.repo.repo.head.commit.message)[1]["pwd"],
+        "subdir")
 
     # Double brackets can be used to escape placeholders.
     ds.run("touch {{inputs}}", inputs=["*.in"])
     ok_exists(opj(path, "{inputs}"))
+
+    # rerun --script expands the placeholders.
+    with patch("sys.stdout", new_callable=StringIO) as cmout:
+        ds.rerun(script="-", since="")
+        script_out = cmout.getvalue()
+        assert_in("echo a.in b.in >c.out", script_out)
+        assert_in("echo {} >expanded-pwd".format(subdir_path),
+                  script_out)
+        assert_in("echo {} >expanded-dspath".format(ds.path),
+                  script_out)
 
 
 @with_tree(tree={"1.txt": "",
@@ -835,11 +855,9 @@ def test_globbedpaths(path):
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)
 
-    with swallow_logs(new_level=logging.WARN) as cml:
+    with swallow_logs(new_level=logging.DEBUG) as cml:
         GlobbedPaths(["not here"], pwd=path).expand()
         assert_in("No matching files found for 'not here'", cml.out)
-        GlobbedPaths(["also not"], pwd=path, warn=False).expand()
-        assert_not_in("No matching files found for 'also not'", cml.out)
 
 
 def test_rerun_commit_message_check():

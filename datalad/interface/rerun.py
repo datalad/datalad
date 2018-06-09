@@ -27,6 +27,7 @@ from datalad.interface.diff import Diff
 from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
+from datalad.interface.run import format_command
 from datalad.interface.run import _format_cmd_shorty
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
@@ -431,10 +432,17 @@ def _get_script_handler(script, since, revision):
             if "run_info" not in res:
                 continue
 
-            cmd = res["run_info"]["cmd"]
+            run_info = res["run_info"]
+            cmd = run_info["cmd"]
             msg = res["run_message"]
             if msg == _format_cmd_shorty(cmd):
                 msg = ''
+
+            expanded_cmd = format_command(
+                cmd, **dict(run_info,
+                            dspath=dset.path,
+                            pwd=op.join(dset.path, run_info["pwd"])))
+
             ofh.write(
                 "\n" + "".join("# " + ln
                                for ln in msg.splitlines(True)) +
@@ -443,9 +451,7 @@ def _get_script_handler(script, since, revision):
             ofh.write('# (record: {})\n'.format(
                 commit_descr if commit_descr else res["commit"]))
 
-            if isinstance(cmd, list):
-                cmd = " ".join(cmd)
-            ofh.write(cmd + "\n")
+            ofh.write(expanded_cmd + "\n")
         if ofh is not sys.stdout:
             ofh.close()
 
