@@ -916,7 +916,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1.install('subds1')
 
 
-# document the "undesired" behavior described in gh-2601
+# test fix for gh-2601
 @with_tempfile()
 def test_relative_submodule_url(path):
     Dataset(op.join(path, 'origin')).create()
@@ -927,5 +927,4 @@ def test_relative_submodule_url(path):
             path='sources')
     subinfo = ds.subdatasets(return_type='item-or-list')
     eq_(subinfo['gitmodule_url'],
-        # this is one ugly monster
-        op.join(ds.path, op.pardir, 'origin'))
+        op.join(op.pardir, 'origin'))

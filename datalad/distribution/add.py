@@ -374,6 +374,10 @@ class Add(Interface):
                 # discovered remote configuration
                 remote, branch = subds.repo.get_tracking_branch()
                 subds_url = subds.repo.get_remote_url(remote) if remote else None
+                if subds_url and op.isabs(subds_url):
+                    # plain isabs() should be OK to determine a local platform
+                    # absolute path. No URL would start with a slash or a drive
+                    subds_url = op.relpath(subds_url, start=ds_path)
                 # Register the repository in the repo tree as a submodule
                 try:
                     ds.repo.add_submodule(subds_relpath, url=subds_url, name=None)
