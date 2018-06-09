@@ -377,7 +377,8 @@ class Add(Interface):
                 if subds_url and op.isabs(subds_url):
                     # plain isabs() should be OK to determine a local platform
                     # absolute path. No URL would start with a slash or a drive
-                    subds_url = op.relpath(subds_url, start=ds_path)
+                    # result must be a URL, not a platform relpath!
+                    subds_url = op.relpath(subds_url, start=ds_path).replace(op.sep, '/')
                 # Register the repository in the repo tree as a submodule
                 try:
                     ds.repo.add_submodule(subds_relpath, url=subds_url, name=None)

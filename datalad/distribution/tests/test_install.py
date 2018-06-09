@@ -927,4 +927,5 @@ def test_relative_submodule_url(path):
             path='sources')
     subinfo = ds.subdatasets(return_type='item-or-list')
     eq_(subinfo['gitmodule_url'],
-        op.join(op.pardir, 'origin'))
+        # must be a relative URL, not platform-specific relpath!
+        '{}/{}'.format(op.pardir, 'origin'))

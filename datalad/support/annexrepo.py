@@ -482,9 +482,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         if branch is None:
             branch = self.get_active_branch()
 
-        return super(AnnexRepo, self).get_tracking_branch(
-                        branch=self.get_corresponding_branch(branch)
-                        if corresponding else branch)
+        remote, branch = super(AnnexRepo, self).get_tracking_branch(
+            branch=self.get_corresponding_branch(branch)
+            if corresponding else branch)
+        if corresponding and remote is None:
+            # we got nothing, but maybe should have not asked for the
+            # corresponding branch....?
+            remote, branch = super(AnnexRepo, self).get_tracking_branch(
+                branch=branch)
+        return remote, branch
+
 
     def _submodules_dirty_direct_mode(self,
             untracked=True, deleted=True, modified=True, added=True,
