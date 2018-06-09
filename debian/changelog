@@ -6,7 +6,7 @@ datalad (0.10.0-1) unstable; urgency=medium
     - updated B-Depends/Recommends/Suggests to include new modules for
       extracting meta-data and removed all needed for crawling (split away).
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 08 Jun 2018 22:56:29 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 09 Jun 2018 09:30:23 -0400
 
 datalad (0.9.3-1) unstable; urgency=medium
 
