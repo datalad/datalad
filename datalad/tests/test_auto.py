@@ -211,8 +211,8 @@ from datalad.tests.utils import skip_if_no_module
 
 
 def test_proxying_lzma_LZMAFile():
-    skip_if_no_module('lzma')
-    import lzma
+    skip_if_no_module('datalad.support.lzma')
+    from datalad.support.lzma import lzma
 
     def generate_dat(f):
         with LZMAFile(f, "w") as f:

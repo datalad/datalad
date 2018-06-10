@@ -54,6 +54,9 @@ except Exception as exc:
 
 lzma = None
 try:
+    # Our mocking would not work with backports.lzma ATM, so only lzma
+    # would be supported
+    # from datalad.support.lzma import lzma
     import lzma
 except ImportError:
     pass
