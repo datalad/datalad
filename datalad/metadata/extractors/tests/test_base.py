@@ -25,24 +25,17 @@ def check_api(no_annex, path):
     ds = Dataset(path).create(force=True, no_annex=no_annex)
     ds.add('.')
     ok_clean_git(ds.path)
-    processed_extractors = []
 
-    skip = []
+    processed_extractors, skipped_extractors = [], []
     for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
-        processed_extractors.append(extractor_ep.name)
         # we need to be able to query for metadata, even if there is none
         # from any extractor
         try:
             extractor_cls = extractor_ep.load()
         except Exception as exc:
             exc_ = str(exc)
-            #if 'Exempi library not found.' in exc_ or \
-            #   'which was built for Mac OS X 10' in exc_:
-            # known problems on OSX
-            if on_osx:
-                skip += [exc_]
-                continue
-            raise
+            skipped_extractors += [exc_]
+            continue
         extractor = extractor_cls(
             ds, paths=['file.dat'])
         meta = extractor.get_metadata(
@@ -61,12 +54,13 @@ def check_api(no_annex, path):
         # precious file
         if extractor_ep.name == 'datalad_core':
             assert 'file.dat' in cm
+        processed_extractors.append(extractor_ep.name)
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"
-    if skip:
+    if skipped_extractors:
         raise SkipTest(
             "Not fully tested/succeded since some extractors failed"
-            " to load:\n%s" % ("\n".join(skip)))
+            " to load:\n%s" % ("\n".join(skipped_extractors)))
 
 
 def test_api_git():
