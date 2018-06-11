@@ -23,7 +23,6 @@ from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
 
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
@@ -31,6 +30,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
+from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.utils import assure_list
 
@@ -193,6 +193,8 @@ class RunProcedure(Interface):
     def __call__(
             spec,
             dataset=None):
+        if not spec:
+            raise InsufficientArgumentsError('requires at least a procedure name')
         if not isinstance(spec, (tuple, list)):
             # maybe coming from config
             import shlex
