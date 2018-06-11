@@ -1,3 +1,11 @@
+datalad (0.10.0-2) neurodebian; urgency=medium
+
+  * Migrate python*-github into recommends from Depends.  Used only by
+    one command and should address some snafu with xenial package making it into
+    python3-pygithub, which is N/A, so python3-datalad is not installable.
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 11 Jun 2018 11:39:55 -0400
+
 datalad (0.10.0-1) unstable; urgency=medium
 
   * Fresh upstream release

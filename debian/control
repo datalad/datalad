@@ -120,7 +120,6 @@ Depends:
  python-appdirs,
  python-fasteners,
  python-git (>= 2.1.6~),
- python-github,
  python-humanize,
  python-iso8601,
  python-keyrings.alt | python-keyring (<=8),
@@ -138,6 +137,7 @@ Depends:
  ${python:Depends}
 Recommends:
  python-exif,
+ python-github,
  python-jsmin,
  python-html5lib,
  python-httpretty,
@@ -183,7 +183,6 @@ Depends:
  python3-appdirs,
  python3-fasteners,
  python3-git (>= 2.1.6~),
- python3-github,
  python3-humanize,
  python3-iso8601,
  python3-keyrings.alt | python3-keyring (<=8),
@@ -201,6 +200,7 @@ Depends:
  ${python3:Depends}
 Recommends:
  python3-exif,
+ python3-github,
  python3-jsmin,
  python3-html5lib,
  python3-httpretty,
