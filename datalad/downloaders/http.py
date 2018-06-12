@@ -305,7 +305,7 @@ class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
 
     def _post_credential(self, credentials, post_url, session):
         # we do not need to post anything, just inject token into the session
-        session.headers['Authorization'] = "Bearer: %s" % credentials['token']
+        session.headers['Authorization'] = "Bearer %s" % credentials['token']
         # TODO: actually access some location to verify that token is correct
         class DummyResponse(object):
             text = ''

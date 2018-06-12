@@ -21,8 +21,10 @@ from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
 from ..credentials import UserPassword
+from ..credentials import Token
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
+from ..http import HTTPBearerTokenAuthenticator
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
@@ -503,6 +505,54 @@ def test_scenario_2(d):
 
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+
+class FakeCredential3(Token):
+    """Credential to test scenarios."""
+    _fixed_credentials = {'token' : 'testtoken' }
+    def is_known(self):
+        return True
+    def __call__(self):
+        return self._fixed_credentials
+    def enter_new(self):
+        return self._fixed_credentials
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+def test_HTTPBearerTokenAuthenticatord(d):
+    fpath = opj(d, 'crap.txt')
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+
+
+
+    credential = FakeCredential3(name='test', url=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    # Perform assertions. See note above.
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken")
 
     with open(fpath) as f:
         content = f.read()
