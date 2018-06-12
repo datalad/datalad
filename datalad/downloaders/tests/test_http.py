@@ -22,6 +22,7 @@ from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
 from ..credentials import UserPassword
 from ..credentials import Token
+from ..credentials import LORIS_Token
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..http import HTTPBearerTokenAuthenticator
@@ -526,7 +527,7 @@ class FakeCredential3(Token):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
-def test_HTTPBearerTokenAuthenticatord(d):
+def test_HTTPBearerTokenAuthenticator(d):
     fpath = opj(d, 'crap.txt')
 
     def request_get_callback(request, uri, headers):
@@ -553,6 +554,92 @@ def test_HTTPBearerTokenAuthenticatord(d):
     assert_equal(r.body, '')
     assert_in('Authorization', r.headers)
     assert_equal(r.headers['Authorization'], "Bearer testtoken")
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+class FakeLorisCredential(Token):
+    """Credential to test scenarios."""
+    _fixed_credentials = {'token' : 'testtoken' }
+    def is_known(self):
+        return False
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+def test_HTTPLorisTokenAuthenticator(d):
+    fpath = opj(d, 'crap.txt')
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+
+
+
+    credential = FakeCredential3(name='test', url=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    # Perform assertions. See note above.
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken")
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+@with_memory_keyring
+@with_testsui(responses=['yes', 'user'])
+def test_lorisadapter(d, keyring):
+    fpath = opj(d, 'crap.txt')
+    loginurl = "http://www.example.com/api/v0.0.2/login"
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+    def request_post_callback(request, uri, headers):
+        return (200, headers, '{ "token": "testtoken33" }')
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+    httpretty.register_uri(httpretty.POST, loginurl,
+                           body=request_post_callback)
+
+
+
+    credential = LORIS_Token(name='test', url=loginurl, keyring=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken33")
+    # Verify credentials correctly set to test user:pass
 
     with open(fpath) as f:
         content = f.read()
