@@ -1,0 +1,12 @@
+--- a/setup.py
++++ b/setup.py
+@@ -203,8 +203,7 @@ setup(
+     long_description=long_description,
+     packages=datalad_pkgs,
+     install_requires=
+-        requires['core'] + requires['downloaders'] +
+-        requires['publish'] + requires['metadata'],
++        requires['core'] + requires['downloaders'],
+     extras_require=requires,
+     cmdclass=cmdclass,
+     package_data={

@@ -1,3 +1,12 @@
+datalad (0.10.0-3) neurodebian; urgency=medium
+
+  * debian/patches/deb_loosenup_setup_requires
+    - to not demand PyGitHub since it causes pybuild on nd16.04 to
+      inject incorrect dependency on python3-pygithub.  All dependencies
+      are enforced by debian/control anyways
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 12 Jun 2018 09:20:00 -0400
+
 datalad (0.10.0-2) neurodebian; urgency=medium
 
   * Migrate python*-github into recommends from Depends.  Used only by
