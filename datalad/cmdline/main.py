@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """"""
+from datalad.ui.utils import get_console_width
 
 __docformat__ = 'restructuredtext'
 
@@ -18,7 +19,6 @@ lgr.log(5, "Importing cmdline.main")
 import argparse
 import sys
 import textwrap
-import shutil
 from importlib import import_module
 import os
 
@@ -394,8 +394,7 @@ def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
     from ..interface.base import dedent_docstring
     lgr.debug("Generating detailed description for the parser")
     cmd_summary = []
-    console_width = shutil.get_terminal_size()[0] \
-        if hasattr(shutil, 'get_terminal_size') else 80
+    console_width = get_console_width()
     for i, grp in enumerate(
             sorted(interface_groups, key=lambda x: x[1])):
         grp_descr = grp[1]

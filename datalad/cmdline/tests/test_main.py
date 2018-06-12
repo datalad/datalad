@@ -22,6 +22,7 @@ import datalad
 from ..main import main, fail_with_short_help
 from datalad import __version__
 from datalad.cmd import Runner
+from datalad.ui.utils import get_console_width
 from datalad.api import create
 from datalad.utils import chpwd
 from datalad.tests.utils import with_tempfile
@@ -103,9 +104,7 @@ def test_help_np():
     # none of the lines must be longer than 80 chars
     # TODO: decide on   create-sibling and possibly
     # rewrite-urls
-    import shutil
-    accepted_width = shutil.get_terminal_size()[0] \
-        if hasattr(shutil, 'get_terminal_size') else 80
+    accepted_width = get_console_width()
 
     long_lines = ["%d %s" % (len(l), l) for l in stdout.split('\n')
                   if len(l) > accepted_width and

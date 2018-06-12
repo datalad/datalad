@@ -48,3 +48,20 @@ def get_terminal_size():
             return w, h
         except:
             return None, None
+
+
+def get_console_width(default_min=20):
+    """Return console width to use
+
+    In some cases shutil reports it to be 0, so we cannot rely on it
+    alone
+    """
+    console_width = get_terminal_size()[0] or 0
+    # it might still be 0, e.g. in conda builds for 0.10.0
+    if console_width <= 0:
+        console_width = 80
+    elif console_width <= 20:
+        # or some other too small to be real number,
+        # to prevent crashes below guarantee that it is at least 20
+        console_width = 20
+    return console_width
