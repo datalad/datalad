@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+import os.path as op
 
 from .utils import (
     chpwd,
@@ -18,10 +19,29 @@ from .utils import (
     assert_raises,
     assert_equal,
     assert_in,
+    ok_file_has_content,
 )
 from datalad.support.gitrepo import check_git_configured
 
 from mock import patch
+
+
+# verify that any target platform can deal with forward slashes
+# as os.path.sep, regardless of its native preferences
+@with_tree(tree={'subdir': {'testfile': 'testcontent'}})
+def test_paths_with_forward_slashes(path):
+    # access file with native absolute path spec
+    print(path)
+    ok_file_has_content(op.join(path, 'subdir', 'testfile'), 'testcontent')
+    with chpwd(path):
+        # native relative path spec
+        ok_file_has_content(op.join('subdir', 'testfile'), 'testcontent')
+        # posix relative path spec
+        ok_file_has_content('subdir/testfile', 'testcontent')
+    # abspath with forward slash path sep char
+    ok_file_has_content(
+        op.join(path, 'subdir', 'testfile').replace(op.sep, '/'),
+        'testcontent')
 
 
 #@with_tempfile(mkdir=True)
