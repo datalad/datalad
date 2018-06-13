@@ -107,6 +107,12 @@ def test_HTTPDownloader_basic(toppath, topurl):
     assert_equal(downloaded_path, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
+    # Fail with an informative message if we're downloading into a directory
+    # and the file name can't be determined from the URL.
+    with assert_raises(DownloadError) as cm:
+        download(topurl, toppath)
+    assert_in("File name could not be determined", str(cm.exception))
+
     # Some errors handling
     # XXX obscure mocking since impossible to mock write alone
     # and it still results in some warning being spit out
