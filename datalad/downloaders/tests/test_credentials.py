@@ -55,7 +55,7 @@ def test_keyring():
     raise SkipTest("provide tests for Keyring which interfaces keyring module")
 
 
-def _cred1_adapter(user=None, password=None):
+def _cred1_adapter(composite, user=None, password=None):
     """Just a sample adapter from one user/pw type to another"""
     return dict(user=user + "_1", password=password + "_2")
 

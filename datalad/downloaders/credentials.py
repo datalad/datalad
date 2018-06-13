@@ -274,13 +274,13 @@ class CompositeCredential(Credential):
                 self._CREDENTIAL_ADAPTERS[idx:],
                 self._credentials[idx + 1:]):
             fields = c()
-            next_fields = adapter(**fields)
+            next_fields = adapter(self, **fields)
             next_c.set(**next_fields)
 
         return self._credentials[-1]()
 
 
-def _nda_adapter(user=None, password=None):
+def _nda_adapter(composite, user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
     gen = NDATokenGenerator()
     token = gen.generate_token(user, password)
@@ -302,9 +302,26 @@ class NDA_S3(CompositeCredential):
     _CREDENTIAL_ADAPTERS = (_nda_adapter,)
 
 
+def _loris_adapter(composite, user=None, password=None, **kwargs):
+    from datalad.support.third.loris_token_generator import LORISTokenGenerator
+
+    gen = LORISTokenGenerator(url=composite.url)
+    token = gen.generate_token(user, password)
+
+    return dict(token=token)
+
+
+class LORIS_Token(CompositeCredential):
+    _CREDENTIAL_CLASSES = (UserPassword, Token)
+    _CREDENTIAL_ADAPTERS = (_loris_adapter,)
+
+    def __init__(self, name, url=None, keyring=None):
+        super(CompositeCredential, self).__init__(name, url, keyring)
+
 CREDENTIAL_TYPES = {
     'user_password': UserPassword,
     'aws-s3': AWS_S3,
     'nda-s3': NDA_S3,
     'token': Token,
+    'loris-token': LORIS_Token
 }
