@@ -15,6 +15,14 @@ else:
     from urllib import request as urllib_request
 
 class LORISTokenGenerator(object):
+    """
+    Generate a LORIS API token by making a request to the
+    LORIS login API endpoint with the given username
+    and password.
+
+    url is the complete URL of the $LORIS/api/$VERSION/login
+    endpoint.
+    """
     def __init__(self, url=None):
         assert(url is not None)
         self.url = url
