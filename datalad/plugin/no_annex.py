@@ -134,7 +134,7 @@ class NoAnnex(Interface):
         gitattr_file = opj(gitattr_dir, '.gitattributes')
         with open(gitattr_file, 'a') as fp:
             for p in pattern:
-                fp.write('{} annex.largefiles=nothing'.format(p))
+                fp.write('{} annex.largefiles=nothing\n'.format(p))
             yield dict(res_kwargs, status='ok')
 
         for r in dataset.add(
