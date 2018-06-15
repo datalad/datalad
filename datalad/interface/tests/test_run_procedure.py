@@ -59,13 +59,8 @@ def test_basics(path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
-    # make clean (until run can handle it)
-    # XXX for some reason `save` doesn't do the job in direct mode
-    ds.add(op.join('.datalad', 'config'))
-    ok_clean_git(ds.path)
     # run command that should trigger the demo procedure
     ds.clean()
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(ds.path)
-
+    ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])

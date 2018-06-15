@@ -221,10 +221,9 @@ class RunProcedure(Interface):
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,
-                # See gh-2593 for discussion on run feature extension
-                #explicit=True,
-                #inputs=None,
-                #outputs=None,
+                explicit=True,
+                inputs=None,
+                outputs=None,
                 # pass through here
                 on_failure='ignore',
         ):
