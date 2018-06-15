@@ -9,10 +9,16 @@
 import sys
 import json
 
+
 if sys.version_info[0] == 2:
     import urllib2 as urllib_request
+    from urllib2 import HTTPError
 else:
     from urllib import request as urllib_request
+    from urllib import HTTPError
+
+from datalad.downloaders.base import AccessDeniedError, AccessFailedError
+
 
 class LORISTokenGenerator(object):
     """
@@ -33,7 +39,11 @@ class LORISTokenGenerator(object):
 
         request = urllib_request.Request(self.url, encoded_data)
 
-        response = urllib_request.urlopen(request)
+        try:
+            response = urllib_request.urlopen(request)
+        except HTTPError:
+            raise AccessDeniedError("Could not authenticate into LORIS")
+
         data = json.load(response)
         return data["token"]
 
