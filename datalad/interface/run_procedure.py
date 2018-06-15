@@ -23,6 +23,7 @@ from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
+from datalad.interface.results import get_status_dict
 
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
@@ -40,17 +41,17 @@ from datalad.interface.run import Run
 lgr = logging.getLogger('datalad.interface.run_procedures')
 
 
-def _get_file_match(name, dir):
+def _get_file_match(dir, name='*'):
     targets = (name, ('[!_]*.py'), ('[!_]*.sh'))
     lgr.debug("Looking for procedure '%s' in '%s'", name, dir)
     for target in targets:
         for m in iglob(op.join(dir, target)):
             m_bn = op.basename(m)
-            if m_bn == name or m_bn.startswith('{}.'.format(name)):
-                return m
+            if name == '*' or m_bn == name or m_bn.startswith('{}.'.format(name)):
+                yield m
 
 
-def _get_procedure_implementation(name, ds=None):
+def _get_procedure_implementation(name='*', ds=None):
     ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
     # 1. check dataset for procedure
     if ds is not None and ds.is_installed():
@@ -58,16 +59,14 @@ def _get_procedure_implementation(name, ds=None):
         dirs = assure_list(ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary
-            m = _get_file_match(name, op.join(ds.path, dir))
-            if m:
-                return m
+            for m in _get_file_match(op.join(ds.path, dir), name):
+                yield m
     # 2. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
         for dir in assure_list(loc):
-            m = _get_file_match(name, dir)
-            if m:
-                return m
+            for m in _get_file_match(dir, name):
+                yield m
     # 3. check extensions for procedure
     # delay heavy import until here
     from pkg_resources import iter_entry_points
@@ -76,28 +75,29 @@ def _get_procedure_implementation(name, ds=None):
     for entry_point in iter_entry_points('datalad.extensions'):
         # use of '/' here is OK wrt to platform compatibility
         if resource_isdir(entry_point.module_name, 'resources/procedures'):
-            m = _get_file_match(
-                name,
-                resource_filename(
-                    entry_point.module_name,
-                    'resources/procedures'))
-            if m:
-                return m
+            for m in _get_file_match(
+                    resource_filename(
+                        entry_point.module_name,
+                        'resources/procedures'),
+                    name):
+                yield m
     # 4. at last check datalad itself for procedure
-    return _get_file_match(
-        name,
-        resource_filename('datalad', 'resources/procedures'))
+    for m in _get_file_match(
+            resource_filename('datalad', 'resources/procedures'),
+            name):
+        yield m
 
 
 def _guess_exec(script_file):
     # TODO check for exec permission and rely on interpreter
     if os.stat(script_file).st_mode & stat.S_IEXEC:
-        return u'"{script}" "{ds}" {args}'
+        return ('executable', u'"{script}" "{ds}" {args}')
     elif script_file.endswith('.sh'):
-        return u'bash "{script}" "{ds}" {args}'
+        return (u'bash_script', u'bash "{script}" "{ds}" {args}')
     elif script_file.endswith('.py'):
-        return u'python "{script}" "{ds}" {args}'
-    raise ValueError("No idea how to execute procedure %s. Missing 'execute' permissions?", script_file)
+        return (u'python_script', u'python "{script}" "{ds}" {args}')
+    else:
+        return None
 
 
 @build_doc
@@ -181,36 +181,72 @@ class RunProcedure(Interface):
             to-be-executed procedure."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
+            metavar="PATH",
             doc="""specify the dataset to run the procedure on.
             An attempt is made to identify the dataset based on the current
             working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
+        discover=Parameter(
+            args=('--discover',),
+            action='store_true',
+            doc="""if given, all configured paths are searched for procedures
+            and one result record per discovered procedure is yielded, but
+            no procedure is executed"""),
     )
 
     @staticmethod
     @datasetmethod(name='run_procedure')
     @eval_results
     def __call__(
-            spec,
-            dataset=None):
-        if not spec:
+            spec=None,
+            dataset=None,
+            discover=False):
+        if not spec and not discover:
             raise InsufficientArgumentsError('requires at least a procedure name')
+
+        ds = require_dataset(
+            dataset, check_installed=False,
+            purpose='run a procedure') if dataset else None
+
+        if discover:
+            reported = set()
+            for m in _get_procedure_implementation('*', ds=ds):
+                if m in reported:
+                    continue
+                cmd_type, cmd_tmpl = _guess_exec(m)
+                res = get_status_dict(
+                    action='run_procedure',
+                    path=m,
+                    type='file',
+                    logger=lgr,
+                    refds=ds.path if ds else None,
+                    status='ok',
+                    procedure_type=cmd_type,
+                    procedure_callfmt=cmd_tmpl,
+                    message=cmd_type)
+                reported.add(m)
+                yield res
+            return
+
         if not isinstance(spec, (tuple, list)):
             # maybe coming from config
             import shlex
             spec = shlex.split(spec)
         name = spec[0]
         args = spec[1:]
-        procedure_file = _get_procedure_implementation(name, ds=dataset)
-        if not procedure_file:
+
+        try:
+            # get the first match an run with it
+            procedure_file = next(_get_procedure_implementation(name, ds=ds))
+        except StopIteration:
             # TODO error result
             raise ValueError("Cannot find procedure with name '%s'", name)
 
-        ds = require_dataset(
-            dataset, check_installed=False,
-            purpose='run a procedure') if dataset else None
-
-        cmd_tmpl = _guess_exec(procedure_file)
+        cmd_type, cmd_tmpl = _guess_exec(procedure_file)
+        if cmd_tmpl is None:
+            raise ValueError(
+                "No idea how to execute procedure %s. Missing 'execute' permissions?",
+                procedure_file)
         cmd = cmd_tmpl.format(
             script=procedure_file,
             ds=ds.path if ds else '',
