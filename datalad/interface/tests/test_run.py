@@ -727,7 +727,7 @@ def test_run_inputs_outputs(path):
         eq_(fh.read(), "a.dat appended\n")
 
     # --output will remove files that are not present.
-    ds.repo.drop("a.dat", options=["--force"])
+    ds.repo.drop(["a.dat", "d.txt"], options=["--force"])
     ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
     with open(opj(path, "a.dat")) as fh:
         eq_(fh.read(), " appended\n")
