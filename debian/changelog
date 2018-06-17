@@ -1,3 +1,9 @@
+datalad (0.10.1-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 17 Jun 2018 15:25:22 +0800
+
 datalad (0.10.0-3) neurodebian; urgency=medium
 
   * debian/patches/deb_loosenup_setup_requires
