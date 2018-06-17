@@ -81,8 +81,8 @@ def test_procedure_discovery():
     assert_true(len(ps) > 2)
     # we get three essential properties
     eq_(
-        sum([p for p in ps
-             if 'procedure_type' in p and
+        sum(['procedure_type' in p and
              'procedure_callfmt' in p and
-             'path' in p]),
+             'path' in p
+             for p in ps]),
         len(ps))
