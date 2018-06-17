@@ -53,6 +53,10 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
 
 # lzma is included in python since 3.3
+# We now support backports.lzma as well (besides AutomagicIO), but since
+# there is not way to define an alternative here (AFAIK, yoh), we will
+# use pyliblzma as the default for now.  Patch were you would prefer
+# backports.lzma instead
 req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
 
 

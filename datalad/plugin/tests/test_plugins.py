@@ -125,11 +125,13 @@ def test_no_annex(path):
         ds.path,
         {'code': {
             'inannex': 'content',
-            'notinannex': 'othercontent'}})
-    # add two files, pre and post configuration
+            'notinannex': 'othercontent'},
+         'README': 'please'})
+    # add inannex pre configuration
     ds.add(opj('code', 'inannex'))
-    no_annex(pattern='code/**', dataset=ds)
-    ds.add(opj('code', 'notinannex'))
+    no_annex(pattern=['code/**', 'README'], dataset=ds)
+    # add inannex and README post configuration
+    ds.add([opj('code', 'notinannex'), 'README'])
     ok_clean_git(ds.path)
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed

@@ -251,6 +251,7 @@ class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
     """
 
     REQUESTS_AUTHENTICATOR = None
+    REQUESTS_FIELDS = ('user', 'password')
 
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
@@ -258,7 +259,8 @@ class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
 
     def _post_credential(self, credentials, post_url, session):
         response = session.post(post_url, data={},
-                                auth=self.REQUESTS_AUTHENTICATOR(credentials['user'], credentials['password']))
+                                auth=self.REQUESTS_AUTHENTICATOR(
+                                    *[credentials[f] for f in self.REQUESTS_FIELDS]))
         return response
 
 
@@ -291,6 +293,25 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
 
     def _post_credential(self, *args, **kwargs):
         raise NotImplementedError("not yet functioning, see https://github.com/kennethreitz/requests/issues/2934")
+
+
+@auto_repr
+class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
+    """Authenticate via HTTP Authorization header
+    """
+    def __init__(self, **kwargs):
+        # so we have __init__ solely for a custom docstring
+        super(HTTPBearerTokenAuthenticator, self).__init__(**kwargs)
+
+    def _post_credential(self, credentials, post_url, session):
+        # we do not need to post anything, just inject token into the session
+        session.headers['Authorization'] = "Bearer %s" % credentials['token']
+        # TODO: actually access some location to verify that token is correct
+        class DummyResponse(object):
+            text = ''
+            cookies = None
+            status_code = 200
+        return DummyResponse()
 
 
 @auto_repr
@@ -375,9 +396,10 @@ class HTTPDownloader(BaseDownloader):
     """
 
     @borrowkwargs(BaseDownloader)
-    def __init__(self, **kwargs):
+    def __init__(self, headers={}, **kwargs):
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
+        self._headers = headers
 
     def _establish_session(self, url, allow_old=True):
         """
@@ -433,7 +455,9 @@ class HTTPDownloader(BaseDownloader):
         nretries = 1
         for retry in range(1, nretries+1):
             try:
-                response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
+                response = self._session.get(
+                    url, stream=True, allow_redirects=allow_redirects,
+                    headers=headers)
             #except (MaxRetryError, NewConnectionError) as exc:
             except Exception as exc:
                 # happen to run into those with urls pointing to Amazon, so let's rest and try again

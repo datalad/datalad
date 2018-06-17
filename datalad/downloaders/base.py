@@ -288,6 +288,9 @@ class BaseDownloader(object):
             if isdir(path):
                 # provided path is a directory under which to save
                 filename = downloader_session.filename
+                if not filename:
+                    raise DownloadError(
+                        "File name could not be determined from {}".format(url))
                 filepath = opj(path, filename)
             else:
                 filepath = path

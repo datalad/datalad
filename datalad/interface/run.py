@@ -303,14 +303,15 @@ def _unlock_or_remove(dset, paths):
             # common cases (e.g., when rerunning with --onto).
             lgr.debug("Filtered out non-existing path: %s", path)
 
-    for res in dset.unlock(existing, on_failure="ignore"):
-        if res["status"] == "impossible":
-            if "no content" in res["message"]:
-                for rem_res in dset.remove(res["path"],
-                                           check=False, save=False):
-                    yield rem_res
-                continue
-        yield res
+    if existing:
+        for res in dset.unlock(existing, on_failure="ignore"):
+            if res["status"] == "impossible":
+                if "no content" in res["message"]:
+                    for rem_res in dset.remove(res["path"],
+                                               check=False, save=False):
+                        yield rem_res
+                    continue
+            yield res
 
 
 def get_command_pwds(dataset):

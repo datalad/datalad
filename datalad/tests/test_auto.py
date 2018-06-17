@@ -119,13 +119,14 @@ def _test_proxying_open(generate_load, verify_load, repo):
     fpath1_2 = fpath1.replace(repo, repo2)
     fpath2_2 = fpath2.replace(repo, repo2)
 
-    assert_raises(IOError, verify_load, fpath1_2)
+    EXPECTED_EXCEPTIONS = (IOError, OSError)
+    assert_raises(EXPECTED_EXCEPTIONS, verify_load, fpath1_2)
 
     with AutomagicIO():
         # verify that it doesn't even try to get files which do not exist
         with patch('datalad.support.annexrepo.AnnexRepo.get') as gricm:
             # if we request absent file
-            assert_raises(IOError, open, fpath1_2+"_", 'r')
+            assert_raises(EXPECTED_EXCEPTIONS, open, fpath1_2+"_", 'r')
             # no get should be called
             assert_false(gricm.called)
         verify_load(fpath1_2)
@@ -211,8 +212,8 @@ from datalad.tests.utils import skip_if_no_module
 
 
 def test_proxying_lzma_LZMAFile():
-    skip_if_no_module('lzma')
-    import lzma
+    skip_if_no_module('datalad.support.lzma')
+    from datalad.support.lzma import lzma
 
     def generate_dat(f):
         with LZMAFile(f, "w") as f:
@@ -244,3 +245,15 @@ def test_proxying_open_nibabel():
         assert_array_equal(ni.get_data(), d)
 
     yield _test_proxying_open, generate_nii, verify_nii
+
+
+def test_proxying_os_stat():
+    from os.path import exists
+    def generate_dat(f):
+        with io.open(f, "w", encoding='utf-8') as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        assert os.stat(f).st_size == 3
+
+    yield _test_proxying_open, generate_dat, verify_dat

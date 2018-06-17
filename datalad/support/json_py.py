@@ -69,19 +69,7 @@ def LZMAFile(*args, **kwargs):
     calling dir() helps to avoid AttributeError __exit__
     see https://bugs.launchpad.net/pyliblzma/+bug/1219296
     """
-    try:
-        import lzma
-    except Exception as exc:
-        if PY2 and 'undefined symbol: lzma_alone_encoder' in str(exc):
-            lgr.error(
-                "lzma fails to import and a typical problem is installation "
-                "of pyliblzma via pip while pkg-config utility is missing. "
-                "If you did installed it using pip, please "
-                "1) pip uninstall pyliblzma; "
-                "2) install pkg-config (e.g. apt-get install pkg-config on "
-                "Debian-based systems); "
-                "3) pip install pyliblzma again.")
-        raise
+    from .lzma import lzma
     lzmafile = lzma.LZMAFile(*args, **kwargs)
     dir(lzmafile)
     return lzmafile

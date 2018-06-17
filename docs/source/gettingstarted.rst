@@ -118,14 +118,17 @@ For example, we might want to look for datasets that were funded by, or acknowle
 
   ~ % datalad search NSF
   No DataLad dataset found at current location
-  Would you like to install the DataLad superdataset at '~/datalad'? (choices: yes, no): yes
-  2016-10-24 09:13:32,414 [INFO   ] Installing dataset at ~/datalad from http://datasets.datalad.org/
+  Would you like to install the DataLad superdataset at '/home/yoh/datalad'? (choices: yes, no): yes
+  [INFO   ] Cloning http://datasets.datalad.org/ to '/home/yoh/datalad'
   From now on you can refer to this dataset using the label '///'
-  2016-10-24 09:13:39,072 [INFO   ] Performing search using DataLad superdataset '~/datalad'
-  2016-10-24 09:13:39,086 [INFO   ] Loading and caching local meta-data... might take a few seconds
-  ~/datalad/openfmri/ds000001
-  ~/datalad/openfmri/ds000002
-  ~/datalad/openfmri/ds000003
+  [INFO   ] Performing search using DataLad superdataset '/home/yoh/datalad'
+  search(ok): /home/yoh/datalad/crcns/cai-2 (dataset)
+  search(ok): /home/yoh/datalad/crcns/hc-11 (dataset)
+  search(ok): /home/yoh/datalad/hbnssi (dataset)
+  search(ok): /home/yoh/datalad/labs/haxby/attention (dataset)
+  search(ok): /home/yoh/datalad/labs/haxby/life (dataset)
+  search(ok): /home/yoh/datalad/openfmri/ds000001 (dataset)
+  search(ok): /home/yoh/datalad/openfmri/ds000002 (dataset)
   ...
 
 Any known dataset can now be installed inside the local superdataset with a
