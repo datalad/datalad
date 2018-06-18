@@ -15,13 +15,22 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_true
 
 from datalad.distribution.dataset import Dataset
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
 from datalad.api import clean
+
+
+def test_invalid_call():
+    # needs spec or discover
+    assert_raises(InsufficientArgumentsError, run_procedure)
 
 
 @skip_if_on_windows
@@ -59,13 +68,21 @@ def test_basics(path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
-    # make clean (until run can handle it)
-    # XXX for some reason `save` doesn't do the job in direct mode
-    ds.add(op.join('.datalad', 'config'))
-    ok_clean_git(ds.path)
     # run command that should trigger the demo procedure
     ds.clean()
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(ds.path)
+    ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
 
+
+def test_procedure_discovery():
+    ps = run_procedure(discover=True)
+    # there are a few procedures coming with datalad, needs to find them
+    assert_true(len(ps) > 2)
+    # we get three essential properties
+    eq_(
+        sum(['procedure_type' in p and
+             'procedure_callfmt' in p and
+             'path' in p
+             for p in ps]),
+        len(ps))
