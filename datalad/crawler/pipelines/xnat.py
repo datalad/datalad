@@ -141,17 +141,13 @@ class XNATServer(object):
            'private' -- projects you have no any access to. 'protected' -- you could
            fetch description but not the data. None - would list all the projects
 
-        drop_empty: whether to drop projects with no experiments
+        drop_empty: whether to drop projects with no experiments.  Implies 
+        limit = 'public' since we need access to projects to determine if they 
+        are empty.
         """
-        # accessible  option could limit to the projects I have access to
-        fields_to_check = DEFAULT_RESULT_FIELDS.union({'title'})
-        experiments = self('data/experiments', fields_to_check=fields_to_check)
-        self.experiment_labels = { e['id']: e['label'] for e in experiments }
+
         if drop_empty:
-            # TODO: describe assumption here.  Verify e.g. on ADHD200 within
-            # xnat-central -- seems to download nothing.  So might not be
-            # enough
-            non_empty_projects = set([ e['project'] for e in experiments ])
+            limit = 'public'
 
         kw = {}
         if limit:
@@ -159,30 +155,45 @@ class XNATServer(object):
             kw['fields_to_check'] = DEFAULT_RESULT_FIELDS | {'title', 'xdat_user_id'}
         all_projects = self('data/projects', **kw)
 
-        if drop_empty:
-            out = []
-            for p in all_projects:
-                if p['id'] in non_empty_projects:
-                    out.append(p)
-                else:
-                    lgr.debug("Skipping %s because seems to not be listed "
-                              "among experiments",
-                              p)
-            lgr.info("Skipped %d empty projects", len(all_projects) - len(out))
-        else:
-            out = all_projects
-
         if limit:
             limit = assure_list(limit)
             # double check that all the project_access thingies in the set which
             # we know
             assert all(p['project_access'] in PROJECT_ACCESS_TYPES
-                       for p in out)
-            out = [
-                p for p in out
+                       for p in all_projects)
+            limited_projects = [
+                p for p in all_projects
                 if p['project_access'] in limit
             ]
+        else:
+            limited_projects = all_projects
+
+        fields_to_check = DEFAULT_RESULT_FIELDS.union({'title'})
+        experiments = self('data/experiments', fields_to_check=fields_to_check)
+        self.experiment_labels = { e['id']: e['label'] for e in experiments }
+
+        if drop_empty:
+            # first pass: exclude projects without experiments
+            non_empty_projects = set([ e['project'] for e in experiments ])
+            out = []
+            # second pass: descend into exeriments to find files
+            for p in limited_projects:
+                if self.project_has_files(p['id']):
+                    out.append(p)
+                else:
+                    lgr.debug("Skipping %s (no files)", p)
+            lgr.info("Skipped %d empty projects", len(all_projects) - len(out))
+        else:
+            out = limited_projects
+
         return list_to_dict(out, 'id') if asdict else out
+
+    def project_has_files(self, project):
+        for subject in self.get_subjects(project):
+            for experiment in self.get_experiments(project, subject):
+                if self.get_files(project, subject, experiment):
+                    return True
+        return False
 
     def get_subjects(self, project):
         return list_to_dict(
@@ -191,9 +202,10 @@ class XNATServer(object):
         )
 
     def get_experiments(self, project, subject):
+        fmt = 'data/projects/%(project)s/subjects/%(subject)s/experiments'
+        url = fmt % locals()
         return list_to_dict(
-            # http://www.nitrc.org/ir/data/projects/fcon_1000/subjects/SaintLouis_sub82830/experiments?
-            self('data/projects/%(project)s/subjects/%(subject)s/experiments' % locals()),
+            self(url, options={'xsiType': 'xnat:imageSessionData'}),
             'id'
         )
 

@@ -63,12 +63,16 @@ NITRC_IR = 'https://www.nitrc.org/ir'
 CENTRAL_XNAT = 'https://central.xnat.org'
 
 
-def check_basic_xnat_interface(url, project, subjects):
+def check_basic_xnat_interface(url, project, empty_project, subjects):
     nitrc = XNATServer(url)
     projects = nitrc.get_projects()
     # verify that we still have projects we want!
-
     assert_in(project, projects)
+    if empty_project:
+        all_projects = nitrc.get_projects(drop_empty=False)
+        assert len(all_projects) > len(projects)
+        assert empty_project in all_projects
+        assert empty_project not in projects
     projects_public = nitrc.get_projects(limit='public')
     import json
     print json.dumps(projects_public, indent=2)
@@ -105,15 +109,15 @@ def check_basic_xnat_interface(url, project, subjects):
 #@skip_if_no_network
 @use_cassette('test_basic_xnat_interface')
 def test_basic_xnat_interface():
-    for url, project, subjects in [
-        (NITRC_IR, 'fcon_1000', ['xnat_S00401', 'xnat_S00447']),
-        (CENTRAL_XNAT, 'CENTRAL_OASIS_LONG', ['OAS2_0001', 'OAS2_0176']),
+    for url, project, empty_project, subjects in [
+        (NITRC_IR, 'fcon_1000', None, ['xnat_S00401', 'xnat_S00447']),
+        (CENTRAL_XNAT, 'CENTRAL_OASIS_LONG', 'ADHD200', ['OAS2_0001', 'OAS2_0176']),
     # Should have worked, since we do have authentication setup for hcp, but
     # failed to authenticate.  need to recall what is differently done for the test
     # since it downloads just fine using download-url
     #   ('https://db.humanconnectome.org', 'HCP_Retest', ['103818', '149741']),
     ]:
-        yield check_basic_xnat_interface, url, project, subjects
+        yield check_basic_xnat_interface, url, project, empty_project, subjects
 
 
 @skip_if_no_network
