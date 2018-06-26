@@ -270,6 +270,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
+    def _allow_local_urls(self):
+        """Allow URL schemes and addresses which potentially could be harmful.
+
+        For now it is internal method used within tests only
+        """
+        # from annex 6.20180626 file:/// and http://localhost access isn't
+        # allowed by default
+        self.config.add(
+            'annex.security.allowed-url-schemes', 'http https file',
+            'local')
+        self.config.add(
+            'annex.security.allowed-http-addresses', 'all',
+            'local')
 
     def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend
