@@ -2070,8 +2070,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     cmd="addurl",
                     msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
             assert(out_json['command'] == 'addurl')
-            if not out_json.get('success', False):
-                raise AnnexBatchCommandError(
+        if not out_json.get('success', False):
+            raise (AnnexBatchCommandError if batch else CommandError)(
                     cmd="addurl",
                     msg="Error, annex reported failure for addurl (url='%s'): %s"
                     % (url, str(out_json)))
