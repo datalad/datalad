@@ -115,6 +115,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
+    # Class wide setting to allow insecure URLs. Used during testing, since
+    # git annex 6.20180626 those will by default be not allowed for security
+    # reasons
+    _ALLOW_LOCAL_URLS = False
+
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
@@ -269,6 +274,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # the annex, in case there are annexed files already?
         if backend:
             self.set_default_backend(backend, persistent=True)
+
+        if self._ALLOW_LOCAL_URLS:
+            self._allow_local_urls()
 
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
