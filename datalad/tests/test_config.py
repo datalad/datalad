@@ -29,6 +29,7 @@ from datalad.config import ConfigManager
 from datalad.cmd import CommandError
 
 from datalad.tests.utils import with_testsui
+from datalad.support.external_versions import external_versions
 
 # XXX tabs are intentional (part of the format)!
 # XXX put back! confuses pep8
@@ -174,10 +175,11 @@ def test_something(path, new_home):
         # but after we unset the only value -- that section is no longer listed
         assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
-        # although it does leaves empty section behind in the file
-        ok_file_has_content(global_gitconfig, '[datalad "unittest"]', strip=True)
-        # remove_section to clean it up entirely
-        globalcfg.remove_section('datalad.unittest', where='global')
+        if external_versions['cmd:git'] < '2.18':
+            # older versions leave empty section behind in the file
+            ok_file_has_content(global_gitconfig, '[datalad "unittest"]', strip=True)
+            # remove_section to clean it up entirely
+            globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
 
     cfg = ConfigManager(
