@@ -52,20 +52,15 @@ lgr = logging.getLogger('datalad.distribution.remove')
 class Remove(Interface):
     """Remove components from datasets
 
-    This command can remove any components (subdatasets, and (directories with)
-    files) from datasets. Removing a component implies any present content to
-    be dropped, and any associated subdatasets to be uninstalled. Subsequently,
-    the component is "unregistered" from the respective dataset. This means
-    that the respective component is no longer present on the file system.
+    This command can remove subdatasets and paths, including non-empty
+    directories, from datasets. Removing a component implies dropping present
+    content and uninstalling associated subdatasets. Subsequently, the
+    component is "unregistered" from the respective dataset. This means that
+    the component is no longer present on the file system.
 
-    By default, the availability of at least one remote copy is verified, by
-    default, before file content is dropped. As these checks could lead to slow
-    operation (network latencies, etc), they can be disabled.
-
-    Any number of paths to process can be given as input. Recursion into
-    subdatasets needs to be explicitly enabled, while recursion in
-    subdirectories within a dataset as always done automatically. An optional
-    recursion limit is applied relative to each given input path.
+    By default, the availability of at least one remote copy is verified before
+    file content is dropped. As these checks could lead to slow operation
+    (network latencies, etc), they can be disabled.
 
     Examples:
 
