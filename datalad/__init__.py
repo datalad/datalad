@@ -134,6 +134,12 @@ def setup_package():
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
 
+    # During tests we allow for "insecure" access to local file:// and
+    # http://localhost URLs since all of them either generated as tests
+    # fixtures or cloned from trusted sources
+    from datalad.support.annexrepo import AnnexRepo
+    AnnexRepo._ALLOW_LOCAL_URLS = True
+
     DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
     if DATALAD_LOG_LEVEL is None:
         # very very silent.  Tests introspecting logs should use
@@ -196,6 +202,9 @@ def teardown_package():
     if _test_states['DATASETS_TOPURL_ENV']:
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
+
+    from datalad.support.annexrepo import AnnexRepo
+    AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
 
 lgr.log(5, "Done importing main __init__")
