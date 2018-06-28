@@ -291,6 +291,7 @@ eval_params = dict(
         constraints=EnsureChoice(*list(known_result_xfms.keys())) | EnsureCallable() | EnsureNone()),
     result_renderer=Parameter(
         doc="""format of return value rendering on stdout""",
+        default='tailored',
         constraints=EnsureChoice('default', 'json', 'json_pp', 'tailored') | EnsureNone()),
     on_failure=Parameter(
         doc="""behavior to perform on failure: 'ignore' any failure is reported,
