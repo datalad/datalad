@@ -9,10 +9,11 @@
 import sys
 import json
 
-if sys.version_info[0] == 2:
-    import urllib2 as urllib_request
-else:
-    from urllib import request as urllib_request
+from six.moves.urllib.request import Request, urlopen
+from six.moves.urllib.error import HTTPError
+
+from datalad.downloaders.base import AccessDeniedError, AccessFailedError
+
 
 class LORISTokenGenerator(object):
     """
@@ -31,9 +32,13 @@ class LORISTokenGenerator(object):
         data = {'username': user, 'password' : password}
         encoded_data = json.dumps(data).encode('utf-8')
 
-        request = urllib_request.Request(self.url, encoded_data)
+        request = Request(self.url, encoded_data)
 
-        response = urllib_request.urlopen(request)
+        try:
+            response = urlopen(request)
+        except HTTPError:
+            raise AccessDeniedError("Could not authenticate into LORIS")
+
         data = json.load(response)
         return data["token"]
 
