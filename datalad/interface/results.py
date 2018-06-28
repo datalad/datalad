@@ -331,6 +331,7 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
         if any(p in ps for ps in respath_by_status.values()):
             # we have a report for this path already
             continue
+        # TODO: handle full vs relative here as well
         common_report = dict(path=p, **kwargs)
         if isdir(p):
             # `annex` itself will not report on directories, but if a

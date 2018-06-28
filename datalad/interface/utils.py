@@ -35,8 +35,10 @@ import json
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
+from datalad.utils import getpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
+from datalad.support import path as op
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
@@ -154,7 +156,6 @@ def path_is_under(values, path=None):
     bool
     """
     if path is None:
-        from datalad.utils import getpwd
         path = getpwd()
     if isinstance(values, dict):
         values = chain(*values.values())
@@ -487,6 +488,11 @@ def _process_results(
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
+    pwd = getpwd()
+    path_key = {
+        'relative': 'relpath',
+        'full': 'path'
+    }[dlcfg.obtain('datalad.runtime.report-pathstyle')]
     for res in results:
         if not res or 'action' not in res:
             # XXX Yarik has to no clue on how to track the origin of the
@@ -497,6 +503,9 @@ def _process_results(
             for k, v in res.items():
                 if isinstance(v, unicode):
                     res[k] = v.encode('utf-8')
+
+        if 'path' in res and 'relpath' not in res:
+            res['relpath'] = op.relpath(res['path'], pwd)
 
         actsum = action_summary.get(res['action'], {})
         if res['status']:
@@ -516,9 +525,9 @@ def _process_results(
             if isinstance(msg, tuple):
                 msgargs = msg[1:]
                 msg = msg[0]
-            if 'path' in res:
+            if path_key in res:
                 msg = '{} [{}({})]'.format(
-                    msg, res['action'], res['path'])
+                    msg, res['action'], res[path_key])
             if msgargs:
                 # support string expansion of logging to avoid runtime cost
                 res_lgr(msg, *msgargs)
@@ -550,8 +559,9 @@ def _process_results(
             ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
-                path=relpath(res['path'],
-                             res['refds']) if res.get('refds', None) else res['path'],
+                path=relpath(res['path'], res['refds'])
+                     if res.get('refds', None)
+                     else res[path_key],
                 type=' ({})'.format(
                     ac.color_word(res['type'], ac.MAGENTA)
                     ) if 'type' in res else '',

@@ -272,6 +272,15 @@ definitions = {
         'type': EnsureBool(),
         'default': False,
     },
+    'datalad.runtime.report-pathstyle': {
+        'ui': ('question', {
+            'title': 'Path',
+            'text': 'How to report paths in UI (default renderer, progressbars,'
+                    ' etc) '}),
+        # ATM progressbars report relative from the top of dataset even within subdir
+        'type': EnsureChoice('relative', 'full'),  # 'mixed' for reporting full when upstairs??? 'reldataset' for from the top of dataset
+        'default': 'relative',
+    },
     'datalad.runtime.report-status': {
         'ui': ('question', {
                'title': 'Command line result reporting behavior',
