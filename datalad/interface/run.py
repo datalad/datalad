@@ -48,7 +48,8 @@ from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
 from datalad.utils import chpwd
-from datalad.utils import get_dataset_root
+# Rename get_dataset_pwds for the benefit of containers_run.
+from datalad.utils import get_dataset_pwds as get_command_pwds
 from datalad.utils import getpwd
 from datalad.utils import partition
 from datalad.utils import SequenceFormatter
@@ -312,40 +313,6 @@ def _unlock_or_remove(dset, paths):
                         yield rem_res
                     continue
             yield res
-
-
-def get_command_pwds(dataset):
-    """Return the directory for the command.
-
-    Parameters
-    ----------
-    dataset : Dataset
-
-    Returns
-    -------
-    A tuple, where the first item is the absolute path of the pwd and the
-    second is the pwd relative to the dataset's path.
-    """
-    if dataset:
-        pwd = dataset.path
-        rel_pwd = curdir
-    else:
-        # act on the whole dataset if nothing else was specified
-
-        # Follow our generic semantic that if dataset is specified,
-        # paths are relative to it, if not -- relative to pwd
-        pwd = getpwd()
-        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
-        # repos whose leading paths have a symlinked directory (see the
-        # TMPDIR="/var/tmp/sym link" test case).
-        dataset = get_dataset_root(pwd)
-
-        if dataset:
-            rel_pwd = relpath(pwd, dataset)
-        else:
-            rel_pwd = pwd  # and leave handling on deciding either we
-                           # deal with it or crash to checks below
-    return pwd, rel_pwd
 
 
 def normalize_command(command):
