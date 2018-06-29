@@ -20,6 +20,7 @@ from ..interface.common_opts import save_message_opt
 from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
+from ..utils import get_dataset_pwds
 from ..distribution.add import Add
 from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
@@ -88,6 +89,8 @@ class DownloadURL(Interface):
                  archive=False, save=True, message=None):
         from ..downloaders.providers import Providers
 
+        pwd, rel_pwd = get_dataset_pwds(dataset)
+
         try:
             ds = require_dataset(
                 dataset, check_installed=True,
@@ -110,8 +113,13 @@ class DownloadURL(Interface):
                 path=path,
                 **common_report)
             return
-        if not path:
-            path = ds.path if ds else op.curdir
+
+        if dataset:  # A dataset was explicitly given.
+            path = op.join(ds.path, path or op.curdir)
+        elif ds:
+            path = op.join(ds.path, rel_pwd, path or op.curdir)
+        elif not path:
+            path = op.curdir
 
         # TODO setup fancy ui.progressbars doing this in parallel and reporting overall progress
         # in % of urls which were already downloaded

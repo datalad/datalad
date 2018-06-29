@@ -74,6 +74,9 @@ def test_download_url_return(toppath, topurl, outdir):
     ('file1.txt', 'abc'),
     ('file2.txt', 'def'),
     ('file3.txt', 'ghi'),
+    ('file4.txt', 'jkl'),
+    ('file5.txt', 'mno'),
+    ('file6.txt', 'pqr'),
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -103,6 +106,18 @@ def test_download_url_dataset(toppath, topurl, path):
 
     ds.download_url([opj(topurl, "file3.txt")], save=False)
     assert_false(ds.repo.file_has_content("file3.txt"))
+
+    subdir_path = opj(path, "subdir")
+    os.mkdir(subdir_path)
+    with chpwd(subdir_path):
+        download_url(opj(topurl, "file4.txt"))
+        download_url(opj(topurl, "file5.txt"), path="five.txt")
+        ds.download_url(opj(topurl, "file6.txt"))
+    # download_url calls within a subdirectory save the file there
+    ok_(ds.repo.file_has_content(opj("subdir", "file4.txt")))
+    ok_(ds.repo.file_has_content(opj("subdir", "five.txt")))
+    # ... unless the dataset is provided.
+    ok_(ds.repo.file_has_content("file6.txt"))
 
 
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
