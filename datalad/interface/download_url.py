@@ -11,7 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import isdir, curdir
+import os.path as op
 
 from .base import Interface
 from ..interface.base import build_doc
@@ -100,7 +100,7 @@ class DownloadURL(Interface):
 
         urls = assure_list_from_str(urls)
 
-        if len(urls) > 1 and path and not isdir(path):
+        if len(urls) > 1 and path and not op.isdir(path):
             yield get_status_dict(
                 status="error",
                 message=(
@@ -111,7 +111,7 @@ class DownloadURL(Interface):
                 **common_report)
             return
         if not path:
-            path = ds.path if ds else curdir
+            path = ds.path if ds else op.curdir
 
         # TODO setup fancy ui.progressbars doing this in parallel and reporting overall progress
         # in % of urls which were already downloaded
