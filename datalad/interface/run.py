@@ -96,6 +96,18 @@ class Run(Interface):
     << REFLOW ||
 
     To escape a brace character, double it (i.e., "{{" or "}}").
+
+    Custom placeholders can be added as configuration variables under
+    "datalad.run.substitutions".  As an example:
+
+      Add a placeholder "name" with the value "joe"::
+
+        % git config --file=.datalad/config datalad.run.substitutions.name joe
+        % datalad add -m "Configure name placeholder" .datalad/config
+
+      Access the new placeholder in a command::
+
+        % datalad run "echo my name is {name} >me"
     """
     _params_ = dict(
         cmd=Parameter(
@@ -414,12 +426,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
+    sub_namespace = {k.replace("datalad.run.substitutions.", ""): v
+                     for k, v in ds.config.items("datalad.run.substitutions")}
     try:
         cmd_expanded = format_command(cmd,
                                       pwd=pwd,
                                       dspath=ds.path,
                                       inputs=inputs,
-                                      outputs=outputs)
+                                      outputs=outputs,
+                                      **sub_namespace)
     except KeyError as exc:
         yield get_status_dict(
             'run',
