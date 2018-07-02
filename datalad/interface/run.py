@@ -414,11 +414,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    cmd_expanded = format_command(cmd,
-                                  pwd=pwd,
-                                  dspath=ds.path,
-                                  inputs=inputs,
-                                  outputs=outputs)
+    try:
+        cmd_expanded = format_command(cmd,
+                                      pwd=pwd,
+                                      dspath=ds.path,
+                                      inputs=inputs,
+                                      outputs=outputs)
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=('command has an unrecognized placeholder: %s',
+                     exc))
+        return
 
     # we have a clean dataset, let's run things
     exc = None

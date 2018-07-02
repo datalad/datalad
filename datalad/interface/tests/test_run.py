@@ -865,6 +865,10 @@ def test_placeholders(path):
         assert_in("echo {} >expanded-dspath".format(ds.path),
                   script_out)
 
+    assert_result_count(
+        ds.run("{unknown_placeholder}", on_failure="ignore"),
+        1, status="impossible", action="run")
+
 
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
