@@ -534,7 +534,8 @@ def main(args=None):
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
                 if exc.msg:
-                    os.write(2, exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg)
+                    msg = exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg
+                    os.write(2, msg + b"\n")
                 if exc.stdout:
                     os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)
                 if exc.stderr:
