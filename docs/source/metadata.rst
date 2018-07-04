@@ -44,8 +44,8 @@ particular types of data structures and file formats.
 Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
 extractors are enabled by default.  Any additional metadata extractor should be
 enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
-via ``git config`` command or by editing ``.datalad/config`` file directly,
-e.g. ``git config -f .datalad/config --add datalad.metadata.nativetype audio``
+via the ``git config`` command or by editing ``.datalad/config`` directly.
+For example, ``git config -f .datalad/config --add datalad.metadata.nativetype audio``
 would add :ref:`audio <metadata-audio>` metadata extractor to the list.
 
 
@@ -54,29 +54,29 @@ would add :ref:`audio <metadata-audio>` metadata extractor to the list.
 Annex metadata (``annex``)
 --------------------------
 
-`git-annex metadata`_
-command allows to `manage (add, remove, change) <http://git-annex.branchable.com/metadata/>`_
-metadata records associated with tracked by git-annex content.
-Metadata defined at the level of annex can be used by many git-annex commands.
-For `datalad`, git-annex level defined metadat is just yet another source of
-metadata which could be extracted and aggregated.  You can use
-`git-annex metadata`_ command to assign metadata at that level.
-:ref:`datalad addurls <man_datalad-addurls>` command can come useful to quickly
-populate a dataset with files and associated with them metadata at the level of
-git-annex from an arbitrary spreadsheet
-(`///labs/openneurolab/metasearch <http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_
-is an example of such a dataset).
+Content tracked by git-annex can have associated
+`metadata records <http://git-annex.branchable.com/metadata/>`_.
+From DataLad's perspective, git-annex metadata is just another source of
+metadata that can be extracted and aggregated.
+
+You can use the `git-annex metadata`_ command to assign git-annex
+metadata.  And, if you have a table or records that contain data
+sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
+to quickly populate a dataset with files and associated
+git-annex metadata. (`///labs/openneurolab/metasearch
+<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+an example of such a dataset.)
 
 
 Pros of git-annex level metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Many git-annex commands, such as `git-annex get`_, `git-annex copy`_ etc can
-  use metadata to decide on which files (keys) to operate, making it possible to
-  automate files (re)distribution  based on their metadata annotation
+- Many git-annex commands, such as `git-annex get`_ and `git-annex copy`_, can
+  use metadata to decide which files (keys) to operate on, making it possible to
+  automate file (re)distribution based on their metadata annotation
 - Assigned metadata is available for use by git-annex right away without
   requiring any additional "aggregation" step
-- `git-annex view`_ could be used to quickly establish completely new layout
+- `git-annex view`_ can be used to quickly generate completely new layouts
   of the repository solely based on the metadata fields associated with the files
 
 .. _git-annex get: https://git-annex.branchable.com/git-annex-get/
@@ -87,20 +87,18 @@ Pros of git-annex level metadata
 
 Cons of git-annex level metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-- Metadata fields are actually stored per "git annex key" and not really per "file".
+- Metadata fields are actually stored per git-annex key rather than per file.
   If multiple files contain the same content, metadata will be shared among them.
-- Only the files with content tracked by `git-annex`, so not committed directly to
-  git, can have git-annex metadata assigned
+- Files whose content is tracked directly by git cannot have git-annex metadata assigned.
 - No per repository/directory metadata, and no mechanism to use/aggregate
   metadata from sub-datasets
 - Field names cannot contain some symbols, such as ':'
-- Metadata is stored within `git-annex` branch, so it is distributed
+- Metadata is stored within the `git-annex` branch, so it is distributed
   across all clones of the dataset, making it hard to scale for large metadata
-  sizes, or to work with sensitive (to not be re-distributed) metadata
-- It is a generic storage and there is no prescribed vocabularly to be used --
-  any (valid) field/value could be used, making it very flexible but also
-  requiring consistency and harmonization to make stored metadata useful for
-  search
+  sizes or to work with sensitive metadata (not intended to be redistributed)
+- It is a generic storage with no prescribed vocabularly,
+  making it very flexible but also requiring consistency and
+  harmonization to make the stored metadata useful for search
 
 
 Example uses of git-annex metadata
@@ -112,37 +110,37 @@ Annotating files for different purposes
 FreeSurfer project `uses <https://surfer.nmr.mgh.harvard.edu/fswiki/DevelopersGuide_git#GettheDataFiles>`_
 `git-annex` for managing their source code+data base within a single
 git/git-annex repository. Files necessary for different scenarios (deployment,
-testing) are annotated and could be fetched selectively for the scenario at hands.
+testing) are annotated and can be fetched selectively for the scenario at hand.
 
 Automating "non-distribution" of sensitive files
 ################################################
 
-In `ReproIn <http://reproin.repronim.org>`_ framework for automated
-conversion of BIDS dataset, and in some manually prepared datasets
+In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
+conversion of BIDS dataset and in some manually prepared datasets
 (such as
 `///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
 and
-`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_)
-we annotated materials which must not be publicly shared with a git-annex
-metadata field `distribution-restrictions`.  We used following of the values to
-describe why any particular file (content) is not redistributable:
+`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+we annotated materials that must not be publicly shared with a git-annex
+metadata field `distribution-restrictions`.  We used the following of values to
+describe why any particular file (content) should not be redistributed:
 
 - **sensitive** - files which potentially contain participant sensitive
   information, such as non-defaced anatomicals
 - **proprietary** - files which contain proprietary data, which we have no
   permissions to share (e.g., movie video files)
 
-Having annotated non-distributable files this way, we could instruct git-annex
+Having annotated files this way, we could instruct git-annex
 to :ref:`publish <man_datalad-publish>` all but those restricted files to our
 server: `git annex wanted datalad-public "not metadata=distribution-restrictions=*"`.
 
 
-Flexible directories layout
-###########################
+Flexible directory layout
+#########################
 
-Either you are maintaining a collection of music files, or PDFs for the lab you
-might like to get an alternative or filtered hierarchy, `git-annex view`_ could
-be of help. Example:
+If you are maintaining a collection of music files or PDFs for the lab, you
+may want to display the files in an alternative or filtered hierarchy.
+`git-annex view`_ could be of help. Example:
 
 .. code-block:: sh
 
