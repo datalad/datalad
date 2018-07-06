@@ -526,8 +526,8 @@ class Runner(object):
                 if status not in [0, None]:
                     msg = "Failed to run %r%s. Exit code=%d.%s%s" \
                         % (cmd, " under %r" % (cwd or self.cwd), status,
-                           "" if log_online else " out=" + out[0],
-                           "" if log_online else " err=" + out[1])
+                           "" if log_online else " out=%s" % out[0],
+                           "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
                     raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
