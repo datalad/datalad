@@ -35,6 +35,13 @@ env:
 matrix:
   include:
   # Additional custom ones
+  - python: 3.7-dev
+    # Single run for Python 3.7
+    env:
+    # Run all tests in a single whoop here
+    # We cannot have empty -A selector, so the one which always will be fulfilled
+    - NOSE_SELECTION=
+    - NOSE_SELECTION_OP=not
   - python: 3.6
     # Single run for Python 3.6
     env:
