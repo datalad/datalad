@@ -10,10 +10,8 @@ Problems go away if UTF-8 locale is configured and set (instead of C or POSIX)
 
 Last-Update: 2018-06-05
 
-Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_cmd.py
-===================================================================
---- datalad-0.10.0~rc4+git167-g88f3ea8f.orig/datalad/tests/test_cmd.py
-+++ datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_cmd.py
+--- a/datalad/tests/test_cmd.py
++++ b/datalad/tests/test_cmd.py
 @@ -42,7 +42,7 @@ def test_runner_dry(tempfile):
      runner = Runner(protocol=dry)
  
@@ -62,11 +60,9 @@ Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_cmd.py
              eq_(cml.out, "")
  
  
-Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
-===================================================================
---- datalad-0.10.0~rc4+git167-g88f3ea8f.orig/datalad/tests/test_config.py
-+++ datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
-@@ -38,7 +38,7 @@ user = name=Jane Doe
+--- a/datalad/tests/test_config.py
++++ b/datalad/tests/test_config.py
+@@ -39,7 +39,7 @@ user = name=Jane Doe
  user = email=jd@example.com
  myint = 3
  
@@ -75,7 +71,7 @@ Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
  findme = 5.0
  """
  
-@@ -65,16 +65,16 @@ def test_something(path, new_home):
+@@ -66,16 +66,16 @@ def test_something(path, new_home):
      assert_true(cfg.has_section('something'))
      assert_false(cfg.has_section('somethingelse'))
      assert_equal(sorted(cfg.sections()),
@@ -95,7 +91,7 @@ Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
           ('something.myint', '3'),
           ('something.user', ('name=Jane Doe', 'email=jd@example.com'))])
      assert_equal(
-@@ -87,7 +87,7 @@ def test_something(path, new_home):
+@@ -88,7 +88,7 @@ def test_something(path, new_home):
          cfg.get('something.user'),
          ('name=Jane Doe', 'email=jd@example.com'))
      assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
@@ -104,7 +100,7 @@ Index: datalad-0.10.0~rc4+git167-g88f3ea8f/datalad/tests/test_config.py
      assert_equal(cfg.getint('something', 'myint'), 3)
      assert_equal(cfg.getbool('something', 'myint'), True)
      assert_equal(cfg.getbool('doesnot', 'exist', default=True), True)
-@@ -100,8 +100,8 @@ def test_something(path, new_home):
+@@ -101,8 +101,8 @@ def test_something(path, new_home):
      assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
  
      # modification follows

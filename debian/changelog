@@ -1,3 +1,10 @@
+datalad (0.10.2-1) unstable; urgency=medium
+
+  * A small bugfix release rushed out for compatibility with recent
+    git-annex (Closes: #903213)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 07 Jul 2018 22:20:16 -0400
+
 datalad (0.10.1-1) unstable; urgency=medium
 
   * Fresh upstream bugfix release

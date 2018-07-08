@@ -12,7 +12,7 @@ Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -71,7 +71,7 @@ requires = {
+@@ -75,7 +75,7 @@ requires = {
      ] + pbar_requires,
      'downloaders': [
          'boto',

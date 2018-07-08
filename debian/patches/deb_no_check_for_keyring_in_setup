@@ -10,7 +10,7 @@ Last-Update: 2016-05-20
 
 --- a/setup.py
 +++ b/setup.py
-@@ -56,6 +56,11 @@ if dist[0] == 'debian' and dist[1].split
+@@ -60,6 +60,11 @@ if dist[0] == 'debian' and dist[1].split
  req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
  
  

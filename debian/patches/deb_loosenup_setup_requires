@@ -1,6 +1,6 @@
 --- a/setup.py
 +++ b/setup.py
-@@ -203,8 +203,7 @@ setup(
+@@ -207,8 +207,7 @@ setup(
      long_description=long_description,
      packages=datalad_pkgs,
      install_requires=
