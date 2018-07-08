@@ -15,6 +15,32 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
+0.10.2 (Jul 08, 2018) -- Thesecuriestever
+-----------------------------------------
+
+Primarily a bugfix release to accommodate recent git-annex release
+forbidding file:// and http://localhost/ URLs which might lead to
+revealing private files if annex is publicly shared.
+
+Fixes
+~~~~~
+
+-  fixed testing to be compatible with recent git-annex (6.20180626)
+-  [download-url] will now download to current directory instead of the
+   top of the dataset
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  `run <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html>`__
+   support for user-configured placeholder values
+-  documentation on native git-annex metadata support
+-  handle 401 errors from LORIS tokens
+-  ``yoda`` procedure will instantiate ``README.md``
+-  ``--discover`` option added to
+   `run-procedure <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html>`__
+   to list available procedures
+
 0.10.1 (Jun 17, 2018) -- OHBM polish
 ------------------------------------
 
