@@ -115,6 +115,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '6.20170220'
     git_annex_version = None
 
+    # Class wide setting to allow insecure URLs. Used during testing, since
+    # git annex 6.20180626 those will by default be not allowed for security
+    # reasons
+    _ALLOW_LOCAL_URLS = False
+
     def __init__(self, path, url=None, runner=None,
                  direct=None, backend=None, always_commit=True, create=True,
                  init=False, batch_size=None, version=None, description=None,
@@ -270,6 +275,22 @@ class AnnexRepo(GitRepo, RepoInterface):
         if backend:
             self.set_default_backend(backend, persistent=True)
 
+        if self._ALLOW_LOCAL_URLS:
+            self._allow_local_urls()
+
+    def _allow_local_urls(self):
+        """Allow URL schemes and addresses which potentially could be harmful.
+
+        For now it is internal method used within tests only
+        """
+        # from annex 6.20180626 file:/// and http://localhost access isn't
+        # allowed by default
+        self.config.add(
+            'annex.security.allowed-url-schemes', 'http https file',
+            'local')
+        self.config.add(
+            'annex.security.allowed-http-addresses', 'all',
+            'local')
 
     def set_default_backend(self, backend, persistent=True, commit=True):
         """Set default backend
@@ -2070,8 +2091,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     cmd="addurl",
                     msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
             assert(out_json['command'] == 'addurl')
-            if not out_json.get('success', False):
-                raise AnnexBatchCommandError(
+        if not out_json.get('success', False):
+            raise (AnnexBatchCommandError if batch else CommandError)(
                     cmd="addurl",
                     msg="Error, annex reported failure for addurl (url='%s'): %s"
                     % (url, str(out_json)))

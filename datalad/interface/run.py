@@ -48,7 +48,8 @@ from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
 from datalad.utils import chpwd
-from datalad.utils import get_dataset_root
+# Rename get_dataset_pwds for the benefit of containers_run.
+from datalad.utils import get_dataset_pwds as get_command_pwds
 from datalad.utils import getpwd
 from datalad.utils import partition
 from datalad.utils import SequenceFormatter
@@ -95,6 +96,18 @@ class Run(Interface):
     << REFLOW ||
 
     To escape a brace character, double it (i.e., "{{" or "}}").
+
+    Custom placeholders can be added as configuration variables under
+    "datalad.run.substitutions".  As an example:
+
+      Add a placeholder "name" with the value "joe"::
+
+        % git config --file=.datalad/config datalad.run.substitutions.name joe
+        % datalad add -m "Configure name placeholder" .datalad/config
+
+      Access the new placeholder in a command::
+
+        % datalad run "echo my name is {name} >me"
     """
     _params_ = dict(
         cmd=Parameter(
@@ -314,40 +327,6 @@ def _unlock_or_remove(dset, paths):
             yield res
 
 
-def get_command_pwds(dataset):
-    """Return the directory for the command.
-
-    Parameters
-    ----------
-    dataset : Dataset
-
-    Returns
-    -------
-    A tuple, where the first item is the absolute path of the pwd and the
-    second is the pwd relative to the dataset's path.
-    """
-    if dataset:
-        pwd = dataset.path
-        rel_pwd = curdir
-    else:
-        # act on the whole dataset if nothing else was specified
-
-        # Follow our generic semantic that if dataset is specified,
-        # paths are relative to it, if not -- relative to pwd
-        pwd = getpwd()
-        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
-        # repos whose leading paths have a symlinked directory (see the
-        # TMPDIR="/var/tmp/sym link" test case).
-        dataset = get_dataset_root(pwd)
-
-        if dataset:
-            rel_pwd = relpath(pwd, dataset)
-        else:
-            rel_pwd = pwd  # and leave handling on deciding either we
-                           # deal with it or crash to checks below
-    return pwd, rel_pwd
-
-
 def normalize_command(command):
     """Convert `command` to the string representation.
     """
@@ -447,11 +426,23 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    cmd_expanded = format_command(cmd,
-                                  pwd=pwd,
-                                  dspath=ds.path,
-                                  inputs=inputs,
-                                  outputs=outputs)
+    sub_namespace = {k.replace("datalad.run.substitutions.", ""): v
+                     for k, v in ds.config.items("datalad.run.substitutions")}
+    try:
+        cmd_expanded = format_command(cmd,
+                                      pwd=pwd,
+                                      dspath=ds.path,
+                                      inputs=inputs,
+                                      outputs=outputs,
+                                      **sub_namespace)
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=('command has an unrecognized placeholder: %s',
+                     exc))
+        return
 
     # we have a clean dataset, let's run things
     exc = None

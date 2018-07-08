@@ -19,9 +19,19 @@ ds = require_dataset(
     purpose='YODA dataset setup')
 
 README_code = """\
-All custom code goes into the directory. All scripts should be written such
+All custom code goes into this directory. All scripts should be written such
 that they can be executed from the root of the dataset, and are only using
 relative paths for portability.
+"""
+
+README_top = """\
+# Project <insert name>
+
+## Dataset structure
+
+- All inputs (i.e. building blocks from other sources) are located in
+  `inputs/`.
+- All custom code is located in `code/`.
 """
 
 tmpl = {
@@ -30,7 +40,7 @@ tmpl = {
         # all code goes into Git
         '.gitattributes': '** annex.largefiles=nothing',
     },
-    'README.md': '',  # TODO
+    'README.md': README_top,
     'CHANGELOG.md': '',  # TODO
 }
 

@@ -262,7 +262,7 @@ class Remove(Interface):
             # avoid unnecessary git calls when there is nothing to do
             if to_reporemove:
                 if check and hasattr(ds.repo, 'drop'):
-                    for r in _drop_files(ds, [p for p in to_reporemove],
+                    for r in _drop_files(ds, list(to_reporemove),
                                          check=True):
                         if r['status'] == 'error':
                             # if drop errored on that path, we can't remove it
@@ -270,7 +270,7 @@ class Remove(Interface):
                         yield r
 
                 if to_reporemove:
-                    for r in ds.repo.remove([p for p in to_reporemove], r=True):
+                    for r in ds.repo.remove(list(to_reporemove), r=True):
                         # these were removed, but we still need to save the
                         # removal
 

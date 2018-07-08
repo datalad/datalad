@@ -9,7 +9,7 @@ Overview
 DataLad has built-in, modular, and extensible support for metadata in various
 formats. Metadata is extracted from a dataset and its content by one or more
 extractors that have to be enabled in a dataset's configuration. Extractors
-yield metadata in a JSON-LD-like structure that can be arbitrarily complex and
+yield metadata in a JSON-LD_-like structure that can be arbitrarily complex and
 deeply nested. Metadata from each extractor is kept unmodified, unmangled, and
 separate from metadata of other extractors. This design enables tailored
 applications using particular metadata that can use Datalad as a
@@ -41,6 +41,118 @@ Supported metadata sources
 
 This following sections provide an overview of included metadata extractors for
 particular types of data structures and file formats.
+Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
+extractors are enabled by default.  Any additional metadata extractor should be
+enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
+via the ``git config`` command or by editing ``.datalad/config`` directly.
+For example, ``git config -f .datalad/config --add datalad.metadata.nativetype audio``
+would add :ref:`audio <metadata-audio>` metadata extractor to the list.
+
+
+.. _metadata-annex:
+
+Annex metadata (``annex``)
+--------------------------
+
+Content tracked by git-annex can have associated
+`metadata records <http://git-annex.branchable.com/metadata/>`_.
+From DataLad's perspective, git-annex metadata is just another source of
+metadata that can be extracted and aggregated.
+
+You can use the `git-annex metadata`_ command to assign git-annex
+metadata.  And, if you have a table or records that contain data
+sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
+to quickly populate a dataset with files and associated
+git-annex metadata. (`///labs/openneurolab/metasearch
+<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+an example of such a dataset.)
+
+
+Pros of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Many git-annex commands, such as `git-annex get`_ and `git-annex copy`_, can
+  use metadata to decide which files (keys) to operate on, making it possible to
+  automate file (re)distribution based on their metadata annotation
+- Assigned metadata is available for use by git-annex right away without
+  requiring any additional "aggregation" step
+- `git-annex view`_ can be used to quickly generate completely new layouts
+  of the repository solely based on the metadata fields associated with the files
+
+.. _git-annex get: https://git-annex.branchable.com/git-annex-get/
+.. _git-annex copy: https://git-annex.branchable.com/git-annex-copy/
+.. _git-annex metadata: https://git-annex.branchable.com/git-annex-metadata/
+.. _git-annex view: https://git-annex.branchable.com/git-annex-view/
+
+
+Cons of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Metadata fields are actually stored per git-annex key rather than per file.
+  If multiple files contain the same content, metadata will be shared among them.
+- Files whose content is tracked directly by git cannot have git-annex metadata assigned.
+- No per repository/directory metadata, and no mechanism to use/aggregate
+  metadata from sub-datasets
+- Field names cannot contain some symbols, such as ':'
+- Metadata is stored within the `git-annex` branch, so it is distributed
+  across all clones of the dataset, making it hard to scale for large metadata
+  sizes or to work with sensitive metadata (not intended to be redistributed)
+- It is a generic storage with no prescribed vocabularly,
+  making it very flexible but also requiring consistency and
+  harmonization to make the stored metadata useful for search
+
+
+Example uses of git-annex metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Annotating files for different purposes
+#######################################
+
+FreeSurfer project `uses <https://surfer.nmr.mgh.harvard.edu/fswiki/DevelopersGuide_git#GettheDataFiles>`_
+`git-annex` for managing their source code+data base within a single
+git/git-annex repository. Files necessary for different scenarios (deployment,
+testing) are annotated and can be fetched selectively for the scenario at hand.
+
+Automating "non-distribution" of sensitive files
+################################################
+
+In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
+conversion of BIDS dataset and in some manually prepared datasets
+(such as
+`///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
+and
+`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+we annotated materials that must not be publicly shared with a git-annex
+metadata field `distribution-restrictions`.  We used the following of values to
+describe why any particular file (content) should not be redistributed:
+
+- **sensitive** - files which potentially contain participant sensitive
+  information, such as non-defaced anatomicals
+- **proprietary** - files which contain proprietary data, which we have no
+  permissions to share (e.g., movie video files)
+
+Having annotated files this way, we could instruct git-annex
+to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+server: `git annex wanted datalad-public "not metadata=distribution-restrictions=*"`.
+
+
+Flexible directory layout
+#########################
+
+If you are maintaining a collection of music files or PDFs for the lab, you
+may want to display the files in an alternative or filtered hierarchy.
+`git-annex view`_ could be of help. Example:
+
+.. code-block:: sh
+
+  datalad install ///labs/openneurolab/metasearch
+  cd metasearch
+  git annex view sex=* handedness=ambidextrous
+
+would give you two directories (Male, Female) with only the files belonging to
+ambidextrous subjects.
+
+
+.. _metadata-audio:
 
 Various audio file formats (``audio``)
 --------------------------------------
@@ -56,6 +168,8 @@ datacite.org compliant datasets (``datacite``)
 This extractor can handle dataset-level metadata following the `datacite.org
 <https://www.datacite.org>`_ specification. No constrained vocabulary is
 identified at the moment.
+
+.. _metadata-datalad_core:
 
 Datalad's internal metadata storage (``datalad_core``)
 ------------------------------------------------------

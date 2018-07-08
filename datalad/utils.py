@@ -1545,6 +1545,39 @@ def get_dataset_root(path):
     return None
 
 
+def get_dataset_pwds(dataset):
+    """Return the current directory for the dataset.
+
+    Parameters
+    ----------
+    dataset : Dataset
+
+    Returns
+    -------
+    A tuple, where the first item is the absolute path of the pwd and the
+    second is the pwd relative to the dataset's path.
+    """
+    if dataset:
+        pwd = dataset.path
+        rel_pwd = curdir
+    else:
+        # act on the whole dataset if nothing else was specified
+
+        # Follow our generic semantic that if dataset is specified,
+        # paths are relative to it, if not -- relative to pwd
+        pwd = getpwd()
+        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
+        # repos whose leading paths have a symlinked directory (see the
+        # TMPDIR="/var/tmp/sym link" test case).
+        dataset = get_dataset_root(pwd)
+
+        if dataset:
+            rel_pwd = relpath(pwd, dataset)
+        else:
+            rel_pwd = pwd  # and leave handling to caller
+    return pwd, rel_pwd
+
+
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str

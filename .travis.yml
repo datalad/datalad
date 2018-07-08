@@ -57,6 +57,7 @@ matrix:
     - NOSE_SELECTION_OP=""
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
+    - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
   - python: 3.5
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
@@ -75,7 +76,6 @@ matrix:
     env:
     - DATALAD_LOG_LEVEL=2
     - DATALAD_LOG_TARGET=/dev/null
-    - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
     - DATALAD_TESTS_PROTOCOLREMOTE=1
     - DATALAD_TESTS_DATALADREMOTE=1
     - DATALAD_LOG_CMD_CWD=1

@@ -865,6 +865,15 @@ def test_placeholders(path):
         assert_in("echo {} >expanded-dspath".format(ds.path),
                   script_out)
 
+    assert_result_count(
+        ds.run("{unknown_placeholder}", on_failure="ignore"),
+        1, status="impossible", action="run")
+
+    # Configured placeholders.
+    ds.config.add("datalad.run.substitutions.license", "gpl3", where="local")
+    ds.run("echo {license} >configured-license")
+    ok_file_has_content(opj(path, "configured-license"), "gpl3", strip=True)
+
 
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
