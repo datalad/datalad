@@ -7,6 +7,12 @@ environment:
       PYTHON_ARCH: "32"
       MINICONDA: C:\Miniconda35
       DATALAD_TESTS_SSH: 1
+    # 3.7 is coming https://github.com/appveyor/ci/issues/2475
+    - PYTHON: "C:\\Python37"
+      PYTHON_VERSION: "3.7.0"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda37
+      DATALAD_TESTS_SSH: 1
 
 cache:
   # cache the pip cache

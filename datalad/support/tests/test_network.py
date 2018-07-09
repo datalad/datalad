@@ -246,8 +246,8 @@ def test_url_samples():
     _check_ri("file:///path/sp1", URL, localpath='/path/sp1', scheme='file', path='/path/sp1')
     # we don't do any magical comprehension for home paths/drives for windows
     # of file:// urls, thus leaving /~ and /c: for now:
-    _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
-    _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
+    _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
+    _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
     # not sure but let's check
     _check_ri("file:///c:/path/sp1", URL, localpath='/c:/path/sp1', scheme='file', path='/c:/path/sp1', exact_str=False)
 
@@ -403,7 +403,7 @@ def test_is_datalad_compat_ri():
 def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a'), 'file:///a')
     eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    eq_(get_local_file_url('/a~'), 'file:///a%7E')
+    eq_(get_local_file_url('/a~'), 'file:///a~')
     eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
 
 
