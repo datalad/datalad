@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.10.2 (Jul 08, 2018) -- Thesecuriestever
+## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
 Primarily a bugfix release to accommodate recent git-annex release
 forbidding file:// and http://localhost/ URLs which might lead to
@@ -23,6 +23,8 @@ revealing private files if annex is publicly shared.
 
 ### Enhancements and new features
 
+- do not quote ~ in URLs to be consistent with quote implementation in
+  Python 3.7 which now follows RFC 3986
 - [run] support for user-configured placeholder values
 - documentation on native git-annex metadata support
 - handle 401 errors from LORIS tokens
