@@ -15,8 +15,6 @@ import logging
 from os.path import join as opj
 from os.path import relpath
 
-from six.moves.urllib.parse import quote as urlquote
-
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -48,6 +46,7 @@ from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import urlquote
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
