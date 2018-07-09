@@ -16,6 +16,7 @@ import email.utils
 import os
 import pickle
 import re
+import sys
 import time
 import iso8601
 
@@ -30,7 +31,7 @@ from six import string_types
 from six import iteritems
 from six.moves.urllib.parse import urlsplit
 from six.moves.urllib.request import Request
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
+from six.moves.urllib.parse import unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
 from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
@@ -46,6 +47,24 @@ from datalad.support.cache import lru_cache
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
+
+# Change introduced in 3.7: Moved from RFC 2396 to RFC 3986 for quoting URL
+# strings. "~" is now included in the set of reserved characters.
+# For consistency we will provide urlquote
+if sys.version_info >= (3, 7):
+    from six.moves.urllib.parse import quote as urlquote
+else:
+    from six.moves.urllib.parse import quote as _urlquote
+
+    def urlquote(url, safe='/', **kwargs):
+        safe += '~'
+        return _urlquote(url, safe=safe, **kwargs)
+
+    urlquote.__doc__ = _urlquote.__doc__ + """
+
+This DataLad version of the function assumes ~ to be a safe character to be
+consistent with Python >= 3.7
+"""
 
 
 def is_windows_path(path):
