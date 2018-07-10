@@ -532,7 +532,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             ofh.write(msg)
         lgr.info("The command had a non-zero exit code. "
                  "If this is expected, you can save the changes with "
-                 "'datalad save -r -F%s .'",
+                 "'datalad save -r -F %s .'",
                  msg_path)
         raise exc
     else:
