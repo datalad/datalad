@@ -122,12 +122,12 @@ class Drop(Interface):
     interpreted relative to this dataset.
 
     Recursion into subdatasets needs to be explicitly enabled, while recursion
-    in subdirectories within a dataset is always done automatically. An
-    optional recursion limit is applied relative to each given input path.
+    into subdirectories within a dataset is done automatically. An optional
+    recursion limit is applied relative to each given input path.
 
-    By default, the availability of at least one remote copy is verified,
-    before file content is dropped. As these checks could lead to slow
-    operation (network latencies, etc), they can be disabled.
+    By default, the availability of at least one remote copy is verified before
+    file content is dropped. As these checks could lead to slow operation
+    (network latencies, etc), they can be disabled.
 
     Examples:
 
