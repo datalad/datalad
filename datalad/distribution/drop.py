@@ -71,7 +71,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
       whether to instruct annex to perform minimum copy availability
       checks
     noannex_iserror : bool
-      whether calling this function on a pur Git repo results in an
+      whether calling this function on a pure Git repo results in an
       'impossible' or 'notneeded' result.
     **kwargs
       additional payload for the result dicts
