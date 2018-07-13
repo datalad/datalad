@@ -89,22 +89,19 @@ def _uninstall_dataset(ds, check, has_super, **kwargs):
 class Uninstall(Interface):
     """Uninstall subdatasets
 
-    This command can be used to uninstall any number of installed subdataset.
-    If a to-be-uninstalled subdataset contains presently installed subdatasets
-    itself, their recursive removal has to be enabled explicitly to avoid the
-    command to exit with an error. This command will error if individual files
-    or non-dataset directories are given as input (use the drop or remove
-    command depending in the desired goal), nor will it uninstall top-level
-    datasets (i.e. datasets that or not a subdataset in another dataset; use
-    the remove command for this purpose).
+    This command can be used to uninstall any number of installed subdatasets.
+    This command will error if individual files or non-dataset directories are
+    given as input (use the drop or remove command depending on the desired
+    goal), nor will it uninstall top-level datasets (i.e. datasets that are not
+    a subdataset in another dataset; use the remove command for this purpose).
 
     By default, the availability of at least one remote copy for each currently
     available file in any dataset is verified. As these checks could lead to
     slow operation (network latencies, etc), they can be disabled.
 
     Any number of paths to process can be given as input. Recursion into
-    subdatasets needs to be explicitly enabled, while recursion in
-    subdirectories within a dataset as always done automatically. An optional
+    subdatasets needs to be explicitly enabled, while recursion into
+    subdirectories within a dataset is done automatically. An optional
     recursion limit is applied relative to each given input path.
 
     Examples:
@@ -112,7 +109,6 @@ class Uninstall(Interface):
       Uninstall a subdataset (undo installation)::
 
         ~/some/dataset$ datalad uninstall somesubdataset1
-
     """
     _action = 'uninstall'
 
