@@ -31,6 +31,7 @@ from .locking import lock_if_check_fails
 from ..utils import (
     any_re_search,
     assure_bytes,
+    chpwd,
     rmdir,
 )
 
@@ -200,30 +201,15 @@ def compress_files(files, archive, path=None, overwrite=True):
     overwrite : bool
       Either to allow overwriting the target archive file if one already exists
     """
-
     with swallow_outputs() as cmo:
-        # to test filenames, if path is not None, we should join:
-        if path:
-            opj_path = lambda p: opj(path, p)
-        else:
-            opj_path = lambda p: p
-        if not overwrite:
-            patoolib.util.check_new_filename(opj_path(archive))
-        patoolib.util.check_archive_filelist([opj_path(f) for f in files])
-
-        # ugly but what can you do? ;-) we might wrap it all into a class
-        # at some point. TODO
-        old_cwd = _runner.cwd
-        if path is not None:
-            _runner.cwd = path
-        try:
+        with chpwd(path):
+            if not overwrite:
+                patoolib.util.check_new_filename(archive)
+            patoolib.util.check_archive_filelist(files)
             # Call protected one to avoid the checks on existence on unixified path
             patoolib._create_archive(unixify_path(archive),
                                      [unixify_path(f) for f in files],
                                      verbosity=100)
-        finally:
-            _runner.cwd = old_cwd
-
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
