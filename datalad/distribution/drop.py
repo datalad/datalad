@@ -71,7 +71,7 @@ def _drop_files(ds, paths, check, noannex_iserror=False, **kwargs):
       whether to instruct annex to perform minimum copy availability
       checks
     noannex_iserror : bool
-      whether calling this function on a pur Git repo results in an
+      whether calling this function on a pure Git repo results in an
       'impossible' or 'notneeded' result.
     **kwargs
       additional payload for the result dicts
@@ -122,12 +122,12 @@ class Drop(Interface):
     interpreted relative to this dataset.
 
     Recursion into subdatasets needs to be explicitly enabled, while recursion
-    in subdirectories within a dataset is always done automatically. An
-    optional recursion limit is applied relative to each given input path.
+    into subdirectories within a dataset is done automatically. An optional
+    recursion limit is applied relative to each given input path.
 
-    By default, the availability of at least one remote copy is verified,
-    before file content is dropped. As these checks could lead to slow
-    operation (network latencies, etc), they can be disabled.
+    By default, the availability of at least one remote copy is verified before
+    file content is dropped. As these checks could lead to slow operation
+    (network latencies, etc), they can be disabled.
 
     Examples:
 
