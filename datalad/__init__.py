@@ -16,29 +16,9 @@ if _seed:
     import random
     random.seed(_seed)
 
-# Other imports are interspersed with lgr.debug to ease troubleshooting startup
-# delays etc.
-
-# If there is a bundled git, make sure GitPython uses it too:
-from datalad.cmd import GitRunner
-GitRunner._check_git_path()
-if GitRunner._GIT_PATH:
-    import os
-    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
-        os.path.join(GitRunner._GIT_PATH, 'git')
-
-from .config import ConfigManager
-cfg = ConfigManager()
-
-from .log import lgr
 import atexit
-from datalad.utils import on_windows, get_encoding_info, get_envvars_info
-
-lgr.log(5, "Instantiating ssh manager")
-from .support.sshconnector import SSHManager
-ssh_manager = SSHManager()
-atexit.register(ssh_manager.close, allow_fail=False)
-
+# Colorama (for Windows terminal colors) must be imported before we use/bind
+# any sys.stdout
 try:
     # this will fix the rendering of ANSI escape sequences
     # for colored terminal output on windows
@@ -54,6 +34,28 @@ except ImportError as e:
             "'colorama' Python module missing, terminal output may look garbled [%s]",
             exc_str(e))
     pass
+
+# Other imports are interspersed with lgr.debug to ease troubleshooting startup
+# delays etc.
+
+# If there is a bundled git, make sure GitPython uses it too:
+from datalad.cmd import GitRunner
+GitRunner._check_git_path()
+if GitRunner._GIT_PATH:
+    import os
+    os.environ['GIT_PYTHON_GIT_EXECUTABLE'] = \
+        os.path.join(GitRunner._GIT_PATH, 'git')
+
+from .config import ConfigManager
+cfg = ConfigManager()
+
+from .log import lgr
+from datalad.utils import on_windows, get_encoding_info, get_envvars_info
+
+lgr.log(5, "Instantiating ssh manager")
+from .support.sshconnector import SSHManager
+ssh_manager = SSHManager()
+atexit.register(ssh_manager.close, allow_fail=False)
 
 atexit.register(lgr.log, 5, "Exiting")
 
