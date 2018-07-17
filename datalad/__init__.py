@@ -168,8 +168,12 @@ def teardown_package():
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
-    print("Obscure filename: str=%s repr=%r"
-            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    try:
+        print("Obscure filename: str=%s repr=%r"
+                % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    except UnicodeEncodeError as exc:
+        from .dochelpers import exc_str
+        print("Obscure filename failed to print: %s" % exc_str(exc))
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))
