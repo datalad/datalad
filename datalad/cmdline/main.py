@@ -35,6 +35,7 @@ from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import setup_exceptionhook, chpwd
 from ..utils import assure_unicode
+from ..utils import on_msys_tainted_paths
 from ..dochelpers import exc_str
 
 
@@ -450,10 +451,25 @@ def add_entrypoints_to_interface_groups(interface_groups):
             lgr.warning('Failed to load entrypoint %s: %s', ep.name, exc_str(e))
             continue
 
+def _fix_datalad_ri(s):
+    """Fixup argument if it was a DataLadRI and had leading / removed
+
+    See gh-2643
+    """
+    if s.startswith('//') and (len(s) == 2 or (len(s) > 2 and s[2] != '/')):
+        lgr.info(
+            "Changing %s back to /%s as it was probably changed by MINGW/MSYS, "
+            "see http://www.mingw.org/wiki/Posix_path_conversion", s, s)
+        return "/" + s
+    return s
+
 
 def main(args=None):
     lgr.log(5, "Starting main(%r)", args)
     args = args or sys.argv
+    if on_msys_tainted_paths:
+        # Possibly present DataLadRIs were stripped of a leading /
+        args = [_fix_datalad_ri(s) for s in args]
     # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser(args)
     try:
