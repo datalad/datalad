@@ -1215,7 +1215,17 @@ def getpwd():
     If no PWD found in the env, output of getcwd() is returned
     """
     try:
-        return os.environ['PWD']
+        pwd = os.environ['PWD']
+        if on_windows and pwd and pwd.startswith('/'):
+            # It should be a path from MSYS.
+            # - it might start with a drive letter or not
+            # - it seems to be "illegal" to have a single letter directories
+            #   under / path, i.e. if created - they aren't found
+            # - 'ln -s' does not fail to create a "symlink" but it just copies!
+            #   so we are not likely to need original PWD purpose on those systems
+            # Verdict:
+            return os.getcwd()
+        return pwd
     except KeyError:
         return os.getcwd()
 
