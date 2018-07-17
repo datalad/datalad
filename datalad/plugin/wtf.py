@@ -13,10 +13,38 @@ __docformat__ = 'restructuredtext'
 from collections import OrderedDict
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
+from datalad.utils import getpwd
 
 # wording to use for items which were considered sensitive and thus not shown
 _HIDDEN = "<Sensitive data, use -s=some or -s=all to show>"
 
+
+def get_max_path_length(top_path=None, maxl=1000):
+    """Deduce the maximal length of the filename in a given path
+    """
+    if not top_path:
+        top_path = getpwd()
+    import os
+    import random
+    from datalad import lgr
+    from datalad.dochelpers import exc_str
+    from datalad.support import path
+    prefix = path.join(top_path, "dl%d" % random.randint(1 ,100000))
+    # some smart folks could implement binary search for this
+    max_path_length = None
+    for i in range(maxl-len(prefix)):
+        filename = prefix + '_' * i
+        path_length = len(filename)
+        try:
+            with open(filename, 'w') as f:
+                max_path_length = path_length
+        except Exception as exc:
+            lgr.debug(
+                "Failed to create sample file for length %d. Last succeeded was %s. Exception: %s",
+                path_length, max_path_length, exc_str(exc))
+            break
+        os.unlink(filename)
+    return max_path_length
 
 @build_doc
 class WTF(Interface):
@@ -179,6 +207,12 @@ Metadata
                     cfg[k] = _HIDDEN
 
         from datalad.version import __version__, __full_version__
+
+        pwd = getpwd()
+        max_path_length = get_max_path_length(pwd)
+        max_path_msg = '%d  You are left with %d characters under %s' \
+                       % (max_path_length, max_path_length - (len(pwd) + 1), pwd) \
+            if max_path_length is not None else "UNKNOWN"
         text = report_template.format(
             datalad=_format_dict([
                 ('Version', __version__),
@@ -193,7 +227,9 @@ Metadata
                 ('Distribution',
                  ' '.join([_t2s(pl.dist()),
                            _t2s(pl.mac_ver()),
-                           _t2s(pl.win32_ver())]).rstrip())
+                           _t2s(pl.win32_ver())]).rstrip()),
+                ('Max path length',
+                 max_path_msg)
             ], indent=True),
             loc=_format_dict(get_encoding_info(), indent=True),  # , fmt="{}={!r}"),
             env=_format_dict(get_envvars_info(), fmt="{}={!r}"),
