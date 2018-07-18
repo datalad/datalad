@@ -95,6 +95,17 @@ class Run(Interface):
     values can be accessed with an integer index (e.g., "{inputs[0]}").
     << REFLOW ||
 
+    || REFLOW >>
+    Note that the representation of the inputs or outputs in the formatted
+    command string depends on whether the command is given as a list of
+    arguments or as a string[CMD:  (quotes surrounding the command) CMD]. The
+    concatenated list of inputs or outputs will be surrounded by quotes when
+    the command is given as a list but not when it is given as a string. This
+    means that the string form is required if you need to pass each input as a
+    separate argument to a preceding script (i.e., write the command as
+    "./script {inputs}", quotes included).
+    << REFLOW ||
+
     To escape a brace character, double it (i.e., "{{" or "}}").
 
     Custom placeholders can be added as configuration variables under
