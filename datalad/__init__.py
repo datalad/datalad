@@ -16,6 +16,22 @@ if _seed:
     import random
     random.seed(_seed)
 
+import atexit
+# Colorama (for Windows terminal colors) must be imported before we use/bind
+# any sys.stdout
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError as e:
+    # To not interfer with carefully crafted order of imports
+    # delay possibly issuing a warning until all needed imports are done
+    colorama = None
+
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
 
@@ -31,7 +47,6 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-import atexit
 from datalad.utils import on_windows, get_encoding_info, get_envvars_info
 
 lgr.log(5, "Instantiating ssh manager")
@@ -39,21 +54,13 @@ from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
 
-try:
-    # this will fix the rendering of ANSI escape sequences
-    # for colored terminal output on windows
-    # it will do nothing on any other platform, hence it
-    # is safe to call unconditionally
-    import colorama
-    colorama.init()
-    atexit.register(colorama.deinit)
-except ImportError as e:
-    if on_windows:
-        from datalad.dochelpers import exc_str
-        lgr.warning(
-            "'colorama' Python module missing, terminal output may look garbled [%s]",
-            exc_str(e))
-    pass
+if on_windows and colorama is None:
+    from datalad.dochelpers import exc_str
+
+    lgr.warning(
+        "'colorama' Python module missing, terminal output may look garbled ["
+        "%s]",
+        exc_str(e))
 
 atexit.register(lgr.log, 5, "Exiting")
 
@@ -168,8 +175,12 @@ def teardown_package():
     lgr.debug("Printing versioning information collected so far")
     from datalad.support.external_versions import external_versions as ev
     print(ev.dumps(query=True))
-    print("Obscure filename: str=%s repr=%r"
-            % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    try:
+        print("Obscure filename: str=%s repr=%r"
+                % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    except UnicodeEncodeError as exc:
+        from .dochelpers import exc_str
+        print("Obscure filename failed to print: %s" % exc_str(exc))
     def print_dict(d):
         return " ".join("%s=%r" % v for v in d.items())
     print("Encodings: %s" % print_dict(get_encoding_info()))

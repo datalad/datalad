@@ -19,7 +19,11 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..main import main, fail_with_short_help
+from ..main import (
+    main,
+    fail_with_short_help,
+    _fix_datalad_ri,
+)
 from datalad import __version__
 from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
@@ -261,3 +265,13 @@ def test_fail_with_short_help():
                  "        mother\n"
                  "        father\n"
                  "Hint: You can become one\n")
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
