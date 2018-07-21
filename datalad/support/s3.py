@@ -87,6 +87,9 @@ def get_bucket(conn, bucket_name):
         # and we would need to list which buckets are available under following
         # credentials:
         lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
+        if conn.anon:
+            raise AccessDeniedError(
+                "Requesting 'all buckets' for anonymous S3 connection makes no sense.")
         try:
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
@@ -139,6 +142,9 @@ class VersionedFilesPool(object):
 
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
+
+    if versioned url is requested but version_id is None, no versionId suffix
+    will be added
     """
     # TODO: here we would need to encode the name since urlquote actually
     # can't do that on its own... but then we should get a copy of the thing
@@ -151,7 +157,7 @@ def get_key_url(e, schema='http', versioned=True):
         fmt = "s3://{e.bucket.name}/{e.name_urlquoted}"
     else:
         raise ValueError(schema)
-    if versioned:
+    if versioned and e.version_id is not None:
         fmt += "?versionId={e.version_id}"
     return fmt.format(e=e)
 

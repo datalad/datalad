@@ -41,7 +41,7 @@ __docformat__ = 'restructuredtext'
 class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
     """
-
+    allows_anonymous = True
     DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
 
     def __init__(self, *args, **kwargs):
@@ -74,15 +74,21 @@ class S3Authenticator(Authenticator):
         if bucket_name.lower() != bucket_name:
             # per http://stackoverflow.com/a/19089045/1265472
             conn_kwargs['calling_format'] = OrdinaryCallingFormat()
-        credentials = credential()
 
-        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
+        if credential is not None:
+            credentials = credential()
+            conn_kind = "with authentication"
+            conn_args = [credentials['key_id'], credentials['secret_id']]
+            conn_kwargs['security_token'] = credentials.get('session')
+        else:
+            conn_kind = "anonymously"
+            conn_args = []
+            conn_kwargs['anon'] = True
 
-        self.connection = conn = boto.connect_s3(
-            credentials['key_id'], credentials['secret_id'],
-            security_token=credentials.get('session'),
-            **conn_kwargs
+        lgr.info(
+            "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
         )
+        self.connection = conn = boto.connect_s3(*conn_args, **conn_kwargs)
         self.bucket = bucket = get_bucket(conn, bucket_name)
         return bucket
 

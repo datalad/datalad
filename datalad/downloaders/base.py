@@ -75,11 +75,12 @@ class BaseDownloader(object):
         authenticator: Authenticator, optional
           Authenticator to use for authentication.
         """
+        # Allow for anonymous connection if no credential is provided
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
         if authenticator:
-            if not credential:
+            if not credential and not authenticator.allows_anonymous:
                 msg = "Both authenticator and credentials must be provided." \
                       " Got only authenticator %s" % repr(authenticator)
                 if ui.yesno(
@@ -181,14 +182,9 @@ class BaseDownloader(object):
                                 raise AccessDeniedError(
                                     "Interface is not interactive and we were denied access."
                                     " Report to datalad developers")
-                        if ui.yesno(
-                                title="Authentication to access {url} has failed".format(url=url),
-                                text="Do you want to enter other credentials in case they were updated?"):
-                            self.credential.enter_new()
-                            allow_old_session = False
-                            continue
-                        else:
-                            raise DownloadError("Failed to download from %s given available credentials" % url)
+                        self._get_new_credentials(url)
+                        allow_old_session = False
+                        continue
                 else:  # None or False
                     if needs_authentication is False:
                         # those urls must or should NOT require authentication but we got denied
@@ -204,11 +200,50 @@ class BaseDownloader(object):
 
         return result
 
+    def _get_new_credentials(self, url):
+        """Use when authentication fails to set new credentials for url
+
+        Raises
+        ------
+        DownloadError
+          If either no known credentials type, or user refuses to update
+        """
+        title = "Authentication to access {url} has failed.".format(url=url)
+        if not self.credential:
+            # No credential was known, we need to create an
+            # appropriate one
+            if not self.authenticator:
+                raise DownloadError(title +
+                                    " No authenticator is known, cannot set "
+                                    "any credential")
+            credential_type = self.authenticator.DEFAULT_CREDENTIAL_TYPE
+            if not credential_type:
+                raise DownloadError(
+                    title +
+                    " %s does not have a default credential type, "
+                    "cannot authenticate"
+                    % self.authenticator
+                )
+            action_msg = "add new %s" % credential_type
+        else:
+            action_msg = "enter other"
+        if ui.yesno(
+                title=title,
+                text="Do you want to %s credentials in case they were updated?"
+                     % action_msg):
+            if not self.credential:
+                self.credential = CREDENTIAL_TYPES[credential_type](name="temporary-TODO-record")
+            self.credential.enter_new()
+        else:
+            raise DownloadError(
+                "Failed to download from %s given available credentials" % url)
+
     @staticmethod
     def _get_temp_download_filename(filepath):
         """Given a filepath, return the one to use as temp file during download
         """
-        # TODO: might better reside somewhere under .datalad/tmp or .git/datalad/tmp
+        # TODO: might better reside somewhere under .datalad/tmp or
+        # .git/datalad/tmp
         return filepath + ".datalad-download-temp"
 
     @abstractmethod
@@ -575,6 +610,7 @@ class Authenticator(object):
     from "provider:" sections
     """
     requires_authentication = True
+    allows_anonymous = False
     # TODO: figure out interface
 
     DEFAULT_CREDENTIAL_TYPE = 'user_password'
