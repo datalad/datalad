@@ -598,9 +598,11 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
     ]
 
     prefix_all_versions = None
+    got_versioned_list = False
     for acc in ACCESS_METHODS:
         try:
             prefix_all_versions = list(acc(prefix, **kwargs))
+            got_versioned_list = acc is bucket.list_versions
             break
         except Exception as exc:
             lgr.debug("Failed to access via %s: %s", acc, exc_str(exc))
@@ -620,7 +622,9 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
         base_msg = ("%%-%ds %%s" % max_length) % (e.name, e.last_modified)
         if isinstance(e, Key):
-            if not (e.is_latest or all_):
+            if got_versioned_list and not (e.is_latest or all_):
+                lgr.debug(
+                    "Skipping Key since not all versions requested: %s", e)
                 # Skip this one
                 continue
             ui.message(base_msg + " %%%dd" % max_size_length % e.size, cr=' ')
