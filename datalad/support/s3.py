@@ -27,7 +27,11 @@ import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
 from datalad.dochelpers import exc_str
-from datalad.support.exceptions import DownloadError, AccessDeniedError
+from datalad.support.exceptions import (
+    DownloadError,
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
 
 from six.moves.urllib.request import urlopen, Request
 
@@ -80,6 +84,7 @@ def get_bucket(conn, bucket_name):
     bucket_name: str
         Name of the bucket to connect to
     """
+    bucket = None
     try:
         bucket = conn.get_bucket(bucket_name)
     except S3ResponseError as e:
@@ -88,8 +93,11 @@ def get_bucket(conn, bucket_name):
         # credentials:
         lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
         if conn.anon:
-            raise AccessDeniedError(
-                "Requesting 'all buckets' for anonymous S3 connection makes no sense.")
+            raise AnonymousAccessDeniedError(
+                "Access to the bucket %s did not succeed.  Requesting "
+                "'all buckets' for anonymous S3 connection makes "
+                "little sense and thus not supported." % bucket_name)
+        all_buckets = []
         try:
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:

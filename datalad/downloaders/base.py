@@ -30,6 +30,7 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
+from ..support.exceptions import *
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -139,9 +140,13 @@ class BaseDownloader(object):
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
-                lgr.debug("Access was denied: %s", exc_str(e))
+                if isinstance(e, AnonymousAccessDeniedError):
+                    access_denied = "Anonymous"
+                else:
+                    access_denied = "Authenticated"
+                lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
                 exc_info = sys.exc_info()
-                access_denied = True
+
             except IncompleteDownloadError as e:
                 exc_info = sys.exc_info()
                 incomplete_attempt += 1
@@ -155,6 +160,12 @@ class BaseDownloader(object):
                 raise
 
             if access_denied:  # moved logic outside of except for clarity
+                # TODO: what if it was anonimous attempt without authentication,
+                #     so it is not "requires_authentication" but rather
+                #     "supports_authentication"?  We should not report below in
+                # _get_new_credential that authentication has failed then since there
+                # were no authentication.  We might need a custom exception to
+                # be caught above about that
                 if needs_authentication:
                     # so we knew it needs authentication
                     if used_old_session:
@@ -182,25 +193,32 @@ class BaseDownloader(object):
                                 raise AccessDeniedError(
                                     "Interface is not interactive and we were denied access."
                                     " Report to datalad developers")
-                        self._get_new_credentials(url)
+                        self._enter_credentials(
+                            url, denied_msg=access_denied, new=not self.credential)
                         allow_old_session = False
                         continue
                 else:  # None or False
                     if needs_authentication is False:
-                        # those urls must or should NOT require authentication but we got denied
-                        raise DownloadError("Failed to download from %s, which must be available without "
-                                            "authentication but access was denied" % url)
-                    else:
+                        # those urls must or should NOT require authentication
+                        # but we got denied
+                        raise DownloadError(
+                            "Failed to download from %s, which must be available without "
+                            "authentication but access was denied" % url)
+                    else:  # yoh: not sure if we ever get there since do not see
+                        # how could be None or any other non-False bool(False)
                         assert(needs_authentication is None)
-                        # So we didn't know if authentication necessary, and it seems to be necessary, so
-                        # Let's ask the user to setup authentication mechanism for this website
+                        # So we didn't know if authentication necessary, and it
+                        # seems to be necessary, so Let's ask the user to setup
+                        # authentication mechanism for this website
+                        # TODO: self._get_new_credentials(url)  but what do we do about
+                        # need_authentication
                         raise AccessDeniedError(
                             "Access to %s was denied but we don't know about this data provider. "
                             "You would need to configure data provider authentication using TODO " % url)
 
         return result
 
-    def _get_new_credentials(self, url):
+    def _enter_credentials(self, url, denied_msg, new=True):
         """Use when authentication fails to set new credentials for url
 
         Raises
@@ -208,8 +226,9 @@ class BaseDownloader(object):
         DownloadError
           If either no known credentials type, or user refuses to update
         """
-        title = "Authentication to access {url} has failed.".format(url=url)
-        if not self.credential:
+        title = "{msg} access to {url} has failed.".format(
+            msg=denied_msg, url=url)
+        if new:
             # No credential was known, we need to create an
             # appropriate one
             if not self.authenticator:
@@ -224,15 +243,23 @@ class BaseDownloader(object):
                     "cannot authenticate"
                     % self.authenticator
                 )
-            action_msg = "add new %s" % credential_type
+            action_msg = "enter new %s credentials?" % credential_type
         else:
-            action_msg = "enter other"
+            credential_type = None  # just to please pylint
+            action_msg = "enter other credentials in case they were updated?"
         if ui.yesno(
                 title=title,
-                text="Do you want to %s credentials in case they were updated?"
-                     % action_msg):
-            if not self.credential:
-                self.credential = CREDENTIAL_TYPES[credential_type](name="temporary-TODO-record")
+                text="Do you want to %s" % action_msg):
+            if new:
+                # TODO:
+                #  - ask for a type of credential if default not known
+                #  - make it persistent - ask for all the needed fields and save
+                #    in user config directory
+                name = 'one-time-record'
+                if not credential_type:
+                    raise ValueError(
+                        "Do not know what type of credential record is needed")
+                self.credential = CREDENTIAL_TYPES[credential_type](name=name)
             self.credential.enter_new()
         else:
             raise DownloadError(
@@ -592,11 +619,6 @@ class BaseDownloader(object):
 
     def _get_target_url(self, url):
         return self.get_downloader_session(url).url
-
-
-# Exceptions.  might migrate elsewhere
-# MIH: Completely non-obvious why this is here
-from ..support.exceptions import *
 
 
 #

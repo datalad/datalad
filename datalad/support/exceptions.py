@@ -313,6 +313,10 @@ class AccessDeniedError(DownloadError):
     pass
 
 
+class AnonymousAccessDeniedError(AccessDeniedError):
+    pass
+
+
 class AccessFailedError(DownloadError):
     pass
 
