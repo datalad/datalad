@@ -67,9 +67,15 @@ class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
     # Don't accept abbreviations for long options. With py3.5 and above, we
     # could just use allow_abbrev=False.
     #
-    # See https://bugs.python.org/issue14910#msg204678
+    # Modified from the solution posted at
+    # https://bugs.python.org/issue14910#msg204678
     def _get_option_tuples(self, option_string):
-        return []
+        chars = self.prefix_chars
+        if option_string[0] in chars and option_string[1] in chars:
+            # option_string is a long flag. Disable abbreviation.
+            return []
+        return super(ArgumentParserDisableAbbrev, self)._get_option_tuples(
+            option_string)
 
 
 # TODO:  OPT look into making setup_parser smarter to become faster

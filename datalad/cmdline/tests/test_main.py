@@ -131,6 +131,12 @@ def test_subcmd_usage_on_unknown_args():
     in_('get', stdout)
 
 
+def test_combined_short_option():
+    stdout, stderr = run_main(['-fjson'], exit_code=2, expect_stderr=True)
+    assert_not_in("unrecognized argument", stderr)
+    assert_in("too few arguments", stderr)
+
+
 def check_incorrect_option(opts, err_str):
     # The first line used to be:
     # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
