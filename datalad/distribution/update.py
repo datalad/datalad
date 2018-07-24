@@ -16,6 +16,8 @@ __docformat__ = 'restructuredtext'
 import logging
 from os.path import lexists, join as opj
 
+from gitdb.exc import BadName
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -163,10 +165,20 @@ class Update(Interface):
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
-            repo.fetch(
+            fetch_kwargs = dict(
                 remote=None if fetch_all else sibling_,
                 all_=fetch_all,
                 prune=True)  # prune to not accumulate a mess over time
+            try:
+                repo.fetch(**fetch_kwargs)
+            except BadName:
+                # Workaround for
+                # https://github.com/gitpython-developers/GitPython/issues/768
+                # also see https://github.com/datalad/datalad/issues/2550
+                # Let's try to precommit (to flush anything flushable) and do
+                # it again
+                repo.precommit()
+                repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate
             # ds.repo again, as it might have be converted from an GitRepo
             # to an AnnexRepo
