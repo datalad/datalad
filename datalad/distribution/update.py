@@ -171,7 +171,7 @@ class Update(Interface):
                 prune=True)  # prune to not accumulate a mess over time
             try:
                 repo.fetch(**fetch_kwargs)
-            except BadName:
+            except BadName:  # pragma: no cover
                 # Workaround for
                 # https://github.com/gitpython-developers/GitPython/issues/768
                 # also see https://github.com/datalad/datalad/issues/2550
