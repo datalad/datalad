@@ -12,10 +12,13 @@ __docformat__ = 'restructuredtext'
 
 from .. import _UI_Switcher
 from ..dialog import DialogUI, ConsoleLog
-from ...tests.utils import assert_equal, assert_not_equal
-from ...tests.utils import assert_raises
-from ...tests.utils import assert_false
-from ...tests.utils import with_testsui
+from ...tests.utils import (
+    assert_equal, assert_not_equal,
+    assert_raises,
+    assert_false,
+    ok_,
+    with_testsui,
+)
 
 
 def test_ui_switcher():
@@ -85,3 +88,6 @@ def test_with_testsui():
     @with_testsui(responses='a')
     def ask():
         assert_equal(ui.question('what is a?'), 'a')
+
+
+    ask()
