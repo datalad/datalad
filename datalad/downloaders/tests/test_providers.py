@@ -92,6 +92,7 @@ def test_get_downloader_class():
             Provider._get_downloader_class(url)
         assert_in("you need 'requests'", str(cmr.exception))
 
+
 @with_tree(tree={
   'providers': {'atest.cfg':"""\
 [provider:syscrcns]

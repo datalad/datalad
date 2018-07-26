@@ -31,6 +31,7 @@ from ..utils import auto_repr
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
 from ..support.exceptions import *
+from ..support.network import RI
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -120,7 +121,9 @@ class BaseDownloader(object):
         # would just call the corresponding method
 
         authenticator = self.authenticator
-        needs_authentication = authenticator and authenticator.requires_authentication
+        needs_authentication = (
+            authenticator and authenticator.requires_authentication
+        ) or self.credential
 
         attempt, incomplete_attempt = 0, 0
         while True:
@@ -129,6 +132,7 @@ class BaseDownloader(object):
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
                 raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
             exc_info = None
+            supported_auth_types = []
             try:
                 used_old_session = False
                 access_denied = False
@@ -145,6 +149,7 @@ class BaseDownloader(object):
                 else:
                     access_denied = "Authenticated"
                 lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
+                supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
             except IncompleteDownloadError as e:
@@ -159,6 +164,10 @@ class BaseDownloader(object):
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
 
+            msg_types = ''
+            if supported_auth_types:
+                msg_types = " The failure response indicated that following " \
+                            "authentication types should be used: %s" % (', '.join(supported_auth_types))
             if access_denied:  # moved logic outside of except for clarity
                 # TODO: what if it was anonimous attempt without authentication,
                 #     so it is not "requires_authentication" but rather
@@ -185,16 +194,20 @@ class BaseDownloader(object):
                         if not ui.is_interactive:
                             lgr.error(
                                 "Interface is non interactive, so we are "
-                                "reraising: %s" % exc_str(e))
+                                "re-raising: %s" % exc_str(e))
                             if exc_info:
                                 reraise(*exc_info)
                             else:
                                 # must not happen but who knows
                                 raise AccessDeniedError(
                                     "Interface is not interactive and we were denied access."
-                                    " Report to datalad developers")
+                                    " Run in interactive mode to get provider "
+                                    " setup, or configure it manually.")
                         self._enter_credentials(
-                            url, denied_msg=access_denied, new=not self.credential)
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=not self.credential)
                         allow_old_session = False
                         continue
                 else:  # None or False
@@ -202,23 +215,46 @@ class BaseDownloader(object):
                         # those urls must or should NOT require authentication
                         # but we got denied
                         raise DownloadError(
-                            "Failed to download from %s, which must be available without "
-                            "authentication but access was denied" % url)
-                    else:  # yoh: not sure if we ever get there since do not see
+                            "Failed to download from %s, which must be available"
+                            "without authentication but access was denied. "
+                            "Adjust your configuration for the provider.%s"
+                            % (url, msg_types))
+                    else:
                         # how could be None or any other non-False bool(False)
                         assert(needs_authentication is None)
                         # So we didn't know if authentication necessary, and it
                         # seems to be necessary, so Let's ask the user to setup
                         # authentication mechanism for this website
-                        # TODO: self._get_new_credentials(url)  but what do we do about
-                        # need_authentication
-                        raise AccessDeniedError(
-                            "Access to %s was denied but we don't know about this data provider. "
-                            "You would need to configure data provider authentication using TODO " % url)
+                        self._enter_credentials(
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=True)
+                        allow_old_session = False
+                        continue
 
         return result
 
-    def _enter_credentials(self, url, denied_msg, new=True):
+    def _setup_new_provider(self, title, url, auth_types=None):
+        # Full new provider (TODO move into Providers?)
+        from .providers import Providers
+        providers = Providers.from_config_files()
+        while True:
+            provider = providers.enter_new(url, auth_types=auth_types)
+            if not provider:
+                if ui.yesno(
+                    title="Re-enter provider?",
+                    text="You haven't entered or saved provider, would you like to retry?",
+                    default=True
+                ):
+                    continue
+            break
+        return provider
+
+
+    def _enter_credentials(
+            self, url, denied_msg,
+            auth_types=[], new_provider=True):
         """Use when authentication fails to set new credentials for url
 
         Raises
@@ -228,42 +264,56 @@ class BaseDownloader(object):
         """
         title = "{msg} access to {url} has failed.".format(
             msg=denied_msg, url=url)
-        if new:
+
+        if new_provider:
             # No credential was known, we need to create an
             # appropriate one
-            if not self.authenticator:
-                raise DownloadError(title +
-                                    " No authenticator is known, cannot set "
-                                    "any credential")
-            credential_type = self.authenticator.DEFAULT_CREDENTIAL_TYPE
-            if not credential_type:
-                raise DownloadError(
-                    title +
-                    " %s does not have a default credential type, "
-                    "cannot authenticate"
-                    % self.authenticator
-                )
-            action_msg = "enter new %s credentials?" % credential_type
-        else:
-            credential_type = None  # just to please pylint
-            action_msg = "enter other credentials in case they were updated?"
-        if ui.yesno(
-                title=title,
-                text="Do you want to %s" % action_msg):
-            if new:
-                # TODO:
-                #  - ask for a type of credential if default not known
-                #  - make it persistent - ask for all the needed fields and save
-                #    in user config directory
+            if not ui.yesno(
+                    title=title,
+                    text="Would you like to setup a new provider "
+                         "configuration to "
+                         "access url?",
+                    default=True
+            ):
+                if not self.authenticator:
+                    raise DownloadError(title +
+                                        " No authenticator is known, cannot "
+                                        "set "
+                                        "any credential")
+                # we could try to just
+                credential_type = self.authenticator.DEFAULT_CREDENTIAL_TYPE
+                if not credential_type:
+                    raise DownloadError(
+                        title +
+                        " %s does not have a default credential type, "
+                        "cannot authenticate"
+                        % self.authenticator
+                    )
+
                 name = 'one-time-record'
                 if not credential_type:
                     raise ValueError(
                         "Do not know what type of credential record is needed")
                 self.credential = CREDENTIAL_TYPES[credential_type](name=name)
-            self.credential.enter_new()
+                self.credential.enter_new()
+            else:
+                provider = self._setup_new_provider(
+                    title, url, auth_types=auth_types)
+                self.authenticator = provider.authenticator
+                self.credential = provider.credential
+                if not (self.credential and self.credential.is_known):
+                    # TODO: or should we ask to re-enter?
+                    self.credential.enter_new()
         else:
-            raise DownloadError(
-                "Failed to download from %s given available credentials" % url)
+            action_msg = "enter other credentials in case they were updated?"
+
+            if ui.yesno(
+                    title=title,
+                    text="Do you want to %s" % action_msg):
+                self.credential.enter_new()
+            else:
+                raise DownloadError(
+                    "Failed to download from %s given available credentials" % url)
 
     @staticmethod
     def _get_temp_download_filename(filepath):
@@ -550,7 +600,6 @@ class BaseDownloader(object):
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
         out = self.access(self._fetch, url, **kwargs)
-        # import pdb; pdb.set_trace()
         return out[0]
 
     def get_status(self, url, old_status=None, **kwargs):

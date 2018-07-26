@@ -96,7 +96,9 @@ def get_bucket(conn, bucket_name):
             raise AnonymousAccessDeniedError(
                 "Access to the bucket %s did not succeed.  Requesting "
                 "'all buckets' for anonymous S3 connection makes "
-                "little sense and thus not supported." % bucket_name)
+                "little sense and thus not supported." % bucket_name,
+                supported_types=['aws-s3']
+            )
         all_buckets = []
         try:
             all_buckets = conn.get_all_buckets()
