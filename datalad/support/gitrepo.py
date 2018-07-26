@@ -73,6 +73,13 @@ _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
+_lgr_level = lgr.getEffectiveLevel()
+if _lgr_level <= 2:
+    from ..log import LoggerHelper
+    # Let's also enable gitpy etc debugging
+    gitpy_lgr = LoggerHelper(logtarget="git").get_initialized_logger()
+    gitpy_lgr.setLevel(_lgr_level)
+    gitpy_lgr.propagate = True
 
 # Override default GitPython's DB backend to talk directly to git so it doesn't
 # interfere with possible operations performed by gc/repack
