@@ -3511,6 +3511,13 @@ class BatchedAnnex(object):
         return ret
 
 
+def _get_size_from_perc_complete(count, perc):
+    """A helper to get full size if know % and corresponding size"""
+    portion = (float(perc) / 100.)
+    return int(math.ceil(int(count) / portion)) \
+        if portion else 0
+
+
 class ProcessAnnexProgressIndicators(object):
     """'Filter' for annex --json output to react to progress indicators
 
@@ -3641,10 +3648,6 @@ class ProcessAnnexProgressIndicators(object):
             # some other thing than progress
             return line
 
-        def get_size_from_perc_complete(count, perc):
-            return int(math.ceil(int(count) / (float(perc) / 100.))) \
-                if perc else 0
-
         # so we have a progress indicator, let's deal with it
         action = j['action']
         download_item = action.get('file') or action.get('key')
@@ -3661,7 +3664,7 @@ class ProcessAnnexProgressIndicators(object):
             if not target_size:
                 target_size = \
                     AnnexRepo.get_size_from_key(action.get('key')) or \
-                    get_size_from_perc_complete(
+                    _get_size_from_perc_complete(
                         j['byte-progress'],
                         j.get('percent-progress', '').rstrip('%')
                     ) or \
