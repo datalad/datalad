@@ -50,13 +50,14 @@ matrix:
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
   - python: 3.5
-    # Single run for v6
+    # Split runs for v6 since a single one is too long now
     env:
-    # Run all tests in a single whoop here
-    # We cannot have empty -A selector, so the one which always will be fulfilled
     - DATALAD_REPO_VERSION=6
-    - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
+  - python: 3.5
+    env:
+    - DATALAD_REPO_VERSION=6
+    - NOSE_SELECTION_OP=""
   - python: 3.5
     # Run slow etc tests under a single tricky scenario
     env:
