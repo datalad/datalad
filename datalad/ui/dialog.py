@@ -214,9 +214,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
             # TODO: dedicated option?  got annoyed by this one
             # multiple times already, typically we are not defining
             # new credentials where repetition would be needed.
-            repeat = hidden
+            repeat = hidden and choices is None
             if repeat:
-                response_r = self.input('{} (repeat): '.format(msg))
+                response_r = self.input('{} (repeat): '.format(msg), hidden=hidden)
                 if response != response_r:
                     self.error("input mismatch, please start over")
                     continue
