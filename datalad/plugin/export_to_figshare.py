@@ -165,8 +165,8 @@ class ExportToFigshare(Interface):
             metavar="PATH",
             nargs='?',
             doc="""File name of the generated ZIP archive. If no file name is
-            given the archive will be generated in the current directory and
-            will be named: datalad_<dataset_uuid>.zip.""",
+            given the archive will be generated in the top directory
+            of the dataset and will be named: datalad_<dataset_uuid>.zip.""",
             constraints=EnsureStr() | EnsureNone()),
         no_annex=Parameter(
             args=("--no-annex",),
@@ -230,7 +230,11 @@ class ExportToFigshare(Interface):
             raise RuntimeError(
                 "Paranoid authors of DataLad refuse to proceed in a dirty repository"
             )
-        lgr.info("Exporting current tree as an archive since figshare does not support directories")
+        lgr.info(
+            "Exporting current tree as an archive since figshare "
+            "does not support directories")
+        if filename is None:
+            filename = dataset.path
         archive_out = next(
             export_archive(
                 dataset,
