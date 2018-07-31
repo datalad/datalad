@@ -241,8 +241,16 @@ class DialogUI(ConsoleLog, InteractiveUI):
         return response
 
 
-class IPythonWebUI(DialogUI):
-    """Custom to IPython Web frontend UI implementation
+class IPythonUI(DialogUI):
+    """Custom to IPython frontend UI implementation
+
+    There is no way to discriminate between web notebook or qt console,
+    so we have just a single class for all.
+
+    TODO: investigate how to provide 'proper' displays for
+    IPython of progress bars so backend could choose the
+    appropriate one
+
     """
 
     _tqdm_frontend = "unknown"
@@ -275,7 +283,7 @@ class IPythonWebUI(DialogUI):
                 self.__class__._tqdm_frontend = None
         if self._tqdm_frontend:
             kwargs.update()
-        return super(IPythonWebUI, self).get_progressbar(
+        return super(IPythonUI, self).get_progressbar(
                 *args, frontend=self._tqdm_frontend, **kwargs)
 
 

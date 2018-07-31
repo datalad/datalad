@@ -182,6 +182,17 @@ def is_interactive():
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
 
+def get_ipython_shell():
+    """Detect if running within IPython and returns its `ip` (shell) object
+
+    Returns None if not under ipython (no `get_ipython` function)
+    """
+    try:
+        return get_ipython()
+    except NameError:
+        return None
+
+
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()

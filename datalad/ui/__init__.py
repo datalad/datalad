@@ -20,12 +20,25 @@ lgr.log(5, "Starting importing ui")
 from .dialog import (
     ConsoleLog,
     DialogUI,
-    IPythonWebUI,
+    IPythonUI,
     UnderAnnexUI,
     UnderTestsUI,
 )
 from .dialog import SilentConsoleLog
-from ..utils import is_interactive
+from ..utils import (
+    is_interactive,
+    get_ipython_shell,
+)
+
+KNOWN_BACKENDS = {
+    'console': ConsoleLog,
+    'dialog': DialogUI,
+    'ipython': IPythonUI,
+    'annex': UnderAnnexUI,
+    'tests': UnderTestsUI,
+    'tests-noninteractive': SilentConsoleLog,
+}
+
 
 # TODO: implement logic on selection of the ui based on the cfg and environment
 # e.g. we cannot use DialogUI if session is not interactive
@@ -49,15 +62,25 @@ class _UI_Switcher(object):
             lgr.debug("not changing backend since the same %s" % backend)
             return
         if backend is None:
-            backend = 'console' if not is_interactive() else 'dialog'
-        self._ui = {
-            'console': ConsoleLog,
-            'dialog': DialogUI,
-            'ipython-web': IPythonWebUI,
-            'annex': UnderAnnexUI,
-            'tests': UnderTestsUI,
-            'tests-noninteractive': SilentConsoleLog,
-        }[backend]()
+            # Might be IPython
+            ipython_shell = get_ipython_shell()
+            if ipython_shell:
+                # Good old ipython would have TerminalInteractiveShell
+                if ipython_shell.__class__.__name__ in ('ZMQInteractiveShell',):
+                    backend = 'ipython'
+                    # well -- this will not even be printed yet since unlikely
+                    # the lgr handlers were set already
+                    lgr.info(
+                        "Detected IPython session. Setting UI backend to %r. "
+                        "If this is not a web IPython notebook session, you "
+                        "might like to datalad.ui.ui.set_backend('dialog'). "
+                        "Other known UI backends: %s",
+                        backend, ', '.join(KNOWN_BACKENDS))
+                else:
+                    backend = 'dialog'
+            else:
+                backend = 'console' if not is_interactive() else 'dialog'
+        self._ui = KNOWN_BACKENDS[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend
 
