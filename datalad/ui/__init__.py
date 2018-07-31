@@ -17,9 +17,14 @@ lgr = getLogger('datalad.ui')
 
 lgr.log(5, "Starting importing ui")
 
-from .dialog import ConsoleLog, DialogUI, UnderAnnexUI
+from .dialog import (
+    ConsoleLog,
+    DialogUI,
+    IPythonWebUI,
+    UnderAnnexUI,
+    UnderTestsUI,
+)
 from .dialog import SilentConsoleLog
-from .dialog import UnderTestsUI
 from ..utils import is_interactive
 
 # TODO: implement logic on selection of the ui based on the cfg and environment
@@ -48,6 +53,7 @@ class _UI_Switcher(object):
         self._ui = {
             'console': ConsoleLog,
             'dialog': DialogUI,
+            'ipython-web': IPythonWebUI,
             'annex': UnderAnnexUI,
             'tests': UnderTestsUI,
             'tests-noninteractive': SilentConsoleLog,
