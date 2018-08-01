@@ -307,8 +307,10 @@ class _WhooshSearch(_Search):
             except widx.IndexError as e:
                 # Generic index error.
                 # we try to regenerate
-                # TODO log this
-                pass
+                lgr.warning(
+                    "Cannot open existing index %s (%s), will regenerate",
+                    index_dir, exc_str(e)
+                )
             except widx.IndexVersionError as e:  # (msg, version, release=None)
                 # Raised when you try to open an index using a format that the
                 # current version of Whoosh cannot read. That is, when the index
@@ -321,12 +323,20 @@ class _WhooshSearch(_Search):
                 # Raised when you try to commit changes to an index which is not
                 # the latest generation.
                 # this should not happen here, but if it does ... KABOOM
-                raise e
+                raise
             except widx.EmptyIndexError as e:
                 # Raised when you try to work with an index that has no indexed
                 # terms.
                 # we can just continue with generating an index
                 pass
+            except ValueError as e:
+                if 'unsupported pickle protocol' in str(e):
+                    lgr.warning(
+                        "Cannot open existing index %s (%s), will regenerate",
+                        index_dir, exc_str(e)
+                    )
+                else:
+                    raise
 
         lgr.info('{} search index'.format(
             'Rebuilding' if exists(index_dir) else 'Building'))
