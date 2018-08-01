@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -724,7 +725,14 @@ class _EGrepSearch(_Search):
                 try:
                     kvals_set = assure_iter(kvals, set)
                 except TypeError:
-                    kvals_set = {'unhashable'}
+                    # TODO: may be do show hashable ones???
+                    nunhashable = sum(
+                        isinstance(x, collections.Hashable) for x in kvals
+                    )
+                    kvals_set = {
+                        'unhashable %d out of %d entries'
+                        % (nunhashable, len(kvals))
+                    }
                 keys[k].uvals |= kvals_set
 
         for k in sorted(keys):
@@ -735,9 +743,10 @@ class _EGrepSearch(_Search):
             # do a bit more
             stat = keys[k]
             uvals = stat.uvals
-            # show only up to X uvals
-            if len(stat.uvals) > 10:
-                uvals = {v for i, v in enumerate(uvals) if i < 10}
+            if mode == 'short':
+                # show only up to X uvals
+                if len(stat.uvals) > 10:
+                    uvals = {v for i, v in enumerate(uvals) if i < 10}
             # all unicode still scares yoh -- he will just use repr
             # def conv(s):
             #     try:
