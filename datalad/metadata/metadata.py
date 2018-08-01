@@ -476,9 +476,12 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
             lgr.warn(
-                '{} files have no content present, skipped metadata extraction for {}'.format(
+                '{} files have no content present, '
+                'some extractors will not operate on {}'.format(
                     nocontent,
-                    'them' if nocontent > 10 else [p for p, c, a in content_info if not c and a]))
+                    'them' if nocontent > 10
+                           else [p for p, c, a in content_info if not c and a])
+            )
 
     # pull out potential metadata field blacklist config settings
     blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
@@ -518,7 +521,9 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 mtype_key)
         try:
             extractor_cls = extractors[mtype_key].load()
-            extractor = extractor_cls(ds, paths=paths)
+            extractor = extractor_cls(
+                ds,
+                paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
         except Exception as e:
             log_progress(
                 lgr.error,

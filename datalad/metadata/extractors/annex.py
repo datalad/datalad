@@ -21,6 +21,9 @@ from datalad.metadata.definitions import version as vocabulary_version
 
 
 class MetadataExtractor(BaseMetadataExtractor):
+
+    NEEDS_CONTENT = False
+
     def _get_dataset_metadata(self):
         return {}
 
