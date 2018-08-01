@@ -273,7 +273,7 @@ class ExportToFigshare(Interface):
                 else:
                     article_id = int(ui.question(
                         "Which of the articles should we upload to.",
-                        choices=map(str, figshare.get_article_ids())
+                        choices=list(map(str, figshare.get_article_ids()))
                     ))
             if not article_id:
                 raise ValueError("We need an article to upload to.")
