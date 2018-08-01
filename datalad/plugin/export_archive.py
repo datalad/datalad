@@ -37,9 +37,9 @@ class ExportArchive(Interface):
             nargs='?',
             doc="""File name of the generated TAR archive. If no file name is
             given the archive will be generated in the current directory and
-            will be named: datalad_<dataset_uuid>.(tar.*|zip).  If an existing
-            directory provided as filename, such file will be generated under 
-            that directory.""",
+            will be named: datalad_<dataset_uuid>.(tar.*|zip). To generate that
+            file in a different directory, provide an existing directory as the
+            file name.""",
             constraints=EnsureStr() | EnsureNone()),
         archivetype=Parameter(
             args=("-t", "--archivetype"),
