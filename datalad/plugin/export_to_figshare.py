@@ -230,11 +230,13 @@ class ExportToFigshare(Interface):
             raise RuntimeError(
                 "Paranoid authors of DataLad refuse to proceed in a dirty repository"
             )
-        lgr.info(
-            "Exporting current tree as an archive since figshare "
-            "does not support directories")
         if filename is None:
             filename = dataset.path
+        lgr.info(
+            "Exporting current tree as an archive under %s since figshare "
+            "does not support directories",
+            filename
+        )
         archive_out = next(
             export_archive(
                 dataset,

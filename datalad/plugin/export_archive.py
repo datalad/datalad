@@ -108,11 +108,11 @@ class ExportArchive(Interface):
                 '.' if compression else '',
                 compression) if archivetype == 'tar' else '')
 
-        filename_tmpl = "datalad_{.id}".format(dataset)
+        default_filename = "datalad_{.id}".format(dataset)
         if filename is None:
-            filename = filename_tmpl  # in current directory
+            filename = default_filename  # in current directory
         elif path.exists(filename) and path.isdir(filename):
-            filename = path.join(filename, filename_tmpl) # under given directory
+            filename = path.join(filename, default_filename) # under given directory
         if not filename.endswith(file_extension):
             filename += file_extension
 
