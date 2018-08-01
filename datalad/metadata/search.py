@@ -237,7 +237,10 @@ class _WhooshSearch(_Search):
 
     def show_keys(self, mode):
         if mode != 'name':
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "ATM %s can show only names, so please use show_keys with 'name'"
+                % self.__class__.__name__
+            )
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
 
