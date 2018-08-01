@@ -188,6 +188,8 @@ def test_within_ds_file_search(path):
             opj(dirname(dirname(__file__)), 'tests', 'data', src),
             opj(path, dst))
     ds.add('.')
+    list(ds.repo.set_metadata(
+        opj('stim', 'stim1.mp3'), init={'importance': 'very'}))
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     # basic sanity check on the metadata structure of the dataset
@@ -213,6 +215,7 @@ type
 """, cmo.out)
 
     target_out = """\
+annex.importance
 audio.bitrate
 audio.duration(s)
 audio.format

@@ -94,12 +94,18 @@ def _listdict2dictlist(lst):
 def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
+
+    - if `consider_ucn` (default) it would copy keys from
+      datalad_unique_content_properties into `meta` for that extractor
+    - ... TODO ...
     """
     if consider_ucn:
         # loop over all metadata sources and the report of their unique values
         ucnprops = meta.get("datalad_unique_content_properties", {})
         for src, umeta in ucnprops.items():
             srcmeta = meta.get(src, {})
+            if src not in meta:
+                meta[src] = srcmeta  # assign the new one back
             for uk in umeta:
                 if uk in srcmeta:
                     # we have a real entry for this key in the dataset metadata
@@ -107,6 +113,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # tailored data
                     continue
                 srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+
+    srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
