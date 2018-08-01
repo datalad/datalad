@@ -292,7 +292,8 @@ def test_result_filter():
             TestUtils().__call__(
                 4,
                 result_filter=filt)[-1],
-            {'action': 'off', 'path': 'some', 'status': 'ok', 'somekey': 2})
+            {'action': 'off', 'path': 'some', 'relpath': 'some',
+             'status': 'ok', 'somekey': 2})
 
     # test more sophisticated filters that actually get to see the
     # API call's kwargs
