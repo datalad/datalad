@@ -21,7 +21,10 @@ from ...tests.utils import assert_re_in
 from ...tests.utils import assert_in
 from ...tests.utils import ok_startswith
 from ...tests.utils import ok_endswith
-from ..dialog import DialogUI
+from ..dialog import (
+    DialogUI,
+    IPythonUI,
+)
 from datalad.ui.progressbars import progressbars
 
 
@@ -105,3 +108,18 @@ def test_progress_bar():
         for l in 0, 4, 10, 1000:
             for increment in True, False:
                 yield _test_progress_bar, backend, l, increment
+
+
+def test_IPythonUI():
+    # largely just smoke tests to see if nothing is horribly bad
+    with patch_input(return_value='a'):
+        out = StringIO()
+        response = IPythonUI(out=out).question(
+            "prompt", choices=sorted(['b', 'a'])
+        )
+        eq_(response, 'a')
+        eq_(out.getvalue(), 'prompt (choices: a, b): ')
+
+    ui = IPythonUI()
+    pbar = ui.get_progressbar(total=10)
+    assert_in('notebook', str(pbar._tqdm))
