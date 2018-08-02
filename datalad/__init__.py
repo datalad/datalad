@@ -7,7 +7,12 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """DataLad aims to expose (scientific) data available online as a unified data
-distribution with the convenience of git-annex repositories as a backend."""
+distribution with the convenience of git-annex repositories as a backend.
+
+Commands are exposed through both a command-line interface and a Python API. On
+the command line, run 'datalad --help' for a summary of the available commands.
+From an interactive Python session, call `help(datalad.api)` instead.
+"""
 
 # For reproducible demos/tests
 import os
