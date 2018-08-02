@@ -159,6 +159,20 @@ def load_interface(spec):
     return intf
 
 
+def get_cmd_doc(interface):
+    """Return the documentation for the command defined by `interface`.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_doc = '' if interface.__doc__ is None else interface.__doc__.strip()
+    if hasattr(interface, '_docs_'):
+        # expand docs
+        intf_doc = intf_doc.format(**interface._docs_)
+    return intf_doc
+
+
 def dedent_docstring(text):
     """Remove uniform indentation from a multiline docstring"""
     # Problem is that first line might often have no offset, so might
