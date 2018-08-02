@@ -14,7 +14,10 @@ from six import PY2
 from six.moves import StringIO
 import six.moves.builtins as __builtin__
 
-from mock import patch
+from mock import (
+    call,
+    patch,
+)
 from ...tests.utils import eq_
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_re_in
@@ -53,12 +56,13 @@ def test_question_choices():
             for entered_value, expected_value in [(default_value, default_value),
                                                   ('', default_value),
                                                   ('cc', 'cc')]:
-                with patch_getpass(return_value=entered_value):
+                with patch_getpass(return_value=entered_value) as gpcm:
                     out = StringIO()
                     response = DialogUI(out=out).question(
                         "prompt", choices=sorted(choices), default=default_value,
                         hidden=hidden
                     )
+                    gpcm.assert_called_once()  # should have not asked multiple times
                     eq_(response, expected_value)
                     # getpass doesn't use out -- goes straight to the terminal
                     eq_(out.getvalue(), '')
@@ -74,6 +78,17 @@ def test_question_choices():
     with patch_getpass(return_value='incorrect'):
         assert_raises(RuntimeError, ui.question, "prompt", choices=['a', 'b'])
     assert_re_in(".*ERROR: .incorrect. is not among choices.*", out.getvalue())
+
+
+def test_hidden_doubleentry():
+    # In above test due to 'choices' there were no double entry for a hidden
+    out = StringIO()
+    ui = DialogUI(out=out)
+    with patch_getpass(return_value='ab') as gpcm:
+        response = ui.question(
+            "?", hidden=True)
+        eq_(response, 'ab')
+        gpcm.assert_has_calls([call('?: '), call('? (repeat): ')])
 
 
 def _test_progress_bar(backend, len, increment):
