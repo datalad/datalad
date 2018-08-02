@@ -387,12 +387,8 @@ def fail_with_short_help(parser=None,
     raise SystemExit(exit_code)
 
 
-def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
-                                     parser_description):
-    from ..interface.base import dedent_docstring
-    lgr.debug("Generating detailed description for the parser")
+def get_cmd_summaries(grp_short_descriptions, interface_groups, width=79):
     cmd_summary = []
-    console_width = get_console_width()
     for grp in sorted(interface_groups, key=lambda x: x[1]):
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[grp[0]]
@@ -403,9 +399,20 @@ def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
                                % ((cd[0],
                                    textwrap.fill(
                                        cd[1].rstrip(' .'),
-                                       console_width - 5,
+                                       width - 5,
                                        initial_indent=' ' * 6,
                                        subsequent_indent=' ' * 6))))
+    return cmd_summary
+
+
+def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
+                                     parser_description):
+    from ..interface.base import dedent_docstring
+    lgr.debug("Generating detailed description for the parser")
+
+    console_width = get_console_width()
+    cmd_summary = get_cmd_summaries(grp_short_descriptions, interface_groups,
+                                    width=console_width)
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
