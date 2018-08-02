@@ -62,7 +62,9 @@ def test_question_choices():
                         "prompt", choices=sorted(choices), default=default_value,
                         hidden=hidden
                     )
-                    gpcm.assert_called_once()  # should have not asked multiple times
+                    # .assert_called_once() is not available on older mock's
+                    # e.g. on  1.3.0 on nd16.04
+                    eq_(gpcm.call_count, 1)  # should have asked only once
                     eq_(response, expected_value)
                     # getpass doesn't use out -- goes straight to the terminal
                     eq_(out.getvalue(), '')
