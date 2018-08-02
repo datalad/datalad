@@ -17,6 +17,7 @@ lgr = logging.getLogger('datalad.cmdline')
 lgr.log(5, "Importing cmdline.main")
 
 import argparse
+from collections import defaultdict
 import sys
 import textwrap
 from importlib import import_module
@@ -274,14 +275,11 @@ def setup_parser(
     # --help output before we setup --help for each command
     helpers.parser_add_common_opt(parser, 'help')
 
-    grp_short_descriptions = []
+    grp_short_descriptions = defaultdict(list)
     # create subparser, use module suffix as cmd name
     subparsers = parser.add_subparsers()
-    for _, _, _interfaces \
+    for group_name, _, _interfaces \
             in sorted(interface_groups, key=lambda x: x[1]):
-        # for all subcommand modules it can find
-        cmd_short_descriptions = []
-
         for _intfspec in _interfaces:
             cmd_name = get_cmdline_command_name(_intfspec)
             if need_single_subparser and cmd_name != need_single_subparser:
@@ -334,8 +332,7 @@ def setup_parser(
             # store short description for later
             sdescr = getattr(_intf, 'short_description',
                              parser_args['description'].split('\n')[0])
-            cmd_short_descriptions.append((cmd_name, sdescr))
-        grp_short_descriptions.append(cmd_short_descriptions)
+            grp_short_descriptions[group_name].append((cmd_name, sdescr))
 
     # create command summary
     if '--help' in cmdlineargs or '--help-np' in cmdlineargs:
@@ -396,10 +393,9 @@ def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
     lgr.debug("Generating detailed description for the parser")
     cmd_summary = []
     console_width = get_console_width()
-    for i, grp in enumerate(
-            sorted(interface_groups, key=lambda x: x[1])):
+    for grp in sorted(interface_groups, key=lambda x: x[1]):
         grp_descr = grp[1]
-        grp_cmds = grp_short_descriptions[i]
+        grp_cmds = grp_short_descriptions[grp[0]]
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
