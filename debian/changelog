@@ -1,3 +1,11 @@
+datalad (0.10.2-2) unstable; urgency=medium
+
+  * debian/control
+    + python3-distutils to B-Depends and Depends of python3-datalad
+      (Closes: #905293). Thanks Andreas Beckmann for the report
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 02 Aug 2018 13:58:11 -0400
+
 datalad (0.10.2-1) unstable; urgency=medium
 
   * A small bugfix release rushed out for compatibility with recent
