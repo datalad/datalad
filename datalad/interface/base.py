@@ -93,11 +93,11 @@ def get_interface_groups(include_plugins=False):
     return grps
 
 
-def get_cmd_summaries(grp_short_descriptions, interface_groups, width=79):
+def get_cmd_summaries(descriptions, groups, width=79):
     cmd_summary = []
-    for grp in sorted(interface_groups, key=lambda x: x[1]):
+    for grp in sorted(groups, key=lambda x: x[1]):
         grp_descr = grp[1]
-        grp_cmds = grp_short_descriptions[grp[0]]
+        grp_cmds = descriptions[grp[0]]
 
         cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
