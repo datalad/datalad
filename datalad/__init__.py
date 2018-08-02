@@ -11,7 +11,8 @@ distribution with the convenience of git-annex repositories as a backend.
 
 Commands are exposed through both a command-line interface and a Python API. On
 the command line, run 'datalad --help' for a summary of the available commands.
-From an interactive Python session, call `help(datalad.api)` instead.
+From an interactive Python session, import `datalad.api` and inspect its
+documentation with `help`.
 """
 
 # For reproducible demos/tests
