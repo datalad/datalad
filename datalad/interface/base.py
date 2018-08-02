@@ -60,6 +60,18 @@ def get_cmdline_command_name(intfspec):
 
 
 def get_interface_groups(include_plugins=False):
+    """Return a list of command groups.
+
+    Parameters
+    ----------
+    include_plugins : bool, optional
+        Whether to include a group named 'plugins' that has a list of
+        discovered plugin commands.
+
+    Returns
+    -------
+    A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
+    """
     from .. import interface as _interfaces
 
     grps = []
