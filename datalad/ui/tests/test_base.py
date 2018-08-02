@@ -11,12 +11,17 @@
 __docformat__ = 'restructuredtext'
 
 from .. import _UI_Switcher
-from ..dialog import DialogUI, ConsoleLog
+from ..dialog import (
+    ConsoleLog,
+    DialogUI,
+    IPythonUI,
+)
 from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_false
 from ...tests.utils import with_testsui
 
+from mock import patch
 
 def test_ui_switcher():
     ui = _UI_Switcher('dialog')
@@ -32,6 +37,16 @@ def test_ui_switcher():
         ui.yesno
 
     ui.set_backend('annex')
+
+    # Let's pretend we are under IPython
+    class ZMQInteractiveShell(object):
+        pass
+
+    with patch('datalad.utils.get_ipython',
+               lambda: ZMQInteractiveShell(),
+               create=True):
+        ui = _UI_Switcher()
+        assert (isinstance(ui.ui, IPythonUI))
 
 
 def test_tests_ui():
