@@ -387,27 +387,10 @@ def fail_with_short_help(parser=None,
     raise SystemExit(exit_code)
 
 
-def get_cmd_summaries(grp_short_descriptions, interface_groups, width=79):
-    cmd_summary = []
-    for grp in sorted(interface_groups, key=lambda x: x[1]):
-        grp_descr = grp[1]
-        grp_cmds = grp_short_descriptions[grp[0]]
-
-        cmd_summary.append('\n*%s*\n' % (grp_descr,))
-        for cd in grp_cmds:
-            cmd_summary.append('  %s\n%s'
-                               % ((cd[0],
-                                   textwrap.fill(
-                                       cd[1].rstrip(' .'),
-                                       width - 5,
-                                       initial_indent=' ' * 6,
-                                       subsequent_indent=' ' * 6))))
-    return cmd_summary
-
-
 def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
                                      parser_description):
     from ..interface.base import dedent_docstring
+    from ..interface.base import get_cmd_summaries
     lgr.debug("Generating detailed description for the parser")
 
     console_width = get_console_width()
