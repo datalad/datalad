@@ -94,6 +94,23 @@ def get_interface_groups(include_plugins=False):
 
 
 def get_cmd_summaries(descriptions, groups, width=79):
+    """Return summaries for the commands in `groups`.
+
+    Parameters
+    ----------
+    descriptions : dict
+        A map of group names to summaries.
+    groups : list of tuples
+        A list of groups and commands in the form described by
+        `get_interface_groups`.
+    width : int, optional
+        The maximum width of each line in the summary text.
+
+    Returns
+    -------
+    A list with a formatted entry for each command. The first command of each
+    group is preceded by an entry describing the group.
+    """
     cmd_summary = []
     for grp in sorted(groups, key=lambda x: x[1]):
         grp_descr = grp[1]
