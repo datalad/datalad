@@ -20,7 +20,6 @@ import argparse
 from collections import defaultdict
 import sys
 import textwrap
-from importlib import import_module
 import os
 
 from six import text_type
@@ -28,7 +27,6 @@ from six import text_type
 import datalad
 
 from datalad.cmdline import helpers
-from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
@@ -90,7 +88,8 @@ def setup_parser(
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
-        get_cmdline_command_name, alter_interface_docs_for_cmdline
+        get_cmdline_command_name, alter_interface_docs_for_cmdline, \
+        load_interface
     # setup cmdline args parser
     parts = {}
     # main parser
@@ -284,23 +283,11 @@ def setup_parser(
             cmd_name = get_cmdline_command_name(_intfspec)
             if need_single_subparser and cmd_name != need_single_subparser:
                 continue
-            if isinstance(_intfspec[1], dict):
-                # plugin
-                _intf = _load_plugin(_intfspec[1]['file'], fail=False)
-                if _intf is None:
-                    # TODO:  add doc why we could skip this one... makes this
-                    # loop harder to extract into a dedicated function
-                    continue
-            else:
-                # turn the interface spec into an instance
-                lgr.log(5, "Importing module %s " % _intfspec[0])
-                try:
-                    _mod = import_module(_intfspec[0], package='datalad')
-                except Exception as e:
-                    lgr.error("Internal error, cannot import interface '%s': %s",
-                              _intfspec[0], exc_str(e))
-                    continue
-                _intf = getattr(_mod, _intfspec[1])
+            _intf = load_interface(_intfspec)
+            if _intf is None:
+                # TODO(yoh):  add doc why we could skip this one... makes this
+                # loop harder to extract into a dedicated function
+                continue
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args

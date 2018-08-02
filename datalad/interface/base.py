@@ -18,6 +18,7 @@ lgr = logging.getLogger('datalad.interface.base')
 import sys
 import re
 import textwrap
+from importlib import import_module
 import inspect
 from collections import OrderedDict
 
@@ -30,6 +31,7 @@ from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -126,6 +128,35 @@ def get_cmd_summaries(descriptions, groups, width=79):
                                        initial_indent=' ' * 6,
                                        subsequent_indent=' ' * 6))))
     return cmd_summary
+
+
+def load_interface(spec):
+    """Load and return the class for `spec`.
+
+    Parameters
+    ----------
+    spec : tuple
+        For a standard interface, the first item is the datalad source module
+        and the second object name for the interface. For a plugin, the second
+        item should be a dictionary that maps 'file' to the path the of module.
+
+    Returns
+    -------
+    The interface class or, if importing the module fails, None.
+    """
+    if isinstance(spec[1], dict):
+        intf = _load_plugin(spec[1]['file'], fail=False)
+    else:
+        lgr.log(5, "Importing module %s " % spec[0])
+        try:
+            mod = import_module(spec[0], package='datalad')
+        except Exception as e:
+            lgr.error("Internal error, cannot import interface '%s': %s",
+                      spec[0], exc_str(e))
+            intf = None
+        else:
+            intf = getattr(mod, spec[1])
+    return intf
 
 
 def dedent_docstring(text):
