@@ -47,20 +47,23 @@ def test_question_choices():
         'cc': 'a, b, [cc]'
     }
 
-    for default_value in ['a', 'b']:
-        choices_str = choices[default_value]
-        for entered_value, expected_value in [(default_value, default_value),
-                                              ('', default_value),
-                                              ('cc', 'cc')]:
-            with patch_getpass(return_value=entered_value), \
-                patch_getpass(return_value=entered_value):
-                out = StringIO()
-                response = DialogUI(out=out).question("prompt", choices=sorted(choices), default=default_value)
-                eq_(response, expected_value)
-                # getpass doesn't use out -- goes straight to the terminal
-                eq_(out.getvalue(), '')
-                # TODO: may be test that the prompt was passed as a part of the getpass arg
-                #eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
+    for hidden in (True, False):
+        for default_value in ['a', 'b']:
+            choices_str = choices[default_value]
+            for entered_value, expected_value in [(default_value, default_value),
+                                                  ('', default_value),
+                                                  ('cc', 'cc')]:
+                with patch_getpass(return_value=entered_value):
+                    out = StringIO()
+                    response = DialogUI(out=out).question(
+                        "prompt", choices=sorted(choices), default=default_value,
+                        hidden=hidden
+                    )
+                    eq_(response, expected_value)
+                    # getpass doesn't use out -- goes straight to the terminal
+                    eq_(out.getvalue(), '')
+                    # TODO: may be test that the prompt was passed as a part of the getpass arg
+                    #eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
 
     # check some expected exceptions to be thrown
     out = StringIO()
