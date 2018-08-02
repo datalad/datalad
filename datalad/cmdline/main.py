@@ -27,7 +27,6 @@ from six import text_type
 import datalad
 
 from datalad.cmdline import helpers
-from datalad.plugin import _get_plugins
 from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
@@ -226,12 +225,7 @@ def setup_parser(
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
 
-    interface_groups = get_interface_groups()
-    # TODO: see if we could retain "generator" for plugins
-    # ATM we need to make it explicit so we could check the command(s) below
-    # It could at least follow the same destiny as extensions so we would
-    # just do more iterative "load ups"
-    interface_groups.append(('plugins', 'Plugins', list(_get_plugins())))
+    interface_groups = get_interface_groups(include_plugins=True)
 
     # First unparsed could be either unknown option to top level "datalad"
     # or a command. Among unknown could be --help/--help-np which would

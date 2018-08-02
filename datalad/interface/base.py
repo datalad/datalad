@@ -29,6 +29,7 @@ from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.plugin import _get_plugins
 
 
 default_logchannels = {
@@ -58,7 +59,7 @@ def get_cmdline_command_name(intfspec):
     return name
 
 
-def get_interface_groups():
+def get_interface_groups(include_plugins=False):
     from .. import interface as _interfaces
 
     grps = []
@@ -70,6 +71,13 @@ def get_interface_groups():
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
+    # TODO(yoh): see if we could retain "generator" for plugins
+    # ATM we need to make it explicit so we could check the command(s) below
+    # It could at least follow the same destiny as extensions so we would
+    # just do more iterative "load ups"
+
+    if include_plugins:
+        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
 
 
