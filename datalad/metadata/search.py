@@ -622,7 +622,7 @@ class _EGrepSearch(_Search):
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
     def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
-        query_re = re.compile(self.get_query(query))
+        query = self.get_query(query)
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -638,15 +638,22 @@ class _EGrepSearch(_Search):
             meta = res.get('metadata', {})
             # produce a flattened metadata dict to search through
             doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            doc.update({
+                k: res[k] for k in ('@id', 'type', 'path', 'parentds')
+                if k in res})
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            lgr.log(7, "Querying %s among %d items", query_re, len(doc))
+            lgr.log(7, "Querying %s among %d items", query, len(doc))
             t0 = time()
-            matches = {k: query_re.search(v.lower())
-                       for k, v in iteritems(doc)}
+            matches = {k: q['query'].search(v) if isinstance(q, dict) else q.search(v)
+                       for k, v in iteritems(doc)
+                       for q in query
+                       if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
             # retain what actually matched
@@ -692,6 +699,14 @@ class _EGrepSearch(_Search):
                 aps=[dict(path=self.ds.path, type='dataset')],
                 recursive=True):
             meta = res.get('metadata', {})
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            meta.update({
+                k: res.get(k, None) for k in ('@id', 'type', 'path', 'parentds')
+                # parentds is tricky all files will have it, but the dataset
+                # queried above might not (single dataset), let's force it in
+                if k == 'parentds' or k in res})
+
             # no stringification of values for speed
             idxd = _meta2autofield_dict(meta, val2str=False)
 
@@ -743,10 +758,20 @@ class _EGrepSearch(_Search):
             ))
 
     def get_query(self, query):
-        # cmdline args might come in as a list
-        if isinstance(query, list):
-            query = u' '.join(query)
-        return query.lower()
+        query = assure_list(query)
+        simple_fieldspec = re.compile(r"(?P<field>\S+?):(?P<query>.*)")
+        quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
+        query = [
+            simple_fieldspec.match(q) or
+            quoted_fieldspec.match(q) or
+            q
+            for q in query]
+        # expand matches, compile expressions
+        query = [
+            {k: re.compile(v) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else re.compile(q)
+            for q in query]
+        return query
 
 
 @build_doc
