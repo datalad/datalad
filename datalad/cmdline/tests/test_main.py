@@ -81,8 +81,9 @@ def test_version():
     # https://hg.python.org/cpython/file/default/Doc/whatsnew/3.4.rst#l1952
     out = stdout if sys.version_info >= (3, 4) else stderr
     ok_startswith(out, 'datalad %s\n' % datalad.__version__)
-    in_("Copyright", out)
-    in_("Permission is hereby granted", out)
+    # since https://github.com/datalad/datalad/pull/2733 no license in --version
+    assert_not_in("Copyright", out)
+    assert_not_in("Permission is hereby granted", out)
 
 
 def test_help_np():
