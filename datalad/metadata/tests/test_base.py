@@ -171,8 +171,8 @@ def test_aggregation(path):
 
     # test search in search tests, not all over the place
     ## query smoke test
-    assert_result_count(clone.search('mother', mode='egrep'), 1)
-    assert_result_count(clone.search('MoTHER', mode='egrep'), 1)
+    assert_result_count(clone.search('(?i)mother', mode='egrep'), 1)
+    assert_result_count(clone.search('(?i)MoTHER', mode='egrep'), 1)
 
     child_res = clone.search('child', mode='egrep')
     assert_result_count(child_res, 2)
