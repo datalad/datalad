@@ -118,7 +118,7 @@ def setup_parser(
     helpers.parser_add_common_opt(
         parser,
         'version',
-        version='datalad %s\n\n%s' % (datalad.__version__, _license_info()))
+        version='datalad %s\n' % datalad.__version__)
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
