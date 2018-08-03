@@ -84,7 +84,9 @@ class AddReadme(Interface):
             dataset.unlock(filename)
 
         # get any metadata on the dataset itself
-        dsinfo = dataset.metadata('.', reporton='datasets', return_type='item-or-list')
+        dsinfo = dataset.metadata(
+            '.', reporton='datasets', return_type='item-or-list',
+            on_failure='ignore')
         meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
             lgr.warn("Could not obtain dataset metadata, proceeding without")
