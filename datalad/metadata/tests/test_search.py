@@ -246,6 +246,11 @@ type
     # now check that we can discover things from the aggregated metadata
     for mode, query, hitpath, matched in (
         ('egrep',
+         ':mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # same as above, leading : is stripped, in indicates "ALL FIELDS"
+        ('egrep',
          'mp3',
          opj('stim', 'stim1.mp3'),
          {'audio.format': 'mp3'}),
@@ -289,7 +294,6 @@ type
         # TODO extend with more complex queries to test whoosh
         # query language configuration
     ):
-        print('KKKKKKKKKKKKKKKKKK', query, mode)
         res = ds.search(query, mode=mode, full_record=True)
         assert_result_count(
             res, 1, type='file', path=opj(ds.path, hitpath),

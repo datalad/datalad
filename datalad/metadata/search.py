@@ -759,7 +759,7 @@ class _EGrepSearch(_Search):
 
     def get_query(self, query):
         query = assure_list(query)
-        simple_fieldspec = re.compile(r"(?P<field>\S+?):(?P<query>.*)")
+        simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
         quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
         query = [
             simple_fieldspec.match(q) or
@@ -771,6 +771,11 @@ class _EGrepSearch(_Search):
             {k: re.compile(v) for k, v in q.groupdict().items()}
             if hasattr(q, 'groupdict') else re.compile(q)
             for q in query]
+        # turn "empty" field specs into simple queries
+        # this is used to forcibly disable field-based search
+        # e.g. when searching for a value
+        query = [q['query'] if isinstance(q, dict) and q['field'].pattern == '' else q
+                 for q in query]
         return query
 
 
