@@ -1331,9 +1331,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(fetch_files) != len(files):
             lgr.debug("Actually getting %d files", len(fetch_files))
 
-        # options  might be the '--key' which should go last
-        options = ['--json-progress'] + options
-
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
         # TODO: reproduce DK's bug on OSX, and either switch to
@@ -1348,6 +1345,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # TODO: eventually make use of --batch mode
             jobs=jobs,
             expected_entries=expected_downloads,
+            progress=True,
             **kwargs
         )
         results_list = list(results)
@@ -2057,6 +2055,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             out_json = self._run_annex_command_json(
                 'addurl',
                 opts=options + [files_opt] + [url],
+                progress=True,
                 log_online=True, log_stderr=False,
                 **kwargs
             )
@@ -2271,6 +2270,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 jobs=None,
                                 files=None,
                                 expected_entries=None,
+                                progress=False,
                                 **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
 
@@ -2279,6 +2279,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         expected_entries : dict, optional
           If provided `filename/key: size` dictionary, will be used to create
           ProcessAnnexProgressIndicators to display progress
+        progress: bool, optional
+          Either request/handle --json-progress
         """
         progress_indicators = None
         try:
@@ -2294,11 +2296,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
+            if progress:
+                annex_options += ['--json-progress']
+
             if jobs == 'auto':
                 jobs = N_AUTO_JOBS
             if jobs and jobs != 1:
                 annex_options += ['-J%d' % jobs]
             if opts:
+                # opts might be the '--key' which should go last
                 annex_options += opts
 
             # TODO: RF to use --batch where possible instead of splitting
@@ -3048,7 +3054,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(copy_files) != len(files):
             lgr.debug("Actually copying %d files", len(copy_files))
 
-        annex_options = ['--to=%s' % remote, '--json-progress']
+        annex_options = ['--to=%s' % remote]
         if options:
             annex_options.extend(shlex.split(options))
 
@@ -3059,7 +3065,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             opts=annex_options,
             files=files,  # copy_files,
             jobs=jobs,
-            expected_entries=expected_copys
+            expected_entries=expected_copys,
+            progress=True
             #log_stdout=True, log_stderr=not log_online,
             #log_online=log_online, expect_stderr=True
         )
