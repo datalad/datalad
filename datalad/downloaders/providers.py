@@ -380,19 +380,19 @@ class Providers(object):
                 except AttributeError:
                     pass
         known_providers_by_name = {p.name: p for p in self._providers}
-        PROVIDERS_USER_DIR = self._get_providers_dirs()['user']
+        providers_user_dir = self._get_providers_dirs()['user']
         while True:
             name = ui.question(
                 title="New provider name",
                 text="Unique name to identify 'provider' for %s" % url,
                 default=name
             )
-            filename = pathjoin(PROVIDERS_USER_DIR, '%s.cfg' % name)
+            filename = pathjoin(providers_user_dir, '%s.cfg' % name)
             if name in known_providers_by_name:
                 if ui.yesno(
                     title="Known provider %s" % name,
                     text="Provider with name %s already known. Do you want to "
-                         "use it for this session? If 'No' - enter another name"
+                         "use it for this session?"
                          % name,
                     default=True
                 ):
@@ -406,7 +406,7 @@ class Providers(object):
         url_re = re.escape(url)
         while True:
             url_re = ui.question(
-                title="New provider regular_expression",
+                title="New provider regular expression",
                 text="A (Python) regular expression to specify for which URLs "
                      "this provider should be used",
                 default=url_re

@@ -77,7 +77,6 @@ class BaseDownloader(object):
         authenticator: Authenticator, optional
           Authenticator to use for authentication.
         """
-        # Allow for anonymous connection if no credential is provided
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
@@ -194,7 +193,7 @@ class BaseDownloader(object):
                         if not ui.is_interactive:
                             lgr.error(
                                 "Interface is non interactive, so we are "
-                                "re-raising: %s" % exc_str(e))
+                                "reraising: %s" % exc_str(e))
                             if exc_info:
                                 reraise(*exc_info)
                             else:
@@ -270,25 +269,21 @@ class BaseDownloader(object):
             # appropriate one
             if not ui.yesno(
                     title=title,
-                    text="Would you like to setup a new provider "
-                         "configuration to "
-                         "access url?",
+                    text="Would you like to setup a new provider configuration"
+                         " to access url?",
                     default=True
             ):
                 if not self.authenticator:
-                    raise DownloadError(title +
-                                        " No authenticator is known, cannot "
-                                        "set "
-                                        "any credential")
+                    raise DownloadError(
+                        title +
+                        " No authenticator is known, cannot set any credential")
                 # we could try to just
                 credential_type = self.authenticator.DEFAULT_CREDENTIAL_TYPE
                 if not credential_type:
                     raise DownloadError(
                         title +
-                        " %s does not have a default credential type, "
-                        "cannot authenticate"
-                        % self.authenticator
-                    )
+                        " %s does not have a default credential type,"
+                        " cannot authenticate" % self.authenticator)
 
                 name = 'one-time-record'
                 if not credential_type:
@@ -313,7 +308,8 @@ class BaseDownloader(object):
                 self.credential.enter_new()
             else:
                 raise DownloadError(
-                    "Failed to download from %s given available credentials" % url)
+                    "Failed to download from %s given available credentials"
+                    % url)
 
     @staticmethod
     def _get_temp_download_filename(filepath):
