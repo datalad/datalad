@@ -18,6 +18,7 @@ lgr = logging.getLogger('datalad.interface.base')
 import sys
 import re
 import textwrap
+from importlib import import_module
 import inspect
 from collections import OrderedDict
 
@@ -29,6 +30,8 @@ from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -58,7 +61,19 @@ def get_cmdline_command_name(intfspec):
     return name
 
 
-def get_interface_groups():
+def get_interface_groups(include_plugins=False):
+    """Return a list of command groups.
+
+    Parameters
+    ----------
+    include_plugins : bool, optional
+        Whether to include a group named 'plugins' that has a list of
+        discovered plugin commands.
+
+    Returns
+    -------
+    A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
+    """
     from .. import interface as _interfaces
 
     grps = []
@@ -70,7 +85,92 @@ def get_interface_groups():
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
+    # TODO(yoh): see if we could retain "generator" for plugins
+    # ATM we need to make it explicit so we could check the command(s) below
+    # It could at least follow the same destiny as extensions so we would
+    # just do more iterative "load ups"
+
+    if include_plugins:
+        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
+
+
+def get_cmd_summaries(descriptions, groups, width=79):
+    """Return summaries for the commands in `groups`.
+
+    Parameters
+    ----------
+    descriptions : dict
+        A map of group names to summaries.
+    groups : list of tuples
+        A list of groups and commands in the form described by
+        `get_interface_groups`.
+    width : int, optional
+        The maximum width of each line in the summary text.
+
+    Returns
+    -------
+    A list with a formatted entry for each command. The first command of each
+    group is preceded by an entry describing the group.
+    """
+    cmd_summary = []
+    for grp in sorted(groups, key=lambda x: x[1]):
+        grp_descr = grp[1]
+        grp_cmds = descriptions[grp[0]]
+
+        cmd_summary.append('\n*%s*\n' % (grp_descr,))
+        for cd in grp_cmds:
+            cmd_summary.append('  %s\n%s'
+                               % ((cd[0],
+                                   textwrap.fill(
+                                       cd[1].rstrip(' .'),
+                                       width - 5,
+                                       initial_indent=' ' * 6,
+                                       subsequent_indent=' ' * 6))))
+    return cmd_summary
+
+
+def load_interface(spec):
+    """Load and return the class for `spec`.
+
+    Parameters
+    ----------
+    spec : tuple
+        For a standard interface, the first item is the datalad source module
+        and the second object name for the interface. For a plugin, the second
+        item should be a dictionary that maps 'file' to the path the of module.
+
+    Returns
+    -------
+    The interface class or, if importing the module fails, None.
+    """
+    if isinstance(spec[1], dict):
+        intf = _load_plugin(spec[1]['file'], fail=False)
+    else:
+        lgr.log(5, "Importing module %s " % spec[0])
+        try:
+            mod = import_module(spec[0], package='datalad')
+        except Exception as e:
+            lgr.error("Internal error, cannot import interface '%s': %s",
+                      spec[0], exc_str(e))
+            intf = None
+        else:
+            intf = getattr(mod, spec[1])
+    return intf
+
+
+def get_cmd_doc(interface):
+    """Return the documentation for the command defined by `interface`.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_doc = '' if interface.__doc__ is None else interface.__doc__.strip()
+    if hasattr(interface, '_docs_'):
+        # expand docs
+        intf_doc = intf_doc.format(**interface._docs_)
+    return intf_doc
 
 
 def dedent_docstring(text):

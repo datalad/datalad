@@ -11,6 +11,33 @@
 from datalad.coreapi import *
 
 
+def _command_summary():
+    # Import here to avoid polluting the datalad.api namespace.
+    from collections import defaultdict
+    from datalad.interface.base import alter_interface_docs_for_api
+    from datalad.interface.base import get_api_name
+    from datalad.interface.base import get_cmd_doc
+    from datalad.interface.base import get_cmd_summaries
+    from datalad.interface.base import get_interface_groups
+    from datalad.interface.base import load_interface
+
+    groups = get_interface_groups(include_plugins=True)
+    grp_short_descriptions = defaultdict(list)
+    for group, _, specs in sorted(groups, key=lambda x: x[1]):
+        for spec in specs:
+            intf = load_interface(spec)
+            if intf is None:
+                continue
+            sdescr = getattr(intf, "short_description", None) or \
+                alter_interface_docs_for_api(get_cmd_doc(intf)).split("\n")[0]
+            grp_short_descriptions[group].append(
+                (get_api_name(spec), sdescr))
+    return "\n".join(get_cmd_summaries(grp_short_descriptions, groups))
+
+
+__doc__ += "\n\n{}".format(_command_summary())
+
+
 def _load_plugins():
     from datalad.plugin import _get_plugins
     from datalad.plugin import _load_plugin
@@ -68,3 +95,4 @@ _load_plugins()
 # Be nice and clean up the namespace properly
 del _load_plugins
 del _generate_extension_api
+del _command_summary

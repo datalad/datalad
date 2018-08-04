@@ -17,9 +17,9 @@ lgr = logging.getLogger('datalad.cmdline')
 lgr.log(5, "Importing cmdline.main")
 
 import argparse
+from collections import defaultdict
 import sys
 import textwrap
-from importlib import import_module
 import os
 
 from six import text_type
@@ -27,8 +27,6 @@ from six import text_type
 import datalad
 
 from datalad.cmdline import helpers
-from datalad.plugin import _get_plugins
-from datalad.plugin import _load_plugin
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
@@ -90,7 +88,8 @@ def setup_parser(
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
-        get_cmdline_command_name, alter_interface_docs_for_cmdline
+        get_cmdline_command_name, alter_interface_docs_for_cmdline, \
+        load_interface, get_cmd_doc
     # setup cmdline args parser
     parts = {}
     # main parser
@@ -226,12 +225,7 @@ def setup_parser(
         need_single_subparser = False
         unparsed_args = cmdlineargs[1:]  # referenced before assignment otherwise
 
-    interface_groups = get_interface_groups()
-    # TODO: see if we could retain "generator" for plugins
-    # ATM we need to make it explicit so we could check the command(s) below
-    # It could at least follow the same destiny as extensions so we would
-    # just do more iterative "load ups"
-    interface_groups.append(('plugins', 'Plugins', list(_get_plugins())))
+    interface_groups = get_interface_groups(include_plugins=True)
 
     # First unparsed could be either unknown option to top level "datalad"
     # or a command. Among unknown could be --help/--help-np which would
@@ -280,45 +274,27 @@ def setup_parser(
     # --help output before we setup --help for each command
     helpers.parser_add_common_opt(parser, 'help')
 
-    grp_short_descriptions = []
+    grp_short_descriptions = defaultdict(list)
     # create subparser, use module suffix as cmd name
     subparsers = parser.add_subparsers()
-    for _, _, _interfaces \
+    for group_name, _, _interfaces \
             in sorted(interface_groups, key=lambda x: x[1]):
-        # for all subcommand modules it can find
-        cmd_short_descriptions = []
-
         for _intfspec in _interfaces:
             cmd_name = get_cmdline_command_name(_intfspec)
             if need_single_subparser and cmd_name != need_single_subparser:
                 continue
-            if isinstance(_intfspec[1], dict):
-                # plugin
-                _intf = _load_plugin(_intfspec[1]['file'], fail=False)
-                if _intf is None:
-                    # TODO:  add doc why we could skip this one... makes this
-                    # loop harder to extract into a dedicated function
-                    continue
-            else:
-                # turn the interface spec into an instance
-                lgr.log(5, "Importing module %s " % _intfspec[0])
-                try:
-                    _mod = import_module(_intfspec[0], package='datalad')
-                except Exception as e:
-                    lgr.error("Internal error, cannot import interface '%s': %s",
-                              _intfspec[0], exc_str(e))
-                    continue
-                _intf = getattr(_mod, _intfspec[1])
+            _intf = load_interface(_intfspec)
+            if _intf is None:
+                # TODO(yoh):  add doc why we could skip this one... makes this
+                # loop harder to extract into a dedicated function
+                continue
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
                 parser_args = dict(formatter_class=formatter_class)
                 # use class description, if no explicit description is available
-                intf_doc = '' if _intf.__doc__ is None else _intf.__doc__.strip()
-                if hasattr(_intf, '_docs_'):
-                    # expand docs
-                    intf_doc = intf_doc.format(**_intf._docs_)
+                intf_doc = get_cmd_doc(_intf)
                 parser_args['description'] = alter_interface_docs_for_cmdline(
                     intf_doc)
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
@@ -340,8 +316,7 @@ def setup_parser(
             # store short description for later
             sdescr = getattr(_intf, 'short_description',
                              parser_args['description'].split('\n')[0])
-            cmd_short_descriptions.append((cmd_name, sdescr))
-        grp_short_descriptions.append(cmd_short_descriptions)
+            grp_short_descriptions[group_name].append((cmd_name, sdescr))
 
     # create command summary
     if '--help' in cmdlineargs or '--help-np' in cmdlineargs:
@@ -399,23 +374,12 @@ def fail_with_short_help(parser=None,
 def get_description_with_cmd_summary(grp_short_descriptions, interface_groups,
                                      parser_description):
     from ..interface.base import dedent_docstring
+    from ..interface.base import get_cmd_summaries
     lgr.debug("Generating detailed description for the parser")
-    cmd_summary = []
-    console_width = get_console_width()
-    for i, grp in enumerate(
-            sorted(interface_groups, key=lambda x: x[1])):
-        grp_descr = grp[1]
-        grp_cmds = grp_short_descriptions[i]
 
-        cmd_summary.append('\n*%s*\n' % (grp_descr,))
-        for cd in grp_cmds:
-            cmd_summary.append('  %s\n%s'
-                               % ((cd[0],
-                                   textwrap.fill(
-                                       cd[1].rstrip(' .'),
-                                       console_width - 5,
-                                       initial_indent=' ' * 6,
-                                       subsequent_indent=' ' * 6))))
+    console_width = get_console_width()
+    cmd_summary = get_cmd_summaries(grp_short_descriptions, interface_groups,
+                                    width=console_width)
     # we need one last formal section to not have the trailed be
     # confused with the last command group
     cmd_summary.append('\n*General information*\n')
