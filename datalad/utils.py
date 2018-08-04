@@ -66,6 +66,9 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
+on_msys_tainted_paths = on_windows \
+                        and 'MSYS_NO_PATHCONV' not in os.environ \
+                        and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 try:
     linux_distribution_name, linux_distribution_release \
         = platform.linux_distribution()[:2]
@@ -177,6 +180,17 @@ def is_interactive():
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+def get_ipython_shell():
+    """Detect if running within IPython and returns its `ip` (shell) object
+
+    Returns None if not under ipython (no `get_ipython` function)
+    """
+    try:
+        return get_ipython()
+    except NameError:
+        return None
 
 
 def md5sum(filename):
@@ -1215,7 +1229,17 @@ def getpwd():
     If no PWD found in the env, output of getcwd() is returned
     """
     try:
-        return os.environ['PWD']
+        pwd = os.environ['PWD']
+        if on_windows and pwd and pwd.startswith('/'):
+            # It should be a path from MSYS.
+            # - it might start with a drive letter or not
+            # - it seems to be "illegal" to have a single letter directories
+            #   under / path, i.e. if created - they aren't found
+            # - 'ln -s' does not fail to create a "symlink" but it just copies!
+            #   so we are not likely to need original PWD purpose on those systems
+            # Verdict:
+            return os.getcwd()
+        return pwd
     except KeyError:
         return os.getcwd()
 

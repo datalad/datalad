@@ -331,6 +331,20 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
+def test_add_archive_content_zip(repo_path):
+    repo = AnnexRepo(repo_path, create=True)
+    with chpwd(repo_path):
+        with swallow_outputs():
+            repo.add(["1.zip"])
+        repo.commit("add 1.zip")
+        add_archive_content("1.zip")
+        ok_file_under_git(opj(repo.path, "1", "foo"), annexed=True)
+        ok_file_under_git(opj("1", "dir", "bar"), annexed=True)
+        ok_archives_caches(repo.path, 0)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM

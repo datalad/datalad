@@ -94,8 +94,11 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.annexrepo import ProcessAnnexProgressIndicators
+from datalad.support.annexrepo import (
+    AnnexRepo,
+    ProcessAnnexProgressIndicators,
+    _get_size_from_perc_complete,
+)
 from .utils import check_repo_deals_with_inode_change
 
 
@@ -2273,3 +2276,11 @@ def test_fake_dates(path):
         eq_(timestamp, commit.committed_date)
     assert_in("timestamp={}s".format(timestamp),
               ar.repo.git.cat_file("blob", "git-annex:uuid.log"))
+
+
+def test_get_size_from_perc_complete():
+    f = _get_size_from_perc_complete
+    eq_(f(0, 0), 0)
+    eq_(f(0, '0'), 0)
+    eq_(f(100, '0'), 0)  # we do not know better
+    eq_(f(1, '1'), 100)

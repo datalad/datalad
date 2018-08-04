@@ -19,7 +19,11 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..main import main, fail_with_short_help
+from ..main import (
+    main,
+    fail_with_short_help,
+    _fix_datalad_ri,
+)
 from datalad import __version__
 from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
@@ -77,8 +81,9 @@ def test_version():
     # https://hg.python.org/cpython/file/default/Doc/whatsnew/3.4.rst#l1952
     out = stdout if sys.version_info >= (3, 4) else stderr
     ok_startswith(out, 'datalad %s\n' % datalad.__version__)
-    in_("Copyright", out)
-    in_("Permission is hereby granted", out)
+    # since https://github.com/datalad/datalad/pull/2733 no license in --version
+    assert_not_in("Copyright", out)
+    assert_not_in("Permission is hereby granted", out)
 
 
 def test_help_np():
@@ -125,6 +130,12 @@ def test_usage_on_insufficient_args():
 def test_subcmd_usage_on_unknown_args():
     stdout, stderr = run_main(['get', '--murks'], exit_code=1, expect_stderr=True)
     in_('get', stdout)
+
+
+def test_combined_short_option():
+    stdout, stderr = run_main(['-fjson'], exit_code=2, expect_stderr=True)
+    assert_not_in("unrecognized argument", stderr)
+    assert_in("too few arguments", stderr)
 
 
 def check_incorrect_option(opts, err_str):
@@ -261,3 +272,13 @@ def test_fail_with_short_help():
                  "        mother\n"
                  "        father\n"
                  "Hint: You can become one\n")
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')
