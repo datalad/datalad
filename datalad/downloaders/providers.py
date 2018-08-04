@@ -13,6 +13,7 @@ from glob import glob
 from logging import getLogger
 from six import iteritems
 
+import os
 import re
 from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
@@ -447,8 +448,8 @@ class Providers(object):
         )
 
         # Just create a configuration file and reload the thing
-        if not path.lexists(PROVIDERS_USER_DIR):
-            path.makedirs(PROVIDERS_USER_DIR)
+        if not path.lexists(providers_user_dir):
+            os.makedirs(providers_user_dir)
         cfg = """\
 # Provider configuration file created to initially access
 # {url}
