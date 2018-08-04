@@ -758,6 +758,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     @staticmethod
     def get_size_from_key(key):
         """A little helper to obtain size encoded in a key"""
+        if not key:
+            return None
         try:
             size_str = key.split('-', 2)[1].lstrip('s')
         except IndexError:
@@ -2056,7 +2058,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'addurl',
                 opts=options + [files_opt] + [url],
                 progress=True,
-                log_online=True, log_stderr=False,
+                expected_entries={file_: None},
+                #log_online=True,
+                #log_stderr=False,
                 **kwargs
             )
             if len(out_json) != 1:
@@ -3544,6 +3548,7 @@ class ProcessAnnexProgressIndicators(object):
         self.pbars = {}
         self.total_pbar = None
         self.expected = expected
+        self.only_one_expected = expected and len(self.expected) == 1
         self._failed = 0
         self._succeeded = 0
         self.start()
@@ -3552,9 +3557,19 @@ class ProcessAnnexProgressIndicators(object):
         if self.expected:
             from datalad.ui import ui
             total = sum(filter(bool, self.expected.values()))
-            self.total_pbar = ui.get_progressbar(
-                label="Total", total=total)
-            self.total_pbar.start()
+            if len(self.expected) > 1:
+                self.total_pbar = ui.get_progressbar(
+                    label="Total", total=total)
+                self.total_pbar.start()
+
+    def __getitem__(self, download_id):
+        if self.pbars == 1:
+            # regardless what it is, it is the one!
+            # will happen e.g. in case of add_url_to_file since filename
+            # is not even reported in the status and final msg just
+            # reports the key which is not known before
+            return self.pbars.items()[0]
+        return self.pbars[download_id]
 
     def _update_pbar(self, pbar, new_value):
         """Updates pbar while also updating possibly total pbar"""
@@ -3595,7 +3610,6 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
-
         # Process some messages which remotes etc might push to us
         if list(j) == ['info']:
             # Just INFO was received without anything else -- we log it at INFO
@@ -3611,10 +3625,14 @@ class ProcessAnnexProgressIndicators(object):
                 return
 
         target_size = None
-        if 'command' in j and 'key' in j:
+        if 'command' in j and ('key' in j or 'file' in j):
             # might be the finish line message
-            j_download_id = (j['command'], j['key'])
+            download_item = j.get('key') or j.get('file')
+            j_download_id = (j['command'], download_item)
             pbar = self.pbars.pop(j_download_id, None)
+            if pbar is None and len(self.pbars) == 1 and self.only_one_expected:
+                # it is the only one left - take it!
+                pbar = self.pbars.popitem()[1]
             if j.get('success') in {True, 'true'}:
                 self._succeeded += 1
                 if pbar:
@@ -3623,10 +3641,11 @@ class ProcessAnnexProgressIndicators(object):
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
                     try:
-                        size_j = self.expected[j['key']]
+                        target_size = self.expected[download_item]
                     except:
-                        size_j = None
-                    target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
+                        target_size = None
+                    if not target_size and 'key' in j:
+                        target_size = AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(target_size, increment=True)
             else:
                 lgr.log(5, "Message with failed status: %s" % str(j))
@@ -3657,8 +3676,8 @@ class ProcessAnnexProgressIndicators(object):
 
         # so we have a progress indicator, let's deal with it
         action = j['action']
-        download_item = action.get('file') or action.get('key')
-        download_id = (action['command'], action['key'])
+        download_item = action.get('key') or action.get('file')
+        download_id = (action['command'], download_item)
         if download_id not in self.pbars:
             # New download!
             from datalad.ui import ui
@@ -3677,7 +3696,13 @@ class ProcessAnnexProgressIndicators(object):
                     ) or \
                     0
             w = ui_utils.get_console_width()
-            title = str(download_item)
+
+            if not download_item and self.only_one_expected:
+                # must be the one!
+                download_item = list(self.expected)[0]
+
+            title = str(action.get('file') or download_item)
+
             pbar_right = 50
             title_len = w - pbar_right - 4  # (4 for reserve)
             if len(title) > title_len:
@@ -3690,7 +3715,7 @@ class ProcessAnnexProgressIndicators(object):
         lgr.log(1, "Updating pbar for download_id=%s. annex: %s.\n",
                 download_id, j)
         self._update_pbar(
-            self.pbars[download_id],
+            self[download_id],
             int(j.get('byte-progress'))
         )
 
