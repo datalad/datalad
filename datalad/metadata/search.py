@@ -420,6 +420,10 @@ class _WhooshSearch(_Search):
         self.idx_obj = idx_obj
 
     def __call__(self, query, max_nresults=None, force_reindex=False, full_record=False):
+        if max_nresults is None:
+            # mode default
+            max_nresults = 20
+
         with self.idx_obj.searcher() as searcher:
             wquery = self.get_query(query)
 
@@ -622,6 +626,9 @@ class _EGrepSearch(_Search):
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
     def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
+        if max_nresults is None:
+            # no limit by default
+            max_nresults = 0
         query = self.get_query(query)
 
         nhits = 0
@@ -965,9 +972,10 @@ class Search(Interface):
         max_nresults=Parameter(
             args=("--max-nresults",),
             doc="""maxmimum number of search results to report. Setting this
-            to 0 will report all search matches, and make searching substantially
-            slower on large metadata sets.""",
-            constraints=EnsureInt()),
+            to 0 will report all search matches. Depending on the mode this
+            can search substantially slower. If not specified, a
+            mode-specific default setting will be used.""",
+            constraints=EnsureInt() | EnsureNone()),
         mode=Parameter(
             args=("--mode",),
             choices=('egrep', 'textblob', 'autofield'),
@@ -1012,7 +1020,7 @@ class Search(Interface):
     def __call__(query=None,
                  dataset=None,
                  force_reindex=False,
-                 max_nresults=20,
+                 max_nresults=None,
                  mode=None,
                  full_record=False,
                  show_keys=None,
