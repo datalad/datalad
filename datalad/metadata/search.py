@@ -657,19 +657,24 @@ class _EGrepSearch(_Search):
             # be able to match content coming for a later field
             lgr.log(7, "Querying %s among %d items", query, len(doc))
             t0 = time()
-            matches = {k: q['query'].search(v) if isinstance(q, dict) else q.search(v)
+            matches = {(q['query'] if isinstance(q, dict) else q, k):
+                       q['query'].search(v) if isinstance(q, dict) else q.search(v)
                        for k, v in iteritems(doc)
                        for q in query
                        if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
             # retain what actually matched
-            matches = {k: match.group() for k, match in matches.items() if match}
-            if matches:
+            matched = {k[1]: match.group() for k, match in matches.items() if match}
+            # implement AND behavior across query expressions, but OR behavior
+            # across queries matching multiple fields for a single query expression
+            # for multiple queries, this makes it consistent with a query that
+            # has no field specification
+            if matched and len(query) == len(set(k[0] for k in matches if matches[k])):
                 hit = dict(
                     res,
                     action='search',
-                    query_matched=matches,
+                    query_matched=matched,
                 )
                 yield hit
                 nhits += 1
@@ -796,10 +801,11 @@ class Search(Interface):
     they are not available locally.
 
     Ultimately DataLad metadata are a graph of linked data structures. However,
-    this command does not (yet) support queries that can exploit all information
-    stored in the metadata. At the moment three search modes are implemented that
-    represent different trade-offs between the expressiveness of a query and
-    the computational and storage resources required to execute a query.
+    this command does not (yet) support queries that can exploit all
+    information stored in the metadata. At the moment three search modes are
+    implemented that represent different trade-offs between the expressiveness
+    of a query and the computational and storage resources required to execute
+    a query.
 
     - egrep (default)
 
@@ -823,17 +829,30 @@ class Search(Interface):
 
     *Mode: egrep*
 
-    This search mode is completely ignorant of the metadata structure, and
-    simply performs matching of a search pattern against a flat
-    string-representation of metadata. This mode is advantageous when the
-    query is simple and the metadata structure is irrelevant. Moreover,
-    this mode does not require a search index, hence results can be reported
-    without an initial latency for building a search index when the underlying
-    metadata has changed (e.g. due to a dataset update). By default, this
-    search mode only considers datasets and does not investigate records
-    for individual files for speed reasons.
+    This search mode is largely ignorant of the metadata structure, and simply
+    performs matching of a search pattern against a flat string-representation
+    of metadata. This mode is advantageous when the query is simple and the
+    metadata structure is irrelevant, or precisely known. Moreover, this mode
+    does not require a search index, hence results can be reported without an
+    initial latency for building a search index when the underlying metadata
+    has changed (e.g. due to a dataset update). By default, this search mode
+    only considers datasets and does not investigate records for individual
+    files for speed reasons. Search results are reported in the order in which
+    they were discovered.
 
-    Search results are reported in the order in which they were discovered.
+    Queries can make use of Python regular expression syntax
+    (https://docs.python.org/3/library/re.html). Matching is case-sensitive by
+    default, by can be altered for each query, see example below.  Expression
+    will match anywhere in a metadata string, not yet at the start.
+
+    When multiple queries are given, all queries have to match for a search hit
+    (AND behavior).
+
+    It is possible to search individual metadata key/value items by prefixing
+    the query with a metadata key name, separated by a colon (':'). The key
+    name can also be a regular expression to match multiple keys. A query match
+    happens when any value of an item with a matching key name matches the query
+    (OR behavior). See examples for more information.
 
     Examples:
 
@@ -841,11 +860,11 @@ class Search(Interface):
 
         % datalad search haxby
 
-      Queries are case-insensitive and can be regular expressions. The
-      following queries for datasets with (what happens to be) two
-      particular authors::
+      Queries are case-sensitive, and can be regular expressions. Using
+      expression flags a case-insensitive query can be made for (what happens
+      to be) two particular authors::
 
-        % datalad search halchenko.*haxby
+        % datalad search (?i)haLchenko.*haXby
 
       However, this search mode performs NO analysis of the metadata content.
       Therefore queries can easily fail to match. For example, the above
@@ -853,10 +872,26 @@ class Search(Interface):
       If that is the case (which may or may not be true), the following query
       would yield NO hits::
 
-        % datalad search haxby.*halchenko
+        % datalad search Haxby.*Halchenko
 
       The ``textblob`` search mode represents an alternative that is more
       robust in such cases.
+
+      For more complex queries multiple query expressions can be provided that
+      all have to match to be considered a hit (AND behavior). This query
+      discovers all files (non-default behavior) that match 'bids.type=T1w'
+      AND 'nifti1.qform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.qform_code:scanner
+
+      Key name selectors can also be expressions, which can be used to select
+      multiple keys or construct "fuzzy" queries. In such cases a query matches
+      when any item with a matching key matches the query (OR behavior).
+      However, multiple queries are always evaluated using an AND conjunction.
+      The following query extends the example above to match any files that
+      have either 'nifti1.qform_code=scanner' or 'nifti1.sform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.(q|s)form_code:scanner
 
     *Mode: textblob*
 
