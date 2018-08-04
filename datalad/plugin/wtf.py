@@ -10,13 +10,30 @@
 
 __docformat__ = 'restructuredtext'
 
-from collections import OrderedDict
+import os
+import os.path as op
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import getpwd
+from datalad.utils import assure_unicode
+from datalad.dochelpers import exc_str
+from datalad.support.external_versions import external_versions
 
 # wording to use for items which were considered sensitive and thus not shown
-_HIDDEN = "<Sensitive data, use -s=some or -s=all to show>"
+_HIDDEN = "<SENSITIVE, report disabled by configuration>"
+
+
+# formatting helper
+def _t2s(t):
+    res = []
+    for e in t:
+        if isinstance(e, tuple):
+            es = _t2s(e)
+            if es != '':
+                res += ['(%s)' % es]
+        elif e != '':
+            res += [e]
+    return '/'.join(res)
 
 
 def get_max_path_length(top_path=None, maxl=1000):
@@ -46,6 +63,143 @@ def get_max_path_length(top_path=None, maxl=1000):
         os.unlink(filename)
     return max_path_length
 
+
+def _describe_datalad():
+    from datalad.version import __version__, __full_version__
+
+    return {
+        'version': assure_unicode(__version__),
+        'full_version': assure_unicode(__full_version__),
+    }
+
+
+def _describe_system():
+    import platform as pl
+    from datalad import get_encoding_info
+    return {
+        'type': os.name,
+        'name': pl.system(),
+        'release': pl.release(),
+        'version': pl.version(),
+        'distribution': ' '.join([_t2s(pl.dist()),
+                                  _t2s(pl.mac_ver()),
+                                  _t2s(pl.win32_ver())]).rstrip(),
+        'max_path_length': get_max_path_length(getpwd()),
+        'encoding': get_encoding_info(),
+    }
+
+
+def _describe_environment():
+    from datalad import get_envvars_info
+    return get_envvars_info()
+
+
+def _describe_configuration(cfg, sensitive):
+    if not cfg:
+        return _HIDDEN
+
+    # make it into a dict to be able to reassign
+    cfg = dict(cfg.items())
+
+    if sensitive != 'all':
+        # filter out some of the entries which known to be highly sensitive
+        for k in cfg.keys():
+            if 'user' in k or 'token' in k or 'passwd' in k:
+                cfg[k] = _HIDDEN
+
+    return cfg
+
+
+def _describe_extensions():
+    infos = {}
+    from pkg_resources import iter_entry_points
+    from importlib import import_module
+
+    for e in iter_entry_points('datalad.extensions'):
+        info = {}
+        infos[e.name] = info
+        try:
+            ext = e.load()
+            info['load_error'] = None
+            info['description'] = ext[0]
+            info['module'] = e.module_name
+            mod = import_module(e.module_name, package='datalad')
+            info['version'] = getattr(mod, '__version__', None)
+        except Exception as e:
+            info['load_error'] = exc_str(e)
+            continue
+        info['entrypoints'] = entry_points = {}
+        for ep in ext[1]:
+            ep_info = {
+                'module': ep[0],
+                'class': ep[1],
+                'names': ep[2:],
+            }
+            entry_points['{}.{}'.format(*ep[:2])] = ep_info
+            try:
+                import_module(ep[0], package='datalad')
+                ep_info['load_error'] = None
+            except Exception as e:
+                ep_info['load_error'] = exc_str(e)
+                continue
+    return infos
+
+
+def _describe_metadata_extractors():
+    infos = {}
+    from pkg_resources import iter_entry_points
+    from importlib import import_module
+
+    for e in iter_entry_points('datalad.metadata.extractors'):
+        info = {}
+        infos[e.name] = info
+        try:
+            info['module'] = e.module_name
+            mod = import_module(e.module_name, package='datalad')
+            info['version'] = getattr(mod, '__version__', None)
+            e.load()
+            info['load_error'] = None
+        except Exception as e:
+            info['load_error'] = exc_str(e)
+            continue
+    return infos
+
+
+def _describe_dependencies():
+    # query all it got
+    [external_versions[k]
+     for k in tuple(external_versions.CUSTOM) + external_versions.INTERESTING]
+
+    return {
+        k: str(external_versions[k]) for k in external_versions.keys()
+    }
+
+
+def _describe_dataset(ds, sensitive):
+    from datalad.interface.results import success_status_map
+    from datalad.api import metadata
+
+    infos = {
+        'path': ds.path,
+        'repo': ds.repo.__class__.__name__ if ds.repo else None,
+    }
+    if not sensitive:
+        infos['metadata'] = _HIDDEN
+    elif ds.id:
+        ds_meta = metadata(
+            dataset=ds, reporton='datasets', return_type='list',
+            result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
+            result_renderer='disabled', on_failure='ignore')
+        if ds_meta:
+            ds_meta = [dm['metadata'] for dm in ds_meta]
+            if len(ds_meta) == 1:
+                ds_meta = ds_meta.pop()
+            infos['metadata'] = ds_meta
+        else:
+            infos['metadata'] = None
+    return infos
+
+
 @build_doc
 class WTF(Interface):
     """Generate a report about the DataLad installation and configuration
@@ -54,6 +208,8 @@ class WTF(Interface):
     should be done with care, as it may include identifying information, and/or
     credentials or access tokens.
     """
+    result_renderer = 'tailored'
+
     from datalad.support.param import Parameter
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
@@ -85,11 +241,10 @@ class WTF(Interface):
     @datasetmethod(name='wtf')
     @eval_results
     def __call__(dataset=None, sensitive=None, clipboard=None):
-        from datalad import get_encoding_info
-        from datalad import get_envvars_info
-
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
+        from datalad.interface.results import get_status_dict
+
         ds = None
         try:
             ds = require_dataset(dataset, check_installed=False, purpose='reporting')
@@ -107,174 +262,67 @@ class WTF(Interface):
         else:
             cfg = None
 
-        from pkg_resources import iter_entry_points
         from datalad.ui import ui
-        from datalad.api import metadata
         from datalad.support.external_versions import external_versions
-        from datalad.dochelpers import exc_str
-        from datalad.interface.results import success_status_map
-        import os
-        import platform as pl
-        import json
 
-        extractors={}
-        for ep in iter_entry_points('datalad.metadata.extractors'):
-            try:
-                ep.load()
-                status = 'OK'
-            except Exception as e:
-                status = 'BROKEN ({})'.format(exc_str(e))
-            extractors[ep.name] = status
-
-        # formatting helper
-        def _t2s(t):
-            res = []
-            for e in t:
-                if isinstance(e, tuple):
-                    es = _t2s(e)
-                    if es != '':
-                        res += ['(%s)' % es]
-                elif e != '':
-                    res += [e]
-            return '/'.join(res)
-
-
-        report_template = """\
-DataLad
-=======
-{datalad}
-
-System
-======
-{system}
-
-Locale/Encoding
-===============
-{loc}
-
-Environment
-===========
-{env}
-
-Externals
-=========
-{externals}
-Installed extensions
-====================
-{extensions}
-
-Known metadata extractors
-=========================
-{metaextractors}
-
-Configuration
-=============
-{cfg}
-{dataset}
-"""
-
-        dataset_template = """\
-
-Dataset information
-===================
-{basic}
-
-Metadata
---------
-{meta}
-"""
-        ds_meta = None
-        if not sensitive:
-            ds_meta = _HIDDEN
-        elif ds and ds.is_installed() and ds.id:
-            ds_meta = metadata(
-                dataset=ds, reporton='datasets', return_type='list',
-                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
-                result_renderer='disabled', on_failure='ignore')
-            if ds_meta:
-                ds_meta = [dm['metadata'] for dm in ds_meta]
-                if len(ds_meta) == 1:
-                    ds_meta = ds_meta.pop()
-
-        if cfg is not None:
-            # make it into a dict to be able to reassign
-            cfg = dict(cfg.items())
-
-        if sensitive != 'all' and cfg:
-            # filter out some of the entries which known to be highly sensitive
-            for k in cfg.keys():
-                if 'user' in k or 'token' in k or 'passwd' in k:
-                    cfg[k] = _HIDDEN
-
-        from datalad.version import __version__, __full_version__
-
-        pwd = getpwd()
-        max_path_length = get_max_path_length(pwd)
-        max_path_msg = '%d  You are left with %d characters under %s' \
-                       % (max_path_length, max_path_length - (len(pwd) + 1), pwd) \
-            if max_path_length is not None else "UNKNOWN"
-        text = report_template.format(
-            datalad=_format_dict([
-                ('Version', __version__),
-                ('Full version', __full_version__)
-            ], indent=True),
-            system=_format_dict([
-                ('OS', ' '.join([
-                    os.name,
-                    pl.system(),
-                    pl.release(),
-                    pl.version()]).rstrip()),
-                ('Distribution',
-                 ' '.join([_t2s(pl.dist()),
-                           _t2s(pl.mac_ver()),
-                           _t2s(pl.win32_ver())]).rstrip()),
-                ('Max path length',
-                 max_path_msg)
-            ], indent=True),
-            loc=_format_dict(get_encoding_info(), indent=True),  # , fmt="{}={!r}"),
-            env=_format_dict(get_envvars_info(), fmt="{}={!r}"),
-            dataset='' if not ds else dataset_template.format(
-                basic=_format_dict([
-                    ('path', ds.path),
-                    ('repo', ds.repo.__class__.__name__ if ds.repo else '[NONE]'),
-                ]),
-                meta=_HIDDEN if not sensitive
-                     else json.dumps(ds_meta, indent=1)
-                     if ds_meta else '[no metadata]'
-            ),
-            externals=external_versions.dumps(preamble=None, indent='', query=True),
-            extensions='\n'.join(ep.name for ep in iter_entry_points('datalad.extensions')),
-            metaextractors=_format_dict(extractors),
-            cfg=_format_dict(sorted(cfg.items(), key=lambda x: x[0]))
-                if cfg else _HIDDEN,
+        infos = {}
+        res = get_status_dict(
+            action='wtf',
+            ds=dataset,
+            path=dataset.path if dataset else op.abspath(op.curdir),
+            status='ok',
+            infos=infos,
         )
+        infos['datalad'] = _describe_datalad()
+        infos['system'] = _describe_system()
+        infos['environment'] = _describe_environment()
+        infos['configuration'] = _describe_configuration(cfg, sensitive)
+        infos['extentions'] = _describe_extensions()
+        infos['metadata_extractors'] = _describe_metadata_extractors()
+        infos['dependencies'] = _describe_dependencies()
+        if ds:
+            infos['dataset'] = _describe_dataset(ds, sensitive)
+
         if clipboard:
-            from datalad.support.external_versions import external_versions
             external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")
             import pyperclip
-            pyperclip.copy(text)
+            report = _render_report(res)
+            pyperclip.copy(report)
             ui.message("WTF information of length %s copied to clipboard"
-                       % len(text))
+                       % len(report))
+        yield res
+        return
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.ui import ui
+        ui.message(_render_report(res))
+
+
+def _render_report(res):
+    report = u'# WTF\n'
+    report += u'\n'.join(
+        u'- {}: {}'.format(k, v) for k, v in res.items()
+        if k not in ('action', 'infos', 'status')
+    )
+
+    def _unwind(text, val, top):
+        if isinstance(val, dict):
+            for k in sorted(val):
+                text += u'\n{}{} {}{} '.format(
+                    '##' if not top else top,
+                    '-' if top else '',
+                    k,
+                    ':' if top else '')
+                text = _unwind(text, val[k], u'{}  '.format(top))
+        elif isinstance(val, (list, tuple)):
+            for i, v in enumerate(val):
+                text += u'\n{}{}. '.format(top, i + 1)
+                text = _unwind(text, v, u'{}  '.format(top))
         else:
-            ui.message(text)
-        yield
+            text += u'{}'.format(val)
+        return text
 
-
-def _format_dict(d, indent=False, fmt=None):
-    """A helper for uniform formatting of an OrderedDict output
-
-    d could be of anything OrderedDict could be built from, e.g a list
-    of tuples
-    """
-    od = OrderedDict(d)
-    assert not (indent and fmt), "specify only indent of fmt"
-    if not fmt:
-        if indent:
-            fmt = '{:%d}: {}' % max(map(len, od))
-        else:
-            fmt = '{}: {}'
-    return '\n'.join(fmt.format(k, v) for k, v in od.items())
-
-
-__datalad_plugin__ = WTF
+    report = _unwind(report, res.get('infos', {}), '')
+    return report

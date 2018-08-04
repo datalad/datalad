@@ -59,6 +59,7 @@ _group_metadata = (
 _group_misc = (
     'Miscellaneous commands',
     [
+        ('datalad.plugin.wtf', 'WTF'),
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
