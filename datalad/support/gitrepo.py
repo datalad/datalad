@@ -17,6 +17,7 @@ import re
 import shlex
 import time
 import os
+import os.path as op
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -2344,20 +2345,61 @@ class GitRepo(RepoInterface):
         stdout, stderr = self._git_custom_command(path, cmd)
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {p: {} for p in path}
+        attributes = {_normalize_path(self.path, p): {} for p in path}
         attr = []
         for item in stdout.split('\0'):
             attr.append(item)
             if len(attr) < 3:
                 continue
             # we have a full record
-            path, name, value = attr
-            attrs = attributes[path]
+            p, name, value = attr
+            attrs = attributes[p]
             attrs[name] = \
                 True if value == 'set' else False if value == 'unset' else value
             # done, reset item
             attr = []
         return attributes
+
+    def set_gitattributes(self, attrs, attrfile='.gitattributes'):
+        """Set gitattributes
+
+        Parameters
+        ----------
+        attrs : list
+          Each item is a 2-tuple, where the first element is a path pattern,
+          and the second element is a dictionary with attribute key/value
+          pairs. The attribute dictionary must use the same semantics as those
+          returned by `get_gitattributes()`. Path patterns can use absolute paths,
+          in which case they will be normalized relative to the directory
+          that contains the target .gitattribute file (see `attrfile`).
+        attrfile: path
+          Path relative to the repository root of the .gitattributes file the
+          attributes shall be set in.
+        """
+        git_attributes_file = op.join(self.path, attrfile)
+        attrdir = op.dirname(git_attributes_file)
+        if not op.exists(attrdir):
+            os.makedirs(attrdir)
+        with open(git_attributes_file, 'a') as f:
+            for pattern, attr in sorted(attrs, key=lambda x: x[0]):
+                # normalize the pattern relative to the target .gitattributes file
+                npath = _normalize_path(
+                    op.join(self.path, op.dirname(attrfile)), pattern)
+                attrline = u''
+                if npath.count(' '):
+                    # quote patterns with spaces
+                    attrline += u'"{}"'.format(npath)
+                else:
+                    attrline += npath
+                for a in sorted(attr):
+                    val = attr[a]
+                    if val is True:
+                        attrline += ' {}'.format(a)
+                    elif val is False:
+                        attrline += ' -{}'.format(a)
+                    else:
+                        attrline += ' {}={}'.format(a, val)
+                f.write('{}\n'.format(attrline))
 
 
 # TODO
