@@ -269,7 +269,7 @@ class WTF(Interface):
         res = get_status_dict(
             action='wtf',
             ds=dataset,
-            path=dataset.path if dataset else op.abspath(op.curdir),
+            path=ds.path if ds else op.abspath(op.curdir),
             status='ok',
             infos=infos,
         )
