@@ -2319,28 +2319,45 @@ class GitRepo(RepoInterface):
                 for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
                 if f.split('\t')[0] == 'D']
 
-    def get_git_attributes(self):
-        """Check git attribute for the current repository (not per-file support for now)
+    def get_gitattributes(self, path, index_only=False):
+        """Query gitattributes for one or more paths
 
         Parameters
         ----------
-        all_: bool
-          Adds --all to git check-attr call
+        path: path or list
+          Path(s) to query. Paths may be relative or absolute.
+        index_only: bool
+          Flag whether to consider only gitattribute setting that are reflected
+          in the repository index, not just in the work tree content.
 
         Returns
         -------
         dict:
-          attribute: value pairs
+          Each key is a queried path, each value is a dictionary with attribute
+          name and value items. Attribute values are either True or False,
+          for set and unset attributes, or are the literal attribute value.
         """
-        out, err = self._git_custom_command(["."], ["git", "check-attr", "--all"])
-        assert not err, "no stderr output is expected"
-        out_split = [
-            # splitting by : would leave leading space(s)
-            [e.lstrip(' ') for e in l.split(':', 2)]
-            for l in out.split('\n') if l
-        ]
-        assert all(o[0] == '.' for o in out_split)  # for paranoid
-        return dict(o[1:] for o in out_split)
+        path = assure_list(path)
+        cmd = ["git", "check-attr", "-z", "--all"]
+        if index_only:
+            cmd.append('--cached')
+        stdout, stderr = self._git_custom_command(path, cmd)
+        # make sure we have one entry for each query path to
+        # simplify work with the result
+        attributes = {p: {} for p in path}
+        attr = []
+        for item in stdout.split('\0'):
+            attr.append(item)
+            if len(attr) < 3:
+                continue
+            # we have a full record
+            path, name, value = attr
+            attrs = attributes[path]
+            attrs[name] = \
+                True if value == 'set' else False if value == 'unset' else value
+            # done, reset item
+            attr = []
+        return attributes
 
 
 # TODO
