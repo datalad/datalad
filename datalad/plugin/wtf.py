@@ -10,6 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
 import os
 import os.path as op
 from datalad.interface.base import Interface
@@ -18,6 +19,9 @@ from datalad.utils import getpwd
 from datalad.utils import assure_unicode
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
+
+lgr = logging.getLogger('datalad.plugin.wtf')
+
 
 # wording to use for items which were considered sensitive and thus not shown
 _HIDDEN = "<SENSITIVE, report disabled by configuration>"
@@ -268,9 +272,10 @@ class WTF(Interface):
         infos = {}
         res = get_status_dict(
             action='wtf',
-            ds=dataset,
             path=ds.path if ds else op.abspath(op.curdir),
+            type='dataset' if ds else 'directory',
             status='ok',
+            logger=lgr,
             infos=infos,
         )
         infos['datalad'] = _describe_datalad()
