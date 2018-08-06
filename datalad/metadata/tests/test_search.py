@@ -262,7 +262,7 @@ type
          {'type': 'file', 'audio.format': 'mp3'}),
         # case insensitive search
         ('egrep',
-         '(?i)MP3',
+         'mp3',
          opj('stim', 'stim1.mp3'),
          {'audio.format': 'mp3'}),
         # field selection by expression

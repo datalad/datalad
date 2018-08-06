@@ -618,8 +618,8 @@ class _AutofieldSearch(_WhooshSearch):
         self.parser = parser
 
 
-class _EGrepSearch(_Search):
-    _mode_label = 'egrep'
+class _EGrepCSSearch(_Search):
+    _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
     # If there were custom "per-search engine" options, we could expose
@@ -780,15 +780,32 @@ class _EGrepSearch(_Search):
             for q in query]
         # expand matches, compile expressions
         query = [
-            {k: re.compile(v) for k, v in q.groupdict().items()}
-            if hasattr(q, 'groupdict') else re.compile(q)
+            {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
             for q in query]
+
         # turn "empty" field specs into simple queries
         # this is used to forcibly disable field-based search
         # e.g. when searching for a value
         query = [q['query'] if isinstance(q, dict) and q['field'].pattern == '' else q
                  for q in query]
         return query
+
+    def _xfm_query(self, q):
+        # implement potential transformations of regex before they get compiles
+        return q
+
+
+class _EGrepSearch(_EGrepCSSearch):
+    _mode_label = 'egrep'
+    _default_documenttype = 'datasets'
+
+    def _xfm_query(self, q):
+        if q == q.lower():
+            # we have no upper case symbol in the query, go case-insensitive
+            return '(?i){}'.format(q)
+        else:
+            return q
 
 
 @build_doc
@@ -802,12 +819,14 @@ class Search(Interface):
 
     Ultimately DataLad metadata are a graph of linked data structures. However,
     this command does not (yet) support queries that can exploit all
-    information stored in the metadata. At the moment three search modes are
-    implemented that represent different trade-offs between the expressiveness
-    of a query and the computational and storage resources required to execute
-    a query.
+    information stored in the metadata. At the moment the following search
+    modes are implemented that represent different trade-offs between the
+    expressiveness of a query and the computational and storage resources
+    required to execute a query.
 
     - egrep (default)
+
+    - egrepcs [case-sensitive egrep]
 
     - textblob
 
@@ -817,7 +836,7 @@ class Search(Interface):
     configuration variable 'datalad.search.default-mode'::
 
       [datalad "search"]
-        default-mode = egrep
+        default-mode = egrepcs
 
     Each search mode has its own default configuration for what kind of
     documents to query. The respective default can be changed via configuration
@@ -827,23 +846,25 @@ class Search(Interface):
         index-<mode_name>-documenttype = (all|datasets|files)
 
 
-    *Mode: egrep*
+    *Mode: egrep/egrepcs*
 
-    This search mode is largely ignorant of the metadata structure, and simply
-    performs matching of a search pattern against a flat string-representation
-    of metadata. This mode is advantageous when the query is simple and the
-    metadata structure is irrelevant, or precisely known. Moreover, this mode
-    does not require a search index, hence results can be reported without an
-    initial latency for building a search index when the underlying metadata
-    has changed (e.g. due to a dataset update). By default, this search mode
-    only considers datasets and does not investigate records for individual
-    files for speed reasons. Search results are reported in the order in which
-    they were discovered.
+    These search modes are largely ignorant of the metadata structure, and
+    simply performs matching of a search pattern against a flat
+    string-representation of metadata. This is advantageous when the query is
+    simple and the metadata structure is irrelevant, or precisely known.
+    Moreover, it does not require a search index, hence results can be reported
+    without an initial latency for building a search index when the underlying
+    metadata has changed (e.g. due to a dataset update). By default, these
+    search modes only consider datasets and do not investigate records for
+    individual files for speed reasons. Search results are reported in the
+    order in which they were discovered.
 
     Queries can make use of Python regular expression syntax
-    (https://docs.python.org/3/library/re.html). Matching is case-sensitive by
-    default, by can be altered for each query, see example below.  Expression
-    will match anywhere in a metadata string, not yet at the start.
+    (https://docs.python.org/3/library/re.html). In `egrep` mode, matching is
+    case-insensitive when the query does not contain upper case characters, but
+    is case-sensitive when it does. In `egrepcs` mode, matching is always
+    case-sensitive. Expressions will match anywhere in a metadata string, not
+    only at the start.
 
     When multiple queries are given, all queries have to match for a search hit
     (AND behavior).
@@ -860,17 +881,17 @@ class Search(Interface):
 
         % datalad search haxby
 
-      Queries are case-sensitive, and can be regular expressions. Using
-      expression flags a case-insensitive query can be made for (what happens
-      to be) two particular authors::
+      Queries are case-INsensitive when the query contains no upper case characters,
+      and can be regular expressions. Use `egrepcs` mode when it is desired
+      to perform a case-sensitive lowercase match::
 
-        % datalad search (?i)haLchenko.*haXby
+        % datalad search --mode egrepcs halchenko.*haxby
 
-      However, this search mode performs NO analysis of the metadata content.
-      Therefore queries can easily fail to match. For example, the above
-      query implicitly assumes that authors are listed in alphabetical order.
-      If that is the case (which may or may not be true), the following query
-      would yield NO hits::
+      This search mode performs NO analysis of the metadata content.  Therefore
+      queries can easily fail to match. For example, the above query implicitly
+      assumes that authors are listed in alphabetical order.  If that is the
+      case (which may or may not be true), the following query would yield NO
+      hits::
 
         % datalad search Haxby.*Halchenko
 
@@ -1079,6 +1100,8 @@ class Search(Interface):
 
         if mode == 'egrep':
             searcher = _EGrepSearch
+        elif mode == 'egrepcs':
+            searcher = _EGrepCSSearch
         elif mode == 'textblob':
             searcher = _BlobSearch
         elif mode == 'autofield':
