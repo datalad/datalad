@@ -15,6 +15,7 @@ import random
 import uuid
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 
@@ -342,16 +343,14 @@ class Create(Interface):
             )
 
             if text_no_annex:
-                git_attributes_file = opj(tbds.path, '.gitattributes')
-                with open(git_attributes_file, 'a') as f:
-                    f.write('* annex.largefiles=(not(mimetype=text/*))\n')
-                # TODO just use add_to_git and avoid separate commit
-                tbrepo.add([git_attributes_file], git=True)
-                tbrepo.commit(
-                    "Instructed annex to add text files to git",
-                    _datalad_msg=True,
-                    files=[git_attributes_file]
-                )
+                attrs = tbrepo.get_gitattributes('.')
+                # some basic protection against useless duplication
+                # on rerun with --force
+                if not attrs.get('.', {}).get('annex.largefiles', None) == '(not(mimetype=text/*))':
+                    tbrepo.set_gitattributes([
+                        # XXX shouldn't this be '**' to have the desired effect?
+                        ('*', {'annex.largefiles': '(not(mimetype=text/*))'})])
+                    add_to_git.append('.gitattributes')
 
         if native_metadata_type is not None:
             if not isinstance(native_metadata_type, list):
@@ -380,18 +379,31 @@ class Create(Interface):
         add_to_git.append('.datalad')
 
         # make sure that v6 annex repos never commit content under .datalad
-        with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
-            # TODO this will need adjusting, when annex'ed aggregate metadata
-            # comes around
-            gitattr.write('config annex.largefiles=nothing\n')
-            gitattr.write('metadata/aggregate* annex.largefiles=nothing\n')
-            gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
-                cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
+        attrs_cfg = (
+            ('config', 'annex.largefiles', 'nothing'),
+            ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
+            ('metadata/objects/**', 'annex.largefiles',
+             '({})'.format(cfg.obtain(
+                 'datalad.metadata.create-aggregate-annex-limit'))))
+        attrs = tbds.repo.get_gitattributes(
+            [op.join('.datalad', i[0]) for i in attrs_cfg])
+        set_attrs = []
+        for p, k, v in attrs_cfg:
+            if not attrs.get(
+                    op.join('.datalad', p), {}).get(k, None) == v:
+                set_attrs.append((p, {k: v}))
+        if set_attrs:
+            tbds.repo.set_gitattributes(
+                set_attrs,
+                attrfile=op.join('.datalad', '.gitattributes'))
+            add_to_git.append('.datalad')
 
         # prevent git annex from ever annexing .git* stuff (gh-1597)
-        with open(opj(tbds.path, '.gitattributes'), 'a') as gitattr:
-            gitattr.write('**/.git* annex.largefiles=nothing\n')
-        add_to_git.append('.gitattributes')
+        attrs = tbds.repo.get_gitattributes('.git')
+        if not attrs.get('.git', {}).get('annex.largefiles', None) == 'nothing':
+            tbds.repo.set_gitattributes([
+                ('**/.git*', {'annex.largefiles': 'nothing'})])
+            add_to_git.append('.gitattributes')
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent

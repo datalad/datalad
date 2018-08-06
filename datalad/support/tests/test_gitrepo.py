@@ -1211,12 +1211,10 @@ def test_GitRepo_set_remote_url(path):
 
 
 @with_tempfile(mkdir=True)
-def test_get_gitattributes(path):
-
+def test_gitattributes(path):
     gr = GitRepo(path, create=True)
     eq_(gr.get_gitattributes('.')['.'], {})  # nothing is recorded within .gitattributes
-
-    create_tree(gr.path, {'.gitattributes': "* tag\n* sec.key=val"})
+    gr.set_gitattributes([('*', {'tag': True}), ('*', {'sec.key': 'val'})])
     # ATM we do not do any translation of values, so if it is just a tag, it
     # would be what git returns -- "set"
     eq_(gr.get_gitattributes('.')['.'], {'tag': True, 'sec.key': 'val'})
