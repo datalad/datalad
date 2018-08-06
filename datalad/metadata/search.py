@@ -849,7 +849,7 @@ class Search(Interface):
     *Mode: egrep/egrepcs*
 
     These search modes are largely ignorant of the metadata structure, and
-    simply performs matching of a search pattern against a flat
+    simply perform matching of a search pattern against a flat
     string-representation of metadata. This is advantageous when the query is
     simple and the metadata structure is irrelevant, or precisely known.
     Moreover, it does not require a search index, hence results can be reported
