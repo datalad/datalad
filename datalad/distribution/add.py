@@ -417,7 +417,7 @@ class Add(Interface):
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
             is_annex = isinstance(ds.repo, AnnexRepo)
             add_kw = {'jobs': jobs} if is_annex and jobs else {}
-            added = ds.repo.add(
+            added = ds.repo.add_(
                 list(torepoadd.keys()),
                 git=to_git if is_annex else True,
                 **add_kw

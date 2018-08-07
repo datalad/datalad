@@ -896,8 +896,10 @@ class GitRepo(RepoInterface):
         list
           Of status dicts.
         """
-        return list(self.add_(
-            files, git=git, git_options=git_options, update=update))
+        # under all circumstances call this class' add_ (otherwise
+        # AnnexRepo.add would go into a loop
+        return list(GitRepo.add_(self, files, git=git, git_options=git_options,
+                    update=update))
 
     def add_(self, files, git=True, git_options=None, update=False):
         """Like `add`, but returns a generator"""
