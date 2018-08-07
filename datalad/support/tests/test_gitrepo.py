@@ -135,8 +135,6 @@ def test_GitRepo_add(src, path):
     filename = "another.txt"
     with open(opj(path, filename), 'w') as f:
         f.write("Another file to add to git")
-    assert_raises(AssertionError, gr.add, filename, git=False)
-    assert_raises(AssertionError, gr.add, filename, git=None)
 
     # include committing:
     added2 = gr.add(filename)

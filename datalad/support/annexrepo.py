@@ -1405,10 +1405,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         return expected_files, fetch_files
 
     @normalize_paths
-    def add(self, files, git=None, backend=None, options=None,
-            jobs=None,
-            git_options=None, annex_options=None,
-            update=False):
+    def add(self, files, git=None, backend=None, options=None, jobs=None,
+            git_options=None, annex_options=None, update=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -1438,6 +1436,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of dict
         """
 
+        return list(self.add_(
+            files, git=git, backend=backend, options=options, jobs=jobs,
+            git_options=git_options, annex_options=annex_options, update=update
+        ))
+
+    def add_(self, files, git=None, backend=None, options=None, jobs=None,
+            git_options=None, annex_options=None, update=False):
+        """Like `add`, but returns a generator"""
         if update and not git:
             raise InsufficientArgumentsError("option 'update' requires 'git', too")
 
@@ -1462,8 +1468,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
-                return self._process_git_get_output(
-                    linesep.join(["'{}'".format(p.encode('utf-8')) for p in paths]))
+                for r in self._process_git_get_output(
+                        linesep.join(["'{}'".format(p.encode('utf-8'))
+                        for p in paths])):
+                    yield r
+                    return
             else:
                 # Note: if a path involves a submodule in direct mode, while we
                 # are not in direct mode at current level, we might still fail.
@@ -1473,8 +1482,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # hierarchy.
                 _git_options = ['--dry-run', '-N', '--ignore-missing']
                 try:
-                    return super(AnnexRepo, self).add(
-                        files, git_options=_git_options, update=update)
+                    for r in super(AnnexRepo, self).add_(
+                            files, git_options=_git_options, update=update):
+                        yield r
+                        return
                 except CommandError as e:
                     if AnnexRepo._is_annex_work_tree_message(e.stderr):
                         lgr.warning(
@@ -1484,8 +1495,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                             "fails. To be resolved by using (Dataset's) status "
                             "instead of a git-add --dry-run altogether.")
                         # fake the return for now
-                        return self._process_git_get_output(
-                            linesep.join(["'{}'".format(f) for f in files]))
+                        for r in self._process_git_get_output(
+                                linesep.join(["'{}'".format(f)
+                                for f in files])):
+                            yield r
+                            return
                     else:
                         # unexpected failure
                         raise e
@@ -1528,11 +1542,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             if self.is_direct_mode() and not files:
                 self.GIT_DIRECT_MODE_PROXY = True
             try:
-                return_list = super(AnnexRepo, self).add(
-                                           files,
-                                           git=True,
-                                           git_options=git_options,
-                                           update=update)
+                for r in super(AnnexRepo, self).add(
+                        files,
+                        git=True,
+                        git_options=git_options,
+                        update=update):
+                    yield r
             finally:
                 if self.is_direct_mode() and not files:
                     # don't accidentally cause other git calls to be done
@@ -1540,18 +1555,16 @@ class AnnexRepo(GitRepo, RepoInterface):
                     self.GIT_DIRECT_MODE_PROXY = False
 
         else:
-            return_list = list(self._run_annex_command_json(
-                'add',
-                opts=options,
-                files=files,
-                backend=backend,
-                expect_fail=True,
-                jobs=jobs,
-                expected_entries=expected_additions,
-                expect_stderr=True
-            ))
-
-        return return_list
+            for r in self._run_annex_command_json(
+                    'add',
+                    opts=options,
+                    files=files,
+                    backend=backend,
+                    expect_fail=True,
+                    jobs=jobs,
+                    expected_entries=expected_additions,
+                    expect_stderr=True):
+                yield r
 
     def proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
