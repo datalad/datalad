@@ -131,7 +131,7 @@ class NoAnnex(Interface):
                     message='target directory for `no_annex` does not exist (consider makedirs=True)')
                 return
 
-        gitattr_file = opj(ref_dir, '.gitattributes')
+        gitattr_file = opj(gitattr_dir, '.gitattributes')
         dataset.repo.set_gitattributes(
             [(p, {'annex.largefiles': 'nothing'}) for p in pattern],
             attrfile=gitattr_file)
