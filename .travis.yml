@@ -258,6 +258,7 @@ install:
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
+  # Tests fail due to an issue with grunt-contrib-qunit 3.0.0 (gh-2742).
   - npm install grunt-contrib-qunit@2.0.0
   - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
