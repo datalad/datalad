@@ -1249,11 +1249,43 @@ def test_GitRepo_set_remote_url(path):
 @with_tempfile(mkdir=True)
 def test_gitattributes(path):
     gr = GitRepo(path, create=True)
-    eq_(gr.get_gitattributes('.')['.'], {})  # nothing is recorded within .gitattributes
+    # starts without any attributes file
+    ok_(not op.exists(op.join(gr.path, '.gitattributes')))
+    eq_(gr.get_gitattributes('.')['.'], {})
+    # bool is a tag or unsets, anything else is key/value
     gr.set_gitattributes([('*', {'tag': True}), ('*', {'sec.key': 'val'})])
-    # ATM we do not do any translation of values, so if it is just a tag, it
-    # would be what git returns -- "set"
+    ok_(op.exists(op.join(gr.path, '.gitattributes')))
     eq_(gr.get_gitattributes('.')['.'], {'tag': True, 'sec.key': 'val'})
+    # unset by amending the record, but does not remove notion of the
+    # tag entirely
+    gr.set_gitattributes([('*', {'tag': False})])
+    eq_(gr.get_gitattributes('.')['.'], {'tag': False, 'sec.key': 'val'})
+    # attributes file is not added or commited, we can ignore such
+    # attributes
+    eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
+    # it is not relevant whether a path actually exists, and paths
+    # with spaces and other funky stuff are just fine
+    funky = '{} {}'.format(
+        get_most_obscure_supported_name(),
+        get_most_obscure_supported_name())
+    gr.set_gitattributes([(funky, {'this': 'that'})])
+    eq_(gr.get_gitattributes(funky)[funky], {
+        'this': 'that',
+        'tag': False,
+        'sec.key': 'val',
+    })
+    # we can send absolute path patterns and write to any file, and
+    # the patterns will be translated relative to the target file
+    gr.set_gitattributes([
+        (op.join(gr.path, 'relative', 'ikethemike/**'), {'bang': True})],
+        attrfile=op.join('relative', '.gitattributes'))
+    # directory and file get created
+    ok_(op.exists(op.join(gr.path, 'relative', '.gitattributes')))
+    eq_(gr.get_gitattributes(
+        op.join(gr.path, 'relative', 'ikethemike', 'probe')),
+        # always comes out relative to the repo root, even if abs goes in
+        {op.join('relative', 'ikethemike', 'probe'):
+            {'tag': False, 'sec.key': 'val', 'bang': True}})
 
 
 @with_tempfile(mkdir=True)

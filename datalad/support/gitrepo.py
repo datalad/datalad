@@ -2334,7 +2334,8 @@ class GitRepo(RepoInterface):
         Returns
         -------
         dict:
-          Each key is a queried path, each value is a dictionary with attribute
+          Each key is a queried path (always relative to the repostiory root),
+          each value is a dictionary with attribute
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
         """
@@ -2388,7 +2389,7 @@ class GitRepo(RepoInterface):
                 attrline = u''
                 if npath.count(' '):
                     # quote patterns with spaces
-                    attrline += u'"{}"'.format(npath)
+                    attrline += u'"{}"'.format(npath.replace('"', '\\"'))
                 else:
                     attrline += npath
                 for a in sorted(attr):
