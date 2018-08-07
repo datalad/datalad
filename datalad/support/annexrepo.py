@@ -1407,7 +1407,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     @normalize_paths
     def add(self, files, git=None, backend=None, options=None,
             jobs=None,
-            git_options=None, annex_options=None, _datalad_msg=False,
+            git_options=None, annex_options=None,
             update=False):
         """Add file(s) to the repository.
 
@@ -1532,7 +1532,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                                            files,
                                            git=True,
                                            git_options=git_options,
-                                           _datalad_msg=_datalad_msg,
                                            update=update)
             finally:
                 if self.is_direct_mode() and not files:

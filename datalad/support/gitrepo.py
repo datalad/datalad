@@ -154,10 +154,10 @@ def _normalize_path(base_dir, path):
 
     Parameters
     ----------
-    path: str
-        path to be normalized
     base_dir: str
         directory to serve as base to normalized, relative paths
+    path: str
+        path to be normalized
 
     Returns
     -------
@@ -870,8 +870,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, git=True, git_options=None,
-            _datalad_msg=False, update=False):
+    def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
 
         Parameters
