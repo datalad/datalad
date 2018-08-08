@@ -19,6 +19,7 @@ from os import linesep
 import os.path as op
 
 
+from datalad import get_encoding_info
 from datalad.cmd import Runner
 
 from datalad.tests.utils import ok_
@@ -1263,17 +1264,7 @@ def test_gitattributes(path):
     # attributes file is not added or commited, we can ignore such
     # attributes
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
-    # it is not relevant whether a path actually exists, and paths
-    # with spaces and other funky stuff are just fine
-    funky = u'{} {}'.format(
-        get_most_obscure_supported_name(),
-        get_most_obscure_supported_name())
-    gr.set_gitattributes([(funky, {'this': 'that'})])
-    eq_(gr.get_gitattributes(funky)[funky], {
-        'this': 'that',
-        'tag': False,
-        'sec.key': 'val',
-    })
+
     # we can send absolute path patterns and write to any file, and
     # the patterns will be translated relative to the target file
     gr.set_gitattributes([
@@ -1286,6 +1277,19 @@ def test_gitattributes(path):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
+    if get_encoding_info()['default'] != 'ascii':
+        # do not perform this on obscure systems without anything like UTF
+        # it is not relevant whether a path actually exists, and paths
+        # with spaces and other funky stuff are just fine
+        funky = u'{} {}'.format(
+            get_most_obscure_supported_name(),
+            get_most_obscure_supported_name())
+        gr.set_gitattributes([(funky, {'this': 'that'})])
+        eq_(gr.get_gitattributes(funky)[funky], {
+            'this': 'that',
+            'tag': False,
+            'sec.key': 'val',
+        })
 
 
 @with_tempfile(mkdir=True)
