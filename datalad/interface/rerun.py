@@ -251,9 +251,18 @@ class Rerun(Interface):
 
 
 def _revrange_as_results(dset, revrange):
-    revs = dset.repo.get_revisions(revrange, options=["--reverse"])
-    for rev in revs:
-        res = get_status_dict("run", ds=dset, commit=rev)
+    rev_lines = dset.repo.get_revisions(
+        revrange, fmt="%H %P", options=["--reverse"])
+    if not rev_lines:
+        return
+
+    for rev_line in rev_lines:
+        # The strip() below is necessary because, with the format above, a
+        # commit without any parent has a trailing space. (We could also use a
+        # custom `rev-list --parents ...` call to avoid this.)
+        fields = rev_line.strip().split(" ")
+        rev, parents = fields[0], fields[1:]
+        res = get_status_dict("run", ds=dset, commit=rev, parents=parents)
         full_msg = dset.repo.format_commit("%B", rev)
         try:
             msg, info = get_run_info(dset, full_msg)
