@@ -135,8 +135,8 @@ class Rerun(Interface):
             an alternative start point, which will be checked out with the
             branch name specified by [CMD: --branch CMD][PY: `branch` PY] or in
             a detached state otherwise. As a special case, an empty value for
-            this option means to use the commit specified by [CMD: --since
-            CMD][PY: `since` PY].""",
+            this option means the parent of the first run commit in the
+            specified revision list.""",
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m", "--message",),
@@ -315,10 +315,6 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             return
 
     if onto is not None and onto.strip() == "":
-        # Special case: --onto='' is the value of --since. Because we're
-        # currently aborting if the revision list contains merges, we know
-        # that, regardless of if and how --since is specified, the effective
-        # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
 
     if onto and not dset.repo.commit_exists(onto):
