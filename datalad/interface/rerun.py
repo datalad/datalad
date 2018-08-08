@@ -250,7 +250,8 @@ class Rerun(Interface):
             yield res
 
 
-def _revs_as_results(dset, revs):
+def _revrange_as_results(dset, revrange):
+    revs = dset.repo.get_revisions(revrange, options=["--reverse"])
     for rev in revs:
         res = get_status_dict("run", ds=dset, commit=rev)
         full_msg = dset.repo.format_commit("%B", rev)
@@ -273,9 +274,9 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     In the standard case, the information in these results will be used to
     actually re-execute the commands.
     """
-    revs = dset.repo.get_revisions(revrange, options=["--reverse"])
+
     try:
-        results = _revs_as_results(dset, revs)
+        results = _revrange_as_results(dset, revrange)
     except ValueError as exc:
         yield get_status_dict("run", status="error", message=exc_str(exc))
         return
