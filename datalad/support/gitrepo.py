@@ -2372,7 +2372,7 @@ class GitRepo(RepoInterface):
           pairs. The attribute dictionary must use the same semantics as those
           returned by `get_gitattributes()`. Path patterns can use absolute paths,
           in which case they will be normalized relative to the directory
-          that contains the target .gitattribute file (see `attrfile`).
+          that contains the target .gitattributes file (see `attrfile`).
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
