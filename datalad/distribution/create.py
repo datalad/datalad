@@ -348,7 +348,6 @@ class Create(Interface):
                 # on rerun with --force
                 if not attrs.get('.', {}).get('annex.largefiles', None) == '(not(mimetype=text/*))':
                     tbrepo.set_gitattributes([
-                        # XXX shouldn't this be '**' to have the desired effect?
                         ('*', {'annex.largefiles': '(not(mimetype=text/*))'})])
                     add_to_git.append('.gitattributes')
 
