@@ -272,6 +272,12 @@ def _revrange_as_results(dset, revrange):
                 "Error on {}'s message: {}".format(rev, exc_str(exc)))
 
         if info is not None:
+            if len(parents) > 1:
+                lgr.warning(
+                    "%s has run information but is a merge commit; "
+                    "it will not be re-executed",
+                    rev)
+                continue
             res["run_info"] = info
             res["run_message"] = msg
         yield dict(res, status="ok")
