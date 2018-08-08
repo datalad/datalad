@@ -2320,6 +2320,11 @@ class GitRepo(RepoInterface):
                 for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
                 if f.split('\t')[0] == 'D']
 
+
+    def get_git_attributes(self):
+        return self.get_gitattributes('.')['.']
+
+
     def get_gitattributes(self, path, index_only=False):
         """Query gitattributes for one or more paths
 
