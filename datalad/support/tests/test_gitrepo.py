@@ -1265,7 +1265,7 @@ def test_gitattributes(path):
     eq_(gr.get_gitattributes('.', index_only=True)['.'], {})
     # it is not relevant whether a path actually exists, and paths
     # with spaces and other funky stuff are just fine
-    funky = '{} {}'.format(
+    funky = u'{} {}'.format(
         get_most_obscure_supported_name(),
         get_most_obscure_supported_name())
     gr.set_gitattributes([(funky, {'this': 'that'})])
