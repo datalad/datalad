@@ -77,6 +77,10 @@ try:
         """Adapter for tqdm.ProgressBar"""
 
         backend = 'tqdm'
+        _frontends = {
+            None: tqdm,
+            'ipython': None  # to be loaded
+        }
 
         # TQDM behaved a bit suboptimally with older versions -- either was
         # completely resetting time/size in global pbar, or not updating
@@ -92,8 +96,41 @@ try:
             else dict(mininterval=0.1)
 
         def __init__(self, label='', fill_text=None,
-                     total=None, unit='B', out=sys.stdout, leave=False):
+                     total=None, unit='B', out=sys.stdout, leave=False,
+                     frontend=None):
+            """
+
+            Parameters
+            ----------
+            label
+            fill_text
+            total
+            unit
+            out
+            leave
+            frontend: (None, 'ipython'), optional
+              tqdm module to use.  Could be tqdm_notebook if under IPython
+            """
             super(tqdmProgressBar, self).__init__(total=total)
+
+            if frontend not in self._frontends:
+                raise ValueError(
+                    "Know only about following tqdm frontends: %s. Got %s"
+                    % (', '.join(map(str, self._frontends)),
+                       frontend))
+
+            tqdm_frontend = self._frontends[frontend]
+            if not tqdm_frontend:
+                if frontend == 'ipython':
+                    from tqdm import tqdm_notebook
+                    tqdm_frontend = self._frontends[frontend] = tqdm_notebook
+                else:
+                    lgr.error(
+                        "Something went wrong here, using default tqdm frontend for %s",
+                        frontend)
+                    tqdm_frontend = self._frontends[frontend] = self._frontends[None]
+
+            self._tqdm = tqdm_frontend
             self._pbar_params = updated(
                 self._default_pbar_params,
                 dict(desc=label, unit=unit,
@@ -104,7 +141,7 @@ try:
 
         def _create(self):
             if self._pbar is None:
-                self._pbar = tqdm(**self._pbar_params)
+                self._pbar = self._tqdm(**self._pbar_params)
 
         def update(self, size, increment=False):
             self._create()
@@ -128,7 +165,7 @@ try:
             super(tqdmProgressBar, self).refresh()
             # older tqdms might not have refresh yet but I think we can live
             # without it for a bit there
-            if hasattr(tqdm, 'refresh'):
+            if hasattr(self._tqdm, 'refresh'):
                 self._pbar.refresh()
 
         def finish(self, clear=False):

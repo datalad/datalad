@@ -135,7 +135,7 @@ class RunProcedure(Interface):
     (filename without a possible extension), the search is aborted and this
     implementation will be executed. This makes it possible for individual
     datasets, users, or machines to override externally provided procedures
-    (enabling the implementation of cutomizable processing "hooks").
+    (enabling the implementation of customizable processing "hooks").
 
 
     *Procedure implementation*

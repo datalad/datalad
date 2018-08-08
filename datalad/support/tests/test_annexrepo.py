@@ -579,7 +579,7 @@ def test_AnnexRepo_backend_option(path, url):
     ar = AnnexRepo(path, backend='MD5')
 
     # backend recorded in .gitattributes
-    eq_(ar.get_git_attributes()['annex.backend'], 'MD5')
+    eq_(ar.get_gitattributes('.')['.']['annex.backend'], 'MD5')
 
     ar.add('firstfile', backend='SHA1')
     ar.add('secondfile')

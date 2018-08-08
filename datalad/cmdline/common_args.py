@@ -29,7 +29,7 @@ help = (
 version = (
     'version', ('--version',),
     dict(action='version',
-         help="show the program's version and license information")
+         help="show the program's version")
 )
 
 _log_level_names = ['critical', 'error', 'warning', 'info', 'debug']
