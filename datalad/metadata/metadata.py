@@ -758,7 +758,7 @@ class ReadOnlyDict(Mapping):
         if self._hash is None:
             h = 0
             for key, value in iteritems(self._dict):
-                h ^= hash((key, value))
+                h ^= hash((key, _val2hashable(value)))
             self._hash = h
         return self._hash
 
