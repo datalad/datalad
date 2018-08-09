@@ -13,7 +13,12 @@
 import mock
 from datalad.tests.utils import *
 from datalad.utils import updated
-from ..base import Interface
+from ..base import (
+    Interface,
+    nadict,
+    nagen,
+    NA_STRING,
+)
 from argparse import Namespace
 
 
@@ -131,3 +136,19 @@ def test_get_result_filter_arg_vs_config():
         with patch_config({"datalad.runtime.report-status": "error"}):
             cargs_overload = f(_new_args(common_report_status=v))
         eq_(repr(cargs), repr(cargs_overload))
+
+
+def test_nagen():
+    na = nagen()
+    eq_(str(na), NA_STRING)
+    eq_(repr(na), 'nagen()')
+    assert na.unknown is na
+    assert na['unknown'] is na
+
+    eq_(str(nagen('-')), '-')
+
+
+def test_nadict():
+    d = nadict({1: 2})
+    eq_(d[1], 2)
+    eq_(str(d[2]), NA_STRING)

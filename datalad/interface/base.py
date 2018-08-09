@@ -326,6 +326,11 @@ class nagen(object):
     def __init__(self, missing=NA_STRING):
         self.missing = missing
 
+    def __repr__(self):
+        cls = self.__class__.__name__
+        args = str(self.missing) if self.missing != NA_STRING else ''
+        return '%s(%s)' % (cls, args)
+
     def __str__(self):
         return self.missing
 
