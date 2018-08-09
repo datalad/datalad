@@ -2059,8 +2059,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 opts=options + [files_opt] + [url],
                 progress=True,
                 expected_entries={file_: None},
-                #log_online=True,
-                #log_stderr=False,
                 **kwargs
             )
             if len(out_json) != 1:
@@ -2284,7 +2282,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           If provided `filename/key: size` dictionary, will be used to create
           ProcessAnnexProgressIndicators to display progress
         progress: bool, optional
-          Either request/handle --json-progress
+          Whether to request/handle --json-progress
         """
         progress_indicators = None
         try:
