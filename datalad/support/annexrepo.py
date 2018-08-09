@@ -3562,14 +3562,14 @@ class ProcessAnnexProgressIndicators(object):
                     label="Total", total=total)
                 self.total_pbar.start()
 
-    def __getitem__(self, download_id):
+    def __getitem__(self, id_):
         if self.pbars == 1:
             # regardless what it is, it is the one!
             # will happen e.g. in case of add_url_to_file since filename
             # is not even reported in the status and final msg just
             # reports the key which is not known before
             return self.pbars.items()[0]
-        return self.pbars[download_id]
+        return self.pbars[id_]
 
     def _update_pbar(self, pbar, new_value):
         """Updates pbar while also updating possibly total pbar"""
@@ -3627,9 +3627,9 @@ class ProcessAnnexProgressIndicators(object):
         target_size = None
         if 'command' in j and ('key' in j or 'file' in j):
             # might be the finish line message
-            download_item = j.get('key') or j.get('file')
-            j_download_id = (j['command'], download_item)
-            pbar = self.pbars.pop(j_download_id, None)
+            action_item = j.get('key') or j.get('file')
+            j_action_id = (j['command'], action_item)
+            pbar = self.pbars.pop(j_action_id, None)
             if pbar is None and len(self.pbars) == 1 and self.only_one_expected:
                 # it is the only one left - take it!
                 pbar = self.pbars.popitem()[1]
@@ -3641,7 +3641,7 @@ class ProcessAnnexProgressIndicators(object):
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
                     try:
-                        target_size = self.expected[download_item]
+                        target_size = self.expected[action_item]
                     except:
                         target_size = None
                     if not target_size and 'key' in j:
@@ -3676,9 +3676,9 @@ class ProcessAnnexProgressIndicators(object):
 
         # so we have a progress indicator, let's deal with it
         action = j['action']
-        download_item = action.get('key') or action.get('file')
-        download_id = (action['command'], download_item)
-        if download_id not in self.pbars:
+        action_item = action.get('key') or action.get('file')
+        action_id = (action['command'], action_item)
+        if action_id not in self.pbars:
             # New download!
             from datalad.ui import ui
             from datalad.ui import utils as ui_utils
@@ -3697,25 +3697,25 @@ class ProcessAnnexProgressIndicators(object):
                     0
             w = ui_utils.get_console_width()
 
-            if not download_item and self.only_one_expected:
+            if not action_item and self.only_one_expected:
                 # must be the one!
-                download_item = list(self.expected)[0]
+                action_item = list(self.expected)[0]
 
-            title = str(action.get('file') or download_item)
+            title = str(action.get('file') or action_item)
 
             pbar_right = 50
             title_len = w - pbar_right - 4  # (4 for reserve)
             if len(title) > title_len:
                 half = title_len//2 - 2
                 title = '%s .. %s' % (title[:half], title[-half:])
-            pbar = self.pbars[download_id] = ui.get_progressbar(
+            pbar = self.pbars[action_id] = ui.get_progressbar(
                 label=title, total=target_size)
             pbar.start()
 
-        lgr.log(1, "Updating pbar for download_id=%s. annex: %s.\n",
-                download_id, j)
+        lgr.log(1, "Updating pbar for action_id=%s. annex: %s.\n",
+                action_id, j)
         self._update_pbar(
-            self[download_id],
+            self[action_id],
             int(j.get('byte-progress'))
         )
 
