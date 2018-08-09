@@ -94,9 +94,7 @@ def setup_parser(
     parts = {}
     # main parser
     parser = ArgumentParserDisableAbbrev(
-        # cannot use '@' because we need to input JSON-LD properties (which might come wit @ prefix)
-        # MH: question, do we need this at all?
-        fromfile_prefix_chars=':',
+        fromfile_prefix_chars=None,
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             Comprehensive data management solution

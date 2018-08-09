@@ -307,7 +307,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # do, if there is sth in that setting already
         if persistent:
             # could be set in .gitattributes or $GIT_DIR/info/attributes
-            if 'annex.backend' in self.get_git_attributes():
+            if 'annex.backend' in self.get_gitattributes('.')['.']:
                 lgr.debug(
                     "Not (re)setting backend since seems already set in git attributes"
                 )

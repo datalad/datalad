@@ -180,6 +180,11 @@ def test_within_ds_file_search(path):
     except ImportError:
         raise SkipTest
     ds = Dataset(path).create(force=True)
+    # override default and search for datasets and files for this test
+    for m in ('egrep', 'textblob', 'autofield'):
+        ds.config.add(
+            'datalad.search.index-{}-documenttype'.format(m), 'all',
+            where='dataset')
     ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
     makedirs(opj(path, 'stim'))
     for src, dst in (
@@ -239,49 +244,72 @@ type
 
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
-    for mode, query, hitpath, matched_key, matched_val in (
-            # random keyword query
-            ('textblob',
-             'mp3',
-             opj('stim', 'stim1.mp3'),
-             'meta', 'mp3'),
-            # report which field matched with auto-field
-            ('autofield',
-             'mp3',
-             opj('stim', 'stim1.mp3'),
-             'audio.format', 'mp3'),
-            # XXX next one is not supported by current text field analyser
-            # decomposes the mime type in [mime, audio, mp3]
-            # ('autofield',
-            # "'mime:audio/mp3'",
-            # opj('stim', 'stim1.mp3'),
-            # 'audio.format', 'mime:audio/mp3'),
-            # but this one works
-            ('autofield',
-             "'mime audio mp3'",
-             opj('stim', 'stim1.mp3'),
-             'audio.format', 'mp3'),
-            # TODO extend with more complex queries to test whoosh
-            # query language configuration
+    for mode, query, hitpath, matched in (
+        ('egrep',
+         ':mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # same as above, leading : is stripped, in indicates "ALL FIELDS"
+        ('egrep',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # same as above, but with AND condition
+        # get both matches
+        ('egrep',
+         ['mp3', 'type:file'],
+         opj('stim', 'stim1.mp3'),
+         {'type': 'file', 'audio.format': 'mp3'}),
+        # case insensitive search
+        ('egrep',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # field selection by expression
+        ('egrep',
+         'audio\.+:mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # random keyword query
+        ('textblob',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'meta': 'mp3'}),
+        # report which field matched with auto-field
+        ('autofield',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # XXX next one is not supported by current text field analyser
+        # decomposes the mime type in [mime, audio, mp3]
+        # ('autofield',
+        # "'mime:audio/mp3'",
+        # opj('stim', 'stim1.mp3'),
+        # 'audio.format', 'mime:audio/mp3'),
+        # but this one works
+        ('autofield',
+         "'mime audio mp3'",
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # TODO extend with more complex queries to test whoosh
+        # query language configuration
     ):
         res = ds.search(query, mode=mode, full_record=True)
-        if mode == 'textblob':
-            # 'textblob' does datasets by default only (be could be configured otherwise
-            assert_result_count(res, 1)
-        else:
-            # the rest has always a file and the dataset, because they carry metadata in
-            # the same structure
-            assert_result_count(res, 2)
-            assert_result_count(
-                res, 1, type='file', path=opj(ds.path, hitpath),
-                # each file must report the ID of the dataset it is from, critical for
-                # discovering related content
-                dsid=ds.id)
         assert_result_count(
-            res, 1, type='dataset', path=ds.path, dsid=ds.id)
+            res, 1, type='file', path=opj(ds.path, hitpath),
+            # each file must report the ID of the dataset it is from, critical for
+            # discovering related content
+            dsid=ds.id)
+        # in egrep we currently do not search unique values
+        # and the queries above aim at files
+        assert_result_count(res, 1 if mode == 'egrep' else 2)
+        if mode != 'egrep':
+            assert_result_count(
+                res, 1, type='dataset', path=ds.path, dsid=ds.id)
         # test the key and specific value of the match
-        assert_in(matched_key, res[-1]['query_matched'])
-        assert_equal(res[-1]['query_matched'][matched_key], matched_val)
+        for matched_key, matched_val in matched.items():
+            assert_in(matched_key, res[-1]['query_matched'])
+            assert_equal(res[-1]['query_matched'][matched_key], matched_val)
 
 
 def test_listdict2dictlist():
