@@ -12,12 +12,12 @@ span.git { font-weight: bold; color: #00BA88; }
 span.annex { font-weight: bold; color: #EC6C20; }
 span.gittag { font-size: 70%; font-weight: normal;  vertical-align: super;}
 
-td.dir { font-weight: bold; color: #00A1CB; }
-td.git { font-weight: bold; color: #00BA88; }
+td.dir { font-weight: bold; color: #00A1CB; cursor: pointer;}
+td.git { font-weight: bold; color: #00BA88; cursor: pointer;}
 td.uninitialized { font-weight: bold; color: #00BA88; text-decoration: line-through; }
-td.annex { font-weight: bold; color: #EC6C20; }
+td.annex { font-weight: bold; color: #EC6C20; cursor: pointer;}
 td.link-broken { color:#E53B51; }
-td.link { color: #FFD03C; }
+td.link { color: #FFD03C; cursor: pointer}
 td.file { color: #67CDDC; }
 
 #installation { font-size: 90%; background-color: #fcfcfc; padding: 0em 0.5em 0.5em 0.5em; margin: 0em 0.5em 0.5em 0.5em; }
