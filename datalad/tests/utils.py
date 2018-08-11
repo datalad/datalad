@@ -39,6 +39,7 @@ from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 from os.path import relpath
 
+from nose.plugins.attrib import attr
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
@@ -512,6 +513,7 @@ def serve_path_via_http(tfunc, *targs):
     """
 
     @wraps(tfunc)
+    @attr('serve_path_via_http')
     def newfunc(*args, **kwargs):
 
         if targs:
@@ -534,6 +536,7 @@ def with_memory_keyring(t):
     """Decorator to use non-persistant MemoryKeyring instance
     """
     @wraps(t)
+    @attr('with_memory_keyring')
     def newfunc(*args, **kwargs):
         keyring = MemoryKeyring()
         with patch("datalad.downloaders.credentials.keyring_", keyring):
@@ -548,6 +551,7 @@ def without_http_proxy(tfunc):
     """
 
     @wraps(tfunc)
+    @attr('without_http_proxy')
     def newfunc(*args, **kwargs):
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
@@ -733,6 +737,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
 
     """
     @wraps(t)
+    @attr('with_testrepos')
     def newfunc(*arg, **kw):
         if on_windows:
             raise SkipTest("Testrepo setup is broken on Windows")
@@ -782,6 +787,7 @@ def with_fake_cookies_db(func, cookies={}):
     from ..support.cookies import cookies_db
 
     @wraps(func)
+    @attr('with_fake_cookies_db')
     def newfunc(*args, **kwargs):
         try:
             orig_cookies_db = cookies_db._cookies_db
@@ -804,12 +810,11 @@ def skip_if_no_network(func=None):
 
     if func:
         @wraps(func)
+        @attr('network')
+        @attr('skip_if_no_network')
         def newfunc(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        # right away tag the test as a networked test
-        tags = getattr(newfunc, 'tags', [])
-        newfunc.tags = tags + ['network']
         return newfunc
     else:
         check_and_raise()
@@ -819,6 +824,7 @@ def skip_if_on_windows(func):
     """Skip test completely under Windows
     """
     @wraps(func)
+    @attr('skip_if_on_windows')
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("Skipping on Windows")
@@ -860,6 +866,7 @@ def skip_ssh(func):
     DATALAD_TESTS_SSH was not set
     """
     @wraps(func)
+    @attr('skip_ssh')
     def newfunc(*args, **kwargs):
         from datalad import cfg
         test_ssh = cfg.get("datalad.tests.ssh", '')
@@ -882,6 +889,7 @@ def probe_known_failure(func):
     """
 
     @wraps(func)
+    @attr('probe_known_failure')
     def newfunc(*args, **kwargs):
         from datalad import cfg
         if cfg.obtain("datalad.tests.knownfailures.probe"):
@@ -908,6 +916,7 @@ def skip_known_failure(func, method='raise'):
              msg="Skip test known to fail",
              method=method)
     @wraps(func)
+    @attr('skip_known_failure')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -923,6 +932,7 @@ def known_failure(func):
     @skip_known_failure
     @probe_known_failure
     @wraps(func)
+    @attr('known_failure')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -942,6 +952,8 @@ def known_failure_v6(func):
 
         @known_failure
         @wraps(func)
+        @attr('known_failure_v6')
+        @attr('v6')
         def v6_func(*args, **kwargs):
             return func(*args, **kwargs)
 
@@ -964,6 +976,8 @@ def known_failure_direct_mode(func):
 
         @known_failure
         @wraps(func)
+        @attr('known_failure_direct_mode')
+        @attr('direct_mode')
         def dm_func(*args, **kwargs):
             return func(*args, **kwargs)
 
@@ -988,6 +1002,8 @@ def skip_v6(func, method='raise'):
 
     @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
     @wraps(func)
+    @attr('skip_v6')
+    @attr('v6')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1005,6 +1021,8 @@ def skip_direct_mode(func, method='raise'):
              msg="Skip test in direct mode test run",
              method=method)
     @wraps(func)
+    @attr('skip_direct_mode')
+    @attr('direct_mode')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1373,6 +1391,7 @@ def with_direct(func):
     Unlike fancy generators would just fail on the first failure
     """
     @wraps(func)
+    @attr('direct_mode')
     def newfunc(*args, **kwargs):
         if on_windows or on_travis:
             # since on windows would become indirect anyways
