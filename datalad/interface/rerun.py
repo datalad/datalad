@@ -60,10 +60,8 @@ class Rerun(Interface):
     << REFLOW ||
 
       - run: the revision has a recorded command that would be re-executed
-      - skip: the revision does not have a recorded command and would be
-        skipped
-      - pick: the revision does not have a recorded command and would be cherry
-        picked
+      - skip-or-pick: the revision does not have a recorded command and would
+        be either skipped or cherry picked
 
     The decision to skip rather than cherry pick a revision is based on whether
     the revision would be reachable from HEAD at the time of execution.
@@ -328,19 +326,12 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             rerun_action="checkout",
             status="ok")
 
-    def rev_is_ancestor(rev):
-        return dset.repo.is_ancestor(rev, start_point)
-
-    # We want to skip revs before the starting point and pick those after.
-    to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
-
     def skip_or_pick(hexsha, result, msg):
-        pick = hexsha in to_pick
-        result["rerun_action"] = "pick" if pick else "skip"
+        result["rerun_action"] = "skip-or-pick"
         shortrev = dset.repo.get_hexsha(hexsha, short=True)
         result["message"] = (
             "%s %s; %s",
-            shortrev, msg, "cherry picking" if pick else "skipping")
+            shortrev, msg, "skipping or cherry picking")
 
     for res in results:
         hexsha = res["commit"]
@@ -359,7 +350,15 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         yield res
 
 
+def _mark_nonrun_result(result, which):
+    msg = dict(skip="skipping", pick="cherry picking")[which]
+    result["rerun_action"] = which
+    result["message"] = result["message"][:-1] + (msg,)
+    return result
+
+
 def _rerun(dset, results, explicit=False):
+    head = dset.repo.get_hexsha()
     for res in results:
         rerun_action = res.get("rerun_action")
         if not rerun_action:
@@ -369,21 +368,25 @@ def _rerun(dset, results, explicit=False):
         res_hexsha = res["commit"]
         if rerun_action == "checkout":
             if res.get("branch"):
-                checkout_options = ["-b", res["branch"]]
+                branch = res["branch"]
+                checkout_options = ["-b", branch]
             else:
                 checkout_options = ["--detach"]
             dset.repo.checkout(res_hexsha,
                                options=checkout_options)
             continue
 
-        if rerun_action == "skip":
-            yield res
-        elif rerun_action == "pick":
-            dset.repo.cherry_pick(res_hexsha)
-            yield res
+        if rerun_action == "skip-or-pick":
+            if dset.repo.is_ancestor(res_hexsha, head):
+                _mark_nonrun_result(res, "skip")
+                yield res
+                continue
+            else:
+                dset.repo.cherry_pick(res_hexsha)
+                _mark_nonrun_result(res, "pick")
+                yield res
         elif rerun_action == "run":
             run_info = res["run_info"]
-
             # Keep a "rerun" trail.
             if "chain" in run_info:
                 run_info["chain"].append(res_hexsha)
@@ -412,6 +415,7 @@ def _rerun(dset, results, explicit=False):
                                  message=message,
                                  rerun_info=run_info):
                 yield r
+        head = dset.repo.get_hexsha()
 
 
 def _report(dset, results):
