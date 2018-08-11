@@ -297,22 +297,14 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         yield get_status_dict("run", status="error", message=exc_str(exc))
         return
 
-    if since is not None and since.strip() == "":
-        # For --since='', drop any leading commits that don't have
-        # a run command.
-        results = list(dropwhile(lambda r: "run_info" not in r, results))
-        if not results:
-            yield get_status_dict(
-                "run", status="impossible", ds=dset,
-                message=("No run commits found in history of %s", revrange))
-            return
-    else:
-        results = list(results)
-        if not results:
-            yield get_status_dict(
-                "run", status="impossible", ds=dset,
-                message=("No commits found in %s", revrange))
-            return
+    # Drop any leading commits that don't have a run command. These would be
+    # skipped anyways.
+    results = list(dropwhile(lambda r: "run_info" not in r, results))
+    if not results:
+        yield get_status_dict(
+            "run", status="impossible", ds=dset,
+            message=("No run commits found in range %s", revrange))
+        return
 
     if onto is not None and onto.strip() == "":
         onto = results[0]["commit"] + "^"
