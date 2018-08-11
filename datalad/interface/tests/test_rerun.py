@@ -265,26 +265,13 @@ def test_rerun_chain(path):
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
-
-    # Check out an orphan branch so that we can test the "one commit
-    # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo._git_custom_command(None, ["git", "reset", "--hard"])
     ds.repo.config.reload()
 
     ds.run('echo static-content > static')
     eq_(len(ds.repo.get_revisions("HEAD")), 1)
-
-    # Rerunning with just one commit doesn't raise an error ...
-    ds.rerun()
-    # ... but we're still at one commit because the content didn't
-    # change.
-    eq_(len(ds.repo.get_revisions("HEAD")), 1)
-
-    # We abort rather than trying to do anything when --onto='' and
-    # --since='' are given together and the first commit contains a
-    # run command.
-    ds.repo.commit(msg="empty", options=["--allow-empty"])
+    assert_raises(IncompleteResultsError, ds.rerun)
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
 
     # --script propagates the error.

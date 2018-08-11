@@ -272,11 +272,12 @@ def _revrange_as_results(dset, revrange):
                 "Error on {}'s message: {}".format(rev, exc_str(exc)))
 
         if info is not None:
-            if len(parents) > 1:
+            if len(parents) != 1:
                 lgr.warning(
-                    "%s has run information but is a merge commit; "
+                    "%s has run information but is a %s commit; "
                     "it will not be re-executed",
-                    rev)
+                    rev,
+                    "merge" if len(parents) > 1 else "root")
                 continue
             res["run_info"] = info
             res["run_message"] = msg
@@ -321,11 +322,6 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         onto = results[0]["commit"] + "^"
 
     if onto and not dset.repo.commit_exists(onto):
-        # This happens either because the user specifies a value that doesn't
-        # exists or the results first parent doesn't exist. The latter is
-        # unlikely to happen in the wild because it means that the first commit
-        # is a datalad run commit. Just abort rather than trying to checkout an
-        # orphan branch or something like that.
         yield get_status_dict(
             "run", ds=dset, status="error",
             message=("Revision specified for --onto (%s) does not exist.",
