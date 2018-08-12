@@ -145,15 +145,6 @@ def test_rerun(path, nodspath):
         ds.rerun()
 
     eq_('x\n', open(probe_path).read())
-    # If the history to rerun has a merge commit, we abort.
-    ds.repo.checkout("HEAD~3", options=["-b", "topic"])
-    with open(op.join(path, "topic-file"), "w") as f:
-        f.write("topic")
-    ds.save("topic-file")
-    ds.repo.checkout("master")
-    ds.repo.merge("topic")
-    assert_repo_status(ds.path)
-    assert_raises(IncompleteResultsError, ds.rerun)
 
 
 @with_tempfile(mkdir=True)
@@ -400,6 +391,33 @@ def test_rerun_cherry_pick(path):
     for onto, action in [("HEAD", "skip"), ("prerun", "pick")]:
         results = ds.rerun(since="prerun", onto=onto)
         assert_in_results(results, status='ok', rerun_action=action)
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+def test_rerun_invalid_merge_run_commit(path):
+    ds = Dataset(path).create()
+    ds.run("echo foo >>foo")
+    ds.run("echo invalid >>invalid")
+    run_msg = ds.repo.format_commit("%B")
+    run_hexsha = ds.repo.get_hexsha()
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard", "master~"])
+    with open(op.join(ds.path, "non-run"), "w") as nrfh:
+        nrfh.write("non-run")
+    ds.save()
+    # Assign two parents to the invalid run commit.
+    commit = ds.repo._git_custom_command(
+        None,
+        ["git", "commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
+         "-p", run_hexsha + "^",
+         "-p", ds.repo.get_hexsha()])[0].strip()
+
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard", commit])
+    hexsha_orig = ds.repo.get_hexsha()
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.rerun(since="")
+        assert_in("has run information but is a merge commit", cml.out)
+    eq_(len(ds.repo.get_revisions(hexsha_orig + "..master")), 1)
 
 
 @known_failure_windows

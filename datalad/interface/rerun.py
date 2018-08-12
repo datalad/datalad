@@ -62,6 +62,8 @@ class Rerun(Interface):
       - run: the revision has a recorded command that would be re-executed
       - skip-or-pick: the revision does not have a recorded command and would
         be either skipped or cherry picked
+      - merge: the revision is a merge commit and a corresponding merge would
+        be made
 
     The decision to skip rather than cherry pick a revision is based on whether
     the revision would be reachable from HEAD at the time of execution.
@@ -230,12 +232,6 @@ class Rerun(Interface):
         else:
             revrange = "{}..{}".format(since, revision)
 
-        if ds.repo.get_revisions(revrange, options=["--merges"]):
-            yield get_status_dict(
-                "run", ds=ds, status="error",
-                message="cannot rerun history with merge commits")
-            return
-
         results = _rerun_as_results(ds, revrange, since, branch, onto, message)
         if script:
             handler = _get_script_handler(script, since, revision)
@@ -346,7 +342,10 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
                 # This is the overriding message, if any, passed to this rerun.
                 res["rerun_message"] = message
         else:
-            skip_or_pick(hexsha, res, "does not have a command")
+            if len(res["parents"]) > 1:
+                res["rerun_action"] = "merge"
+            else:
+                skip_or_pick(hexsha, res, "does not have a command")
         yield res
 
 
@@ -358,7 +357,11 @@ def _mark_nonrun_result(result, which):
 
 
 def _rerun(dset, results, explicit=False):
-    head = dset.repo.get_hexsha()
+    # Keep a map from an original hexsha to a new hexsha created by the rerun
+    # (i.e. a reran, cherry-picked, or merged commit).
+    new_bases = {}  # original hexsha => reran hexsha
+    branch_to_restore = dset.repo.get_active_branch()
+    head = onto = dset.repo.get_hexsha()
     for res in results:
         rerun_action = res.get("rerun_action")
         if not rerun_action:
@@ -370,15 +373,81 @@ def _rerun(dset, results, explicit=False):
             if res.get("branch"):
                 branch = res["branch"]
                 checkout_options = ["-b", branch]
+                branch_to_restore = branch
             else:
                 checkout_options = ["--detach"]
+                branch_to_restore = None
             dset.repo.checkout(res_hexsha,
                                options=checkout_options)
+            head = onto = res_hexsha
             continue
+
+        # First handle the two cases that don't require additional steps to
+        # identify the base, a root commit or a merge commit.
+
+        if not res["parents"]:
+            _mark_nonrun_result(res, "skip")
+            yield res
+            continue
+
+        if rerun_action == "merge":
+            old_parents = res["parents"]
+            new_parents = [new_bases.get(p, p) for p in old_parents]
+            if old_parents == new_parents:
+                if not dset.repo.is_ancestor(res_hexsha, head):
+                    dset.repo.checkout(res_hexsha)
+            elif res_hexsha != head:
+                if dset.repo.is_ancestor(res_hexsha, onto):
+                    new_parents = [p for p in new_parents
+                                   if not dset.repo.is_ancestor(p, onto)]
+                if new_parents:
+                    if new_parents[0] != head:
+                        # Keep the direction of the original merge.
+                        dset.repo.checkout(new_parents[0])
+                    if len(new_parents) > 1:
+                        msg = dset.repo.format_commit("%B", res_hexsha)
+                        dset.repo._git_custom_command(
+                            None,
+                            ["git", "merge", "-m", msg,
+                             "--no-ff", "--allow-unrelated-histories"] +
+                            new_parents[1:],
+                            check_fake_dates=True)
+                    head = dset.repo.get_hexsha()
+                    new_bases[res_hexsha] = head
+            yield res
+            continue
+
+        # For all the remaining actions, first make sure we're on the
+        # appropriate base.
+
+        parent = res["parents"][0]
+        new_base = new_bases.get(parent)
+        head_to_restore = None  # ... to find our way back if we skip.
+
+        if new_base:
+            if new_base != head:
+                dset.repo.checkout(new_base)
+                head_to_restore, head = head, new_base
+        elif parent != head and dset.repo.is_ancestor(onto, parent):
+            if rerun_action == "run":
+                dset.repo.checkout(parent)
+                head = parent
+            else:
+                _mark_nonrun_result(res, "skip")
+                yield res
+                continue
+        else:
+            if parent != head:
+                new_bases[parent] = head
+
+        # We've adjusted base. Now skip, pick, or run the commit.
 
         if rerun_action == "skip-or-pick":
             if dset.repo.is_ancestor(res_hexsha, head):
                 _mark_nonrun_result(res, "skip")
+                if head_to_restore:
+                    dset.repo.checkout(head_to_restore)
+                    head, head_to_restore = head_to_restore, None
                 yield res
                 continue
             else:
@@ -415,7 +484,17 @@ def _rerun(dset, results, explicit=False):
                                  message=message,
                                  rerun_info=run_info):
                 yield r
-        head = dset.repo.get_hexsha()
+        new_head = dset.repo.get_hexsha()
+        if new_head not in [head, res_hexsha]:
+            new_bases[res_hexsha] = new_head
+        head = new_head
+
+    if branch_to_restore:
+        # The user asked us to replay the sequence onto a branch, but the
+        # history had merges, so we're in a detached state.
+        dset.repo.update_ref("refs/heads/" + branch_to_restore,
+                             "HEAD")
+        dset.repo.checkout(branch_to_restore)
 
 
 def _report(dset, results):
