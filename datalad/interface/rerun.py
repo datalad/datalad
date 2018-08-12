@@ -321,7 +321,9 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         yield get_status_dict(
             "run",
             ds=dset,
-            commit=start_point,
+            # Resolve this to the full hexsha so downstream code gets a
+            # predictable form.
+            commit=dset.repo.get_hexsha(start_point),
             branch=branch,
             rerun_action="checkout",
             status="ok")
