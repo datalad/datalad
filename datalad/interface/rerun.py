@@ -252,7 +252,7 @@ class Rerun(Interface):
 
 def _revrange_as_results(dset, revrange):
     rev_lines = dset.repo.get_revisions(
-        revrange, fmt="%H %P", options=["--reverse"])
+        revrange, fmt="%H %P", options=["--reverse", "--topo-order"])
     if not rev_lines:
         return
 
