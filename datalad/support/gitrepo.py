@@ -1473,7 +1473,7 @@ class GitRepo(RepoInterface):
           options for the git executable as key, value pair
           (see above)
         env: dict
-          environment vaiables to temporarily set for this call
+          environment variables to temporarily set for this call
 
         TODO
         ----
@@ -2307,17 +2307,37 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_changed_files(self, staged=False, filter=''):
+        """Return a dictionary with files and their status code
+
+        See `git diff --help` for more information about codes
+
+        Parameters
+        ----------
+        staged: bool, optional
+          Either operate on staged (index) files instead of workdir
+        filter: str, optional
+          Status codes (from ACDMRTUXB) if only specific changes should be
+          considered.  See `--diff-filter` within the `git-diff` for more info
+        """
+        opts = ['--raw', '--name-status']
+        if staged:
+            opts.append('--staged')
+        if filter:
+            opts.append('--diff-filter=%s' % filter)
+        return dict(
+            f.split('\t', 1)[::-1]
+            for f in self.repo.git.diff(*opts).split('\n')
+            if f
+        )
+
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
-                if f.split('\t')[0] == 'D']
+        return list(self.get_changed_files(filter='D'))
 
     def get_deleted_files(self):
         """Return a list of paths with deleted files (staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
-                if f.split('\t')[0] == 'D']
+        return list(self.get_changed_files(staged=True, filter='D'))
 
     def get_git_attributes(self):
         """Check git attribute for the current repository (not per-file support for now)
