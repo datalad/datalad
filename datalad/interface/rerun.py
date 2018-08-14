@@ -364,14 +364,18 @@ def _rerun(dset, results, explicit=False):
         rerun_action = res.get("rerun_action")
         if not rerun_action:
             yield res
-        elif rerun_action == "checkout":
+            continue
+
+        if rerun_action == "checkout":
             if res.get("branch"):
                 checkout_options = ["-b", res["branch"]]
             else:
                 checkout_options = ["--detach"]
             dset.repo.checkout(res["commit"],
                                options=checkout_options)
-        elif rerun_action == "skip":
+            continue
+
+        if rerun_action == "skip":
             yield res
         elif rerun_action == "pick":
             dset.repo.cherry_pick(res["commit"])
