@@ -366,29 +366,29 @@ def _rerun(dset, results, explicit=False):
             yield res
             continue
 
-        hexsha = res["commit"]
+        res_hexsha = res["commit"]
         if rerun_action == "checkout":
             if res.get("branch"):
                 checkout_options = ["-b", res["branch"]]
             else:
                 checkout_options = ["--detach"]
-            dset.repo.checkout(hexsha,
+            dset.repo.checkout(res_hexsha,
                                options=checkout_options)
             continue
 
         if rerun_action == "skip":
             yield res
         elif rerun_action == "pick":
-            dset.repo.cherry_pick(hexsha)
+            dset.repo.cherry_pick(res_hexsha)
             yield res
         elif rerun_action == "run":
             run_info = res["run_info"]
 
             # Keep a "rerun" trail.
             if "chain" in run_info:
-                run_info["chain"].append(hexsha)
+                run_info["chain"].append(res_hexsha)
             else:
-                run_info["chain"] = [hexsha]
+                run_info["chain"] = [res_hexsha]
 
             # now we have to find out what was modified during the last run,
             # and enable re-modification ideally, we would bring back the
