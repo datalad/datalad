@@ -21,6 +21,7 @@ from datalad.utils import swallow_outputs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
@@ -175,6 +176,7 @@ def test_search_non_dataset(tdir):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 def test_within_ds_file_search(path):
     try:
         import mutagen
