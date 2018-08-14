@@ -366,22 +366,22 @@ def _rerun(dset, results, explicit=False):
             yield res
             continue
 
+        hexsha = res["commit"]
         if rerun_action == "checkout":
             if res.get("branch"):
                 checkout_options = ["-b", res["branch"]]
             else:
                 checkout_options = ["--detach"]
-            dset.repo.checkout(res["commit"],
+            dset.repo.checkout(hexsha,
                                options=checkout_options)
             continue
 
         if rerun_action == "skip":
             yield res
         elif rerun_action == "pick":
-            dset.repo.cherry_pick(res["commit"])
+            dset.repo.cherry_pick(hexsha)
             yield res
         elif rerun_action == "run":
-            hexsha = res["commit"]
             run_info = res["run_info"]
 
             # Keep a "rerun" trail.
