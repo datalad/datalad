@@ -1069,7 +1069,7 @@ class GitRepo(RepoInterface):
         return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None, date=None):
+               files=None, date=None, index_file=None):
         """Commit changes to git.
 
         Parameters
@@ -1088,6 +1088,8 @@ class GitRepo(RepoInterface):
           path(s) to commit
         date: str, optional
           Date in one of the formats git understands
+        index_file: str, optional
+          An alternative index to use
         """
 
         self.precommit()
@@ -1132,7 +1134,8 @@ class GitRepo(RepoInterface):
         try:
             self._git_custom_command(files, cmd,
                                      expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True)
+                                     check_fake_dates=True,
+                                     index_file=index_file)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1538,7 +1541,8 @@ class GitRepo(RepoInterface):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            check_fake_dates=False):
+                            check_fake_dates=False,
+                            index_file=None):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1574,6 +1578,9 @@ class GitRepo(RepoInterface):
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
+
+        if index_file:
+            env['GIT_INDEX_FILE'] = index_file
 
         try:
             out, err = self.cmd_call_wrapper.run(
@@ -2307,7 +2314,7 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, filter=''):
+    def get_changed_files(self, staged=False, filter='', index_file=None):
         """Return a dictionary with files and their status code
 
         See `git diff --help` for more information about codes
@@ -2319,15 +2326,21 @@ class GitRepo(RepoInterface):
         filter: str, optional
           Status codes (from ACDMRTUXB) if only specific changes should be
           considered.  See `--diff-filter` within the `git-diff` for more info
+        index_file: str, optional
+          Alternative index file for git to use
         """
         opts = ['--raw', '--name-status']
+        kwargs = {}
         if staged:
             opts.append('--staged')
         if filter:
             opts.append('--diff-filter=%s' % filter)
+        if index_file:
+            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
+        diff_output = self.repo.git.diff(*opts, **kwargs)
         return dict(
             f.split('\t', 1)[::-1]
-            for f in self.repo.git.diff(*opts).split('\n')
+            for f in diff_output.split('\n')
             if f
         )
 

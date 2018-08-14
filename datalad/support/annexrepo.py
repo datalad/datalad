@@ -56,6 +56,7 @@ from datalad.utils import _path_
 from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
+from datalad.utils import make_tempfile
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
@@ -198,6 +199,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 raise e
 
+        # Below while setting for direct mode workaround, we change
+        # _GIT_COMMON_OPTIONS.
+        # But we should not pass workarounds such as --worktree=.
+        # -c core.bare=False to git annex commands, so for their
+        # invocation we will keep and use pristine version of the
+        # common options
+        self._ANNEX_GIT_COMMON_OPTIONS = self._GIT_COMMON_OPTIONS[:]
+
         # check for possible SSH URLs of the remotes in order to set up
         # shared connections:
         for r in self.get_remotes():
@@ -267,7 +276,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # to use 'git annex unlock' instead.
                 lgr.warning("direct mode not available for %s. Ignored." % self)
 
-        self._batched = BatchedAnnexes(batch_size=batch_size)
+        self._batched = BatchedAnnexes(
+            batch_size=batch_size, git_options=self._ANNEX_GIT_COMMON_OPTIONS)
 
         # set default backend for future annex commands:
         # TODO: Should the backend option of __init__() also migrate
@@ -1039,7 +1049,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
         backend = ['--backend=%s' % backend] if backend else []
 
-        git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
+        git_options = (git_options[:] if git_options else []) + self._ANNEX_GIT_COMMON_OPTIONS
         annex_options = annex_options[:] if annex_options else []
         if self._annex_common_options:
             annex_options = self._annex_common_options + annex_options
@@ -1601,9 +1611,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         if len(files) > 1:
-            return self._batched.get('lookupkey',
-                                     git_options=self._GIT_COMMON_OPTIONS,
-                                     path=self.path)(files)
+            return self._batched.get('lookupkey', path=self.path)(files)
         else:
             files = files[0]
             # single file
@@ -1785,7 +1793,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         objects = []
         if batch:
-            objects = self._batched.get('find', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(files)
+            objects = self._batched.get('find', path=self.path)(files)
         else:
             for f in files:
                 try:
@@ -2077,7 +2085,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # Since backend will be critical for non-existing files
                 'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
-                git_options=self._GIT_COMMON_OPTIONS + git_options,
+                git_options=git_options,
                 annex_options=options,  # --raw ?
                 path=self.path,
                 json=True
@@ -2246,7 +2254,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             json_objects = self._batched.get(
                 'dropkey',
-                git_options=self._GIT_COMMON_OPTIONS,
                 annex_options=options, json=True, path=self.path
             )(keys)
         for j in json_objects:
@@ -2520,7 +2527,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             json_objects = self._batched.get(
                 'info',
-                git_options=self._GIT_COMMON_OPTIONS,
                 annex_options=options, json=True, path=self.path
             )(files)
 
@@ -2770,10 +2776,57 @@ class AnnexRepo(GitRepo, RepoInterface):
             #       example.
 
             try:
-                super(AnnexRepo, self).commit(msg, options,
-                                              _datalad_msg=_datalad_msg,
-                                              careless=careless, files=files)
+                alt_index_file = None
+                files_to_commit = None  # we might need to avoid explicit paths
+                if self.is_direct_mode() and files:
+                    # In direct mode, if we commit file(s) they would get
+                    # committed directly into git ignoring possibly being
+                    # staged by annex.  So, if not all files are committed, and
+                    # assuming that what is to be committed is staged (!could be
+                    # wrong assumption), we need to prepare a custom index, and
+                    # commit without specifying any paths
+                    all_staged_files = {
+                        opj(self.path, p)
+                        for p in self.get_changed_files(staged=True)
+                    }
+                    files_set = set(files)
+                    files_notstaged = files_set.difference(all_staged_files)
+                    if files_notstaged:
+                        # To be safe(r), let's just blow for now!
+                        # We could be smart(er) and do all the git or annex add
+                        # but let's see if we run into those cases first
+                        raise RuntimeError(
+                            "To commit files in direct mode, please first git "
+                            "or git-annex add them first!  Files: %s"
+                            % ', '.join(files_notstaged)
+                        )
+                    # Files which were staged but not among files
+                    staged_not_to_commit = all_staged_files.difference(files_set)
+                    if staged_not_to_commit:
+                        # Need an alternative index_file
+                        with make_tempfile() as index_file:
+                            alt_index_file = index_file
+                            # Reset the files we are not to be committed
+                            self._git_custom_command(
+                                list(staged_not_to_commit),
+                                ['git', 'reset'],
+                                index_file=alt_index_file)
+
+                            super(AnnexRepo, self).commit(
+                                msg, options,
+                                _datalad_msg=_datalad_msg,
+                                careless=careless,
+                                index_file=alt_index_file)
+
+                    # in any case we will not specify files explicitly
+                    files_to_commit = None
+                if not alt_index_file:
+                    super(AnnexRepo, self).commit(msg, options,
+                                                  _datalad_msg=_datalad_msg,
+                                                  careless=careless,
+                                                  files=files_to_commit)
             except CommandError as e:
+                # TODO: just remove this???
                 if self.is_direct_mode() and \
                     AnnexRepo._is_annex_work_tree_message(e.stderr):
                     lgr.debug("Commit failed. "
@@ -2782,6 +2835,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 careless=careless, files=files, proxy=True)
                 else:
                     raise
+            finally:
+                if alt_index_file and os.path.exists(alt_index_file):
+                    os.unlink(alt_index_file)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
@@ -2834,7 +2890,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             except CommandError:
                 return ''
         else:
-            return self._batched.get('contentlocation', git_options=self._GIT_COMMON_OPTIONS, path=self.path)(key)
+            return self._batched.get('contentlocation', path=self.path)(key)
 
     @normalize_paths(serialize=True)
     def is_available(self, file_, remote=None, key=False, batch=False):
@@ -2881,7 +2937,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
             out = self._batched.get(
                 ':'.join(annex_cmd), annex_cmd,
-                git_options=self._GIT_COMMON_OPTIONS,
                 path=self.path)(key_)
             try:
                 return {
@@ -3282,15 +3337,16 @@ class BatchedAnnexes(dict):
     """Class to contain the registry of active batch'ed instances of annex for
     a repository
     """
-    def __init__(self, batch_size=0):
+    def __init__(self, batch_size=0, git_options=None):
         self.batch_size = batch_size
+        self.git_options = git_options or []
         super(BatchedAnnexes, self).__init__()
 
     def get(self, codename, annex_cmd=None, **kwargs):
         if annex_cmd is None:
             annex_cmd = codename
 
-        git_options = kwargs.pop('git_options', [])
+        git_options = self.git_options + kwargs.pop('git_options', [])
         if self.batch_size:
             git_options += ['-c', 'annex.queuesize=%d' % self.batch_size]
 
