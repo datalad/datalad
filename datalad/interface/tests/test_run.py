@@ -773,7 +773,6 @@ def test_run_inputs_no_annex_repo(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_testrepos('basic_annex', flavors=['clone'])
-@known_failure_direct_mode  #FIXME
 def test_run_explicit(path):
     ds = Dataset(path)
 

@@ -324,7 +324,6 @@ def test_create_withprocedure(path):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_create_text_no_annex(path):
     ds = create(path, text_no_annex=True)
     ok_clean_git(path)

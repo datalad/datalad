@@ -117,7 +117,6 @@ def test_wtf(path):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_no_annex(path):
     ds = create(path)
     ok_clean_git(ds.path)

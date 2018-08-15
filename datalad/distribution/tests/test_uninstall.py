@@ -391,7 +391,6 @@ def test_careless_subdataset_uninstall(path):
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_kill(path):
     # nested datasets with load
     ds = Dataset(path).create()
