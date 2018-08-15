@@ -2785,23 +2785,29 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # assuming that what is to be committed is staged (!could be
                     # wrong assumption), we need to prepare a custom index, and
                     # commit without specifying any paths
-                    all_staged_files = {
-                        opj(self.path, p)
-                        for p in self.get_changed_files(staged=True)
+                    changed_files = {
+                        staged: {
+                            opj(self.path, p)
+                            for p in self.get_changed_files(staged=staged)
+                        } for staged in (True,) #  False}
                     }
                     files_set = set(files)
-                    files_notstaged = files_set.difference(all_staged_files)
-                    if files_notstaged:
-                        # To be safe(r), let's just blow for now!
-                        # We could be smart(er) and do all the git or annex add
-                        # but let's see if we run into those cases first
-                        raise RuntimeError(
-                            "To commit files in direct mode, please first git "
-                            "or git-annex add them first!  Files: %s"
-                            % ', '.join(files_notstaged)
-                        )
+                    files_notstaged = files_set.difference(changed_files[True])
+                    # Lazy .add('.') results in ALL (performance?) files listed
+                    # here even if they are not changed at all and could be ignored
+                    #files_changed_notstaged = files_notstaged.difference(changed_files[False])
+                    # if files_changed_notstaged:
+                    #     # To be safe(r), let's just blow for now!
+                    #     # We could be smart(er) and do all the git or annex add
+                    #     # but let's see if we run into those cases first
+                    #     import pdb; pdb.set_trace()
+                    #     raise RuntimeError(
+                    #         "To commit files in direct mode, please first git "
+                    #         "or git-annex add them first!  Files: %s"
+                    #         % ', '.join(files_changed_notstaged)
+                    #     )
                     # Files which were staged but not among files
-                    staged_not_to_commit = all_staged_files.difference(files_set)
+                    staged_not_to_commit = changed_files[True].difference(files_set)
                     if staged_not_to_commit:
                         # Need an alternative index_file
                         with make_tempfile() as index_file:
