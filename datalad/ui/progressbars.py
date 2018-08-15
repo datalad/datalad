@@ -32,6 +32,8 @@ class ProgressBarBase(object):
         pass
 
     def update(self, size, increment=False):
+        if not size:
+            return
         if increment:
             self._current += size
         else:
@@ -143,6 +145,8 @@ try:
 
         def update(self, size, increment=False):
             self._create()
+            if not size:
+                return
             inc = size - self.current
             try:
                 self._pbar.update(size if increment else inc)
