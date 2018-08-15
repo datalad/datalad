@@ -108,11 +108,13 @@ def save_dataset(
 
     if to_gitadd or save_entire_ds:
         lgr.debug('Adding files straight to Git at %s: %s', ds, to_gitadd)
+        # TODO this swallows status message, yield properly
         ds.repo.add(to_gitadd, git=True,
                     # this makes sure that pending submodule updates are added too
                     update=save_entire_ds)
     if to_annexadd:
         lgr.debug('Adding files to annex at %s: %s', ds, to_annexadd)
+        # TODO this swallows status message, yield properly
         ds.repo.add(to_annexadd)
 
     _datalad_msg = False

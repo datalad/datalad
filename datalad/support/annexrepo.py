@@ -758,6 +758,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     @staticmethod
     def get_size_from_key(key):
         """A little helper to obtain size encoded in a key"""
+        if not key:
+            return None
         try:
             size_str = key.split('-', 2)[1].lstrip('s')
         except IndexError:
@@ -1331,9 +1333,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(fetch_files) != len(files):
             lgr.debug("Actually getting %d files", len(fetch_files))
 
-        # options  might be the '--key' which should go last
-        options = ['--json-progress'] + options
-
         # TODO: provide more meaningful message (possibly aggregating 'note'
         #  from annex failed ones
         # TODO: reproduce DK's bug on OSX, and either switch to
@@ -1348,6 +1347,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # TODO: eventually make use of --batch mode
             jobs=jobs,
             expected_entries=expected_downloads,
+            progress=True,
             **kwargs
         )
         results_list = list(results)
@@ -1405,10 +1405,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         return expected_files, fetch_files
 
     @normalize_paths
-    def add(self, files, git=None, backend=None, options=None,
-            jobs=None,
-            git_options=None, annex_options=None, _datalad_msg=False,
-            update=False):
+    def add(self, files, git=None, backend=None, options=None, jobs=None,
+            git_options=None, annex_options=None, update=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -1438,6 +1436,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of dict
         """
 
+        return list(self.add_(
+            files, git=git, backend=backend, options=options, jobs=jobs,
+            git_options=git_options, annex_options=annex_options, update=update
+        ))
+
+    def add_(self, files, git=None, backend=None, options=None, jobs=None,
+            git_options=None, annex_options=None, update=False):
+        """Like `add`, but returns a generator"""
         if update and not git:
             raise InsufficientArgumentsError("option 'update' requires 'git', too")
 
@@ -1462,8 +1468,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             if self.is_direct_mode():
                 # we already know we can't use --dry-run
-                return self._process_git_get_output(
-                    linesep.join(["'{}'".format(p.encode('utf-8')) for p in paths]))
+                for r in self._process_git_get_output(
+                        linesep.join(["'{}'".format(p.encode('utf-8'))
+                        for p in paths])):
+                    yield r
+                    return
             else:
                 # Note: if a path involves a submodule in direct mode, while we
                 # are not in direct mode at current level, we might still fail.
@@ -1473,8 +1482,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # hierarchy.
                 _git_options = ['--dry-run', '-N', '--ignore-missing']
                 try:
-                    return super(AnnexRepo, self).add(
-                        files, git_options=_git_options, update=update)
+                    for r in super(AnnexRepo, self).add_(
+                            files, git_options=_git_options, update=update):
+                        yield r
+                        return
                 except CommandError as e:
                     if AnnexRepo._is_annex_work_tree_message(e.stderr):
                         lgr.warning(
@@ -1484,8 +1495,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                             "fails. To be resolved by using (Dataset's) status "
                             "instead of a git-add --dry-run altogether.")
                         # fake the return for now
-                        return self._process_git_get_output(
-                            linesep.join(["'{}'".format(f) for f in files]))
+                        for r in self._process_git_get_output(
+                                linesep.join(["'{}'".format(f)
+                                for f in files])):
+                            yield r
+                            return
                     else:
                         # unexpected failure
                         raise e
@@ -1528,12 +1542,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             if self.is_direct_mode() and not files:
                 self.GIT_DIRECT_MODE_PROXY = True
             try:
-                return_list = super(AnnexRepo, self).add(
-                                           files,
-                                           git=True,
-                                           git_options=git_options,
-                                           _datalad_msg=_datalad_msg,
-                                           update=update)
+                for r in super(AnnexRepo, self).add(
+                        files,
+                        git=True,
+                        git_options=git_options,
+                        update=update):
+                    yield r
             finally:
                 if self.is_direct_mode() and not files:
                     # don't accidentally cause other git calls to be done
@@ -1541,18 +1555,16 @@ class AnnexRepo(GitRepo, RepoInterface):
                     self.GIT_DIRECT_MODE_PROXY = False
 
         else:
-            return_list = list(self._run_annex_command_json(
-                'add',
-                opts=options,
-                files=files,
-                backend=backend,
-                expect_fail=True,
-                jobs=jobs,
-                expected_entries=expected_additions,
-                expect_stderr=True
-            ))
-
-        return return_list
+            for r in self._run_annex_command_json(
+                    'add',
+                    opts=options,
+                    files=files,
+                    backend=backend,
+                    expect_fail=True,
+                    jobs=jobs,
+                    expected_entries=expected_additions,
+                    expect_stderr=True):
+                yield r
 
     def proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
@@ -2057,7 +2069,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             out_json = self._run_annex_command_json(
                 'addurl',
                 opts=options + [files_opt] + [url],
-                log_online=True, log_stderr=False,
+                progress=True,
+                expected_entries={file_: None},
                 **kwargs
             )
             if len(out_json) != 1:
@@ -2271,6 +2284,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 jobs=None,
                                 files=None,
                                 expected_entries=None,
+                                progress=False,
                                 **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
 
@@ -2279,6 +2293,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         expected_entries : dict, optional
           If provided `filename/key: size` dictionary, will be used to create
           ProcessAnnexProgressIndicators to display progress
+        progress: bool, optional
+          Whether to request/handle --json-progress
         """
         progress_indicators = None
         try:
@@ -2294,11 +2310,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 ))
             # TODO: refactor to account for possible --batch ones
             annex_options = ['--json']
+            if progress:
+                annex_options += ['--json-progress']
+
             if jobs == 'auto':
                 jobs = N_AUTO_JOBS
             if jobs and jobs != 1:
                 annex_options += ['-J%d' % jobs]
             if opts:
+                # opts might be the '--key' which should go last
                 annex_options += opts
 
             # TODO: RF to use --batch where possible instead of splitting
@@ -3048,7 +3068,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if len(copy_files) != len(files):
             lgr.debug("Actually copying %d files", len(copy_files))
 
-        annex_options = ['--to=%s' % remote, '--json-progress']
+        annex_options = ['--to=%s' % remote]
         if options:
             annex_options.extend(shlex.split(options))
 
@@ -3059,7 +3079,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             opts=annex_options,
             files=files,  # copy_files,
             jobs=jobs,
-            expected_entries=expected_copys
+            expected_entries=expected_copys,
+            progress=True
             #log_stdout=True, log_stderr=not log_online,
             #log_online=log_online, expect_stderr=True
         )
@@ -3537,6 +3558,7 @@ class ProcessAnnexProgressIndicators(object):
         self.pbars = {}
         self.total_pbar = None
         self.expected = expected
+        self.only_one_expected = expected and len(self.expected) == 1
         self._failed = 0
         self._succeeded = 0
         self.start()
@@ -3545,9 +3567,19 @@ class ProcessAnnexProgressIndicators(object):
         if self.expected:
             from datalad.ui import ui
             total = sum(filter(bool, self.expected.values()))
-            self.total_pbar = ui.get_progressbar(
-                label="Total", total=total)
-            self.total_pbar.start()
+            if len(self.expected) > 1:
+                self.total_pbar = ui.get_progressbar(
+                    label="Total", total=total)
+                self.total_pbar.start()
+
+    def __getitem__(self, id_):
+        if self.pbars == 1:
+            # regardless what it is, it is the one!
+            # will happen e.g. in case of add_url_to_file since filename
+            # is not even reported in the status and final msg just
+            # reports the key which is not known before
+            return self.pbars.items()[0]
+        return self.pbars[id_]
 
     def _update_pbar(self, pbar, new_value):
         """Updates pbar while also updating possibly total pbar"""
@@ -3588,7 +3620,6 @@ class ProcessAnnexProgressIndicators(object):
             # if we fail to parse, just return this precious thing for
             # possibly further processing
             return line
-
         # Process some messages which remotes etc might push to us
         if list(j) == ['info']:
             # Just INFO was received without anything else -- we log it at INFO
@@ -3604,10 +3635,14 @@ class ProcessAnnexProgressIndicators(object):
                 return
 
         target_size = None
-        if 'command' in j and 'key' in j:
+        if 'command' in j and ('key' in j or 'file' in j):
             # might be the finish line message
-            j_download_id = (j['command'], j['key'])
-            pbar = self.pbars.pop(j_download_id, None)
+            action_item = j.get('key') or j.get('file')
+            j_action_id = (j['command'], action_item)
+            pbar = self.pbars.pop(j_action_id, None)
+            if pbar is None and len(self.pbars) == 1 and self.only_one_expected:
+                # it is the only one left - take it!
+                pbar = self.pbars.popitem()[1]
             if j.get('success') in {True, 'true'}:
                 self._succeeded += 1
                 if pbar:
@@ -3616,10 +3651,11 @@ class ProcessAnnexProgressIndicators(object):
                     # we didn't have a pbar for this download, so total should
                     # get it all at once
                     try:
-                        size_j = self.expected[j['key']]
+                        target_size = self.expected[action_item]
                     except:
-                        size_j = None
-                    target_size = size_j or AnnexRepo.get_size_from_key(j['key'])
+                        target_size = None
+                    if not target_size and 'key' in j:
+                        target_size = AnnexRepo.get_size_from_key(j['key'])
                     self.total_pbar.update(target_size, increment=True)
             else:
                 lgr.log(5, "Message with failed status: %s" % str(j))
@@ -3650,9 +3686,9 @@ class ProcessAnnexProgressIndicators(object):
 
         # so we have a progress indicator, let's deal with it
         action = j['action']
-        download_item = action.get('file') or action.get('key')
-        download_id = (action['command'], action['key'])
-        if download_id not in self.pbars:
+        action_item = action.get('key') or action.get('file')
+        action_id = (action['command'], action_item)
+        if action_id not in self.pbars:
             # New download!
             from datalad.ui import ui
             from datalad.ui import utils as ui_utils
@@ -3670,20 +3706,26 @@ class ProcessAnnexProgressIndicators(object):
                     ) or \
                     0
             w = ui_utils.get_console_width()
-            title = str(download_item)
+
+            if not action_item and self.only_one_expected:
+                # must be the one!
+                action_item = list(self.expected)[0]
+
+            title = str(action.get('file') or action_item)
+
             pbar_right = 50
             title_len = w - pbar_right - 4  # (4 for reserve)
             if len(title) > title_len:
                 half = title_len//2 - 2
                 title = '%s .. %s' % (title[:half], title[-half:])
-            pbar = self.pbars[download_id] = ui.get_progressbar(
+            pbar = self.pbars[action_id] = ui.get_progressbar(
                 label=title, total=target_size)
             pbar.start()
 
-        lgr.log(1, "Updating pbar for download_id=%s. annex: %s.\n",
-                download_id, j)
+        lgr.log(1, "Updating pbar for action_id=%s. annex: %s.\n",
+                action_id, j)
         self._update_pbar(
-            self.pbars[download_id],
+            self[action_id],
             int(j.get('byte-progress'))
         )
 

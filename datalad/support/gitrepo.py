@@ -155,10 +155,10 @@ def _normalize_path(base_dir, path):
 
     Parameters
     ----------
-    path: str
-        path to be normalized
     base_dir: str
         directory to serve as base to normalized, relative paths
+    path: str
+        path to be normalized
 
     Returns
     -------
@@ -871,8 +871,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, git=True, git_options=None,
-            _datalad_msg=False, update=False):
+    def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -892,22 +891,37 @@ class GitRepo(RepoInterface):
            files in the entire working tree are updated (old versions of Git
            used to limit the update to the current directory and its
            subdirectories).
-        """
 
+        Returns
+        -------
+        list
+          Of status dicts.
+        """
+        # under all circumstances call this class' add_ (otherwise
+        # AnnexRepo.add would go into a loop
+        return list(GitRepo.add_(self, files, git=git, git_options=git_options,
+                    update=update))
+
+    def add_(self, files, git=True, git_options=None, update=False):
+        """Like `add`, but returns a generator"""
         # TODO: git_options is used as options for the git-add here,
         # instead of options to the git executable => rename for consistency
 
-        # needs to be True - see docstring:
-        # XXX why is this done? this is add() of GitRepo, there is not even a
-        # question
-        assert(git)
+        if not git:
+            lgr.warning(
+                'GitRepo.add() called with git=%s, this should not happen',
+                git)
+            git = True
 
-        files = _remove_empty_items(files)
-        out = []
+        # there is no other way then to collect all files into a list
+        # at this point, because we need to pass them at once to a single
+        # `git add` call
+        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
 
         if not (files or git_options or update):
+            # wondering why just a warning? in cmdline this is also not an error
             lgr.warning("add was called with empty file list and no options.")
-            return out
+            return
 
         try:
             # without --verbose git 2.9.3  add does not return anything
@@ -917,7 +931,8 @@ class GitRepo(RepoInterface):
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
-            out = self._process_git_get_output(*add_out)
+            for o in self._process_git_get_output(*add_out):
+                yield o
             # Note: as opposed to git cmdline, force is True by default in
             #       gitpython, which would lead to add things, that are
             #       ignored or excluded otherwise
@@ -944,7 +959,7 @@ class GitRepo(RepoInterface):
         # currently simulating similar return value, assuming success
         # for all files:
         # TODO: Make return values consistent across both *Repo classes!
-        return out
+        return
 
     @staticmethod
     def _process_git_get_output(stdout, stderr=None):
