@@ -105,8 +105,6 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
         ucnprops = meta.get("datalad_unique_content_properties", {})
         for src, umeta in ucnprops.items():
             srcmeta = meta.get(src, {})
-            if src not in meta:
-                meta[src] = srcmeta  # assign the new one back
             for uk in umeta:
                 if uk in srcmeta:
                     # we have a real entry for this key in the dataset metadata
@@ -114,7 +112,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # tailored data
                     continue
                 srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
-            meta[src] = srcmeta
+            if src not in meta and srcmeta:
+                meta[src] = srcmeta  # assign the new one back
 
     srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
