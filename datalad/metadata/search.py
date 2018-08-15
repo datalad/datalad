@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -94,12 +95,18 @@ def _listdict2dictlist(lst):
 def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
+
+    - if `consider_ucn` (default) it would copy keys from
+      datalad_unique_content_properties into `meta` for that extractor
+    - ... TODO ...
     """
     if consider_ucn:
         # loop over all metadata sources and the report of their unique values
         ucnprops = meta.get("datalad_unique_content_properties", {})
         for src, umeta in ucnprops.items():
             srcmeta = meta.get(src, {})
+            if src not in meta:
+                meta[src] = srcmeta  # assign the new one back
             for uk in umeta:
                 if uk in srcmeta:
                     # we have a real entry for this key in the dataset metadata
@@ -107,6 +114,8 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # tailored data
                     continue
                 srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+
+    srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
@@ -237,7 +246,10 @@ class _WhooshSearch(_Search):
 
     def show_keys(self, mode):
         if mode != 'name':
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "ATM %s can show only names, so please use show_keys with 'name'"
+                % self.__class__.__name__
+            )
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
 
@@ -296,8 +308,10 @@ class _WhooshSearch(_Search):
             except widx.IndexError as e:
                 # Generic index error.
                 # we try to regenerate
-                # TODO log this
-                pass
+                lgr.warning(
+                    "Cannot open existing index %s (%s), will regenerate",
+                    index_dir, exc_str(e)
+                )
             except widx.IndexVersionError as e:  # (msg, version, release=None)
                 # Raised when you try to open an index using a format that the
                 # current version of Whoosh cannot read. That is, when the index
@@ -310,12 +324,20 @@ class _WhooshSearch(_Search):
                 # Raised when you try to commit changes to an index which is not
                 # the latest generation.
                 # this should not happen here, but if it does ... KABOOM
-                raise e
+                raise
             except widx.EmptyIndexError as e:
                 # Raised when you try to work with an index that has no indexed
                 # terms.
                 # we can just continue with generating an index
                 pass
+            except ValueError as e:
+                if 'unsupported pickle protocol' in str(e):
+                    lgr.warning(
+                        "Cannot open existing index %s (%s), will regenerate",
+                        index_dir, exc_str(e)
+                    )
+                else:
+                    raise
 
         lgr.info('{} search index'.format(
             'Rebuilding' if exists(index_dir) else 'Building'))
@@ -730,7 +752,14 @@ class _EGrepCSSearch(_Search):
                 try:
                     kvals_set = assure_iter(kvals, set)
                 except TypeError:
-                    kvals_set = {'unhashable'}
+                    # TODO: may be do show hashable ones???
+                    nunhashable = sum(
+                        isinstance(x, collections.Hashable) for x in kvals
+                    )
+                    kvals_set = {
+                        'unhashable %d out of %d entries'
+                        % (nunhashable, len(kvals))
+                    }
                 keys[k].uvals |= kvals_set
 
         for k in sorted(keys):
@@ -741,9 +770,10 @@ class _EGrepCSSearch(_Search):
             # do a bit more
             stat = keys[k]
             uvals = stat.uvals
-            # show only up to X uvals
-            if len(stat.uvals) > 10:
-                uvals = {v for i, v in enumerate(uvals) if i < 10}
+            if mode == 'short':
+                # show only up to X uvals
+                if len(stat.uvals) > 10:
+                    uvals = {v for i, v in enumerate(uvals) if i < 10}
             # all unicode still scares yoh -- he will just use repr
             # def conv(s):
             #     try:
