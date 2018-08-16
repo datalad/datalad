@@ -1580,6 +1580,7 @@ class GitRepo(RepoInterface):
             env = self.add_fake_dates(env)
 
         if index_file:
+            env = (env if env is not None else os.environ).copy()
             env['GIT_INDEX_FILE'] = index_file
 
         try:
