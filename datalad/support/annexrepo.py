@@ -2812,6 +2812,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                         # Need an alternative index_file
                         with make_tempfile() as index_file:
                             alt_index_file = index_file
+                            index_tree = self.repo.git.write_tree()
+                            self.repo.git.read_tree(index_tree,
+                                                    index_output=index_file)
                             # Reset the files we are not to be committed
                             self._git_custom_command(
                                 list(staged_not_to_commit),
