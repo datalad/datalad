@@ -2777,8 +2777,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             try:
                 alt_index_file = None
-                files_to_commit = None  # we might need to avoid explicit paths
-                if self.is_direct_mode() and files:
+                direct_mode = self.is_direct_mode()
+                # we might need to avoid explicit paths
+                files_to_commit = None if direct_mode else files
+                if direct_mode and files:
                     # In direct mode, if we commit file(s) they would get
                     # committed directly into git ignoring possibly being
                     # staged by annex.  So, if not all files are committed, and
