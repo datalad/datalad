@@ -2702,6 +2702,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                careless=True, files=None, proxy=False):
         self.precommit()
 
+        if files:
+            files = assure_list(files)
+
         # Note: `proxy` is for explicitly enforcing the use of git-annex-proxy
         #       in direct mode. This is needed in very special cases, which
         #       might go away once we figured out a better way. In any case, it
@@ -2727,7 +2730,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # used to fail, because absolute paths are used. Using annex
                 # proxy this leads to an error (path outside repository)
                 if files:
-                    files = assure_list(files)
                     if options is None:
                         options = []
                     for i in range(len(files)):
