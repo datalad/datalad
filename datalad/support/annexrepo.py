@@ -2777,8 +2777,26 @@ class AnnexRepo(GitRepo, RepoInterface):
             #       git-annex-proxy, which is needed for --update option for
             #       example.
 
+            if files:
+                # Raise FileNotInRepositoryError if `files` aren't tracked.
+                try:
+                    super(AnnexRepo, self).commit(
+                        "dryrun", options=["--dry-run", "--no-status"],
+                        files=files)
+                except CommandError as e:
+                    if not (self.is_direct_mode() and
+                            AnnexRepo._is_annex_work_tree_message(e.stderr)):
+                        raise
+                    # The git call may fail with
+                    #   fatal: this operation must be run in a work tree
+                    #   fatal: 'git status --porcelain=2' failed in submodule ...
+                    # But that error message doesn't matter for the purpose of
+                    # the "file is tracked" check. It won't be shown if there
+                    # is a pathspec error.
+                    lgr.debug("Ignoring commit --dry-run failure")
             try:
                 alt_index_file = None
+
                 direct_mode = self.is_direct_mode()
                 # we might need to avoid explicit paths
                 files_to_commit = None if direct_mode else files
