@@ -9,13 +9,11 @@
 """Tests for data providers"""
 
 from mock import patch
-from tempfile import mkdtemp
 
 from ..providers import Provider
 from ..providers import Providers
 from ..providers import HTTPDownloader
 from ...utils import chpwd
-from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
@@ -23,7 +21,6 @@ from ...tests.utils import assert_raises
 from ...tests.utils import with_tree
 
 from ...support.external_versions import external_versions
-from ...interface.common_cfg import dirs
 
 
 def test_Providers_OnStockConfiguration():
