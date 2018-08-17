@@ -64,6 +64,7 @@ from datalad.cmd import GitRunner
 from .repo import RepoInterface
 from .gitrepo import GitRepo
 from .gitrepo import NoSuchPathError
+from .gitrepo import _normalize_path
 from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
@@ -2808,12 +2809,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # wrong assumption), we need to prepare a custom index, and
                     # commit without specifying any paths
                     changed_files = {
-                        staged: {
-                            opj(self.path, p)
-                            for p in self.get_changed_files(staged=staged)
-                        } for staged in (True,) #  False}
+                        staged: set(self.get_changed_files(staged=staged))
+                        for staged in (True,) #  False}
                     }
-                    files_set = set(files)
+                    files_set = {
+                        _normalize_path(self.path, f) if isabs(f) else f
+                        for f in files}
                     files_notstaged = files_set.difference(changed_files[True])
                     # Lazy .add('.') results in ALL (performance?) files listed
                     # here even if they are not changed at all and could be ignored
