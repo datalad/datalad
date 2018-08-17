@@ -26,6 +26,7 @@ from ..credentials import LORIS_Token
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..http import HTTPBearerTokenAuthenticator
+from ..http import process_www_authenticate
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
@@ -88,6 +89,17 @@ def fake_open(write_=None):
 
 def _raise_IOError(*args, **kwargs):
     raise IOError("Testing here")
+
+
+def test_process_www_authenticate():
+    assert_equal(process_www_authenticate("Basic"),
+                 ["http_basic_auth"])
+    assert_equal(process_www_authenticate("Digest"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Digest more"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Unknown"),
+                 [])
 
 
 @with_tree(tree=[('file.dat', 'abc')])
