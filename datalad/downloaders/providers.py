@@ -403,7 +403,7 @@ class Providers(object):
             else:
                 break
 
-        url_re = re.escape(url)
+        url_re = re.escape(url) if url else None
         while True:
             url_re = ui.question(
                 title="New provider regular expression",
