@@ -74,6 +74,7 @@ class ExportArchive(Interface):
         import zipfile
         from mock import patch
         from os.path import join as opj, dirname, normpath, isabs
+        import os.path as op
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import file_basename
@@ -148,10 +149,11 @@ class ExportArchive(Interface):
                             raise IOError('File %s has no content available' % fpath)
 
                     # resolve to possible link target
-                    link_target = os.readlink(fpath)
-                    if not isabs(link_target):
-                        link_target = normpath(opj(dirname(fpath), link_target))
-                    fpath = link_target
+                    if op.islink(fpath):
+                        link_target = os.readlink(fpath)
+                        if not isabs(link_target):
+                            link_target = normpath(opj(dirname(fpath), link_target))
+                        fpath = link_target
                 # name in the archive
                 aname = normpath(opj(leading_dir, rpath))
                 add_method(
