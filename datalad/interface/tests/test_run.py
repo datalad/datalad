@@ -78,6 +78,7 @@ def test_invalid_call(path):
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
     ds = Dataset(path).create()
+    direct_mode = ds.repo.is_direct_mode()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
     with chpwd(path), \
@@ -102,12 +103,17 @@ def test_basics(path, nodspath):
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
         res = ds.run('touch empty', message='NOOP_TEST')
-        assert_result_count(res, 1, action='save', status='notneeded')
+        # When in direct mode, check at the level of save rather than add
+        # because the annex files show up as typechanges and adding them won't
+        # necessarily have a "notneeded" status.
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
         res = ds.run(['touch empty'], message='NOOP_TEST')
-        assert_result_count(res, 1, action='save', status='notneeded')
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
