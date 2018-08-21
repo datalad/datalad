@@ -247,7 +247,8 @@ install:
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
-  - pip install 'sphinx>=1.6.2'
+  # Avoid Sphinx v1.7.7, which fails with spurious warnings.  See gh-2774.
+  - pip install 'sphinx==1.7.6'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # TMPDIRs
