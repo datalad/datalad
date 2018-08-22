@@ -40,12 +40,5 @@ class InteractiveUI(object):
                 default = 'no'
             kwargs['default'] = default
         response = self.question(*args, choices=['yes', 'no'], **kwargs).rstrip('\n')
-        if response == 'yes':
-            return True
-        elif response == 'no':
-            return False
-        else:
-            raise RuntimeError(
-                "must not happen but did, got %r response, whenever "
-                "expected only yes or no" % response
-            )
+        assert response in {'yes', 'no'}, "shouldn't happen; question() failed"
+        return response == 'yes'
