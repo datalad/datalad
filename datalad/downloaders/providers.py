@@ -307,7 +307,7 @@ class Providers(object):
             authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = assure_list_from_str(items.pop('url_re'))
+        url_res = assure_list_from_str(items.pop('url_re', []))
         assert url_res, "current implementation relies on having url_re defined"
 
         credential = items.pop('credential', None)
