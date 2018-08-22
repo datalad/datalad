@@ -205,3 +205,24 @@ def test_providers_enter_new(path):
             providers.enter_new(url, auth_types=["http_basic_auth"])
         nonmatching_url()
         ok_exists(op.join(providers_dir, "foo3.cfg"))
+
+
+@with_tree(tree={'providers.cfg': """\
+[provider:foo0]
+url_re = https?://foo\.org/.*
+authentication_type = none
+
+[provider:foo1]
+url_re = https?://foo\.org/.*
+authentication_type = none
+"""})
+def test_providers_multiple_matches(path):
+    providers = Providers.from_config_files(
+        files=[op.join(path, "providers.cfg")], reload=True)
+    all_provs = providers.get_provider('https://foo.org/data',
+                                       return_all=True)
+    assert_equal({p.name for p in all_provs}, {'foo0', 'foo1'})
+
+    # When selecting a single one, the later one is given priority.
+    the_chosen_one = providers.get_provider('https://foo.org/data')
+    assert_equal(the_chosen_one.name, "foo1")
