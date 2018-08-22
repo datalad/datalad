@@ -338,8 +338,6 @@ class Providers(object):
         # configuration wins in conflicts between url_re
         matching_providers = []
         for provider in self._providers[::-1]:
-            if not provider.url_res:
-                continue
             for url_re in provider.url_res:
                 if re.match(url_re, url):
                     lgr.debug("Returning provider %s for url %s", provider, url)
