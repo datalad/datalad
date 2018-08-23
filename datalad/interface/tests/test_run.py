@@ -298,7 +298,6 @@ def test_rerun_onto(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_chain(path):
     ds = Dataset(path).create()
     commits = []
@@ -376,7 +375,6 @@ def test_rerun_just_one_commit(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_run_failure(path):
     ds = Dataset(path).create()
 
