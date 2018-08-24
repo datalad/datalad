@@ -2316,14 +2316,13 @@ class GitRepo(RepoInterface):
         return count
 
     def get_changed_files(self, staged=False, diff_filter='', index_file=None):
-        """Return a dictionary with files and their status code
-
-        See `git diff --help` for more information about codes
+        """Return files that have changed between the index and working tree.
 
         Parameters
         ----------
         staged: bool, optional
-          Either operate on staged (index) files instead of workdir
+          Consider changes between HEAD and the index instead of changes
+          between the index and the working tree.
         diff_filter: str, optional
           Any value accepted by the `--diff-filter` option of `git diff`.
           Common ones include "A", "D", "M" for add, deleted, and modified
@@ -2331,7 +2330,7 @@ class GitRepo(RepoInterface):
         index_file: str, optional
           Alternative index file for git to use
         """
-        opts = ['--name-status']
+        opts = ['--name-only', '-z']
         kwargs = {}
         if staged:
             opts.append('--staged')
@@ -2339,20 +2338,16 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        diff_output = self.repo.git.diff(*opts, **kwargs)
-        return dict(
-            f.split('\t', 1)[::-1]
-            for f in diff_output.split('\n')
-            if f
-        )
+        return [f
+                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
 
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
-        return list(self.get_changed_files(diff_filter='D'))
+        return self.get_changed_files(diff_filter='D')
 
     def get_deleted_files(self):
         """Return a list of paths with deleted files (staged deletion)"""
-        return list(self.get_changed_files(staged=True, diff_filter='D'))
+        return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
         """Check git attribute for the current repository (not per-file support for now)
