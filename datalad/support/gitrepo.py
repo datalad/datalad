@@ -2315,7 +2315,7 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, filter='', index_file=None):
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
         """Return a dictionary with files and their status code
 
         See `git diff --help` for more information about codes
@@ -2324,7 +2324,7 @@ class GitRepo(RepoInterface):
         ----------
         staged: bool, optional
           Either operate on staged (index) files instead of workdir
-        filter: str, optional
+        diff_filter: str, optional
           Status codes (from ACDMRTUXB) if only specific changes should be
           considered.  See `--diff-filter` within the `git-diff` for more info
         index_file: str, optional
@@ -2334,8 +2334,8 @@ class GitRepo(RepoInterface):
         kwargs = {}
         if staged:
             opts.append('--staged')
-        if filter:
-            opts.append('--diff-filter=%s' % filter)
+        if diff_filter:
+            opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
         diff_output = self.repo.git.diff(*opts, **kwargs)
@@ -2347,11 +2347,11 @@ class GitRepo(RepoInterface):
 
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
-        return list(self.get_changed_files(filter='D'))
+        return list(self.get_changed_files(diff_filter='D'))
 
     def get_deleted_files(self):
         """Return a list of paths with deleted files (staged deletion)"""
-        return list(self.get_changed_files(staged=True, filter='D'))
+        return list(self.get_changed_files(staged=True, diff_filter='D'))
 
     def get_git_attributes(self):
         """Check git attribute for the current repository (not per-file support for now)
