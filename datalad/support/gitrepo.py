@@ -2331,7 +2331,7 @@ class GitRepo(RepoInterface):
         index_file: str, optional
           Alternative index file for git to use
         """
-        opts = ['--raw', '--name-status']
+        opts = ['--name-status']
         kwargs = {}
         if staged:
             opts.append('--staged')
