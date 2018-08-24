@@ -527,6 +527,7 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
     from hashlib import md5
     from boto.s3.key import Key
     from boto.s3.prefix import Prefix
+    from boto.s3.connection import OrdinaryCallingFormat
     from boto.exception import S3ResponseError
     from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
 
@@ -547,7 +548,10 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
         secret_key = config.get('default', 'secret_key')
 
         # TODO: remove duplication -- reuse logic within downloaders/s3.py to get connected
-        conn = boto.connect_s3(access_key, secret_key)
+        kwargs = {}
+        if '.' in bucket_name:
+            kwargs['calling_format']=OrdinaryCallingFormat()
+        conn = boto.connect_s3(access_key, secret_key, **kwargs)
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:

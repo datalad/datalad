@@ -84,6 +84,8 @@ class S3Authenticator(Authenticator):
             conn_kind = "anonymously"
             conn_args = []
             conn_kwargs['anon'] = True
+        if '.' in bucket_name:
+            conn_kwargs['calling_format']=OrdinaryCallingFormat()
 
         lgr.info(
             "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
