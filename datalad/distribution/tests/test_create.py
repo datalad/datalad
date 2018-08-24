@@ -323,6 +323,9 @@ def test_create_withprocedure(path):
     eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
 
 
+# Skipping on Windows due to lack of MagicMime support:
+# https://github.com/datalad/datalad/pull/2770#issuecomment-415842284
+@skip_if_on_windows
 @with_tempfile(mkdir=True)
 def test_create_text_no_annex(path):
     ds = create(path, text_no_annex=True)
