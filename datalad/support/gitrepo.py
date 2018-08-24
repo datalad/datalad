@@ -2325,8 +2325,9 @@ class GitRepo(RepoInterface):
         staged: bool, optional
           Either operate on staged (index) files instead of workdir
         diff_filter: str, optional
-          Status codes (from ACDMRTUXB) if only specific changes should be
-          considered.  See `--diff-filter` within the `git-diff` for more info
+          Any value accepted by the `--diff-filter` option of `git diff`.
+          Common ones include "A", "D", "M" for add, deleted, and modified
+          files, respectively.
         index_file: str, optional
           Alternative index file for git to use
         """
