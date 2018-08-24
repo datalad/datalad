@@ -1053,9 +1053,10 @@ def test_get_missing(path):
     repo.add('.')
     # still no differences between worktree and staged
     eq_(repo.get_changed_files(), [])
-    eq_(set(repo.get_changed_files(staged=True)), {'test1', 'deep/test2'})
+    eq_(set(repo.get_changed_files(staged=True)),
+        {'test1', opj('deep', 'test2')})
     eq_(set(repo.get_changed_files(staged=True, diff_filter='AD')),
-        {'test1', 'deep/test2'})
+        {'test1', opj('deep', 'test2')})
     eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
     repo.commit()
     eq_(repo.get_changed_files(), [])

@@ -2338,7 +2338,7 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        return [f
+        return [normpath(f)  # Call normpath to convert separators on Windows.
                 for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
 
     def get_missing_files(self):
