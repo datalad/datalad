@@ -247,7 +247,8 @@ install:
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
-  - pip install 'sphinx>=1.6.2'
+  # Avoid Sphinx v1.7.7, which fails with spurious warnings.  See gh-2774.
+  - pip install 'sphinx==1.7.6'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # TMPDIRs
@@ -258,7 +259,7 @@ install:
   - if [ ! -z "$UNSET_S3_SECRETS" ]; then echo "usetting"; unset DATALAD_datalad_test_s3_key_id DATALAD_datalad_test_s3_secret_id; fi
   # Install grunt to test run javascript frontend tests
   - npm install grunt
-  - npm install grunt-contrib-qunit
+  - npm install grunt-contrib-qunit@>=3.0.1
   - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:

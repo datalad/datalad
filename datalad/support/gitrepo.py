@@ -17,6 +17,7 @@ import re
 import shlex
 import time
 import os
+import os.path as op
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -154,10 +155,10 @@ def _normalize_path(base_dir, path):
 
     Parameters
     ----------
-    path: str
-        path to be normalized
     base_dir: str
         directory to serve as base to normalized, relative paths
+    path: str
+        path to be normalized
 
     Returns
     -------
@@ -870,8 +871,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, git=True, git_options=None,
-            _datalad_msg=False, update=False):
+    def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -891,22 +891,37 @@ class GitRepo(RepoInterface):
            files in the entire working tree are updated (old versions of Git
            used to limit the update to the current directory and its
            subdirectories).
-        """
 
+        Returns
+        -------
+        list
+          Of status dicts.
+        """
+        # under all circumstances call this class' add_ (otherwise
+        # AnnexRepo.add would go into a loop
+        return list(GitRepo.add_(self, files, git=git, git_options=git_options,
+                    update=update))
+
+    def add_(self, files, git=True, git_options=None, update=False):
+        """Like `add`, but returns a generator"""
         # TODO: git_options is used as options for the git-add here,
         # instead of options to the git executable => rename for consistency
 
-        # needs to be True - see docstring:
-        # XXX why is this done? this is add() of GitRepo, there is not even a
-        # question
-        assert(git)
+        if not git:
+            lgr.warning(
+                'GitRepo.add() called with git=%s, this should not happen',
+                git)
+            git = True
 
-        files = _remove_empty_items(files)
-        out = []
+        # there is no other way then to collect all files into a list
+        # at this point, because we need to pass them at once to a single
+        # `git add` call
+        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
 
         if not (files or git_options or update):
+            # wondering why just a warning? in cmdline this is also not an error
             lgr.warning("add was called with empty file list and no options.")
-            return out
+            return
 
         try:
             # without --verbose git 2.9.3  add does not return anything
@@ -916,7 +931,8 @@ class GitRepo(RepoInterface):
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
-            out = self._process_git_get_output(*add_out)
+            for o in self._process_git_get_output(*add_out):
+                yield o
             # Note: as opposed to git cmdline, force is True by default in
             #       gitpython, which would lead to add things, that are
             #       ignored or excluded otherwise
@@ -943,7 +959,7 @@ class GitRepo(RepoInterface):
         # currently simulating similar return value, assuming success
         # for all files:
         # TODO: Make return values consistent across both *Repo classes!
-        return out
+        return
 
     @staticmethod
     def _process_git_get_output(stdout, stderr=None):
@@ -2350,27 +2366,90 @@ class GitRepo(RepoInterface):
         return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
-        """Check git attribute for the current repository (not per-file support for now)
+        return self.get_gitattributes('.')['.']
+
+
+    def get_gitattributes(self, path, index_only=False):
+        """Query gitattributes for one or more paths
 
         Parameters
         ----------
-        all_: bool
-          Adds --all to git check-attr call
+        path: path or list
+          Path(s) to query. Paths may be relative or absolute.
+        index_only: bool
+          Flag whether to consider only gitattribute setting that are reflected
+          in the repository index, not just in the work tree content.
 
         Returns
         -------
         dict:
-          attribute: value pairs
+          Each key is a queried path (always relative to the repostiory root),
+          each value is a dictionary with attribute
+          name and value items. Attribute values are either True or False,
+          for set and unset attributes, or are the literal attribute value.
         """
-        out, err = self._git_custom_command(["."], ["git", "check-attr", "--all"])
-        assert not err, "no stderr output is expected"
-        out_split = [
-            # splitting by : would leave leading space(s)
-            [e.lstrip(' ') for e in l.split(':', 2)]
-            for l in out.split('\n') if l
-        ]
-        assert all(o[0] == '.' for o in out_split)  # for paranoid
-        return dict(o[1:] for o in out_split)
+        path = assure_list(path)
+        cmd = ["git", "check-attr", "-z", "--all"]
+        if index_only:
+            cmd.append('--cached')
+        stdout, stderr = self._git_custom_command(path, cmd)
+        # make sure we have one entry for each query path to
+        # simplify work with the result
+        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attr = []
+        for item in stdout.split('\0'):
+            attr.append(item)
+            if len(attr) < 3:
+                continue
+            # we have a full record
+            p, name, value = attr
+            attrs = attributes[p]
+            attrs[name] = \
+                True if value == 'set' else False if value == 'unset' else value
+            # done, reset item
+            attr = []
+        return attributes
+
+    def set_gitattributes(self, attrs, attrfile='.gitattributes'):
+        """Set gitattributes
+
+        Parameters
+        ----------
+        attrs : list
+          Each item is a 2-tuple, where the first element is a path pattern,
+          and the second element is a dictionary with attribute key/value
+          pairs. The attribute dictionary must use the same semantics as those
+          returned by `get_gitattributes()`. Path patterns can use absolute paths,
+          in which case they will be normalized relative to the directory
+          that contains the target .gitattributes file (see `attrfile`).
+        attrfile: path
+          Path relative to the repository root of the .gitattributes file the
+          attributes shall be set in.
+        """
+        git_attributes_file = op.join(self.path, attrfile)
+        attrdir = op.dirname(git_attributes_file)
+        if not op.exists(attrdir):
+            os.makedirs(attrdir)
+        with open(git_attributes_file, 'a') as f:
+            for pattern, attr in sorted(attrs, key=lambda x: x[0]):
+                # normalize the pattern relative to the target .gitattributes file
+                npath = _normalize_path(
+                    op.join(self.path, op.dirname(attrfile)), pattern)
+                attrline = u''
+                if npath.count(' '):
+                    # quote patterns with spaces
+                    attrline += u'"{}"'.format(npath.replace('"', '\\"'))
+                else:
+                    attrline += npath
+                for a in sorted(attr):
+                    val = attr[a]
+                    if val is True:
+                        attrline += ' {}'.format(a)
+                    elif val is False:
+                        attrline += ' -{}'.format(a)
+                    else:
+                        attrline += ' {}={}'.format(a, val)
+                f.write('{}\n'.format(attrline))
 
 
 # TODO

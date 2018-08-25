@@ -245,6 +245,12 @@ def test_rerun_onto(path):
 
     grow_file = opj(path, "grows")
 
+    # Make sure we can handle range-specifications that yield no results.
+    for since in ["", "HEAD"]:
+        assert_result_count(
+            ds.rerun("HEAD", onto="", since=since, on_failure="ignore"),
+            1, status="impossible", action="run")
+
     ds.run('echo static-content > static')
     ds.repo.tag("static")
     ds.run('echo x$(cat grows) > grows')
@@ -299,7 +305,6 @@ def test_rerun_onto(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_chain(path):
     ds = Dataset(path).create()
     commits = []
@@ -377,7 +382,6 @@ def test_rerun_just_one_commit(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_run_failure(path):
     ds = Dataset(path).create()
 
