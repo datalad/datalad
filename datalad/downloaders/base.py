@@ -199,7 +199,7 @@ class BaseDownloader(object):
                             url,
                             denied_msg=access_denied,
                             auth_types=supported_auth_types,
-                            new_provider=not self.credential)
+                            new_provider=False)
                         allow_old_session = False
                         continue
                 else:  # None or False
@@ -266,24 +266,10 @@ class BaseDownloader(object):
                          " to access url?",
                     default=True
             ):
-                if not self.authenticator:
-                    raise DownloadError(
-                        title +
-                        " No authenticator is known, cannot set any credential")
-                # we could try to just
-                credential_type = self.authenticator.DEFAULT_CREDENTIAL_TYPE
-                if not credential_type:
-                    raise DownloadError(
-                        title +
-                        " %s does not have a default credential type,"
-                        " cannot authenticate" % self.authenticator)
-
-                name = 'one-time-record'
-                if not credential_type:
-                    raise ValueError(
-                        "Do not know what type of credential record is needed")
-                self.credential = CREDENTIAL_TYPES[credential_type](name=name)
-                self.credential.enter_new()
+                assert not self.authenticator, "bug: incorrect assumption"
+                raise DownloadError(
+                    title +
+                    " No authenticator is known, cannot set any credential")
             else:
                 provider = self._setup_new_provider(
                     title, url, auth_types=auth_types)
