@@ -194,14 +194,7 @@ class BaseDownloader(object):
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            if exc_info:
-                                reraise(*exc_info)
-                            else:
-                                # must not happen but who knows
-                                raise AccessDeniedError(
-                                    "Interface is not interactive and we were denied access."
-                                    " Run in interactive mode to get provider "
-                                    " setup, or configure it manually.")
+                            reraise(*exc_info)
                         self._enter_credentials(
                             url,
                             denied_msg=access_denied,
