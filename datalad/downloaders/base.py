@@ -118,11 +118,11 @@ class BaseDownloader(object):
         """
         # TODO: possibly wrap this logic outside within a decorator, which
         # would just call the corresponding method
-
         authenticator = self.authenticator
-        needs_authentication = (
-            authenticator and authenticator.requires_authentication
-        ) or self.credential
+        if authenticator:
+            needs_authentication = authenticator.requires_authentication
+        else:
+            needs_authentication = self.credential
 
         attempt, incomplete_attempt = 0, 0
         while True:
