@@ -80,7 +80,7 @@ class BaseDownloader(object):
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
-        if authenticator:
+        if authenticator and authenticator.requires_authentication:
             if not credential and not authenticator.allows_anonymous:
                 msg = "Both authenticator and credentials must be provided." \
                       " Got only authenticator %s" % repr(authenticator)
