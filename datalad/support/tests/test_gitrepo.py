@@ -1083,8 +1083,19 @@ def test_get_missing(path):
         f.write('some')
     with open(op.join(path, 'deep', 'test2'), 'w') as f:
         f.write('some more')
+    # no files tracked yet, so nothing changed
+    eq_(repo.get_changed_files(), [])
     repo.add('.')
+    # still no differences between worktree and staged
+    eq_(repo.get_changed_files(), [])
+    eq_(set(repo.get_changed_files(staged=True)),
+        {'test1', op.join('deep', 'test2')})
+    eq_(set(repo.get_changed_files(staged=True, diff_filter='AD')),
+        {'test1', op.join('deep', 'test2')})
+    eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
     repo.commit()
+    eq_(repo.get_changed_files(), [])
+    eq_(repo.get_changed_files(staged=True), [])
     ok_clean_git(path, annex=False)
     os.unlink(op.join(path, 'test1'))
     eq_(repo.get_missing_files(), ['test1'])

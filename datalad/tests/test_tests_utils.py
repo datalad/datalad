@@ -492,7 +492,7 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
-        eq_(somefunc.tags, ['network'])
+        ok_(hasattr(somefunc, "network"))
         with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):

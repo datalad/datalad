@@ -80,7 +80,6 @@ def test_download_url_return(toppath, topurl, outdir):
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_download_url_dataset(toppath, topurl, path):
     # Non-dataset directory.
     file1_fullpath = opj(path, "file1.txt")
@@ -123,7 +122,6 @@ def test_download_url_dataset(toppath, topurl, path):
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).create()
     ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)

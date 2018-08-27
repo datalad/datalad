@@ -1085,7 +1085,7 @@ class GitRepo(RepoInterface):
         return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None, date=None):
+               files=None, date=None, index_file=None):
         """Commit changes to git.
 
         Parameters
@@ -1104,6 +1104,8 @@ class GitRepo(RepoInterface):
           path(s) to commit
         date: str, optional
           Date in one of the formats git understands
+        index_file: str, optional
+          An alternative index to use
         """
 
         self.precommit()
@@ -1148,7 +1150,8 @@ class GitRepo(RepoInterface):
         try:
             self._git_custom_command(files, cmd,
                                      expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True)
+                                     check_fake_dates=True,
+                                     index_file=index_file)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1489,7 +1492,7 @@ class GitRepo(RepoInterface):
           options for the git executable as key, value pair
           (see above)
         env: dict
-          environment vaiables to temporarily set for this call
+          environment variables to temporarily set for this call
 
         TODO
         ----
@@ -1554,7 +1557,8 @@ class GitRepo(RepoInterface):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            check_fake_dates=False):
+                            check_fake_dates=False,
+                            index_file=None):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1590,6 +1594,10 @@ class GitRepo(RepoInterface):
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
+
+        if index_file:
+            env = (env if env is not None else os.environ).copy()
+            env['GIT_INDEX_FILE'] = index_file
 
         try:
             out, err = self.cmd_call_wrapper.run(
@@ -2323,18 +2331,39 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+        """Return files that have changed between the index and working tree.
+
+        Parameters
+        ----------
+        staged: bool, optional
+          Consider changes between HEAD and the index instead of changes
+          between the index and the working tree.
+        diff_filter: str, optional
+          Any value accepted by the `--diff-filter` option of `git diff`.
+          Common ones include "A", "D", "M" for add, deleted, and modified
+          files, respectively.
+        index_file: str, optional
+          Alternative index file for git to use
+        """
+        opts = ['--name-only', '-z']
+        kwargs = {}
+        if staged:
+            opts.append('--staged')
+        if diff_filter:
+            opts.append('--diff-filter=%s' % diff_filter)
+        if index_file:
+            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
+        return [normpath(f)  # Call normpath to convert separators on Windows.
+                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
+
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
-                if f.split('\t')[0] == 'D']
+        return self.get_changed_files(diff_filter='D')
 
     def get_deleted_files(self):
         """Return a list of paths with deleted files (staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
-                if f.split('\t')[0] == 'D']
-
+        return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
         return self.get_gitattributes('.')['.']

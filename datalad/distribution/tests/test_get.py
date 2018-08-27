@@ -97,7 +97,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
-@known_failure_direct_mode  #FIXME
 def test_get_invalid_call(path, file_outside):
 
     # no argument at all:
@@ -160,7 +159,6 @@ def test_get_single_file(path):
                  'file4.txt': 'whatever 4'})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_multiple_files(path, url, ds_dir):
     from os import listdir
     from datalad.support.network import RI
@@ -208,7 +206,6 @@ def test_get_multiple_files(path, url, ds_dir):
                                 'file4.txt': 'something'
                             }}})
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:

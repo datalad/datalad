@@ -176,7 +176,6 @@ def test_search_non_dataset(tdir):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_within_ds_file_search(path):
     try:
         import mutagen

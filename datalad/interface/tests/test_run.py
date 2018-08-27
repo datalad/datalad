@@ -78,6 +78,7 @@ def test_invalid_call(path):
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
     ds = Dataset(path).create()
+    direct_mode = ds.repo.is_direct_mode()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
     with chpwd(path), \
@@ -102,19 +103,25 @@ def test_basics(path, nodspath):
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
         res = ds.run('touch empty', message='NOOP_TEST')
-        assert_status('notneeded', res)
+        # When in direct mode, check at the level of save rather than add
+        # because the annex files show up as typechanges and adding them won't
+        # necessarily have a "notneeded" status.
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
         res = ds.run(['touch empty'], message='NOOP_TEST')
-        assert_status('notneeded', res)
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
             swallow_outputs():
         res = ds.run(['touch', 'empty2'], message='TEST')
-        assert_status('ok', res)
-        assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
+        assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file',
+                            status='ok')
+        assert_result_count(res, 1, action='save', status='ok')
 
     # running without a command is a noop
     with chpwd(path):
@@ -465,6 +472,7 @@ def test_rerun_branch(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -777,7 +785,6 @@ def test_run_inputs_no_annex_repo(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_testrepos('basic_annex', flavors=['clone'])
-@known_failure_direct_mode  #FIXME
 def test_run_explicit(path):
     ds = Dataset(path)
 
