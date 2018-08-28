@@ -169,7 +169,8 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
-def test_access_denied(toppath, topurl):
+@with_memory_keyring
+def test_access_denied(toppath, topurl, keyring):
     furl = topurl + "file.dat"
 
     def deny_access(*args, **kwargs):
