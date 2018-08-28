@@ -344,7 +344,6 @@ def test_rerun_old_flag_compatibility(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
@@ -523,7 +522,6 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
