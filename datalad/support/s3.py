@@ -27,7 +27,11 @@ import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
 from datalad.dochelpers import exc_str
-from datalad.support.exceptions import DownloadError, AccessDeniedError
+from datalad.support.exceptions import (
+    DownloadError,
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+)
 
 from six.moves.urllib.request import urlopen, Request
 
@@ -80,6 +84,7 @@ def get_bucket(conn, bucket_name):
     bucket_name: str
         Name of the bucket to connect to
     """
+    bucket = None
     try:
         bucket = conn.get_bucket(bucket_name)
     except S3ResponseError as e:
@@ -87,6 +92,14 @@ def get_bucket(conn, bucket_name):
         # and we would need to list which buckets are available under following
         # credentials:
         lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
+        if conn.anon:
+            raise AnonymousAccessDeniedError(
+                "Access to the bucket %s did not succeed.  Requesting "
+                "'all buckets' for anonymous S3 connection makes "
+                "little sense and thus not supported." % bucket_name,
+                supported_types=['aws-s3']
+            )
+        all_buckets = []
         try:
             all_buckets = conn.get_all_buckets()
         except S3ResponseError as e2:
@@ -139,6 +152,9 @@ class VersionedFilesPool(object):
 
 def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
+
+    if versioned url is requested but version_id is None, no versionId suffix
+    will be added
     """
     # TODO: here we would need to encode the name since urlquote actually
     # can't do that on its own... but then we should get a copy of the thing
@@ -151,7 +167,7 @@ def get_key_url(e, schema='http', versioned=True):
         fmt = "s3://{e.bucket.name}/{e.name_urlquoted}"
     else:
         raise ValueError(schema)
-    if versioned:
+    if versioned and e.version_id is not None:
         fmt += "?versionId={e.version_id}"
     return fmt.format(e=e)
 

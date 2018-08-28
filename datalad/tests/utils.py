@@ -1061,7 +1061,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
                     % (func, cwd_after, pwd_before))
-                # If there was already exception raised, we better re-raise
+                # If there was already exception raised, we better reraise
                 # that one since it must be more important, so not masking it
                 # here with our assertion
                 if exc_info is None:

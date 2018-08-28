@@ -318,6 +318,7 @@ class LORIS_Token(CompositeCredential):
     def __init__(self, name, url=None, keyring=None):
         super(CompositeCredential, self).__init__(name, url, keyring)
 
+
 CREDENTIAL_TYPES = {
     'user_password': UserPassword,
     'aws-s3': AWS_S3,

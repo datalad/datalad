@@ -11,21 +11,25 @@
 import time
 from calendar import timegm
 from six import PY3
+import re
 
 import os
 import six.moves.builtins as __builtin__
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
+from ..base import AccessFailedError
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
+from ..base import NoneAuthenticator
 from ..credentials import UserPassword
 from ..credentials import Token
 from ..credentials import LORIS_Token
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..http import HTTPBearerTokenAuthenticator
+from ..http import process_www_authenticate
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
@@ -61,6 +65,8 @@ from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
 from ...tests.utils import without_http_proxy
+from ...support.exceptions import AccessDeniedError
+from ...support.exceptions import AnonymousAccessDeniedError
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
 
@@ -88,6 +94,17 @@ def fake_open(write_=None):
 
 def _raise_IOError(*args, **kwargs):
     raise IOError("Testing here")
+
+
+def test_process_www_authenticate():
+    assert_equal(process_www_authenticate("Basic"),
+                 ["http_basic_auth"])
+    assert_equal(process_www_authenticate("Digest"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Digest more"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Unknown"),
+                 [])
 
 
 @with_tree(tree=[('file.dat', 'abc')])
@@ -148,6 +165,66 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
     # TODO: access denied scenario
     # TODO: access denied detection
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+@with_memory_keyring
+def test_access_denied(toppath, topurl, keyring):
+    furl = topurl + "file.dat"
+
+    def deny_access(*args, **kwargs):
+        raise AccessDeniedError(supported_types=["http_basic_auth"])
+
+    def deny_anon_access(*args, **kwargs):
+        raise AnonymousAccessDeniedError(supported_types=["http_basic_auth"])
+
+    downloader = HTTPDownloader()
+
+    # Test different paths that should lead to a DownloadError.
+
+    for denier in deny_access, deny_anon_access:
+        @with_testsui(responses=["no"])
+        def run_refuse_provider_setup():
+            with patch.object(downloader, '_download', denier):
+                downloader.download(furl)
+        assert_raises(DownloadError, run_refuse_provider_setup)
+
+    downloader_creds = HTTPDownloader(credential="irrelevant")
+
+    @with_testsui(responses=["no"])
+    def run_refuse_creds_update():
+        with patch.object(downloader_creds, '_download', deny_access):
+            downloader_creds.download(furl)
+    assert_raises(DownloadError, run_refuse_creds_update)
+
+    downloader_noauth = HTTPDownloader(authenticator=NoneAuthenticator())
+
+    def run_noauth():
+        with patch.object(downloader_noauth, '_download', deny_access):
+            downloader_noauth.download(furl)
+    assert_raises(DownloadError, run_noauth)
+
+    # Complete setup for a new provider.
+
+    @with_testsui(responses=[
+        "yes",  # Set up provider?
+        # Enter provider details, but then don't save ...
+        "newprovider", re.escape(furl), "http_auth", "user_password", "no",
+        # No provider, try again?
+        "yes",
+        # Enter same provider detains but save this time.
+        "newprovider", re.escape(furl), "http_auth", "user_password", "yes",
+        # Enter credentials.
+        "me", "mypass"
+    ])
+    def run_set_up_provider():
+        with patch.object(downloader, '_download', deny_access):
+            downloader.download(furl)
+
+    # We've forced an AccessDenied error and then set up bogus credentials,
+    # leading to a 501 (not implemented) error.
+    assert_raises(AccessFailedError, run_set_up_provider)
 
 
 @with_tempfile(mkdir=True)

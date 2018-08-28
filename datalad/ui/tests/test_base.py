@@ -16,12 +16,16 @@ from ..dialog import (
     DialogUI,
     IPythonUI,
 )
-from ...tests.utils import assert_equal, assert_not_equal
-from ...tests.utils import assert_raises
-from ...tests.utils import assert_false
-from ...tests.utils import with_testsui
+from ...tests.utils import (
+    assert_equal, assert_not_equal,
+    assert_raises,
+    assert_false,
+    ok_,
+    with_testsui,
+)
 
 from mock import patch
+
 
 def test_ui_switcher():
     ui = _UI_Switcher('dialog')
@@ -100,3 +104,6 @@ def test_with_testsui():
     @with_testsui(responses='a')
     def ask():
         assert_equal(ui.question('what is a?'), 'a')
+
+
+    ask()

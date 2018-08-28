@@ -118,7 +118,6 @@ class SilentConsoleLog(ConsoleLog):
 def getpass_echo(prompt='Password', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
     """
-    prompt = '{}: '.format(prompt)
     if on_windows:
         # Can't do anything fancy yet, so just ask the one without echo
         return getpass.getpass(prompt=prompt, stream=stream)

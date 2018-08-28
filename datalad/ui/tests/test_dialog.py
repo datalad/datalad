@@ -40,6 +40,16 @@ def patch_getpass(**kwargs):
     return patch('getpass.getpass', **kwargs)
 
 
+def test_yesno():
+    for expected_value, defaults in {True: ('yes', True),
+                                     False: ('no', False)}.items():
+        for d in defaults:
+            with patch_getpass(return_value=''):
+                out = StringIO()
+                response = DialogUI(out=out).yesno("?", default=d)
+                eq_(response, expected_value)
+
+
 def test_question_choices():
 
     # TODO: come up with a reusable fixture for testing here
