@@ -382,7 +382,6 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)

@@ -729,7 +729,6 @@ def test_AnnexRepo_commit(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_annex(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -784,7 +783,6 @@ def test_AnnexRepo_add_to_annex(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_git(path):
 
     # Note: Some test repos appears to not be initialized.

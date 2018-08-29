@@ -126,7 +126,6 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_clone_simple_local(src, path):
@@ -169,7 +168,6 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):

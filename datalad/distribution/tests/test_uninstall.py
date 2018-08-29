@@ -149,7 +149,6 @@ def test_uninstall_annex_file(path):
     ok_(not exists(opj(path, 'test-annex.dat')))
 
 
-@known_failure_v6  # FIXME: git files end up in annex, therefore drop result is different
 @with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_git_file(path):
     ds = Dataset(path)
@@ -181,7 +180,6 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
-@known_failure_v6  #FIXME  Note: Failure seems to somehow be depend on PY2/PY3
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):

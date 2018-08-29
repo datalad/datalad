@@ -490,7 +490,6 @@ def test_rerun_cherry_pick(path):
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
     input_file = opj(path, "foo")

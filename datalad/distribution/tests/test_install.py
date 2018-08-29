@@ -243,7 +243,6 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
-@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -283,7 +282,6 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -297,7 +295,6 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -314,7 +311,6 @@ def test_install_dataset_from_instance(src, dst):
 
 @with_testrepos(flavors=['network'])
 @with_tempfile
-@known_failure_v6  #FIXME
 def test_install_dataset_from_just_source_via_path(url, path):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
