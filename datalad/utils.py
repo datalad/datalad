@@ -307,7 +307,7 @@ def rotree(path, ro=True, chmod_files=True):
         chmod(root)
 
 
-def rmtree(path, chmod_files='auto', *args, **kwargs):
+def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
 
     Parameters
@@ -316,6 +316,9 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
+    children_only : bool, optional
+       If set, all files and subdirectories would be removed while the path
+       itself (must be a directory) would be preserved
     `*args` :
     `**kwargs` :
        Passed into shutil.rmtree call
@@ -327,6 +330,12 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     # Check for open files
     assert_no_open_files(path)
 
+    if children_only:
+        if not os.path.isdir(path):
+            raise ValueError("Can remove children only of directories")
+        for p in os.listdir(path):
+            rmtree(op.join(path, p))
+        return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
