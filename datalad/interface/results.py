@@ -284,7 +284,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # this was installed from a URL that was given, we'll take that too
         return True
     else:
-        False
+        return False
 
 
 def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
