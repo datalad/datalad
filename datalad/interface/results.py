@@ -23,6 +23,7 @@ from os.path import normpath
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_is_subpath
+from datalad.support.path import robust_abspath
 
 from datalad.distribution.dataset import Dataset
 
@@ -276,7 +277,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # path of a result matches in input argument -- not 100% exhaustive
         # test, but could be good enough
         return True
-    elif any(abspath(p) == respath for p in paths):
+    elif any(robust_abspath(p) == respath for p in paths):
         # one absolutified input path matches the result path
         # I'd say: got for it!
         return True

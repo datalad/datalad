@@ -15,7 +15,10 @@ One of the reasons is also to robustify operation with unicode filenames
 
 from functools import wraps
 import os.path as op
-from ..utils import assure_bytes
+from ..utils import (
+    assure_bytes,
+    getpwd,
+)
 
 
 def _get_unicode_robust_version(f):
@@ -48,3 +51,18 @@ pathsep = op.pathsep
 relpath = op.relpath
 realpath = _get_unicode_robust_version(op.realpath)
 sep = op.sep
+
+
+def robust_abspath(p):
+    """A helper which would not fail if p is relative and we are in non-existing directory
+
+    It will rely on getpwd, which would rely on $PWD env variable to report
+    the path.  Desired for improved resilience during e.g. reporting as in
+    https://github.com/datalad/datalad/issues/2787
+    """
+    try:
+        return abspath(p)
+    except OSError as exc:
+        if "No such" in str(exc) and not isabs(p):
+            return normpath(join(getpwd(), p))
+        raise
