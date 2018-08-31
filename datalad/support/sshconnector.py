@@ -16,7 +16,7 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from socket import gethostname
 from hashlib import md5
-from os import remove
+from os import remove, linesep
 from os.path import exists
 from os.path import join as opj
 from subprocess import Popen
@@ -218,7 +218,7 @@ class SSHConnection(object):
         # start control master:
         lgr.debug("Opening %s by calling %s" % (self, cmd))
         proc = Popen(cmd)
-        stdout, stderr = proc.communicate(input="\n")  # why the f.. this is necessary?
+        stdout, stderr = proc.communicate(input="%s" % linesep)  # why the f.. this is necessary?
 
         # wait till the command exits, connection is conclusively
         # open or not at this point
@@ -227,8 +227,8 @@ class SSHConnection(object):
 
         if not ret:
             lgr.warning(
-                "Failed to run cmd %s. Exit code=%s\nstdout: %s\nstderr: %s",
-                cmd, exit_code, stdout, stderr
+                "Failed to run cmd %s. Exit code=%s%sstdout: %s%sstderr: %s",
+                cmd, exit_code, linesep, stdout, linesep, stderr
             )
         else:
             self._opened_by_us = True
@@ -436,7 +436,7 @@ class SSHManager(object):
             port=sshri.port,
             username=sshri.username)
         # determine control master:
-        ctrl_path = "%s/%s" % (self.socket_dir, conhash)
+        ctrl_path = opj(self.socket_dir, conhash)
 
         # do we know it already?
         if ctrl_path in self._connections:

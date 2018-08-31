@@ -41,6 +41,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.network import PathRI
 from datalad.cmd import Runner
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_tempfile
@@ -887,7 +888,6 @@ def test_install_from_tilda(opath, tpath):
 @with_tempfile(mkdir=True)
 def test_install_subds_from_another_remote(topdir):
     # https://github.com/datalad/datalad/issues/1905
-    from datalad.support.network import PathRI
     with chpwd(topdir):
         origin_ = 'origin'
         clone1_ = 'clone1'

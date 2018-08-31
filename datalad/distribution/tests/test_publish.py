@@ -28,6 +28,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.utils import chpwd
+from datalad.support.network import PathRI
 
 from nose.tools import eq_, ok_, assert_is_instance
 from nose.tools import assert_false as nok_
@@ -56,7 +57,7 @@ def test_invalid_call(origin, tdir):
     ds = Dataset(origin)
     ds.uninstall('subm 1', check=False)
     # nothing
-    assert_status('error', publish('/notthere', on_failure='ignore'))
+    assert_status('error', publish('notthere', on_failure='ignore'))
     # known, but not present
     assert_status('impossible', publish(opj(ds.path, 'subm 1'), on_failure='ignore'))
     # --since without dataset is now supported as long as it
@@ -509,13 +510,13 @@ def test_publish_depends(
 
     # two remote sibling on two "different" hosts
     source.create_sibling(
-        'ssh://localhost' + target1_path,
+        'ssh://localhost' + PathRI(target1_path).posixpath,
         annex_wanted='standard',
         annex_group='backup',
         name='target1')
     # fails with unknown remote
     res = source.create_sibling(
-        'ssh://datalad-test' + target2_path,
+        'ssh://datalad-test' + PathRI(target2_path).posixpath,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
         publish_depends='bogus',
@@ -528,7 +529,7 @@ def test_publish_depends(
             set(['bogus'])))
     # for real
     source.create_sibling(
-        'ssh://datalad-test' + target2_path,
+        'ssh://datalad-test' + PathRI(target2_path).posixpath,
         name='target2',
         existing='reconfigure',  # because 'target2' is known in polluted cfg
         annex_wanted='standard',
@@ -538,7 +539,7 @@ def test_publish_depends(
     eq_(source.config.get(depvar, None), 'target1')
     # and one more remote, on the same host but associated with a dependency
     source.create_sibling(
-        'ssh://datalad-test' + target3_path,
+        'ssh://datalad-test' + PathRI(target3_path).posixpath,
         name='target3')
     ok_clean_git(src_path)
     # introduce change in source
@@ -616,7 +617,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 
     # create the target(s):
     source.create_sibling(
-        'ssh://localhost:' + dst_path,
+        'ssh://localhost:' + PathRI(dst_path).posixpath,
         name='target', recursive=True)
 
     # publish recursively, which silently ignores non-installed datasets
@@ -639,7 +640,7 @@ def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
     ds.add('1')
-    ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
+    ds.create_sibling('ssh://localhost:' + PathRI('%s/subdir' % desttop).posixpath,
                       name='target',
                       target_url=desturl + 'subdir/.git')
     results = ds.publish(to='target', transfer_data='all')
@@ -658,10 +659,10 @@ def test_gh1763(src, target1, target2):
     # comprehensible, and directly tests issue 1763
     src = Dataset(src).create(force=True)
     src.create_sibling(
-        'ssh://datalad-test' + target1,
+        'ssh://datalad-test' + PathRI(target1).posixpath,
         name='target1')
     src.create_sibling(
-        'ssh://datalad-test' + target2,
+        'ssh://datalad-test' + PathRI(target2).posixpath,
         name='target2',
         publish_depends='target1')
     # a file to annex

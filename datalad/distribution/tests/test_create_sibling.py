@@ -28,6 +28,7 @@ from datalad.tests.utils import create_tree
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import urlquote
+from datalad.support.network import PathRI
 from nose.tools import eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, \
     with_testrepos
@@ -117,17 +118,25 @@ def test_invalid_call(path):
     # needs a SSH URL
     assert_raises(InsufficientArgumentsError, create_sibling, '')
     assert_raises(ValueError, create_sibling, 'http://ignore.me')
+
+    # valid but not existing path:
+    generic_somewhere = "C:\\tmp\\somewhere" if on_windows else "/tmp/somewhere"
+    assert_false(exists(generic_somewhere),
+                 msg="%s exists for some reason" % generic_somewhere)
     # needs an actual dataset
     assert_raises(
         ValueError,
-        create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+        create_sibling, 'localhost:' + PathRI(generic_somewhere).posixpath,
+        dataset='nothere')
     # pre-configure a bogus remote
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
     # fails to reconfigure by default with generated
     # and also when given an existing name
-    for res in (ds.create_sibling('bogus:/tmp/somewhere', on_failure='ignore'),
-                ds.create_sibling('localhost:/tmp/somewhere', name='bogus', on_failure='ignore')):
+    for res in (ds.create_sibling('bogus:' + PathRI(generic_somewhere).posixpath,
+                                  on_failure='ignore'),
+                ds.create_sibling('localhost:' + PathRI(generic_somewhere).posixpath,
+                                  name='bogus', on_failure='ignore')):
         assert_result_count(
             res, 1,
             status='error',
@@ -201,7 +210,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         assert_create_sshwebserver(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost" + target_path,
+            sshurl="ssh://localhost" + PathRI(target_path).posixpath,
             publish_by_default='master',
             existing='replace')
         eq_("ssh://localhost" + urlquote(target_path),
@@ -227,7 +236,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             sshurl="ssh://localhost",
             target_dir=target_path,
             target_url=target_path,
-            target_pushurl="ssh://localhost" + target_path,
+            target_pushurl="ssh://localhost" + PathRI(target_path).posixpath,
             ui=True,
         )
         assert_create_sshwebserver(existing='replace', **cpkwargs)
@@ -238,7 +247,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 
         eq_(target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + target_path,
+        eq_("ssh://localhost" + PathRI(target_path).posixpath,
             source.repo.get_remote_url("local_target", push=True))
 
         _test_correct_publish(target_path)
@@ -331,7 +340,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         with chpwd(source.path):
             assert_create_sshwebserver(
                 name=remote_name,
-                sshurl="ssh://localhost" + target_path_,
+                sshurl="ssh://localhost" + PathRI(target_path_).posixpath,
                 target_dir=target_dir_tpl,
                 recursive=True,
                 ui=True)
@@ -364,7 +373,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             #publish(to=remote_name)  # no recursion
             assert_create_sshwebserver(
                 name=remote_name,
-                sshurl="ssh://localhost" + target_path_,
+                sshurl="ssh://localhost" + PathRI(target_path_).posixpath,
                 target_dir=target_dir_tpl,
                 recursive=True,
                 existing='skip',
@@ -395,7 +404,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     assert_create_sshwebserver(
         name='dominique_carrera',
         dataset=source,
-        sshurl="ssh://localhost" + target_path,
+        sshurl="ssh://localhost" + PathRI(target_path).posixpath,
         recursive=True,
         since='HEAD~1')
     # there is one thing in the target directory only, and that is the
@@ -413,7 +422,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     assert_create_sshwebserver(
         name='dominique_carrera',
         dataset=source,
-        sshurl="ssh://localhost" + target_path,
+        sshurl="ssh://localhost" + PathRI(target_path).posixpath,
         recursive=True,
         existing='skip')
     # verify that it created the sub and sub/sub
@@ -433,13 +442,13 @@ def test_failon_no_permissions(src_path, target_path):
         CommandError,
         ds.create_sibling,
         name='noperm',
-        sshurl="ssh://localhost" + opj(target_path, 'ds'))
+        sshurl="ssh://localhost" + PathRI(opj(target_path, 'ds')).posixpath)
     # restore permissions
     chmod(target_path, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
     assert_create_sshwebserver(
         name='goodperm',
         dataset=ds,
-        sshurl="ssh://localhost" + opj(target_path, 'ds'))
+        sshurl="ssh://localhost" + PathRI(opj(target_path, 'ds')).posixpath)
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
@@ -457,7 +466,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert not err
     remote_home = remote_home.rstrip('\n')
     dst_relpath = os.path.relpath(dst_path, remote_home)
-    url = 'localhost:%s' % dst_relpath
+    url = 'localhost:%s' % PathRI(dst_relpath).posixpath
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.add('sub.dat')
@@ -504,7 +513,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
 @with_tempfile(suffix="target")
 def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds = Dataset(src_path).create()
-    target_url = 'localhost:%s' % target_path
+    target_url = 'localhost:%s' % PathRI(target_path).posixpath
     remote = "magical"
     ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
     if standardgroup:
