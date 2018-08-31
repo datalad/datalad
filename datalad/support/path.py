@@ -12,9 +12,10 @@ One of the reasons is also to robustify operation with unicode filenames
 """
 
 # TODO: RF and move all paths related functions from datalad.utils in here
+import os
+import os.path as op
 
 from functools import wraps
-import os.path as op
 from ..utils import (
     assure_bytes,
     getpwd,
@@ -39,6 +40,7 @@ def _get_unicode_robust_version(f):
 
 
 abspath = op.abspath
+curdir = op.curdir
 dirname = op.dirname
 exists = _get_unicode_robust_version(op.exists)
 isdir = _get_unicode_robust_version(op.isdir)
@@ -63,6 +65,11 @@ def robust_abspath(p):
     try:
         return abspath(p)
     except OSError as exc:
-        if "No such" in str(exc) and not isabs(p):
-            return normpath(join(getpwd(), p))
+        if not isabs(p):
+            try:
+                os.getcwd()
+                # if no exception raised it was not the reason, raise original
+                raise
+            except:
+                return normpath(join(getpwd(), p))
         raise
