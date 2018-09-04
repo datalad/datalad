@@ -267,7 +267,7 @@ class GlobbedPaths(object):
                     expanded.extend([pattern])
         return expanded
 
-    def expand(self, full=False, dot=True):
+    def expand(self, full=False, dot=True, refresh=False):
         """Return paths with the globs expanded.
 
         Parameters
@@ -276,12 +276,15 @@ class GlobbedPaths(object):
             Return full paths rather than paths relative to `pwd`.
         dot : bool, optional
             Include the "." pattern if it was specified.
+        refresh : bool, optional
+            Run glob regardless of whether there are cached values. This is
+            useful if there may have been changes on the file system.
         """
         maybe_dot = self._maybe_dot if dot else []
         if not self._paths["patterns"]:
             return maybe_dot + []
 
-        if "expanded" not in self._paths:
+        if refresh or "expanded" not in self._paths:
             paths = self._expand_globs()
             self._paths["expanded"] = paths
         else:
