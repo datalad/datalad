@@ -24,6 +24,7 @@ env:
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
     - _DL_DEVEL_ANNEX=1
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
   matrix:
     - DATALAD_REPO_DIRECT=yes
 ##1    - DATALAD_REPO_VERSION=6
