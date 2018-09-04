@@ -34,6 +34,7 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
+from datalad.api import install
 from datalad.api import run
 from datalad.interface.run import GlobbedPaths
 from datalad.interface.rerun import get_run_info
@@ -653,11 +654,16 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_tree(tree={"test-annex.dat": "content"})
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
-def test_run_inputs_outputs(path):
-    ds = Dataset(path)
+def test_run_inputs_outputs(src, path):
+    src_ds = Dataset(src).create(force=True)
+    src_ds.add(".", recursive=True)
+
+    ds = install(path, source=src,
+                 result_xfm='datasets', return_type='item-or-list')
 
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
