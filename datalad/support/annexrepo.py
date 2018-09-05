@@ -3601,13 +3601,6 @@ class BatchedAnnex(object):
             # close possibly still open fd
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
-        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
-                with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
-            # remove the file where we kept dumping stderr
-            unlink(self._stderr_out_fname)
-            self._stderr_out_fname = None
         if self._process:
             process = self._process
             lgr.debug(
@@ -3617,6 +3610,13 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
+            # remove the file where we kept dumping stderr
+            unlink(self._stderr_out_fname)
+            self._stderr_out_fname = None
         return ret
 
 
