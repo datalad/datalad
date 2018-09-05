@@ -18,7 +18,6 @@ from argparse import REMAINDER
 from glob import glob
 import os.path as op
 from os.path import join as opj
-from os.path import curdir
 from os.path import normpath
 from os.path import relpath
 from os.path import isabs
