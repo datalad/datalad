@@ -33,7 +33,8 @@ from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import (
-    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes
+    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    unlink,
 )
 from .dochelpers import borrowdoc
 
@@ -94,7 +95,7 @@ def _cleanup_output(stream, std):
         if not stream.closed:
             stream.close()
         if op.exists(stream.name):
-            os.unlink(stream.name)
+            unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
 
@@ -689,7 +690,7 @@ def link_file_load(src, dst, dry_run=False):
     if op.lexists(dst):
         lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
-        os.unlink(dst)
+        unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
     src_realpath = op.realpath(src)
 

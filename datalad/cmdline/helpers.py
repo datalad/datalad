@@ -20,7 +20,10 @@ from tempfile import NamedTemporaryFile
 
 from ..cmd import Runner
 from ..log import is_interactive
-from ..utils import getpwd
+from ..utils import (
+    getpwd,
+    unlink,
+)
 from ..version import __version__
 from ..dochelpers import exc_str
 
@@ -165,7 +168,7 @@ queue
         Runner().run(['condor_submit', f.name])
         lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
     finally:
-        os.unlink(f.name)
+        unlink(f.name)
 
 
 # TODO: useful also outside of cmdline, move to support/

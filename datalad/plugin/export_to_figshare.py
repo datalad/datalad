@@ -10,6 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.utils import unlink
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 
@@ -285,7 +286,7 @@ class ExportToFigshare(Interface):
 
         if no_annex:
             lgr.info("Removing generated tarball")
-            os.unlink(fname)
+            unlink(fname)
         else:
             # I will leave all the complaining etc to the dataset add if path
             # is outside etc

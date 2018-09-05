@@ -44,6 +44,7 @@ from datalad.utils import on_windows
 from datalad.utils import chpwd
 from datalad.utils import rmtree
 from datalad.utils import linux_distribution_name
+from datalad.utils import unlink
 
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import assert_cwd_unchanged
@@ -957,7 +958,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar.add_url_to_file(testfile, testurl, batch=True)
 
     # Remove it and re-add
-    os.unlink(opj(dst, testfile))
+    unlink(opj(dst, testfile))
     ar.add_url_to_file(testfile, testurl, batch=True)
 
     info = ar.info(testfile)

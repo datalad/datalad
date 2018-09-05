@@ -29,7 +29,10 @@ from datalad.interface.common_opts import nosave_opt
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
 from datalad.support.s3 import get_versioned_url
-from datalad.utils import assure_list
+from datalad.utils import (
+    assure_list,
+    unlink,
+)
 
 lgr = logging.getLogger("datalad.plugin.addurls")
 
@@ -494,7 +497,7 @@ def add_urls(rows, ifexists=None, options=None):
                 continue
             elif ifexists == "overwrite":
                 lgr.debug("Removing %s", filename_abs)
-                os.unlink(filename_abs)
+                unlink(filename_abs)
             else:
                 lgr.debug("File %s already exists", filename_abs)
 

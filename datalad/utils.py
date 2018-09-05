@@ -341,7 +341,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         shutil.rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
-        os.unlink(path)
+        unlink(path)
 
 
 def rmdir(path, *args, **kwargs):
@@ -427,28 +427,37 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            # on windows boxes there is evidence for a latency of
-            # more than a second until a file is considered no
-            # longer "in-use"
-            # WindowsError is not known on Linux, and if IOError
-            # or any other exception is thrown then if except
-            # statement has WindowsError in it -- NameError
-            # also see gh-2533
-            exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
-            # Check for open files
-            assert_no_open_files(f)
-            for i in range(50):
-                try:
-                    os.unlink(f)
-                except exceptions:
-                    if i < 49:
-                        sleep(0.1)
-                        continue
-                    else:
-                        raise
-                break
+            unlink(f)
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def unlink(f, ntimes=None, sleep_duration=0.1):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    exceptions = (OSError, WindowsError, PermissionError) \
+        if on_windows else OSError
+    if not ntimes:
+        # Life goes fast on proper systems, no need to delay it much
+        ntimes = 50 if on_windows else 3
+    # Check for open files
+    assert_no_open_files(f)
+    for i in range(ntimes):
+        try:
+            os.unlink(f)
+        except exceptions:
+            if i < ntimes - 1:
+                sleep(sleep_duration)
+                continue
+            else:
+                raise
+        break
 
 
 def file_basename(name, return_ext=False):

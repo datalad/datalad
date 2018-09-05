@@ -17,7 +17,7 @@ import logging
 import shlex
 
 from .utils import ok_, eq_, assert_is, assert_equal, assert_false, \
-    assert_true, assert_greater, assert_raises, assert_in, SkipTest
+    assert_true, assert_greater, assert_raises, assert_in, SkipTest, unlink
 
 from ..cmd import Runner, link_file_load
 from ..cmd import GitRunner
@@ -277,7 +277,7 @@ def test_link_file_load(tempfile):
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
-    os.unlink(tempfile2)  # TODO: next two with_tempfile
+    unlink(tempfile2)  # TODO: next two with_tempfile
 
 
 @with_tempfile(mkdir=True)
