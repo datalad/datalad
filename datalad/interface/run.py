@@ -39,6 +39,7 @@ from datalad.support.json_py import dump2stream
 
 from datalad.distribution.add import Add
 from datalad.distribution.get import Get
+from datalad.distribution.install import Install
 from datalad.distribution.remove import Remove
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -353,6 +354,34 @@ class GlobbedPaths(object):
         return self._maybe_dot + self._paths["patterns"]
 
 
+def _install_and_reglob(dset, gpaths):
+    """Install globbed subdatasets and repeat.
+
+    Parameters
+    ----------
+    dset : Dataset
+    gpaths : list of GlobbedPaths objects
+
+    Returns
+    -------
+    Generator with the results of the `install` calls.
+    """
+    def glob_dirs():
+        return list(map(op.dirname, gpaths.expand(refresh=True)))
+
+    dirs, dirs_new = [], glob_dirs()
+    while dirs != dirs_new:
+        for res in dset.install(dirs_new,
+                                result_xfm=None, return_type='generator',
+                                on_failure="ignore"):
+            if res.get("state") == "absent":
+                lgr.debug("Skipping install of non-existent path: %s",
+                          res["path"])
+            else:
+                yield res
+        dirs, dirs_new = dirs_new, glob_dirs()
+
+
 def _unlock_or_remove(dset, paths):
     """Unlock `paths` if content is present; remove otherwise.
 
@@ -465,7 +494,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
+
     if inputs:
+        for res in _install_and_reglob(ds, inputs):
+            yield res
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
             if res.get("state") == "absent":
                 lgr.warning("Input does not exist: %s", res["path"])
@@ -474,7 +506,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
+
     if outputs:
+        for res in _install_and_reglob(ds, outputs):
+            yield res
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
             yield res
 

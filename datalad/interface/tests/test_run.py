@@ -654,17 +654,28 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
-@with_tree(tree={"test-annex.dat": "content"})
+@with_tree(tree={"test-annex.dat": "content",
+                 "s0": {"s1_0": {"s2": {"a.dat": "a",
+                                        "b.txt": "b"}},
+                        "s1_1": {"s2": {"c.dat": "c",
+                                        "d.txt": "d"}},
+                        "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_run_inputs_outputs(src, path):
+    for subds in [("s0", "s1_0", "s2"),
+                  ("s0", "s1_1", "s2"),
+                  ("s0", "s1_0"),
+                  ("s0", "s1_1"),
+                  ("s0", "ss"),
+                  ("s0",)]:
+        Dataset(op.join(*((src,) + subds))).create(force=True)
     src_ds = Dataset(src).create(force=True)
     src_ds.add(".", recursive=True)
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
-
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
     # If we specify test-annex.dat as an input, it will be retrieved before the
@@ -771,6 +782,22 @@ def test_run_inputs_outputs(src, path):
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
+
+    # We install subdatasets to fully resolve globs.
+    ds.uninstall("s0")
+    assert_false(Dataset(op.join(path, "s0")).is_installed())
+    ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
+    ok_file_has_content(op.join(ds.path, "globbed-subds"),
+                        "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
+                        strip=True)
+
+    ds_ss = Dataset(op.join(path, "s0", "ss"))
+    assert_false(ds_ss.is_installed())
+    ds.run("echo blah >{outputs}", outputs=["s0/ss/out"])
+    ok_(ds_ss.is_installed())
+    ok_file_has_content(op.join(ds.path, "s0", "ss", "out"),
+                        "blah",
+                        strip=True)
 
 
 @ignore_nose_capturing_stdout
