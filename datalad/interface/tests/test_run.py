@@ -23,6 +23,8 @@ import os.path as op
 from os.path import join as opj
 from os.path import relpath
 from os import mkdir, remove
+import sys
+
 from six.moves import StringIO
 from mock import patch
 
@@ -881,6 +883,28 @@ def test_placeholders(path):
     ds.config.add("datalad.run.substitutions.license", "gpl3", where="local")
     ds.run("echo {license} >configured-license")
     ok_file_has_content(opj(path, "configured-license"), "gpl3", strip=True)
+
+
+@ignore_nose_capturing_stdout
+@skip_if_on_windows
+@with_tree(tree={"bar.txt": "b",
+                 "foo blah.txt": "f"})
+def test_inputs_spaces(path):
+    ds = Dataset(path).create(force=True)
+    ds.add(".")
+    cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
+    # The string form of a command works fine when the inputs/outputs have
+    # spaces ...
+    cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
+        sys.executable, cmd)
+    ds.run(cmd_str, inputs=["*.txt"], outputs=["out0"])
+    ok_file_has_content(opj(path, "out0"), "bar.txt!foo blah.txt!out0",
+                        strip=True)
+    # ... but the list form of a command does not.
+    cmd_list = [sys.executable, "-c", cmd, "{inputs}", "{outputs[0]}"]
+    ds.run(cmd_list, inputs=["*.txt"], outputs=["out0"])
+    ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0",
+                        strip=True)
 
 
 @with_tree(tree={"1.txt": "",

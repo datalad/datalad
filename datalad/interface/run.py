@@ -103,7 +103,9 @@ class Run(Interface):
     the command is given as a list but not when it is given as a string. This
     means that the string form is required if you need to pass each input as a
     separate argument to a preceding script (i.e., write the command as
-    "./script {inputs}", quotes included).
+    "./script {inputs}", quotes included). The string form should also be used
+    if the input or output paths contain spaces or other characters that need
+    to be escaped.
     << REFLOW ||
 
     To escape a brace character, double it (i.e., "{{" or "}}").
@@ -372,7 +374,7 @@ def format_command(command, **kwds):
         io_val = kwds.pop(name, None)
         if not isinstance(io_val, GlobbedPaths):
             io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
-        kwds[name] = io_val.expand(dot=False)
+        kwds[name] = list(map(shlex_quote, io_val.expand(dot=False)))
     return sfmt.format(command, **kwds)
 
 
