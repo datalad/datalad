@@ -435,7 +435,7 @@ def guard_BadName(func):
     def wrapped(repo, *args, **kwargs):
         try:
             return func(repo, *args, **kwargs)
-        except BadName:  # pragma: no cover
+        except BadName:
             repo.precommit()
             return func(repo, *args, **kwargs)
 
