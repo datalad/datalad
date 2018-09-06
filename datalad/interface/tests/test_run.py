@@ -889,6 +889,31 @@ def test_placeholders(path):
     ok_file_has_content(opj(path, "configured-license"), "gpl3", strip=True)
 
 
+def test_globbedpaths_get_sub_patterns():
+    gp = GlobbedPaths([], "doesn't matter")
+    for pat, expected in [
+            # If there are no patterns in the directory component, we get no
+            # sub-patterns.
+            ("", []),
+            ("nodir", []),
+            (op.join("nomagic", "path"), []),
+            (op.join("nomagic", "path*"), []),
+            # Create sub-patterns from leading path, successively dropping the
+            # right-most component.
+            (op.join("s*", "path"), ["s*" + op.sep]),
+            (op.join("s", "ss*", "path"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*", "path*"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*" + op.sep), []),
+            (op.join("s*", "ss", "path*"),
+             [op.join("s*", "ss") + op.sep,
+              "s*" + op.sep]),
+            (op.join("s?", "ss", "sss*", "path*"),
+             [op.join("s?", "ss", "sss*") + op.sep,
+              op.join("s?", "ss") + op.sep,
+              "s?" + op.sep])]:
+        eq_(gp._get_sub_patterns(pat), expected)
+
+
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": ""})
@@ -917,7 +942,7 @@ def test_globbedpaths(path):
     # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
-    with patch('datalad.interface.run.glob', glob_results.get):
+    with patch('glob.glob', glob_results.get):
         gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 

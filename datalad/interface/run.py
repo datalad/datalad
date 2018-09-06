@@ -15,7 +15,7 @@ import logging
 import json
 
 from argparse import REMAINDER
-from glob import glob
+import glob
 import os.path as op
 from os.path import join as opj
 from os.path import normpath
@@ -242,28 +242,74 @@ class GlobbedPaths(object):
 
         if patterns is None:
             self._maybe_dot = []
-            self._paths = {"patterns": []}
+            self._paths = {"patterns": [], "sub_patterns": {}}
         else:
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
                 "patterns": [relpath(p, start=pwd) if isabs(p) else p
-                             for p in patterns]}
+                             for p in patterns],
+                "sub_patterns": {}}
 
     def __bool__(self):
         return bool(self._maybe_dot or self.expand())
 
     __nonzero__ = __bool__  # py2
 
+    def _get_sub_patterns(self, pattern):
+        """Extract sub-patterns from the leading path of `pattern`.
+
+        The right-most path component is successively peeled off until there
+        are no patterns left.
+        """
+        if pattern in self._paths["sub_patterns"]:
+            return self._paths["sub_patterns"][pattern]
+
+        head, tail = op.split(pattern)
+        if not tail:
+            # Pattern ended with a separator. Take the first directory as the
+            # base.
+            head, tail = op.split(head)
+
+        sub_patterns = []
+        seen_magic = glob.has_magic(tail)
+        while head:
+            new_head, tail = op.split(head)
+            if seen_magic and not glob.has_magic(head):
+                break
+            elif not seen_magic and glob.has_magic(tail):
+                seen_magic = True
+
+            if seen_magic:
+                sub_patterns.append(head + op.sep)
+            head = new_head
+        self._paths["sub_patterns"][pattern] = sub_patterns
+        return sub_patterns
+
     def _expand_globs(self):
+        def normalize_hits(hs):
+            return [relpath(h) + ("" if op.basename(h) else op.sep)
+                    for h in sorted(hs)]
+
         expanded = []
         with chpwd(self.pwd):
             for pattern in self._paths["patterns"]:
-                hits = glob(pattern)
+                hits = glob.glob(pattern)
                 if hits:
-                    expanded.extend([relpath(h) for h in sorted(hits)])
+                    expanded.extend(normalize_hits(hits))
                 else:
                     lgr.debug("No matching files found for '%s'", pattern)
+                    # We didn't find a hit for the complete pattern. If we find
+                    # a sub-pattern hit, that may mean we have an uninstalled
+                    # subdataset.
+                    for sub_pattern in self._get_sub_patterns(pattern):
+                        sub_hits = glob.glob(sub_pattern)
+                        if sub_hits:
+                            expanded.extend(normalize_hits(sub_hits))
+                            break
+                    # ... but we still want to retain the original pattern
+                    # because we don't know for sure at this point, and it
+                    # won't bother the "install, reglob" routine.
                     expanded.extend([pattern])
         return expanded
 
