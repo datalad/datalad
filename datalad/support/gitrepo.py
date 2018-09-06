@@ -32,6 +32,7 @@ from os.path import curdir
 from os.path import pardir
 from os.path import sep
 import posixpath
+from functools import wraps
 from weakref import WeakValueDictionary
 
 
@@ -39,6 +40,7 @@ from six import string_types
 from six import add_metaclass
 from functools import wraps
 import git as gitpy
+from gitdb.exc import BadName
 from git.exc import GitCommandError
 from git.exc import NoSuchPathError
 from git.exc import InvalidGitRepositoryError
@@ -417,6 +419,27 @@ def split_remote_branch(branch):
     assert not branch.endswith('/'), \
         "branch name with trailing / is invalid. (%s)" % branch
     return branch.split('/', 1)
+
+
+def guard_BadName(func):
+    """A helper to guard against BadName exception
+
+    Workaround for
+    https://github.com/gitpython-developers/GitPython/issues/768
+    also see https://github.com/datalad/datalad/issues/2550
+    Let's try to precommit (to flush anything flushable) and do
+    it again
+    """
+
+    @wraps(func)
+    def wrapped(repo, *args, **kwargs):
+        try:
+            return func(repo, *args, **kwargs)
+        except BadName:  # pragma: no cover
+            repo.precommit()
+            return func(repo, *args, **kwargs)
+
+    return wrapped
 
 
 @add_metaclass(Flyweight)
@@ -1669,6 +1692,7 @@ class GitRepo(RepoInterface):
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
+    @guard_BadName
     def fetch(self, remote=None, refspec=None, progress=None, all_=False,
               **kwargs):
         """Fetches changes from a remote (or all_ remotes).
