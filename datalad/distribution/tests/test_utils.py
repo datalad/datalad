@@ -19,7 +19,10 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_raises
 
-from datalad.utils import on_windows
+from datalad.utils import (
+    on_windows,
+    unlink,
+)
 
 
 def test_get_flexible_source_candidates():
@@ -73,7 +76,7 @@ def test_get_git_dir(path):
         os.symlink(srcpath, targetgitpath)
         eq_(srcpath, get_git_dir(targetpath))
         # cleanup for following test
-        os.unlink(targetgitpath)
+        unlink(targetgitpath)
     with open(targetgitpath, 'w') as f:
         f.write('gitdir: {}'.format(srcpath))
     eq_(srcpath, get_git_dir(targetpath))

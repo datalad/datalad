@@ -17,6 +17,7 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import getpwd
 from datalad.utils import assure_unicode
+from datalad.utils import unlink
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 
@@ -64,7 +65,7 @@ def get_max_path_length(top_path=None, maxl=1000):
                 "Failed to create sample file for length %d. Last succeeded was %s. Exception: %s",
                 path_length, max_path_length, exc_str(exc))
             break
-        os.unlink(filename)
+        unlink(filename)
     return max_path_length
 
 

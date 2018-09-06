@@ -33,6 +33,7 @@ from ..utils import (
     assure_bytes,
     chpwd,
     rmdir,
+    unlink,
 )
 
 import logging
@@ -385,7 +386,7 @@ class ExtractedArchive(object):
                     lgr.debug("Cleaning up the %s for %s under %s", name, self._archive, path)
                     # TODO:  we must be careful here -- to not modify permissions of files
                     #        only of directories
-                    (rmtree if isdir(path) else os.unlink)(path)
+                    (rmtree if isdir(path) else unlink)(path)
 
     @property
     def path(self):

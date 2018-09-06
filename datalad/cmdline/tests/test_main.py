@@ -10,7 +10,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import on_windows
 
 
 import re
@@ -171,18 +171,21 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
-@skip_if_on_windows
 def test_script_shims():
     runner = Runner()
     for script in [
         'datalad',
         'git-annex-remote-datalad-archives',
         'git-annex-remote-datalad']:
-        # those must be available for execution, and should not contain
-        which, _ = runner(['which', script])
-        # test if there is no easy install shim in there
-        with open(which.rstrip()) as f:
-            content = f.read()
+        if not on_windows:
+            # those must be available for execution, and should not contain
+            which, _ = runner(['which', script])
+            # test if there is no easy install shim in there
+            with open(which.rstrip()) as f:
+                content = f.read()
+        else:
+            from distutils.spawn import find_executable
+            content = find_executable(script)
         assert_not_in('EASY', content) # NOTHING easy should be there
         assert_not_in('pkg_resources', content)
 
@@ -208,7 +211,6 @@ def test_cfg_override(path):
         # ensure that this is not a dataset's cfg manager
         assert_not_in('datalad.dataset.id', out)
         # env var
-        from datalad.utils import on_windows
         if on_windows:
             cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
         else:

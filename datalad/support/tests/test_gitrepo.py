@@ -22,6 +22,7 @@ import os.path as op
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
+from datalad.utils import unlink
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
@@ -1098,7 +1099,7 @@ def test_get_missing(path):
     eq_(repo.get_changed_files(), [])
     eq_(repo.get_changed_files(staged=True), [])
     ok_clean_git(path, annex=False)
-    os.unlink(op.join(path, 'test1'))
+    unlink(op.join(path, 'test1'))
     eq_(repo.get_missing_files(), ['test1'])
     rmtree(op.join(path, 'deep'))
     eq_(sorted(repo.get_missing_files()), [op.join('deep', 'test2'), 'test1'])
