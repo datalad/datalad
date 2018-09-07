@@ -307,7 +307,7 @@ def rotree(path, ro=True, chmod_files=True):
         chmod(root)
 
 
-def rmtree(path, chmod_files='auto', *args, **kwargs):
+def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
 
     Parameters
@@ -316,6 +316,9 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
+    children_only : bool, optional
+       If set, all files and subdirectories would be removed while the path
+       itself (must be a directory) would be preserved
     `*args` :
     `**kwargs` :
        Passed into shutil.rmtree call
@@ -327,12 +330,18 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     # Check for open files
     assert_no_open_files(path)
 
+    if children_only:
+        if not os.path.isdir(path):
+            raise ValueError("Can remove children only of directories")
+        for p in os.listdir(path):
+            rmtree(op.join(path, p))
+        return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
-        os.unlink(path)
+        unlink(path)
 
 
 def rmdir(path, *args, **kwargs):
@@ -418,28 +427,37 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            # on windows boxes there is evidence for a latency of
-            # more than a second until a file is considered no
-            # longer "in-use"
-            # WindowsError is not known on Linux, and if IOError
-            # or any other exception is thrown then if except
-            # statement has WindowsError in it -- NameError
-            # also see gh-2533
-            exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
-            # Check for open files
-            assert_no_open_files(f)
-            for i in range(50):
-                try:
-                    os.unlink(f)
-                except exceptions:
-                    if i < 49:
-                        sleep(0.1)
-                        continue
-                    else:
-                        raise
-                break
+            unlink(f)
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def unlink(f, ntimes=None, sleep_duration=0.1):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    exceptions = (OSError, WindowsError, PermissionError) \
+        if on_windows else OSError
+    if not ntimes:
+        # Life goes fast on proper systems, no need to delay it much
+        ntimes = 50 if on_windows else 3
+    # Check for open files
+    assert_no_open_files(f)
+    for i in range(ntimes):
+        try:
+            os.unlink(f)
+        except exceptions:
+            if i < ntimes - 1:
+                sleep(sleep_duration)
+                continue
+            else:
+                raise
+        break
 
 
 def file_basename(name, return_ext=False):

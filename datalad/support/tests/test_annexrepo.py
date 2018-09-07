@@ -44,6 +44,7 @@ from datalad.utils import on_windows
 from datalad.utils import chpwd
 from datalad.utils import rmtree
 from datalad.utils import linux_distribution_name
+from datalad.utils import unlink
 
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import assert_cwd_unchanged
@@ -957,7 +958,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar.add_url_to_file(testfile, testurl, batch=True)
 
     # Remove it and re-add
-    os.unlink(opj(dst, testfile))
+    unlink(opj(dst, testfile))
     ar.add_url_to_file(testfile, testurl, batch=True)
 
     info = ar.info(testfile)
@@ -2282,3 +2283,25 @@ def test_get_size_from_perc_complete():
     eq_(f(0, '0'), 0)
     eq_(f(100, '0'), 0)  # we do not know better
     eq_(f(1, '1'), 100)
+
+
+# to prevent regression
+# http://git-annex.branchable.com/bugs/v6_-_under_subdir__58___git_add___34__whines__34____44___git_commit___34__blows__34__/
+# It is disabled because is not per se relevant to DataLad since we do not
+# Since we invoke from the top of the repo, we do not hit it,
+# but thought to leave it around if we want to enforce/test system-wide git being
+# compatible with annex for v6 mode
+@with_tempfile(mkdir=True)
+def _test_add_under_subdir(path):
+    ar = AnnexRepo(path, create=True, version=6)
+    gr = GitRepo(path)  # "Git" view over the repository, so we force "git add"
+    subdir = opj(path, 'sub')
+    subfile = opj('sub', 'empty')
+    # os.mkdir(subdir)
+    create_tree(subdir, {'empty': ''})
+    runner = Runner(cwd=subdir)
+    with chpwd(subdir):
+        runner(['git', 'add', 'empty'])  # should add sucesfully
+        # gr.commit('important') #
+        runner(['git', 'commit', '-m', 'important'])
+        ar.is_under_annex(subfile)

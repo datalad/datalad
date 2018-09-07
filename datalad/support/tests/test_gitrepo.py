@@ -22,6 +22,7 @@ import os.path as op
 from datalad import get_encoding_info
 from datalad.cmd import Runner
 
+from datalad.utils import unlink
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
@@ -60,6 +61,7 @@ from datalad.support.gitrepo import _normalize_path
 from datalad.support.gitrepo import normalize_paths
 from datalad.support.gitrepo import split_remote_branch
 from datalad.support.gitrepo import gitpy
+from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import FileNotInRepositoryError
@@ -1097,7 +1099,7 @@ def test_get_missing(path):
     eq_(repo.get_changed_files(), [])
     eq_(repo.get_changed_files(staged=True), [])
     ok_clean_git(path, annex=False)
-    os.unlink(op.join(path, 'test1'))
+    unlink(op.join(path, 'test1'))
     eq_(repo.get_missing_files(), ['test1'])
     rmtree(op.join(path, 'deep'))
     eq_(sorted(repo.get_missing_files()), [op.join('deep', 'test2'), 'test1'])
@@ -1394,3 +1396,23 @@ def test_fake_dates(path):
     gr.commit("commit baz")
     eq_(gr.get_active_branch(), "other")
     eq_(seconds_initial + 3, gr.get_commit_date())
+
+
+def test_guard_BadName():
+    from gitdb.exc import BadName
+
+    calls = []
+
+    class Vulnerable(object):
+        def precommit(self):
+            calls.append('precommit')
+
+        @guard_BadName
+        def __call__(self, x, y=2):
+            if not calls:
+                calls.append(1)
+                raise BadName
+            return x+y
+    v = Vulnerable()
+    eq_(v(1, y=3), 4)
+    eq_(calls, [1, 'precommit'])

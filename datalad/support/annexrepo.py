@@ -23,7 +23,6 @@ import time
 
 from itertools import chain
 from os import linesep
-from os import unlink
 from os.path import join as opj
 from os.path import exists
 from os.path import islink
@@ -57,6 +56,7 @@ from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
 from datalad.utils import make_tempfile
+from datalad.utils import unlink
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
 
@@ -2067,7 +2067,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "File %s:%s is already under git, removing so it could possibly"
                 " be added under annex", self, file_
             )
-            os.unlink(opj(self.path, file_))
+            unlink(opj(self.path, file_))
         if not batch or self.fake_dates_enabled:
             if batch:
                 lgr.debug("Not batching addurl call "
@@ -2889,7 +2889,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     raise
             finally:
                 if alt_index_file and os.path.exists(alt_index_file):
-                    os.unlink(alt_index_file)
+                    unlink(alt_index_file)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
@@ -3601,13 +3601,6 @@ class BatchedAnnex(object):
             # close possibly still open fd
             os.fdopen(self._stderr_out).close()
             self._stderr_out = None
-        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
-                with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
-            # remove the file where we kept dumping stderr
-            os.unlink(self._stderr_out_fname)
-            self._stderr_out_fname = None
         if self._process:
             process = self._process
             lgr.debug(
@@ -3617,6 +3610,13 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
+            if return_stderr:
+                with open(self._stderr_out_fname, 'r') as f:
+                    ret = f.read()
+            # remove the file where we kept dumping stderr
+            unlink(self._stderr_out_fname)
+            self._stderr_out_fname = None
         return ret
 
 

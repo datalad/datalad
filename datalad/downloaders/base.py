@@ -27,7 +27,10 @@ from six import reraise
 
 from .. import cfg
 from ..ui import ui
-from ..utils import auto_repr
+from ..utils import (
+    auto_repr,
+    unlink,
+)
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
 from ..support.exceptions import *
@@ -438,7 +441,7 @@ class BaseDownloader(object):
             if exists(temp_filepath):
                 # clean up
                 lgr.debug("Removing a temporary download %s", temp_filepath)
-                os.unlink(temp_filepath)
+                unlink(temp_filepath)
 
         return filepath
 
