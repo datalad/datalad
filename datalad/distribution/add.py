@@ -13,6 +13,7 @@
 import logging
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 from os.path import normpath
@@ -70,7 +71,7 @@ def _discover_subdatasets_recursively(
         return
     if not isdir(top):
         return
-    if GitRepo.is_valid_repo(top):
+    if not op.islink(top) and GitRepo.is_valid_repo(top):
         if top in discovered:
             # this was found already, assume everything beneath it too
             return
@@ -113,7 +114,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, or
+      Power-user info: This command uses :command:`git annex add` or
       :command:`git add` to incorporate new dataset content.
     """
 
@@ -236,7 +237,7 @@ class Add(Interface):
                 ap['type'] = 'dataset'
             if recursive and \
                     (ap.get('raw_input', False) or
-                     ap.get('state', None) in ('modified', 'untracked')) and \
+                     ap.get('state', None) in ('added', 'modified', 'untracked')) and \
                     (ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
                 # this was an actually requested input path, or a path that was found
                 # modified by path annotation, based on an input argument
@@ -256,10 +257,6 @@ class Add(Interface):
             if not ap['path'] in ds_to_annotate_from_recursion:
                 # if it was somehow already discovered
                 to_add.append(ap)
-            # TODO check if next isn't covered by discover_dataset_trace_to_targets already??
-            if dataset and ap.get('type', None) == 'dataset':
-                # duplicates not possible, annotated_paths returns unique paths
-                subds_to_add[ap['path']] = ap
         if got_nothing:
             # path annotation yielded nothing, most likely cause is that nothing
             # was found modified, we need to say something about the reference
@@ -323,8 +320,7 @@ class Add(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 annotated_paths,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         if not content_by_ds:
@@ -415,10 +411,13 @@ class Add(Interface):
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
-            added = ds.repo.add(
+            is_annex = isinstance(ds.repo, AnnexRepo)
+            add_kw = {'jobs': jobs} if is_annex and jobs else {}
+            added = ds.repo.add_(
                 list(torepoadd.keys()),
-                git=to_git if isinstance(ds.repo, AnnexRepo) else True,
-                commit=False)
+                git=to_git if is_annex else True,
+                **add_kw
+            )
             for a in added:
                 res = annexjson2result(a, ds, type='file', **common_report)
                 success = success_status_map[res['status']]

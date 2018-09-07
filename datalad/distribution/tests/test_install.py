@@ -25,11 +25,14 @@ from os.path import dirname
 
 from mock import patch
 
+from datalad.utils import getpwd
+
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad.consts import DATASETS_TOPURL
+from datalad import consts
 from datalad.utils import chpwd
+from datalad.utils import on_windows
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -61,10 +64,12 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import put_file_under_git
 from datalad.tests.utils import integration
 from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
+from datalad.tests.utils import get_datasets_topdir
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -85,14 +90,28 @@ def test_installationpath_from_url():
               'lastbit.git/',
               'http://example.com/lastbit',
               'http://example.com/lastbit.git',
+              'http://lastbit:8000'
               ):
         eq_(_get_installationpath_from_url(p), 'lastbit')
+    # we need to deal with quoted urls
+    for url in (
+        # although some docs say that space could've been replaced with +
+        'http://localhost:8000/+last%20bit',
+        'http://localhost:8000/%2Blast%20bit',
+        '///%2Blast%20bit',
+        '///d1/%2Blast%20bit',
+        '///d1/+last bit',
+    ):
+        eq_(_get_installationpath_from_url(url), '+last bit')
+    # and the hostname alone
+    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
+    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
 
     # resolves datalad RIs:
-    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
+    eq_(_get_git_url_from_source('///subds'), consts.DATASETS_TOPURL + 'subds')
     assert_raises(NotImplementedError, _get_git_url_from_source,
                   '//custom/subds')
 
@@ -116,7 +135,8 @@ def test_get_git_url_from_source():
 @with_tempfile
 def _test_guess_dot_git(annex, path, url, tdir):
     repo = (AnnexRepo if annex else GitRepo)(path, create=True)
-    repo.add('file.txt', commit=True, git=not annex)
+    repo.add('file.txt', git=not annex)
+    repo.commit()
 
     # we need to prepare to be served via http, otherwise it must fail
     with swallow_logs() as cml:
@@ -207,7 +227,7 @@ def test_install_datasets_root(tdir):
     with chpwd(tdir):
         ds = install("///")
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         result = install("///", result_xfm=None, return_type='list')
@@ -220,10 +240,9 @@ def test_install_datasets_root(tdir):
 
         with assert_raises(IncompleteResultsError) as cme:
             install("sub", source='///')
-            assert_in("already exists and not empty", str(cme))
+        assert_in("already exists and not empty", str(cme.exception))
 
 
-@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -263,7 +282,6 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -277,7 +295,6 @@ def test_install_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_dataset_from_instance(src, dst):
@@ -294,7 +311,6 @@ def test_install_dataset_from_instance(src, dst):
 
 @with_testrepos(flavors=['network'])
 @with_tempfile
-@known_failure_v6  #FIXME
 def test_install_dataset_from_just_source_via_path(url, path):
     # for remote urls only, the source could be given to `path`
     # to allows for simplistic cmdline calls
@@ -323,7 +339,7 @@ def test_install_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl), \
+    with patch('datalad.consts.DATASETS_TOPURL', topurl), \
             swallow_logs():
         ds = install(path, source='///ds')
     eq_(ds.path, path)
@@ -579,7 +595,7 @@ def test_failed_install(dspath):
     assert_raises(IncompleteResultsError,
                   ds.install,
                   "sub",
-                  source="http://nonexistingreallyanything.somewhere/bla")
+                  source="http://nonexistingreallyanything.datalad.org/bla")
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -628,7 +644,7 @@ def test_reckless(path, top_path):
                            }
                  })
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
+@skip_if_on_windows  # Due to "another process error" and buggy ok_clean_git
 def test_install_recursive_repeat(src, path):
     subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
@@ -840,6 +856,55 @@ def test_install_subds_with_space(opath, tpath):
     ds.create('sub ds')
     # works even now, boring
     # install(tpath, source=opath, recursive=True)
-    # do via ssh!
-    install(tpath, source="localhost:" + opath, recursive=True)
+    if on_windows:
+        # on windows we cannot simply prepend localhost: to a path
+        # and get a working sshurl...
+        install(tpath, source=opath, recursive=True)
+    else:
+        # do via ssh!
+        install(tpath, source="localhost:" + opath, recursive=True)
     assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
+# https://github.com/datalad/datalad/issues/2232
+@with_tempfile
+@with_tempfile
+def test_install_from_tilda(opath, tpath):
+    ds = create(opath)
+    ds.create('sub ds')
+    orelpath = os.path.join(
+        '~',
+        os.path.relpath(opath, os.path.expanduser('~'))
+    )
+    assert orelpath.startswith('~')  # just to make sure no normalization
+    install(tpath, source=orelpath, recursive=True)
+    assert Dataset(opj(tpath, 'sub ds')).is_installed()
+
+
+@skip_if_on_windows  # create_sibling incompatible with win servers
+@skip_ssh
+@usecase
+@with_tempfile(mkdir=True)
+def test_install_subds_from_another_remote(topdir):
+    # https://github.com/datalad/datalad/issues/1905
+    from datalad.support.network import PathRI
+    with chpwd(topdir):
+        origin_ = 'origin'
+        clone1_ = 'clone1'
+        clone2_ = 'clone2'
+
+        origin = create(origin_, no_annex=True)
+        clone1 = install(source=origin, path=clone1_)
+        # print("Initial clone")
+        clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
+
+        # print("Creating clone2")
+        clone1.publish(to=clone2_)
+        clone2 = Dataset(clone2_)
+        # print("Initiating subdataset")
+        clone2.create('subds1')
+
+        # print("Updating")
+        clone1.update(merge=True, sibling=clone2_)
+        # print("Installing within updated dataset -- should be able to install from clone2")
+        clone1.install('subds1')

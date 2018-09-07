@@ -18,16 +18,23 @@ assert(external_versions["patoolib"] >= "1.7")
 
 import os
 import tempfile
-from os.path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
-from os.path import sep as opsep
-from os.path import realpath
-from six import next
+from .path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
+from .path import sep as opsep
+from .path import realpath
+from six import next, PY2
 from six.moves.urllib.parse import unquote as urlunquote
 
 import string
 import random
 
-from ..utils import any_re_search
+from .locking import lock_if_check_fails
+from ..utils import (
+    any_re_search,
+    assure_bytes,
+    chpwd,
+    rmdir,
+    unlink,
+)
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -62,6 +69,7 @@ from ..cmd import Runner
 from ..consts import ARCHIVES_TEMP_DIR
 from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
+from ..utils import assure_unicode
 
 from ..utils import on_windows
 
@@ -131,16 +139,40 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         os.makedirs(dir_)
 
     with swallow_outputs() as cmo:
+        archive = assure_bytes(archive)
+        dir_ = assure_bytes(dir_)
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
+        outdir = unixify_path(dir_)
+        if not PY2:
+            # should be supplied in PY3 to avoid b''
+            outdir = assure_unicode(outdir)
+            archive = assure_unicode(archive)
         patoolib._extract_archive(unixify_path(archive),
-                                  outdir=unixify_path(dir_),
+                                  outdir=outdir,
                                   verbosity=100)
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
             lgr.debug("patool gave stderr:\n%s" % cmo.err)
+
+    # Note: (ben) Experienced issue, where extracted tarball
+    # lacked execution bit of directories, leading to not being
+    # able to delete them while having write permission.
+    # Can't imagine a situation, where we would want to fail on
+    # that kind of mess. So, to be sure set it.
+
+    if not on_windows:
+        os.chmod(dir_,
+                 os.stat(dir_).st_mode |
+                 os.path.stat.S_IEXEC)
+        for root, dirs, files in os.walk(dir_, followlinks=False):
+            for d in dirs:
+                subdir = opj(root, d)
+                os.chmod(subdir,
+                         os.stat(subdir).st_mode |
+                         os.path.stat.S_IEXEC)
 
     if leading_directories == 'strip':
         _, dirs, files = next(os.walk(dir_))
@@ -151,7 +183,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
-            os.rmdir(widow_dir)
+            rmdir(widow_dir)
     elif leading_directories is None:
         pass   # really do nothing
     else:
@@ -171,30 +203,15 @@ def compress_files(files, archive, path=None, overwrite=True):
     overwrite : bool
       Either to allow overwriting the target archive file if one already exists
     """
-
     with swallow_outputs() as cmo:
-        # to test filenames, if path is not None, we should join:
-        if path:
-            opj_path = lambda p: opj(path, p)
-        else:
-            opj_path = lambda p: p
-        if not overwrite:
-            patoolib.util.check_new_filename(opj_path(archive))
-        patoolib.util.check_archive_filelist([opj_path(f) for f in files])
-
-        # ugly but what can you do? ;-) we might wrap it all into a class
-        # at some point. TODO
-        old_cwd = _runner.cwd
-        if path is not None:
-            _runner.cwd = path
-        try:
+        with chpwd(path):
+            if not overwrite:
+                patoolib.util.check_new_filename(archive)
+            patoolib.util.check_archive_filelist(files)
             # Call protected one to avoid the checks on existence on unixified path
             patoolib._create_archive(unixify_path(archive),
                                      [unixify_path(f) for f in files],
                                      verbosity=100)
-        finally:
-            _runner.cwd = old_cwd
-
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
@@ -207,7 +224,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(realpath(archive).encode()).hexdigest()[:10]
+    archive_cached = hashlib.md5(assure_bytes(realpath(archive))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -369,7 +386,7 @@ class ExtractedArchive(object):
                     lgr.debug("Cleaning up the %s for %s under %s", name, self._archive, path)
                     # TODO:  we must be careful here -- to not modify permissions of files
                     #        only of directories
-                    (rmtree if isdir(path) else os.unlink)(path)
+                    (rmtree if isdir(path) else unlink)(path)
 
     @property
     def path(self):
@@ -391,39 +408,47 @@ class ExtractedArchive(object):
         """
         path = self.path
 
-        if not self.is_extracted:
-            # we need to extract the archive
-            # TODO: extract to _tmp and then move in a single command so we
-            # don't end up picking up broken pieces
-            lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
-            if exists(path):
-                lgr.debug("Previous extracted (but probably not fully) cached archive found. Removing %s", path)
-                rmtree(path)
-
-            os.makedirs(path)
-            assert(exists(path))
-            # remove old stamp
-            if exists(self.stamp_path):
-                rmtree(self.stamp_path)
-            decompress_file(self._archive, path, leading_directories=None)
-
-            # TODO: must optional since we might to use this content, move it into the tree etc
-            # lgr.debug("Adjusting permissions to R/O for the extracted content")
-            # rotree(path)
-            assert(exists(path))
-
-            # create a stamp
-            with open(self.stamp_path, 'w') as f:
-                f.write(self._archive)
-
-            # assert that stamp mtime is not older than archive's directory
-            assert(self.is_extracted)
-
+        with lock_if_check_fails(
+            check=(lambda s: s.is_extracted, (self,)),
+            lock_path=path,
+            operation="extract"
+        ) as (check, lock):
+            if lock:
+                assert not check
+                self._extract_archive(path)
         return path
+
+    def _extract_archive(self, path):
+        # we need to extract the archive
+        # TODO: extract to _tmp and then move in a single command so we
+        # don't end up picking up broken pieces
+        lgr.debug(u"Extracting {self._archive} under {path}".format(**locals()))
+        if exists(path):
+            lgr.debug(
+                "Previous extracted (but probably not fully) cached archive "
+                "found. Removing %s",
+                path)
+            rmtree(path)
+        os.makedirs(path)
+        assert (exists(path))
+        # remove old stamp
+        if exists(self.stamp_path):
+            rmtree(self.stamp_path)
+        decompress_file(self._archive, path, leading_directories=None)
+        # TODO: must optional since we might to use this content, move it
+        # into the tree etc
+        # lgr.debug("Adjusting permissions to R/O for the extracted content")
+        # rotree(path)
+        assert (exists(path))
+        # create a stamp
+        with open(self.stamp_path, 'wb') as f:
+            f.write(assure_bytes(self._archive))
+        # assert that stamp mtime is not older than archive's directory
+        assert (self.is_extracted)
 
     # TODO: remove?
     #def has_file_ready(self, afile):
-    #    lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
+    #    lgr.debug(u"Checking file {afile} from archive {archive}".format(**locals()))
     #    return exists(self.get_extracted_filename(afile))
 
     def get_extracted_filename(self, afile):
@@ -440,7 +465,7 @@ class ExtractedArchive(object):
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
-                yield opj(root, name)[path_len:]
+                yield assure_unicode(opj(root, name)[path_len:])
 
     def get_leading_directory(self, depth=None, consider=None, exclude=None):
         """Return leading directory of the content within archive
@@ -490,7 +515,7 @@ class ExtractedArchive(object):
         return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
-        lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
+        lgr.debug(u"Requested file {afile} from archive {self._archive}".format(**locals()))
         # TODO: That could be a good place to provide "compatibility" layer if
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back

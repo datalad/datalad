@@ -7,18 +7,29 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import logging
+
 from os import linesep
 
+from ... import __version__
+from ...dochelpers import exc_str
 from ...version import __version__
 from ..external_versions import ExternalVersions, LooseVersion
 from ..exceptions import CommandError
-from ..exceptions import OutdatedExternalDependency
+from ..exceptions import OutdatedExternalDependency, MissingExternalDependency
 from ...support.annexrepo import AnnexRepo
+from ...tests.utils import (
+    with_tempfile,
+    create_tree,
+    swallow_logs,
+)
 
 from mock import patch
-from nose.tools import assert_true, assert_false
-from nose.tools import assert_equal, assert_greater_equal, assert_greater
-from nose.tools import assert_raises
+from nose.tools import (
+    assert_true, assert_false,
+    assert_equal, assert_greater_equal, assert_greater,
+    assert_raises, assert_in
+)
 from nose import SkipTest
 from six import PY3
 
@@ -80,11 +91,11 @@ def test_external_versions_unknown():
 
 def _test_external(ev, modname):
     try:
-        exec ("import %s" % modname, globals(), locals())
+        exec("import %s" % modname, globals(), locals())
     except ImportError:
         raise SkipTest("External %s not present" % modname)
     except Exception as e:
-        raise SkipTest("External %s fails to import: %s" % (modname, e))
+        raise SkipTest("External %s fails to import: %s" % (modname, exc_str(e)))
     assert (ev[modname] is not ev.UNKNOWN)
     assert_greater(ev[modname], '0.0.1')
     assert_greater('1000000.0', ev[modname])  # unlikely in our lifetimes
@@ -100,6 +111,20 @@ def test_external_versions_popular_packages():
     # more of a smoke test
     assert_false(linesep in ev.dumps())
     assert_true(ev.dumps(indent=True).endswith(linesep))
+
+
+@with_tempfile(mkdir=True)
+def test_external_versions_rogue_module(topd):
+    ev = ExternalVersions()
+    # if module throws some other non-ImportError exception upon import
+    # we must not crash, but issue a warning
+    modname = 'verycustomrogue__'
+    create_tree(topd, {modname + '.py': 'raise Exception("pickaboo")'})
+    with patch('sys.path', [topd]), \
+        swallow_logs(new_level=logging.WARNING) as cml:
+        assert ev[modname] is None
+        assert_true(ev.dumps(indent=True).endswith(linesep))
+        assert_in('pickaboo', cml.out)
 
 
 def test_custom_versions():
@@ -150,6 +175,8 @@ def _test_annex_version_comparison(v, cmp_):
             if cmp_ == 0:
                 assert_equal(AnnexRepo.git_annex_version, v)
         elif cmp == -1:
+            with assert_raises(OutdatedExternalDependency):
+                ev.check('cmd:annex', min_version=AnnexRepo.GIT_ANNEX_MIN_VERSION)
             with assert_raises(OutdatedExternalDependency):
                 AnnexRepo._check_git_annex_version()
 
@@ -204,3 +231,20 @@ def test_system_ssh_version():
 def test_humanize():
     # doesn't provide __version__
     assert ExternalVersions()['humanize']
+
+
+def test_check():
+    ev = ExternalVersions()
+    # should be all good
+    ev.check('datalad')
+    ev.check('datalad', min_version=__version__)
+
+    with assert_raises(MissingExternalDependency):
+        ev.check('dataladkukaracha')
+    with assert_raises(MissingExternalDependency) as cme:
+        ev.check('dataladkukaracha', min_version="buga", msg="duga")
+
+    assert_in("duga", str(cme.exception))
+
+    with assert_raises(OutdatedExternalDependency):
+        ev.check('datalad', min_version="10000000")  # we will never get there!

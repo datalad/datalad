@@ -21,13 +21,17 @@ import tempfile
 import platform
 import gc
 import glob
+import string
 import wrapt
 
+from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
 from inspect import getargspec
+from itertools import tee
 
+import os.path as op
 from os.path import sep as dirsep
 from os.path import commonprefix
 from os.path import curdir, basename, exists, realpath, islink, join as opj
@@ -40,10 +44,17 @@ from os.path import split as psplit
 import posixpath
 
 
-from six import text_type, binary_type, string_types
+from six import PY2, text_type, binary_type, string_types
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
+
+
+if PY2:
+    unicode_srctypes = string_types
+else:
+    unicode_srctypes = string_types + (bytes,)
+
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -55,6 +66,9 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
+on_msys_tainted_paths = on_windows \
+                        and 'MSYS_NO_PATHCONV' not in os.environ \
+                        and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 try:
     linux_distribution_name, linux_distribution_release \
         = platform.linux_distribution()[:2]
@@ -166,6 +180,17 @@ def is_interactive():
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+def get_ipython_shell():
+    """Detect if running within IPython and returns its `ip` (shell) object
+
+    Returns None if not under ipython (no `get_ipython` function)
+    """
+    try:
+        return get_ipython()
+    except NameError:
+        return None
 
 
 def md5sum(filename):
@@ -282,7 +307,7 @@ def rotree(path, ro=True, chmod_files=True):
         chmod(root)
 
 
-def rmtree(path, chmod_files='auto', *args, **kwargs):
+def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
 
     Parameters
@@ -291,6 +316,9 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
+    children_only : bool, optional
+       If set, all files and subdirectories would be removed while the path
+       itself (must be a directory) would be preserved
     `*args` :
     `**kwargs` :
        Passed into shutil.rmtree call
@@ -299,12 +327,89 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     if chmod_files == 'auto':
         chmod_files = on_windows
 
+    # Check for open files
+    assert_no_open_files(path)
+
+    if children_only:
+        if not os.path.isdir(path):
+            raise ValueError("Can remove children only of directories")
+        for p in os.listdir(path):
+            rmtree(op.join(path, p))
+        return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
         shutil.rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
-        os.unlink(path)
+        unlink(path)
+
+
+def rmdir(path, *args, **kwargs):
+    """os.rmdir with our optional checking for open files"""
+    assert_no_open_files(path)
+    os.rmdir(path)
+
+
+def get_open_files(path, log_open=False):
+    """Get open files under a path
+
+    Parameters
+    ----------
+    path : str
+      File or directory to check for open files under
+    log_open : bool or int
+      If set - logger level to use
+
+    Returns
+    -------
+    dict
+      path : pid
+
+    """
+    # Original idea: https://stackoverflow.com/a/11115521/1265472
+    import psutil
+    files = {}
+    # since the ones returned by psutil would not be aware of symlinks in the
+    # path we should also get realpath for path
+    path = realpath(path)
+    for proc in psutil.process_iter():
+        try:
+            open_paths = [p.path for p in proc.open_files()] + [proc.cwd()]
+            for p in open_paths:
+                # note: could be done more efficiently so we do not
+                # renormalize path over and over again etc
+                if path_startswith(p, path):
+                    files[p] = proc.pid
+        # Catch a race condition where a process ends
+        # before we can examine its files
+        except psutil.NoSuchProcess:
+            pass
+        except psutil.AccessDenied:
+            pass
+
+    if files and log_open:
+        lgr.log(log_open, "Open files under %s: %s", path, files)
+    return files
+
+
+_assert_no_open_files_cfg = os.environ.get('DATALAD_ASSERT_NO_OPEN_FILES')
+if _assert_no_open_files_cfg:
+    def assert_no_open_files(path):
+        files = get_open_files(path, log_open=40)
+        if _assert_no_open_files_cfg == 'assert':
+            assert not files
+        elif files:
+            if _assert_no_open_files_cfg == 'pdb':
+                import pdb
+                pdb.set_trace()
+            elif _assert_no_open_files_cfg == 'epdb':
+                import epdb
+                epdb.serve()
+            pass
+        # otherwise we would just issue that error message in the log
+else:
+    def assert_no_open_files(*args, **kwargs):
+        pass
 
 
 def rmtemp(f, *args, **kwargs):
@@ -322,25 +427,37 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            # on windows boxes there is evidence for a latency of
-            # more than a second until a file is considered no
-            # longer "in-use"
-            # WindowsError is not known on Linux, and if IOError
-            # or any other exception is thrown then if except
-            # statement has WindowsError in it -- NameError
-            exceptions = (OSError, WindowsError) if on_windows else OSError
-            for i in range(50):
-                try:
-                    os.unlink(f)
-                except exceptions:
-                    if i < 49:
-                        sleep(0.1)
-                        continue
-                    else:
-                        raise
-                break
+            unlink(f)
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def unlink(f, ntimes=None, sleep_duration=0.1):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    exceptions = (OSError, WindowsError, PermissionError) \
+        if on_windows else OSError
+    if not ntimes:
+        # Life goes fast on proper systems, no need to delay it much
+        ntimes = 50 if on_windows else 3
+    # Check for open files
+    assert_no_open_files(f)
+    for i in range(ntimes):
+        try:
+            os.unlink(f)
+        except exceptions:
+            if i < ntimes - 1:
+                sleep(sleep_duration)
+                continue
+            else:
+                raise
+        break
 
 
 def file_basename(name, return_ext=False):
@@ -431,6 +548,33 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
+def assure_iter(s, cls, copy=False, iterate=True):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    cls: class
+      Which iterable class to assure
+    copy: bool, optional
+      If correct iterable is passed, it would generate its shallow copy
+    iterate: bool, optional
+      If it is not a list, but something iterable (but not a text_type)
+      iterate over it.
+    """
+
+    if isinstance(s, cls):
+        return s if not copy else shallow_copy(s)
+    elif isinstance(s, text_type):
+        return cls((s,))
+    elif iterate and hasattr(s, '__iter__'):
+        return cls(s)
+    elif s is None:
+        return cls()
+    else:
+        return cls((s,))
+
+
 def assure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
@@ -443,17 +587,7 @@ def assure_list(s, copy=False, iterate=True):
       If it is not a list, but something iterable (but not a text_type)
       iterate over it.
     """
-
-    if isinstance(s, list):
-        return s if not copy else s[:]
-    elif isinstance(s, text_type):
-        return [s]
-    elif iterate and hasattr(s, '__iter__'):
-        return list(s)
-    elif s is None:
-        return []
-    else:
-        return [s]
+    return assure_iter(s, list, copy=copy, iterate=iterate)
 
 
 def assure_list_from_str(s, sep='\n'):
@@ -500,9 +634,62 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
-def assure_unicode(s, encoding='utf-8'):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'"""
-    return s.decode(encoding) if isinstance(s, binary_type) else s
+def assure_bytes(s, encoding='utf-8'):
+    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  "utf-8" is the default
+    """
+    if not isinstance(s, text_type):
+        return s
+    return s.encode(encoding)
+
+
+def assure_unicode(s, encoding=None, confidence=None):
+    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+
+    Parameters
+    ----------
+    encoding: str, optional
+      Encoding to use.  If None, "utf-8" is tried, and then if not a valid
+      UTF-8, encoding will be guessed
+    confidence: float, optional
+      A value between 0 and 1, so if guessing of encoding is of lower than
+      specified confidence, ValueError is raised
+    """
+    if not isinstance(s, binary_type):
+        return s
+    if encoding is None:
+        # Figure out encoding, defaulting to 'utf-8' which is our common
+        # target in contemporary digital society
+        try:
+            return s.decode('utf-8')
+        except UnicodeDecodeError as exc:
+            from .dochelpers import exc_str
+            lgr.debug("Failed to decode a string as utf-8: %s", exc_str(exc))
+        # And now we could try to guess
+        from chardet import detect
+        enc = detect(s)
+        denc = enc.get('encoding', None)
+        if denc:
+            denc_confidence = enc.get('confidence', 0)
+            if confidence is not None and  denc_confidence < confidence:
+                raise ValueError(
+                    "Failed to auto-detect encoding with high enough "
+                    "confidence. Highest confidence was %s for %s"
+                    % (denc_confidence, denc)
+                )
+            return s.decode(denc)
+        else:
+            raise ValueError(
+                "Could not decode value as utf-8, or to guess its encoding: %s"
+                % repr(s)
+            )
+    else:
+        return s.decode(encoding)
+
 
 def assure_bool(s):
     """Convert value into boolean following convention for strings
@@ -520,6 +707,34 @@ def assure_bool(s):
         else:
             raise ValueError("Do not know how to treat %r as a boolean" % s)
     return bool(s)
+
+
+def as_unicode(val, cast_types=object):
+    """Given an arbitrary value, would try to obtain unicode value of it
+    
+    For unicode it would return original value, for python2 str or python3
+    bytes it would use assure_unicode, for None - an empty (unicode) string,
+    and for any other type (see `cast_types`) - would apply the unicode 
+    constructor.  If value is not an instance of `cast_types`, TypeError
+    is thrown
+    
+    Parameters
+    ----------
+    cast_types: type
+      Which types to cast to unicode by providing to constructor
+    """
+    if val is None:
+        return u''
+    elif isinstance(val, text_type):
+        return val
+    elif isinstance(val, unicode_srctypes):
+        return assure_unicode(val)
+    elif isinstance(val, cast_types):
+        return text_type(val)
+    else:
+        raise TypeError(
+            "Value %r is not of any of known or provided %s types"
+            % (val, cast_types))
 
 
 def unique(seq, key=None):
@@ -548,6 +763,47 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+def map_items(func, v):
+    """A helper to apply `func` to all elements (keys and values) within dict
+
+    No type checking of values passed to func is done, so `func`
+    should be resilient to values which it should not handle
+
+    Initial usecase - apply_recursive(url_fragment, assure_unicode)
+    """
+    # map all elements within item
+    return v.__class__(
+        item.__class__(map(func, item))
+        for item in v.items()
+    )
+
+
+def partition(items, predicate=bool):
+    """Partition `items` by `predicate`.
+
+    Parameters
+    ----------
+    items : iterable
+    predicate : callable
+        A function that will be mapped over each element in `items`. The
+        elements will partitioned based on whether the return value is false or
+        true.
+
+    Returns
+    -------
+    A tuple with two generators, the first for 'false' items and the second for
+    'true' ones.
+
+    Notes
+    -----
+    Taken from Peter Otten's snippet posted at
+    https://nedbatchelder.com/blog/201306/filter_a_list_into_two_parts.html
+    """
+    a, b = tee((predicate(item), item) for item in items)
+    return ((item for pred, item in a if not pred),
+            (item for pred, item in b if pred))
 
 
 def generate_chunks(container, size):
@@ -712,12 +968,14 @@ def swallow_outputs():
 
         @property
         def out(self):
-            self._out.flush()
+            if not self._out.closed:
+                self._out.flush()
             return self._read(self._out)
 
         @property
         def err(self):
-            self._err.flush()
+            if not self._err.closed:
+                self._err.flush()
             return self._read(self._err)
 
         @property
@@ -742,7 +1000,12 @@ def swallow_outputs():
 
         if file in (oldout, olderr, sys.stdout, sys.stderr):
             # we mock
-            sys.stdout.write(sep.join(args) + end)
+            try:
+                sys.stdout.write(sep.join(args) + end)
+            except UnicodeEncodeError as exc:
+                lgr.error(
+                    "Failed to write to mocked stdout, got %s, continue as it "
+                    "didn't happen",  exc)
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
@@ -869,7 +1132,10 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
     swallow_handler.setFormatter(
         logging.Formatter('[%(levelname)s] %(message)s'))
     # Inherit filters
-    swallow_handler.filters = sum([h.filters for h in old_handlers], [])
+    from datalad.log import ProgressHandler
+    swallow_handler.filters = sum([h.filters for h in old_handlers
+                                   if not isinstance(h, ProgressHandler)],
+                                  [])
     lgr.handlers = [swallow_handler]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
@@ -981,7 +1247,17 @@ def getpwd():
     If no PWD found in the env, output of getcwd() is returned
     """
     try:
-        return os.environ['PWD']
+        pwd = os.environ['PWD']
+        if on_windows and pwd and pwd.startswith('/'):
+            # It should be a path from MSYS.
+            # - it might start with a drive letter or not
+            # - it seems to be "illegal" to have a single letter directories
+            #   under / path, i.e. if created - they aren't found
+            # - 'ln -s' does not fail to create a "symlink" but it just copies!
+            #   so we are not likely to need original PWD purpose on those systems
+            # Verdict:
+            return os.getcwd()
+        return pwd
     except KeyError:
         return os.getcwd()
 
@@ -1027,6 +1303,21 @@ class chpwd(object):
             self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
+def dlabspath(path, norm=False):
+    """Symlinks-in-the-cwd aware abspath
+
+    os.path.abspath relies on os.getcwd() which would not know about symlinks
+    in the path
+
+    TODO: we might want to norm=True by default to match behavior of
+    os .path.abspath?
+    """
+    if not isabs(path):
+        # if not absolute -- relative to pwd
+        path = opj(getpwd(), path)
+    return normpath(path) if norm else path
+
+
 def with_pathsep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
@@ -1040,9 +1331,7 @@ def get_path_prefix(path, pwd=None):
     assumed
     """
     pwd = pwd or getpwd()
-    if not isabs(path):
-        # if not absolute -- relative to pwd
-        path = opj(getpwd(), path)
+    path = dlabspath(path)
     path_ = with_pathsep(path)
     pwd_ = with_pathsep(pwd)
     common = commonprefix((path_, pwd_))
@@ -1058,10 +1347,39 @@ def get_path_prefix(path, pwd=None):
         return path
 
 
+def _get_normalized_paths(path, prefix):
+    if isabs(path) != isabs(prefix):
+        raise ValueError("Bot paths must either be absolute or relative. "
+                         "Got %r and %r" % (path, prefix))
+    path = with_pathsep(path)
+    prefix = with_pathsep(prefix)
+    return path, prefix
+
+
 def path_startswith(path, prefix):
-    """Return True if path starts with prefix path"""
-    return commonprefix((with_pathsep(path), with_pathsep(prefix))) \
-           == with_pathsep(prefix)
+    """Return True if path starts with prefix path
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return path.startswith(prefix)
+
+
+def path_is_subpath(path, prefix):
+    """Return True if path is a subpath of prefix
+
+    It will return False if path == prefix.
+
+    Parameters
+    ----------
+    path: str
+    prefix: str
+    """
+    path, prefix = _get_normalized_paths(path, prefix)
+    return (len(prefix) < len(path)) and path.startswith(prefix)
 
 
 def knows_annex(path):
@@ -1160,7 +1478,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
     if on_windows:
-        return opj(*map(lambda x: x.split('/'), p))
+        return opj(*map(lambda x: opj(*x.split('/')), p))
     else:
         # Assume that all others as POSIX compliant so nothing to be done
         return opj(*p)
@@ -1269,6 +1587,39 @@ def get_dataset_root(path):
     return None
 
 
+def get_dataset_pwds(dataset):
+    """Return the current directory for the dataset.
+
+    Parameters
+    ----------
+    dataset : Dataset
+
+    Returns
+    -------
+    A tuple, where the first item is the absolute path of the pwd and the
+    second is the pwd relative to the dataset's path.
+    """
+    if dataset:
+        pwd = dataset.path
+        rel_pwd = curdir
+    else:
+        # act on the whole dataset if nothing else was specified
+
+        # Follow our generic semantic that if dataset is specified,
+        # paths are relative to it, if not -- relative to pwd
+        pwd = getpwd()
+        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
+        # repos whose leading paths have a symlinked directory (see the
+        # TMPDIR="/var/tmp/sym link" test case).
+        dataset = get_dataset_root(pwd)
+
+        if dataset:
+            rel_pwd = relpath(pwd, dataset)
+        else:
+            rel_pwd = pwd  # and leave handling to caller
+    return pwd, rel_pwd
+
+
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str
@@ -1312,5 +1663,309 @@ def safe_print(s):
             if hasattr(s, 'encode') else s
         print_f(s.decode())
 
-lgr.log(5, "Done importing datalad.utils")
+#
+# IO Helpers
+#
 
+def open_r_encdetect(fname, readahead=1000):
+    """Return a file object in read mode with auto-detected encoding
+
+    This is helpful when dealing with files of unknown encoding.
+
+    Parameters
+    ----------
+    readahead: int, optional
+      How many bytes to read for guessing the encoding type.  If
+      negative - full file will be read
+    """
+    from chardet import detect
+    import io
+    # read some bytes from the file
+    with open(fname, 'rb') as f:
+        head = f.read(readahead)
+    enc = detect(head)
+    denc = enc.get('encoding', None)
+    lgr.debug("Auto-detected encoding %s for file %s (confidence: %s)",
+              denc,
+              fname,
+              enc.get('confidence', 'unknown'))
+    return io.open(fname, encoding=denc)
+
+
+def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
+    """A generator of dict records from a CSV/TSV
+
+    Automatically guesses the encoding for each record to convert to UTF-8
+
+    Parameters
+    ----------
+    fname: str
+      Filename
+    dialect: str, optional
+      Dialect to specify to csv.reader. If not specified -- guessed from
+      the file, if fails to guess, "excel-tab" is assumed
+    readahead: int, optional
+      How many bytes to read from the file to guess the type
+    **kwargs
+      Passed to `csv.reader`
+    """
+    import csv
+    if dialect is None:
+        with open(fname) as tsvfile:
+            # add robustness, use a sniffer
+            try:
+                dialect = csv.Sniffer().sniff(tsvfile.read(readahead))
+            except Exception as exc:
+                from .dochelpers import exc_str
+                lgr.warning(
+                    'Could not determine file-format, assuming TSV: %s',
+                    exc_str(exc)
+                )
+                dialect = 'excel-tab'
+
+    kw = {} if PY2 else dict(encoding='utf-8')
+    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
+        # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+        csv_reader = csv.reader(
+            tsvfile,
+            dialect=dialect,
+            **kwargs
+        )
+        header = None
+        for row in csv_reader:
+            # decode UTF-8 back to Unicode, cell by cell:
+            row_unicode = map(assure_unicode, row)
+            if header is None:
+                header = list(row_unicode)
+            else:
+                yield dict(zip(header, row_unicode))
+
+
+def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug):
+    """Helper to import a list of modules without failing if N/A
+
+    Parameters
+    ----------
+    modnames: list of str
+      List of module names to import
+    pkg: str
+      Package under which to import
+    msg: str, optional
+      Message template for .format() to log at DEBUG level if import fails.
+      Keys {module} and {package} will be provided and ': {exception}' appended
+    log: callable, optional
+      Logger call to use for logging messages
+    """
+    from importlib import import_module
+    _globals = globals()
+    mods_loaded = []
+    if pkg and not pkg in sys.modules:
+        # with python 3.5.1 (ok with 3.5.5) somehow kept running into
+        #  Failed to import dlsub1: Parent module 'dltestm1' not loaded
+        # while running the test. Preloading pkg resolved the issue
+        import_module(pkg)
+    for modname in modnames:
+        try:
+            _globals[modname] = mod = import_module(
+                '.{}'.format(modname),
+                pkg)
+            mods_loaded.append(mod)
+        except Exception as exc:
+            from datalad.dochelpers import exc_str
+            log((msg + ': {exception}').format(
+                module=modname, package=pkg, exception=exc_str(exc)))
+    return mods_loaded
+
+
+def import_module_from_file(modpath, pkg=None, log=lgr.debug):
+    """Import provided module given a path
+
+    TODO:
+    - RF/make use of it in pipeline.py which has similar logic
+    - join with import_modules above?
+
+    Parameters
+    ----------
+    pkg: module, optional
+       If provided, and modpath is under pkg.__path__, relative import will be
+       used
+    """
+    assert(modpath.endswith('.py'))  # for now just for .py files
+
+    log("Importing %s" % modpath)
+
+    modname = basename(modpath)[:-3]
+    relmodpath = None
+    if pkg:
+        for pkgpath in pkg.__path__:
+            if path_is_subpath(modpath, pkgpath):
+                # for now relying on having .py extension -- assertion above
+                relmodpath = '.' + relpath(modpath[:-3], pkgpath).replace(sep, '.')
+                break
+
+    try:
+        if relmodpath:
+            from importlib import import_module
+            mod = import_module(relmodpath, pkg.__name__)
+        else:
+            dirname_ = dirname(modpath)
+            try:
+                sys.path.insert(0, dirname_)
+                mod = __import__(modname, level=0)
+            finally:
+                if dirname_ in sys.path:
+                    sys.path.pop(sys.path.index(dirname_))
+                else:
+                    log("Expected path %s to be within sys.path, but it was gone!" % dirname_)
+    except Exception as e:
+        from datalad.dochelpers import exc_str
+        raise RuntimeError(
+            "Failed to import module from %s: %s" % (modpath, exc_str(e)))
+
+    return mod
+
+
+def get_encoding_info():
+    """Return a dictionary with various encoding/locale information"""
+    import sys, locale
+    from collections import OrderedDict
+    return OrderedDict([
+        ('default', sys.getdefaultencoding()),
+        ('filesystem', sys.getfilesystemencoding()),
+        ('locale.prefered', locale.getpreferredencoding()),
+    ])
+
+
+def get_envvars_info():
+    from collections import OrderedDict
+    envs = []
+    for var, val in os.environ.items():
+        if (
+                var.startswith('PYTHON') or
+                var.startswith('LC_') or
+                var.startswith('GIT_') or
+                var in ('LANG', 'LANGUAGE', 'PATH')
+        ):
+            envs.append((var, val))
+    return OrderedDict(envs)
+
+
+# This class is modified from Snakemake (v5.1.4)
+class SequenceFormatter(string.Formatter):
+    """string.Formatter subclass with special behavior for sequences.
+
+    This class delegates formatting of individual elements to another
+    formatter object. Non-list objects are formatted by calling the
+    delegate formatter's "format_field" method. List-like objects
+    (list, tuple, set, frozenset) are formatted by formatting each
+    element of the list according to the specified format spec using
+    the delegate formatter and then joining the resulting strings with
+    a separator (space by default).
+    """
+
+    def __init__(self, separator=" ", element_formatter=string.Formatter(),
+                 *args, **kwargs):
+        self.separator = separator
+        self.element_formatter = element_formatter
+
+    def format_element(self, elem, format_spec):
+        """Format a single element
+
+        For sequences, this is called once for each element in a
+        sequence. For anything else, it is called on the entire
+        object. It is intended to be overridden in subclases.
+        """
+        return self.element_formatter.format_field(elem, format_spec)
+
+    def format_field(self, value, format_spec):
+        if isinstance(value, (list, tuple, set, frozenset)):
+            return self.separator.join(self.format_element(v, format_spec)
+                                       for v in value)
+        else:
+            return self.format_element(value, format_spec)
+
+
+# TODO: eventually we might want to make use of attr module
+class File(object):
+    """Helper for a file entry in the create_tree/@with_tree
+
+    It allows to define additional settings for entries
+    """
+    def __init__(self, name, executable=False):
+        """
+
+        Parameters
+        ----------
+        name : str
+          Name of the file
+        executable: bool, optional
+          Make it executable
+        """
+        self.name = name
+        self.executable = executable
+
+    def __str__(self):
+        return self.name
+
+
+def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
+    """Given an archive `name`, create under `path` with specified `load` tree
+    """
+    from datalad.support.archives import compress_files
+    dirname = file_basename(name)
+    full_dirname = op.join(path, dirname)
+    os.makedirs(full_dirname)
+    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
+    # create archive
+    if archives_leading_dir:
+        compress_files([dirname], name, path=path, overwrite=overwrite)
+    else:
+        compress_files(list(map(op.basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(op.pardir, name),
+                       path=op.join(path, dirname),
+                       overwrite=overwrite)
+    # remove original tree
+    shutil.rmtree(full_dirname)
+
+
+def create_tree(path, tree, archives_leading_dir=True):
+    """Given a list of tuples (name, load) create such a tree
+
+    if load is a tuple itself -- that would create either a subtree or an archive
+    with that content and place it into the tree if name ends with .tar.gz
+    """
+    lgr.log(5, "Creating a tree under %s", path)
+    if not op.exists(path):
+        os.makedirs(path)
+
+    if isinstance(tree, dict):
+        tree = tree.items()
+
+    for file_, load in tree:
+        if isinstance(file_, File):
+            executable = file_.executable
+            name = file_.name
+        else:
+            executable = False
+            name = file_
+        full_name = op.join(path, name)
+        if isinstance(load, (tuple, list, dict)):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
+                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+            else:
+                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+        else:
+            if PY2:
+                open_kwargs = {'mode': "w"}
+                if isinstance(load, text_type):
+                    load = load.encode('utf-8')
+            else:
+                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
+
+            with open(full_name, **open_kwargs) as f:
+                f.write(load)
+        if executable:
+            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+lgr.log(5, "Done importing datalad.utils")

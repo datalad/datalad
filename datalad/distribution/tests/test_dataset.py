@@ -21,6 +21,7 @@ from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.utils import get_dataset_root
+from datalad.utils import on_windows
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -29,6 +30,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import skip_if_on_windows
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathOutsideRepositoryError
 
@@ -149,6 +151,7 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
+@skip_if_on_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch
@@ -190,12 +193,16 @@ def test_subdatasets(path):
         result_xfm='datasets', return_type='item-or-list')
     assert_true(subsubds.is_installed())
     eq_(subsubds.get_superdataset(), subds)
-    eq_(subsubds.get_superdataset(topmost=True), ds)
+    # by default, it will only report a subperdataset that actually
+    # has the queries dataset as a registered true subdataset
+    eq_(subsubds.get_superdataset(topmost=True), subds)
+    # by we can also ask for a dataset that is merely above
+    eq_(subsubds.get_superdataset(topmost=True, registered_only=False), ds)
 
     # verify that '^' alias would work
     with chpwd(subsubds.path):
         dstop = Dataset('^')
-        eq_(dstop, ds)
+        eq_(dstop, subds)
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path, LOCAL_CENTRAL_PATH)
@@ -307,9 +314,11 @@ def test_Dataset_flyweight(path1, path2):
         ok_(ds1 == ds3)
         ok_(ds1 is ds3)
 
-    # reference the same via symlink:
-    with chpwd(path2):
-        os.symlink(path1, 'linked')
-        ds3 = Dataset('linked')
-        ok_(ds3 == ds1)
-        ok_(ds3 is not ds1)
+    # on windows as symlink is not what you think it is
+    if not on_windows:
+        # reference the same via symlink:
+        with chpwd(path2):
+            os.symlink(path1, 'linked')
+            ds3 = Dataset('linked')
+            ok_(ds3 == ds1)
+            ok_(ds3 is not ds1)

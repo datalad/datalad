@@ -97,7 +97,6 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(content="doesntmatter")
-@known_failure_direct_mode  #FIXME
 def test_get_invalid_call(path, file_outside):
 
     # no argument at all:
@@ -160,7 +159,6 @@ def test_get_single_file(path):
                  'file4.txt': 'whatever 4'})
 @serve_path_via_http
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_multiple_files(path, url, ds_dir):
     from os import listdir
     from datalad.support.network import RI
@@ -208,7 +206,6 @@ def test_get_multiple_files(path, url, ds_dir):
                                 'file4.txt': 'something'
                             }}})
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:
@@ -422,7 +419,6 @@ def test_autoresolve_multiple_datasets(src, path):
 @slow  # 20 sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_autoresolve_recurse_subdatasets(src, path):
 
     origin = Dataset(src).create()
@@ -450,7 +446,6 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
 @slow  # 92sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_recurse_existing(src, path):
     origin_ds = _make_dataset_hierarchy(src)
 
@@ -493,7 +488,6 @@ def test_recurse_existing(src, path):
 @slow  # 33sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_in_unavailable_subdataset(src, path):
     _make_dataset_hierarchy(src)
     root = install(

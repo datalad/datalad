@@ -44,6 +44,7 @@ from datalad.utils import on_windows
 from datalad.utils import chpwd
 from datalad.utils import rmtree
 from datalad.utils import linux_distribution_name
+from datalad.utils import unlink
 
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import assert_cwd_unchanged
@@ -94,8 +95,11 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.annexrepo import ProcessAnnexProgressIndicators
+from datalad.support.annexrepo import (
+    AnnexRepo,
+    ProcessAnnexProgressIndicators,
+    _get_size_from_perc_complete,
+)
 from .utils import check_repo_deals_with_inode_change
 
 
@@ -546,7 +550,8 @@ def __test_get_md5s(path):
     # was used just to generate above dict
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = [basename(f) for f in find_files('.*', path)]
-    annex.add(files, commit=True)
+    annex.add(files)
+    annex.commit()
     print({f: annex.get_file_key(f) for f in files})
 
 
@@ -556,7 +561,8 @@ def test_dropkey(batch, direct, path):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
     files = list(tree1_md5e_keys)
-    annex.add(files, commit=True)
+    annex.add(files)
+    annex.commit()
     # drop one key
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # drop multiple
@@ -574,7 +580,7 @@ def test_AnnexRepo_backend_option(path, url):
     ar = AnnexRepo(path, backend='MD5')
 
     # backend recorded in .gitattributes
-    eq_(ar.get_git_attributes()['annex.backend'], 'MD5')
+    eq_(ar.get_gitattributes('.')['.']['annex.backend'], 'MD5')
 
     ar.add('firstfile', backend='SHA1')
     ar.add('secondfile')
@@ -724,7 +730,6 @@ def test_AnnexRepo_commit(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_annex(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -768,7 +773,8 @@ def test_AnnexRepo_add_to_annex(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename, commit=True, msg="Added another file to annex.")
+    repo.add(filename)
+    repo.commit(msg="Added another file to annex.")
     # known to annex:
     ok_(repo.get_file_key(filename))
     ok_(repo.file_has_content(filename))
@@ -778,7 +784,6 @@ def test_AnnexRepo_add_to_annex(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_git(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -806,8 +811,8 @@ def test_AnnexRepo_add_to_git(path):
     with open(opj(repo.path, filename), "w") as f:
         f.write("something else")
 
-    repo.add(filename, git=True, commit=True,
-             msg="Added another file to annex.")
+    repo.add(filename, git=True)
+    repo.commit(msg="Added another file to annex.")
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
 
@@ -930,6 +935,10 @@ def test_AnnexRepo_get_contentlocation():
 @with_tempfile
 def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
+    if os.environ.get('DATALAD_FAKE__DATES'):
+        raise SkipTest(
+            "Faked dates are enabled; skipping batched addurl tests")
+
     ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
     testurl2 = urljoin(siteurl, 'about2.txt')
@@ -949,7 +958,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar.add_url_to_file(testfile, testurl, batch=True)
 
     # Remove it and re-add
-    os.unlink(opj(dst, testfile))
+    unlink(opj(dst, testfile))
     ar.add_url_to_file(testfile, testurl, batch=True)
 
     info = ar.info(testfile)
@@ -1024,6 +1033,30 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     raise SkipTest("TODO: more, e.g. add with a custom backend")
     # TODO: also with different modes (relaxed, fast)
     # TODO: verify that file is added with that backend and that we got a new batched process
+
+
+@with_tree(tree={"foo": "foo content"})
+@serve_path_via_http()
+@with_tree(tree={"bar": "bar content"})
+def test_annexrepo_fake_dates_disables_batched(sitepath, siteurl, dst):
+    ar = AnnexRepo(dst, create=True, fake_dates=True)
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ar.add_url_to_file("foo-dst", urljoin(siteurl, "foo"), batch=True)
+        cml.assert_logged(
+            msg="Not batching addurl call because fake dates are enabled",
+            level="DEBUG",
+            regex=False)
+
+    ar.add("bar")
+    ar.commit("add bar")
+
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ar.drop_key(ar.get_file_key(["bar"]), batch=True)
+        cml.assert_logged(
+            msg="Not batching drop_key call because fake dates are enabled",
+            level="DEBUG",
+            regex=False)
 
 
 @with_tempfile(mkdir=True)
@@ -1297,6 +1330,34 @@ def test_annex_drop(src, dst):
 
     # too much arguments:
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
+
+
+@with_tree({"a.txt": "a", "b.txt": "b", "c.py": "c", "d": "d"})
+def test_annex_get_annexed_files(path):
+    repo = AnnexRepo(path)
+    repo.add(".")
+    repo.commit()
+    eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
+
+    repo.drop("a.txt", options=["--force"])
+    eq_(set(repo.get_annexed_files()), {"a.txt", "b.txt", "c.py", "d"})
+    eq_(set(repo.get_annexed_files(with_content_only=True)),
+        {"b.txt", "c.py", "d"})
+
+    eq_(set(repo.get_annexed_files(patterns=["*.txt"])),
+        {"a.txt", "b.txt"})
+    eq_(set(repo.get_annexed_files(with_content_only=True,
+                                   patterns=["*.txt"])),
+        {"b.txt"})
+
+    eq_(set(repo.get_annexed_files(patterns=["*.txt", "*.py"])),
+        {"a.txt", "b.txt", "c.py"})
+
+    eq_(set(repo.get_annexed_files()),
+        set(repo.get_annexed_files(patterns=["*"])))
+
+    eq_(set(repo.get_annexed_files(with_content_only=True)),
+        set(repo.get_annexed_files(with_content_only=True, patterns=["*"])))
 
 
 @with_testrepos('basic_annex', flavors=['clone'])
@@ -1842,7 +1903,8 @@ def _test_status(ar):
     eq_(stat, ar.get_status())
 
     # add to subrepo
-    sub.add('fourth', commit=True, msg="birther mod init'ed")
+    sub.add('fourth')
+    sub.commit(msg="birther mod init'ed")
     stat['untracked'].remove(opj('submod', 'fourth'))
 
     if ar.get_active_branch().endswith('(unlocked)') and \
@@ -2118,6 +2180,17 @@ def test_AnnexRepo_metadata(path):
     eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
 
+@with_tree(tree={'file.txt': 'content'})
+@serve_path_via_http()
+@with_tempfile
+def test_AnnexRepo_addurl_batched_and_set_metadata(path, url, dest):
+    ar = AnnexRepo(dest, create=True)
+    fname = "file.txt"
+    ar.add_url_to_file(fname, urljoin(url, fname), batch=True)
+    list(ar.set_metadata(fname, init={"number": "one"}))
+    eq_(["one"], dict(ar.get_metadata(fname))[fname]["number"])
+
+
 @with_tempfile(mkdir=True)
 def test_change_description(path):
     # prelude
@@ -2191,3 +2264,44 @@ def test_fake_is_not_special(path):
     # doesn't exist -- we fail by default
     assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
     assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
+
+
+@with_tempfile(mkdir=True)
+def test_fake_dates(path):
+    ar = AnnexRepo(path, create=True, fake_dates=True)
+    timestamp = ar.config.obtain("datalad.fake-dates-start") + 1
+    # Commits from the "git annex init" call are one second ahead.
+    for commit in ar.get_branch_commits("git-annex"):
+        eq_(timestamp, commit.committed_date)
+    assert_in("timestamp={}s".format(timestamp),
+              ar.repo.git.cat_file("blob", "git-annex:uuid.log"))
+
+
+def test_get_size_from_perc_complete():
+    f = _get_size_from_perc_complete
+    eq_(f(0, 0), 0)
+    eq_(f(0, '0'), 0)
+    eq_(f(100, '0'), 0)  # we do not know better
+    eq_(f(1, '1'), 100)
+
+
+# to prevent regression
+# http://git-annex.branchable.com/bugs/v6_-_under_subdir__58___git_add___34__whines__34____44___git_commit___34__blows__34__/
+# It is disabled because is not per se relevant to DataLad since we do not
+# Since we invoke from the top of the repo, we do not hit it,
+# but thought to leave it around if we want to enforce/test system-wide git being
+# compatible with annex for v6 mode
+@with_tempfile(mkdir=True)
+def _test_add_under_subdir(path):
+    ar = AnnexRepo(path, create=True, version=6)
+    gr = GitRepo(path)  # "Git" view over the repository, so we force "git add"
+    subdir = opj(path, 'sub')
+    subfile = opj('sub', 'empty')
+    # os.mkdir(subdir)
+    create_tree(subdir, {'empty': ''})
+    runner = Runner(cwd=subdir)
+    with chpwd(subdir):
+        runner(['git', 'add', 'empty'])  # should add sucesfully
+        # gr.commit('important') #
+        runner(['git', 'commit', '-m', 'important'])
+        ar.is_under_annex(subfile)

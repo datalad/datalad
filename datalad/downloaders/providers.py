@@ -13,19 +13,32 @@ from glob import glob
 from logging import getLogger
 from six import iteritems
 
+import os
 import re
 from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
+from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 
-from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
-from .http import HTTPDownloader
+from .http import (
+    HTMLFormAuthenticator,
+    HTTPAuthAuthenticator,
+    HTTPBasicAuthAuthenticator,
+    HTTPDigestAuthAuthenticator,
+    HTTPBearerTokenAuthenticator,
+    HTTPDownloader,
+)
 from .s3 import S3Authenticator, S3Downloader
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
+from ..support.network import RI
+from ..support import path
 from ..utils import assure_list_from_str
 from ..utils import auto_repr
+from ..utils import get_dataset_root
+
+from ..interface.common_cfg import dirs
 
 lgr = getLogger('datalad.downloaders.providers')
 
@@ -33,17 +46,18 @@ lgr = getLogger('datalad.downloaders.providers')
 # parameters will be fetched from config file itself
 AUTHENTICATION_TYPES = {
     'html_form': HTMLFormAuthenticator,
-    'http_auth': HTTPBasicAuthAuthenticator,
+    'http_auth': HTTPAuthAuthenticator,
     'http_basic_auth': HTTPBasicAuthAuthenticator,
     'http_digest_auth': HTTPDigestAuthAuthenticator,
+    'bearer_token': HTTPBearerTokenAuthenticator,
     'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
     'nda-s3': S3Authenticator,
+    'loris-token': HTTPBearerTokenAuthenticator,
     'xnat': NotImplementedAuthenticator,
     'none': NoneAuthenticator,
 }
 
 from .credentials import CREDENTIAL_TYPES
-
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -150,6 +164,7 @@ class Providers(object):
     """
 
     _DEFAULT_PROVIDERS = None
+    _DS_ROOT = None
 
     def __init__(self, providers=None):
         """
@@ -160,7 +175,10 @@ class Providers(object):
         self._default_providers = {}
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, "" if not self._providers else repr(self._providers))
+        return "%s(%s)" % (
+            self.__class__.__name__,
+            "" if not self._providers else repr(self._providers)
+        )
 
     def __len__(self):
         return len(self._providers)
@@ -172,33 +190,61 @@ class Providers(object):
         return self._providers.__iter__()
 
     @classmethod
+    def _get_providers_dirs(cls, dsroot=None):
+        """Return an ordered dict with directories to look for provider config files
+
+        Is implemented as a function to ease mock testing depending on dirs.
+        values
+        """
+        paths = OrderedDict()
+        paths['dist'] = pathjoin(dirname(abspath(__file__)), 'configs')
+        if dsroot is not None:
+            paths['ds'] = pathjoin(dsroot, '.datalad', 'providers')
+        paths['site'] = pathjoin(dirs.site_config_dir, "providers") \
+            if dirs.site_config_dir else None
+        paths['user'] = pathjoin(dirs.user_config_dir, "providers") \
+            if dirs.user_config_dir else None
+        return paths
+
+    @classmethod
+    def _get_configs(cls, dir, files='*.cfg'):
+        return glob(pathjoin(dir, files)) if dir is not None else []
+
+    @classmethod
     def from_config_files(cls, files=None, reload=False):
-        """Would load information about related/possible websites requiring authentication from
+        """Loads information about related/possible websites requiring authentication from:
 
-        - codebase (for now) datalad/downloaders/configs/providers.cfg
+        - datalad/downloaders/configs/*.cfg files provided by the codebase
         - current dataset .datalad/providers/
-        - user dir  ~/.config/datalad/providers/
-        - system-wide datalad installation/config /etc/datalad/providers/
+        - User's home directory directory (ie ~/.config/datalad/providers/*.cfg)
+        - system-wide datalad installation/config (ie /etc/datalad/providers/*.cfg)
 
-        For sample configs look into datalad/downloaders/configs/providers.cfg
+        For sample configs files see datalad/downloaders/configs/providers.cfg
 
-        If files is None, loading is "lazy".  Specify reload=True to force
-        reload.  reset_default_providers could also be used to reset the memoized
-        providers
+        If files is None, loading is cached between calls.  Specify reload=True to force
+        reloading of files from the filesystem.  The class method reset_default_providers
+        can also be called to reset the cached providers.
         """
         # lazy part
-        if files is None and cls._DEFAULT_PROVIDERS and not reload:
+        dsroot = get_dataset_root("")
+        if files is None and cls._DEFAULT_PROVIDERS and not reload and dsroot==cls._DS_ROOT:
             return cls._DEFAULT_PROVIDERS
 
         config = SafeConfigParserWithIncludes()
-        # TODO: support all those other paths
         files_orig = files
         if files is None:
-            files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
+            cls._DS_ROOT = dsroot
+            files = []
+            for p in cls._get_providers_dirs(dsroot).values():
+                files.extend(cls._get_configs(p))
         config.read(files)
 
         # We need first to load Providers and credentials
-        providers = {}
+        # Order matters, because we need to ensure that when
+        # there's a conflict between configuration files declared
+        # at different precedence levels (ie. dataset vs system)
+        # the appropriate precedence config wins.
+        providers = OrderedDict()
         credentials = {}
 
         for section in config.sections():
@@ -261,7 +307,7 @@ class Providers(object):
             authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = assure_list_from_str(items.pop('url_re'))
+        url_res = assure_list_from_str(items.pop('url_re', []))
         assert url_res, "current implementation relies on having url_re defined"
 
         credential = items.pop('credential', None)
@@ -274,29 +320,37 @@ class Providers(object):
     def _process_credential(cls, name, items):
         assert 'type' in items, "Credential must specify type.  Missing in %s" % name
         cred_type = items.pop('type')
-        if not cred_type in CREDENTIAL_TYPES:
+        if cred_type not in CREDENTIAL_TYPES:
             raise ValueError("I do not know type %s credential. Known: %s"
                              % (cred_type, CREDENTIAL_TYPES.keys()))
         return CREDENTIAL_TYPES[cred_type](name=name, url=items.pop('url', None))
 
-    def get_provider(self, url, only_nondefault=False):
+    def reload(self):
+        new_providers = self.from_config_files(reload=True)
+        self._providers = new_providers._providers
+        self._default_providers = new_providers._default_providers
+
+    def get_provider(self, url, only_nondefault=False, return_all=False):
         """Given a URL returns matching provider
         """
-        nproviders = len(self._providers)
-        for i in range(nproviders):
-            provider = self._providers[i]
-            if not provider.url_res:
-                continue
+
+        # Range backwards to ensure that more locally defined
+        # configuration wins in conflicts between url_re
+        matching_providers = []
+        for provider in self._providers[::-1]:
             for url_re in provider.url_res:
                 if re.match(url_re, url):
-                    if i != 0:
-                        # place it first
-                        # TODO: optimize with smarter datastructures if this becomes a burden
-                        del self._providers[i]
-                        self._providers = [provider] + self._providers
-                        assert(len(self._providers) == nproviders)
                     lgr.debug("Returning provider %s for url %s", provider, url)
-                    return provider
+                    matching_providers.append(provider)
+
+        if matching_providers:
+            if return_all:
+                return matching_providers
+            if len(matching_providers) > 1:
+                lgr.warning(
+                    "Multiple providers matched for %s, using the first one"
+                    % url)
+            return matching_providers[0]
 
         if only_nondefault:
             return None
@@ -311,6 +365,119 @@ class Providers(object):
         lgr.debug("No dedicated provider, returning default one for %s: %s",
                   scheme, provider)
         return provider
+
+    def enter_new(self, url=None, auth_types=[]):
+        from datalad.ui import ui
+        name = None
+        if url:
+            ri = RI(url)
+            for f in ('hostname', 'name'):
+                try:
+                    # might need sanitarization
+                    name = str(getattr(ri, f))
+                except AttributeError:
+                    pass
+        known_providers_by_name = {p.name: p for p in self._providers}
+        providers_user_dir = self._get_providers_dirs()['user']
+        while True:
+            name = ui.question(
+                title="New provider name",
+                text="Unique name to identify 'provider' for %s" % url,
+                default=name
+            )
+            filename = pathjoin(providers_user_dir, '%s.cfg' % name)
+            if name in known_providers_by_name:
+                if ui.yesno(
+                    title="Known provider %s" % name,
+                    text="Provider with name %s already known. Do you want to "
+                         "use it for this session?"
+                         % name,
+                    default=True
+                ):
+                    return known_providers_by_name[name]
+            elif path.lexists(filename):
+                ui.error(
+                    "File %s already exists, choose another name" % filename)
+            else:
+                break
+
+        url_re = re.escape(url) if url else None
+        while True:
+            url_re = ui.question(
+                title="New provider regular expression",
+                text="A (Python) regular expression to specify for which URLs "
+                     "this provider should be used",
+                default=url_re
+            )
+            if not re.match(url_re, url):
+                ui.error("Provided regular expression doesn't match original "
+                         "url.  Please re-enter")
+            # TODO: url_re of another provider might match it as well
+            #  I am not sure if we have any kind of "priority" setting ATM
+            #  to differentiate or to to try multiple types :-/
+            else:
+                break
+
+        authentication_type = None
+        if auth_types:
+            auth_types = [
+                t for t in auth_types if t in AUTHENTICATION_TYPES
+            ]
+            if auth_types:
+                authentication_type = auth_types[0]
+
+        # Setup credential
+        authentication_type = ui.question(
+            title="Authentication type",
+            text="What authentication type to use",
+            default=authentication_type,
+            choices=sorted(AUTHENTICATION_TYPES)
+        )
+        authenticator_class = AUTHENTICATION_TYPES[authentication_type]
+
+        # TODO: need to figure out what fields that authenticator might
+        #       need to have setup and ask for them here!
+
+        credential_type = ui.question(
+            title="Credential",
+            text="What type of credential should be used?",
+            choices=sorted(CREDENTIAL_TYPES),
+            default=getattr(authenticator_class, 'DEFAULT_CREDENTIAL_TYPE')
+        )
+
+        # Just create a configuration file and reload the thing
+        if not path.lexists(providers_user_dir):
+            os.makedirs(providers_user_dir)
+        cfg = """\
+# Provider configuration file created to initially access
+# {url}
+
+[provider:{name}]
+url_re = {url_re}
+authentication_type = {authentication_type}
+# Note that you might need to specify additional fields specific to the
+# authenticator.  Fow now "look into the docs/source" of {authenticator_class}
+# {authentication_type}_
+credential = {name}
+
+[credential:{name}]
+# If known, specify URL or email to how/where to request credentials
+# url = ???
+type = {credential_type}
+""".format(**locals())
+        if ui.yesno(
+            title="Save provider configuration file",
+            text="Following configuration will be written to %s:\n%s"
+                % (filename, cfg),
+            default='yes'
+        ):
+            with open(filename, 'wb') as f:
+                f.write(cfg.encode('utf-8'))
+        else:
+            return None
+        self.reload()
+        # XXX see above note about possibly multiple matches etc
+        return self.get_provider(url)
 
     # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders

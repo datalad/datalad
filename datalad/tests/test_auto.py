@@ -9,6 +9,7 @@
 """Test proxying of core IO operations
 """
 
+import io
 import os
 from os.path import join as opj, dirname
 
@@ -25,6 +26,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from datalad.support.json_py import LZMAFile
 
 try:
     import h5py
@@ -37,7 +39,7 @@ try:
 except ImportError:
     nib = None
 
-# somewhat superseeded by  test_proxying_open_regular but still does
+# somewhat superseeded by test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
@@ -117,13 +119,14 @@ def _test_proxying_open(generate_load, verify_load, repo):
     fpath1_2 = fpath1.replace(repo, repo2)
     fpath2_2 = fpath2.replace(repo, repo2)
 
-    assert_raises(IOError, verify_load, fpath1_2)
+    EXPECTED_EXCEPTIONS = (IOError, OSError)
+    assert_raises(EXPECTED_EXCEPTIONS, verify_load, fpath1_2)
 
     with AutomagicIO():
         # verify that it doesn't even try to get files which do not exist
         with patch('datalad.support.annexrepo.AnnexRepo.get') as gricm:
             # if we request absent file
-            assert_raises(IOError, open, fpath1_2+"_", 'r')
+            assert_raises(EXPECTED_EXCEPTIONS, open, fpath1_2+"_", 'r')
             # no get should be called
             assert_false(gricm.called)
         verify_load(fpath1_2)
@@ -133,6 +136,20 @@ def _test_proxying_open(generate_load, verify_load, repo):
         assert_false(annex2.file_has_content(fpath2_2))
         verify_load(fpath2_2)
         assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_true(os.path.isfile(fpath2_2))
+
+    # In check_once mode, if we drop it, it wouldn't be considered again
+    annex2.drop(fpath2_2)
+    assert_false(annex2.file_has_content(fpath2_2))
+    with AutomagicIO(check_once=True):
+        verify_load(fpath2_2)
+        assert_true(annex2.file_has_content(fpath2_2))
+        annex2.drop(fpath2_2)
+        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(os.path.isfile(fpath2_2))
+
 
     # if we override stdout with something not supporting fileno, like tornado
     # does which ruins using get under IPython
@@ -172,8 +189,39 @@ def test_proxying_open_regular():
             f.write("123")
 
     def verify_dat(f, mode="r"):
-        with open(f, "r") as f:
+        with open(f, mode) as f:
             eq_(f.read(), "123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+def test_proxying_io_open_regular():
+
+    def generate_dat(f):
+        with io.open(f, "w", encoding='utf-8') as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        with io.open(f, mode, encoding='utf-8') as f:
+            eq_(f.read(), u"123")
+
+    yield _test_proxying_open, generate_dat, verify_dat
+
+
+from datalad.tests.utils import skip_if_no_module
+
+
+def test_proxying_lzma_LZMAFile():
+    skip_if_no_module('datalad.support.lzma')
+    from datalad.support.lzma import lzma
+
+    def generate_dat(f):
+        with LZMAFile(f, "w") as f:
+            f.write("123".encode('utf-8'))
+
+    def verify_dat(f, mode="r"):
+        with LZMAFile(f, mode) as f:
+            eq_(f.read().decode('utf-8'), "123")
 
     yield _test_proxying_open, generate_dat, verify_dat
 
@@ -197,3 +245,15 @@ def test_proxying_open_nibabel():
         assert_array_equal(ni.get_data(), d)
 
     yield _test_proxying_open, generate_nii, verify_nii
+
+
+def test_proxying_os_stat():
+    from os.path import exists
+    def generate_dat(f):
+        with io.open(f, "w", encoding='utf-8') as f:
+            f.write(u"123")
+
+    def verify_dat(f, mode="r"):
+        assert os.stat(f).st_size == 3
+
+    yield _test_proxying_open, generate_dat, verify_dat

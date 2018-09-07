@@ -27,7 +27,9 @@ from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_false
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
-from ...tests.utils import SkipTest
+from ...tests.utils import slow
+from ...tests.utils import assert_re_in
+from datalad.tests.utils import assert_result_values_cond
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
@@ -161,7 +163,7 @@ tree4uargs = dict(
 )
 
 
-@known_failure_v6   # FIXME
+@slow  # 29.4293s
 #  apparently fails only sometimes in PY3, but in a way that's common in V6
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
@@ -271,7 +273,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     ok_archives_caches(repo.path, 0, persistent=False)
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     repo.get(opj('1', '1 f.txt'))  # that what managed to not work
 
     # TODO: check if persistent archive is there for the 1.tar.gz
@@ -279,7 +281,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     # We should be able to drop everything since available online
     with swallow_outputs():
         clean(dataset=repo.path)
-    repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
@@ -289,11 +291,15 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
 
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
-    repo.get(key_1tar, options=['--key'])
+    repo.get(key_1tar, key=True)
     unlink(opj(path_orig, '1.tar.gz'))
-    res = repo.drop(key_1tar, options=['--key'])
+    res = repo.drop(key_1tar, key=True)
     assert_equal(res['success'], False)
-    assert_equal(res['note'], '(Use --force to override this check, or adjust numcopies.)')
+
+    assert_result_values_cond(
+        [res], 'note',
+        lambda x: '(Use --force to override this check, or adjust numcopies.)' in x
+    )
     assert exists(opj(repo.path, repo.get_contentlocation(key_1tar)))
 
 
@@ -324,6 +330,20 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(tree={"1.zip": {"dir": {"bar": "blah"}, "foo": "blahhhhh"}})
+def test_add_archive_content_zip(repo_path):
+    repo = AnnexRepo(repo_path, create=True)
+    with chpwd(repo_path):
+        with swallow_outputs():
+            repo.add(["1.zip"])
+        repo.commit("add 1.zip")
+        add_archive_content("1.zip")
+        ok_file_under_git(opj(repo.path, "1", "foo"), annexed=True)
+        ok_file_under_git(opj("1", "dir", "bar"), annexed=True)
+        ok_archives_caches(repo.path, 0)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
@@ -331,6 +351,13 @@ def test_add_archive_use_archive_dir(repo_path):
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
+        # check it gives informative error if archive is not already added
+        with assert_raises(RuntimeError) as cmr:
+            add_archive_content(archive_path)
+        assert_re_in(
+            "You should run ['\"]datalad add %s['\"] first" % archive_path,
+            str(cmr.exception), match=False
+        )
         with swallow_outputs():
             repo.add(archive_path)
         repo.commit("added 1.tar.gz")
@@ -405,7 +432,12 @@ class TestAddArchiveOptions():
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
         commits_after = list(self.annex.get_branch_commits('git-annex'))
         # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
-        assert_equal(len(commits_after), len(commits_prior) + 2)
+        # If faking dates, there should be another +1 because
+        # annex.alwayscommit isn't set to false.
+        assert_equal(len(commits_after),
+                     # We expect one more when faking dates because
+                     # annex.alwayscommit isn't set to false.
+                     len(commits_prior) + 2 + self.annex.fake_dates_enabled)
         assert_equal(prev_files, list(find_files('.*', self.annex.path)))
         w = self.annex.whereis(key1, key=True, output='full')
         assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
@@ -440,8 +472,11 @@ class TestAddArchiveOptions():
             commits_after_master = list(self.annex.get_branch_commits())
             commits_after = list(self.annex.get_branch_commits('git-annex'))
             # There should be a single commit for all additions +1 to
-            # initiate datalad-archives gh-1258
-            assert_equal(len(commits_after), len(commits_prior) + 2)
+            # initiate datalad-archives gh-1258.  If faking dates,
+            # there should be another +1 because annex.alwayscommit
+            # isn't set to false.
+            assert_equal(len(commits_after),
+                         len(commits_prior) + 2 + self.annex.fake_dates_enabled)
             assert_equal(len(commits_after_master), len(commits_prior_master))
             assert(add_out is self.annex)
             # there should be no .datalad temporary files hanging around

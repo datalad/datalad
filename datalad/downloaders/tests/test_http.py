@@ -11,18 +11,25 @@
 import time
 from calendar import timegm
 from six import PY3
+import re
 
 import os
 import six.moves.builtins as __builtin__
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
+from ..base import AccessFailedError
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
+from ..base import NoneAuthenticator
 from ..credentials import UserPassword
+from ..credentials import Token
+from ..credentials import LORIS_Token
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
+from ..http import HTTPBearerTokenAuthenticator
+from ..http import process_www_authenticate
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
@@ -34,7 +41,9 @@ try:
     if PY3:
         raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
-except ImportError:
+except (ImportError, AttributeError):
+    # Attribute Error happens with newer httpretty and older ssl module
+    # https://github.com/datalad/datalad/pull/2623
     class NoHTTPPretty(object):
        __bool__ = __nonzero__ = lambda s: False
        activate = lambda s, t: t
@@ -56,6 +65,8 @@ from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
 from ...tests.utils import without_http_proxy
+from ...support.exceptions import AccessDeniedError
+from ...support.exceptions import AnonymousAccessDeniedError
 from ...support.status import FileStatus
 from ...support.network import get_url_disposition_filename
 
@@ -85,6 +96,17 @@ def _raise_IOError(*args, **kwargs):
     raise IOError("Testing here")
 
 
+def test_process_www_authenticate():
+    assert_equal(process_www_authenticate("Basic"),
+                 ["http_basic_auth"])
+    assert_equal(process_www_authenticate("Digest"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Digest more"),
+                 ["http_digest_auth"])
+    assert_equal(process_www_authenticate("Unknown"),
+                 [])
+
+
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_HTTPDownloader_basic(toppath, topurl):
@@ -104,6 +126,12 @@ def test_HTTPDownloader_basic(toppath, topurl):
     downloaded_path = download(furl, tfpath, overwrite=True)
     assert_equal(downloaded_path, tfpath)
     ok_file_has_content(tfpath, 'abc')
+
+    # Fail with an informative message if we're downloading into a directory
+    # and the file name can't be determined from the URL.
+    with assert_raises(DownloadError) as cm:
+        download(topurl, toppath)
+    assert_in("File name could not be determined", str(cm.exception))
 
     # Some errors handling
     # XXX obscure mocking since impossible to mock write alone
@@ -137,6 +165,66 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
     # TODO: access denied scenario
     # TODO: access denied detection
+
+
+@with_tree(tree=[('file.dat', 'abc')])
+@serve_path_via_http
+@with_memory_keyring
+def test_access_denied(toppath, topurl, keyring):
+    furl = topurl + "file.dat"
+
+    def deny_access(*args, **kwargs):
+        raise AccessDeniedError(supported_types=["http_basic_auth"])
+
+    def deny_anon_access(*args, **kwargs):
+        raise AnonymousAccessDeniedError(supported_types=["http_basic_auth"])
+
+    downloader = HTTPDownloader()
+
+    # Test different paths that should lead to a DownloadError.
+
+    for denier in deny_access, deny_anon_access:
+        @with_testsui(responses=["no"])
+        def run_refuse_provider_setup():
+            with patch.object(downloader, '_download', denier):
+                downloader.download(furl)
+        assert_raises(DownloadError, run_refuse_provider_setup)
+
+    downloader_creds = HTTPDownloader(credential="irrelevant")
+
+    @with_testsui(responses=["no"])
+    def run_refuse_creds_update():
+        with patch.object(downloader_creds, '_download', deny_access):
+            downloader_creds.download(furl)
+    assert_raises(DownloadError, run_refuse_creds_update)
+
+    downloader_noauth = HTTPDownloader(authenticator=NoneAuthenticator())
+
+    def run_noauth():
+        with patch.object(downloader_noauth, '_download', deny_access):
+            downloader_noauth.download(furl)
+    assert_raises(DownloadError, run_noauth)
+
+    # Complete setup for a new provider.
+
+    @with_testsui(responses=[
+        "yes",  # Set up provider?
+        # Enter provider details, but then don't save ...
+        "newprovider", re.escape(furl), "http_auth", "user_password", "no",
+        # No provider, try again?
+        "yes",
+        # Enter same provider detains but save this time.
+        "newprovider", re.escape(furl), "http_auth", "user_password", "yes",
+        # Enter credentials.
+        "me", "mypass"
+    ])
+    def run_set_up_provider():
+        with patch.object(downloader, '_download', deny_access):
+            downloader.download(furl)
+
+    # We've forced an AccessDenied error and then set up bogus credentials,
+    # leading to a 501 (not implemented) error.
+    assert_raises(AccessFailedError, run_set_up_provider)
 
 
 @with_tempfile(mkdir=True)
@@ -282,10 +370,15 @@ def test_get_status_from_headers():
 
 class FakeCredential1(UserPassword):
     """Credential to test scenarios."""
-    _fixed_credentials = [
-        {'user': 'testlogin', 'password': 'testpassword'},
-        {'user': 'testlogin2', 'password': 'testpassword2'},
-        {'user': 'testlogin2', 'password': 'testpassword3'}]
+    # to be reusable, and not leak across tests,
+    # we should get _fixed_credentials per instance
+    def __init__(self, *args, **kwargs):
+        super(FakeCredential1, self).__init__(*args, **kwargs)
+        self._fixed_credentials = [
+            {'user': 'testlogin', 'password': 'testpassword'},
+            {'user': 'testlogin2', 'password': 'testpassword2'},
+            {'user': 'testlogin2', 'password': 'testpassword3'}
+        ]
     def is_known(self):
         return True
     def __call__(self):
@@ -379,13 +472,26 @@ def test_auth_but_no_cred(keyring):
     assert_equal(downloader.credential.get('password'), 'testpassword')
 
 
+@with_testsui(responses=['yes'])  # will request to reentry it
+def test_authfail404_interactive():
+    # we will firsts get 'failed' but then real 404 when trying new password
+    check_httpretty_authfail404(['failed', '404'])
+
+
+@with_testsui(interactive=False)  # no interactions -- blow!
+def test_authfail404_noninteractive():
+    # we do not get to the 2nd attempt so just get 'failed'
+    # and exception thrown inside is not emerging all the way here but
+    # caught in the check_
+    check_httpretty_authfail404(['failed'])
+
+
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
 @httpretty.activate
-@with_tempfile(mkdir=True)
 @with_fake_cookies_db
-@with_testsui(responses=['yes'])  # will request to reentry it
-def test_HTMLFormAuthenticator_httpretty_authfail404(d):
+@with_tempfile(mkdir=True)
+def check_httpretty_authfail404(exp_called, d):
     # mimic behavior of nersc which 404s but provides feedback whenever
     # credentials are incorrect.  In our case we should fail properly
     credential = FakeCredential1(name='test', url=None)
@@ -412,7 +518,7 @@ def test_HTMLFormAuthenticator_httpretty_authfail404(d):
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     # first one goes with regular DownloadError -- was 404 with not matching content
     assert_raises(DownloadError, downloader.download, url, path=d)
-    assert_equal(was_called, ['failed', '404'])
+    assert_equal(was_called, exp_called)
 
 
 class FakeCredential2(UserPassword):
@@ -431,7 +537,7 @@ class FakeCredential2(UserPassword):
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
-def test_HTMLFormAuthenticator_httpretty_2(d):
+def test_scenario_2(d):
     fpath = opj(d, 'crap.txt')
 
     credential = FakeCredential2(name='test', url=None)
@@ -483,6 +589,140 @@ def test_HTMLFormAuthenticator_httpretty_2(d):
 
     downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+
+class FakeCredential3(Token):
+    """Credential to test scenarios."""
+    _fixed_credentials = {'token' : 'testtoken' }
+    def is_known(self):
+        return True
+    def __call__(self):
+        return self._fixed_credentials
+    def enter_new(self):
+        return self._fixed_credentials
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+def test_HTTPBearerTokenAuthenticator(d):
+    fpath = opj(d, 'crap.txt')
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+
+
+
+    credential = FakeCredential3(name='test', url=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    # Perform assertions. See note above.
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken")
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+class FakeLorisCredential(Token):
+    """Credential to test scenarios."""
+    _fixed_credentials = {'token' : 'testtoken' }
+    def is_known(self):
+        return False
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+def test_HTTPLorisTokenAuthenticator(d):
+    fpath = opj(d, 'crap.txt')
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+
+
+
+    credential = FakeCredential3(name='test', url=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    # Perform assertions. See note above.
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken")
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+@with_memory_keyring
+@with_testsui(responses=['yes', 'user'])
+def test_lorisadapter(d, keyring):
+    fpath = opj(d, 'crap.txt')
+    loginurl = "http://www.example.com/api/v0.0.2/login"
+
+    def request_get_callback(request, uri, headers):
+        # We can't assert inside the callback, or running the
+        # test give "Connection aborted" errors instead of telling
+        # us that the assertion failed. So instead, we make
+        # the request object available outside of the callback
+        # and do the assertions in the main test, not the callback
+        request_get_callback.req = request
+        return (200, headers, "correct body")
+    def request_post_callback(request, uri, headers):
+        return (200, headers, '{ "token": "testtoken33" }')
+
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback)
+    httpretty.register_uri(httpretty.POST, loginurl,
+                           body=request_post_callback)
+
+
+
+    credential = LORIS_Token(name='test', url=loginurl, keyring=None)
+    authenticator = HTTPBearerTokenAuthenticator()
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
+
+    r = request_get_callback.req
+    assert_equal(r.body, '')
+    assert_in('Authorization', r.headers)
+    assert_equal(r.headers['Authorization'], "Bearer testtoken33")
+    # Verify credentials correctly set to test user:pass
 
     with open(fpath) as f:
         content = f.read()

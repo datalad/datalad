@@ -35,7 +35,6 @@ except ImportError:
 
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
-from datalad.utils import not_supported_on_windows
 from datalad.utils import assure_dir
 from datalad.utils import auto_repr
 from datalad.cmd import Runner
@@ -347,33 +346,62 @@ class SSHManager(object):
     """
 
     def __init__(self):
-        not_supported_on_windows("TODO: Make this an abstraction to "
-                                 "interface platform dependent SSH")
-
-        self._connections = dict()
         self._socket_dir = None
-
-        from os import listdir
-        from os.path import isdir
-        self._prev_connections = [opj(self.socket_dir, p)
-                                  for p in listdir(self.socket_dir)
-                                  if not isdir(opj(self.socket_dir, p))]
-        lgr.log(5,
-                "Found %d previous connections",
-                len(self._prev_connections))
+        self._connections = dict()
+        # Initialization of prev_connections is happening during initial
+        # handling of socket_dir, so we do not define them here explicitly
+        # to an empty list to fail if logic is violated
+        self._prev_connections = None
+        # and no explicit initialization in the constructor
+        # self.assure_initialized()
 
     @property
     def socket_dir(self):
-        if self._socket_dir is None:
-            from ..config import ConfigManager
-            from os import chmod
-            cfg = ConfigManager()
-            self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
-                                   'sockets')
-            assure_dir(self._socket_dir)
-            chmod(self._socket_dir, 0o700)
-
+        """Return socket_dir, and if was not defined before,
+        and also pick up all previous connections (if any)
+        """
+        self.assure_initialized()
         return self._socket_dir
+
+    def assure_initialized(self):
+        """Assures that manager is initialized - knows socket_dir, previous connections
+        """
+        if self._socket_dir is not None:
+            return
+        from ..config import ConfigManager
+        from os import chmod
+        cfg = ConfigManager()
+        self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
+                               'sockets')
+        assure_dir(self._socket_dir)
+        try:
+            chmod(self._socket_dir, 0o700)
+        except OSError as exc:
+            lgr.warning(
+                "Failed to (re)set permissions on the %s. "
+                "Most likely future communications would be impaired or fail. "
+                "Original exception: %s",
+                self._socket_dir, exc_str(exc)
+            )
+
+        from os import listdir
+        from os.path import isdir
+        try:
+            self._prev_connections = [opj(self.socket_dir, p)
+                                      for p in listdir(self.socket_dir)
+                                      if not isdir(opj(self.socket_dir, p))]
+        except OSError as exc:
+            self._prev_connections = []
+            lgr.warning(
+                "Failed to list %s for existing sockets. "
+                "Most likely future communications would be impaired or fail. "
+                "Original exception: %s",
+                self._socket_dir, exc_str(exc)
+            )
+
+        lgr.log(5,
+                "Found %d previous connections",
+                len(self._prev_connections))
 
     def get_connection(self, url):
         """Get a singleton, representing a shared ssh connection to `url`
@@ -389,7 +417,15 @@ class SSHManager(object):
         """
         # parse url:
         from datalad.support.network import RI, is_ssh
-        sshri = RI(url) if not isinstance(url, RI) else url
+        if isinstance(url, RI):
+            sshri = url
+        else:
+            if ':' not in url and '/' not in url:
+                # it is just a hostname
+                lgr.debug("Assuming %r is just a hostname for ssh connection",
+                          url)
+                url += ':'
+            sshri = RI(url)
 
         if not is_ssh(sshri):
             raise ValueError("Unsupported SSH URL: '{0}', use "

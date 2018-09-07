@@ -31,6 +31,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import ok_endswith
+from datalad.tests.utils import assert_re_in
 
 # pretend we are in interactive mode so we could check if coloring is
 # disabled
@@ -49,18 +50,19 @@ def test_logging_to_a_file(dst):
     assert_equal(len(lines), 1, "Read more than a single log line: %s" %  lines)
     line = lines[0]
     ok_(msg in line)
-    ok_(not '\033[' in line,
+    ok_('\033[' not in line,
         msg="There should be no color formatting in log files. Got: %s" % line)
     # verify that time stamp and level are present in the log line
     # do not want to rely on not having race conditions around date/time changes
     # so matching just with regexp
-    # .* is added to swallow possible traceback logs
+    # (...)? is added to swallow possible traceback logs
+    regex = "\[ERROR\]"
     if EnsureBool()(cfg.get('datalad.log.timestamp', False)):
-        ok_(re.match("\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} \[ERROR\](\s+\S+\s*)? %s" % msg,
-                    line))
-    else:
-        ok_(re.match("\[ERROR\](\s+\S+\s*)? %s" % msg,
-                    line))
+        regex = "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} " + regex
+    if EnsureBool()(cfg.get('datalad.log.vmem', False)):
+        regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
+    regex += "(\s+\S+\s*)? " + msg
+    assert_re_in(regex, line, match=True)
 
 
 @with_tempfile

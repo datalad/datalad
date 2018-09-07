@@ -65,6 +65,17 @@ if lgr.getEffectiveLevel() <= 1:
 __docformat__ = 'restructuredtext'
 
 
+def process_www_authenticate(v):
+    if not v:
+        return []
+    supported_type = v.split(' ')[0].lower()
+    our_type = {
+        'basic': 'http_basic_auth',
+        'digest': 'http_digest_auth',
+    }.get(supported_type)
+    return [our_type] if our_type else []
+
+
 def check_response_status(response, err_prefix="", session=None):
     """Check if response's status_code signals problem with authentication etc
 
@@ -81,7 +92,10 @@ def check_response_status(response, err_prefix="", session=None):
         # TODO: actually may be that is where we could use tagid and actually determine the form submission url
         raise DownloadError(err_prefix + "not found")
     elif 400 <= response.status_code < 500:
-        raise AccessDeniedError(err_msg)
+        raise AccessDeniedError(
+            err_msg,
+            supported_types=process_www_authenticate(
+                response.headers.get('WWW-Authenticate')))
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
@@ -129,14 +143,19 @@ class HTTPBaseAuthenticator(Authenticator):
         post_url = self.url if self.url else url
         credentials = credential()
 
-        # TODO: With digestauth there is no POST strictly necessary.
         # The whole thing relies on server first spitting out 401
         # and client GETing again with 'Authentication:' header
         # So we need custom handling for those, while keeping track not
         # of cookies per se, but of 'Authentication:' header which is
         # to be used in subsequent GETs
         response = self._post_credential(credentials, post_url, session)
+        if response is None:
+            # authentication did not involve any interaction, nothing to
+            # check at this point
+            return
 
+        # Handle responses if there was initial authentication exchange,
+        # e.g. posting to a form and getting a cookie etc
         err_prefix = "Authentication to %s failed: " % post_url
         try:
             check_response_status(response, err_prefix, session=session)
@@ -177,6 +196,7 @@ class HTTPBaseAuthenticator(Authenticator):
             for c, v in cookies_dict.items():
                 if c not in session.cookies or session.cookies[c] != v:
                     session.cookies[c] = v  # .update(cookies_dict)
+
         return response
 
     def _post_credential(self, credentials, post_url, session):
@@ -241,7 +261,8 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
 
         response = session.post(post_url, data=post_fields)
         lgr.debug("Posted to %s fields %s, got response %s with headers %s",
-                  post_url, list(post_fields.keys()), response, list(response.headers.keys()))
+                  post_url, list(post_fields.keys()), response,
+                  list(response.headers.keys()))
         return response
 
 
@@ -251,15 +272,16 @@ class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
     """
 
     REQUESTS_AUTHENTICATOR = None
+    REQUESTS_FIELDS = ('user', 'password')
 
     def __init__(self, **kwargs):
         # so we have __init__ solely for a custom docstring
         super(HTTPRequestsAuthenticator, self).__init__(**kwargs)
 
     def _post_credential(self, credentials, post_url, session):
-        response = session.post(post_url, data={},
-                                auth=self.REQUESTS_AUTHENTICATOR(credentials['user'], credentials['password']))
-        return response
+        authenticator = self.REQUESTS_AUTHENTICATOR(
+            *[credentials[f] for f in self.REQUESTS_FIELDS])
+        session.auth = authenticator
 
 
 @auto_repr
@@ -271,7 +293,6 @@ class HTTPBasicAuthAuthenticator(HTTPRequestsAuthenticator):
     ...
     credential = hcp-db
     authentication_type = http_auth
-    http_auth_url = .... TODO
 
     Parameters
     ----------
@@ -283,14 +304,46 @@ class HTTPBasicAuthAuthenticator(HTTPRequestsAuthenticator):
 
 
 @auto_repr
+class HTTPAuthAuthenticator(HTTPRequestsAuthenticator):
+    """Authenticate via Basic authentication to some other post url
+
+    TODO:  actually this is some remnants which might later were RFed
+    into the form authenticator since otherwise they make little sense
+    """
+
+    REQUESTS_AUTHENTICATOR = requests.auth.HTTPBasicAuth
+
+    def _post_credential(self, credentials, post_url, session):
+        authenticator = self.REQUESTS_AUTHENTICATOR(
+            *[credentials[f] for f in self.REQUESTS_FIELDS])
+        session.auth = authenticator
+        response = session.post(post_url, data={},
+                                auth=authenticator)
+        return response
+
+
+@auto_repr
 class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
     """Authenticate via HTTP digest authentication
     """
 
     REQUESTS_AUTHENTICATOR = requests.auth.HTTPDigestAuth
 
-    def _post_credential(self, *args, **kwargs):
-        raise NotImplementedError("not yet functioning, see https://github.com/kennethreitz/requests/issues/2934")
+
+@auto_repr
+class HTTPBearerTokenAuthenticator(HTTPRequestsAuthenticator):
+    """Authenticate via HTTP Authorization header
+    """
+
+    DEFAULT_CREDENTIAL_TYPE = 'token'
+
+    def __init__(self, **kwargs):
+        # so we have __init__ solely for a custom docstring
+        super(HTTPBearerTokenAuthenticator, self).__init__(**kwargs)
+
+    def _post_credential(self, credentials, post_url, session):
+        # we do not need to post anything, just inject token into the session
+        session.headers['Authorization'] = "Bearer %s" % credentials['token']
 
 
 @auto_repr
@@ -375,9 +428,10 @@ class HTTPDownloader(BaseDownloader):
     """
 
     @borrowkwargs(BaseDownloader)
-    def __init__(self, **kwargs):
+    def __init__(self, headers={}, **kwargs):
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
+        self._headers = headers
 
     def _establish_session(self, url, allow_old=True):
         """
@@ -419,30 +473,42 @@ class HTTPDownloader(BaseDownloader):
 
     def get_downloader_session(self, url,
                                allow_redirects=True,
-                               use_redirected_url=True):
+                               use_redirected_url=True,
+                               headers=None):
         # TODO: possibly make chunk size adaptive
         # TODO: make it not this ugly -- but at the moment we are testing end-file size
         # while can't know for sure if content was gunziped and either it all went ok.
         # So safer option -- just request to not have it gzipped
-        headers = {'Accept-Encoding': ''}
+        if headers is None:
+            headers = {}
+        if 'Accept-Encoding' not in headers:
+            headers['Accept-Encoding'] = ''
         # TODO: our tests ATM aren't ready for retries, thus altogether disabled for now
         nretries = 1
         for retry in range(1, nretries+1):
             try:
-                response = self._session.get(url, stream=True, allow_redirects=allow_redirects, headers=headers)
+                response = self._session.get(
+                    url, stream=True, allow_redirects=allow_redirects,
+                    headers=headers)
             #except (MaxRetryError, NewConnectionError) as exc:
             except Exception as exc:
-                # happen to run into those with urls pointing to Amazon, so let's rest and try again
+                # happen to run into those with urls pointing to Amazon,
+                # so let's rest and try again
                 if retry >= nretries:
                     #import epdb; epdb.serve()
-                    raise AccessFailedError("Failed to establish a new session %d times. Last exception was: %s"
-                                            % (nretries, exc_str(exc)))
-                lgr.warning("Caught exception %s. Will retry %d out of %d times", exc_str(exc), retry+1, nretries)
+                    raise AccessFailedError(
+                        "Failed to establish a new session %d times. "
+                        "Last exception was: %s"
+                        % (nretries, exc_str(exc)))
+                lgr.warning(
+                    "Caught exception %s. Will retry %d out of %d times",
+                    exc_str(exc), retry+1, nretries)
                 sleep(2**retry)
 
         check_response_status(response, session=self._session)
         headers = response.headers
-        lgr.debug("Establishing session for url %s, response headers: %s", url, headers)
+        lgr.debug("Establishing session for url %s, response headers: %s",
+                  url, headers)
         target_size = int(headers.get('Content-Length', '0').strip()) or None
         if use_redirected_url and response.url and response.url != url:
             lgr.debug("URL %s was redirected to %s and thus the later will be used"

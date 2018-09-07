@@ -11,7 +11,7 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
-
+import time
 import subprocess
 import sys
 import logging
@@ -20,29 +20,84 @@ import shutil
 import shlex
 import atexit
 import functools
+import tempfile
 
 from collections import OrderedDict
 from six import PY3, PY2
-from six import string_types, binary_type
-from os.path import abspath, isabs, pathsep
+from six import string_types, binary_type, text_type
+from .support import path as op
 
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows
+from .utils import (
+    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    unlink,
+)
 from .dochelpers import borrowdoc
 
 lgr = logging.getLogger('datalad.cmd')
 
+# In python3 to split byte stream on newline, it must be bytes
+linesep_bytes = os.linesep.encode()
+
 _TEMP_std = sys.stdout, sys.stderr
+# To be used in the temp file name to distinguish the ones we create
+# in Runner so we take care about their removal, in contrast to those
+# which might be created outside and passed into Runner
+_MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
 if PY2:
     # TODO apparently there is a recommended substitution for Python2
     # which is a backported implementation of python3 subprocess
     # https://pypi.python.org/pypi/subprocess32/
-    pass
+    file_class = file
+else:
+    from io import IOBase as file_class
+
+
+def _decide_to_log(v):
+    """Hacky workaround for now so we could specify per each which to
+    log online and which to the log"""
+    if isinstance(v, bool) or callable(v):
+        return v
+    elif v in {'online'}:
+        return True
+    elif v in {'offline'}:
+        return False
+    else:
+        raise ValueError("can be bool, callable, 'online' or 'offline'")
+
+
+def _get_output_stream(log_std, false_value):
+    """Helper to prepare output stream for Popen and use file for 'offline'
+
+    Necessary to avoid lockdowns when both stdout and stderr are pipes
+    """
+    if log_std:
+        if log_std == 'offline':
+            # we will open a temporary file
+
+            tf = tempfile.mktemp(
+                **get_tempfile_kwargs({}, prefix=_MAGICAL_OUTPUT_MARKER)
+            )
+            return open(tf, 'w')  # XXX PY3 should be 'b' may be?
+        else:
+            return subprocess.PIPE
+    else:
+        return false_value
+
+
+def _cleanup_output(stream, std):
+    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+        if not stream.closed:
+            stream.close()
+        if op.exists(stream.name):
+            unlink(stream.name)
+    elif stream == subprocess.PIPE:
+        std.close()
 
 
 class Runner(object):
@@ -197,7 +252,9 @@ class Runner(object):
                      level={True: 9,
                             False: 11}[expected])
 
-    def _get_output_online(self, proc, log_stdout, log_stderr,
+    def _get_output_online(self, proc,
+                           log_stdout, log_stderr,
+                           outputstream, errstream,
                            expect_stderr=False, expect_fail=False):
         """
 
@@ -221,71 +278,93 @@ class Runner(object):
         """
         stdout, stderr = binary_type(), binary_type()
 
-        def decide_to_log(v):
-            """Hacky workaround for now so we could specify per each which to
-            log online and which to the log"""
-            if isinstance(v, bool) or callable(v):
-                return v
-            elif v in {'online'}:
-                return True
-            elif v in {'offline'}:
-                return False
-            else:
-                raise ValueError("can be bool, callable, 'online' or 'offline'")
+        log_stdout_ = _decide_to_log(log_stdout)
+        log_stderr_ = _decide_to_log(log_stderr)
+        log_stdout_is_callable = callable(log_stdout_)
+        log_stderr_is_callable = callable(log_stderr_)
 
-        log_stdout_ = decide_to_log(log_stdout)
-        log_stderr_ = decide_to_log(log_stderr)
+        # arguments to be passed into _process_one_line
+        stdout_args = (
+                'stdout',
+                proc, log_stdout_, log_stdout_is_callable
+        )
+        stderr_args = (
+                'stderr',
+                proc, log_stderr_, log_stderr_is_callable,
+                expect_stderr or expect_fail
+        )
 
         while proc.poll() is None:
+            # see for a possibly useful approach to processing output
+            # in another thread http://codereview.stackexchange.com/a/17959
+            # current problem is that if there is no output on stderr
+            # it stalls
+            # Monitor if anything was output and if nothing, sleep a bit
+            stdout_, stderr_ = None, None
             if log_stdout_:
-                lgr.log(3, "Reading line from stdout")
-                line = proc.stdout.readline()
-                if line and callable(log_stdout_):
-                    # Let it be processed
-                    line = log_stdout_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stdout += line
-                    self._log_out(line.decode())
-                    # TODO: what level to log at? was: level=5
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stdout()
-            else:
-                pass
-
+                stdout_ = self._process_one_line(*stdout_args)
+                stdout += stdout_
             if log_stderr_:
-                # see for a possibly useful approach to processing output
-                # in another thread http://codereview.stackexchange.com/a/17959
-                # current problem is that if there is no output on stderr
-                # it stalls
-                lgr.log(3, "Reading line from stderr")
-                line = proc.stderr.readline()
-                if line and callable(log_stderr_):
-                    # Let it be processed
-                    line = log_stderr_(line.decode())
-                    if line is not None:
-                        # we are working with binary type here
-                        line = line.encode()
-                if line:
-                    stderr += line
-                    self._log_err(line.decode() if PY3 else line,
-                                  expect_stderr or expect_fail)
-                    # TODO: what's the proper log level here?
-                    # Changes on that should be properly adapted in
-                    # test.cmd.test_runner_log_stderr()
-            else:
-                pass
+                stderr_ = self._process_one_line(*stderr_args)
+                stderr += stderr_
+            if not (stdout_ or stderr_):
+                # no output was generated, so sleep a tiny bit
+                time.sleep(0.001)
 
-        if log_stdout in {'offline'} or log_stderr in {'offline'}:
-            lgr.log(4, "Issuing proc.communicate() since one of the targets "
-                       "is 'offline'")
-            stdout_, stderr_ = proc.communicate()
-            stdout += stdout_
-            stderr += stderr_
+        # Handle possible remaining output
+        stdout_, stderr_ = proc.communicate()
+        # ??? should we condition it on log_stdout in {'offline'} ???
+        stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
+        stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
 
         return stdout, stderr
+
+    def _process_remaining_output(self, stream, out_, *pargs):
+        """Helper to process output which might have been obtained from popen or
+        should be loaded from file"""
+        out = binary_type()
+        if isinstance(stream,
+                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+            assert out_ is None, "should have gone into a file"
+            if not stream.closed:
+                stream.close()
+            with open(stream.name, 'rb') as f:
+                for line in f:
+                    out += self._process_one_line(*pargs, line=line)
+        else:
+            if out_:
+                # resolving a once in a while failing test #2185
+                if isinstance(out_, text_type):
+                    out_ = out_.encode('utf-8')
+                for line in out_.split(linesep_bytes):
+                    out += self._process_one_line(
+                        *pargs, line=line, suf=linesep_bytes)
+        return out
+
+    def _process_one_line(self, out_type, proc, log_, log_is_callable,
+                          expected=False, line=None, suf=None):
+        if line is None:
+            lgr.log(3, "Reading line from %s", out_type)
+            line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
+        else:
+            lgr.log(3, "Processing provided line")
+        if line and log_is_callable:
+            # Let it be processed
+            line = log_(assure_unicode(line))
+            if line is not None:
+                # we are working with binary type here
+                line = assure_bytes(line)
+        if line:
+            if out_type == 'stdout':
+                self._log_out(assure_unicode(line))
+            elif out_type == 'stderr':
+                self._log_err(line.decode('utf-8') if PY3 else line,
+                              expected)
+            else:  # pragma: no cover
+                raise RuntimeError("must not get here")
+            return (line + suf) if suf else line
+        # it was output already directly but for code to work, return ""
+        return binary_type()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
@@ -347,7 +426,7 @@ class Runner(object):
 
         Returns
         -------
-        (stdout, stderr)
+        (stdout, stderr) - bytes!
 
         Raises
         ------
@@ -356,12 +435,8 @@ class Runner(object):
            CommandError's `code`-field. Command's stdout and stderr are stored
            in CommandError's `stdout` and `stderr` fields respectively.
         """
-
-        # TODO:  having two PIPEs is dangerous, and leads to lock downs so we
-        # would need either threaded solution as in .communicate or just allow
-        # only one to be monitored and another one just being dumped into a file
-        outputstream = subprocess.PIPE if log_stdout else sys.stdout
-        errstream = subprocess.PIPE if log_stderr else sys.stderr
+        outputstream = _get_output_stream(log_stdout, sys.stdout)
+        errstream = _get_output_stream(log_stderr, sys.stderr)
 
         popen_env = env or self.env
 
@@ -423,7 +498,9 @@ class Runner(object):
 
             try:
                 if log_online:
-                    out = self._get_output_online(proc, log_stdout, log_stderr,
+                    out = self._get_output_online(proc,
+                                                  log_stdout, log_stderr,
+                                                  outputstream, errstream,
                                                   expect_stderr=expect_stderr,
                                                   expect_fail=expect_fail)
                 else:
@@ -448,8 +525,10 @@ class Runner(object):
                         self._log_err(out[1], expected=expect_stderr)
 
                 if status not in [0, None]:
-                    msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
-                        % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
+                    msg = "Failed to run %r%s. Exit code=%d.%s%s" \
+                        % (cmd, " under %r" % (cwd or self.cwd), status,
+                           "" if log_online else " out=%s" % out[0],
+                           "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
                     raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
@@ -457,10 +536,9 @@ class Runner(object):
                              level=8)
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                if outputstream == subprocess.PIPE:
-                    proc.stdout.close()
-                if errstream == subprocess.PIPE:
-                    proc.stderr.close()
+                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                _cleanup_output(outputstream, proc.stdout)
+                _cleanup_output(errstream, proc.stderr)
 
         else:
             if self.protocol.records_ext_commands:
@@ -543,17 +621,24 @@ class GitRunner(Runner):
         """
         if GitRunner._GIT_PATH is None:
             from distutils.spawn import find_executable
+            # with all the nesting of config and this runner, cannot use our
+            # cfg here, so will resort to dark magic of environment options
+            if (os.environ.get('DATALAD_USE_DEFAULT_GIT', '0').lower()
+                    in ('1', 'on', 'true', 'yes')):
+                git_fpath = find_executable("git")
+                if git_fpath:
+                    GitRunner._GIT_PATH = ''
+                    lgr.log(9, "Will use default git %s", git_fpath)
+                    return  # we are done - there is a default git avail.
+                # if not -- we will look for a bundled one
+
             annex_fpath = find_executable("git-annex")
             if not annex_fpath:
                 # not sure how to live further anyways! ;)
                 alongside = False
             else:
-                annex_path = os.path.dirname(os.path.realpath(annex_fpath))
-                if on_windows:
-                    # just bundled installations so git should be taken from annex
-                    alongside = True
-                else:
-                    alongside = os.path.lexists(os.path.join(annex_path, 'git'))
+                annex_path = op.dirname(op.realpath(annex_fpath))
+                alongside = op.lexists(op.join(annex_path, 'git'))
             GitRunner._GIT_PATH = annex_path if alongside else ''
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
                        "string)", GitRunner._GIT_PATH)
@@ -567,15 +652,15 @@ class GitRunner(Runner):
         # if env set copy else get os environment
         git_env = env.copy() if env else os.environ.copy()
         if GitRunner._GIT_PATH:
-            git_env['PATH'] = pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
+            git_env['PATH'] = op.pathsep.join([GitRunner._GIT_PATH, git_env['PATH']]) \
                 if 'PATH' in git_env \
                 else GitRunner._GIT_PATH
 
         for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
             var = git_env.get(varstring)
             if var:                                    # if env variable set
-                if not isabs(var):                     # and it's a relative path
-                    git_env[varstring] = abspath(var)  # to absolute path
+                if not op.isabs(var):                   # and it's a relative path
+                    git_env[varstring] = op.abspath(var)  # to absolute path
                     lgr.log(9, "Updated %s to %s", varstring, git_env[varstring])
 
         if 'GIT_SSH_COMMAND' not in git_env:
@@ -584,8 +669,11 @@ class GitRunner(Runner):
         return git_env
 
     def run(self, cmd, env=None, *args, **kwargs):
-        return super(GitRunner, self).run(
+        out, err = super(GitRunner, self).run(
             cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
+        # All communication here will be returned as unicode
+        # TODO: do that instead within the super's run!
+        return assure_unicode(out), assure_unicode(err)
 
 
 # ####
@@ -596,15 +684,15 @@ class GitRunner(Runner):
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load
     """
-    dst_dir = os.path.dirname(dst)
-    if not os.path.exists(dst_dir):
+    dst_dir = op.dirname(dst)
+    if not op.exists(dst_dir):
         os.makedirs(dst_dir)
-    if os.path.lexists(dst):
+    if op.lexists(dst):
         lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
-        os.unlink(dst)
+        unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
-    src_realpath = os.path.realpath(src)
+    src_realpath = op.realpath(src)
 
     try:
         os.link(src_realpath, dst)

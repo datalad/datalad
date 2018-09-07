@@ -17,7 +17,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, realpath, dirname, lexists
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -28,8 +28,11 @@ lgr.log(5, "Importing datalad.customremotes.main")
 
 from ..ui import ui
 from ..support.protocol import ProtocolInterface
+from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
+from ..dochelpers import exc_str
+from ..utils import assure_unicode
 
 
 URI_PREFIX = "dl"
@@ -113,14 +116,14 @@ send () {
         if exists(_file):
             lgr.debug("Commenting out previous entries")
             # comment out all the past entries
-            with open(_file) as f:
-                entries = f.readlines()
+            with open(_file, 'rb') as f:
+                entries = list(map(assure_unicode, f.readlines()))
             for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
-            with open(_file, 'w') as f:
-                f.write(''.join(entries))
+            with open(_file, 'wb') as f:
+                f.write(u''.join(entries).encode('utf-8'))
             return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
@@ -249,6 +252,8 @@ class AnnexCustomRemote(object):
         # Delay introspection until the first instance gets born
         # could in principle be done once in the metaclass I guess
         self.__class__._introspect_req_signatures()
+        self._annex_supports_info = \
+            external_versions['cmd:annex'] >= '6.20180206'
 
     @classmethod
     def _introspect_req_signatures(cls):
@@ -331,7 +336,11 @@ class AnnexCustomRemote(object):
             else:
                 raise exc
 
-    def send_unsupported(self):
+    def send_unsupported(self, msg=None):
+        """Send UNSUPPORTED-REQUEST to annex and log optional message in our log
+        """
+        if msg:
+            lgr.debug(msg)
         self.send("UNSUPPORTED-REQUEST")
 
     def read(self, req=None, n=1):
@@ -352,9 +361,11 @@ class AnnexCustomRemote(object):
         if self._protocol is not None:
             self._protocol += "recv %s" % l
         msg = l.split(None, n)
-        if req and (req != msg[0]):
+        if req and ((not msg) or (req != msg[0])):
             # verify correct response was given
-            self.error("Expected %r, got %r.  Ignoring" % (req, msg[0]))
+            self.send_unsupported(
+                "Expected %r, got a line %r.  Ignoring" % (req, l)
+            )
             return None
         self.heavydebug("Received %r" % (msg,))
         return msg
@@ -372,6 +383,11 @@ class AnnexCustomRemote(object):
     def error(self, msg, annex_err="ERROR"):
         lgr.error(msg)
         self.send(annex_err, msg)
+
+    def info(self, msg):
+        lgr.info(msg)
+        if self._annex_supports_info:
+            self.send('INFO', msg)
 
     def progress(self, bytes):
         bytes = int(bytes)
@@ -415,9 +431,10 @@ class AnnexCustomRemote(object):
             req, req_load = l[0], l[1:]
             method = getattr(self, "req_%s" % req, None)
             if not method:
-                self.debug("We have no support for %s request, part of %s response"
-                           % (req, l))
-                self.send("UNSUPPORTED-REQUEST")
+                self.send_unsupported(
+                    "We have no support for %s request, part of %s response"
+                    % (req, l)
+                )
                 continue
 
             req_nargs = self._req_nargs[req]
@@ -433,7 +450,7 @@ class AnnexCustomRemote(object):
                 method(*req_load)
             except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
-                           % (req, req_load, e))
+                           % (req, req_load, exc_str(e)))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s" % format_exc())
 
@@ -463,6 +480,9 @@ class AnnexCustomRemote(object):
                        "PREPARE-FAILURE")
         else:
             self.send("PREPARE-SUCCESS")
+
+        self.debug("Encodings: filesystem %s, default %s"
+                   % (sys.getfilesystemencoding(), sys.getdefaultencoding()))
 
     def req_EXPORTSUPPORTED(self):
         self.send(
@@ -495,10 +515,16 @@ class AnnexCustomRemote(object):
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):
             lgr.debug("%s key %s into/from %s" % (cmd, key, file))  # was INFO level
-            self._transfer(cmd, key, file)
+            try:
+                self._transfer(cmd, key, file)
+            except Exception as exc:
+                self.send(
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
+                )
         else:
-            self.error("Retrieved unsupported for TRANSFER command %s" % cmd)
-            self.send_unsupported()
+            self.send_unsupported(
+                "Received unsupported by our TRANSFER command %s" % cmd
+            )
 
     # Specific implementations to be provided in derived classes when necessary
 

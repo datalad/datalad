@@ -33,15 +33,19 @@ from nose import SkipTest
 
 from ..utils import getpwd, chpwd
 
+from . import utils
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
-    rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
+    rmtemp, \
+    OBSCURE_PREFIX, OBSCURE_FILENAMES,\
+    get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
 from .utils import ok_generator
 from .utils import assert_dict_equal
+from .utils import assert_str_equal
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
@@ -51,6 +55,10 @@ from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
 from .utils import with_testsui
+from .utils import skip_ssh
+from .utils import probe_known_failure
+from .utils import patch_config
+from .utils import ignore_nose_capturing_stdout
 
 #
 # Test with_tempfile, especially nested invocations
@@ -195,10 +203,10 @@ def test_with_tempfile_specified_prefix(d1):
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
     if platform.system() in ('Linux', 'Darwin'):
-        eq_(n, OBSCURE_FILENAMES[1])
+        eq_(n, OBSCURE_PREFIX + OBSCURE_FILENAMES[1])
     else:
         # ATM no one else is as good
-        ok_(n in OBSCURE_FILENAMES[2:])
+        ok_(n in OBSCURE_PREFIX + OBSCURE_FILENAMES[2:])
 
 
 def test_keeptemp_via_env_variable():
@@ -484,7 +492,7 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
-        eq_(somefunc.tags, ['network'])
+        ok_(hasattr(somefunc, "network"))
         with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
@@ -561,6 +569,15 @@ def test_assert_dict_equal():
     assert_raises(AssertionError, assert_dict_equal, {1: 0}, {1: np.arange(3)})
 
 
+def test_assert_str_equal():
+    assert_str_equal("a", "a")
+    assert_str_equal("a\n", "a\n")
+    assert_str_equal("a\nb", "a\nb")
+    assert_raises(AssertionError, assert_str_equal, "a", "a\n")
+    assert_raises(AssertionError, assert_str_equal, "a", "b")
+    assert_raises(AssertionError, assert_str_equal, "ab", "b")
+
+
 def test_testsui():
     # just one for now to test conflicting arguments
     with assert_raises(ValueError):
@@ -584,3 +601,36 @@ def test_testsui():
         assert_false(ui.is_interactive)
         return x*3
     eq_(func3(2), 6)
+
+
+def test_setup():
+    # just verify that we monkey patched consts correctly
+    from datalad.consts import DATASETS_TOPURL
+    eq_(DATASETS_TOPURL, 'http://datasets-tests.datalad.org/')
+    from datalad.tests.utils import get_datasets_topdir
+    eq_(get_datasets_topdir(), 'datasets-tests.datalad.org')
+
+
+def test_skip_ssh():
+    with patch_config({'datalad.tests.ssh': False}):
+        with assert_raises(SkipTest):
+            skip_ssh(lambda: False)()
+
+
+def test_probe_known_failure():
+    # should raise assert error if function no longer fails
+    with patch_config({'datalad.tests.knownfailures.probe': True}):
+        with assert_raises(AssertionError):
+            probe_known_failure(lambda: True)()
+
+    with patch_config({'datalad.tests.knownfailures.probe': False}):
+        ok_(probe_known_failure(lambda: True))
+
+
+def test_ignore_nose_capturing_stdout():
+    # Just test the logic, not really a situation under overwritten stdout
+    def raise_exc():
+        raise AttributeError('nose causes a message which includes words '
+                             'StringIO and fileno')
+    with assert_raises(SkipTest):
+        ignore_nose_capturing_stdout(raise_exc)()

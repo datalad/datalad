@@ -35,6 +35,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_result_values_cond
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import with_tempfile
@@ -148,7 +149,6 @@ def test_uninstall_annex_file(path):
     ok_(not exists(opj(path, 'test-annex.dat')))
 
 
-@known_failure_v6  # FIXME: git files end up in annex, therefore drop result is different
 @with_testrepos('.*basic.*', flavors=['clone'])
 def test_uninstall_git_file(path):
     ds = Dataset(path)
@@ -180,7 +180,6 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
-@known_failure_v6  #FIXME  Note: Failure seems to somehow be depend on PY2/PY3
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):
@@ -326,8 +325,12 @@ def test_uninstall_recursive(path):
     # doesn't have the minimum number of copies for a safe drop
     res = ds.drop(target_fname, recursive=True, on_failure='ignore')
     assert_status('error', res)
-    assert_result_count(res, 1,
-                        message='configured minimum number of copies not found')
+    assert_result_values_cond(
+        res, 'message',
+        lambda x: "configured minimum number of copies not found" in x or
+        "Could only verify the existence of 0 out of 1 necessary copies" in x
+    )
+
     # this should do it
     ds.drop(target_fname, check=False, recursive=True)
     # link is dead
@@ -386,7 +389,6 @@ def test_careless_subdataset_uninstall(path):
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_kill(path):
     # nested datasets with load
     ds = Dataset(path).create()
@@ -402,8 +404,16 @@ def test_kill(path):
     res = ds.remove(on_failure='ignore')
     assert_result_count(
         res, 1,
-        status='error', path=testfile,
-        message='configured minimum number of copies not found')
+        status='error', path=testfile)
+    # Following two assertions on message are relying on the actual error.
+    # We have a second result with status 'impossible' for the ds, that we need
+    # to filter out for those assertions:
+    err_result = [r for r in res if r['status'] == 'error'][0]
+    assert_result_values_cond(
+        [err_result], 'message',
+        lambda x: "configured minimum number of copies not found" in x or
+        "Could only verify the existence of 0 out of 1 necessary copies" in x
+    )
     eq_(ds.remove(recursive=True, check=False, result_xfm='datasets'),
         [subds, ds])
     ok_(not exists(path))
@@ -448,6 +458,7 @@ def test_remove_nowhining(path):
 
 
 @usecase
+@known_failure_v6  # https://github.com/datalad/datalad/pull/2391#issuecomment-379414293
 @skip_if_no_network
 @with_tempfile(mkdir=True)
 @use_cassette('test_remove_recursive_2')
@@ -520,3 +531,14 @@ def test_drop_nocrash_absent_subds(path):
     ok_clean_git(parent.path)
     with chpwd(path):
         assert_status('notneeded', drop('.', recursive=True))
+
+
+@known_failure_direct_mode  #FIXME
+@with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
+def test_remove_more_than_one(path):
+    ds = Dataset(path).create(force=True)
+    ds.add('.')
+    ok_clean_git(path)
+    # ensure #1912 stays resolved
+    ds.remove(['one', 'two'], check=False)
+    ok_clean_git(path)

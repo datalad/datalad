@@ -10,14 +10,17 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import defaultdict
 
 import logging
 import textwrap
+from collections import OrderedDict
 
 from os import curdir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
+from os.path import islink
 from os.path import dirname
 from os.path import pardir
 from os.path import normpath
@@ -42,6 +45,8 @@ from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
@@ -50,23 +55,7 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 lgr = logging.getLogger('datalad.interface.annotate_paths')
 
 
-def annotated2ds_props(annotated):
-    """Return a dict with properties of all datasets in `annotated`.
-
-    Returns
-    -------
-    dict
-    """
-    props = {}
-    for a in annotated:
-        if a.get('type', None) == 'dataset':
-            dp = props.get(a['path'], {})
-            dp.update(a)
-            props[a['path']]
-    return props
-
-
-def annotated2content_by_ds(annotated, refds_path, path_only=False):
+def annotated2content_by_ds(annotated, refds_path):
     """Helper to convert annotated paths into an old-style content_by_ds dict
 
     Only items with an `status` property value not equal to 'ok', 'notneeded',
@@ -79,38 +68,37 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
       Dicts with annotated path information.
     refds_path : str
       Path to the reference dataset the original path annotation was based on.
-    path_only: bool
-      Whether returned dict values are sequences of just paths for each
-      dataset, or whether the full info dicts are reported as items.
 
     Returns
     -------
     dict, dict, list, list
-      Dict keys are dataset paths, values are determined by the `path_only`
-      switch. The keys in the second dict are paths to dataset, values are
+      Dict keys are dataset paths, values are full info dicts.
+      The keys in the second dict are paths to dataset, values are
       dicts with all known properties about those datasets.
       The first list contains all already "processed" results, which
       typically need to be re-yielded. The second list contains items (same
       type as dict values) for all annotated paths that have no associated
       parent dataset (i.e. nondataset paths) -- this list will be empty by
       default, unless `nondataset_path_status` was set to ''."""
-    content_by_ds = {}
+    content_by_ds = OrderedDict()
     ds_props = {}
     nondataset_paths = []
     completed = []
     for r in annotated:
+        r_path = r['path']
         if r.get('type', None) == 'dataset':
             # collect all properties of all known datasets from the annotated
             # paths
-            dp = ds_props.get(r['path'], {})
+            dp = ds_props.get(r_path, {})
             dp.update(r)
-            ds_props[r['path']] = dp
+            ds_props[r_path] = dp
         if r.get('status', None) in ('ok', 'notneeded', 'impossible', 'error'):
             completed.append(r)
             continue
         parentds = r.get('parentds', None)
+        appendto = []  # what entries, if any, to append r to
         if r.get('type', None) == 'dataset':
-            # to dataset handling first, it is the more complex beast
+            # do dataset handling first, it is the more complex beast
             orig_request = r.get('orig_request', None)
             if parentds is None or refds_path is None or \
                     r.get('process_content', False) or (orig_request and (
@@ -122,22 +110,21 @@ def annotated2content_by_ds(annotated, refds_path, path_only=False):
                 # content rather then the dataset itself
                 # in both cases we want to process this part as part
                 # of the same dataset, and not any potential parent
-                toappendto = content_by_ds.get(r['path'], [])
-                toappendto.append(r['path'] if path_only else r)
-                content_by_ds[r['path']] = toappendto
+                appendto += [r_path]
             if parentds and refds_path and \
-                    _with_sep(parentds).startswith(_with_sep(refds_path)):
+                    path_startswith(parentds, refds_path):
                 # put also in parentds record if there is any, and the parent
                 # is underneath or identical to the reference dataset
-                toappendto = content_by_ds.get(parentds, [])
-                toappendto.append(r['path'] if path_only else r)
-                content_by_ds[parentds] = toappendto
+                appendto += [parentds]
         else:
             # files and dirs
             # common case, something with a parentds
-            toappendto = content_by_ds.get(parentds, [])
-            toappendto.append(r['path'] if path_only else r)
-            content_by_ds[parentds] = toappendto
+            appendto += [parentds]
+
+        for e in appendto:
+            if e not in content_by_ds:
+                content_by_ds[e] = []
+            content_by_ds[e] += [r]
 
     return content_by_ds, ds_props, completed, nondataset_paths
 
@@ -146,6 +133,7 @@ def yield_recursive(ds, path, action, recursion_limit):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
     # is elsewhere
+    from datalad.distribution.subdatasets import Subdatasets
     for subd_res in ds.subdatasets(
             recursive=True,
             recursion_limit=recursion_limit,
@@ -153,7 +141,7 @@ def yield_recursive(ds, path, action, recursion_limit):
         # this check is not the same as subdatasets --contains=path
         # because we want all subdataset below a path, not just the
         # containing one
-        if subd_res['path'].startswith(_with_sep(path)):
+        if path_is_subpath(subd_res['path'], path):
             # this subdatasets is underneath the search path
             # be careful to not overwrite anything, in case
             # this subdataset has been processed before
@@ -177,6 +165,8 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
     revision : str
       Commit-ish
     """
+    from datalad.interface.diff import Diff
+
     # TODO needs recursion limit
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
@@ -242,7 +232,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
                 ap.update(m)
                 yield ap
                 break
-            if m['path'].startswith(_with_sep(ap['path'])):
+            if path_is_subpath(m['path'], ap['path']):
                 # a modified path is underneath this AP
                 # yield the modified one instead
                 yield m
@@ -537,7 +527,7 @@ class AnnotatePaths(Interface):
                 for r in requested_paths:
                     p = r['path'] if isinstance(r, dict) else r
                     p = resolve_path(p, ds=refds_path)
-                    if _with_sep(p).startswith(_with_sep(refds_path)):
+                    if path_startswith(p, refds_path):
                         # all good
                         continue
                     # not the refds
@@ -601,9 +591,9 @@ class AnnotatePaths(Interface):
                 path_props['type'] = \
                     path_props.get(
                         'type',
-                        'dataset' if GitRepo.is_valid_repo(path) else 'directory')
+                        'dataset' if not islink(path) and GitRepo.is_valid_repo(path) else 'directory')
                 # this could contain all types of additional content
-                containing_dir = path
+                containing_dir = path if not islink(path) else normpath(opj(path, pardir))
             else:
                 if lexists(path):
                     path_props['type'] = 'file'
@@ -654,7 +644,7 @@ class AnnotatePaths(Interface):
                 continue
 
             # check that we only got SUBdatasets
-            if refds_path and not _with_sep(dspath).startswith(_with_sep(refds_path)):
+            if refds_path and not path_startswith(dspath, refds_path):
                 res = get_status_dict(**dict(res_kwargs, **path_props))
                 res['status'] = nondataset_path_status
                 res['message'] = \
@@ -678,6 +668,7 @@ class AnnotatePaths(Interface):
                     (path_type == 'dataset' and 'registered_subds' not in path_props) or
                     path_type == 'directory' or
                     not lexists(path)):
+                from datalad.distribution.subdatasets import Subdatasets
                 # if the path doesn't exist, or is labeled a directory, or a dataset even
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent

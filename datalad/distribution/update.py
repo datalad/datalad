@@ -163,10 +163,11 @@ class Update(Interface):
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
-            repo.fetch(
+            fetch_kwargs = dict(
                 remote=None if fetch_all else sibling_,
                 all_=fetch_all,
                 prune=True)  # prune to not accumulate a mess over time
+            repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate
             # ds.repo again, as it might have be converted from an GitRepo
             # to an AnnexRepo
@@ -184,7 +185,7 @@ def _update_repo(ds, remote, reobtain_data):
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
             # get all annexed files that have data present
-            lgr.info('Recording file content availability to re-obtain update files later on')
+            lgr.info('Recording file content availability to re-obtain updated files later on')
             reobtain_data = \
                 [opj(ds.path, p)
                  for p in repo.get_annexed_files(with_content_only=True)]

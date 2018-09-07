@@ -17,11 +17,13 @@ from ..utils import rmtree
 from ..support.param import Parameter
 from ..consts import ARCHIVES_TEMP_DIR
 from ..consts import ANNEX_TEMP_DIR
+from ..consts import SEARCH_INDEX_DOTGITDIR
 
 from datalad.support.constraints import EnsureNone
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.utils import get_git_dir
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -56,7 +58,7 @@ class Clean(Interface):
         what=Parameter(
             args=("--what",),
             dest='what',
-            choices=('cached-archives', 'annex-tmp'),
+            choices=('cached-archives', 'annex-tmp', 'search-index'),
             nargs="*",
             doc="""What to clean.  If none specified -- all known targets are
             cleaned"""),
@@ -88,22 +90,25 @@ class Clean(Interface):
                 yield ap
                 continue
             d = ap['path']
+            gitdir = get_git_dir(d)
             for dirpath, flag, msg, sing_pl in [
                 (ARCHIVES_TEMP_DIR, "cached-archives",
                  "temporary archive", ("directory", "directories")),
                 (ANNEX_TEMP_DIR, "annex-tmp",
                  "temporary annex", ("file", "files")),
+                (opj(gitdir, SEARCH_INDEX_DOTGITDIR), 'search-index',
+                 "metadata search index", ("file", "files")),
             ]:
                 topdir = opj(d, dirpath)
                 lgr.debug("Considering to clean %s:%s", d, dirpath)
                 if not ((what is None) or (flag in what)):
                     yield get_status_dict(
-                        path=topdir, status='notneeded', type='dir', **res_kwargs)
+                        path=topdir, status='notneeded', type='directory', **res_kwargs)
                     continue
                 paths = glob(opj(topdir, '*'))
                 if not paths:
                     yield get_status_dict(
-                        path=topdir, status='notneeded', type='dir', **res_kwargs)
+                        path=topdir, status='notneeded', type='directory', **res_kwargs)
                     continue
                 pl = len(paths) > 1
                 message = ("Removed %d %s %s: %s",

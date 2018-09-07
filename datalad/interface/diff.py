@@ -38,6 +38,7 @@ from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import path_startswith
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
@@ -104,9 +105,12 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # nothing to filter
             paths = None
 
+    from datalad.utils import assure_unicode
+
     for line in stdout.split('\0'):
         if not line:
             continue
+        line = assure_unicode(line)
         if not line.startswith('?? '):
             # nothing untracked, ignore, task of `diff`
             continue
@@ -115,7 +119,8 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # strip state marker
             line[3:])
         norm_apath = normpath(apath)
-        if paths and not any([norm_apath == p or apath.startswith(_with_sep(p)) for p in paths]):
+        if paths and not any(norm_apath == p or path_startswith(apath, p)
+                             for p in paths):
             # we got a whitelist for paths, don't report any other
             continue
         ap = dict(
@@ -335,8 +340,7 @@ class Diff(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_process,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         for ds_path in sorted(content_by_ds.keys()):

@@ -1,69 +1,192 @@
 .. _chap_metadata:
 
-Meta data
-*********
+Metadata
+********
 
 Overview
 ========
 
-DataLad has built-in, modular, and extensible support for meta data in various
-formats. The core concept is that meta data is accessed via dedicated parsers
-in their native format, avoiding the need for mandatory conversion into a
-"standard" format. Via these parser datalad is capable of performing a certain
-amount of meta data homogenization, and standardization into a JSON-LD_
-compliant `linked data`_ structure for the purpose of meta data aggregation in
-:term:`superdataset`\ s.  Through this mechanism it is possible to obtain and
-query meta data of any number of :term:`subdataset`\ s without the need to
-actually install them.
+DataLad has built-in, modular, and extensible support for metadata in various
+formats. Metadata is extracted from a dataset and its content by one or more
+extractors that have to be enabled in a dataset's configuration. Extractors
+yield metadata in a JSON-LD_-like structure that can be arbitrarily complex and
+deeply nested. Metadata from each extractor is kept unmodified, unmangled, and
+separate from metadata of other extractors. This design enables tailored
+applications using particular metadata that can use Datalad as a
+content-agnostic aggregation and transport layer without being limited or
+impacted by other metadata sources and schemas.
+
+Extracted metadata is stored in a dataset in (compressed) files using a JSON
+stream format, separately for metadata describing a dataset as a whole, and
+metadata describing individual files in a dataset. This limits the amount of
+metadata that has to be obtained and processed for applications that do not
+require all available metadata.
+
+DataLad provides a content-agnostic metadata aggregation mechanism that
+stores metadata of sub-datasets (with arbitrary nesting levels) in a
+superdataset, where it can then be queried without having the subdatasets
+locally present.
+
+Lastly, DataLad comes with a `search` command that enable metadata queries
+via a flexible query language. However, alternative applications for metadata
+queries (e.g. graph-based queries) can be built on DataLad, by requesting
+a complete or partial dump of aggregated metadata available in a dataset.
 
 .. _JSON-LD: http://json-ld.org/
 .. _linked data: https://en.wikipedia.org/wiki/Linked_data
 
-Sample datasets with meta data
-==============================
 
-http://datasets.datalad.org superdataset contains a collection of datasets
-which we have prepared primarily from available online data resources such
-as OpenfMRI_, CRCNS_, etc.  Many of those datasets came with meta data in
-their native formats, such as `Brain Imaging Data Structure (BIDS)`_.  DataLad has
-:ref:`aggregated <man_datalad-aggregate-metadata>` metadata where it was available
-to enable basic :ref:`search <man_datalad-search>` queries.  If you
-run :ref:`search <man_datalad-search>` command outside of any datalad dataset,
-it will offer to install our http://datasets.datalad.org superdataset at
-`~/datalad` and then search through its metadata.  If that superdataset is already
-installed (by :ref:`datalad search <man_datalad-search>` or manually via
-`datalad install -s /// ~/datalad`), you can refer to it in the search command
-using `-d ///` option, e.g.::
+Supported metadata sources
+==========================
 
-    $> datalad search -d /// bids
-    /home/yoh/datalad/openfmri/ds000017A
-    /home/yoh/datalad/openfmri/ds000017
-    /home/yoh/datalad/dicoms/dartmouth-phantoms/bids_test3
-    /home/yoh/datalad/labs
-    /home/yoh/datalad/labs/haxby
-    /home/yoh/datalad/labs/haxby/raiders
-    /home/yoh/datalad/openfmri
-    /home/yoh/datalad/openfmri/ds000001
-    ..    .
-
-.. _OpenfMRI: http://openfmri.org
-.. _CRCNS: http://crcns.org
-
-Supported meta data formats
-===========================
-
-This following sections provide an overview of supported meta data formats.
+This following sections provide an overview of included metadata extractors for
+particular types of data structures and file formats.
+Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
+extractors are enabled by default.  Any additional metadata extractor should be
+enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
+via the ``git config`` command or by editing ``.datalad/config`` directly.
+For example, ``git config -f .datalad/config --add datalad.metadata.nativetype audio``
+would add :ref:`audio <metadata-audio>` metadata extractor to the list.
 
 
-RFC822-compliant meta data
+.. _metadata-annex:
+
+Annex metadata (``annex``)
 --------------------------
 
-This is a custom meta data format, inspired by the standard used for Debian
+Content tracked by git-annex can have associated
+`metadata records <http://git-annex.branchable.com/metadata/>`_.
+From DataLad's perspective, git-annex metadata is just another source of
+metadata that can be extracted and aggregated.
+
+You can use the `git-annex metadata`_ command to assign git-annex
+metadata.  And, if you have a table or records that contain data
+sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
+to quickly populate a dataset with files and associated
+git-annex metadata. (`///labs/openneurolab/metasearch
+<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+an example of such a dataset.)
+
+
+Pros of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Many git-annex commands, such as `git-annex get`_ and `git-annex copy`_, can
+  use metadata to decide which files (keys) to operate on, making it possible to
+  automate file (re)distribution based on their metadata annotation
+- Assigned metadata is available for use by git-annex right away without
+  requiring any additional "aggregation" step
+- `git-annex view`_ can be used to quickly generate completely new layouts
+  of the repository solely based on the metadata fields associated with the files
+
+.. _git-annex get: https://git-annex.branchable.com/git-annex-get/
+.. _git-annex copy: https://git-annex.branchable.com/git-annex-copy/
+.. _git-annex metadata: https://git-annex.branchable.com/git-annex-metadata/
+.. _git-annex view: https://git-annex.branchable.com/git-annex-view/
+
+
+Cons of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Metadata fields are actually stored per git-annex key rather than per file.
+  If multiple files contain the same content, metadata will be shared among them.
+- Files whose content is tracked directly by git cannot have git-annex metadata assigned.
+- No per repository/directory metadata, and no mechanism to use/aggregate
+  metadata from sub-datasets
+- Field names cannot contain some symbols, such as ':'
+- Metadata is stored within the `git-annex` branch, so it is distributed
+  across all clones of the dataset, making it hard to scale for large metadata
+  sizes or to work with sensitive metadata (not intended to be redistributed)
+- It is a generic storage with no prescribed vocabularly,
+  making it very flexible but also requiring consistency and
+  harmonization to make the stored metadata useful for search
+
+
+Example uses of git-annex metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Annotating files for different purposes
+#######################################
+
+FreeSurfer project `uses <https://surfer.nmr.mgh.harvard.edu/fswiki/DevelopersGuide_git#GettheDataFiles>`_
+`git-annex` for managing their source code+data base within a single
+git/git-annex repository. Files necessary for different scenarios (deployment,
+testing) are annotated and can be fetched selectively for the scenario at hand.
+
+Automating "non-distribution" of sensitive files
+################################################
+
+In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
+conversion of BIDS dataset and in some manually prepared datasets
+(such as
+`///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
+and
+`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+we annotated materials that must not be publicly shared with a git-annex
+metadata field `distribution-restrictions`.  We used the following of values to
+describe why any particular file (content) should not be redistributed:
+
+- **sensitive** - files which potentially contain participant sensitive
+  information, such as non-defaced anatomicals
+- **proprietary** - files which contain proprietary data, which we have no
+  permissions to share (e.g., movie video files)
+
+Having annotated files this way, we could instruct git-annex
+to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+server: `git annex wanted datalad-public "not metadata=distribution-restrictions=*"`.
+
+
+Flexible directory layout
+#########################
+
+If you are maintaining a collection of music files or PDFs for the lab, you
+may want to display the files in an alternative or filtered hierarchy.
+`git-annex view`_ could be of help. Example:
+
+.. code-block:: sh
+
+  datalad install ///labs/openneurolab/metasearch
+  cd metasearch
+  git annex view sex=* handedness=ambidextrous
+
+would give you two directories (Male, Female) with only the files belonging to
+ambidextrous subjects.
+
+
+.. _metadata-audio:
+
+Various audio file formats (``audio``)
+--------------------------------------
+
+This extractor uses the `mutagen <https://github.com/quodlibet/mutagen>`_
+package to extract essential metadata from a range of audio file formats.  For
+the most common metadata properties a constrained vocabulary, based on the
+`Music Ontology <http://purl.org/ontology/mo/>`_ is employed.
+
+datacite.org compliant datasets (``datacite``)
+----------------------------------------------
+
+This extractor can handle dataset-level metadata following the `datacite.org
+<https://www.datacite.org>`_ specification. No constrained vocabulary is
+identified at the moment.
+
+.. _metadata-datalad_core:
+
+Datalad's internal metadata storage (``datalad_core``)
+------------------------------------------------------
+
+This extractor can express Datalad's internal metadata representation, such
+as the relationship of a super- and a subdataset. It uses DataLad's own
+constrained vocabulary.
+
+RFC822-compliant metadata (``datalad_rfc822``)
+----------------------------------------------
+
+This is a custom metadata format, inspired by the standard used for Debian
 software packages that is particularly suited for manual entry. This format is
-a good choice when meta data describing a dataset as a whole cannot be obtained
+a good choice when metadata describing a dataset as a whole cannot be obtained
 from some other structured format. The syntax is :rfc:`822`-compliant. In other
 words: this is a text-based format that uses the syntax of email headers.
-Meta data must be placed in ``DATASETROOT/.datalad/meta.rfc822`` for this format.
+Metadata must be placed in ``DATASETROOT/.datalad/meta.rfc822`` for this format.
 
 .. _RFC822: https://tools.ietf.org/html/rfc822
 
@@ -131,39 +254,100 @@ The following fields are supported:
   A version for the dataset. This should be in a format that is alphanumerically
   sortable and lead to a "greater" version for an update of a dataset.
 
+Metadata keys used by this extractor are defined in DataLad's own constrained
+vocabulary.
 
-Brain Imaging Data Structure (BIDS)
------------------------------------
+Friction-less data packages (``frictionless_datapackage``)
+----------------------------------------------------------
 
-DataLad has basic support for extraction of meta data from the `BIDS
-<http://bids.neuroimaging.io>`_ ``dataset_description.json`` file.
+DataLad has basic support for extraction of essential dataset-level metadata
+from `friction-less data packages
+<http://specs.frictionlessdata.io/data-packages>`_ (``datapackage.json``).
+file. Metadata keys are constrained to DataLad's own vocabulary.
 
-Friction-less data packages
----------------------------
+Exchangeable Image File Format (``exif``)
+-----------------------------------------
 
-DataLad has basic support for extraction of meta data from `friction-less data
-packages <http://specs.frictionlessdata.io/data-packages>`_
-(``datapackage.json``).  file.
+The extractor yields EXIF metadata from any compatible file. It uses
+the W3C EXIF vocabulary (http://www.w3.org/2003/12/exif/ns/).
 
-JSON-LD meta data format
-------------------------
+Various image/photo formats (``image``)
+---------------------------------------
 
-DataLad uses JSON-LD_ as its primary meta data format. By default, the
-following context (available from `here <schema.json>`_
-is used for any meta data item:
+Standard image metadata is extractor using the `Pillow package
+<https://github.com/python-pillow/Pillow>`_. Core metadata is available using
+an adhoc vocabulary defined by the extractor.
 
-.. literalinclude:: _extras/schema.json
-   :language: json
+Extensible Metadata Platform (``xmp``)
+--------------------------------------
 
-While it is technically possible to mix different contexts across items this
-has not been fully tested yet.
+This extractor yields any XMP-compliant metadata from any supported file (e.g.
+PDFs, photos). XMP metadata uses fully qualified terms from standard
+vocabularies that are simply passed through by the extractor. At the moment
+metadata extraction from side-car files is not supported, but would be easy to
+add.
 
-The following sections describe details and changes in the meta data
+Metadata aggregation and query
+==============================
+
+Metadata aggregation can be performed with the :ref:`aggregate-metadata
+<man_datalad-aggregate-metadata>` command. Aggregation is done for two
+interrelated but distinct reasons:
+
+- Fast uniform metadata access, independent of local data availability
+- Comprehensive data discovery without access to or knowledge of individual
+  datasets
+
+In an individual dataset, metadata aggregation engages any number of enabled
+metadata extractors to build a JSON-LD based metadata representation that is
+separate from the original data files. These metadata objects are added to the
+dataset and are tracked with the same mechanisms that are used for any other
+dataset content. Based on this metadata, DataLad can provide fast and uniform
+access to metadata for any dataset component (individual files, subdatasets,
+the whole dataset itself), based on the relative path of a component within a
+dataset (available via the :ref:`metadata <man_datalad-metadata>` command).
+This extracted metadata can be kept or made available locally for any such
+query, even when it is impossible or undesirable to keep the associated data
+files around (e.g. due to size constraints).
+
+For any superdataset (a dataset that contains subdatasets as components),
+aggregation can go one step further. In this case, aggregation imports
+extracted metadata from subdatasets into the superdataset to offer the just
+described query feature for any aggregated subdataset too. This works across
+any number of levels of nesting. For example, a subdataset that contains the
+aggregated metadata for eight other datasets (that might have never been
+available locally) can be aggregated into a local superdataset with all its
+metadata. In that superdataset, a DataLad user is then able to query
+information on any content of any subdataset, regardless of their actual
+availability. This principle also allows any user to install the superdataset
+from http://datasets.datalad.org and perform *local and offline* queries about
+any dataset available online from this server.
+
+Besides full access to all aggregated metadata by path (via the :ref:`metadata
+<man_datalad-metadata>` command), DataLad also comes with a :ref:`search
+<man_datalad-search>` command that provides different search modes to query the
+entirety of the locally available metadata. Its capabilities include simple
+keyword searches as well as more complex queries using date ranges or logical
+conjunctions.
+
+
+Vocabulary
+==========
+
+The following sections describe details and changes in the metadata
 specifications implemented in datalad.
 
-.. _0.1:
+.. _2.0:
 
-v0.1
-----
+`v2.0 <http://docs.datalad.org/schema_v2.0.json>`_
+--------------------------------------------------
 
-* Original implementation
+* Current development version that will be released together with
+  DataLad v0.10.
+
+.. _1.0:
+
+`v1.0 <http://docs.datalad.org/schema_v1.0.json>`_
+--------------------------------------------------
+
+* Original implementation that did not really see the light of the day.

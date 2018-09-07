@@ -18,11 +18,11 @@ from .utils import assert_equal
 from ..support.archives import decompress_file, compress_files, unixify_path
 from ..support.archives import ExtractedArchive, ArchivesCache
 
-from .utils import get_most_obscure_supported_name, assert_raises
+from .utils import OBSCURE_FILENAME, assert_raises
 from .utils import assert_in
 from .utils import ok_generator
 
-fn_in_archive_obscure = get_most_obscure_supported_name()
+fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
 fn_archive_obscure_ext = fn_archive_obscure + '.tar.gz'
 
@@ -97,7 +97,8 @@ def check_compress_file(ext, path, name):
 def test_compress_file():
     yield check_compress_file, '.tar.gz'
     yield check_compress_file, '.tar'
-    # yield check_compress_file, '.zip'
+    yield check_compress_file, '.zip'
+
 
 @with_tree(**tree_simplearchive)
 def test_ExtractedArchive(path):

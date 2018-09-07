@@ -37,6 +37,8 @@ from datalad.dochelpers import exc_str
 from datalad.utils import rmtree
 from datalad.utils import assure_list
 
+from datalad.distribution.add import Add
+
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import resolve_path
@@ -223,8 +225,13 @@ class Clone(Interface):
         # combine all given sources (incl. alternatives), maintain order
         for s in [source] + assure_list(alt_sources):
             candidate_sources.extend(_get_flexible_source_candidates(s))
-        lgr.info("Cloning %s to '%s'",
-                 source, dest_path)
+        candidates_str = \
+            " [%d other candidates]" % (len(candidate_sources) - 1) \
+            if len(candidate_sources) > 1 \
+            else ''
+        lgr.info("Cloning %s%s into '%s'",
+                 source, candidates_str, dest_path)
+        dest_path_existed = exists(dest_path)
         for isource_, source_ in enumerate(candidate_sources):
             try:
                 lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
@@ -237,7 +244,9 @@ class Clone(Interface):
                 if exists(dest_path):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
-                    rmtree(dest_path)
+                    # We must not just rmtree since it might be curdir etc
+                    # we should remove all files/directories under it
+                    rmtree(dest_path, children_only=dest_path_existed)
                 if 'could not create work tree' in e.stderr.lower():
                     # this cannot be fixed by trying another URL
                     yield get_status_dict(

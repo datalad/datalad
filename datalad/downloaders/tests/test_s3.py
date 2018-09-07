@@ -38,7 +38,7 @@ skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
-
+url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
 
 @use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
@@ -47,9 +47,9 @@ def test_s3_download_basic():
         (url_2versions_nonversioned1, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
+        (url_1version_bucketwithdot, 'version1', 'nothing')
     ]:
         yield check_download_external_url, url, failed_str, success_str
-
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @use_cassette('test_s3_mtime')
@@ -93,3 +93,15 @@ def test_reuse_session(tempfile, mocked_auth):
 
     Providers.reset_default_providers()  # necessary to avoid side-effects from having a vcr'ed connection
     # leaking through default provider's bucket, e.g. breaking test_mtime if ran after this one
+
+
+def test_parse_url():
+    from ..s3 import S3Downloader
+    f = S3Downloader._parse_url
+    b1 = "s3://bucket.name/file/path?revision=123"
+    assert_equal(f(b1, bucket_only=True), 'bucket.name')
+    assert_equal(f(b1), ('bucket.name', 'file/path', {'revision': '123'}))
+    assert_equal(f("s3://b/f name"), ('b', 'f name', {}))
+    assert_equal(f("s3://b/f%20name"), ('b', 'f name', {}))
+    assert_equal(f("s3://b/f%2Bname"), ('b', 'f+name', {}))
+    assert_equal(f("s3://b/f%2bname?r=%20"), ('b', 'f+name', {'r': '%20'}))

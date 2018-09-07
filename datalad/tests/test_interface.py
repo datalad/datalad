@@ -51,8 +51,8 @@ class Demo(Interface):
 
 
 def test_param():
-    # having a parametr with no information is fine
-    # it doesn't need a name, because it comes from the signatur
+    # having a parameter with no information is fine
+    # it doesn't need a name, because it comes from the signature
     # of the actual implementation that is described
     p = Parameter()
     pname = 'testname'

@@ -15,8 +15,6 @@ import logging
 from os.path import join as opj
 from os.path import relpath
 
-from six.moves.urllib.parse import quote as urlquote
-
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -48,11 +46,14 @@ from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import urlquote
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import unique
+from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -74,32 +75,55 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     parent's module tracking branch remote.
     """
     clone_urls = []
+
+    # should be our first candidate
+    tracking_remote, tracking_branch = ds.repo.get_tracking_branch()
+    candidate_remotes = [tracking_remote] if tracking_remote else []
+
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
-    remote_name, remote_url = _get_tracking_source(ds)
+    try:
+        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
+        # ideally should also give preference to the remotes which have
+        # the same branch checked out I guess
+        candidate_remotes += list(ds.repo._get_remotes_having_commit(last_commit))
+    except StopIteration:
+        # no commit for it known yet, ... oh well
+        pass
 
-    # Directly on parent's ds url
-    if remote_url:
-        # attempt: submodule checkout at parent remote URL
-        # We might need to quote sm_path portion, e.g. for spaces etc
-        if isinstance(RI(remote_url), URL):
-            sm_path_url = urlquote(sm_path)
-        else:
-            sm_path_url = sm_path
+    for remote in unique(candidate_remotes):
+        remote_url = ds.repo.get_remote_url(remote, push=False)
 
-        clone_urls.extend(
-            _get_flexible_source_candidates(
-                # alternate suffixes are tested by `clone` anyways
-                sm_path_url, remote_url, alternate_suffix=False))
+        # Directly on parent's ds url
+        if remote_url:
+            # attempt: submodule checkout at parent remote URL
+            # We might need to quote sm_path portion, e.g. for spaces etc
+            if isinstance(RI(remote_url), URL):
+                sm_path_url = urlquote(sm_path)
+            else:
+                sm_path_url = sm_path
 
-    # attempt: provided (configured?) submodule URL
-    # TODO: consider supporting DataLadRI here?  or would confuse
-    #  git and we wouldn't want that (i.e. not allow pure git clone
-    #  --recursive)
+            clone_urls.extend(
+                _get_flexible_source_candidates(
+                    # alternate suffixes are tested by `clone` anyways
+                    sm_path_url, remote_url, alternate_suffix=False))
+
+            # attempt: provided (configured?) submodule URL
+            # TODO: consider supporting DataLadRI here?  or would confuse
+            #  git and we wouldn't want that (i.e. not allow pure git clone
+            #  --recursive)
+            if sm_url:
+                clone_urls += _get_flexible_source_candidates(
+                    sm_url,
+                    remote_url,
+                    alternate_suffix=False
+                )
+
+    # Do based on the ds.path as the last resort
     if sm_url:
         clone_urls += _get_flexible_source_candidates(
             sm_url,
-            remote_url if remote_url else ds.path,
+            ds.path,
             alternate_suffix=False)
 
     return unique(clone_urls)
@@ -119,6 +143,11 @@ def _install_subds_from_flexible_source(
     # prevent inevitable exception from `clone`
     dest_path = opj(ds.path, sm_path)
     clone_urls = [src for src in clone_urls if src != dest_path]
+
+    if not clone_urls:
+        raise InstallFailedError(
+            msg="Have got no candidates to install subdataset {} from".format(
+                sm_path))
 
     # now loop over all candidates and try to clone
     subds = None
@@ -143,6 +172,9 @@ def _install_subds_from_flexible_source(
     except IncompleteResultsError:
         # details of the failure are logged already by common code
         pass
+    except Exception as exc:
+        lgr.warning("Something went wrong while installing %s: %s",
+                    sm_path, exc_str(exc))
     if subds is None:
         raise InstallFailedError(
             msg="Failed to install dataset from{}: {}".format(
@@ -269,10 +301,10 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 "subdataset %s is configured to be skipped on recursive installation",
                 sub['path'])
             continue
-        if start is not None and not subds.path.startswith(_with_sep(start)):
+        if start is not None and not path_is_subpath(subds.path, start):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,
@@ -398,7 +430,7 @@ class Get(Interface):
             #git_opts=None,
             #annex_opts=None,
             #annex_get_opts=None,
-            jobs=None,
+            jobs='auto',
             verbose=False,
     ):
         # IMPLEMENTATION CONCEPT:
@@ -560,8 +592,7 @@ class Get(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_get,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # hand over to git-annex, get files content,
@@ -591,8 +622,14 @@ class Get(Interface):
                 res = annexjson2result(res, ds, type='file', logger=lgr,
                                        refds=refds_path)
                 success = success_status_map[res['status']]
-                respath_by_status[success] = \
-                    respath_by_status.get(success, []) + [res['path']]
+                # TODO: in case of some failed commands (e.g. get) there might
+                # be no path in the record.  yoh has only vague idea of logic
+                # here so just checks for having 'path', but according to
+                # results_from_annex_noinfo, then it would be assumed that
+                # `content` was acquired successfully, which is not the case
+                if 'path' in res:
+                    respath_by_status[success] = \
+                        respath_by_status.get(success, []) + [res['path']]
                 yield res
 
             for r in results_from_annex_noinfo(

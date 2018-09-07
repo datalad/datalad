@@ -12,8 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
-from os import geteuid
+import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -29,11 +28,9 @@ from datalad.tests.utils import getpwd
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import assert_in
 from datalad.tests.utils import on_windows, skip_if
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
-from datalad.utils import swallow_logs
 
 
 @assert_cwd_unchanged
@@ -72,7 +69,7 @@ def test_unlock_raises(path, path2, path3):
 @known_failure_v6  # FIXME: See TODOs in the comments below
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
-@skip_if(cond=not on_windows and geteuid() == 0)  # uid not available on windows
+@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 
@@ -106,7 +103,7 @@ def test_unlock(path):
     if ds.repo.is_direct_mode():
         assert_status('notneeded', result)
     else:
-        assert_in_results(result, path='test-annex.dat', status='ok')
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
@@ -131,15 +128,10 @@ def test_unlock(path):
     result = ds.unlock(path='test-annex.dat')
     assert_result_count(result, 1)
 
-    # TODO: Why in the following result there is the absolute path in direct mode
-    # while it's the relative one in indirect mode?
-    # Probably:
-    # => direct mode: no actual call to annex-unlock
-    # => indirect mode: it's what AnnexRepo.unlock returns
     if ds.repo.is_direct_mode():
         assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='notneeded')
     else:
-        assert_in_results(result, path='test-annex.dat', status='ok')
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")

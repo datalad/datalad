@@ -9,21 +9,218 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.9.2 (??? ??, 2017) -- will be better than ever
+## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+Primarily a bugfix release to accommodate recent git-annex release
+forbidding file:// and http://localhost/ URLs which might lead to
+revealing private files if annex is publicly shared.
 
 ### Fixes
 
-?
+- fixed testing to be compatible with recent git-annex (6.20180626)
+- [download-url] will now download to current directory instead of the
+  top of the dataset
 
 ### Enhancements and new features
 
-?
+- do not quote ~ in URLs to be consistent with quote implementation in
+  Python 3.7 which now follows RFC 3986
+- [run] support for user-configured placeholder values
+- documentation on native git-annex metadata support
+- handle 401 errors from LORIS tokens
+- `yoda` procedure will instantiate `README.md`
+- `--discover` option added to [run-procedure] to list available
+  procedures
+
+## 0.10.1 (Jun 17, 2018) -- OHBM polish
+
+The is a minor bugfix release.
+
+### Fixes
+
+- Be able to use backports.lzma as a drop-in replacement for pyliblzma.
+- Give help when not specifying a procedure name in `run-procedure`.
+- Abort early when a downloader received no filename.
+- Avoid `rerun` error when trying to unlock non-available files.
+
+## 0.10.0 (Jun 09, 2018) -- The Release
+
+This release is a major leap forward in metadata support.
+
+### Major refactoring and deprecations
+
+- Metadata
+  - Prior metadata provided by datasets under `.datalad/meta` is no
+    longer used or supported. Metadata must be reaggregated using 0.10
+    version
+  - Metadata extractor types are no longer auto-guessed and must be
+    explicitly specified in `datalad.metadata.nativetype` config
+    (could contain multiple values)
+  - Metadata aggregation of a dataset hierarchy no longer updates all
+    datasets in the tree with new metadata. Instead, only the target
+    dataset is updated. This behavior can be changed via the --update-mode
+    switch. The new default prevents needless modification of (3rd-party)
+    subdatasets.
+  - Neuroimaging metadata support has been moved into a dedicated extension:
+    https://github.com/datalad/datalad-neuroimaging
+- Crawler
+  - moved into a dedicated extension:
+    https://github.com/datalad/datalad-crawler
+- `export_tarball` plugin has been generalized to `export_archive` and
+  can now also generate ZIP archives.
+- By default a dataset X is now only considered to be a super-dataset of
+  another dataset Y, if Y is also a registered subdataset of X.
+
+### Fixes
+
+A number of fixes did not make it into the 0.9.x series:
+
+- Dynamic configuration overrides via the `-c` option were not in effect.
+- `save` is now more robust with respect to invocation in subdirectories
+  of a dataset.
+- `unlock` now reports correct paths when running in a dataset subdirectory.
+- `get` is more robust to path that contain symbolic links.
+- symlinks to subdatasets of a dataset are now correctly treated as a symlink,
+  and not as a subdataset
+- `add` now correctly saves staged subdataset additions.
+- Running `datalad save` in a dataset no longer adds untracked content to the
+  dataset. In order to add content a path has to be given, e.g. `datalad save .`
+- `wtf` now works reliably with a DataLad that wasn't installed from Git (but,
+  e.g., via pip)
+- More robust URL handling in `simple_with_archives` crawler pipeline.
+
+### Enhancements and new features
+
+- Support for DataLad extension that can contribute API components from 3rd-party sources,
+  incl. commands, metadata extractors, and test case implementations.
+  See https://github.com/datalad/datalad-extension-template for a demo extension.
+- Metadata (everything has changed!)
+  - Metadata extraction and aggregation is now supported for datasets and individual
+    files.
+  - Metadata query via `search` can now discover individual files.
+  - Extracted metadata can now be stored in XZ compressed files, is optionally
+    annexed (when exceeding a configurable size threshold), and obtained on
+    demand (new configuration option `datalad.metadata.create-aggregate-annex-limit`).
+  - Status and availability of aggregated metadata can now be reported via
+    `metadata --get-aggregates`
+  - New configuration option `datalad.metadata.maxfieldsize` to exclude too large
+    metadata fields from aggregation.
+  - The type of metadata is no longer guessed during metadata extraction. A new
+    configuration option `datalad.metadata.nativetype` was introduced to enable
+    one or more particular metadata extractors for a dataset.
+  - New configuration option `datalad.metadata.store-aggregate-content` to enable
+    the storage of aggregated metadata for dataset content (i.e. file-based metadata)
+    in contrast to just metadata describing a dataset as a whole.
+- `search` was completely reimplemented. It offers three different modes now:
+  - 'egrep' (default): expression matching in a plain string version of metadata
+  - 'textblob': search a text version of all metadata using a fully featured
+     query language (fast indexing, good for keyword search)
+  - 'autofield': search an auto-generated index that preserves individual fields
+     of metadata that can be represented in a tabular structure (substantial
+     indexing cost, enables the most detailed queries of all modes)
+- New extensions:
+  - addurls, an extension for creating a dataset (and possibly subdatasets)
+    from a list of URLs.
+  - export_to_figshare
+  - extract_metadata
+- add_readme makes use of available metadata
+- By default the wtf extension now hides sensitive information, which can be
+  included in the output by passing `--senstive=some` or `--senstive=all`.
+- Reduced startup latency by only importing commands necessary for a particular
+  command line call.
+- `datalad create -d <parent> --nosave` now registers subdatasets, when possible.
+- `datalad run` now provides a way for the caller to save the result when a
+  command has a non-zero exit status.
+- `datalad rerun` now has a `--script` option that can be used to extract
+  previous commands into a file.
+- A DataLad Singularity container is now available on
+  [Singularity Hub](https://singularity-hub.org/collections/667).
+- More casts have been embedded in the [use case section of the documentation](http://docs.datalad.org/en/docs/usecases/index.html).
+- `datalad --report-status` has a new value 'all' that can be used to
+  temporarily re-enable reporting that was disable by configuration settings.
+
+
+## 0.9.3 (Mar 16, 2018) -- pi+0.02 release
+
+Some important bug fixes which should improve usability
+
+### Fixes
+
+- `datalad-archives` special remote now will lock on acquiring or
+  extracting an archive - this allows for it to be used with -J flag
+  for parallel operation
+- relax introduced in 0.9.2 demand on git being configured for datalad
+  operation - now we will just issue a warning
+- `datalad ls` should now list "authored date" and work also for datasets
+  in detached HEAD mode
+- `datalad save` will now save original file as well, if file was
+  "git mv"ed, so you can now `datalad run git mv old new` and have
+  changes recorded
+
+### Enhancements and new features
+
+- `--jobs` argument now could take `auto` value which would decide on
+  # of jobs depending on the # of available CPUs.
+  `git-annex` > 6.20180314 is recommended to avoid regression with -J.
+- memoize calls to `RI` meta-constructor -- should speed up operation a
+  bit
+- `DATALAD_SEED` environment variable could be used to seed Python RNG
+  and provide reproducible UUIDs etc (useful for testing and demos)
+
+
+## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
+
+Largely a bugfix release with a few enhancements.
+
+### Fixes
+
+- Execution of external commands (git) should not get stuck when
+  lots of both stdout and stderr output, and should not loose remaining
+  output in some cases
+- Config overrides provided in the command line (-c) should now be
+  handled correctly
+- Consider more remotes (not just tracking one, which might be none)
+  while installing subdatasets
+- Compatibility with git 2.16 with some changed behaviors/annotations
+  for submodules
+- Fail `remove` if `annex drop` failed
+- Do not fail operating on files which start with dash (-)
+- URL unquote paths within S3, URLs and DataLad RIs (///)
+- In non-interactive mode fail if authentication/access fails
+- Web UI:
+  - refactored a little to fix incorrect listing of submodules in
+    subdirectories
+  - now auto-focuses on search edit box upon entering the page
+- Assure that extracted from tarballs directories have executable bit set
+
+### Enhancements and new features
+
+- A log message and progress bar will now inform if a tarball to be
+  downloaded while getting specific files
+  (requires git-annex > 6.20180206)
+- A dedicated `datalad rerun` command capable of rerunning entire
+  sequences of previously `run` commands.
+  **Reproducibility through VCS. Use `run` even if not interested in `rerun`**
+- Alert the user if `git` is not yet configured but git operations
+  are requested
+- Delay collection of previous ssh connections until it is actually
+  needed.  Also do not require ':' while specifying ssh host
+- AutomagicIO: Added proxying of isfile, lzma.LZMAFile and io.open
+- Testing:
+  - added DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org to
+    run tests against another website to not obscure access stats
+  - tests run against temporary HOME to avoid side-effects
+  - better unit-testing of interactions with special remotes
+- CONTRIBUTING.md describes how to setup and use `git-hub` tool to
+  "attach" commits to an issue making it into a PR
+- DATALAD_USE_DEFAULT_GIT env variable could be used to cause DataLad
+  to use default (not the one possibly bundled with git-annex) git
+- Be more robust while handling not supported requests by annex in
+  special remotes
+- Use of `swallow_logs` in the code was refactored away -- less
+  mysteries now, just increase logging level
+- `wtf` plugin will report more information about environment, externals
+  and the system
 
 
 # 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
@@ -497,6 +694,7 @@ publishing
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
 [run]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html
+[run-procedure]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [siblings]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html

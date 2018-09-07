@@ -310,6 +310,12 @@ class TargetFileAbsent(DownloadError):
 
 
 class AccessDeniedError(DownloadError):
+    def __init__(self, msg=None, supported_types=None, **kwargs):
+        super(AccessDeniedError, self).__init__(msg, **kwargs)
+        self.supported_types = supported_types
+
+
+class AnonymousAccessDeniedError(AccessDeniedError):
     pass
 
 

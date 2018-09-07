@@ -36,6 +36,9 @@ from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
+# haunted imports/bindings
+from datalad.interface.diff import Diff
+
 
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -507,6 +510,8 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             if not superds:
                 return ('error',
                         ("No super-dataset to inherit settings for remote %s", to))
+            # avoid global import, only needed for this corner case
+            from datalad.distribution.create_sibling import CreateSibling
             # XXX due to difference between create-sibling and create-sibling-github
             # would not be as transparent to inherit for -github
             lgr.info("Will try to create a sibling inheriting settings from %s", superds)
@@ -760,8 +765,7 @@ class Publish(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_process,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         lgr.debug(

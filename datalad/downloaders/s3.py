@@ -10,8 +10,9 @@
 
 """
 
+import re
 
-from six.moves.urllib.parse import urlsplit
+from six.moves.urllib.parse import urlsplit, unquote as urlunquote
 
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
@@ -40,7 +41,7 @@ __docformat__ = 'restructuredtext'
 class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
     """
-
+    allows_anonymous = True
     DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
 
     def __init__(self, *args, **kwargs):
@@ -73,15 +74,23 @@ class S3Authenticator(Authenticator):
         if bucket_name.lower() != bucket_name:
             # per http://stackoverflow.com/a/19089045/1265472
             conn_kwargs['calling_format'] = OrdinaryCallingFormat()
-        credentials = credential()
 
-        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
+        if credential is not None:
+            credentials = credential()
+            conn_kind = "with authentication"
+            conn_args = [credentials['key_id'], credentials['secret_id']]
+            conn_kwargs['security_token'] = credentials.get('session')
+        else:
+            conn_kind = "anonymously"
+            conn_args = []
+            conn_kwargs['anon'] = True
+        if '.' in bucket_name:
+            conn_kwargs['calling_format']=OrdinaryCallingFormat()
 
-        self.connection = conn = boto.connect_s3(
-            credentials['key_id'], credentials['secret_id'],
-            security_token=credentials.get('session'),
-            **conn_kwargs
+        lgr.info(
+            "S3 session: Connecting to the bucket %s %s", bucket_name, conn_kind
         )
+        self.connection = conn = boto.connect_s3(*conn_args, **conn_kwargs)
         self.bucket = bucket = get_bucket(conn, bucket_name)
         return bucket
 
@@ -139,14 +148,25 @@ class S3Downloader(BaseDownloader):
         self._bucket = None
 
     @classmethod
-    def _parse_url(cls, url):
+    def _parse_url(cls, url, bucket_only=False):
         """Parses s3:// url and returns bucket name, prefix, additional query elements
          as a dict (such as VersionId)"""
         rec = urlsplit(url)
+        if bucket_only:
+            return rec.netloc
         assert(rec.scheme == 's3')
+        # We are often working with urlencoded URLs so we could safely interact
+        # with git-annex via its text based protocol etc.  So, if URL looks like
+        # it was urlencoded the filepath, we should revert back to an original key
+        # name.  Since we did not demarkate either it was urlencoded, we will do
+        # magical check, which would fail if someone had % followed by two digits
+        filepath = rec.path.lstrip('/')
+        if re.search('%[0-9a-fA-F]{2}', filepath):
+            lgr.debug("URL unquoting S3 URL filepath %s", filepath)
+            filepath = urlunquote(filepath)
         # TODO: needs replacement to assure_ since it doesn't
         # deal with non key=value
-        return rec.netloc, rec.path.lstrip('/'), assure_dict_from_str(rec.query, sep='&') or {}
+        return rec.netloc, filepath, assure_dict_from_str(rec.query, sep='&') or {}
 
     def _establish_session(self, url, allow_old=True):
         """
@@ -162,7 +182,7 @@ class S3Downloader(BaseDownloader):
         bool
           To state if old instance of a session/authentication was used
         """
-        bucket_name = self._parse_url(url)[0]
+        bucket_name = self._parse_url(url, bucket_only=True)
         if allow_old and self._bucket:
             if self._bucket.name == bucket_name:
                 lgr.debug(
