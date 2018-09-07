@@ -338,7 +338,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
-        shutil.rmtree(path, *args, **kwargs)
+        _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
         unlink(path)
@@ -1672,6 +1672,17 @@ def unlink(f):
     return os.unlink(f)
 
 
+@try_multiple_dec
+def _rmtree(*args, **kwargs):
+    """Just a helper to decorate solely shutil.rmtree.
+
+    rmtree defined above does more and ideally should not itself be decorated
+    since a recursive definition and does checks for open files inside etc -
+    might be too runtime expensive
+    """
+    return shutil.rmtree(*args, **kwargs)
+
+
 def slash_join(base, extension):
     """Join two strings with a '/', avoiding duplicate slashes
 
@@ -1962,7 +1973,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
                        path=op.join(path, dirname),
                        overwrite=overwrite)
     # remove original tree
-    shutil.rmtree(full_dirname)
+    rmtree(full_dirname)
 
 
 def create_tree(path, tree, archives_leading_dir=True):
