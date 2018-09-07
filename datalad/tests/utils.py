@@ -192,7 +192,7 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             test_submodules = not ignore_submodules
             ok_(not r.is_dirty(untracked_files=test_untracked,
                                submodules=test_submodules),
-                msg="Repo unexpectly dirty (tested for: untracked({}), submodules({})".format(
+                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
                     test_untracked, test_submodules))
     else:
         repo = r.repo
