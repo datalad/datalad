@@ -898,13 +898,11 @@ def test_inputs_spaces(path):
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
     ds.run(cmd_str, inputs=["*.txt"], outputs=["out0"])
-    ok_file_has_content(opj(path, "out0"), "bar.txt!foo blah.txt!out0",
-                        strip=True)
+    ok_file_has_content(opj(path, "out0"), "bar.txt!foo blah.txt!out0")
     # ... but the list form of a command does not.
     cmd_list = [sys.executable, "-c", cmd, "{inputs}", "{outputs[0]}"]
     ds.run(cmd_list, inputs=["*.txt"], outputs=["out0"])
-    ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0",
-                        strip=True)
+    ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
 
 
 @with_tree(tree={"1.txt": "",
