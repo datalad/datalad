@@ -78,44 +78,43 @@ treeargs = dict(
 @with_tempfile(mkdir=True)
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
-    chpwd(repo_path)
+    with chpwd(repo_path):
+        # create annex repo
+        repo = AnnexRepo(repo_path, create=True, direct=False)
 
-    # create annex repo
-    repo = AnnexRepo(repo_path, create=True, direct=False)
+        # add archive to the repo so we could test
+        with swallow_outputs():
+            repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+        repo.commit("added 1.tar.gz")
 
-    # add archive to the repo so we could test
-    with swallow_outputs():
-        repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-    repo.commit("added 1.tar.gz")
+        # test with excludes and annex options
+        add_archive_content('1.tar.gz',
+                            existing='archive-suffix',
+                            # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
+                            strip_leading_dirs=True,
+                            delete=True,
+                            leading_dirs_consider=['crcns.*', '1'],
+                            leading_dirs_depth=2,
+                            use_current_dir=False,
+                            exclude='.*__MACOSX.*')  # some junk penetrates
 
-    # test with excludes and annex options
-    add_archive_content('1.tar.gz',
-                        existing='archive-suffix',
-                        # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
-                        strip_leading_dirs=True,
-                        delete=True,
-                        leading_dirs_consider=['crcns.*', '1'],
-                        leading_dirs_depth=2,
-                        use_current_dir=False,
-                        exclude='.*__MACOSX.*')  # some junk penetrates
+        if external_versions['cmd:annex'] >= '6.20170208':
+            # should have fixed remotes
+            eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
+                '[%s]' % ARCHIVES_SPECIAL_REMOTE)
 
-    if external_versions['cmd:annex'] >= '6.20170208':
-        # should have fixed remotes
-        eq_(repo.get_description(uuid=DATALAD_SPECIAL_REMOTES_UUIDS[ARCHIVES_SPECIAL_REMOTE]),
-            '[%s]' % ARCHIVES_SPECIAL_REMOTE)
+        all_files = sorted(find_files('.'))
+        target_files = {
+            './CR24A/behaving1/1 f.txt',
+            './CR24C/behaving3/3 f.txt',
+            './CR24D/behaving2/2 f.txt',
+        }
+        eq_(set(all_files), target_files)
 
-    all_files = sorted(find_files('.'))
-    target_files = {
-        './CR24A/behaving1/1 f.txt',
-        './CR24C/behaving3/3 f.txt',
-        './CR24D/behaving2/2 f.txt',
-    }
-    eq_(set(all_files), target_files)
-
-    # regression test: the subdir in MACOSX wasn't excluded and its name was getting stripped by leading_dir_len
-    assert_false(exists('__MACOSX'))  # if stripping and exclude didn't work this fails
-    assert_false(exists('c-1_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
-    assert_false(exists('CR24B'))     # if exclude doesn't work but everything else works this fails
+        # regression test: the subdir in MACOSX wasn't excluded and its name was getting stripped by leading_dir_len
+        assert_false(exists('__MACOSX'))  # if stripping and exclude didn't work this fails
+        assert_false(exists('c-1_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
+        assert_false(exists('CR24B'))     # if exclude doesn't work but everything else works this fails
 
 
 # within top directory
@@ -171,59 +170,58 @@ tree4uargs = dict(
 @with_tempfile(mkdir=True)
 def test_add_archive_content(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
-    orig_pwd = getpwd()
-    chpwd(repo_path)
-    # TODO we need to be able to pass path into add_archive_content
-    # We could mock but I mean for the API
-    assert_raises(RuntimeError, add_archive_content, "nonexisting.tar.gz") # no repo yet
+    with chpwd(repo_path):
+        # TODO we need to be able to pass path into add_archive_content
+        # We could mock but I mean for the API
+        assert_raises(RuntimeError, add_archive_content, "nonexisting.tar.gz") # no repo yet
 
-    repo = AnnexRepo(repo_path, create=True, direct=direct)
-    assert_raises(ValueError, add_archive_content, "nonexisting.tar.gz")
-    # we can't add a file from outside the repo ATM
-    assert_raises(FileNotInRepositoryError, add_archive_content, opj(path_orig, '1.tar.gz'))
+        repo = AnnexRepo(repo_path, create=True, direct=direct)
+        assert_raises(ValueError, add_archive_content, "nonexisting.tar.gz")
+        # we can't add a file from outside the repo ATM
+        assert_raises(FileNotInRepositoryError, add_archive_content, opj(path_orig, '1.tar.gz'))
 
-    # Let's add first archive to the repo so we could test
-    with swallow_outputs():
-        repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-        for s in range(1, 5):
-            repo.add_urls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
-    repo.commit("added 1.tar.gz")
+        # Let's add first archive to the repo so we could test
+        with swallow_outputs():
+            repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+            for s in range(1, 5):
+                repo.add_urls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
+        repo.commit("added 1.tar.gz")
 
-    key_1tar = repo.get_file_key('1.tar.gz')  # will be used in the test later
+        key_1tar = repo.get_file_key('1.tar.gz')  # will be used in the test later
 
-    def d1_basic_checks():
-        ok_(exists('1'))
-        ok_file_under_git('1', '1 f.txt', annexed=True)
-        ok_file_under_git(opj('1', 'd', '1d'), annexed=True)
-        ok_archives_caches(repo_path, 0)
+        def d1_basic_checks():
+            ok_(exists('1'))
+            ok_file_under_git('1', '1 f.txt', annexed=True)
+            ok_file_under_git(opj('1', 'd', '1d'), annexed=True)
+            ok_archives_caches(repo_path, 0)
 
-    # and by default it just does it, everything goes to annex
-    repo_ = add_archive_content('1.tar.gz')
-    eq_(repo.path, repo_.path)
-    d1_basic_checks()
+        # and by default it just does it, everything goes to annex
+        repo_ = add_archive_content('1.tar.gz')
+        eq_(repo.path, repo_.path)
+        d1_basic_checks()
 
-    # If ran again, should proceed just fine since the content is the same so no changes would be made really
-    add_archive_content('1.tar.gz')
+        # If ran again, should proceed just fine since the content is the same so no changes would be made really
+        add_archive_content('1.tar.gz')
 
-    # But that other one carries updated file, so should fail due to overwrite
-    with assert_raises(RuntimeError) as cme:
-        add_archive_content(opj('1u', '1.tar.gz'), use_current_dir=True)
+        # But that other one carries updated file, so should fail due to overwrite
+        with assert_raises(RuntimeError) as cme:
+            add_archive_content(opj('1u', '1.tar.gz'), use_current_dir=True)
 
-    # TODO: somewhat not precise since we have two possible "already exists"
-    # -- in caching and overwrite check
-    assert_in("already exists", str(cme.exception))
-    # but should do fine if overrides are allowed
-    add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite', use_current_dir=True)
-    add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
-    add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
-    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+        # TODO: somewhat not precise since we have two possible "already exists"
+        # -- in caching and overwrite check
+        assert_in("already exists", str(cme.exception))
+        # but should do fine if overrides are allowed
+        add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite', use_current_dir=True)
+        add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+        add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+        add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
 
-    # rudimentary test
-    assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
-                 ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
-    whereis = repo.whereis(glob(opj(repo_path, '1', '1*')))
-    # they all must be the same
-    assert(all([x == whereis[0] for x in whereis[1:]]))
+        # rudimentary test
+        assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
+                     ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
+        whereis = repo.whereis(glob(opj(repo_path, '1', '1*')))
+        # they all must be the same
+        assert(all([x == whereis[0] for x in whereis[1:]]))
 
     # and we should be able to reference it while under subdirectory
     subdir = opj(repo_path, 'subdir')
@@ -233,21 +231,23 @@ def test_add_archive_content(path_orig, url, repo_path):
         # or we could keep relative path and also demand to keep the archive prefix
         # while extracting under original (annex root) dir
         add_archive_content(opj(pardir, '1.tar.gz'), add_archive_leading_dir=True)
-    with chpwd('1'):
+
+    with chpwd(opj(repo_path, '1')):
         d1_basic_checks()
 
-    # test with excludes and renames and annex options
-    add_archive_content(
-        '1.tar.gz', exclude=['d'], rename=['/ /_', '/^1/2'],
-        annex_options="-c annex.largefiles=exclude=*.txt",
-        delete=True)
-    # no conflicts since new name
-    ok_file_under_git('2', '1_f.txt', annexed=False)
-    assert_false(exists(opj('2', 'd')))
-    assert_false(exists('1.tar.gz'))  # delete was in effect
+    with chpwd(repo_path):
+        # test with excludes and renames and annex options
+        add_archive_content(
+            '1.tar.gz', exclude=['d'], rename=['/ /_', '/^1/2'],
+            annex_options="-c annex.largefiles=exclude=*.txt",
+            delete=True)
+        # no conflicts since new name
+        ok_file_under_git('2', '1_f.txt', annexed=False)
+        assert_false(exists(opj('2', 'd')))
+        assert_false(exists('1.tar.gz'))  # delete was in effect
 
     # now test ability to extract within subdir
-    with chpwd('d1', mkdir=True):
+    with chpwd(opj(repo_path, 'd1'), mkdir=True):
         # Let's add first archive to the repo so we could test
         # named the same way but different content
         with swallow_outputs():
@@ -282,7 +282,6 @@ def test_add_archive_content(path_orig, url, repo_path):
     with swallow_outputs():
         clean(dataset=repo.path)
     repo.drop(key_1tar, key=True)  # is available from the URL -- should be kosher
-    chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
@@ -310,23 +309,19 @@ def test_add_archive_content(path_orig, url, repo_path):
 @with_tempfile(mkdir=True)
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     direct = False  # TODO: test on undirect, but too long ATM
-    orig_pwd = getpwd()
-    chpwd(repo_path)
+    with chpwd(repo_path):
+        repo = AnnexRepo(repo_path, create=True, direct=direct)
 
-    repo = AnnexRepo(repo_path, create=True, direct=direct)
+        # Let's add first archive to the repo so we could test
+        with swallow_outputs():
+            repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+        repo.commit("added 1.tar.gz")
 
-    # Let's add first archive to the repo so we could test
-    with swallow_outputs():
-        repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-    repo.commit("added 1.tar.gz")
-
-    add_archive_content('1.tar.gz', strip_leading_dirs=True)
-    ok_(not exists('1'))
-    ok_file_under_git(repo.path, '1 f.txt', annexed=True)
-    ok_file_under_git('d', '1d', annexed=True)
-    ok_archives_caches(repo.path, 0)
-
-    chpwd(orig_pwd)  # just to avoid warnings ;)
+        add_archive_content('1.tar.gz', strip_leading_dirs=True)
+        ok_(not exists('1'))
+        ok_file_under_git(repo.path, '1 f.txt', annexed=True)
+        ok_file_under_git('d', '1d', annexed=True)
+        ok_archives_caches(repo.path, 0)
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
