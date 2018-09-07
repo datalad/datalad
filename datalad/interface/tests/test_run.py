@@ -28,6 +28,7 @@ import sys
 from six.moves import StringIO
 from mock import patch
 
+from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
@@ -61,6 +62,7 @@ from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import OBSCURE_FILENAME
 
 
 @with_tempfile(mkdir=True)
@@ -887,9 +889,10 @@ def test_placeholders(path):
 
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
-@with_tree(tree={"bar.txt": "b",
+@with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
+                 "bar.txt": "b",
                  "foo blah.txt": "f"})
-def test_inputs_spaces(path):
+def test_inputs_quotes_needed(path):
     ds = Dataset(path).create(force=True)
     ds.add(".")
     cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
@@ -897,9 +900,15 @@ def test_inputs_spaces(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.txt"], outputs=["out0"])
-    ok_file_has_content(opj(path, "out0"), "bar.txt!foo blah.txt!out0")
-    # ... but the list form of a command does not.
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    expected = u"!".join(
+        list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
+        ["out0"])
+    with open(op.join(path, "out0")) as ifh:
+        eq_(assure_unicode(ifh.read()), expected)
+    # ... but the list form of a command does not. (Don't test this failure
+    # with the obscure file name because we'd need to know its composition to
+    # predict the failure.)
     cmd_list = [sys.executable, "-c", cmd, "{inputs}", "{outputs[0]}"]
     ds.run(cmd_list, inputs=["*.txt"], outputs=["out0"])
     ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
