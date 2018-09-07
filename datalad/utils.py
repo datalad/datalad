@@ -432,34 +432,6 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
-def unlink(f, ntimes=None, sleep_duration=0.1):
-    """'Robust' unlink.  Would try multiple times
-
-    On windows boxes there is evidence for a latency of more than a second
-    until a file is considered no longer "in-use".
-    WindowsError is not known on Linux, and if IOError or any other exception
-    is thrown then if except statement has WindowsError in it -- NameError
-    also see gh-2533
-    """
-    exceptions = (OSError, WindowsError, PermissionError) \
-        if on_windows else OSError
-    if not ntimes:
-        # Life goes fast on proper systems, no need to delay it much
-        ntimes = 50 if on_windows else 3
-    # Check for open files
-    assert_no_open_files(f)
-    for i in range(ntimes):
-        try:
-            os.unlink(f)
-        except exceptions:
-            if i < ntimes - 1:
-                sleep(sleep_duration)
-                continue
-            else:
-                raise
-        break
-
-
 def file_basename(name, return_ext=False):
     """
     Strips up to 2 extensions of length up to 4 characters and starting with alpha
@@ -1620,6 +1592,7 @@ def get_dataset_pwds(dataset):
     return pwd, rel_pwd
 
 
+# ATM used in datalad_crawler extension, so do not remove yet
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str
@@ -1633,6 +1606,70 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
                         exc_str(exc), trial, t)
             sleep(t)
+
+
+@optional_args
+def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+    """Decorator to try function multiple times.
+
+    Main purpose is to decorate functions dealing with removal of files/directories
+    and which might need a few seconds to work correctly on Windows which takes
+    its time to release files/directories.
+
+    Parameters
+    ----------
+    ntrials: int, optional
+    duration: float, optional
+    increment_type: {None, 'exponential'}
+      Note that if it is exponential, duration should typically be > 1.0
+      so it grows with higher power
+
+    """
+    from .dochelpers import exc_str
+    if not exceptions:
+        exceptions = (OSError, WindowsError, PermissionError) \
+            if on_windows else OSError
+    if not ntrials:
+        # Life goes fast on proper systems, no need to delay it much
+        ntrials = 50 if on_windows else 3
+
+    assert increment_type in {None, 'exponential'}
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        t = duration
+        for trial in range(ntrials):
+            try:
+                return f(*args, **kwargs)
+            except exceptions as exc:
+                if increment_type == 'exponential':
+                    t = duration ** (trial + 1)
+                lgr.log(
+                    5,
+                    "Caught %s on trial #%d. Sleeping %f and retrying",
+                    exc_str(exc), trial, t)
+                if trial < ntrials - 1:
+                    sleep(t)
+                else:
+                    raise
+
+    return wrapped
+
+
+@try_multiple_dec
+def unlink(f):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other
+    exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    # Check for open files
+    assert_no_open_files(f)
+    return os.unlink(f)
 
 
 def slash_join(base, extension):
