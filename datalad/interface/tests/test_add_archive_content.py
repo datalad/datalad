@@ -394,6 +394,7 @@ class TestAddArchiveOptions():
 
     def teardown(self):
         assert_equal(self.pwd, getpwd())
+        self.annex.precommit()  # so we close any outstanding batch process etc
         rmtemp(self.annex.path)
 
     def test_add_delete(self):
