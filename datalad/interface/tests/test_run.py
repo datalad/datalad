@@ -37,6 +37,7 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
+from datalad.api import install
 from datalad.api import run
 from datalad.interface.run import GlobbedPaths
 from datalad.interface.rerun import get_run_info
@@ -657,12 +658,28 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @skip_if_on_windows
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_tree(tree={"test-annex.dat": "content",
+                 "s0": {"s1_0": {"s2": {"a.dat": "a",
+                                        "b.txt": "b"}},
+                        "s1_1": {"s2": {"c.dat": "c",
+                                        "d.txt": "d"}},
+                        "ss": {"e.dat": "e"}}})
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
-def test_run_inputs_outputs(path):
-    ds = Dataset(path)
+def test_run_inputs_outputs(src, path):
+    for subds in [("s0", "s1_0", "s2"),
+                  ("s0", "s1_1", "s2"),
+                  ("s0", "s1_0"),
+                  ("s0", "s1_1"),
+                  ("s0", "ss"),
+                  ("s0",)]:
+        Dataset(op.join(*((src,) + subds))).create(force=True)
+    src_ds = Dataset(src).create(force=True)
+    src_ds.add(".", recursive=True)
 
+    ds = install(path, source=src,
+                 result_xfm='datasets', return_type='item-or-list')
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
     # If we specify test-annex.dat as an input, it will be retrieved before the
@@ -769,6 +786,22 @@ def test_run_inputs_outputs(path):
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
+
+    # We install subdatasets to fully resolve globs.
+    ds.uninstall("s0")
+    assert_false(Dataset(op.join(path, "s0")).is_installed())
+    ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
+    ok_file_has_content(op.join(ds.path, "globbed-subds"),
+                        "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
+                        strip=True)
+
+    ds_ss = Dataset(op.join(path, "s0", "ss"))
+    assert_false(ds_ss.is_installed())
+    ds.run("echo blah >{outputs}", outputs=["s0/ss/out"])
+    ok_(ds_ss.is_installed())
+    ok_file_has_content(op.join(ds.path, "s0", "ss", "out"),
+                        "blah",
+                        strip=True)
 
 
 @ignore_nose_capturing_stdout
@@ -914,6 +947,31 @@ def test_inputs_quotes_needed(path):
     ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
 
 
+def test_globbedpaths_get_sub_patterns():
+    gp = GlobbedPaths([], "doesn't matter")
+    for pat, expected in [
+            # If there are no patterns in the directory component, we get no
+            # sub-patterns.
+            ("", []),
+            ("nodir", []),
+            (op.join("nomagic", "path"), []),
+            (op.join("nomagic", "path*"), []),
+            # Create sub-patterns from leading path, successively dropping the
+            # right-most component.
+            (op.join("s*", "path"), ["s*" + op.sep]),
+            (op.join("s", "ss*", "path"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*", "path*"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*" + op.sep), []),
+            (op.join("s*", "ss", "path*"),
+             [op.join("s*", "ss") + op.sep,
+              "s*" + op.sep]),
+            (op.join("s?", "ss", "sss*", "path*"),
+             [op.join("s?", "ss", "sss*") + op.sep,
+              op.join("s?", "ss") + op.sep,
+              "s?" + op.sep])]:
+        eq_(gp._get_sub_patterns(pat), expected)
+
+
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": ""})
@@ -942,7 +1000,7 @@ def test_globbedpaths(path):
     # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
-    with patch('datalad.interface.run.glob', glob_results.get):
+    with patch('glob.glob', glob_results.get):
         gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
