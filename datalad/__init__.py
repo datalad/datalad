@@ -220,6 +220,8 @@ def teardown_package():
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
+    from datalad.support.cookies import cookies_db
+    cookies_db.close()
     from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 
