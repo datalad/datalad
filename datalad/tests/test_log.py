@@ -92,6 +92,9 @@ def test_mutliple_targets(dst1, dst2):
             lines = f.readlines()
         assert_equal(len(lines), 1, "Read more than a single log line: %s" %  lines)
         ok_(msg in lines[0])
+    # Close all handlers so windows is happy -- apparently not closed fast enough
+    for handler in lgr.handlers:
+        handler.close()
 
 
 def check_filters(name):
