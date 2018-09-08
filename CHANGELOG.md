@@ -9,6 +9,89 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## master (unreleased)
+
+### Fixes
+
+- The `datalad save` instructions shown by `datalad run` for a command
+  with a non-zero exit were incorrectly formatted. (#2692)
+- Decompression of zip files (e.g., through `datalad
+  add-archive-content`) failed on Python 3.  (#2702)
+- On Windows, colored log output was not being processed by colorama.  (#2707)
+- Parsing of combined short options has been broken since DataLad
+  v0.10.0. (#2710)
+- Internal git fetch calls have been updated to work around a
+  GitPython issue.  (#2712, #2794)
+- The progess bar for annex file transferring was unable to handle an
+  empty file.  (#2717)
+- `datalad add-readme` halted when no aggregated metadata was found
+  rather than displaying a warning.  (#2731)
+- `datalad rerun` failed if `--onto` was specified and the history
+  contained no run commits.  (#2761)
+- Processing of a command's results failed on a result record with a
+  missing value (e.g., absent field or subfield in metadata).  Now the
+  missing value is rendered as "N/A".  (#2725).
+- A couple of documentation links in the "Delineation from related
+  solutions" were misformatted.  (#2773)
+- With the latest git-annex, several known V6 failures are no longer
+  an issue.  (#2777)
+- In direct mode, commit changes would often commit annexed content as
+  regular Git files.  A new approach fixes this and resolves a good
+  number of known failures.  (#2770)
+- The reporting of command results failed if the current working
+  directory was removed (e.g., after an unsuccessful `install`). (#2788)
+- When installing into an existing empty directory, `datalad install`
+  removed the directory after a failed clone.  (#2788)
+- `datalad run` incorrectly handled inputs and outputs for paths with
+  spaces and other characters that require shell escaping.  (#2798)
+- Globbing inputs and outputs for `datalad run` didn't work correctly
+  if a subdataset wasn't installed.  (#2796)
+
+### Enhancements and new features
+
+- The documentation on how to format commands for `datalad run` has
+  been improved.  (#2703)
+- The method for determining the current working directory on Windows
+  has been improved.  (#2707)
+- `datalad --version` now simply shows the version without the
+  license.  (#2733)
+- `datalad export-archive` learned to export under an existing
+  directory via its `--filename` option.  (#2723)
+- `datalad export-to-figshare` now generates the zip archive in the
+  root of the dataset unless `--filename` is specified.  (#2723)
+- After importing `datalad.api`, `help(datalad.api)` (or
+  `datalad.api?` in IPython) now shows a summary of the available
+  DataLad commands.  (#2728)
+- Support for using `datalad` from IPython has been improved.  (#2722)
+- `datalad wtf` now returns structured data and reports the version of
+  each extension.  (#2741)
+- Metadata: changes to egrep mode search  (#2735)
+  - Queries in egrep mode are now case-sensitive when the query
+    contains any uppercase letters and are case-insensitive otherwise.
+    The new mode egrepcs can be used to perform a case-sensitive query
+    with all lower-case letters.
+  - Search can now be limited to a specific key.
+  - Multiple queries (list of expressions) are evaluated using AND to
+    determine whether something is a hit.
+  - A single multi-field query (e.g., `pa*:findme`) is a hit, when any
+    matching field matches the query.
+  - All matching key/value combinations across all (multi-field)
+    queries are reported in the query_matched result field.
+  - egrep mode now shows all hits rather than limiting the results to
+    the top 20 hits.
+- The internal handling of gitattributes information has been
+  improved.  A user-visible consequence is that `datalad create
+  --force` no longer duplicates existing attributes.  (#2744)
+- The "annex" metadata extractor can now be used even when no content
+  is present.  (#2724)
+- The `add_url_to_file` method (called by commands like `datalad
+  download-url` and `datalad add-archive-content`) learned how to
+  display a progress bar.  (#2738)
+- Anonymous access is now supported for S3 and other downloaders.  (#2708)
+- A new interface is available to ease setting up new providers.  (#2708)
+- More codepaths now try multiple times when removing a file to deal
+  with latency and locking issues on Windows.  (#2795)
+
 ## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
 Primarily a bugfix release to accommodate recent git-annex release
