@@ -326,7 +326,10 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-
+    # TODO:  yoh thinks that if we could quickly check our Flyweight for
+    #        repos if any of them is under the path, and could call .precommit
+    #        on those to possibly stop batched processes etc, we did not have
+    #        to do it on case by case
     # Check for open files
     assert_no_open_files(path)
 

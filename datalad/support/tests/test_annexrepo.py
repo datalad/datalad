@@ -399,6 +399,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
             eq_(ar.info('nonexistent-batch', batch=True), None)
             eq_(cmo.out, '')
             eq_(cmo.err, '')
+            ar.precommit()  # to stop all the batched processes for swallow_outputs
 
     # annex repo info
     repo_info = ar.repo_info(fast=False)
@@ -1010,6 +1011,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         eq_(len(ar2._batched), 0)
         ar2.add_url_to_file(filename, testurl, batch=True)
         eq_(len(ar2._batched), 1)  # we added one more with batch_size=1
+        ar2.precommit()  # to possibly stop batch process occupying the stdout
     ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
     assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))

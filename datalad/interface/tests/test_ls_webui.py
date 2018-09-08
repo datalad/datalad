@@ -75,7 +75,8 @@ def test_fs_traverse(topdir):
     for recursive in [True, False]:
         # test fs_traverse in display mode
         with swallow_logs(new_level=logging.INFO) as log, swallow_outputs() as cmo:
-            fs = fs_traverse(topdir, AnnexRepo(topdir), recurse_directories=recursive, json='display')
+            repo = AnnexRepo(topdir)
+            fs = fs_traverse(topdir, repo, recurse_directories=recursive, json='display')
             if recursive:
                 # fs_traverse logs should contain all not ignored subdirectories
                 for subdir in [opj(topdir, 'dir'), opj(topdir, 'dir', 'subdir')]:
@@ -89,10 +90,12 @@ def test_fs_traverse(topdir):
             # dir type child's size currently has no metadata file for traverser to pick its size from
             # and would require a recursive traversal w/ write to child metadata file mode
             assert_equal(child['size']['total'], {True: '6 Bytes', False: '0 Bytes'}[recursive])
+            repo.precommit()  # to possibly stop batch process occupying the stdout
 
     for recursive in [True, False]:
         # run fs_traverse in write to json 'file' mode
-        fs = fs_traverse(topdir, AnnexRepo(topdir), recurse_directories=recursive, json='file')
+        repo = AnnexRepo(topdir)
+        fs = fs_traverse(topdir, repo, recurse_directories=recursive, json='file')
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
         # not including git and annex folders
