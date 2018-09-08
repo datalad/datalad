@@ -22,7 +22,6 @@ from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
     with_tempfile
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
-from ...tests.utils import known_failure_direct_mode
 
 
 def test_download_url_exceptions():

@@ -115,9 +115,9 @@ class DownloadURL(Interface):
             return
 
         if dataset:  # A dataset was explicitly given.
-            path = op.join(ds.path, path or op.curdir)
+            path = op.normpath(op.join(ds.path, path or op.curdir))
         elif ds:
-            path = op.join(ds.path, rel_pwd, path or op.curdir)
+            path = op.normpath(op.join(ds.path, rel_pwd, path or op.curdir))
         elif not path:
             path = op.curdir
 
