@@ -78,11 +78,14 @@ def test_proxying_open_testrepobased(repo):
     with AutomagicIO() as aio:
         ok_(isinstance(aio, AutomagicIO))
         ok_(aio.active)
-        with swallow_outputs():
-            # now we should be able just to request to open this file
-            with open(fpath2) as f:
-                content = f.read()
-                eq_(content, TEST_CONTENT)
+        # swallowing output would cause trouble while testing with
+        # DATALAD_ASSERT_NO_OPEN_FILES mode on.  Reason is not 100% clear
+        # on why underlying git-annex process would be dumping to stdout or err
+        #with swallow_outputs():
+        # now we should be able just to request to open this file
+        with open(fpath2) as f:
+            content = f.read()
+            eq_(content, TEST_CONTENT)
 
     annex.drop(fpath2)
     assert_raises(IOError, open, fpath2)
