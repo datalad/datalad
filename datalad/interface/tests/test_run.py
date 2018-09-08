@@ -59,7 +59,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
@@ -78,7 +78,7 @@ def test_invalid_call(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
@@ -152,7 +152,7 @@ def test_basics(path, nodspath):
 
 @slow  # 17.1880s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -241,7 +241,7 @@ def test_rerun_empty_branch(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
@@ -308,7 +308,7 @@ def test_rerun_onto(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_chain(path):
     ds = Dataset(path).create()
@@ -330,7 +330,7 @@ def test_rerun_chain(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_old_flag_compatibility(path):
     ds = Dataset(path).create()
@@ -347,7 +347,7 @@ def test_rerun_old_flag_compatibility(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
@@ -384,7 +384,7 @@ def test_rerun_just_one_commit(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -421,7 +421,7 @@ def test_run_failure(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 def test_rerun_branch(path):
@@ -474,7 +474,7 @@ def test_rerun_branch(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
@@ -493,7 +493,7 @@ def test_rerun_cherry_pick(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
@@ -512,7 +512,7 @@ def test_rerun_outofdate_tree(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
@@ -617,7 +617,7 @@ def test_new_or_modified(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
@@ -657,7 +657,7 @@ def test_rerun_script(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tree(tree={"test-annex.dat": "content",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
@@ -805,7 +805,7 @@ def test_run_inputs_outputs(src, path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).create(no_annex=True)
@@ -817,7 +817,7 @@ def test_run_inputs_no_annex_repo(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -863,7 +863,7 @@ def test_run_explicit(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @known_failure_v6  #FIXME
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
@@ -921,7 +921,7 @@ def test_placeholders(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
