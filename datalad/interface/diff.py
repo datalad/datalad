@@ -166,7 +166,7 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
                 status='impossible',
                 message=e.stderr.strip())
             return
-        raise e
+        raise
 
     ap = None
     for line in stdout.split('\0'):
