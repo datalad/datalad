@@ -446,7 +446,7 @@ class SSHManager(object):
             self._connections[ctrl_path] = c
             return c
 
-    def close(self, allow_fail=True):
+    def close(self, allow_fail=True, ctrl_path=None):
         """Closes all connections, known to this instance.
 
         Parameters
@@ -454,13 +454,19 @@ class SSHManager(object):
         allow_fail: bool, optional
           If True, swallow exceptions which might be thrown during
           connection.close, and just log them at DEBUG level
+        ctrl_path: str or list of str, optional
+          If specified, only the path(s) provided would be considered
         """
         if self._connections:
+            from datalad.utils import assure_list
+            ctrl_paths = assure_list(ctrl_path)
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
-                        exists(self._connections[c].ctrl_path)]
+                        exists(self._connections[c].ctrl_path)
+                        and (not ctrl_paths
+                             or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
                 lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:

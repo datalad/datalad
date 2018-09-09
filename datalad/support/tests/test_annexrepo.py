@@ -1111,7 +1111,6 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
         ok_(not exists(socket_1))
 
     from datalad import lgr
-    lgr.debug("HERE")
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
@@ -1165,7 +1164,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
             pass
 
     ok_(exists(socket_2))
-
+    ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
