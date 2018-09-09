@@ -63,6 +63,9 @@ def test_logging_to_a_file(dst):
         regex += ' RSS/VMS: \S+/\S+( \S+)?\s*'
     regex += "(\s+\S+\s*)? " + msg
     assert_re_in(regex, line, match=True)
+    # Close all handlers so windows is happy -- apparently not closed fast enough
+    for handler in lgr.handlers:
+        handler.close()
 
 
 @with_tempfile
