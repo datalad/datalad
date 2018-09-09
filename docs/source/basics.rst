@@ -22,6 +22,42 @@ A DataLad :term:`dataset` is a Git repository that may or may not have a data
 :term:`annex` that is used to manage data referenced in a dataset. In practice,
 most DataLad datasets will come with an annex.
 
+Types of IDs used in datasets
+-----------------------------
+
+Four types of unique identifiers are used by DataLad to enable identification
+of different aspects of datasets and their components.
+
+Dataset ID
+  A UUID that identifies a dataset as a whole across its entire history and
+  flavors. This ID is stored in a dataset's own configuration file
+  (``<dataset root>/.datalad/config``) under the configuration key
+  ``datalad.dataset.id``.
+  As this configuration is stored in a file that is part of the Git history of
+  a dataset, this ID is identical for all "clones" of a dataset and across all
+  its versions. If the purpose or scope of a dataset changes enough to warrant
+  a new dataset ID, it can be changed by altering the dataset configuration
+  setting.
+Annex ID
+  A UUID assigned to an annex of each individual clone of a dataset repository.
+  Git-annex uses this UUID to track file content availability information. The
+  UUID is available under the configuration key ``annex.uuid`` and is stored
+  in the configuration file of a local clone (``<dataset root>/.git/config``).
+  A single dataset instance (i.e. clone) can only have a single annex UUID,
+  but a dataset with multiple clones will have multiple annex UUIDs.
+Commit ID
+  A Git hexsha or tag that identifies a version of a dataset. This ID uniquely
+  identifies the content and history of a dataset up to its present state. As
+  the dataset history also includes the dataset ID, a commit ID of a DataLad
+  dataset is unique to a particular dataset.
+Content ID
+  Git-annex key (typically a checksum) assigned to the content of a file in
+  a dataset's annex. The checksum reflects the content of a file, not its name.
+  Hence the content of multiple identical files in a single (or across)
+  dataset(s) will have the same checksum. Content IDs are managed by Git-annex
+  in a dedicated ``annex`` branch of the dataset's Git repository.
+
+
 Dataset nesting
 ---------------
 
