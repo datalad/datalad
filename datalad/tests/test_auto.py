@@ -82,6 +82,7 @@ def test_proxying_open_testrepobased(repo):
         # DATALAD_ASSERT_NO_OPEN_FILES mode on.  Reason is not 100% clear
         # on why underlying git-annex process would be dumping to stdout or err
         #with swallow_outputs():
+
         # now we should be able just to request to open this file
         with open(fpath2) as f:
             content = f.read()
