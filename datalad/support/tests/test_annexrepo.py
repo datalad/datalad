@@ -2010,7 +2010,7 @@ def _test_status(ar):
 
     # remove a submodule:
     # rm; git rm; git commit
-    sub.precommit()  # Do precommit so there is not active batched processes etc
+    sub.precommit()  # Do precommit so there are not active batched processes etc
     from datalad.utils import rmtree
     rmtree(opj(ar.path, 'submod'))
     stat['deleted'].append('submod')
