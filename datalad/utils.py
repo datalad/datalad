@@ -1623,6 +1623,7 @@ def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_t
     ----------
     ntrials: int, optional
     duration: float, optional
+      Seconds to sleep before retrying.
     increment_type: {None, 'exponential'}
       Note that if it is exponential, duration should typically be > 1.0
       so it grows with higher power
