@@ -42,7 +42,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -338,7 +338,7 @@ def test_subdataset_save(path):
     ok_clean_git(parent.path, untracked=['untracked'])
 
 
-@skip_if_on_windows  # gh-2536
+@known_failure_windows  # gh-2536
 @with_tempfile(mkdir=True)
 def test_symlinked_relpath(path):
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406

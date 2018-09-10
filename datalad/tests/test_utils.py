@@ -142,7 +142,7 @@ def test_rotree(d):
     # so explicit 'or'
     if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
-        assert_raises(OSError, unlink, f, ntimes=10)  # and even with waiting and trying!
+        assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
         with open(f) as f_:

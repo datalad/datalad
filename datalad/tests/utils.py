@@ -986,6 +986,24 @@ def known_failure_direct_mode(func):
     return func
 
 
+def known_failure_windows(func):
+    """Test decorator marking a test as known to fail on windows
+
+    On Windows behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+    if on_windows:
+
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_windows')
+        @attr('windows')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+    return func
+
 # ### ###
 # END known failure decorators
 # ### ###

@@ -17,7 +17,7 @@ import os.path as op
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
@@ -33,7 +33,7 @@ def test_invalid_call():
     assert_raises(InsufficientArgumentsError, run_procedure)
 
 
-@skip_if_on_windows
+@known_failure_windows
 #@ignore_nose_capturing_stdout
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\

@@ -855,7 +855,7 @@ def test_GitRepo_git_get_branch_commits(src):
     eq_([commits[0].hexsha], commits_hexsha)
     # our unittest is rudimentary ;-)
     eq_(commits_hexsha_left, commits_hexsha)
-
+    repo.precommit()  # to stop all the batched processes for swallow_outputs
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 

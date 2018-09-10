@@ -57,6 +57,10 @@ class CookiesDB(object):
         except Exception as exc:
             lgr.warning("Failed to open cookies DB %s: %s", filename, exc_str(exc))
 
+    def close(self):
+        if self._cookies_db:
+            self._cookies_db.close()
+
     def _get_provider(self, url):
         if self._cookies_db is None:
             self._load()
