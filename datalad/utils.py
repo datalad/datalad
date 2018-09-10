@@ -1677,7 +1677,7 @@ def unlink(f):
 
 @try_multiple_dec
 def _rmtree(*args, **kwargs):
-    """Just a helper to decorate solely shutil.rmtree.
+    """Just a helper to decorate shutil.rmtree.
 
     rmtree defined above does more and ideally should not itself be decorated
     since a recursive definition and does checks for open files inside etc -
