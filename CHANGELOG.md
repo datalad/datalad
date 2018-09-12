@@ -60,6 +60,8 @@ of fixes and enhancements in the past months.
   spaces and other characters that require shell escaping.  ([#2798])
 - Globbing inputs and outputs for `datalad run` didn't work correctly
   if a subdataset wasn't installed.  ([#2796])
+- Minor (in)compatibility with git 2.19 - (no) trailing period
+  in an error message now. ([#2815])
 
 ### Enhancements and new features
 
@@ -827,3 +829,4 @@ publishing
 [#2795]: https://github.com/datalad/datalad/issues/2795
 [#2796]: https://github.com/datalad/datalad/issues/2796
 [#2798]: https://github.com/datalad/datalad/issues/2798
+[#2815]: https://github.com/datalad/datalad/issues/2815
