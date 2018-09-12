@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import collections
 import logging
 from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
@@ -94,6 +95,10 @@ def _listdict2dictlist(lst):
 def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
+
+    - if `consider_ucn` (default) it would copy keys from
+      datalad_unique_content_properties into `meta` for that extractor
+    - ... TODO ...
     """
     if consider_ucn:
         # loop over all metadata sources and the report of their unique values
@@ -107,6 +112,10 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # tailored data
                     continue
                 srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+            if src not in meta and srcmeta:
+                meta[src] = srcmeta  # assign the new one back
+
+    srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
@@ -237,7 +246,10 @@ class _WhooshSearch(_Search):
 
     def show_keys(self, mode):
         if mode != 'name':
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "ATM %s can show only names, so please use show_keys with 'name'"
+                % self.__class__.__name__
+            )
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
 
@@ -296,8 +308,10 @@ class _WhooshSearch(_Search):
             except widx.IndexError as e:
                 # Generic index error.
                 # we try to regenerate
-                # TODO log this
-                pass
+                lgr.warning(
+                    "Cannot open existing index %s (%s), will regenerate",
+                    index_dir, exc_str(e)
+                )
             except widx.IndexVersionError as e:  # (msg, version, release=None)
                 # Raised when you try to open an index using a format that the
                 # current version of Whoosh cannot read. That is, when the index
@@ -310,12 +324,20 @@ class _WhooshSearch(_Search):
                 # Raised when you try to commit changes to an index which is not
                 # the latest generation.
                 # this should not happen here, but if it does ... KABOOM
-                raise e
+                raise
             except widx.EmptyIndexError as e:
                 # Raised when you try to work with an index that has no indexed
                 # terms.
                 # we can just continue with generating an index
                 pass
+            except ValueError as e:
+                if 'unsupported pickle protocol' in str(e):
+                    lgr.warning(
+                        "Cannot open existing index %s (%s), will regenerate",
+                        index_dir, exc_str(e)
+                    )
+                else:
+                    raise
 
         lgr.info('{} search index'.format(
             'Rebuilding' if exists(index_dir) else 'Building'))
@@ -420,6 +442,10 @@ class _WhooshSearch(_Search):
         self.idx_obj = idx_obj
 
     def __call__(self, query, max_nresults=None, force_reindex=False, full_record=False):
+        if max_nresults is None:
+            # mode default
+            max_nresults = 20
+
         with self.idx_obj.searcher() as searcher:
             wquery = self.get_query(query)
 
@@ -614,15 +640,18 @@ class _AutofieldSearch(_WhooshSearch):
         self.parser = parser
 
 
-class _EGrepSearch(_Search):
-    _mode_label = 'egrep'
+class _EGrepCSSearch(_Search):
+    _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
     def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
-        query_re = re.compile(self.get_query(query))
+        if max_nresults is None:
+            # no limit by default
+            max_nresults = 0
+        query = self.get_query(query)
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -638,24 +667,36 @@ class _EGrepSearch(_Search):
             meta = res.get('metadata', {})
             # produce a flattened metadata dict to search through
             doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            doc.update({
+                k: res[k] for k in ('@id', 'type', 'path', 'parentds')
+                if k in res})
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            lgr.log(7, "Querying %s among %d items", query_re, len(doc))
+            lgr.log(7, "Querying %s among %d items", query, len(doc))
             t0 = time()
-            matches = {k: query_re.search(v.lower())
-                       for k, v in iteritems(doc)}
+            matches = {(q['query'] if isinstance(q, dict) else q, k):
+                       q['query'].search(v) if isinstance(q, dict) else q.search(v)
+                       for k, v in iteritems(doc)
+                       for q in query
+                       if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
             # retain what actually matched
-            matches = {k: match.group() for k, match in matches.items() if match}
-            if matches:
+            matched = {k[1]: match.group() for k, match in matches.items() if match}
+            # implement AND behavior across query expressions, but OR behavior
+            # across queries matching multiple fields for a single query expression
+            # for multiple queries, this makes it consistent with a query that
+            # has no field specification
+            if matched and len(query) == len(set(k[0] for k in matches if matches[k])):
                 hit = dict(
                     res,
                     action='search',
-                    query_matched=matches,
+                    query_matched=matched,
                 )
                 yield hit
                 nhits += 1
@@ -692,6 +733,14 @@ class _EGrepSearch(_Search):
                 aps=[dict(path=self.ds.path, type='dataset')],
                 recursive=True):
             meta = res.get('metadata', {})
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            meta.update({
+                k: res.get(k, None) for k in ('@id', 'type', 'path', 'parentds')
+                # parentds is tricky all files will have it, but the dataset
+                # queried above might not (single dataset), let's force it in
+                if k == 'parentds' or k in res})
+
             # no stringification of values for speed
             idxd = _meta2autofield_dict(meta, val2str=False)
 
@@ -703,7 +752,14 @@ class _EGrepSearch(_Search):
                 try:
                     kvals_set = assure_iter(kvals, set)
                 except TypeError:
-                    kvals_set = {'unhashable'}
+                    # TODO: may be do show hashable ones???
+                    nunhashable = sum(
+                        isinstance(x, collections.Hashable) for x in kvals
+                    )
+                    kvals_set = {
+                        'unhashable %d out of %d entries'
+                        % (nunhashable, len(kvals))
+                    }
                 keys[k].uvals |= kvals_set
 
         for k in sorted(keys):
@@ -714,9 +770,10 @@ class _EGrepSearch(_Search):
             # do a bit more
             stat = keys[k]
             uvals = stat.uvals
-            # show only up to X uvals
-            if len(stat.uvals) > 10:
-                uvals = {v for i, v in enumerate(uvals) if i < 10}
+            if mode == 'short':
+                # show only up to X uvals
+                if len(stat.uvals) > 10:
+                    uvals = {v for i, v in enumerate(uvals) if i < 10}
             # all unicode still scares yoh -- he will just use repr
             # def conv(s):
             #     try:
@@ -743,10 +800,42 @@ class _EGrepSearch(_Search):
             ))
 
     def get_query(self, query):
-        # cmdline args might come in as a list
-        if isinstance(query, list):
-            query = u' '.join(query)
-        return query.lower()
+        query = assure_list(query)
+        simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
+        quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
+        query = [
+            simple_fieldspec.match(q) or
+            quoted_fieldspec.match(q) or
+            q
+            for q in query]
+        # expand matches, compile expressions
+        query = [
+            {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
+            for q in query]
+
+        # turn "empty" field specs into simple queries
+        # this is used to forcibly disable field-based search
+        # e.g. when searching for a value
+        query = [q['query'] if isinstance(q, dict) and q['field'].pattern == '' else q
+                 for q in query]
+        return query
+
+    def _xfm_query(self, q):
+        # implement potential transformations of regex before they get compiles
+        return q
+
+
+class _EGrepSearch(_EGrepCSSearch):
+    _mode_label = 'egrep'
+    _default_documenttype = 'datasets'
+
+    def _xfm_query(self, q):
+        if q == q.lower():
+            # we have no upper case symbol in the query, go case-insensitive
+            return '(?i){}'.format(q)
+        else:
+            return q
 
 
 @build_doc
@@ -759,12 +848,15 @@ class Search(Interface):
     they are not available locally.
 
     Ultimately DataLad metadata are a graph of linked data structures. However,
-    this command does not (yet) support queries that can exploit all information
-    stored in the metadata. At the moment three search modes are implemented that
-    represent different trade-offs between the expressiveness of a query and
-    the computational and storage resources required to execute a query.
+    this command does not (yet) support queries that can exploit all
+    information stored in the metadata. At the moment the following search
+    modes are implemented that represent different trade-offs between the
+    expressiveness of a query and the computational and storage resources
+    required to execute a query.
 
     - egrep (default)
+
+    - egrepcs [case-sensitive egrep]
 
     - textblob
 
@@ -774,7 +866,7 @@ class Search(Interface):
     configuration variable 'datalad.search.default-mode'::
 
       [datalad "search"]
-        default-mode = egrep
+        default-mode = egrepcs
 
     Each search mode has its own default configuration for what kind of
     documents to query. The respective default can be changed via configuration
@@ -784,19 +876,34 @@ class Search(Interface):
         index-<mode_name>-documenttype = (all|datasets|files)
 
 
-    *Mode: egrep*
+    *Mode: egrep/egrepcs*
 
-    This search mode is completely ignorant of the metadata structure, and
-    simply performs matching of a search pattern against a flat
-    string-representation of metadata. This mode is advantageous when the
-    query is simple and the metadata structure is irrelevant. Moreover,
-    this mode does not require a search index, hence results can be reported
+    These search modes are largely ignorant of the metadata structure, and
+    simply perform matching of a search pattern against a flat
+    string-representation of metadata. This is advantageous when the query is
+    simple and the metadata structure is irrelevant, or precisely known.
+    Moreover, it does not require a search index, hence results can be reported
     without an initial latency for building a search index when the underlying
-    metadata has changed (e.g. due to a dataset update). By default, this
-    search mode only considers datasets and does not investigate records
-    for individual files for speed reasons.
+    metadata has changed (e.g. due to a dataset update). By default, these
+    search modes only consider datasets and do not investigate records for
+    individual files for speed reasons. Search results are reported in the
+    order in which they were discovered.
 
-    Search results are reported in the order in which they were discovered.
+    Queries can make use of Python regular expression syntax
+    (https://docs.python.org/3/library/re.html). In `egrep` mode, matching is
+    case-insensitive when the query does not contain upper case characters, but
+    is case-sensitive when it does. In `egrepcs` mode, matching is always
+    case-sensitive. Expressions will match anywhere in a metadata string, not
+    only at the start.
+
+    When multiple queries are given, all queries have to match for a search hit
+    (AND behavior).
+
+    It is possible to search individual metadata key/value items by prefixing
+    the query with a metadata key name, separated by a colon (':'). The key
+    name can also be a regular expression to match multiple keys. A query match
+    happens when any value of an item with a matching key name matches the query
+    (OR behavior). See examples for more information.
 
     Examples:
 
@@ -804,22 +911,38 @@ class Search(Interface):
 
         % datalad search haxby
 
-      Queries are case-insensitive and can be regular expressions. The
-      following queries for datasets with (what happens to be) two
-      particular authors::
+      Queries are case-INsensitive when the query contains no upper case characters,
+      and can be regular expressions. Use `egrepcs` mode when it is desired
+      to perform a case-sensitive lowercase match::
 
-        % datalad search halchenko.*haxby
+        % datalad search --mode egrepcs halchenko.*haxby
 
-      However, this search mode performs NO analysis of the metadata content.
-      Therefore queries can easily fail to match. For example, the above
-      query implicitly assumes that authors are listed in alphabetical order.
-      If that is the case (which may or may not be true), the following query
-      would yield NO hits::
+      This search mode performs NO analysis of the metadata content.  Therefore
+      queries can easily fail to match. For example, the above query implicitly
+      assumes that authors are listed in alphabetical order.  If that is the
+      case (which may or may not be true), the following query would yield NO
+      hits::
 
-        % datalad search haxby.*halchenko
+        % datalad search Haxby.*Halchenko
 
       The ``textblob`` search mode represents an alternative that is more
       robust in such cases.
+
+      For more complex queries multiple query expressions can be provided that
+      all have to match to be considered a hit (AND behavior). This query
+      discovers all files (non-default behavior) that match 'bids.type=T1w'
+      AND 'nifti1.qform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.qform_code:scanner
+
+      Key name selectors can also be expressions, which can be used to select
+      multiple keys or construct "fuzzy" queries. In such cases a query matches
+      when any item with a matching key matches the query (OR behavior).
+      However, multiple queries are always evaluated using an AND conjunction.
+      The following query extends the example above to match any files that
+      have either 'nifti1.qform_code=scanner' or 'nifti1.sform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.(q|s)form_code:scanner
 
     *Mode: textblob*
 
@@ -935,9 +1058,10 @@ class Search(Interface):
         max_nresults=Parameter(
             args=("--max-nresults",),
             doc="""maxmimum number of search results to report. Setting this
-            to 0 will report all search matches, and make searching substantially
-            slower on large metadata sets.""",
-            constraints=EnsureInt()),
+            to 0 will report all search matches. Depending on the mode this
+            can search substantially slower. If not specified, a
+            mode-specific default setting will be used.""",
+            constraints=EnsureInt() | EnsureNone()),
         mode=Parameter(
             args=("--mode",),
             choices=('egrep', 'textblob', 'autofield'),
@@ -982,7 +1106,7 @@ class Search(Interface):
     def __call__(query=None,
                  dataset=None,
                  force_reindex=False,
-                 max_nresults=20,
+                 max_nresults=None,
                  mode=None,
                  full_record=False,
                  show_keys=None,
@@ -1006,6 +1130,8 @@ class Search(Interface):
 
         if mode == 'egrep':
             searcher = _EGrepSearch
+        elif mode == 'egrepcs':
+            searcher = _EGrepCSSearch
         elif mode == 'textblob':
             searcher = _BlobSearch
         elif mode == 'autofield':

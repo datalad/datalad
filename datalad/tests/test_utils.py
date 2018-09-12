@@ -60,6 +60,7 @@ from ..utils import disable_logger
 from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
 from ..utils import map_items
+from ..utils import unlink
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -140,14 +141,15 @@ def test_rotree(d):
     # under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
     # so explicit 'or'
     if not (ar.is_crippled_fs() or (os.getuid() == 0)):
-        assert_raises(OSError, os.unlink, f)
+        assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
+        assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
         with open(f) as f_:
             eq_(f_.read(), "LOAD")
     # make it RW
     rotree(d, False)
-    os.unlink(f)
+    unlink(f)
     shutil.rmtree(d)
 
 

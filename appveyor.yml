@@ -7,6 +7,12 @@ environment:
       PYTHON_ARCH: "32"
       MINICONDA: C:\Miniconda35
       DATALAD_TESTS_SSH: 1
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+      DATALAD_TESTS_SSH: 1
+      DATALAD_REPO_VERSION: 6
 
 cache:
   # cache the pip cache

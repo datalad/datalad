@@ -27,9 +27,14 @@ from six import reraise
 
 from .. import cfg
 from ..ui import ui
-from ..utils import auto_repr
+from ..utils import (
+    auto_repr,
+    unlink,
+)
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
+from ..support.exceptions import *
+from ..support.network import RI
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -78,8 +83,8 @@ class BaseDownloader(object):
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
-        if authenticator:
-            if not credential:
+        if authenticator and authenticator.requires_authentication:
+            if not credential and not authenticator.allows_anonymous:
                 msg = "Both authenticator and credentials must be provided." \
                       " Got only authenticator %s" % repr(authenticator)
                 if ui.yesno(
@@ -116,9 +121,11 @@ class BaseDownloader(object):
         """
         # TODO: possibly wrap this logic outside within a decorator, which
         # would just call the corresponding method
-
         authenticator = self.authenticator
-        needs_authentication = authenticator and authenticator.requires_authentication
+        if authenticator:
+            needs_authentication = authenticator.requires_authentication
+        else:
+            needs_authentication = self.credential
 
         attempt, incomplete_attempt = 0, 0
         while True:
@@ -127,6 +134,7 @@ class BaseDownloader(object):
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
                 raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
             exc_info = None
+            supported_auth_types = []
             try:
                 used_old_session = False
                 access_denied = False
@@ -138,9 +146,14 @@ class BaseDownloader(object):
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
-                lgr.debug("Access was denied: %s", exc_str(e))
+                if isinstance(e, AnonymousAccessDeniedError):
+                    access_denied = "Anonymous"
+                else:
+                    access_denied = "Authenticated"
+                lgr.debug("%s access was denied: %s", access_denied, exc_str(e))
+                supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
-                access_denied = True
+
             except IncompleteDownloadError as e:
                 exc_info = sys.exc_info()
                 incomplete_attempt += 1
@@ -153,7 +166,17 @@ class BaseDownloader(object):
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
 
+            msg_types = ''
+            if supported_auth_types:
+                msg_types = " The failure response indicated that following " \
+                            "authentication types should be used: %s" % (', '.join(supported_auth_types))
             if access_denied:  # moved logic outside of except for clarity
+                # TODO: what if it was anonimous attempt without authentication,
+                #     so it is not "requires_authentication" but rather
+                #     "supports_authentication"?  We should not report below in
+                # _get_new_credential that authentication has failed then since there
+                # were no authentication.  We might need a custom exception to
+                # be caught above about that
                 if needs_authentication:
                     # so we knew it needs authentication
                     if used_old_session:
@@ -174,41 +197,108 @@ class BaseDownloader(object):
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            if exc_info:
-                                reraise(*exc_info)
-                            else:
-                                # must not happen but who knows
-                                raise AccessDeniedError(
-                                    "Interface is not interactive and we were denied access."
-                                    " Report to datalad developers")
-                        if ui.yesno(
-                                title="Authentication to access {url} has failed".format(url=url),
-                                text="Do you want to enter other credentials in case they were updated?"):
-                            self.credential.enter_new()
-                            allow_old_session = False
-                            continue
-                        else:
-                            raise DownloadError("Failed to download from %s given available credentials" % url)
+                            reraise(*exc_info)
+                        self._enter_credentials(
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=False)
+                        allow_old_session = False
+                        continue
                 else:  # None or False
                     if needs_authentication is False:
-                        # those urls must or should NOT require authentication but we got denied
-                        raise DownloadError("Failed to download from %s, which must be available without "
-                                            "authentication but access was denied" % url)
+                        # those urls must or should NOT require authentication
+                        # but we got denied
+                        raise DownloadError(
+                            "Failed to download from %s, which must be available"
+                            "without authentication but access was denied. "
+                            "Adjust your configuration for the provider.%s"
+                            % (url, msg_types))
                     else:
+                        # how could be None or any other non-False bool(False)
                         assert(needs_authentication is None)
-                        # So we didn't know if authentication necessary, and it seems to be necessary, so
-                        # Let's ask the user to setup authentication mechanism for this website
-                        raise AccessDeniedError(
-                            "Access to %s was denied but we don't know about this data provider. "
-                            "You would need to configure data provider authentication using TODO " % url)
+                        # So we didn't know if authentication necessary, and it
+                        # seems to be necessary, so Let's ask the user to setup
+                        # authentication mechanism for this website
+                        self._enter_credentials(
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=True)
+                        allow_old_session = False
+                        continue
 
         return result
+
+    def _setup_new_provider(self, title, url, auth_types=None):
+        # Full new provider (TODO move into Providers?)
+        from .providers import Providers
+        providers = Providers.from_config_files()
+        while True:
+            provider = providers.enter_new(url, auth_types=auth_types)
+            if not provider:
+                if ui.yesno(
+                    title="Re-enter provider?",
+                    text="You haven't entered or saved provider, would you like to retry?",
+                    default=True
+                ):
+                    continue
+            break
+        return provider
+
+
+    def _enter_credentials(
+            self, url, denied_msg,
+            auth_types=[], new_provider=True):
+        """Use when authentication fails to set new credentials for url
+
+        Raises
+        ------
+        DownloadError
+          If either no known credentials type, or user refuses to update
+        """
+        title = "{msg} access to {url} has failed.".format(
+            msg=denied_msg, url=url)
+
+        if new_provider:
+            # No credential was known, we need to create an
+            # appropriate one
+            if not ui.yesno(
+                    title=title,
+                    text="Would you like to setup a new provider configuration"
+                         " to access url?",
+                    default=True
+            ):
+                assert not self.authenticator, "bug: incorrect assumption"
+                raise DownloadError(
+                    title +
+                    " No authenticator is known, cannot set any credential")
+            else:
+                provider = self._setup_new_provider(
+                    title, url, auth_types=auth_types)
+                self.authenticator = provider.authenticator
+                self.credential = provider.credential
+                if not (self.credential and self.credential.is_known):
+                    # TODO: or should we ask to re-enter?
+                    self.credential.enter_new()
+        else:
+            action_msg = "enter other credentials in case they were updated?"
+
+            if ui.yesno(
+                    title=title,
+                    text="Do you want to %s" % action_msg):
+                self.credential.enter_new()
+            else:
+                raise DownloadError(
+                    "Failed to download from %s given available credentials"
+                    % url)
 
     @staticmethod
     def _get_temp_download_filename(filepath):
         """Given a filepath, return the one to use as temp file during download
         """
-        # TODO: might better reside somewhere under .datalad/tmp or .git/datalad/tmp
+        # TODO: might better reside somewhere under .datalad/tmp or
+        # .git/datalad/tmp
         return filepath + ".datalad-download-temp"
 
     @abstractmethod
@@ -351,7 +441,7 @@ class BaseDownloader(object):
             if exists(temp_filepath):
                 # clean up
                 lgr.debug("Removing a temporary download %s", temp_filepath)
-                os.unlink(temp_filepath)
+                unlink(temp_filepath)
 
         return filepath
 
@@ -488,7 +578,6 @@ class BaseDownloader(object):
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
         out = self.access(self._fetch, url, **kwargs)
-        # import pdb; pdb.set_trace()
         return out[0]
 
     def get_status(self, url, old_status=None, **kwargs):
@@ -559,11 +648,6 @@ class BaseDownloader(object):
         return self.get_downloader_session(url).url
 
 
-# Exceptions.  might migrate elsewhere
-# MIH: Completely non-obvious why this is here
-from ..support.exceptions import *
-
-
 #
 # Authenticators    XXX might go into authenticators.py
 #
@@ -575,6 +659,7 @@ class Authenticator(object):
     from "provider:" sections
     """
     requires_authentication = True
+    allows_anonymous = False
     # TODO: figure out interface
 
     DEFAULT_CREDENTIAL_TYPE = 'user_password'

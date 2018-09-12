@@ -10,7 +10,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import on_windows
 
 
 import re
@@ -19,7 +19,11 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..main import main, fail_with_short_help
+from ..main import (
+    main,
+    fail_with_short_help,
+    _fix_datalad_ri,
+)
 from datalad import __version__
 from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
@@ -77,8 +81,9 @@ def test_version():
     # https://hg.python.org/cpython/file/default/Doc/whatsnew/3.4.rst#l1952
     out = stdout if sys.version_info >= (3, 4) else stderr
     ok_startswith(out, 'datalad %s\n' % datalad.__version__)
-    in_("Copyright", out)
-    in_("Permission is hereby granted", out)
+    # since https://github.com/datalad/datalad/pull/2733 no license in --version
+    assert_not_in("Copyright", out)
+    assert_not_in("Permission is hereby granted", out)
 
 
 def test_help_np():
@@ -127,6 +132,12 @@ def test_subcmd_usage_on_unknown_args():
     in_('get', stdout)
 
 
+def test_combined_short_option():
+    stdout, stderr = run_main(['-fjson'], exit_code=2, expect_stderr=True)
+    assert_not_in("unrecognized argument", stderr)
+    assert_in("too few arguments", stderr)
+
+
 def check_incorrect_option(opts, err_str):
     # The first line used to be:
     # stdout, stderr = run_main((sys.argv[0],) + opts, expect_stderr=True, exit_code=2)
@@ -160,18 +171,21 @@ def test_incorrect_options():
     yield check_incorrect_option, tuple(), err_insufficient
 
 
-@skip_if_on_windows
 def test_script_shims():
     runner = Runner()
     for script in [
         'datalad',
         'git-annex-remote-datalad-archives',
         'git-annex-remote-datalad']:
-        # those must be available for execution, and should not contain
-        which, _ = runner(['which', script])
-        # test if there is no easy install shim in there
-        with open(which.rstrip()) as f:
-            content = f.read()
+        if not on_windows:
+            # those must be available for execution, and should not contain
+            which, _ = runner(['which', script])
+            # test if there is no easy install shim in there
+            with open(which.rstrip()) as f:
+                content = f.read()
+        else:
+            from distutils.spawn import find_executable
+            content = find_executable(script)
         assert_not_in('EASY', content) # NOTHING easy should be there
         assert_not_in('pkg_resources', content)
 
@@ -197,7 +211,6 @@ def test_cfg_override(path):
         # ensure that this is not a dataset's cfg manager
         assert_not_in('datalad.dataset.id', out)
         # env var
-        from datalad.utils import on_windows
         if on_windows:
             cmd_str = 'set DATALAD_DUMMY=this&& datalad wtf -s some'
         else:
@@ -261,3 +274,13 @@ def test_fail_with_short_help():
                  "        mother\n"
                  "        father\n"
                  "Hint: You can become one\n")
+
+def test_fix_datalad_ri():
+    assert_equal(_fix_datalad_ri('/'), '/')
+    assert_equal(_fix_datalad_ri('/a/b'), '/a/b')
+    assert_equal(_fix_datalad_ri('//'), '///')
+    assert_equal(_fix_datalad_ri('///'), '///')
+    assert_equal(_fix_datalad_ri('//a'), '///a')
+    assert_equal(_fix_datalad_ri('///a'), '///a')
+    assert_equal(_fix_datalad_ri('//a/b'), '///a/b')
+    assert_equal(_fix_datalad_ri('///a/b'), '///a/b')

@@ -275,8 +275,18 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         # For --since='', drop any leading commits that don't have
         # a run command.
         results = list(dropwhile(lambda r: "run_info" not in r, results))
+        if not results:
+            yield get_status_dict(
+                "run", status="impossible", ds=dset,
+                message=("No run commits found in history of %s", revrange))
+            return
     else:
         results = list(results)
+        if not results:
+            yield get_status_dict(
+                "run", status="impossible", ds=dset,
+                message=("No commits found in %s", revrange))
+            return
 
     if onto is not None and onto.strip() == "":
         # Special case: --onto='' is the value of --since. Because we're
@@ -341,12 +351,10 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
 
 def _rerun(dset, results):
     for res in results:
-        if res["status"] == "error":
-            yield res
-            return
-
         rerun_action = res.get("rerun_action")
-        if rerun_action == "skip":
+        if not rerun_action:
+            yield res
+        elif rerun_action == "skip":
             yield res
         elif rerun_action == "checkout":
             if res.get("branch"):
@@ -360,7 +368,7 @@ def _rerun(dset, results):
                 None, ["git", "cherry-pick", res["commit"]],
                 check_fake_dates=True)
             yield res
-        else:
+        elif rerun_action == "run":
             hexsha = res["commit"]
             run_info = res["run_info"]
 

@@ -8,22 +8,26 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
+import os.path as op
+
 from mock import patch
-from tempfile import mkdtemp
 
 from ..providers import Provider
 from ..providers import Providers
 from ..providers import HTTPDownloader
 from ...utils import chpwd
-from ...tests.utils import eq_
+from ...utils import create_tree
 from ...tests.utils import assert_in
+from ...tests.utils import assert_false
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
+from ...tests.utils import ok_exists
+from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
+from ...tests.utils import with_testsui
 
 from ...support.external_versions import external_versions
-from ...interface.common_cfg import dirs
 
 
 def test_Providers_OnStockConfiguration():
@@ -92,6 +96,7 @@ def test_get_downloader_class():
             Provider._get_downloader_class(url)
         assert_in("you need 'requests'", str(cmr.exception))
 
+
 @with_tree(tree={
   'providers': {'atest.cfg':"""\
 [provider:syscrcns]
@@ -146,3 +151,78 @@ def test_Providers_from_config__files(sysdir, userdir, dsdir):
             providers = Providers.from_config_files(reload=True)
             provider = providers.get_provider('https://crcns.org/data....')
             assert_equal(provider.name, 'usercrcns')
+
+
+@with_tempfile(mkdir=True)
+def test_providers_enter_new(path):
+    with patch.multiple("appdirs.AppDirs", site_config_dir=None,
+                        user_config_dir=path):
+        providers_dir = op.join(path, "providers")
+        providers = Providers.from_config_files(reload=True)
+
+        url = "blah://thing"
+        url_re = "blah:\/\/.*"
+        auth_type = "http_auth"
+        creds = "user_password"
+
+        @with_testsui(responses=["foo", url_re, auth_type,
+                                 creds, "no"])
+        def no_save():
+            providers.enter_new(url)
+        no_save()
+        assert_false(op.exists(op.join(providers_dir, "foo.cfg")))
+
+        @with_testsui(responses=["foo", url_re, auth_type,
+                                 creds, "yes"])
+        def save():
+            providers.enter_new(url)
+        save()
+        ok_exists(op.join(providers_dir, "foo.cfg"))
+
+        create_tree(path=providers_dir, tree={"exists.cfg": ""})
+        @with_testsui(responses=["exists", "foobert", url_re,
+                                 auth_type, creds, "yes"])
+        def already_exists():
+            providers.enter_new(url)
+        already_exists()
+        ok_exists(op.join(providers_dir, "foobert.cfg"))
+
+        @with_testsui(responses=["crawdad", "yes"])
+        def known_provider():
+            providers.enter_new(url)
+        known_provider()
+
+        @with_testsui(responses=["foo2", url_re, auth_type,
+                                 creds, "yes"])
+        def auth_types():
+            providers.enter_new(url, auth_types=["http_basic_auth"])
+        auth_types()
+        ok_exists(op.join(providers_dir, "foo2.cfg"))
+
+        @with_testsui(responses=["foo3", "doesn't match", url_re, auth_type,
+                                 creds, "yes"])
+        def nonmatching_url():
+            providers.enter_new(url, auth_types=["http_basic_auth"])
+        nonmatching_url()
+        ok_exists(op.join(providers_dir, "foo3.cfg"))
+
+
+@with_tree(tree={'providers.cfg': """\
+[provider:foo0]
+url_re = https?://foo\.org/.*
+authentication_type = none
+
+[provider:foo1]
+url_re = https?://foo\.org/.*
+authentication_type = none
+"""})
+def test_providers_multiple_matches(path):
+    providers = Providers.from_config_files(
+        files=[op.join(path, "providers.cfg")], reload=True)
+    all_provs = providers.get_provider('https://foo.org/data',
+                                       return_all=True)
+    assert_equal({p.name for p in all_provs}, {'foo0', 'foo1'})
+
+    # When selecting a single one, the later one is given priority.
+    the_chosen_one = providers.get_provider('https://foo.org/data')
+    assert_equal(the_chosen_one.name, "foo1")

@@ -94,7 +94,7 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
@@ -172,7 +172,7 @@ def test_aggregation(path):
     # test search in search tests, not all over the place
     ## query smoke test
     assert_result_count(clone.search('mother', mode='egrep'), 1)
-    assert_result_count(clone.search('MoTHER', mode='egrep'), 1)
+    assert_result_count(clone.search('(?i)MoTHER', mode='egrep'), 1)
 
     child_res = clone.search('child', mode='egrep')
     assert_result_count(child_res, 2)
@@ -231,11 +231,6 @@ def test_get_aggregates_fails(path):
     assert_result_count(res, 1, path=ds.path, status='impossible')
 
 
-# XXX MIH knows of no way to test if the content of a file is NOT
-# available in a local clone that works in direct mode
-# tried whereis() -- no output
-# is_under_annex -- also fails
-@known_failure_direct_mode
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):

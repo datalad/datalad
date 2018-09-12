@@ -163,10 +163,11 @@ class Update(Interface):
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
-            repo.fetch(
+            fetch_kwargs = dict(
                 remote=None if fetch_all else sibling_,
                 all_=fetch_all,
                 prune=True)  # prune to not accumulate a mess over time
+            repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate
             # ds.repo again, as it might have be converted from an GitRepo
             # to an AnnexRepo

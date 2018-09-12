@@ -382,7 +382,6 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_tempfile(mkdir=True)
 @with_tempfile
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -447,7 +446,6 @@ def test_failon_no_permissions(src_path, target_path):
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_replace_and_relative_sshpath(src_path, dst_path):
     # We need to come up with the path relative to our current home directory
     # https://github.com/datalad/datalad/issues/1653

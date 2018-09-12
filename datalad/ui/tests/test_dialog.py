@@ -14,14 +14,20 @@ from six import PY2
 from six.moves import StringIO
 import six.moves.builtins as __builtin__
 
-from mock import patch
+from mock import (
+    call,
+    patch,
+)
 from ...tests.utils import eq_
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_re_in
 from ...tests.utils import assert_in
 from ...tests.utils import ok_startswith
 from ...tests.utils import ok_endswith
-from ..dialog import DialogUI
+from ..dialog import (
+    DialogUI,
+    IPythonUI,
+)
 from datalad.ui.progressbars import progressbars
 
 
@@ -34,6 +40,16 @@ def patch_getpass(**kwargs):
     return patch('getpass.getpass', **kwargs)
 
 
+def test_yesno():
+    for expected_value, defaults in {True: ('yes', True),
+                                     False: ('no', False)}.items():
+        for d in defaults:
+            with patch_getpass(return_value=''):
+                out = StringIO()
+                response = DialogUI(out=out).yesno("?", default=d)
+                eq_(response, expected_value)
+
+
 def test_question_choices():
 
     # TODO: come up with a reusable fixture for testing here
@@ -44,20 +60,26 @@ def test_question_choices():
         'cc': 'a, b, [cc]'
     }
 
-    for default_value in ['a', 'b']:
-        choices_str = choices[default_value]
-        for entered_value, expected_value in [(default_value, default_value),
-                                              ('', default_value),
-                                              ('cc', 'cc')]:
-            with patch_getpass(return_value=entered_value), \
-                patch_getpass(return_value=entered_value):
-                out = StringIO()
-                response = DialogUI(out=out).question("prompt", choices=sorted(choices), default=default_value)
-                eq_(response, expected_value)
-                # getpass doesn't use out -- goes straight to the terminal
-                eq_(out.getvalue(), '')
-                # TODO: may be test that the prompt was passed as a part of the getpass arg
-                #eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
+    for hidden in (True, False):
+        for default_value in ['a', 'b']:
+            choices_str = choices[default_value]
+            for entered_value, expected_value in [(default_value, default_value),
+                                                  ('', default_value),
+                                                  ('cc', 'cc')]:
+                with patch_getpass(return_value=entered_value) as gpcm:
+                    out = StringIO()
+                    response = DialogUI(out=out).question(
+                        "prompt", choices=sorted(choices), default=default_value,
+                        hidden=hidden
+                    )
+                    # .assert_called_once() is not available on older mock's
+                    # e.g. on  1.3.0 on nd16.04
+                    eq_(gpcm.call_count, 1)  # should have asked only once
+                    eq_(response, expected_value)
+                    # getpass doesn't use out -- goes straight to the terminal
+                    eq_(out.getvalue(), '')
+                    # TODO: may be test that the prompt was passed as a part of the getpass arg
+                    #eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
 
     # check some expected exceptions to be thrown
     out = StringIO()
@@ -68,6 +90,17 @@ def test_question_choices():
     with patch_getpass(return_value='incorrect'):
         assert_raises(RuntimeError, ui.question, "prompt", choices=['a', 'b'])
     assert_re_in(".*ERROR: .incorrect. is not among choices.*", out.getvalue())
+
+
+def test_hidden_doubleentry():
+    # In above test due to 'choices' there were no double entry for a hidden
+    out = StringIO()
+    ui = DialogUI(out=out)
+    with patch_getpass(return_value='ab') as gpcm:
+        response = ui.question(
+            "?", hidden=True)
+        eq_(response, 'ab')
+        gpcm.assert_has_calls([call('?: '), call('? (repeat): ')])
 
 
 def _test_progress_bar(backend, len, increment):
@@ -105,3 +138,18 @@ def test_progress_bar():
         for l in 0, 4, 10, 1000:
             for increment in True, False:
                 yield _test_progress_bar, backend, l, increment
+
+
+def test_IPythonUI():
+    # largely just smoke tests to see if nothing is horribly bad
+    with patch_input(return_value='a'):
+        out = StringIO()
+        response = IPythonUI(out=out).question(
+            "prompt", choices=sorted(['b', 'a'])
+        )
+        eq_(response, 'a')
+        eq_(out.getvalue(), 'prompt (choices: a, b): ')
+
+    ui = IPythonUI()
+    pbar = ui.get_progressbar(total=10)
+    assert_in('notebook', str(pbar._tqdm))

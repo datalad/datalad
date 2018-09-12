@@ -12,7 +12,7 @@ __docformat__ = 'restructuredtext'
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-
+from datalad.support import path
 
 @build_doc
 class ExportArchive(Interface):
@@ -37,7 +37,9 @@ class ExportArchive(Interface):
             nargs='?',
             doc="""File name of the generated TAR archive. If no file name is
             given the archive will be generated in the current directory and
-            will be named: datalad_<dataset_uuid>.(tar.*|zip).""",
+            will be named: datalad_<dataset_uuid>.(tar.*|zip). To generate that
+            file in a different directory, provide an existing directory as the
+            file name.""",
             constraints=EnsureStr() | EnsureNone()),
         archivetype=Parameter(
             args=("-t", "--archivetype"),
@@ -74,6 +76,7 @@ class ExportArchive(Interface):
         import zipfile
         from mock import patch
         from os.path import join as opj, dirname, normpath, isabs
+        import os.path as op
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import file_basename
@@ -106,8 +109,11 @@ class ExportArchive(Interface):
                 '.' if compression else '',
                 compression) if archivetype == 'tar' else '')
 
+        default_filename = "datalad_{.id}".format(dataset)
         if filename is None:
-            filename = "datalad_{}".format(dataset.id)
+            filename = default_filename  # in current directory
+        elif path.exists(filename) and path.isdir(filename):
+            filename = path.join(filename, default_filename) # under given directory
         if not filename.endswith(file_extension):
             filename += file_extension
 
@@ -148,10 +154,11 @@ class ExportArchive(Interface):
                             raise IOError('File %s has no content available' % fpath)
 
                     # resolve to possible link target
-                    link_target = os.readlink(fpath)
-                    if not isabs(link_target):
-                        link_target = normpath(opj(dirname(fpath), link_target))
-                    fpath = link_target
+                    if op.islink(fpath):
+                        link_target = os.readlink(fpath)
+                        if not isabs(link_target):
+                            link_target = normpath(opj(dirname(fpath), link_target))
+                        fpath = link_target
                 # name in the archive
                 aname = normpath(opj(leading_dir, rpath))
                 add_method(

@@ -33,7 +33,8 @@ from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import (
-    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes
+    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    unlink,
 )
 from .dochelpers import borrowdoc
 
@@ -94,7 +95,7 @@ def _cleanup_output(stream, std):
         if not stream.closed:
             stream.close()
         if op.exists(stream.name):
-            os.unlink(stream.name)
+            unlink(stream.name)
     elif stream == subprocess.PIPE:
         std.close()
 
@@ -524,8 +525,10 @@ class Runner(object):
                         self._log_err(out[1], expected=expect_stderr)
 
                 if status not in [0, None]:
-                    msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
-                        % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
+                    msg = "Failed to run %r%s. Exit code=%d.%s%s" \
+                        % (cmd, " under %r" % (cwd or self.cwd), status,
+                           "" if log_online else " out=%s" % out[0],
+                           "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
                     raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
@@ -687,7 +690,7 @@ def link_file_load(src, dst, dry_run=False):
     if op.lexists(dst):
         lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
         # TODO: how would it interact with git/git-annex
-        os.unlink(dst)
+        unlink(dst)
     lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
     src_realpath = op.realpath(src)
 

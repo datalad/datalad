@@ -31,7 +31,9 @@ from .locking import lock_if_check_fails
 from ..utils import (
     any_re_search,
     assure_bytes,
+    chpwd,
     rmdir,
+    unlink,
 )
 
 import logging
@@ -146,6 +148,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         if not PY2:
             # should be supplied in PY3 to avoid b''
             outdir = assure_unicode(outdir)
+            archive = assure_unicode(archive)
         patoolib._extract_archive(unixify_path(archive),
                                   outdir=outdir,
                                   verbosity=100)
@@ -200,30 +203,15 @@ def compress_files(files, archive, path=None, overwrite=True):
     overwrite : bool
       Either to allow overwriting the target archive file if one already exists
     """
-
     with swallow_outputs() as cmo:
-        # to test filenames, if path is not None, we should join:
-        if path:
-            opj_path = lambda p: opj(path, p)
-        else:
-            opj_path = lambda p: p
-        if not overwrite:
-            patoolib.util.check_new_filename(opj_path(archive))
-        patoolib.util.check_archive_filelist([opj_path(f) for f in files])
-
-        # ugly but what can you do? ;-) we might wrap it all into a class
-        # at some point. TODO
-        old_cwd = _runner.cwd
-        if path is not None:
-            _runner.cwd = path
-        try:
+        with chpwd(path):
+            if not overwrite:
+                patoolib.util.check_new_filename(archive)
+            patoolib.util.check_archive_filelist(files)
             # Call protected one to avoid the checks on existence on unixified path
             patoolib._create_archive(unixify_path(archive),
                                      [unixify_path(f) for f in files],
                                      verbosity=100)
-        finally:
-            _runner.cwd = old_cwd
-
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
@@ -398,7 +386,7 @@ class ExtractedArchive(object):
                     lgr.debug("Cleaning up the %s for %s under %s", name, self._archive, path)
                     # TODO:  we must be careful here -- to not modify permissions of files
                     #        only of directories
-                    (rmtree if isdir(path) else os.unlink)(path)
+                    (rmtree if isdir(path) else unlink)(path)
 
     @property
     def path(self):

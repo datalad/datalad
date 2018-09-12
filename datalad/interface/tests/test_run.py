@@ -23,9 +23,12 @@ import os.path as op
 from os.path import join as opj
 from os.path import relpath
 from os import mkdir, remove
+import sys
+
 from six.moves import StringIO
 from mock import patch
 
+from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 
 from datalad.distribution.dataset import Dataset
@@ -34,6 +37,7 @@ from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitCommandError, GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
+from datalad.api import install
 from datalad.api import run
 from datalad.interface.run import GlobbedPaths
 from datalad.interface.rerun import get_run_info
@@ -55,10 +59,11 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import OBSCURE_FILENAME
 
 
 @with_tempfile(mkdir=True)
@@ -73,11 +78,12 @@ def test_invalid_call(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
     ds = Dataset(path).create()
+    direct_mode = ds.repo.is_direct_mode()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
     with chpwd(path), \
@@ -102,19 +108,25 @@ def test_basics(path, nodspath):
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
         res = ds.run('touch empty', message='NOOP_TEST')
-        assert_status('notneeded', res)
+        # When in direct mode, check at the level of save rather than add
+        # because the annex files show up as typechanges and adding them won't
+        # necessarily have a "notneeded" status.
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
         res = ds.run(['touch empty'], message='NOOP_TEST')
-        assert_status('notneeded', res)
+        assert_result_count(res, 1, action='save' if direct_mode else 'add',
+                            status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
             swallow_outputs():
         res = ds.run(['touch', 'empty2'], message='TEST')
-        assert_status('ok', res)
-        assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file')
+        assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty2'), type='file',
+                            status='ok')
+        assert_result_count(res, 1, action='save', status='ok')
 
     # running without a command is a noop
     with chpwd(path):
@@ -140,7 +152,7 @@ def test_basics(path, nodspath):
 
 @slow  # 17.1880s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -229,7 +241,7 @@ def test_rerun_empty_branch(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
@@ -237,6 +249,12 @@ def test_rerun_onto(path):
     ds = Dataset(path).create()
 
     grow_file = opj(path, "grows")
+
+    # Make sure we can handle range-specifications that yield no results.
+    for since in ["", "HEAD"]:
+        assert_result_count(
+            ds.rerun("HEAD", onto="", since=since, on_failure="ignore"),
+            1, status="impossible", action="run")
 
     ds.run('echo static-content > static')
     ds.repo.tag("static")
@@ -290,9 +308,8 @@ def test_rerun_onto(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_chain(path):
     ds = Dataset(path).create()
     commits = []
@@ -313,7 +330,7 @@ def test_rerun_chain(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_old_flag_compatibility(path):
     ds = Dataset(path).create()
@@ -330,9 +347,8 @@ def test_rerun_old_flag_compatibility(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
@@ -368,9 +384,8 @@ def test_rerun_just_one_commit(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_run_failure(path):
     ds = Dataset(path).create()
 
@@ -406,7 +421,7 @@ def test_run_failure(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 def test_rerun_branch(path):
@@ -459,8 +474,9 @@ def test_rerun_branch(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
@@ -477,9 +493,8 @@ def test_rerun_cherry_pick(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_outofdate_tree(path):
     ds = Dataset(path).create()
     input_file = opj(path, "foo")
@@ -497,7 +512,7 @@ def test_rerun_outofdate_tree(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
@@ -511,7 +526,6 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
@@ -603,7 +617,7 @@ def test_new_or_modified(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
     ds = Dataset(path).create()
@@ -643,13 +657,29 @@ def test_rerun_script(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
-@with_testrepos('basic_annex', flavors=['clone'])
+@known_failure_windows
+@with_tree(tree={"test-annex.dat": "content",
+                 "s0": {"s1_0": {"s2": {"a.dat": "a",
+                                        "b.txt": "b"}},
+                        "s1_1": {"s2": {"c.dat": "c",
+                                        "d.txt": "d"}},
+                        "ss": {"e.dat": "e"}}})
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
 @known_failure_v6  #FIXME
-def test_run_inputs_outputs(path):
-    ds = Dataset(path)
+def test_run_inputs_outputs(src, path):
+    for subds in [("s0", "s1_0", "s2"),
+                  ("s0", "s1_1", "s2"),
+                  ("s0", "s1_0"),
+                  ("s0", "s1_1"),
+                  ("s0", "ss"),
+                  ("s0",)]:
+        Dataset(op.join(*((src,) + subds))).create(force=True)
+    src_ds = Dataset(src).create(force=True)
+    src_ds.add(".", recursive=True)
 
+    ds = install(path, source=src,
+                 result_xfm='datasets', return_type='item-or-list')
     assert_false(ds.repo.file_has_content("test-annex.dat"))
 
     # If we specify test-annex.dat as an input, it will be retrieved before the
@@ -757,9 +787,25 @@ def test_run_inputs_outputs(path):
     eq_(res["run_info"]['inputs'], ["a.dat"])
     eq_(res["run_info"]['outputs'], ["b.dat"])
 
+    # We install subdatasets to fully resolve globs.
+    ds.uninstall("s0")
+    assert_false(Dataset(op.join(path, "s0")).is_installed())
+    ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
+    ok_file_has_content(op.join(ds.path, "globbed-subds"),
+                        "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
+                        strip=True)
+
+    ds_ss = Dataset(op.join(path, "s0", "ss"))
+    assert_false(ds_ss.is_installed())
+    ds.run("echo blah >{outputs}", outputs=["s0/ss/out"])
+    ok_(ds_ss.is_installed())
+    ok_file_has_content(op.join(ds.path, "s0", "ss", "out"),
+                        "blah",
+                        strip=True)
+
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).create(no_annex=True)
@@ -771,9 +817,8 @@ def test_run_inputs_no_annex_repo(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
-@known_failure_direct_mode  #FIXME
 def test_run_explicit(path):
     ds = Dataset(path)
 
@@ -818,7 +863,7 @@ def test_run_explicit(path):
 
 
 @ignore_nose_capturing_stdout
-@skip_if_on_windows
+@known_failure_windows
 @known_failure_v6  #FIXME
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
@@ -875,6 +920,58 @@ def test_placeholders(path):
     ok_file_has_content(opj(path, "configured-license"), "gpl3", strip=True)
 
 
+@ignore_nose_capturing_stdout
+@known_failure_windows
+@with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
+                 "bar.txt": "b",
+                 "foo blah.txt": "f"})
+def test_inputs_quotes_needed(path):
+    ds = Dataset(path).create(force=True)
+    ds.add(".")
+    cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
+    # The string form of a command works fine when the inputs/outputs have
+    # spaces ...
+    cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
+        sys.executable, cmd)
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    expected = u"!".join(
+        list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
+        ["out0"])
+    with open(op.join(path, "out0")) as ifh:
+        eq_(assure_unicode(ifh.read()), expected)
+    # ... but the list form of a command does not. (Don't test this failure
+    # with the obscure file name because we'd need to know its composition to
+    # predict the failure.)
+    cmd_list = [sys.executable, "-c", cmd, "{inputs}", "{outputs[0]}"]
+    ds.run(cmd_list, inputs=["*.txt"], outputs=["out0"])
+    ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
+
+
+def test_globbedpaths_get_sub_patterns():
+    gp = GlobbedPaths([], "doesn't matter")
+    for pat, expected in [
+            # If there are no patterns in the directory component, we get no
+            # sub-patterns.
+            ("", []),
+            ("nodir", []),
+            (op.join("nomagic", "path"), []),
+            (op.join("nomagic", "path*"), []),
+            # Create sub-patterns from leading path, successively dropping the
+            # right-most component.
+            (op.join("s*", "path"), ["s*" + op.sep]),
+            (op.join("s", "ss*", "path"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*", "path*"), [op.join("s", "ss*") + op.sep]),
+            (op.join("s", "ss*" + op.sep), []),
+            (op.join("s*", "ss", "path*"),
+             [op.join("s*", "ss") + op.sep,
+              "s*" + op.sep]),
+            (op.join("s?", "ss", "sss*", "path*"),
+             [op.join("s?", "ss", "sss*") + op.sep,
+              op.join("s?", "ss") + op.sep,
+              "s?" + op.sep])]:
+        eq_(gp._get_sub_patterns(pat), expected)
+
+
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": ""})
@@ -903,7 +1000,7 @@ def test_globbedpaths(path):
     # We can the glob outputs.
     glob_results = {"z": "z",
                     "a": ["x", "d", "b"]}
-    with patch('datalad.interface.run.glob', glob_results.get):
+    with patch('glob.glob', glob_results.get):
         gp = GlobbedPaths(["z", "a"])
         eq_(gp.expand(), ["z", "b", "d", "x"])
 

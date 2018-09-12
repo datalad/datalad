@@ -18,8 +18,14 @@ lgr = logging.getLogger('datalad.interface.base')
 import sys
 import re
 import textwrap
+from importlib import import_module
 import inspect
-from collections import OrderedDict
+import string
+from collections import (
+    defaultdict,
+    OrderedDict,
+)
+from six import iteritems
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -29,6 +35,8 @@ from datalad.interface.common_opts import eval_defaults
 from datalad.support.constraints import EnsureKeyChoice
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
+from datalad.plugin import _get_plugins
+from datalad.plugin import _load_plugin
 
 
 default_logchannels = {
@@ -58,7 +66,19 @@ def get_cmdline_command_name(intfspec):
     return name
 
 
-def get_interface_groups():
+def get_interface_groups(include_plugins=False):
+    """Return a list of command groups.
+
+    Parameters
+    ----------
+    include_plugins : bool, optional
+        Whether to include a group named 'plugins' that has a list of
+        discovered plugin commands.
+
+    Returns
+    -------
+    A list of tuples with the form (GROUP_NAME, GROUP_DESCRIPTION, COMMANDS).
+    """
     from .. import interface as _interfaces
 
     grps = []
@@ -70,7 +90,92 @@ def get_interface_groups():
         grp_name = _item[7:]
         grp = getattr(_interfaces, _item)
         grps.append((grp_name,) + grp)
+    # TODO(yoh): see if we could retain "generator" for plugins
+    # ATM we need to make it explicit so we could check the command(s) below
+    # It could at least follow the same destiny as extensions so we would
+    # just do more iterative "load ups"
+
+    if include_plugins:
+        grps.append(('plugins', 'Plugins', list(_get_plugins())))
     return grps
+
+
+def get_cmd_summaries(descriptions, groups, width=79):
+    """Return summaries for the commands in `groups`.
+
+    Parameters
+    ----------
+    descriptions : dict
+        A map of group names to summaries.
+    groups : list of tuples
+        A list of groups and commands in the form described by
+        `get_interface_groups`.
+    width : int, optional
+        The maximum width of each line in the summary text.
+
+    Returns
+    -------
+    A list with a formatted entry for each command. The first command of each
+    group is preceded by an entry describing the group.
+    """
+    cmd_summary = []
+    for grp in sorted(groups, key=lambda x: x[1]):
+        grp_descr = grp[1]
+        grp_cmds = descriptions[grp[0]]
+
+        cmd_summary.append('\n*%s*\n' % (grp_descr,))
+        for cd in grp_cmds:
+            cmd_summary.append('  %s\n%s'
+                               % ((cd[0],
+                                   textwrap.fill(
+                                       cd[1].rstrip(' .'),
+                                       width - 5,
+                                       initial_indent=' ' * 6,
+                                       subsequent_indent=' ' * 6))))
+    return cmd_summary
+
+
+def load_interface(spec):
+    """Load and return the class for `spec`.
+
+    Parameters
+    ----------
+    spec : tuple
+        For a standard interface, the first item is the datalad source module
+        and the second object name for the interface. For a plugin, the second
+        item should be a dictionary that maps 'file' to the path the of module.
+
+    Returns
+    -------
+    The interface class or, if importing the module fails, None.
+    """
+    if isinstance(spec[1], dict):
+        intf = _load_plugin(spec[1]['file'], fail=False)
+    else:
+        lgr.log(5, "Importing module %s " % spec[0])
+        try:
+            mod = import_module(spec[0], package='datalad')
+        except Exception as e:
+            lgr.error("Internal error, cannot import interface '%s': %s",
+                      spec[0], exc_str(e))
+            intf = None
+        else:
+            intf = getattr(mod, spec[1])
+    return intf
+
+
+def get_cmd_doc(interface):
+    """Return the documentation for the command defined by `interface`.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_doc = '' if interface.__doc__ is None else interface.__doc__.strip()
+    if hasattr(interface, '_docs_'):
+        # expand docs
+        intf_doc = intf_doc.format(**interface._docs_)
+    return intf_doc
 
 
 def dedent_docstring(text):
@@ -307,6 +412,106 @@ def build_doc(cls, **kwargs):
     return cls
 
 
+NA_STRING = 'N/A'  # we might want to make it configurable via config
+
+
+class nagen(object):
+    """A helper to provide a desired missing value if no value is known
+
+    Usecases
+    - could be used as a generator for `defaultdict`
+    - since it returns itself upon getitem, should work even for complex
+      nested dictionaries/lists .format templates
+    """
+    def __init__(self, missing=NA_STRING):
+        self.missing = missing
+
+    def __repr__(self):
+        cls = self.__class__.__name__
+        args = str(self.missing) if self.missing != NA_STRING else ''
+        return '%s(%s)' % (cls, args)
+
+    def __str__(self):
+        return self.missing
+
+    def __getitem__(self, *args):
+        return self
+
+    def __getattr__(self, item):
+        return self
+
+
+def nadict(*items):
+    """A generator of default dictionary with the default nagen"""
+    dd = defaultdict(nagen)
+    dd.update(*items)
+    return dd
+
+
+class DefaultOutputFormatter(string.Formatter):
+    """A custom formatter for default output rendering using .format
+    """
+    # TODO: make missing configurable?
+    def __init__(self, missing=nagen()):
+        """
+        Parameters
+        ----------
+        missing: string, optional
+          What to output for the missing values
+        """
+        super(DefaultOutputFormatter, self).__init__()
+        self.missing = missing
+
+    def _d(self, msg, *args):
+        # print("   HERE %s" % (msg % args))
+        pass
+
+    def get_value(self, key, args, kwds):
+        assert not args
+        self._d("get_value: %r %r %r", key, args, kwds)
+        return kwds.get(key, self.missing)
+
+    # def get_field(self, field_name, args, kwds):
+    #     assert not args
+    #     self._d("get_field: %r args=%r kwds=%r" % (field_name, args, kwds))
+    #     try:
+    #         out = string.Formatter.get_field(self, field_name, args, kwds)
+    #     except Exception as exc:
+    #         # TODO needs more than just a value
+    #         return "!ERR %s" % exc
+
+
+class DefaultOutputRenderer(object):
+    """A default renderer for .format'ed output line
+    """
+    def __init__(self, format):
+        self.format = format
+        # We still need custom output formatter since at the "first level"
+        # within .format template all items there is no `nadict`
+        self.formatter = DefaultOutputFormatter()
+
+    @classmethod
+    def _dict_to_nadict(cls, v):
+        """Traverse datastructure and replace any regular dict with nadict"""
+        if isinstance(v, list):
+            return [cls._dict_to_nadict(x) for x in v]
+        elif isinstance(v, dict):
+            return nadict((k, cls._dict_to_nadict(x)) for k, x in iteritems(v))
+        else:
+            return v
+
+    def __call__(self, x, **kwargs):
+        dd = nadict(
+            (k, nadict({k_.replace(':', '#'): self._dict_to_nadict(v_)
+                for k_, v_ in v.items()})
+                if isinstance(v, dict) else v)
+            for k, v in x.items()
+        )
+
+        msg = self.formatter.format(self.format, **dd)
+        return ui.message(msg)
+
+
 class Interface(object):
     """Base class for interface implementations"""
 
@@ -404,11 +609,8 @@ class Interface(object):
                 else getattr(cls, 'result_renderer', args.common_output_format)
             if '{' in args.common_output_format:
                 # stupid hack, could and should become more powerful
-                kwargs['result_renderer'] = \
-                    lambda x, **kwargs: ui.message(args.common_output_format.format(
-                        **{k: {k_.replace(':', '#'): v_ for k_, v_ in v.items()}
-                           if isinstance(v, dict) else v
-                           for k, v in x.items()}))
+                kwargs['result_renderer'] = DefaultOutputRenderer(args.common_output_format)
+
             if args.common_on_failure:
                 kwargs['on_failure'] = args.common_on_failure
             # compose filter function from to be invented cmdline options

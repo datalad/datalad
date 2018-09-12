@@ -44,6 +44,7 @@ from datalad.utils import on_windows
 from datalad.utils import chpwd
 from datalad.utils import rmtree
 from datalad.utils import linux_distribution_name
+from datalad.utils import unlink
 
 from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import assert_cwd_unchanged
@@ -94,8 +95,11 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
-from datalad.support.annexrepo import AnnexRepo
-from datalad.support.annexrepo import ProcessAnnexProgressIndicators
+from datalad.support.annexrepo import (
+    AnnexRepo,
+    ProcessAnnexProgressIndicators,
+    _get_size_from_perc_complete,
+)
 from .utils import check_repo_deals_with_inode_change
 
 
@@ -395,6 +399,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
             eq_(ar.info('nonexistent-batch', batch=True), None)
             eq_(cmo.out, '')
             eq_(cmo.err, '')
+            ar.precommit()  # to stop all the batched processes for swallow_outputs
 
     # annex repo info
     repo_info = ar.repo_info(fast=False)
@@ -576,7 +581,7 @@ def test_AnnexRepo_backend_option(path, url):
     ar = AnnexRepo(path, backend='MD5')
 
     # backend recorded in .gitattributes
-    eq_(ar.get_git_attributes()['annex.backend'], 'MD5')
+    eq_(ar.get_gitattributes('.')['.']['annex.backend'], 'MD5')
 
     ar.add('firstfile', backend='SHA1')
     ar.add('secondfile')
@@ -726,7 +731,6 @@ def test_AnnexRepo_commit(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_annex(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -781,7 +785,6 @@ def test_AnnexRepo_add_to_annex(path):
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
-@known_failure_v6  #FIXME
 def test_AnnexRepo_add_to_git(path):
 
     # Note: Some test repos appears to not be initialized.
@@ -956,7 +959,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar.add_url_to_file(testfile, testurl, batch=True)
 
     # Remove it and re-add
-    os.unlink(opj(dst, testfile))
+    unlink(opj(dst, testfile))
     ar.add_url_to_file(testfile, testurl, batch=True)
 
     info = ar.info(testfile)
@@ -1008,6 +1011,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         eq_(len(ar2._batched), 0)
         ar2.add_url_to_file(filename, testurl, batch=True)
         eq_(len(ar2._batched), 1)  # we added one more with batch_size=1
+        ar2.precommit()  # to possibly stop batch process occupying the stdout
     ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
     assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))
@@ -1107,7 +1111,6 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
         ok_(not exists(socket_1))
 
     from datalad import lgr
-    lgr.debug("HERE")
     # remote interaction causes socket to be created:
     try:
         # Note: For some reason, it hangs if log_stdout/err True
@@ -1161,7 +1164,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
             pass
 
     ok_(exists(socket_2))
-
+    ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
@@ -2007,6 +2010,7 @@ def _test_status(ar):
 
     # remove a submodule:
     # rm; git rm; git commit
+    sub.precommit()  # Do precommit so there are not active batched processes etc
     from datalad.utils import rmtree
     rmtree(opj(ar.path, 'submod'))
     stat['deleted'].append('submod')
@@ -2273,3 +2277,33 @@ def test_fake_dates(path):
         eq_(timestamp, commit.committed_date)
     assert_in("timestamp={}s".format(timestamp),
               ar.repo.git.cat_file("blob", "git-annex:uuid.log"))
+
+
+def test_get_size_from_perc_complete():
+    f = _get_size_from_perc_complete
+    eq_(f(0, 0), 0)
+    eq_(f(0, '0'), 0)
+    eq_(f(100, '0'), 0)  # we do not know better
+    eq_(f(1, '1'), 100)
+
+
+# to prevent regression
+# http://git-annex.branchable.com/bugs/v6_-_under_subdir__58___git_add___34__whines__34____44___git_commit___34__blows__34__/
+# It is disabled because is not per se relevant to DataLad since we do not
+# Since we invoke from the top of the repo, we do not hit it,
+# but thought to leave it around if we want to enforce/test system-wide git being
+# compatible with annex for v6 mode
+@with_tempfile(mkdir=True)
+def _test_add_under_subdir(path):
+    ar = AnnexRepo(path, create=True, version=6)
+    gr = GitRepo(path)  # "Git" view over the repository, so we force "git add"
+    subdir = opj(path, 'sub')
+    subfile = opj('sub', 'empty')
+    # os.mkdir(subdir)
+    create_tree(subdir, {'empty': ''})
+    runner = Runner(cwd=subdir)
+    with chpwd(subdir):
+        runner(['git', 'add', 'empty'])  # should add sucesfully
+        # gr.commit('important') #
+        runner(['git', 'commit', '-m', 'important'])
+        ar.is_under_annex(subfile)

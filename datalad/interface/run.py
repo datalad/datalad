@@ -15,10 +15,9 @@ import logging
 import json
 
 from argparse import REMAINDER
-from glob import glob
+import glob
 import os.path as op
 from os.path import join as opj
-from os.path import curdir
 from os.path import normpath
 from os.path import relpath
 from os.path import isabs
@@ -40,6 +39,7 @@ from datalad.support.json_py import dump2stream
 
 from datalad.distribution.add import Add
 from datalad.distribution.get import Get
+from datalad.distribution.install import Install
 from datalad.distribution.remove import Remove
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
@@ -93,6 +93,19 @@ class Run(Interface):
     by a space. The order of the values will match that order from the command
     line, with any globs expanded in alphabetical order (like bash). Individual
     values can be accessed with an integer index (e.g., "{inputs[0]}").
+    << REFLOW ||
+
+    || REFLOW >>
+    Note that the representation of the inputs or outputs in the formatted
+    command string depends on whether the command is given as a list of
+    arguments or as a string[CMD:  (quotes surrounding the command) CMD]. The
+    concatenated list of inputs or outputs will be surrounded by quotes when
+    the command is given as a list but not when it is given as a string. This
+    means that the string form is required if you need to pass each input as a
+    separate argument to a preceding script (i.e., write the command as
+    "./script {inputs}", quotes included). The string form should also be used
+    if the input or output paths contain spaces or other characters that need
+    to be escaped.
     << REFLOW ||
 
     To escape a brace character, double it (i.e., "{{" or "}}").
@@ -232,32 +245,78 @@ class GlobbedPaths(object):
 
         if patterns is None:
             self._maybe_dot = []
-            self._paths = {"patterns": []}
+            self._paths = {"patterns": [], "sub_patterns": {}}
         else:
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
                 "patterns": [relpath(p, start=pwd) if isabs(p) else p
-                             for p in patterns]}
+                             for p in patterns],
+                "sub_patterns": {}}
 
     def __bool__(self):
         return bool(self._maybe_dot or self.expand())
 
     __nonzero__ = __bool__  # py2
 
+    def _get_sub_patterns(self, pattern):
+        """Extract sub-patterns from the leading path of `pattern`.
+
+        The right-most path component is successively peeled off until there
+        are no patterns left.
+        """
+        if pattern in self._paths["sub_patterns"]:
+            return self._paths["sub_patterns"][pattern]
+
+        head, tail = op.split(pattern)
+        if not tail:
+            # Pattern ended with a separator. Take the first directory as the
+            # base.
+            head, tail = op.split(head)
+
+        sub_patterns = []
+        seen_magic = glob.has_magic(tail)
+        while head:
+            new_head, tail = op.split(head)
+            if seen_magic and not glob.has_magic(head):
+                break
+            elif not seen_magic and glob.has_magic(tail):
+                seen_magic = True
+
+            if seen_magic:
+                sub_patterns.append(head + op.sep)
+            head = new_head
+        self._paths["sub_patterns"][pattern] = sub_patterns
+        return sub_patterns
+
     def _expand_globs(self):
+        def normalize_hits(hs):
+            return [relpath(h) + ("" if op.basename(h) else op.sep)
+                    for h in sorted(hs)]
+
         expanded = []
         with chpwd(self.pwd):
             for pattern in self._paths["patterns"]:
-                hits = glob(pattern)
+                hits = glob.glob(pattern)
                 if hits:
-                    expanded.extend([relpath(h) for h in sorted(hits)])
+                    expanded.extend(normalize_hits(hits))
                 else:
                     lgr.debug("No matching files found for '%s'", pattern)
+                    # We didn't find a hit for the complete pattern. If we find
+                    # a sub-pattern hit, that may mean we have an uninstalled
+                    # subdataset.
+                    for sub_pattern in self._get_sub_patterns(pattern):
+                        sub_hits = glob.glob(sub_pattern)
+                        if sub_hits:
+                            expanded.extend(normalize_hits(sub_hits))
+                            break
+                    # ... but we still want to retain the original pattern
+                    # because we don't know for sure at this point, and it
+                    # won't bother the "install, reglob" routine.
                     expanded.extend([pattern])
         return expanded
 
-    def expand(self, full=False, dot=True):
+    def expand(self, full=False, dot=True, refresh=False):
         """Return paths with the globs expanded.
 
         Parameters
@@ -266,12 +325,15 @@ class GlobbedPaths(object):
             Return full paths rather than paths relative to `pwd`.
         dot : bool, optional
             Include the "." pattern if it was specified.
+        refresh : bool, optional
+            Run glob regardless of whether there are cached values. This is
+            useful if there may have been changes on the file system.
         """
         maybe_dot = self._maybe_dot if dot else []
         if not self._paths["patterns"]:
             return maybe_dot + []
 
-        if "expanded" not in self._paths:
+        if refresh or "expanded" not in self._paths:
             paths = self._expand_globs()
             self._paths["expanded"] = paths
         else:
@@ -292,6 +354,34 @@ class GlobbedPaths(object):
         if self._expand:
             return self.expand()
         return self._maybe_dot + self._paths["patterns"]
+
+
+def _install_and_reglob(dset, gpaths):
+    """Install globbed subdatasets and repeat.
+
+    Parameters
+    ----------
+    dset : Dataset
+    gpaths : list of GlobbedPaths objects
+
+    Returns
+    -------
+    Generator with the results of the `install` calls.
+    """
+    def glob_dirs():
+        return list(map(op.dirname, gpaths.expand(refresh=True)))
+
+    dirs, dirs_new = [], glob_dirs()
+    while dirs != dirs_new:
+        for res in dset.install(dirs_new,
+                                result_xfm=None, return_type='generator',
+                                on_failure="ignore"):
+            if res.get("state") == "absent":
+                lgr.debug("Skipping install of non-existent path: %s",
+                          res["path"])
+            else:
+                yield res
+        dirs, dirs_new = dirs_new, glob_dirs()
 
 
 def _unlock_or_remove(dset, paths):
@@ -361,7 +451,7 @@ def format_command(command, **kwds):
         io_val = kwds.pop(name, None)
         if not isinstance(io_val, GlobbedPaths):
             io_val = GlobbedPaths(io_val, pwd=kwds.get("pwd"))
-        kwds[name] = io_val.expand(dot=False)
+        kwds[name] = list(map(shlex_quote, io_val.expand(dot=False)))
     return sfmt.format(command, **kwds)
 
 
@@ -406,7 +496,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
+
     if inputs:
+        for res in _install_and_reglob(ds, inputs):
+            yield res
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
             if res.get("state") == "absent":
                 lgr.warning("Input does not exist: %s", res["path"])
@@ -415,7 +508,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
+
     if outputs:
+        for res in _install_and_reglob(ds, outputs):
+            yield res
         for res in _unlock_or_remove(ds, outputs.expand(full=True)):
             yield res
 
@@ -532,7 +628,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             ofh.write(msg)
         lgr.info("The command had a non-zero exit code. "
                  "If this is expected, you can save the changes with "
-                 "'datalad save -r -F%s .'",
+                 "'datalad save -r -F %s .'",
                  msg_path)
         raise exc
     else:

@@ -63,21 +63,21 @@ def test_wtf(path):
     # smoke test for now
     with swallow_outputs() as cmo:
         wtf(dataset=path)
-        assert_not_in('Dataset information', cmo.out)
-        assert_in('Configuration', cmo.out)
+        assert_not_in('## dataset', cmo.out)
+        assert_in('## configuration', cmo.out)
         # Those sections get sensored out by default now
         assert_not_in('user.name: ', cmo.out)
     with chpwd(path):
         with swallow_outputs() as cmo:
             wtf()
-            assert_not_in('Dataset information', cmo.out)
-            assert_in('Configuration', cmo.out)
+            assert_not_in('## dataset', cmo.out)
+            assert_in('## configuration', cmo.out)
     # now with a dataset
     ds = create(path)
     with swallow_outputs() as cmo:
         wtf(dataset=ds.path)
-        assert_in('Configuration', cmo.out)
-        assert_in('Dataset information', cmo.out)
+        assert_in('## configuration', cmo.out)
+        assert_in('## dataset', cmo.out)
         assert_in('path: {}'.format(ds.path), cmo.out)
 
     # and if we run with all sensitive
@@ -113,11 +113,10 @@ def test_wtf(path):
                 "Pyperclip seems to be not functioning here correctly")
         assert_not_in('user.name', pyperclip.paste())
         assert_in(_HIDDEN, pyperclip.paste())  # by default no sensitive info
-        assert_in("cmd:annex=", pyperclip.paste())  # but the content is there
+        assert_in("cmd:annex:", pyperclip.paste())  # but the content is there
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_no_annex(path):
     ds = create(path)
     ok_clean_git(ds.path)

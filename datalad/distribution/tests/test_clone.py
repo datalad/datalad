@@ -126,7 +126,6 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_clone_simple_local(src, path):
@@ -169,7 +168,6 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -219,7 +217,6 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 
 
 @slow  # 23.1478s
-@known_failure_v6   #FIXME
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose

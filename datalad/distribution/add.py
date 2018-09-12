@@ -257,10 +257,6 @@ class Add(Interface):
             if not ap['path'] in ds_to_annotate_from_recursion:
                 # if it was somehow already discovered
                 to_add.append(ap)
-            # TODO check if next isn't covered by discover_dataset_trace_to_targets already??
-            if dataset and ap.get('type', None) == 'dataset':
-                # duplicates not possible, annotated_paths returns unique paths
-                subds_to_add[ap['path']] = ap
         if got_nothing:
             # path annotation yielded nothing, most likely cause is that nothing
             # was found modified, we need to say something about the reference
@@ -417,7 +413,7 @@ class Add(Interface):
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
             is_annex = isinstance(ds.repo, AnnexRepo)
             add_kw = {'jobs': jobs} if is_annex and jobs else {}
-            added = ds.repo.add(
+            added = ds.repo.add_(
                 list(torepoadd.keys()),
                 git=to_git if is_annex else True,
                 **add_kw

@@ -25,7 +25,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.api import diff
 from datalad.interface.diff import _parse_git_diff
 from datalad.consts import PRE_INIT_COMMIT_SHA
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
@@ -36,7 +36,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 
 
-@skip_if_on_windows
+@known_failure_windows
 def test_magic_number():
     # we hard code the magic SHA1 that represents the state of a Git repo
     # prior to the first commit -- used to diff from scratch to a specific
@@ -49,7 +49,6 @@ def test_magic_number():
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_diff(path, norepo):
     with chpwd(norepo):
         assert_status('impossible', diff(on_failure='ignore'))

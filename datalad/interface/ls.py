@@ -527,6 +527,7 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
     from hashlib import md5
     from boto.s3.key import Key
     from boto.s3.prefix import Prefix
+    from boto.s3.connection import OrdinaryCallingFormat
     from boto.exception import S3ResponseError
     from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
 
@@ -547,7 +548,10 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
         secret_key = config.get('default', 'secret_key')
 
         # TODO: remove duplication -- reuse logic within downloaders/s3.py to get connected
-        conn = boto.connect_s3(access_key, secret_key)
+        kwargs = {}
+        if '.' in bucket_name:
+            kwargs['calling_format']=OrdinaryCallingFormat()
+        conn = boto.connect_s3(access_key, secret_key, **kwargs)
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:
@@ -598,9 +602,11 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
     ]
 
     prefix_all_versions = None
+    got_versioned_list = False
     for acc in ACCESS_METHODS:
         try:
             prefix_all_versions = list(acc(prefix, **kwargs))
+            got_versioned_list = acc is bucket.list_versions
             break
         except Exception as exc:
             lgr.debug("Failed to access via %s: %s", acc, exc_str(exc))
@@ -620,7 +626,9 @@ def _ls_s3(loc, fast=False, recursive=False, all_=False, long_=False,
 
         base_msg = ("%%-%ds %%s" % max_length) % (e.name, e.last_modified)
         if isinstance(e, Key):
-            if not (e.is_latest or all_):
+            if got_versioned_list and not (e.is_latest or all_):
+                lgr.debug(
+                    "Skipping Key since not all versions requested: %s", e)
                 # Skip this one
                 continue
             ui.message(base_msg + " %%%dd" % max_size_length % e.size, cr=' ')

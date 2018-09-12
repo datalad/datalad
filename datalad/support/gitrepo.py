@@ -17,6 +17,7 @@ import re
 import shlex
 import time
 import os
+import os.path as op
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -31,6 +32,7 @@ from os.path import curdir
 from os.path import pardir
 from os.path import sep
 import posixpath
+from functools import wraps
 from weakref import WeakValueDictionary
 
 
@@ -38,6 +40,7 @@ from six import string_types
 from six import add_metaclass
 from functools import wraps
 import git as gitpy
+from gitdb.exc import BadName
 from git.exc import GitCommandError
 from git.exc import NoSuchPathError
 from git.exc import InvalidGitRepositoryError
@@ -73,6 +76,13 @@ _pardirsep = pardir + sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
+_lgr_level = lgr.getEffectiveLevel()
+if _lgr_level <= 2:
+    from ..log import LoggerHelper
+    # Let's also enable gitpy etc debugging
+    gitpy_lgr = LoggerHelper(logtarget="git").get_initialized_logger()
+    gitpy_lgr.setLevel(_lgr_level)
+    gitpy_lgr.propagate = True
 
 # Override default GitPython's DB backend to talk directly to git so it doesn't
 # interfere with possible operations performed by gc/repack
@@ -147,10 +157,10 @@ def _normalize_path(base_dir, path):
 
     Parameters
     ----------
-    path: str
-        path to be normalized
     base_dir: str
         directory to serve as base to normalized, relative paths
+    path: str
+        path to be normalized
 
     Returns
     -------
@@ -409,6 +419,27 @@ def split_remote_branch(branch):
     assert not branch.endswith('/'), \
         "branch name with trailing / is invalid. (%s)" % branch
     return branch.split('/', 1)
+
+
+def guard_BadName(func):
+    """A helper to guard against BadName exception
+
+    Workaround for
+    https://github.com/gitpython-developers/GitPython/issues/768
+    also see https://github.com/datalad/datalad/issues/2550
+    Let's try to precommit (to flush anything flushable) and do
+    it again
+    """
+
+    @wraps(func)
+    def wrapped(repo, *args, **kwargs):
+        try:
+            return func(repo, *args, **kwargs)
+        except BadName:
+            repo.precommit()
+            return func(repo, *args, **kwargs)
+
+    return wrapped
 
 
 @add_metaclass(Flyweight)
@@ -863,8 +894,7 @@ class GitRepo(RepoInterface):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, git=True, git_options=None,
-            _datalad_msg=False, update=False):
+    def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -884,22 +914,37 @@ class GitRepo(RepoInterface):
            files in the entire working tree are updated (old versions of Git
            used to limit the update to the current directory and its
            subdirectories).
-        """
 
+        Returns
+        -------
+        list
+          Of status dicts.
+        """
+        # under all circumstances call this class' add_ (otherwise
+        # AnnexRepo.add would go into a loop
+        return list(GitRepo.add_(self, files, git=git, git_options=git_options,
+                    update=update))
+
+    def add_(self, files, git=True, git_options=None, update=False):
+        """Like `add`, but returns a generator"""
         # TODO: git_options is used as options for the git-add here,
         # instead of options to the git executable => rename for consistency
 
-        # needs to be True - see docstring:
-        # XXX why is this done? this is add() of GitRepo, there is not even a
-        # question
-        assert(git)
+        if not git:
+            lgr.warning(
+                'GitRepo.add() called with git=%s, this should not happen',
+                git)
+            git = True
 
-        files = _remove_empty_items(files)
-        out = []
+        # there is no other way then to collect all files into a list
+        # at this point, because we need to pass them at once to a single
+        # `git add` call
+        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
 
         if not (files or git_options or update):
+            # wondering why just a warning? in cmdline this is also not an error
             lgr.warning("add was called with empty file list and no options.")
-            return out
+            return
 
         try:
             # without --verbose git 2.9.3  add does not return anything
@@ -909,7 +954,8 @@ class GitRepo(RepoInterface):
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
-            out = self._process_git_get_output(*add_out)
+            for o in self._process_git_get_output(*add_out):
+                yield o
             # Note: as opposed to git cmdline, force is True by default in
             #       gitpython, which would lead to add things, that are
             #       ignored or excluded otherwise
@@ -936,7 +982,7 @@ class GitRepo(RepoInterface):
         # currently simulating similar return value, assuming success
         # for all files:
         # TODO: Make return values consistent across both *Repo classes!
-        return out
+        return
 
     @staticmethod
     def _process_git_get_output(stdout, stderr=None):
@@ -1062,7 +1108,7 @@ class GitRepo(RepoInterface):
         return env
 
     def commit(self, msg=None, options=None, _datalad_msg=False, careless=True,
-               files=None, date=None):
+               files=None, date=None, index_file=None):
         """Commit changes to git.
 
         Parameters
@@ -1081,6 +1127,8 @@ class GitRepo(RepoInterface):
           path(s) to commit
         date: str, optional
           Date in one of the formats git understands
+        index_file: str, optional
+          An alternative index to use
         """
 
         self.precommit()
@@ -1125,7 +1173,8 @@ class GitRepo(RepoInterface):
         try:
             self._git_custom_command(files, cmd,
                                      expect_stderr=True, expect_fail=True,
-                                     check_fake_dates=True)
+                                     check_fake_dates=True,
+                                     index_file=index_file)
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
@@ -1140,7 +1189,7 @@ class GitRepo(RepoInterface):
                               "Ignored.".format(self))
                 else:
                     raise
-            elif "did not match any file(s) known to git." in e.stderr:
+            elif "did not match any file(s) known to git" in e.stderr:
                 # TODO: Improve FileNotInXXXXError classes to better deal with
                 # multiple files; Also consider PathOutsideRepositoryError
                 raise FileNotInRepositoryError(cmd=e.cmd,
@@ -1466,7 +1515,7 @@ class GitRepo(RepoInterface):
           options for the git executable as key, value pair
           (see above)
         env: dict
-          environment vaiables to temporarily set for this call
+          environment variables to temporarily set for this call
 
         TODO
         ----
@@ -1531,7 +1580,8 @@ class GitRepo(RepoInterface):
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
-                            check_fake_dates=False):
+                            check_fake_dates=False,
+                            index_file=None):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1567,6 +1617,10 @@ class GitRepo(RepoInterface):
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
+
+        if index_file:
+            env = (env if env is not None else os.environ).copy()
+            env['GIT_INDEX_FILE'] = index_file
 
         try:
             out, err = self.cmd_call_wrapper.run(
@@ -1638,6 +1692,7 @@ class GitRepo(RepoInterface):
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
+    @guard_BadName
     def fetch(self, remote=None, refspec=None, progress=None, all_=False,
               **kwargs):
         """Fetches changes from a remote (or all_ remotes).
@@ -2300,40 +2355,125 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_missing_files(self):
-        """Return a list of paths with missing files (and no staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status').split('\n')
-                if f.split('\t')[0] == 'D']
-
-    def get_deleted_files(self):
-        """Return a list of paths with deleted files (staged deletion)"""
-        return [f.split('\t')[1]
-                for f in self.repo.git.diff('--raw', '--name-status', '--staged').split('\n')
-                if f.split('\t')[0] == 'D']
-
-    def get_git_attributes(self):
-        """Check git attribute for the current repository (not per-file support for now)
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+        """Return files that have changed between the index and working tree.
 
         Parameters
         ----------
-        all_: bool
-          Adds --all to git check-attr call
+        staged: bool, optional
+          Consider changes between HEAD and the index instead of changes
+          between the index and the working tree.
+        diff_filter: str, optional
+          Any value accepted by the `--diff-filter` option of `git diff`.
+          Common ones include "A", "D", "M" for add, deleted, and modified
+          files, respectively.
+        index_file: str, optional
+          Alternative index file for git to use
+        """
+        opts = ['--name-only', '-z']
+        kwargs = {}
+        if staged:
+            opts.append('--staged')
+        if diff_filter:
+            opts.append('--diff-filter=%s' % diff_filter)
+        if index_file:
+            kwargs['env'] = {'GIT_INDEX_FILE': index_file}
+        return [normpath(f)  # Call normpath to convert separators on Windows.
+                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
+
+    def get_missing_files(self):
+        """Return a list of paths with missing files (and no staged deletion)"""
+        return self.get_changed_files(diff_filter='D')
+
+    def get_deleted_files(self):
+        """Return a list of paths with deleted files (staged deletion)"""
+        return self.get_changed_files(staged=True, diff_filter='D')
+
+    def get_git_attributes(self):
+        return self.get_gitattributes('.')['.']
+
+
+    def get_gitattributes(self, path, index_only=False):
+        """Query gitattributes for one or more paths
+
+        Parameters
+        ----------
+        path: path or list
+          Path(s) to query. Paths may be relative or absolute.
+        index_only: bool
+          Flag whether to consider only gitattribute setting that are reflected
+          in the repository index, not just in the work tree content.
 
         Returns
         -------
         dict:
-          attribute: value pairs
+          Each key is a queried path (always relative to the repostiory root),
+          each value is a dictionary with attribute
+          name and value items. Attribute values are either True or False,
+          for set and unset attributes, or are the literal attribute value.
         """
-        out, err = self._git_custom_command(["."], ["git", "check-attr", "--all"])
-        assert not err, "no stderr output is expected"
-        out_split = [
-            # splitting by : would leave leading space(s)
-            [e.lstrip(' ') for e in l.split(':', 2)]
-            for l in out.split('\n') if l
-        ]
-        assert all(o[0] == '.' for o in out_split)  # for paranoid
-        return dict(o[1:] for o in out_split)
+        path = assure_list(path)
+        cmd = ["git", "check-attr", "-z", "--all"]
+        if index_only:
+            cmd.append('--cached')
+        stdout, stderr = self._git_custom_command(path, cmd)
+        # make sure we have one entry for each query path to
+        # simplify work with the result
+        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attr = []
+        for item in stdout.split('\0'):
+            attr.append(item)
+            if len(attr) < 3:
+                continue
+            # we have a full record
+            p, name, value = attr
+            attrs = attributes[p]
+            attrs[name] = \
+                True if value == 'set' else False if value == 'unset' else value
+            # done, reset item
+            attr = []
+        return attributes
+
+    def set_gitattributes(self, attrs, attrfile='.gitattributes'):
+        """Set gitattributes
+
+        Parameters
+        ----------
+        attrs : list
+          Each item is a 2-tuple, where the first element is a path pattern,
+          and the second element is a dictionary with attribute key/value
+          pairs. The attribute dictionary must use the same semantics as those
+          returned by `get_gitattributes()`. Path patterns can use absolute paths,
+          in which case they will be normalized relative to the directory
+          that contains the target .gitattributes file (see `attrfile`).
+        attrfile: path
+          Path relative to the repository root of the .gitattributes file the
+          attributes shall be set in.
+        """
+        git_attributes_file = op.join(self.path, attrfile)
+        attrdir = op.dirname(git_attributes_file)
+        if not op.exists(attrdir):
+            os.makedirs(attrdir)
+        with open(git_attributes_file, 'a') as f:
+            for pattern, attr in sorted(attrs, key=lambda x: x[0]):
+                # normalize the pattern relative to the target .gitattributes file
+                npath = _normalize_path(
+                    op.join(self.path, op.dirname(attrfile)), pattern)
+                attrline = u''
+                if npath.count(' '):
+                    # quote patterns with spaces
+                    attrline += u'"{}"'.format(npath.replace('"', '\\"'))
+                else:
+                    attrline += npath
+                for a in sorted(attr):
+                    val = attr[a]
+                    if val is True:
+                        attrline += ' {}'.format(a)
+                    elif val is False:
+                        attrline += ' -{}'.format(a)
+                    else:
+                        attrline += ' {}={}'.format(a, val)
+                f.write('{}\n'.format(attrline))
 
 
 # TODO

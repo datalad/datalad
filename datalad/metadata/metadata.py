@@ -476,9 +476,12 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
             lgr.warn(
-                '{} files have no content present, skipped metadata extraction for {}'.format(
+                '{} files have no content present, '
+                'some extractors will not operate on {}'.format(
                     nocontent,
-                    'them' if nocontent > 10 else [p for p, c, a in content_info if not c and a]))
+                    'them' if nocontent > 10
+                           else [p for p, c, a in content_info if not c and a])
+            )
 
     # pull out potential metadata field blacklist config settings
     blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
@@ -518,7 +521,9 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 mtype_key)
         try:
             extractor_cls = extractors[mtype_key].load()
-            extractor = extractor_cls(ds, paths=paths)
+            extractor = extractor_cls(
+                ds,
+                paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
         except Exception as e:
             log_progress(
                 lgr.error,
@@ -666,8 +671,17 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # we also want to have each unique value set always come
             # in a top-level list, so we known if some unique value
             # was a list, os opposed to a list of unique values
+
+            def _ensure_serializable(val):
+                if isinstance(val, ReadOnlyDict):
+                    return {k: _ensure_serializable(v) for k, v in iteritems(val)}
+                if isinstance(val, (tuple, list)):
+                    return [_ensure_serializable(v) for v in val]
+                else:
+                    return val
+
             ucp[mtype_key] = {
-                k: [dict(i) if isinstance(i, ReadOnlyDict) else i
+                k: [_ensure_serializable(i)
                     for i in sorted(
                         v,
                         key=_unique_value_key)] if v is not None else None
@@ -758,7 +772,7 @@ class ReadOnlyDict(Mapping):
         if self._hash is None:
             h = 0
             for key, value in iteritems(self._dict):
-                h ^= hash((key, value))
+                h ^= hash((key, _val2hashable(value)))
             self._hash = h
         return self._hash
 

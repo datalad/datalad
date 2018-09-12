@@ -66,6 +66,9 @@ platform_system = platform.system().lower()
 on_windows = platform_system == 'windows'
 on_osx = platform_system == 'darwin'
 on_linux = platform_system == 'linux'
+on_msys_tainted_paths = on_windows \
+                        and 'MSYS_NO_PATHCONV' not in os.environ \
+                        and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
 try:
     linux_distribution_name, linux_distribution_release \
         = platform.linux_distribution()[:2]
@@ -177,6 +180,17 @@ def is_interactive():
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
+
+def get_ipython_shell():
+    """Detect if running within IPython and returns its `ip` (shell) object
+
+    Returns None if not under ipython (no `get_ipython` function)
+    """
+    try:
+        return get_ipython()
+    except NameError:
+        return None
 
 
 def md5sum(filename):
@@ -293,7 +307,7 @@ def rotree(path, ro=True, chmod_files=True):
         chmod(root)
 
 
-def rmtree(path, chmod_files='auto', *args, **kwargs):
+def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
 
     Parameters
@@ -302,6 +316,9 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
+    children_only : bool, optional
+       If set, all files and subdirectories would be removed while the path
+       itself (must be a directory) would be preserved
     `*args` :
     `**kwargs` :
        Passed into shutil.rmtree call
@@ -309,16 +326,25 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-
+    # TODO:  yoh thinks that if we could quickly check our Flyweight for
+    #        repos if any of them is under the path, and could call .precommit
+    #        on those to possibly stop batched processes etc, we did not have
+    #        to do it on case by case
     # Check for open files
     assert_no_open_files(path)
 
+    if children_only:
+        if not os.path.isdir(path):
+            raise ValueError("Can remove children only of directories")
+        for p in os.listdir(path):
+            rmtree(op.join(path, p))
+        return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
-        shutil.rmtree(path, *args, **kwargs)
+        _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
-        os.unlink(path)
+        unlink(path)
 
 
 def rmdir(path, *args, **kwargs):
@@ -404,26 +430,7 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            # on windows boxes there is evidence for a latency of
-            # more than a second until a file is considered no
-            # longer "in-use"
-            # WindowsError is not known on Linux, and if IOError
-            # or any other exception is thrown then if except
-            # statement has WindowsError in it -- NameError
-            # also see gh-2533
-            exceptions = (OSError, WindowsError, PermissionError) if on_windows else OSError
-            # Check for open files
-            assert_no_open_files(f)
-            for i in range(50):
-                try:
-                    os.unlink(f)
-                except exceptions:
-                    if i < 49:
-                        sleep(0.1)
-                        continue
-                    else:
-                        raise
-                break
+            unlink(f)
     else:
         lgr.info("Keeping temp file: %s" % f)
 
@@ -1215,7 +1222,17 @@ def getpwd():
     If no PWD found in the env, output of getcwd() is returned
     """
     try:
-        return os.environ['PWD']
+        pwd = os.environ['PWD']
+        if on_windows and pwd and pwd.startswith('/'):
+            # It should be a path from MSYS.
+            # - it might start with a drive letter or not
+            # - it seems to be "illegal" to have a single letter directories
+            #   under / path, i.e. if created - they aren't found
+            # - 'ln -s' does not fail to create a "symlink" but it just copies!
+            #   so we are not likely to need original PWD purpose on those systems
+            # Verdict:
+            return os.getcwd()
+        return pwd
     except KeyError:
         return os.getcwd()
 
@@ -1578,6 +1595,7 @@ def get_dataset_pwds(dataset):
     return pwd, rel_pwd
 
 
+# ATM used in datalad_crawler extension, so do not remove yet
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str
@@ -1591,6 +1609,82 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
                         exc_str(exc), trial, t)
             sleep(t)
+
+
+@optional_args
+def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+    """Decorator to try function multiple times.
+
+    Main purpose is to decorate functions dealing with removal of files/directories
+    and which might need a few seconds to work correctly on Windows which takes
+    its time to release files/directories.
+
+    Parameters
+    ----------
+    ntrials: int, optional
+    duration: float, optional
+      Seconds to sleep before retrying.
+    increment_type: {None, 'exponential'}
+      Note that if it is exponential, duration should typically be > 1.0
+      so it grows with higher power
+
+    """
+    from .dochelpers import exc_str
+    if not exceptions:
+        exceptions = (OSError, WindowsError, PermissionError) \
+            if on_windows else OSError
+    if not ntrials:
+        # Life goes fast on proper systems, no need to delay it much
+        ntrials = 50 if on_windows else 3
+
+    assert increment_type in {None, 'exponential'}
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        t = duration
+        for trial in range(ntrials):
+            try:
+                return f(*args, **kwargs)
+            except exceptions as exc:
+                if increment_type == 'exponential':
+                    t = duration ** (trial + 1)
+                lgr.log(
+                    5,
+                    "Caught %s on trial #%d. Sleeping %f and retrying",
+                    exc_str(exc), trial, t)
+                if trial < ntrials - 1:
+                    sleep(t)
+                else:
+                    raise
+
+    return wrapped
+
+
+@try_multiple_dec
+def unlink(f):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other
+    exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    # Check for open files
+    assert_no_open_files(f)
+    return os.unlink(f)
+
+
+@try_multiple_dec
+def _rmtree(*args, **kwargs):
+    """Just a helper to decorate shutil.rmtree.
+
+    rmtree defined above does more and ideally should not itself be decorated
+    since a recursive definition and does checks for open files inside etc -
+    might be too runtime expensive
+    """
+    return shutil.rmtree(*args, **kwargs)
 
 
 def slash_join(base, extension):
@@ -1883,7 +1977,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
                        path=op.join(path, dirname),
                        overwrite=overwrite)
     # remove original tree
-    shutil.rmtree(full_dirname)
+    rmtree(full_dirname)
 
 
 def create_tree(path, tree, archives_leading_dir=True):

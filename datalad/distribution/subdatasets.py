@@ -46,6 +46,9 @@ from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import resolve_path
 
+# bound methods
+import datalad.distribution.add
+
 lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 

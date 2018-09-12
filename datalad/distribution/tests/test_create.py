@@ -11,7 +11,7 @@
 
 from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 
 
 import os
@@ -304,7 +304,7 @@ def test_saving_prior(topdir):
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
 
 
-@skip_if_on_windows  # https://github.com/datalad/datalad/issues/2606
+@known_failure_windows  # https://github.com/datalad/datalad/issues/2606
 @with_tempfile(mkdir=True)
 def test_create_withprocedure(path):
     # first without
@@ -323,8 +323,10 @@ def test_create_withprocedure(path):
     eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
 
 
+# Skipping on Windows due to lack of MagicMime support:
+# https://github.com/datalad/datalad/pull/2770#issuecomment-415842284
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_create_text_no_annex(path):
     ds = create(path, text_no_annex=True)
     ok_clean_git(path)

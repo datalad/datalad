@@ -17,7 +17,10 @@ from datalad.tests.utils import known_failure_direct_mode
 import os
 from os.path import pardir
 from os.path import join as opj
-from datalad.utils import chpwd
+from datalad.utils import (
+    chpwd,
+    unlink,
+)
 
 from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
@@ -39,7 +42,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -170,7 +173,7 @@ def test_recursive_save(path):
     subsubds_indexed = subsubds.repo.get_indexed_files()
     assert_not_in('mike1', subsubds_indexed)
     assert_equal(states, [d.repo.get_hexsha() for d in (ds, subds, subsubds)])
-    os.unlink(opj(subsubds.path, 'mike1'))
+    unlink(opj(subsubds.path, 'mike1'))
     ok_clean_git(ds.path)
 
     # modify content in subsub and try saving
@@ -207,7 +210,7 @@ def test_recursive_save(path):
     for old, new in zip(states, newstates):
         assert_equal(old, new)
     assert ds.repo.dirty
-    os.unlink(opj(ds.path, testfname))
+    unlink(opj(ds.path, testfname))
     ok_clean_git(ds.path)
 
     # now let's check saving "upwards"
@@ -335,7 +338,7 @@ def test_subdataset_save(path):
     ok_clean_git(parent.path, untracked=['untracked'])
 
 
-@skip_if_on_windows  # gh-2536
+@known_failure_windows  # gh-2536
 @with_tempfile(mkdir=True)
 def test_symlinked_relpath(path):
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
