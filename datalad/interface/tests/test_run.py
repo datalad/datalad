@@ -666,7 +666,6 @@ def test_rerun_script(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_run_inputs_outputs(src, path):
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),

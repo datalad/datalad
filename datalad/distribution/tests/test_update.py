@@ -41,7 +41,6 @@ from datalad.tests.utils import slow
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src

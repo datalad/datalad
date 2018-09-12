@@ -246,7 +246,6 @@ def test_get_recurse_dirs(o_path, c_path):
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_get_recurse_subdatasets(src, path):
 
     ds = install(
