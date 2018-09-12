@@ -1,17 +1,11 @@
-datalad (0.10.2-3) UNRELEASED; urgency=medium
+datalad (0.10.3-1) unstable; urgency=medium
 
-  *  TODO: fixup for
-     pbuilder-satisfydepends-dummy : Depends: python3-distutils which is a virtual package and is not provided by any available package
-     which happens on 
-     datalad_0.10.2-2~nd12.04+1_amd64.build
-     datalad_0.10.2-2~nd14.04+1_amd64.build
-     datalad_0.10.2-2~nd16.04+1_amd64.build
-     datalad_0.10.2-2~nd17.10+1_amd64.build
-     datalad_0.10.2-2~nd80+1_amd64.build
-     datalad_0.10.2-2~nd90+1_amd64.build
+  * New upstream release
+  * debian/control
+    - make python3-distutils alternative to libpython3-stdlib (<=3.6.4~rc1-2)
+      where it was split out (to ease backporting)
 
-
- -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 02 Aug 2018 18:11:43 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 12 Sep 2018 14:14:31 -0400
 
 datalad (0.10.2-2) unstable; urgency=medium
 
