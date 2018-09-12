@@ -14,58 +14,58 @@ We would recommend to consult log of the
 ### Fixes
 
 - The `datalad save` instructions shown by `datalad run` for a command
-  with a non-zero exit were incorrectly formatted. (#2692)
+  with a non-zero exit were incorrectly formatted. ([#2692])
 - Decompression of zip files (e.g., through `datalad
-  add-archive-content`) failed on Python 3.  (#2702)
-- On Windows, colored log output was not being processed by colorama.  (#2707)
+  add-archive-content`) failed on Python 3.  ([#2702])
+- On Windows, colored log output was not being processed by colorama.  ([#2707])
 - Parsing of combined short options has been broken since DataLad
-  v0.10.0. (#2710)
+  v0.10.0. ([#2710])
 - Internal git fetch calls have been updated to work around a
-  GitPython issue.  (#2712, #2794)
+  GitPython issue.  ([#2712]), ([#2794])
 - The progess bar for annex file transferring was unable to handle an
-  empty file.  (#2717)
+  empty file.  ([#2717])
 - `datalad add-readme` halted when no aggregated metadata was found
-  rather than displaying a warning.  (#2731)
+  rather than displaying a warning.  ([#2731])
 - `datalad rerun` failed if `--onto` was specified and the history
-  contained no run commits.  (#2761)
+  contained no run commits.  ([#2761])
 - Processing of a command's results failed on a result record with a
   missing value (e.g., absent field or subfield in metadata).  Now the
-  missing value is rendered as "N/A".  (#2725).
+  missing value is rendered as "N/A".  ([#2725]).
 - A couple of documentation links in the "Delineation from related
-  solutions" were misformatted.  (#2773)
+  solutions" were misformatted.  ([#2773])
 - With the latest git-annex, several known V6 failures are no longer
-  an issue.  (#2777)
+  an issue.  ([#2777])
 - In direct mode, commit changes would often commit annexed content as
   regular Git files.  A new approach fixes this and resolves a good
-  number of known failures.  (#2770)
+  number of known failures.  ([#2770])
 - The reporting of command results failed if the current working
-  directory was removed (e.g., after an unsuccessful `install`). (#2788)
+  directory was removed (e.g., after an unsuccessful `install`). ([#2788])
 - When installing into an existing empty directory, `datalad install`
-  removed the directory after a failed clone.  (#2788)
+  removed the directory after a failed clone.  ([#2788])
 - `datalad run` incorrectly handled inputs and outputs for paths with
-  spaces and other characters that require shell escaping.  (#2798)
+  spaces and other characters that require shell escaping.  ([#2798])
 - Globbing inputs and outputs for `datalad run` didn't work correctly
-  if a subdataset wasn't installed.  (#2796)
+  if a subdataset wasn't installed.  ([#2796])
 
 ### Enhancements and new features
 
 - The documentation on how to format commands for `datalad run` has
-  been improved.  (#2703)
+  been improved.  ([#2703])
 - The method for determining the current working directory on Windows
-  has been improved.  (#2707)
+  has been improved.  ([#2707])
 - `datalad --version` now simply shows the version without the
-  license.  (#2733)
+  license.  ([#2733])
 - `datalad export-archive` learned to export under an existing
-  directory via its `--filename` option.  (#2723)
+  directory via its `--filename` option.  ([#2723])
 - `datalad export-to-figshare` now generates the zip archive in the
-  root of the dataset unless `--filename` is specified.  (#2723)
+  root of the dataset unless `--filename` is specified.  ([#2723])
 - After importing `datalad.api`, `help(datalad.api)` (or
   `datalad.api?` in IPython) now shows a summary of the available
-  DataLad commands.  (#2728)
-- Support for using `datalad` from IPython has been improved.  (#2722)
+  DataLad commands.  ([#2728])
+- Support for using `datalad` from IPython has been improved.  ([#2722])
 - `datalad wtf` now returns structured data and reports the version of
-  each extension.  (#2741)
-- Metadata: changes to egrep mode search  (#2735)
+  each extension.  ([#2741])
+- Metadata: changes to egrep mode search  ([#2735])
   - Queries in egrep mode are now case-sensitive when the query
     contains any uppercase letters and are case-insensitive otherwise.
     The new mode egrepcs can be used to perform a case-sensitive query
@@ -81,16 +81,16 @@ We would recommend to consult log of the
     the top 20 hits.
 - The internal handling of gitattributes information has been
   improved.  A user-visible consequence is that `datalad create
-  --force` no longer duplicates existing attributes.  (#2744)
+  --force` no longer duplicates existing attributes.  ([#2744])
 - The "annex" metadata extractor can now be used even when no content
-  is present.  (#2724)
+  is present.  ([#2724])
 - The `add_url_to_file` method (called by commands like `datalad
   download-url` and `datalad add-archive-content`) learned how to
-  display a progress bar.  (#2738)
-- Anonymous access is now supported for S3 and other downloaders.  (#2708)
-- A new interface is available to ease setting up new providers.  (#2708)
+  display a progress bar.  ([#2738])
+- Anonymous access is now supported for S3 and other downloaders.  ([#2708])
+- A new interface is available to ease setting up new providers.  ([#2708])
 - More codepaths now try multiple times when removing a file to deal
-  with latency and locking issues on Windows.  (#2795)
+  with latency and locking issues on Windows.  ([#2795])
 
 ## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
@@ -536,7 +536,7 @@ additions which at large should stay consistent with previous behavior
 but provide better functioning.  Lots of code was refactored to provide
 more consistent code-base, and some API breakage has happened.  Further
 work is ongoing to standardize output and results reporting
-(see [PR 1350])
+([#1350])
 
 ### Most notable changes
 
@@ -786,4 +786,31 @@ publishing
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 
-[PR 1350]: https://github.com/datalad/datalad/pull/1350
+[#1350]: https://github.com/datalad/datalad/issues/1350
+[#2692]: https://github.com/datalad/datalad/issues/2692
+[#2702]: https://github.com/datalad/datalad/issues/2702
+[#2703]: https://github.com/datalad/datalad/issues/2703
+[#2707]: https://github.com/datalad/datalad/issues/2707
+[#2708]: https://github.com/datalad/datalad/issues/2708
+[#2710]: https://github.com/datalad/datalad/issues/2710
+[#2717]: https://github.com/datalad/datalad/issues/2717
+[#2722]: https://github.com/datalad/datalad/issues/2722
+[#2723]: https://github.com/datalad/datalad/issues/2723
+[#2724]: https://github.com/datalad/datalad/issues/2724
+[#2725]: https://github.com/datalad/datalad/issues/2725
+[#2728]: https://github.com/datalad/datalad/issues/2728
+[#2731]: https://github.com/datalad/datalad/issues/2731
+[#2733]: https://github.com/datalad/datalad/issues/2733
+[#2735]: https://github.com/datalad/datalad/issues/2735
+[#2738]: https://github.com/datalad/datalad/issues/2738
+[#2741]: https://github.com/datalad/datalad/issues/2741
+[#2744]: https://github.com/datalad/datalad/issues/2744
+[#2761]: https://github.com/datalad/datalad/issues/2761
+[#2770]: https://github.com/datalad/datalad/issues/2770
+[#2773]: https://github.com/datalad/datalad/issues/2773
+[#2777]: https://github.com/datalad/datalad/issues/2777
+[#2788]: https://github.com/datalad/datalad/issues/2788
+[#2794]: https://github.com/datalad/datalad/issues/2794
+[#2795]: https://github.com/datalad/datalad/issues/2795
+[#2796]: https://github.com/datalad/datalad/issues/2796
+[#2798]: https://github.com/datalad/datalad/issues/2798
