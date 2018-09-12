@@ -1189,7 +1189,7 @@ class GitRepo(RepoInterface):
                               "Ignored.".format(self))
                 else:
                     raise
-            elif "did not match any file(s) known to git." in e.stderr:
+            elif "did not match any file(s) known to git" in e.stderr:
                 # TODO: Improve FileNotInXXXXError classes to better deal with
                 # multiple files; Also consider PathOutsideRepositoryError
                 raise FileNotInRepositoryError(cmd=e.cmd,
