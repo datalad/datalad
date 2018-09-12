@@ -9,19 +9,33 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## master (unreleased)
+## 0.10.3 (Sep 13, 2018) -- Almost-perfect
+
+This is largely a bugfix release which addressed many (but not yet all)
+issues of working with git-annex direct and version 6 modes, and operation
+on Windows in general.  Among enhancements you will see the
+support of public S3 buckets (even with periods in their names),
+ability to configure new providers interactively, and improved `egrep`
+search backend.
+
+Although we do not require with this release, it is recommended to make
+sure that you are using a recent `git-annex` since it also had a variety
+of fixes and enhancements in the past months.
 
 ### Fixes
 
+- Parsing of combined short options has been broken since DataLad
+  v0.10.0. ([#2710])
 - The `datalad save` instructions shown by `datalad run` for a command
   with a non-zero exit were incorrectly formatted. ([#2692])
 - Decompression of zip files (e.g., through `datalad
   add-archive-content`) failed on Python 3.  ([#2702])
-- On Windows, colored log output was not being processed by colorama.  ([#2707])
-- Parsing of combined short options has been broken since DataLad
-  v0.10.0. ([#2710])
+- Windows:
+  - colored log output was not being processed by colorama.  ([#2707])
+  - more codepaths now try multiple times when removing a file to deal
+    with latency and locking issues on Windows.  ([#2795])
 - Internal git fetch calls have been updated to work around a
-  GitPython issue.  ([#2712]), ([#2794])
+  GitPython `BadName` issue.  ([#2712]), ([#2794])
 - The progess bar for annex file transferring was unable to handle an
   empty file.  ([#2717])
 - `datalad add-readme` halted when no aggregated metadata was found
@@ -49,6 +63,22 @@ We would recommend to consult log of the
 
 ### Enhancements and new features
 
+- Anonymous access is now supported for S3 and other downloaders.  ([#2708])
+- A new interface is available to ease setting up new providers.  ([#2708])
+- Metadata: changes to egrep mode search  ([#2735])
+  - Queries in egrep mode are now case-sensitive when the query
+    contains any uppercase letters and are case-insensitive otherwise.
+    The new mode egrepcs can be used to perform a case-sensitive query
+    with all lower-case letters.
+  - Search can now be limited to a specific key.
+  - Multiple queries (list of expressions) are evaluated using AND to
+    determine whether something is a hit.
+  - A single multi-field query (e.g., `pa*:findme`) is a hit, when any
+    matching field matches the query.
+  - All matching key/value combinations across all (multi-field)
+    queries are reported in the query_matched result field.
+  - egrep mode now shows all hits rather than limiting the results to
+    the top 20 hits.
 - The documentation on how to format commands for `datalad run` has
   been improved.  ([#2703])
 - The method for determining the current working directory on Windows
@@ -65,20 +95,6 @@ We would recommend to consult log of the
 - Support for using `datalad` from IPython has been improved.  ([#2722])
 - `datalad wtf` now returns structured data and reports the version of
   each extension.  ([#2741])
-- Metadata: changes to egrep mode search  ([#2735])
-  - Queries in egrep mode are now case-sensitive when the query
-    contains any uppercase letters and are case-insensitive otherwise.
-    The new mode egrepcs can be used to perform a case-sensitive query
-    with all lower-case letters.
-  - Search can now be limited to a specific key.
-  - Multiple queries (list of expressions) are evaluated using AND to
-    determine whether something is a hit.
-  - A single multi-field query (e.g., `pa*:findme`) is a hit, when any
-    matching field matches the query.
-  - All matching key/value combinations across all (multi-field)
-    queries are reported in the query_matched result field.
-  - egrep mode now shows all hits rather than limiting the results to
-    the top 20 hits.
 - The internal handling of gitattributes information has been
   improved.  A user-visible consequence is that `datalad create
   --force` no longer duplicates existing attributes.  ([#2744])
@@ -87,10 +103,7 @@ We would recommend to consult log of the
 - The `add_url_to_file` method (called by commands like `datalad
   download-url` and `datalad add-archive-content`) learned how to
   display a progress bar.  ([#2738])
-- Anonymous access is now supported for S3 and other downloaders.  ([#2708])
-- A new interface is available to ease setting up new providers.  ([#2708])
-- More codepaths now try multiple times when removing a file to deal
-  with latency and locking issues on Windows.  ([#2795])
+
 
 ## 0.10.2 (Jul 09, 2018) -- Thesecuriestever
 
