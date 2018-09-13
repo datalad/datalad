@@ -10,7 +10,6 @@
 """
 
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 
 from os import curdir
