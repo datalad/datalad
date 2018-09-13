@@ -77,7 +77,7 @@ Build-Depends:
  python3-wrapt,
 Standards-Version: 4.1.4
 Homepage: http://datalad.org
-Vcs-Git: git://github.com/datalad/datalad -b debian
+Vcs-Git: https://github.com/datalad/datalad -b debian
 Vcs-Browser: https://github.com/datalad/datalad/
 
 Package: datalad
