@@ -9,6 +9,11 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
+
+Emergency bugfix to address forgotten boost of version in
+`datalad/version.py`.
+
 ## 0.10.3 (Sep 13, 2018) -- Almost-perfect
 
 This is largely a bugfix release which addressed many (but not yet all)
