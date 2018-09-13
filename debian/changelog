@@ -1,8 +1,12 @@
-datalad (0.10.3-2) UNRELEASED; urgency=medium
+datalad (0.10.3.1-1) unstable; urgency=medium
 
+  [ Jelmer Vernooĳ ]
   * Use secure URI in Vcs control header.
 
- -- Jelmer Vernooĳ <jelmer@debian.org>  Thu, 13 Sep 2018 16:24:27 +0100
+  [ Yaroslav Halchenko ]
+  * Emergency upstream bugfix release with correct version assigned
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 13 Sep 2018 12:17:18 -0400
 
 datalad (0.10.3-1) unstable; urgency=medium
 
