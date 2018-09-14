@@ -14,10 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from datalad.tests.utils import (
-    known_failure_direct_mode,
-    known_failure_v6,
-)
+from datalad.tests.utils import known_failure_direct_mode
 
 import os.path as op
 from os.path import join as opj
@@ -244,7 +241,6 @@ def test_rerun_empty_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_rerun_onto(path):
     ds = Dataset(path).create()
 
@@ -349,7 +345,6 @@ def test_rerun_old_flag_compatibility(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
 
@@ -477,7 +472,6 @@ def test_rerun_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
 
@@ -514,7 +508,6 @@ def test_rerun_outofdate_tree(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
@@ -526,7 +519,6 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_v6  #FIXME
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -666,7 +658,6 @@ def test_rerun_script(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_run_inputs_outputs(src, path):
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
@@ -864,7 +855,6 @@ def test_run_explicit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@known_failure_v6  #FIXME
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):

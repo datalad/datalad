@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import known_failure_windows
 
@@ -235,7 +234,6 @@ def test_create_subdataset_hierarchy_from_top(path):
 
 @with_tempfile
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_nested_create(path):
     # to document some more organic usage pattern
     ds = Dataset(path).create()
@@ -271,7 +269,9 @@ def test_nested_create(path):
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself
-    assert_status('notneeded', ds.save())
+    assert_status(
+        'ok' if ds.repo.config.getint("annex", "version") == 6 else 'notneeded',
+        ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_in_results(

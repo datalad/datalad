@@ -12,9 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_v6
-
-
 import logging
 import os
 from os import unlink

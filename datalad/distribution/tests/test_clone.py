@@ -11,7 +11,6 @@
 
 
 from datalad.tests.utils import (
-    known_failure_v6,
     get_datasets_topdir,
     integration,
     slow
