@@ -778,10 +778,10 @@ class GitRepo(RepoInterface):
         # (internal `git cat-file --batch` by GitPython)
         try:
             if hasattr(self, 'repo') and exists(self.path) \
-                    and self.repo is not None:
+                    and self._repo is not None:
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
-                self.repo.git.clear_cache()
+                self._repo.git.clear_cache()
                 # We used to write out the index to flush GitPython's
                 # state... but such unconditional write is really a workaround
                 # and does not play nice with read-only operations - permission
