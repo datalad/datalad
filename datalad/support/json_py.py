@@ -140,17 +140,18 @@ def load(fname, fixup=True, **kw):
                 raise
             lgr.warning("Failed to decode content in %s: %s. Trying few tricks", fname, exc_str(exc))
 
-    # Load entire content and replace common "abusers" which break JSON comprehension but in general
-    # are Ok
-    with io.open(fname, 'r', encoding='utf-8') as f:
-        s_orig = s = f.read()
+            # Load entire content and replace common "abusers" which break JSON
+            # comprehension but in general
+            # are Ok
+            with io.open(fname, 'r', encoding='utf-8') as f:
+                s_orig = s = f.read()
 
-    for o, r in {
-        u"\xa0": " ",  # non-breaking space
-    }.items():
-        s = s.replace(o, r)
+            for o, r in {
+                u"\xa0": " ",  # non-breaking space
+            }.items():
+                s = s.replace(o, r)
 
-    if s == s_orig:
-        # we have done nothing, so just reraise previous exception
-        raise
-    return loads(s, **kw)
+            if s == s_orig:
+                # we have done nothing, so just reraise previous exception
+                raise
+            return loads(s, **kw)
