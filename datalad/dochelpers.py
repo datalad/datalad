@@ -124,6 +124,8 @@ def _split_out_parameters(initdoc):
     """
 
     # TODO: bind it to the only word in the line
+    if not initdoc:
+        return '', '', ''
     p_res = __parameters_str_re.search(initdoc)
     if p_res is None:
         return initdoc, "", ""

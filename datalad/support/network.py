@@ -60,7 +60,8 @@ else:
         safe += '~'
         return _urlquote(url, safe=safe, **kwargs)
 
-    urlquote.__doc__ = _urlquote.__doc__ + """
+    if __debug__:
+        urlquote.__doc__ = _urlquote.__doc__ + """
 
 This DataLad version of the function assumes ~ to be a safe character to be
 consistent with Python >= 3.7

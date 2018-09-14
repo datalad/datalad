@@ -242,7 +242,10 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
             if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
-find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
+
+
+if __debug__:
+    find_files.__doc__ %= (_VCS_REGEX, _DATALAD_REGEX)
 
 
 def expandpath(path, force_absolute=True):
@@ -785,7 +788,10 @@ def generate_chunks(container, size):
     """Given a container, generate chunks from it with size up to `size`
     """
     # There could be a "smarter" solution but I think this would suffice
-    assert size > 0,  "Size should be non-0 positive"
+    # Explicit check, instead of assert statement, for correct operation in
+    # -OO mode
+    if not size:
+        raise AssertionError("Size should be non-0 positive")
     while container:
         yield container[:size]
         container = container[size:]

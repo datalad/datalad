@@ -84,6 +84,9 @@ class ManPageFormatter(argparse.HelpFormatter):
         return '.SH NAME\n%s \\- %s\n' % (self._bold(prog), desc)
 
     def _mk_description(self, parser):
+        if not __debug__:
+            raise RuntimeError(
+                "We cannot provide description in -OO mode")
         desc = parser.description
         desc = '\n'.join(desc.splitlines()[1:])
         if not desc:

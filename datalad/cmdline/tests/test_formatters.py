@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover
 from ..main import setup_parser
 from datalad.tests.utils import ok_, assert_in, ok_startswith
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import assert_raises
 
 demo_example = """
 #!/bin/sh
@@ -96,8 +97,10 @@ def test_manpage_formatter():
 
     parsers = setup_parser(['datalad'], return_subparsers=True)
     for p in parsers:
-        mp = fmt.ManPageFormatter(
-            p, ext_sections=addonsections).format_man_page(parsers[p])
+        formatter = fmt.ManPageFormatter(p, ext_sections=addonsections)
+        if not __debug__:
+            continue
+        mp = formatter.format_man_page(parsers[p])
         for section in ('SYNOPSIS', 'NAME', 'OPTIONS', 'MYTEST'):
             assert_in('.SH {0}'.format(section), mp)
         assert_in('uniquedummystring', mp)
@@ -106,7 +109,10 @@ def test_manpage_formatter():
 def test_rstmanpage_formatter():
     parsers = setup_parser(['datalad'], return_subparsers=True)
     for p in parsers:
-        mp = fmt.RSTManPageFormatter(p).format_man_page(parsers[p])
+        formatter = fmt.RSTManPageFormatter(p)
+        if not __debug__:
+            continue
+        mp = formatter.format_man_page(parsers[p])
         for section in ('Synopsis', 'Description', 'Options'):
             assert_in('\n{0}'.format(section), mp)
         assert_in('{0}\n{1}'.format(p, '=' * len(p)), mp)

@@ -48,7 +48,8 @@ def get_git_version(runner):
 
 def _where_reload(obj):
     """Helper decorator to simplify providing repetitive docstring"""
-    obj.__doc__ = obj.__doc__ % _where_reload_doc
+    if __debug__:
+        obj.__doc__ = obj.__doc__ % _where_reload_doc
     return obj
 
 

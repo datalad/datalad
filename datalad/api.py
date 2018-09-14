@@ -35,7 +35,8 @@ def _command_summary():
     return "\n".join(get_cmd_summaries(grp_short_descriptions, groups))
 
 
-__doc__ += "\n\n{}".format(_command_summary())
+if __debug__:
+    __doc__ += "\n\n{}".format(_command_summary())
 
 
 def _load_plugins():

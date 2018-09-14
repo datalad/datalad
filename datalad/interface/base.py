@@ -387,7 +387,7 @@ def build_doc(cls, **kwargs):
     lgr.debug("Building doc for {}".format(cls))
 
     cls_doc = cls.__doc__
-    if hasattr(cls, '_docs_'):
+    if hasattr(cls, '_docs_') and cls_doc:
         # expand docs
         cls_doc = cls_doc.format(**cls._docs_)
 
