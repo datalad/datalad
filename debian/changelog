@@ -1,3 +1,10 @@
+datalad (0.10.3.1-2) neurodebian; urgency=medium
+
+  * BF: add libpython3-stdlib alternative also within Depends of
+    python3-datalad binary package to make it installable e.g. on nd90
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 13 Sep 2018 23:19:16 -0400
+
 datalad (0.10.3.1-1) unstable; urgency=medium
 
   [ Jelmer Vernooĳ ]

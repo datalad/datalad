@@ -182,7 +182,7 @@ Depends:
  git-annex (>= 6.20180509~) | git-annex-standalone (>= 6.20180509~),
  patool,
  python3-appdirs,
- python3-distutils,
+ python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
  python3-fasteners,
  python3-git (>= 2.1.6~),
  python3-humanize,
