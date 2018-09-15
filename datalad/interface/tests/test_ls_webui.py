@@ -20,7 +20,7 @@ from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
 from datalad.interface.ls_webui import machinesize, ignored, fs_traverse, \
-    _ls_json
+    _ls_json, UNKNOWN_SIZE
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import with_tree
@@ -36,6 +36,7 @@ def test_machinesize():
     for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
         assert_equal(1.0*(1000**value), machinesize('1 ' + key))
     assert_raises(ValueError, machinesize, 't byte')
+    assert_equal(0, machinesize(UNKNOWN_SIZE))
 
 
 @with_tree(
@@ -191,6 +192,11 @@ def test_ls_json(topdir, topurl):
         with open(get_metapath(dspath, *path)) as f:
             return js.load(f)
 
+    # Let's see that there is no crash if one of the files is available only
+    # in relaxed URL mode, so no size could be picked up
+    ds.repo.add_url_to_file(
+        'fromweb', topurl + '/noteventhere', options=['--relaxed'])
+
     for all_ in [True, False]:  # recurse directories
         for recursive in [True, False]:
             for state in ['file', 'delete']:
@@ -264,3 +270,7 @@ def test_ls_json(topdir, topurl):
                         if item['name'] == ('subdsfile.txt' or 'subds')
                     ][0]
                     assert_equal(subds['size']['total'], '3 Bytes')
+
+                assert_equal(
+                    topds_nodes['fromweb']['size']['total'], UNKNOWN_SIZE
+                )
