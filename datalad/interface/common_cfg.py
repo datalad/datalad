@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
-from os.path import join as opj
+from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
@@ -43,6 +43,13 @@ definitions = {
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
         'default': dirs.user_cache_dir,
+    },
+    'datalad.locations.local_central_path': {
+        'ui': ('question', {
+               'title': 'Superdataset local central path',
+               'text': 'Where should datalad install the superdataset?'}),
+        'destination': 'global',
+        'default': opj(expanduser('~'), 'datalad'),
     },
     'datalad.locations.system-plugins': {
         'ui': ('question', {

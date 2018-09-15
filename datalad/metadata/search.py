@@ -39,7 +39,6 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
 from datalad.utils import assure_unicode
@@ -176,7 +175,8 @@ def _search_from_virgin_install(dataset, query):
         # none was provided so we could ask user either he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        if os.path.exists(LOCAL_CENTRAL_PATH):
+        LOCAL_CENTRAL_PATH = cfg.obtain('datalad.locations.local_central_path')
+        if os.path.exists(local_central_path):
             central_ds = Dataset(LOCAL_CENTRAL_PATH)
             if central_ds.is_installed():
                 if ui.yesno(
