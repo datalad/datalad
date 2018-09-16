@@ -14,10 +14,10 @@ import shutil
 from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
+from datalad import cfg
 from datalad.api import create
 from datalad.api import install
 from datalad.api import get
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.utils import get_dataset_root
@@ -205,7 +205,8 @@ def test_subdatasets(path):
         eq_(dstop, subds)
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
-        eq_(dscentral.path, LOCAL_CENTRAL_PATH)
+        eq_(dscentral.path,
+            cfg.obtain('datalad.locations.local_central_path'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')

@@ -39,7 +39,6 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
 from datalad.utils import assure_unicode
