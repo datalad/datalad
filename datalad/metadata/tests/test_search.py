@@ -54,7 +54,7 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
-        with patch_config({'datalad.locations.local_central_path': newhome}):
+        with patch_config({'datalad.locations.default-dataset': newhome}):
             gen = search("bu", return_type='generator')
             assert_is_generator(gen)
             assert_raises(NoDatasetArgumentFound, next, gen)
@@ -71,7 +71,7 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \
-            patch_config({'datalad.locations.local_central_path': central_dspath}), \
+            patch_config({'datalad.locations.default-dataset': central_dspath}), \
             patch('datalad.api.install',
                   return_value=Dataset(central_dspath)) as mock_install, \
             patch('datalad.distribution.dataset.Dataset.search',

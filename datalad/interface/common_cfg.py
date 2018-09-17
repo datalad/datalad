@@ -44,10 +44,10 @@ definitions = {
         'destination': 'global',
         'default': dirs.user_cache_dir,
     },
-    'datalad.locations.local_central_path': {
+    'datalad.locations.default-dataset': {
         'ui': ('question', {
                'title': 'Superdataset local central path',
-               'text': 'Where should datalad install the superdataset?'}),
+               'text': 'Where should datalad install the dataset superdataset?'}),
         'destination': 'global',
         'default': opj(expanduser('~'), 'datalad'),
     },

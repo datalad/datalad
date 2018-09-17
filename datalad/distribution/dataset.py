@@ -132,7 +132,7 @@ class Dataset(object):
         elif path == '///':
             # TODO: logic/UI on installing a central dataset could move here
             # from search?
-            path_ = cfg.obtain('datalad.locations.local_central_path')
+            path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
 

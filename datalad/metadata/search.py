@@ -175,7 +175,7 @@ def _search_from_virgin_install(dataset, query):
         # none was provided so we could ask user either he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        LOCAL_CENTRAL_PATH = cfg.obtain('datalad.locations.local_central_path')
+        LOCAL_CENTRAL_PATH = cfg.obtain('datalad.locations.default-dataset')
         if os.path.exists(LOCAL_CENTRAL_PATH):
             central_ds = Dataset(LOCAL_CENTRAL_PATH)
             if central_ds.is_installed():

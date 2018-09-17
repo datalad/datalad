@@ -206,7 +206,7 @@ def test_subdatasets(path):
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
         eq_(dscentral.path,
-            cfg.obtain('datalad.locations.local_central_path'))
+            cfg.obtain('datalad.locations.default-dataset'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')
