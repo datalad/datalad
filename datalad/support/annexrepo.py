@@ -2588,7 +2588,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         info = json_records[0]
         for k in info:
             if k.endswith(' size') or k.endswith(' disk space') or k.startswith('size of '):
-                info[k] = int(info[k].split()[0])
+                size = info[k].split()[0]
+                if size.isdigit():
+                    info[k] = int(size)
+                else:
+                    lgr.debug("Size %r reported to be %s, setting to None", k, size)
+                    info[k] = None
         assert(info.pop('success'))
         assert(info.pop('command') == 'info')
         return info  # just as is for now
