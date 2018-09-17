@@ -492,6 +492,41 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         eq_(info2_[cur_subfile]['size'], 10)
 
 
+@with_tempfile(mkdir=True)
+def test_repo_info(path):
+    repo = AnnexRepo(path)
+    info = repo.repo_info()  # works in empty repo without crashing
+    eq_(info['local annex size'], 0)
+    eq_(info['size of annexed files in working tree'], 0)
+
+    def get_custom(custom={}):
+        """Need a helper since repo_info modifies in place so we should generate
+        new each time
+        """
+        custom_json = {
+            'available local disk space': 'unknown',
+            'size of annexed files in working tree': "0",
+            'success': True,
+            'command': 'info',
+        }
+        if custom:
+            custom_json.update(custom)
+        return [custom_json]
+
+    with patch.object(
+            repo, '_run_annex_command_json',
+            return_value=get_custom()):
+        info = repo.repo_info()
+        eq_(info['available local disk space'], None)
+
+    with patch.object(
+        repo, '_run_annex_command_json',
+        return_value=get_custom({
+            "available local disk space": "19193986496 (+100000 reserved)"})):
+        info = repo.repo_info()
+        eq_(info['available local disk space'], 19193986496)
+
+
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
