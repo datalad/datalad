@@ -1225,12 +1225,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             if old is not False:
                 self.config.set('core.bare', 'False', where='local')
 
-            out, err = super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
-
-            if old is None:
-                self.config.unset('core.bare', where='local')
-            elif old:
-                self.config.set('core.bare', old, where='local')
+            try:
+                out, err = super(AnnexRepo, self)._git_custom_command(
+                    *args, **kwargs)
+            finally:
+                if old is None:
+                    self.config.unset('core.bare', where='local')
+                elif old:
+                    self.config.set('core.bare', old, where='local')
             return out, err
 
         else:
