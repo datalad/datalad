@@ -114,19 +114,21 @@ API principles
 
 You can use DataLad's ``install`` command to download datasets. The command accepts
 URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
-to obtain a first dataset is downloading the canonical :term:`superdataset` from
+to obtain a first dataset is downloading the default :term:`superdataset` from
 http://datasets.datalad.org/ using a shortcut.
 
-Downloading DataLad's canonical superdataset
+Downloading DataLad's default superdataset
 --------------------------------------------
 
-DataLad's canonical :term:`superdataset` provides an automated collection of datasets
-from various portals and sites. The argument ``///`` can be used 
+http://datasets.datalad.org provides a super-dataset consisting of datasets
+from various portals and sites.  Many of them were crawled, and periodically
+updated, using `datalad-crawler <https://github.com/datalad/datalad-crawler>`__
+extension.  The argument ``///`` can be used
 as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
 ``datalad install ///``
-    installs the canonical superdataset (metadata without subdatasets) in a
+    installs this superdataset (metadata without subdatasets) in a
     `datasets.datalad.org/` subdirectory under the current directory
 ``datalad install -r ///openfmri``
     installs the openfmri superdataset into an `openfmri/` subdirectory.
@@ -136,6 +138,11 @@ Here are three common examples in command line notation:
     installs the superdataset of datasets released by the lab of Dr. James V. Haxby
     and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data, too.
     It does so by using 3 parallel download processes (``-J3`` flag).
+
+:ref:`datalad search <man_datalad-search>` command, if ran outside of any dataset,
+will install this default superdataset under a path specified in
+``datalad.locations.default-dataset`` :ref:`configuration <configuration>`
+variable (by default ``$HOME/datalad``).
 
 Downloading datasets via http
 -----------------------------
@@ -169,7 +176,7 @@ relative to the current directory.
 There are also some useful pre-defined "shortcut" values for dataset arguments:
 
 ``///``
-   refers to the "canonical" dataset located under `$HOME/datalad/`.
+   refers to the "default" dataset located under `$HOME/datalad/`.
    So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
    under ``$HOME/datalad/crcns``.  This is the same as running
    ``datalad install $HOME/datalad/crcns``.

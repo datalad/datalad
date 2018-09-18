@@ -46,8 +46,9 @@ definitions = {
     },
     'datalad.locations.default-dataset': {
         'ui': ('question', {
-               'title': 'Superdataset local central path',
-               'text': 'Where should datalad install the dataset superdataset?'}),
+               'title': 'Default dataset path',
+               'text': 'Where should datalad should look for (or install) a '
+                       'default dataset?'}),
         'destination': 'global',
         'default': opj(expanduser('~'), 'datalad'),
     },
