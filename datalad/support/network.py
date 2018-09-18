@@ -775,7 +775,7 @@ class SSHRI(RI, RegexBasedURLMixin):
 
 
 class DataLadRI(RI, RegexBasedURLMixin):
-    """RI pointing to datasets within central DataLad super-dataset"""
+    """RI pointing to datasets within default DataLad super-dataset"""
 
     _FIELDS = RI._FIELDS + (
         'remote',

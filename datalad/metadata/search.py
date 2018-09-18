@@ -175,15 +175,15 @@ def _search_from_virgin_install(dataset, query):
         # none was provided so we could ask user either he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        LOCAL_CENTRAL_PATH = cfg.obtain('datalad.locations.default-dataset')
-        if os.path.exists(LOCAL_CENTRAL_PATH):
-            central_ds = Dataset(LOCAL_CENTRAL_PATH)
-            if central_ds.is_installed():
+        DEFAULT_DATASET_PATH = cfg.obtain('datalad.locations.default-dataset')
+        if os.path.exists(DEFAULT_DATASET_PATH):
+            default_ds = Dataset(DEFAULT_DATASET_PATH)
+            if default_ds.is_installed():
                 if ui.yesno(
                     title="No DataLad dataset found at current location",
                     text="Would you like to search the DataLad "
                          "superdataset at %r?"
-                          % LOCAL_CENTRAL_PATH):
+                          % DEFAULT_DATASET_PATH):
                     pass
                 else:
                     reraise(*exc_info)
@@ -192,14 +192,14 @@ def _search_from_virgin_install(dataset, query):
                     "No DataLad dataset found at current location. "
                     "The DataLad superdataset location %r exists, "
                     "but does not contain an dataset."
-                    % LOCAL_CENTRAL_PATH)
+                    % DEFAULT_DATASET_PATH)
         elif ui.yesno(
                 title="No DataLad dataset found at current location",
                 text="Would you like to install the DataLad "
                      "superdataset at %r?"
-                     % LOCAL_CENTRAL_PATH):
+                     % DEFAULT_DATASET_PATH):
             from datalad.api import install
-            central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+            default_ds = install(DEFAULT_DATASET_PATH, source='///')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -209,9 +209,9 @@ def _search_from_virgin_install(dataset, query):
 
         lgr.info(
             "Performing search using DataLad superdataset %r",
-            central_ds.path
+            default_ds.path
         )
-        for res in central_ds.search(query):
+        for res in default_ds.search(query):
             yield res
         return
     else:

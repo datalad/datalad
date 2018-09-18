@@ -67,16 +67,16 @@ def test_search_outside1(tdir, newhome):
 @with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_search_outside1_install_central_ds(tdir, central_dspath):
+def test_search_outside1_install_default_ds(tdir, default_dspath):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \
-            patch_config({'datalad.locations.default-dataset': central_dspath}), \
+            patch_config({'datalad.locations.default-dataset': default_dspath}), \
             patch('datalad.api.install',
-                  return_value=Dataset(central_dspath)) as mock_install, \
+                  return_value=Dataset(default_dspath)) as mock_install, \
             patch('datalad.distribution.dataset.Dataset.search',
                   new_callable=_mock_search):
-            _check_mocked_install(central_dspath, mock_install)
+            _check_mocked_install(default_dspath, mock_install)
 
             # now on subsequent run, we want to mock as if dataset already exists
             # at central location and then do search again
@@ -86,7 +86,7 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
             with patch(
                     'datalad.distribution.dataset.Dataset.is_installed',
                     True):
-                _check_mocked_install(central_dspath, mock_install)
+                _check_mocked_install(default_dspath, mock_install)
 
             # and what if we say "no" to install?
             ui.add_responses('no')
@@ -95,7 +95,7 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
                 list(search("."))
 
             # and if path exists and is a valid dataset and we say "no"
-            Dataset(central_dspath).create()
+            Dataset(default_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
@@ -124,7 +124,7 @@ class _mock_search(object):
             yield report
 
 
-def _check_mocked_install(central_dspath, mock_install):
+def _check_mocked_install(default_dspath, mock_install):
     gen = search(".", return_type='generator')
     assert_is_generator(gen)
     # we no longer do any custom path tune up from the one returned by search
@@ -132,7 +132,7 @@ def _check_mocked_install(central_dspath, mock_install):
     assert_equal(
         list(gen), [report
                     for report in _mocked_search_results])
-    mock_install.assert_called_once_with(central_dspath, source='///')
+    mock_install.assert_called_once_with(default_dspath, source='///')
 
 
 @with_tempfile

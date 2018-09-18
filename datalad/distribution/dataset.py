@@ -130,7 +130,7 @@ class Dataset(object):
             # might have its ideas on what to do with ^, so better use as -d^
             path_ = Dataset(curdir).get_superdataset(topmost=True).path
         elif path == '///':
-            # TODO: logic/UI on installing a central dataset could move here
+            # TODO: logic/UI on installing a default dataset could move here
             # from search?
             path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
