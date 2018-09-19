@@ -9,6 +9,14 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.10.4 (??? ??, 2018) -- Soon-to-be-perfect
+
+### Major refactoring and deprecations
+
+- `datalad.consts.LOCAL_CENTRAL_PATH` constant was deprecated in favor
+  of `datalad.locations.default-dataset` [configuration] variable
+  (#2835)
+
 ## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 
 Emergency bugfix to address forgotten boost of version in
@@ -782,6 +790,7 @@ publishing
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
+[configuration]: http://docs.datalad.org/en/latest/config.html
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html

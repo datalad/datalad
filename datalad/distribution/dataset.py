@@ -24,8 +24,8 @@ from six import string_types
 from six import add_metaclass
 import wrapt
 
+from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
@@ -130,9 +130,9 @@ class Dataset(object):
             # might have its ideas on what to do with ^, so better use as -d^
             path_ = Dataset(curdir).get_superdataset(topmost=True).path
         elif path == '///':
-            # TODO: logic/UI on installing a central dataset could move here
+            # TODO: logic/UI on installing a default dataset could move here
             # from search?
-            path_ = LOCAL_CENTRAL_PATH
+            path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
 
