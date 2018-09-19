@@ -130,8 +130,7 @@ class Add(Interface):
             args=("path",),
             metavar='PATH',
             doc="""path/name of the component to be added. The component
-            must either exist on the filesystem already, or a `source`
-            has to be provided.""",
+            must exist on the filesystem already.""",
             nargs="+",
             constraints=EnsureStr() | EnsureNone()),
         to_git=Parameter(
