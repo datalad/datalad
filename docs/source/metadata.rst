@@ -40,7 +40,11 @@ Supported metadata sources
 ==========================
 
 This following sections provide an overview of included metadata extractors for
-particular types of data structures and file formats.
+particular types of data structures and file formats. Note that :ref:`DataLad
+extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+<https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
+extractors for particular domains and formats.
+
 Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
 extractors are enabled by default.  Any additional metadata extractor should be
 enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
