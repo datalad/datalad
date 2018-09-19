@@ -23,6 +23,8 @@ env:
     # Special settings/helper for combined coverage from special remotes execution
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
+    - _DL_DEVEL_ANNEX=1
+    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
   matrix:
     - DATALAD_REPO_DIRECT=yes
 ##1    - DATALAD_REPO_VERSION=6
@@ -108,19 +110,13 @@ matrix:
   # The ones to run only on weekends against master.
   # They will not contribute to coverage etc, but might lead to failed status
   #
-  - python: 3.5
-    # By default no logs will be output. This one is to test with log output at INFO level
-    env:
-    - _DL_UPSTREAM_GITPYTHON=1
-    - _DL_UPSTREAM_GITANNEX=1
-    # Just so we test if we did not screw up running under nose without -s as well
-    - NOSE_OPTS=
-    - _DL_CRON=1
-  # run if git-annex version in neurodebian -devel differs
-  - python: 3.5
-    env:
-    - _DL_DEVEL_ANNEX=1
-    - _DL_CRON=1
+#  - python: 3.5
+#    # By default no logs will be output. This one is to test with log output at INFO level
+#    env:
+#    - _DL_UPSTREAM_GITPYTHON=1
+#    - _DL_UPSTREAM_GITANNEX=1
+#    # Just so we test if we did not screw up running under nose without -s as well
+#    - NOSE_OPTS=
   - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -152,7 +148,6 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
   - python: 3.5
     # test whether known direct mode failures still fail
     env:
@@ -160,7 +155,6 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
 
   - python: 3.5
     # test with extension datalad-crawler
@@ -195,14 +189,12 @@ matrix:
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
   # test whether known direct mode failures still fail
   - env:
     - DATALAD_REPO_DIRECT=yes
     - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
     - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
     - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
