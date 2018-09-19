@@ -8,6 +8,7 @@
 
 import sys
 import platform
+import os
 from os.path import dirname
 from os.path import join as opj
 from os.path import sep as pathsep
@@ -72,7 +73,9 @@ requires = {
         'patool>=1.7',
         'six>=1.8.0',
         'wrapt',
-    ] + pbar_requires,
+    ] +
+    pbar_requires +
+    (['colorama'] if os.name == 'nt' else []),
     'downloaders': [
         'boto',
         'msgpack',
