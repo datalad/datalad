@@ -24,7 +24,6 @@ env:
     - COVERAGE=coverage
     - DATALAD_DATASETS_TOPURL=http://datasets-tests.datalad.org
   matrix:
-    - DATALAD_REPO_DIRECT=yes
 ##1    - DATALAD_REPO_VERSION=6
     - DATALAD_REPO_VERSION=5
 
@@ -153,14 +152,6 @@ matrix:
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
-  - python: 3.5
-    # test whether known direct mode failures still fail
-    env:
-    - DATALAD_REPO_DIRECT=yes
-    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-    - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
 
   - python: 3.5
     # test with extension datalad-crawler
@@ -196,13 +187,6 @@ matrix:
 #    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
-  # test whether known direct mode failures still fail
-  - env:
-    - DATALAD_REPO_DIRECT=yes
-    - DATALAD_TESTS_KNOWNFAILURES_SKIP=no
-    - DATALAD_TESTS_KNOWNFAILURES_PROBE=yes
-    - DATALAD_TESTS_SSH=1
-    - _DL_CRON=1
 
 # Causes complete laptop or travis instance crash atm, but survives in a docker
 # need to figure it out (looks like some PID explosion)
