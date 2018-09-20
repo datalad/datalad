@@ -1804,9 +1804,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             for f in files:
                 try:
                     obj, er = self._run_annex_command(
-                        'find', files=[f], expect_fail=True
+                        'find', files=[f],
+                        annex_options=["--print0"],
+                        expect_fail=True
                     )
-                    objects.append(obj)
+                    objects.append(obj.rstrip("\0"))
                 except CommandError:
                     objects.append('')
 
