@@ -1830,6 +1830,23 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return objects
 
+    def _check_files(self, fn, quick_fn, files, allow_quick, batch):
+        # Helper that isolates the common logic in `file_has_content` and
+        # `is_under_annex`. `fn` is the annex command used to do the check, and
+        # `quick_fn` is the non-annex variant.
+        is_v6 = self.config.get("annex.version") == "6"
+        if is_v6 or self.is_direct_mode() or batch or not allow_quick:
+            # We're only concerned about modified files in V6 mode. In V5
+            # `find` returns an empty string for unlocked files, and in direct
+            # mode everything looks modified, so we don't even bother.
+            modified = self.get_changed_files() if is_v6 else []
+            annex_res = fn(files, normalize_paths=False, batch=batch)
+            return [bool(annex_res.get(f) and
+                         not (is_v6 and normpath(f) in modified))
+                    for f in files]
+        else:  # ad-hoc check which should be faster than call into annex
+            return [quick_fn(f) for f in files]
+
     @normalize_paths
     def file_has_content(self, files, allow_quick=True, batch=False):
         """Check whether files have their content present under annex.
@@ -1849,32 +1866,21 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: Also provide option to look for key instead of path
 
-        is_v6 = self.config.get("annex.version") == "6"
-        if is_v6 or self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
-            # We're only concerned about modified files in V6 mode. In V5
-            # `find` returns an empty string for unlocked files, and in direct
-            # mode everything looks modified, so we don't even bother.
-            modified = self.get_changed_files() if is_v6 else []
-            # TODO: Also provide option to look for key instead of path
-            find = self.find(files, normalize_paths=False, batch=batch)
-            return [bool(find[f] and not (is_v6 and f in modified))
-                    for f in files]
-        else:  # ad-hoc check which should be faster than call into annex
-            out = []
-            for f in files:
-                filepath = opj(self.path, f)
-                if islink(filepath):                    # if symlink
-                    # find abspath of node pointed to by symlink
-                    target_path = realpath(filepath)  # realpath OK
-                    # TODO: checks for being not outside of this repository
-                    # Note: ben removed '.git/' from '.git/annex/objects',
-                    # since it is not true for submodules, whose '.git' is a
-                    # symlink and being resolved to some
-                    # '.git/modules/.../annex/objects'
-                    out.append(exists(target_path) and 'annex/objects' in str(target_path))
-                else:
-                    out.append(False)
-            return out
+        def quick_check(filename):
+            filepath = opj(self.path, filename)
+            if islink(filepath):                    # if symlink
+                # find abspath of node pointed to by symlink
+                target_path = realpath(filepath)  # realpath OK
+                # TODO: checks for being not outside of this repository
+                # Note: ben removed '.git/' from '.git/annex/objects',
+                # since it is not true for submodules, whose '.git' is a
+                # symlink and being resolved to some
+                # '.git/modules/.../annex/objects'
+                return exists(target_path) and 'annex/objects' in str(target_path)
+            return False
+
+        return self._check_files(self.find, quick_check,
+                                 files, allow_quick, batch)
 
     @normalize_paths
     def is_under_annex(self, files, allow_quick=True, batch=False):
@@ -1893,41 +1899,35 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of bool
             For each input file states either file is under annex
         """
-        is_v6 = self.config.get("annex.version") == "6"
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
-        if is_v6 or self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
-            # This is an ugly hack to prevent files from being treated as
-            # remotes by `git annex info`. See annex's `nameToUUID'`.
-            files = [opj(curdir, f) for f in files]
-            # We're only concerned about modified files in V6 mode. In V5
-            # `find` returns an empty string for unlocked files, and in direct
-            # mode everything looks modified, so we don't even bother.
-            modified = self.get_changed_files() if is_v6 else []
+
+        # This is an ugly hack to prevent files from being treated as
+        # remotes by `git annex info`. See annex's `nameToUUID'`.
+        files = [opj(curdir, f) for f in files]
+
+        def check(files, **kwargs):
             # Filter out directories because it doesn't make sense to ask if
             # they are under annex control and `info` can only handle
             # non-directories.
-            info = self.info([f for f in files if not isdir(f)],
-                             normalize_paths=False, batch=batch, fast=True)
-            # info is a dict... khe khe -- "thanks" Yarik! ;)
-            return [bool(info.get(f) and
-                         not (is_v6 and normpath(f) in modified))
-                    for f in files]
-        else:  # ad-hoc check which should be faster than call into annex
-            out = []
-            for f in files:
-                filepath = opj(self.path, f)
-                # todo checks for being not outside of this repository
-                # Note: ben removed '.git/' from '.git/annex/objects',
-                # since it is not true for submodules, whose '.git' is a
-                # symlink and being resolved to some
-                # '.git/modules/.../annex/objects'
-                out.append(
-                    islink(filepath)
-                    and 'annex/objects' in str(realpath(filepath))  # realpath OK
-                )
-            return out
+            return self.info([f for f in files if not isdir(f)],
+                             fast=True, **kwargs)
+
+        def quick_check(filename):
+            filepath = opj(self.path, filename)
+            # todo checks for being not outside of this repository
+            # Note: ben removed '.git/' from '.git/annex/objects',
+            # since it is not true for submodules, whose '.git' is a
+            # symlink and being resolved to some
+            # '.git/modules/.../annex/objects'
+            return (
+                islink(filepath)
+                and 'annex/objects' in str(realpath(filepath))  # realpath OK
+            )
+
+        return self._check_files(check, quick_check,
+                                 files, allow_quick, batch)
 
     def init_remote(self, name, options):
         """Creates a new special remote
