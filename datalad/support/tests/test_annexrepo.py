@@ -75,6 +75,7 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import get_most_obscure_supported_name
+from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
@@ -490,6 +491,19 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         # Should maintain original relative file names
         eq_(set(info2_), set(testfiles))
         eq_(info2_[cur_subfile]['size'], 10)
+
+
+@with_tree(tree={"a.txt": "a",
+                 "b": "b",
+                 OBSCURE_FILENAME: "c"})
+def test_find_batch_obscure(path):
+    ar = AnnexRepo(path)
+    files = ["a.txt", "b", OBSCURE_FILENAME]
+    ar.add(files)
+    ar.commit("add files")
+    query = ["not-there"] + files
+    expected = [""] + files
+    eq_(expected, ar.find(query, batch=True))
 
 
 @with_tempfile(mkdir=True)

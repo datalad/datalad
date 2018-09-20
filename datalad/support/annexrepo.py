@@ -1806,7 +1806,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         objects = []
         if batch:
-            objects = self._batched.get('find', path=self.path)(files)
+            find = self._batched.get('find', json=True, path=self.path)
+            objects = [d.get("file", "") for d in find(files)]
         else:
             for f in files:
                 try:
