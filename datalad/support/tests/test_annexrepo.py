@@ -503,9 +503,12 @@ def test_find_batch_equivalence(path):
     ar.add(files + ["subdir"])
     ar.commit("add files")
     query = ["not-there"] + files
-    expected = [""] + files
+    expected = {f: f for f in files}
+    expected.update({"not-there": ""})
     eq_(expected, ar.find(query, batch=True))
     eq_(expected, ar.find(query))
+    # If we give a subdirectory, we split that output.
+    eq_(set(ar.find(["subdir"])["subdir"]), {"subdir/d", "subdir/e"})
     eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
 
 

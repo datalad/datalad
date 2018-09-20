@@ -160,8 +160,7 @@ def test_reaggregate_with_unavailable_objects(path):
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     objpath = opj('.datalad', 'metadata', 'objects')
-    # weird that it comes out as a string...
-    objs = [o for o in sorted(base.repo.find(objpath).split('\0')) if o]
+    objs = list(sorted(base.repo.find(objpath)))
     # we have 3x2 metadata sets (dataset/files) under annex
     eq_(len(objs), 6)
     eq_(all(base.repo.file_has_content(objs)), True)
@@ -176,7 +175,7 @@ def test_reaggregate_with_unavailable_objects(path):
     # and there are no new objects
     eq_(
         objs,
-        [o for o in sorted(base.repo.find(objpath).split('\0')) if o]
+        list(sorted(base.repo.find(objpath)))
     )
 
 
@@ -240,7 +239,7 @@ def test_publish_aggregated(path):
     base.publish('.', to='local_target', transfer_data='all')
     remote = Dataset(spath)
     objpath = opj('.datalad', 'metadata', 'objects')
-    objs = [o for o in sorted(base.repo.find(objpath).split('\0')) if o]
+    objs = list(sorted(base.repo.find(objpath)))
     # all object files a present in both datasets
     eq_(all(base.repo.file_has_content(objs)), True)
     eq_(all(remote.repo.file_has_content(objs)), True)

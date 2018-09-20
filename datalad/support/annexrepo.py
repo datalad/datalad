@@ -1802,15 +1802,18 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        list
-          list with filename if file found else empty string
+        A dictionary the maps each item in `files` to its `git annex find`
+        result. Items without a successful result will be an empty string, and
+        multi-item results (which can occur for if `files` includes a
+        directory) will be returned as a list.
         """
-        objects = []
+        objects = {}
         # Ignore batch=True if any path is a directory because `git annex find
         # --batch` always returns an empty string for directories.
         if batch and not any(isdir(opj(self.path, f)) for f in files):
             find = self._batched.get('find', json=True, path=self.path)
-            objects = [d.get("file", "") for d in find(files)]
+            objects = {f: json_out.get("file", "")
+                       for f, json_out in zip(files, find(files))}
         else:
             for f in files:
                 try:
@@ -1819,9 +1822,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                         annex_options=["--print0"],
                         expect_fail=True
                     )
-                    objects.append(obj.rstrip("\0"))
+                    items = obj.rstrip("\0").split("\0")
+                    objects[f] = items[0] if len(items) == 1 else items
                 except CommandError:
-                    objects.append('')
+                    objects[f] = ''
 
         return objects
 
@@ -1847,7 +1851,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
             # TODO: Also provide option to look for key instead of path
             find = self.find(files, normalize_paths=False, batch=batch)
-            return [bool(filename) for filename in find]
+            return [bool(find[filename]) for filename in files]
         else:  # ad-hoc check which should be faster than call into annex
             out = []
             for f in files:
