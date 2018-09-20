@@ -1909,7 +1909,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # they are under annex control and `info` can only handle
             # non-directories.
             info = self.info([f for f in files if not isdir(f)],
-                             normalize_paths=False, batch=batch)
+                             normalize_paths=False, batch=batch, fast=True)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
             return [bool(info.get(f) and
                          not (is_v6 and normpath(f) in modified))
