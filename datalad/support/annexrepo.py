@@ -1789,7 +1789,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_paths(map_filenames_back=True)
     def find(self, files, batch=False):
-        """Provide annex info for file(s).
+        """Run `git annex find` on file(s).
 
         Parameters
         ----------
