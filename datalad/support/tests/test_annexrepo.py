@@ -355,6 +355,15 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     ok_(ar.is_under_annex("test-annex.dat", batch=batch))
 
+    if not direct:  # There's no unlock in direct mode.
+        ar.unlock(["test-annex.dat"])
+        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+            [ar.config.get("annex.version") == "6"])
+        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+            ofh.write("more")
+        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+            [False])
+
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),

@@ -1893,16 +1893,27 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of bool
             For each input file states either file is under annex
         """
+        is_v6 = self.config.get("annex.version") == "6"
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
-        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
+        if is_v6 or self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
             # This is an ugly hack to prevent files from being treated as
             # remotes by `git annex info`. See annex's `nameToUUID'`.
             files = [opj(curdir, f) for f in files]
-            info = self.info(files, normalize_paths=False, batch=batch)
+            # We're only concerned about modified files in V6 mode. In V5
+            # `find` returns an empty string for unlocked files, and in direct
+            # mode everything looks modified, so we don't even bother.
+            modified = self.get_changed_files() if is_v6 else []
+            # Filter out directories because it doesn't make sense to ask if
+            # they are under annex control and `info` can only handle
+            # non-directories.
+            info = self.info([f for f in files if not isdir(f)],
+                             normalize_paths=False, batch=batch)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
-            return [bool(info[f]) for f in files]
+            return [bool(info.get(f) and
+                         not (is_v6 and normpath(f) in modified))
+                    for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             out = []
             for f in files:
