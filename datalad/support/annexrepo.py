@@ -115,7 +115,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20170220 -- annex status provides --ignore-submodules
     # 6.20180416 -- annex handles unicode filenames more uniformly
     # 6.20180913 -- annex fixes all known to us issues for v6
-    GIT_ANNEX_MIN_VERSION = '6.20180913'
+    GIT_ANNEX_MIN_VERSION = '6.20180808'
     git_annex_version = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
