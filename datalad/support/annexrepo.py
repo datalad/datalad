@@ -1890,7 +1890,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
         if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
-            # no other way but to call whereis and if anything returned for it
             info = self.info(files, normalize_paths=False, batch=batch)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
             return [bool(info[f]) for f in files]
