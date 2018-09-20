@@ -3470,7 +3470,8 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 
 def readline_json(stdout):
-    return json_loads(stdout.readline().strip())
+    toload = stdout.readline().strip()
+    return json_loads(toload) if toload else {}
 
 
 @auto_repr
