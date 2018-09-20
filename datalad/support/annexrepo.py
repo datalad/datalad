@@ -23,6 +23,7 @@ import time
 
 from itertools import chain
 from os import linesep
+from os.path import curdir
 from os.path import join as opj
 from os.path import exists
 from os.path import islink
@@ -1896,6 +1897,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
         if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
+            # This is an ugly hack to prevent files from being treated as
+            # remotes by `git annex info`. See annex's `nameToUUID'`.
+            files = [opj(curdir, f) for f in files]
             info = self.info(files, normalize_paths=False, batch=batch)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
             return [bool(info[f]) for f in files]
