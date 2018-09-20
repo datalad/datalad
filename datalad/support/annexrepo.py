@@ -1797,7 +1797,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             files to find under annex
         batch: bool, optional
             initiate or continue with a batched run of annex find, instead of just
-            calling a single git annex find command
+            calling a single git annex find command. If any items in `files`
+            are directories, this value is treated as False.
 
         Returns
         -------
@@ -1805,7 +1806,9 @@ class AnnexRepo(GitRepo, RepoInterface):
           list with filename if file found else empty string
         """
         objects = []
-        if batch:
+        # Ignore batch=True if any path is a directory because `git annex find
+        # --batch` always returns an empty string for directories.
+        if batch and not any(isdir(opj(self.path, f)) for f in files):
             find = self._batched.get('find', json=True, path=self.path)
             objects = [d.get("file", "") for d in find(files)]
         else:

@@ -495,16 +495,18 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 
 @with_tree(tree={"a.txt": "a",
                  "b": "b",
-                 OBSCURE_FILENAME: "c"})
+                 OBSCURE_FILENAME: "c",
+                 "subdir": {"d": "d", "e": "e"}})
 def test_find_batch_equivalence(path):
     ar = AnnexRepo(path)
     files = ["a.txt", "b", OBSCURE_FILENAME]
-    ar.add(files)
+    ar.add(files + ["subdir"])
     ar.commit("add files")
     query = ["not-there"] + files
     expected = [""] + files
     eq_(expected, ar.find(query, batch=True))
     eq_(expected, ar.find(query))
+    eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
 
 
 @with_tempfile(mkdir=True)
