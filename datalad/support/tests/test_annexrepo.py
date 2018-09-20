@@ -319,6 +319,15 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     assert_false(ar.file_has_content("bogus.txt", batch=batch))
     ok_(ar.file_has_content("test-annex.dat", batch=batch))
 
+    if not direct:  # There's no unlock in direct mode.
+        ar.unlock(["test-annex.dat"])
+        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+            [ar.config.get("annex.version") == "6"])
+        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+            ofh.write("more")
+        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+            [False])
+
 
 # 1 is enough to test
 @with_batch_direct

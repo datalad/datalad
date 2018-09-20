@@ -1848,10 +1848,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: Also provide option to look for key instead of path
 
-        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
+        is_v6 = self.config.get("annex.version") == "6"
+        if is_v6 or self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
+            # We're only concerned about modified files in V6 mode. In V5
+            # `find` returns an empty string for unlocked files, and in direct
+            # mode everything looks modified, so we don't even bother.
+            modified = self.get_changed_files() if is_v6 else []
             # TODO: Also provide option to look for key instead of path
             find = self.find(files, normalize_paths=False, batch=batch)
-            return [bool(find[filename]) for filename in files]
+            return [bool(find[f] and not (is_v6 and f in modified))
+                    for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             out = []
             for f in files:
