@@ -159,15 +159,14 @@ class Update(Interface):
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 res['status'] = 'impossible'
-                res['error'] = NotImplementedError(
-                    "Multiple siblings, please specify from which to update.")
+                res['message'] = "Multiple siblings, please specify from which to update."
                 yield res
                 continue
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
             fetch_kwargs = dict(
                 remote=None if sibling_ is None else sibling_,
-                all_= sibling_ is None,
+                all_=sibling_ is None,
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate

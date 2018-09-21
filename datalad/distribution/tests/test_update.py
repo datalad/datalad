@@ -357,3 +357,5 @@ def test_multiway_merge(path):
     assert_status('ok', ds.publish(to='r2'))
     # just a fetch should be no issue
     assert_status('ok', ds.update())
+    # ATM we do not support multi-way merges
+    assert_status('impossible', ds.update(merge=True, on_failure='ignore'))
