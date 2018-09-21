@@ -140,7 +140,10 @@ class Update(Interface):
                 res['status'] = 'notneeded'
                 yield res
                 continue
-            if not sibling:
+            if not sibling and len(remotes) == 1:
+                # there is only one remote, must be this one
+                sibling_ = remotes[0]
+            elif not sibling:
                 # nothing given, look for tracking branch
                 sibling_ = repo.get_tracking_branch()[0]
             else:
@@ -151,9 +154,6 @@ class Update(Interface):
                 res['status'] = 'impossible'
                 yield res
                 continue
-            if not sibling_ and len(remotes) == 1:
-                # there is only one remote, must be this one
-                sibling_ = remotes[0]
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 res['status'] = 'impossible'
