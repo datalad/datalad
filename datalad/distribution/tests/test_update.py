@@ -268,8 +268,9 @@ def test_newthings_coming_down(originpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-def test_update_volatile_subds(originpath, destpath):
+def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,
@@ -303,9 +304,9 @@ def test_update_volatile_subds(originpath, destpath):
     ds.get(opj(ds.path, sname, 'load.dat'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
 
-    # modify subdataset at origin
+    # modify ds and subds at origin
     # >>> I AM IMPORTANT FEW LINES BELOW
-    create_tree(osm1.path, {'probe': 'little'})
+    create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
     origin.add('.', recursive=True)
     ok_clean_git(origin.path)
     # <<< I AM IMPORTANT FEW LINES BELOW
@@ -334,6 +335,19 @@ def test_update_volatile_subds(originpath, destpath):
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
+    ok_clean_git(ds.path)
+
+    # new separate subdataset, not within the origin dataset
+    otherds = Dataset(otherpath).create()
+    # install separate dataset as a submodule
+    ds.install(source=otherds.path, path='other')
+    create_tree(otherds.path, {'brand': 'new'})
+    otherds.add('.')
+    ok_clean_git(otherds.path)
+    # pull in changes
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        1, type='dataset')
+    ok_clean_git(ds.path)
 
 
 @with_tempfile(mkdir=True)
