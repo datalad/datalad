@@ -165,8 +165,9 @@ class Update(Interface):
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
             fetch_kwargs = dict(
-                remote=None if sibling_ is None else sibling_,
-                all_=sibling_ is None,
+                # test against user-provided value!
+                remote=None if sibling is None else sibling_,
+                all_=sibling is None,
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate
