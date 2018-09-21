@@ -114,7 +114,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
     # 6.20180416 -- annex handles unicode filenames more uniformly
-    GIT_ANNEX_MIN_VERSION = '6.20170220'
+    # 6.20180913 -- annex fixes all known to us issues for v6
+    GIT_ANNEX_MIN_VERSION = '6.20180913'
     git_annex_version = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
@@ -1529,15 +1530,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # if None -- leave it to annex to decide
         if git is not None:
-            if 'annex.version' in self.config and \
-                    self.config.getint("annex", "version") == 6:
-                # Note: For now ugly workaround to prevent unexpected
-                # outcome when adding to git. See:
-                # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
-                lgr.warning("Workaround: Wait for {} to add to git ({})."
-                            "".format(files, self))
-                time.sleep(1)
-
             options += [
                 '-c',
                 'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
