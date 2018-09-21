@@ -162,7 +162,7 @@ class Update(Interface):
                 res['message'] = "Multiple siblings, please specify from which to update."
                 yield res
                 continue
-            lgr.info("Updating dataset '%s' ..." % repo.path)
+            lgr.info("Fetching updates for %s", ds)
             # fetch remote
             fetch_kwargs = dict(
                 # test against user-provided value!
@@ -183,7 +183,7 @@ class Update(Interface):
 def _update_repo(ds, remote, reobtain_data):
     repo = ds.repo
 
-    lgr.info("Merging updates...")
+    lgr.info("Applying updates to %s", ds)
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
             # get all annexed files that have data present

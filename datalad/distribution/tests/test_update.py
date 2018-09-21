@@ -21,7 +21,10 @@ from datalad.api import update
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
 from datalad.utils import chpwd
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    GitCommandError,
+)
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import eq_, assert_false, assert_is_instance, ok_
@@ -300,13 +303,29 @@ def test_update_volatile_subds(originpath, destpath):
     ds.get(opj(ds.path, sname, 'load.dat'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
 
+    # modify subdataset at origin
+    # >>> I AM IMPORTANT FEW LINES BELOW
+    create_tree(osm1.path, {'probe': 'little'})
+    origin.add('.', recursive=True)
+    ok_clean_git(origin.path)
+    # <<< I AM IMPORTANT FEW LINES BELOW
+
     # now remove just-installed subdataset from origin again
     origin.remove(sname, check=False)
     assert_not_in(sname, origin.subdatasets(result_xfm='relpaths'))
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
-    assert_result_count(ds.update(merge=True, recursive=True), 1, type='dataset')
+    try:
+        # === I AM IMPORTANT
+        assert_result_count(ds.update(merge=True, recursive=True),
+                            1, type='dataset')
+    except GitCommandError:
+        # see description in https://github.com/datalad/datalad/pull/2859
+        pass
+    # works on second attempt
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        1, type='dataset')
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
