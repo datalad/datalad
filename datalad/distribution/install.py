@@ -156,7 +156,7 @@ class Install(Interface):
             # git_clone_opts=None,
             # annex_opts=None,
             # annex_init_opts=None,
-            jobs=None):
+            jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
