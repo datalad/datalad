@@ -310,6 +310,11 @@ def test_update_volatile_subds(originpath, destpath):
     ok_clean_git(origin.path)
     # <<< I AM IMPORTANT FEW LINES BELOW
 
+    # updates for both datasets should come down the pipe
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        2, status='ok', type='dataset')
+    ok_clean_git(ds.path)
+
     # now remove just-installed subdataset from origin again
     origin.remove(sname, check=False)
     assert_not_in(sname, origin.subdatasets(result_xfm='relpaths'))
