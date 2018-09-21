@@ -18,7 +18,6 @@ from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.api import update
-from datalad.api import create_sibling
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
 from datalad.utils import chpwd
@@ -52,6 +51,8 @@ def test_update_simple(origin, src_path, dst_path):
 
     # dataset without sibling will not need updates
     assert_status('notneeded', source.update())
+    # deprecation message doesn't ruin things
+    assert_status('notneeded', source.update(fetch_all=True))
     # but error if unknown sibling is given
     assert_status('impossible', source.update(sibling='funky', on_failure='ignore'))
 
@@ -72,6 +73,15 @@ def test_update_simple(origin, src_path, dst_path):
     source.add(path="update.txt")
     source.save("Added update.txt")
     ok_clean_git(src_path)
+
+    # fail when asked to update a non-dataset
+    assert_status(
+        'impossible',
+        source.update("update.txt", on_failure='ignore'))
+    # fail when asked to update a something non-existent
+    assert_status(
+        'impossible',
+        source.update("nothere", on_failure='ignore'))
 
     # update without `merge` only fetches:
     assert_status('ok', dest.update())
@@ -350,7 +360,7 @@ def test_multiway_merge(path):
     # prepare ds with two siblings, but no tracking branch
     ds = Dataset(op.join(path, 'ds_orig')).create()
     r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
-    r2 = AnnexRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
+    r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
     ds.siblings(action='add', name='r1', url=r1.path)
     ds.siblings(action='add', name='r2', url=r2.path)
     assert_status('ok', ds.publish(to='r1'))
