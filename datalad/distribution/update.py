@@ -134,7 +134,7 @@ class Update(Interface):
             # special remotes)
             remotes = repo.get_remotes(
                 **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
-            if not remotes:
+            if not remotes and not sibling:
                 res['message'] = ("No siblings known to dataset at %s\nSkipping",
                                   repo.path)
                 res['status'] = 'notneeded'

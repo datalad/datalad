@@ -48,6 +48,11 @@ def test_update_simple(origin, src_path, dst_path):
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
 
+    # dataset without sibling will not need updates
+    assert_status('notneeded', source.update())
+    # but error if unknown sibling is given
+    assert_status('impossible', source.update(sibling='funky', on_failure='ignore'))
+
     # get a clone to update later on:
     dest = install(dst_path, source=src_path, recursive=True)
     # test setup done;
