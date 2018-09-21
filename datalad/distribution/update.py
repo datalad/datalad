@@ -70,8 +70,8 @@ class Update(Interface):
         recursion_limit=recursion_limit,
         fetch_all=Parameter(
             args=("--fetch-all",),
-            action="store_true",
-            doc="fetch updates from all known siblings", ),
+            doc="""This option has no effect and will be removed in a future version.
+            When no siblings are given, an all-sibling update will be performed.""", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
@@ -87,10 +87,12 @@ class Update(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            fetch_all=False,
+            fetch_all=None,
             reobtain_data=False):
         """
         """
+        if fetch_all is not None:
+            lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
 
         if not dataset and not path:
             # try to find a dataset in PWD
@@ -164,8 +166,8 @@ class Update(Interface):
             lgr.info("Updating dataset '%s' ..." % repo.path)
             # fetch remote
             fetch_kwargs = dict(
-                remote=None if fetch_all else sibling_,
-                all_=fetch_all,
+                remote=None if sibling_ is None else sibling_,
+                all_= sibling_ is None,
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate

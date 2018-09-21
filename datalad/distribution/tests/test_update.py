@@ -13,10 +13,12 @@ from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
+import os.path as op
 from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.api import update
+from datalad.api import create_sibling
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
 from datalad.utils import chpwd
@@ -163,7 +165,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
             ['encryption=none', 'type=external', 'externaltype=datalad'])
     # fetch all remotes
     assert_result_count(
-        ds.update(fetch_all=True), 1, status='ok', type='dataset')
+        ds.update(), 1, status='ok', type='dataset')
 
     # no merge, so changes are not in active branch:
     assert_not_in("first.txt",
@@ -176,7 +178,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
     # no merge strategy for multiple remotes yet:
     # more clever now, there is a tracking branch that provides a remote
-    #assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
+    #assert_raises(NotImplementedError, ds.update, merge=True)
 
     # merge a certain remote:
     assert_result_count(
@@ -341,3 +343,17 @@ def test_reobtain_data(originpath, destpath):
     assert_result_count(res, 1, status='ok', type='file', action='get')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'light')
     assert_false(ds.repo.file_has_content('novel'))
+
+
+@with_tempfile(mkdir=True)
+def test_multiway_merge(path):
+    # prepare ds with two siblings, but no tracking branch
+    ds = Dataset(op.join(path, 'ds_orig')).create()
+    r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
+    r2 = AnnexRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
+    ds.siblings(action='add', name='r1', url=r1.path)
+    ds.siblings(action='add', name='r2', url=r2.path)
+    assert_status('ok', ds.publish(to='r1'))
+    assert_status('ok', ds.publish(to='r2'))
+    # just a fetch should be no issue
+    assert_status('ok', ds.update())
