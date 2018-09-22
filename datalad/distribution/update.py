@@ -168,6 +168,9 @@ class Update(Interface):
                 # test against user-provided value!
                 remote=None if sibling is None else sibling_,
                 all_=sibling is None,
+                # required to not trip over submodules that
+                # were removed in the origin clone
+                recurse_submodules="no",
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate

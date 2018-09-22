@@ -18,6 +18,7 @@ from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.api import update
+from datalad.api import remove
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
 from datalad.utils import chpwd
@@ -305,11 +306,9 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
 
     # modify ds and subds at origin
-    # >>> I AM IMPORTANT FEW LINES BELOW
     create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
     origin.add('.', recursive=True)
     ok_clean_git(origin.path)
-    # <<< I AM IMPORTANT FEW LINES BELOW
 
     # updates for both datasets should come down the pipe
     assert_result_count(ds.update(merge=True, recursive=True),
@@ -322,19 +321,16 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
-    try:
-        # === I AM IMPORTANT
-        assert_result_count(ds.update(merge=True, recursive=True),
-                            1, type='dataset')
-    except GitCommandError:
-        # see description in https://github.com/datalad/datalad/pull/2859
-        pass
-    # works on second attempt
     assert_result_count(ds.update(merge=True, recursive=True),
                         1, type='dataset')
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
+
+    # now remove the now disconnected subdataset for further tests
+    # not using a bound method, not giving a parentds, should
+    # not be needed to get a clean dataset
+    remove(op.join(ds.path, sname), check=False)
     ok_clean_git(ds.path)
 
     # new separate subdataset, not within the origin dataset
@@ -345,9 +341,11 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     otherds.add('.')
     ok_clean_git(otherds.path)
     # pull in changes
-    assert_result_count(ds.update(merge=True, recursive=True),
-                        1, type='dataset')
-    ok_clean_git(ds.path)
+    res = ds.update(merge=True, recursive=True)
+    assert_result_count(
+        res, 2, status='ok', action='update', type='dataset')
+    # the next is #2858
+    #ok_clean_git(ds.path)
 
 
 @with_tempfile(mkdir=True)
