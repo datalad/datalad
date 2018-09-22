@@ -344,8 +344,8 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     res = ds.update(merge=True, recursive=True)
     assert_result_count(
         res, 2, status='ok', action='update', type='dataset')
-    # the next is #2858
-    #ok_clean_git(ds.path)
+    # the next is to check for #2858
+    ok_clean_git(ds.path)
 
 
 @with_tempfile(mkdir=True)

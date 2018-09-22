@@ -103,6 +103,7 @@ class Update(Interface):
             # act on the whole dataset if nothing else was specified
             path = refds_path
 
+        save_paths = []
         for ap in AnnotatePaths.__call__(
                 dataset=refds_path,
                 path=path,
@@ -181,6 +182,19 @@ class Update(Interface):
                     yield fr
             res['status'] = 'ok'
             yield res
+            save_paths.append(ap['path'])
+        if recursive:
+            save_paths = [p for p in save_paths if p != refds_path]
+            if not save_paths:
+                return
+            lgr.debug(
+                'Subdatasets where updated state may need to be '
+                'saved in the parent dataset: %s', save_paths)
+            for r in Dataset(refds_path).add(
+                    path=save_paths,
+                    recursive=False,
+                    message='[DATALAD] Save updated subdatasets'):
+                yield r
 
 
 def _update_repo(ds, remote, reobtain_data):
