@@ -49,6 +49,10 @@ keyring_requires = ['keyring>=8.0', 'keyrings.alt']
 pbar_requires = ['tqdm']
 
 dist = platform.dist()
+# Identical to definition in datalad.utils
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+
 # on oldstable Debian let's ask for lower versions of keyring
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
@@ -75,7 +79,7 @@ requires = {
         'wrapt',
     ] +
     pbar_requires +
-    (['colorama'] if os.name == 'nt' else []),
+    (['colorama'] if on_windows else []),
     'downloaders': [
         'boto',
         'msgpack',
