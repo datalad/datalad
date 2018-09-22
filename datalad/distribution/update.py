@@ -48,12 +48,13 @@ class Update(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path to be updated",
+            doc="path to a dataset that shall be updated",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         sibling=Parameter(
             args=("-s", "--sibling",),
-            doc="""name of the sibling to update from""",
+            doc="""name of the sibling to update from. If no sibling
+            is given, updates from all siblings are obtained.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -70,12 +71,14 @@ class Update(Interface):
         recursion_limit=recursion_limit,
         fetch_all=Parameter(
             args=("--fetch-all",),
-            doc="""This option has no effect and will be removed in a future version.
+            action="store_true",
+            doc="""this option has no effect and will be removed in a future version.
             When no siblings are given, an all-sibling update will be performed.""", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
-            doc="TODO"), )
+            doc="""if enabled, file content that was present before an update
+            will be re-obtained in case a file was changed by the update."""), )
 
     @staticmethod
     @datasetmethod(name='update')
