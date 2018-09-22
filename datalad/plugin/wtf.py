@@ -78,6 +78,24 @@ def _describe_datalad():
     }
 
 
+def _describe_annex():
+    from datalad.cmd import get_runner
+
+    runner = get_runner()
+    out, err = runner.run(['git', 'annex', 'version'])
+    info = {}
+    for line in out.split(os.linesep):
+        key = line.split(':')[0]
+        if not key:
+            continue
+        value = line[len(key) + 2:].strip()
+        key = key.replace('git-annex ', '')
+        if key.endswith('s'):
+            value = value.split()
+        info[key] = value
+    return info
+
+
 def _describe_system():
     import platform as pl
     from datalad import get_encoding_info
@@ -280,6 +298,7 @@ class WTF(Interface):
             infos=infos,
         )
         infos['datalad'] = _describe_datalad()
+        infos['git-annex'] = _describe_annex()
         infos['system'] = _describe_system()
         infos['environment'] = _describe_environment()
         infos['configuration'] = _describe_configuration(cfg, sensitive)
@@ -324,7 +343,7 @@ def _render_report(res):
                 text = _unwind(text, val[k], u'{}  '.format(top))
         elif isinstance(val, (list, tuple)):
             for i, v in enumerate(val):
-                text += u'\n{}{}. '.format(top, i + 1)
+                text += u'\n{}{} '.format(top, '-')
                 text = _unwind(text, v, u'{}  '.format(top))
         else:
             text += u'{}'.format(val)
