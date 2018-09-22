@@ -2328,7 +2328,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 files = assure_list(files)
                 maxl = max(map(len, files))
-                chunk_size = CMD_MAX_ARG // maxl
+                chunk_size = max(
+                    1,  # should at least be 1. If blows then - not our fault
+                    (CMD_MAX_ARG
+                     - len(command)
+                     - sum((len(x) + 3) for x in annex_options)
+                     - 4   # for '--' below
+                     - 50  # for safety since we are to add more options
+                    // (maxl + 3)  # +3 for possible quotes and a space
+                    )
+                )
                 file_chunks = generate_chunks(files, chunk_size)
             out, err = "", ""
             for file_chunk in file_chunks:
