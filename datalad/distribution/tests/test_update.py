@@ -392,6 +392,7 @@ def test_reobtain_data(originpath, destpath):
 
 
 @with_tempfile(mkdir=True)
+@known_failure_direct_mode  # use of bare repos in the test
 def test_multiway_merge(path):
     # prepare ds with two siblings, but no tracking branch
     ds = Dataset(op.join(path, 'ds_orig')).create()
