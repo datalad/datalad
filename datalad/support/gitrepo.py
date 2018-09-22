@@ -451,11 +451,6 @@ class GitRepo(RepoInterface):
     # We use our sshrun helper
     GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
 
-    # Just a non-functional example:
-    # must be implemented, since abstract in RepoInterface:
-    def sth_like_file_has_content(self):
-        return "Yes, if it's in the index"
-
     # We must check git config to have name and email set, but
     # should do it once
     _config_checked = False

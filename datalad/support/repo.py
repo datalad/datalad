@@ -182,7 +182,4 @@ class RepoInterface(object):
     # http://stackoverflow.com/questions/20822850/change-python-mro-at-runtime
 
     # Test!
-
-    def sth_like_file_has_content(self):
-        raise NotImplementedError # the real thing in case of annex and True in case of git
-
+    pass
