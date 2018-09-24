@@ -1289,7 +1289,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 where='local',
                                 reload=False)
 
-        self._run_annex_command('init', annex_options=opts)
+        self._run_annex_command('init', annex_options=opts,
+                                log_stdout=False, log_stderr=False, log_online=True)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
         self.config.reload()
