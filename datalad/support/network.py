@@ -342,9 +342,11 @@ def _guess_ri_cls(ri):
 
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
-        if fields['path'] and '@' in fields['path'] or len(parts) > 1:
+        if fields['path'] and '@' in fields['path'] or \
+                (len(parts) > 1 and not parts[1].startswith('/')):
             # user@host:path/sp1
             # or host_name: (hence parts check)
+            # On Windows might look like /C:/Users/...
             # TODO: we need a regex to catch those really, parts check is not suff
             type_ = 'ssh'
         elif ri.startswith('//'):
