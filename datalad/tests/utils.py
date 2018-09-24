@@ -600,8 +600,11 @@ def with_tempfile(t, **tkwargs):
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
-                else ['network', 'network-clone']) \
+    from datalad import cfg
+    flavors_ = (['local', 'clone', 'local-url', 'network']
+                if not on_windows or cfg.obtain('datalad.repo.version') > 5
+                else ['network', 'network-clone']
+                ) \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
@@ -746,7 +749,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @wraps(t)
     @attr('with_testrepos')
     def newfunc(*arg, **kw):
-        if on_windows:
+        from datalad import cfg
+        if on_windows and not cfg.obtain('datalad.repo.version') > 5:
             raise SkipTest("Testrepo setup is broken on Windows")
 
         # TODO: would need to either avoid this "decorator" approach for
