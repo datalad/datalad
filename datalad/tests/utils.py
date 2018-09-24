@@ -702,6 +702,9 @@ def _get_testrepos_uris(regex, flavors):
             uris.append(clone_url(spec['local']))
 
         if 'network-clone' in flavors and 'network-clone' not in spec:
+            if 'network' not in spec:
+                # Cannot do network-clone since there is no network url
+                continue
             uris.append(clone_url(spec['network']))
 
     return uris
