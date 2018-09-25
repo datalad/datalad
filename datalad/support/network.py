@@ -343,7 +343,7 @@ def _guess_ri_cls(ri):
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
         if fields['path'] and '@' in fields['path'] or \
-                (len(parts) > 1 and not parts[1].startswith('/')):
+                (len(parts) > 1 and not parts[0].startswith('/')):
             # user@host:path/sp1
             # or host_name: (hence parts check)
             # On Windows might look like /C:/Users/...

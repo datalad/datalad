@@ -256,6 +256,11 @@ def test_url_samples():
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
     _check_ri("/f", PathRI, localpath='/f', path='/f')
     _check_ri("/f/s1", PathRI, localpath='/f/s1', path='/f/s1')
+    _check_ri("/C:/f/s1", PathRI, localpath='/C:/f/s1', path='/C:/f/s1')
+    # Single letter is still assumed to correspond to Windows path regardles of OS
+    _check_ri("C:/f/s1", PathRI, localpath='C:/f/s1', path='C:/f/s1')
+    # But two letters make it into a host name, and thus SSH
+    _check_ri("CC:/f/s1", SSHRI, hostname='CC', path='/f/s1')
 
     # some github ones, just to make sure
     _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
