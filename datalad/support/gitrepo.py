@@ -503,6 +503,7 @@ class GitPythonProgressBar(RemoteProgress):
             self._pbar.update(cur_count, increment=False)
         except Exception as exc:
             lgr.debug("GitPythonProgressBar errored with %s", exc_str(exc))
+            return
         #import time; time.sleep(0.001)  # to see that things are actually "moving"
         # without it we would get only a blink on initial 0 value, istead of
         # a blink at some higher value.  Anyways git provides those
