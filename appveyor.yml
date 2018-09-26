@@ -86,7 +86,7 @@ test_script:
   # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
   #- python -m nose -s -v datalad.customremotes
   # remaining fails: test_add test_create_test_dataset test_get test_uninstall test_utils
-  - python -m nose -s -v datalad.distribution.tests.test_create datalad.distribution.tests.test_create_github datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_siblings datalad.distribution.tests.test_update datalad.distribution.tests.test_dataset datalad.distribution.tests.test_install datalad.distribution.tests.test_publish datalad.distribution.tests.test_subdataset datalad.distribution.tests.test_clone datalad.distribution.tests.test_create_sibling
+  - python -m nose -s -v datalad.distribution.tests.test_create datalad.distribution.tests.test_create_github datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_dataset_config datalad.distribution.tests.test_siblings datalad.distribution.tests.test_update datalad.distribution.tests.test_install datalad.distribution.tests.test_publish datalad.distribution.tests.test_subdataset datalad.distribution.tests.test_clone datalad.distribution.tests.test_create_sibling
   # remaining fails: test_http
   - python -m nose -s -v datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3
   # remaining fails: test_add_archive_content test_annotate_paths test_diff test_ls_webui test_run test_save test_utils
