@@ -40,6 +40,7 @@ from six import string_types
 from six import add_metaclass
 from functools import wraps
 import git as gitpy
+from git import RemoteProgress
 from gitdb.exc import BadName
 from git.exc import GitCommandError
 from git.exc import NoSuchPathError
@@ -442,6 +443,73 @@ def guard_BadName(func):
     return wrapped
 
 
+class GitPythonProgressBar(RemoteProgress):
+    """A handler for Git commands interfaced by GitPython which report progress
+    """
+
+    # GitPython operates with op_codes which are a mask for actions.
+    _known_ops = {
+        RemoteProgress.COUNTING: "counting objects",
+        RemoteProgress.COMPRESSING: "compressing objects",
+        RemoteProgress.WRITING: "writing objects",
+        RemoteProgress.RECEIVING: "receiving objects",
+        RemoteProgress.RESOLVING: "resolving stuff",
+        RemoteProgress.FINDING_SOURCES: "finding sources",
+        RemoteProgress.CHECKING_OUT: "checking things out"
+    }
+
+    def __init__(self, action):
+        super(GitPythonProgressBar, self).__init__()
+        self._action = action
+        from datalad.ui import ui
+        self._ui = ui
+        self._pbar = None
+        self._op_code = None
+
+    def __del__(self):
+        self._close_pbar()
+
+    def _close_pbar(self):
+        if self._pbar:
+            self._pbar.finish()
+        self._pbar = None
+
+    def _get_human_msg(self, op_code):
+        """Return human readable action message
+        """
+        op_id = op_code & self.OP_MASK
+        op = self._known_ops.get(op_id, "doing other evil")
+        return "%s (%s)" % (self._action, op)
+
+    def update(self, op_code, cur_count, max_count=None, message=''):
+        # ATM we ignore message which typically includes bandwidth info etc
+        try:
+            if not max_count:
+                # spotted used by GitPython tests, so may be at times it is not
+                # known and assumed to be a 100%...? TODO
+                max_count = 100.0
+            if self._op_code is None or self._op_code != op_code:
+                # new type of operation
+                self._close_pbar()
+
+                self._pbar = self._ui.get_progressbar(
+                    self._get_human_msg(op_code),
+                    total=max_count
+                )
+                self._op_code = op_code
+            if not self._pbar:
+                lgr.error("Ended up without progress bar... how?")
+                return
+            self._pbar.update(cur_count, increment=False)
+        except Exception as exc:
+            lgr.debug("GitPythonProgressBar errored with %s", exc_str(exc))
+        #import time; time.sleep(0.001)  # to see that things are actually "moving"
+        # without it we would get only a blink on initial 0 value, istead of
+        # a blink at some higher value.  Anyways git provides those
+        # without flooding so should be safe to force here.
+        self._pbar.refresh()
+
+
 @add_metaclass(Flyweight)
 class GitRepo(RepoInterface):
     """Representation of a git repository
@@ -662,6 +730,13 @@ class GitRepo(RepoInterface):
         return self._repo
 
     @classmethod
+    def _get_progress_handler(cls, progress, action):
+        # we instructed to have or not progress
+        if (isinstance(progress, bool) and progress) or progress is None:
+            return GitPythonProgressBar(action)
+        return None
+
+    @classmethod
     def clone(cls, url, path, *args, **kwargs):
         """Clone url into path
 
@@ -730,8 +805,12 @@ class GitRepo(RepoInterface):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                repo = gitpy.Repo.clone_from(url, path, env=env,
-                                             odbt=default_git_odbt)
+                repo = gitpy.Repo.clone_from(
+                    url, path,
+                    env=env,
+                    odbt=default_git_odbt,
+                    progress=cls._get_progress_handler(True, 'Cloning')
+                )
                 # Note/TODO: signature for clone from:
                 # (url, to_path, progress=None, env=None, **kwargs)
 
@@ -1700,8 +1779,7 @@ class GitRepo(RepoInterface):
         refspec: str
           (optional) refspec to fetch.
         progress:
-          passed to gitpython. TODO: Figure it out, make consistent use of it
-          and document it.
+          passed to gitpython.
         all_: bool
           fetch all_ remotes (and all_ of their branches).
           Fails if `remote` was given.
@@ -1771,6 +1849,8 @@ class GitRepo(RepoInterface):
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """See fetch
         """
+        progress = self._get_progress_handler(progress, "Pulling")
+
         if remote is None:
             if refspec is not None:
                 # conflicts with using tracking branch or fetch all remotes
@@ -1796,16 +1876,21 @@ class GitRepo(RepoInterface):
             remote.config_reader.get(
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
+        pull_kwargs = dict(
+            refspec=refspec,
+            progress=self._get_progress_handler(progress, "Pulling"),
+            **kwargs
+        )
         if is_ssh(fetch_url):
             ssh_manager.get_connection(fetch_url).open()
             # TODO: with git <= 2.3 keep old mechanism:
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                return remote.pull(refspec=refspec, progress=progress, **kwargs)
-                # TODO: progress +kwargs
+                return remote.pull(**pull_kwargs)
+                # TODO: +kwargs
         else:
-            return remote.pull(refspec=refspec, progress=progress, **kwargs)
-            # TODO: progress +kwargs
+            return remote.pull(**pull_kwargs)
+            # TODO: +kwargs
 
     def push(self, remote=None, refspec=None, progress=None, all_remotes=False,
              **kwargs):
@@ -1817,8 +1902,8 @@ class GitRepo(RepoInterface):
           name of the remote to push to
         refspec: str
           specify what to push
-        progress:
-          TODO
+        progress: bool, optional
+          Either to report progress to UI
         all_remotes: bool
           if set to True push to all remotes. Conflicts with `remote` not being
           None.
@@ -1878,16 +1963,21 @@ class GitRepo(RepoInterface):
                 rm.config_reader.get('pushurl'
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
+            push_kwargs = dict(
+                refspec=refspec,
+                progress=self._get_progress_handler(progress, "Pushing %s" % rm.name ),
+                **kwargs
+            )
             if is_ssh(push_url):
                 ssh_manager.get_connection(push_url).open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                    pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
-                    # TODO: progress +kwargs
+                    pi_list += rm.push(**push_kwargs)
+                    # TODO: +kwargs
             else:
-                pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
-                # TODO: progress +kwargs
+                pi_list += rm.push(**push_kwargs)
+                # TODO: +kwargs
         return pi_list
 
     def get_remote_url(self, name, push=False):
