@@ -103,7 +103,7 @@ def test_download_url_dataset(toppath, topurl, path):
         [urls_tosave[1]])
 
     ds.download_url([opj(topurl, "file3.txt")], save=False)
-    assert_false(ds.repo.file_has_content("file3.txt"))
+    assert_false(ds.repo.file_has_content("file3.txt")[0])
 
     subdir_path = opj(path, "subdir")
     os.mkdir(subdir_path)

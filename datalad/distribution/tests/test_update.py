@@ -238,7 +238,7 @@ def test_newthings_coming_down(originpath, destpath):
     assert_is_instance(ds.repo, AnnexRepo)
     # should be fully functional
     testfname = opj(ds.path, 'load.dat')
-    assert_false(ds.repo.file_has_content(testfname))
+    assert_false(ds.repo.file_has_content(testfname)[0])
     ds.get('.')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
     # check that a new tag comes down
@@ -364,7 +364,7 @@ def test_reobtain_data(originpath, destpath):
     # update does not bring data automatically
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     assert_in('load.dat', ds.repo.get_annexed_files())
-    assert_false(ds.repo.file_has_content('load.dat'))
+    assert_false(ds.repo.file_has_content('load.dat')[0])
     # now get data
     ds.get('load.dat')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
@@ -377,7 +377,7 @@ def test_reobtain_data(originpath, destpath):
 
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
     assert_in('novel', ds.repo.get_annexed_files())
-    assert_false(ds.repo.file_has_content('novel'))
+    assert_false(ds.repo.file_has_content('novel')[0])
     # modify content at origin
     os.remove(opj(origin.path, 'load.dat'))
     create_tree(origin.path, {'load.dat': 'light'})
@@ -388,7 +388,7 @@ def test_reobtain_data(originpath, destpath):
     assert_result_count(res, 1, status='ok', type='dataset', action='update')
     assert_result_count(res, 1, status='ok', type='file', action='get')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'light')
-    assert_false(ds.repo.file_has_content('novel'))
+    assert_false(ds.repo.file_has_content('novel')[0])
 
 
 @with_tempfile(mkdir=True)

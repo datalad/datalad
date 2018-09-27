@@ -127,12 +127,12 @@ def test_uninstall_annex_file(path):
     ok_(ds.is_installed())
     ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     ds.repo.get('test-annex.dat')
-    ok_(ds.repo.file_has_content('test-annex.dat'))
+    ok_(ds.repo.file_has_content('test-annex.dat')[0])
 
     # remove file's content:
     res = ds.drop(path='test-annex.dat', result_xfm='paths')
     # test it happened:
-    ok_(not ds.repo.file_has_content('test-annex.dat'))
+    ok_(not ds.repo.file_has_content('test-annex.dat')[0])
     ok_file_under_git(ds.repo.path, 'test-annex.dat', annexed=True)
     # test result:
     eq_(res, [opj(ds.path, 'test-annex.dat')])
@@ -242,8 +242,8 @@ def test_uninstall_multiple_paths(path):
     ok_clean_git(ds.path)
     files_left = glob(opj(ds.path, '*', '*', '*')) + glob(opj(ds.path, '*'))
     ok_(all([f.endswith('keep') for f in files_left if exists(f) and not isdir(f)]))
-    ok_(not ds.repo.file_has_content(topfile))
-    ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:])))
+    ok_(not ds.repo.file_has_content(topfile)[0])
+    ok_(not subds.repo.file_has_content(opj(*psplit(deepfile)[1:]))[0])
     # remove handles for all 'kill' files
     ds.remove([topfile, deepfile], check=False)
     ok_clean_git(ds.path)

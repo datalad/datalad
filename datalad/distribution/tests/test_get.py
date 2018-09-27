@@ -143,13 +143,13 @@ def test_get_single_file(path):
 
     ds = Dataset(path)
     ok_(ds.is_installed())
-    ok_(ds.repo.file_has_content('test-annex.dat') is False)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is False)
     result = ds.get("test-annex.dat")
     assert_result_count(result, 1)
     assert_status('ok', result)
     eq_(result[0]['path'], opj(ds.path, 'test-annex.dat'))
     eq_(result[0]['annexkey'], ds.repo.get_file_key('test-annex.dat'))
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is True)
 
 
 @with_tree(tree={'file1.txt': 'whatever 1',
@@ -239,7 +239,7 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # additionally got file1.txt silently, since it has the same content as
     # subdir/subsubdir/file4.txt:
-    ok_(ds.repo.file_has_content('file1.txt') is True)
+    ok_(ds.repo.file_has_content('file1.txt')[0] is True)
 
 
 @slow  # 15.1496s
@@ -267,9 +267,9 @@ def test_get_recurse_subdatasets(src, path):
                      rel_path_sub2}
 
     # None of them is currently present:
-    ok_(ds.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat')[0] is False)
 
     ok_clean_git(subds1.path)
     # explicitly given path in subdataset => implicit recursion:
@@ -280,11 +280,11 @@ def test_get_recurse_subdatasets(src, path):
     assert_status('ok', result)
 
     assert_in_results(result, path=opj(ds.path, rel_path_sub1), status='ok')
-    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is True)
 
     # drop it:
     subds1.repo.drop('test-annex.dat')
-    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is False)
 
     # now, with a path not explicitly pointing within a
     # subdataset, but recursive option:
@@ -295,17 +295,17 @@ def test_get_recurse_subdatasets(src, path):
     eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
              if item['type'] == 'file']),
         annexed_files)
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
-    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
-    ok_(subds2.repo.file_has_content('test-annex.dat') is True)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is True)
+    ok_(subds2.repo.file_has_content('test-annex.dat')[0] is True)
 
     # drop them:
     ds.repo.drop('test-annex.dat')
     subds1.repo.drop('test-annex.dat')
     subds2.repo.drop('test-annex.dat')
-    ok_(ds.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat')[0] is False)
 
     # now, the very same call, but without recursive:
     result = ds.get('.', recursive=False)
@@ -314,9 +314,9 @@ def test_get_recurse_subdatasets(src, path):
     eq_(len(result) - 1, 1)
     assert_result_count(
         result, 1, path=opj(ds.path, 'test-annex.dat'), status='ok')
-    ok_(ds.repo.file_has_content('test-annex.dat') is True)
-    ok_(subds1.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds2.repo.file_has_content('test-annex.dat') is False)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is True)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds2.repo.file_has_content('test-annex.dat')[0] is False)
 
 
 @with_testrepos('submodule_annex', flavors='local')
@@ -332,9 +332,9 @@ def test_get_greedy_recurse_subdatasets(src, path):
 
     # We got all content in the subdatasets
     subds1, subds2 = ds.subdatasets(result_xfm='datasets')
-    ok_(ds.repo.file_has_content('test-annex.dat') is False)
-    ok_(subds1.repo.file_has_content('test-annex.dat') is True)
-    ok_(subds2.repo.file_has_content('test-annex.dat') is True)
+    ok_(ds.repo.file_has_content('test-annex.dat')[0] is False)
+    ok_(subds1.repo.file_has_content('test-annex.dat')[0] is True)
+    ok_(subds2.repo.file_has_content('test-annex.dat')[0] is True)
 
 
 @with_testrepos('submodule_annex', flavors='local')
@@ -357,7 +357,7 @@ def test_get_install_missing_subdataset(src, path):
     file_ = opj(subs[0].path, 'test-annex.dat')
     ds.get(file_)
     ok_(subs[0].is_installed())
-    ok_(subs[0].repo.file_has_content('test-annex.dat') is True)
+    ok_(subs[0].repo.file_has_content('test-annex.dat')[0] is True)
 
     # but we fulfill any handles, and dataset handles too
     ds.get(curdir, recursive=True)
@@ -386,7 +386,7 @@ def test_get_mixed_hierarchy(src, path):
     ds, subds = install(
         path, source=src, recursive=True,
         result_xfm='datasets', return_type='item-or-list', result_filter=None)
-    ok_(subds.repo.file_has_content("file_in_annex.txt") is False)
+    ok_(subds.repo.file_has_content("file_in_annex.txt")[0] is False)
 
     # and get:
     result = ds.get(curdir, recursive=True)
@@ -394,7 +394,7 @@ def test_get_mixed_hierarchy(src, path):
     assert_status(['ok', 'notneeded'], result)
     assert_result_count(
         result, 1, path=opj(subds.path, "file_in_annex.txt"), status='ok')
-    ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
+    ok_(subds.repo.file_has_content("file_in_annex.txt")[0] is True)
 
 
 @with_testrepos('submodule_annex', flavors='local')
@@ -410,8 +410,8 @@ def test_autoresolve_multiple_datasets(src, path):
         results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
         # each ds has one file
         assert_result_count(results, 2, type='file', action='get', status='ok')
-        ok_(ds1.repo.file_has_content('test-annex.dat') is True)
-        ok_(ds2.repo.file_has_content('test-annex.dat') is True)
+        ok_(ds1.repo.file_has_content('test-annex.dat')[0] is True)
+        ok_(ds2.repo.file_has_content('test-annex.dat')[0] is True)
 
 
 @slow  # 20 sec
@@ -438,7 +438,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     assert_in(subsub, results)
     # all file handles are fulfilled by default
     ok_(Dataset(opj(ds.path, 'sub', 'subsub')).repo.file_has_content(
-        "file_in_annex.txt") is True)
+        "file_in_annex.txt")[0] is True)
 
 
 @slow  # 92sec
@@ -461,7 +461,7 @@ def test_recurse_existing(src, path):
     root, sub1, sub2 = install(
         path, source=src, recursive=True, recursion_limit=2,
         result_xfm='datasets', result_filter=None)
-    ok_(sub2.repo.file_has_content('file_in_annex.txt') is False)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt')[0] is False)
     sub3 = Dataset(opj(sub2.path, 'sub3'))
     ok_(not sub3.is_installed())
     # now get all content in all existing datasets, no new datasets installed
@@ -469,18 +469,18 @@ def test_recurse_existing(src, path):
     files = root.get(curdir, recursive=True, recursion_limit='existing')
     assert_not_in_results(files, type='dataset', status='ok')
     assert_result_count(files, 1, type='file', status='ok')
-    ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt')[0] is True)
     ok_(not sub3.is_installed())
     # now pull down all remaining datasets, no data
     sub3, sub4 = root.get(
         curdir, recursive=True, get_data=False,
         result_xfm='datasets', result_filter=lambda x: x['status'] == 'ok')
     ok_(sub4.is_installed())
-    ok_(sub3.repo.file_has_content('file_in_annex.txt') is False)
+    ok_(sub3.repo.file_has_content('file_in_annex.txt')[0] is False)
     # aaannd all data
     files = root.get(curdir, recursive=True, result_filter=lambda x: x['status'] == 'ok' and x['type'] == 'file')
     eq_(len(files), 1)
-    ok_(sub3.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(sub3.repo.file_has_content('file_in_annex.txt')[0] is True)
 
 
 @slow  # 33sec
@@ -504,5 +504,5 @@ def test_get_in_unavailable_subdataset(src, path):
     # we got the dataset, and its immediate content, but nothing below
     sub2 = Dataset(targetabspath)
     ok_(sub2.is_installed())
-    ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
+    ok_(sub2.repo.file_has_content('file_in_annex.txt')[0] is True)
     ok_(not Dataset(opj(targetabspath, 'sub3')).is_installed())

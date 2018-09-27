@@ -269,7 +269,7 @@ def test_install_simple_local(src, path):
             {'test.dat', 'INFO.txt', 'test-annex.dat'})
         ok_clean_git(path, annex=True)
         # no content was installed:
-        ok_(not ds.repo.file_has_content('test-annex.dat'))
+        ok_(not ds.repo.file_has_content('test-annex.dat')[0])
         uuid_before = ds.repo.uuid
         eq_(ds.repo.get_description(), 'mydummy')
 
@@ -515,11 +515,11 @@ def test_install_known_subdataset(src, path):
     assert_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
 
     # now, get the data by reinstalling with -g:
-    ok_(subds.repo.file_has_content('test-annex.dat') is False)
+    ok_(subds.repo.file_has_content('test-annex.dat')[0] is False)
     with chpwd(ds.path):
         result = get(path='subm 1', dataset=os.curdir)
         assert_in_results(result, path=opj(subds.path, 'test-annex.dat'))
-        ok_(subds.repo.file_has_content('test-annex.dat') is True)
+        ok_(subds.repo.file_has_content('test-annex.dat')[0] is True)
         ok_(subds.is_installed())
 
 
@@ -670,14 +670,14 @@ def test_install_recursive_repeat(src, path):
     assert_in(sub1, result)
     assert_in(sub2, result)
     assert_not_in(subsub, result)
-    ok_(top_ds.repo.file_has_content('top_file.txt') is True)
-    ok_(sub1.repo.file_has_content('sub1file.txt') is True)
-    ok_(sub2.repo.file_has_content('sub2file.txt') is True)
+    ok_(top_ds.repo.file_has_content('top_file.txt')[0] is True)
+    ok_(sub1.repo.file_has_content('sub1file.txt')[0] is True)
+    ok_(sub2.repo.file_has_content('sub2file.txt')[0] is True)
 
     # install sub1 again, recursively and with data
     top_ds.install('sub 1', recursive=True, get_data=True)
     ok_(subsub.is_installed())
-    ok_(subsub.repo.file_has_content('subsubfile.txt'))
+    ok_(subsub.repo.file_has_content('subsubfile.txt')[0])
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
