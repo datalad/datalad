@@ -260,11 +260,11 @@ class Clone(Interface):
                     e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
                 if 'could not create work tree' in e_stderr.lower():
                     # this cannot be fixed by trying another URL
+                    re_match = re.match(r".*fatal: (.*)$", e_stderr,
+                                        flags=re.MULTILINE | re.DOTALL)
                     yield get_status_dict(
                         status='error',
-                        message=re.match(r".*fatal: (.*)\n",
-                                         e_stderr,
-                                         flags=re.MULTILINE | re.DOTALL).group(1),
+                        message=re_match.group(1) if re_match else "stderr: " + e_stderr,
                         **status_kwargs)
                     return
 
