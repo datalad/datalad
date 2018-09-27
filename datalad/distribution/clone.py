@@ -260,7 +260,7 @@ class Clone(Interface):
         if not destination_dataset.is_installed():
             yield get_status_dict(
                 status='error',
-                message=("Failed to clone data from any candidate source URL: %s",
+                message=("Failed to clone from any candidate source URL: %s",
                          candidate_sources),
                 **status_kwargs)
             return
