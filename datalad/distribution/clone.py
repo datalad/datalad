@@ -11,6 +11,7 @@
 
 import logging
 import re
+from collections import OrderedDict
 from os import listdir
 from os.path import relpath
 from os.path import pardir
@@ -232,6 +233,7 @@ class Clone(Interface):
         lgr.info("Cloning %s%s into '%s'",
                  source, candidates_str, dest_path)
         dest_path_existed = exists(dest_path)
+        error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
         for isource_, source_ in enumerate(candidate_sources):
             try:
                 lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
@@ -239,8 +241,9 @@ class Clone(Interface):
                 GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
+                error_msgs[source_] = exc_str_ = exc_str(e)
                 lgr.debug("Failed to clone from URL: %s (%s)",
-                          source_, exc_str(e))
+                          source_, exc_str_)
                 if exists(dest_path):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
@@ -258,10 +261,22 @@ class Clone(Interface):
                     return
 
         if not destination_dataset.is_installed():
+            if len(error_msgs):
+                error_msg = "Failed to clone from any candidate source URL. " \
+                            "Encountered errors per each url were: %s"
+                error_args = (error_msgs, )
+            else:
+                # yoh: Not sure if we ever get here but I felt that there could
+                #      be a case when this might happen and original error would
+                #      not be sufficient to troubleshoot what is going on.
+                error_msg = "Awkward error -- we failed to clone properly. " \
+                            "Although no errors were encountered, target " \
+                            "dataset at %s seems to be not fully installed. " \
+                            "The 'succesful' source was: %s"
+                error_args = (destination_dataset.path, source_)
             yield get_status_dict(
                 status='error',
-                message=("Failed to clone from any candidate source URL: %s",
-                         candidate_sources),
+                message=(error_msg, error_args),
                 **status_kwargs)
             return
 
