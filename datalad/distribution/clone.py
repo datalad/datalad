@@ -250,6 +250,9 @@ class Clone(Interface):
                     # We must not just rmtree since it might be curdir etc
                     # we should remove all files/directories under it
                     rmtree(dest_path, children_only=dest_path_existed)
+                # Whenever progress reporting is enabled, as it is now,
+                # we end up without e.stderr since it is "processed" out by
+                # GitPython/our progress handler.
                 if 'could not create work tree' in e.stderr.lower():
                     # this cannot be fixed by trying another URL
                     yield get_status_dict(
