@@ -10,6 +10,7 @@
 
 
 import logging
+import os
 import re
 from collections import OrderedDict
 from os import listdir
@@ -253,12 +254,16 @@ class Clone(Interface):
                 # Whenever progress reporting is enabled, as it is now,
                 # we end up without e.stderr since it is "processed" out by
                 # GitPython/our progress handler.
-                if 'could not create work tree' in e.stderr.lower():
+                e_stderr = e.stderr
+                from datalad.support.gitrepo import GitPythonProgressBar
+                if not e_stderr and GitPythonProgressBar._last_error_lines:
+                    e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+                if 'could not create work tree' in e_stderr.lower():
                     # this cannot be fixed by trying another URL
                     yield get_status_dict(
                         status='error',
                         message=re.match(r".*fatal: (.*)\n",
-                                         e.stderr,
+                                         e_stderr,
                                          flags=re.MULTILINE | re.DOTALL).group(1),
                         **status_kwargs)
                     return

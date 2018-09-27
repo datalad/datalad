@@ -458,6 +458,16 @@ class GitPythonProgressBar(RemoteProgress):
         RemoteProgress.CHECKING_OUT: "checking things out"
     }
 
+    # To overcome the bug when GitPython (<=2.1.11), with tentative fix
+    # in https://github.com/gitpython-developers/GitPython/pull/798
+    # we will collect error_lines from the last progress bar used by GitPython
+    # To do that reliably this class should be used as a ContextManager,
+    # or .close() should be called explicitly before analysis of this
+    # attribute is done.
+    # TODO: remove the workaround whenever new GitPython version provides
+    # it natively and we boost versioned dependency on it
+    _last_error_lines = None
+
     def __init__(self, action):
         super(GitPythonProgressBar, self).__init__()
         self._action = action
@@ -465,9 +475,20 @@ class GitPythonProgressBar(RemoteProgress):
         self._ui = ui
         self._pbar = None
         self._op_code = None
+        GitPythonProgressBar._last_error_lines = None
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        GitPythonProgressBar._last_error_lines = self.error_lines
         self._close_pbar()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
 
     def _close_pbar(self):
         if self._pbar:
@@ -731,13 +752,6 @@ class GitRepo(RepoInterface):
         return self._repo
 
     @classmethod
-    def _get_progress_handler(cls, progress, action):
-        # we instructed to have or not progress
-        if (isinstance(progress, bool) and progress) or progress is None:
-            return GitPythonProgressBar(action)
-        return None
-
-    @classmethod
     def clone(cls, url, path, *args, **kwargs):
         """Clone url into path
 
@@ -806,12 +820,13 @@ class GitRepo(RepoInterface):
         for trial in range(ntries):
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                repo = gitpy.Repo.clone_from(
-                    url, path,
-                    env=env,
-                    odbt=default_git_odbt,
-                    progress=cls._get_progress_handler(True, 'Cloning')
-                )
+                with GitPythonProgressBar("Cloning") as git_progress:
+                    repo = gitpy.Repo.clone_from(
+                        url, path,
+                        env=env,
+                        odbt=default_git_odbt,
+                        progress=git_progress
+                    )
                 # Note/TODO: signature for clone from:
                 # (url, to_path, progress=None, env=None, **kwargs)
 
@@ -1768,8 +1783,7 @@ class GitRepo(RepoInterface):
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
     @guard_BadName
-    def fetch(self, remote=None, refspec=None, progress=None, all_=False,
-              **kwargs):
+    def fetch(self, remote=None, refspec=None, all_=False, **kwargs):
         """Fetches changes from a remote (or all_ remotes).
 
         Parameters
@@ -1779,8 +1793,6 @@ class GitRepo(RepoInterface):
           `all_` is not set, the tracking branch is fetched.
         refspec: str
           (optional) refspec to fetch.
-        progress:
-          passed to gitpython.
         all_: bool
           fetch all_ remotes (and all_ of their branches).
           Fails if `remote` was given.
@@ -1833,24 +1845,29 @@ class GitRepo(RepoInterface):
                 lgr.debug("Remote %s has no URL", rm)
                 return []
 
-            if is_ssh(fetch_url):
-                ssh_manager.get_connection(fetch_url).open()
-                # TODO: with git <= 2.3 keep old mechanism:
-                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                    fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
-                    # TODO: progress +kwargs
-            else:
-                fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
-                # TODO: progress +kwargs
+            with GitPythonProgressBar("Fetching %s" % rm.name) as git_progress:
+                git_kwargs = dict(
+                    refspec=refspec,
+                    progress=git_progress,
+                    **kwargs
+                )
+                if is_ssh(fetch_url):
+                    ssh_manager.get_connection(fetch_url).open()
+                    # TODO: with git <= 2.3 keep old mechanism:
+                    #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                    with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
+                        fi_list += rm.fetch(**git_kwargs)
+                        # TODO: +kwargs
+                else:
+                    fi_list += rm.fetch(**git_kwargs)
+                    # TODO: +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
         return fi_list
 
-    def pull(self, remote=None, refspec=None, progress=None, **kwargs):
+    def pull(self, remote=None, refspec=None, **kwargs):
         """See fetch
         """
-        progress = self._get_progress_handler(progress, "Pulling")
 
         if remote is None:
             if refspec is not None:
@@ -1877,23 +1894,25 @@ class GitRepo(RepoInterface):
             remote.config_reader.get(
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
-        pull_kwargs = dict(
-            refspec=refspec,
-            progress=self._get_progress_handler(progress, "Pulling"),
-            **kwargs
-        )
-        if is_ssh(fetch_url):
-            ssh_manager.get_connection(fetch_url).open()
-            # TODO: with git <= 2.3 keep old mechanism:
-            #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-            with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                return remote.pull(**pull_kwargs)
-                # TODO: +kwargs
-        else:
-            return remote.pull(**pull_kwargs)
-            # TODO: +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all_remotes=False,
+        with GitPythonProgressBar("Pulling") as git_progress:
+            git_kwargs = dict(
+                refspec=refspec,
+                progress=git_progress,
+                **kwargs
+            )
+            if is_ssh(fetch_url):
+                ssh_manager.get_connection(fetch_url).open()
+                # TODO: with git <= 2.3 keep old mechanism:
+                #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                with remote.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
+                    return remote.pull(**git_kwargs)
+                    # TODO: +kwargs
+            else:
+                return remote.pull(**git_kwargs)
+                # TODO: +kwargs
+
+    def push(self, remote=None, refspec=None, all_remotes=False,
              **kwargs):
         """Push to remote repository
 
@@ -1903,8 +1922,6 @@ class GitRepo(RepoInterface):
           name of the remote to push to
         refspec: str
           specify what to push
-        progress: bool, optional
-          Either to report progress to UI
         all_remotes: bool
           if set to True push to all remotes. Conflicts with `remote` not being
           None.
@@ -1964,21 +1981,22 @@ class GitRepo(RepoInterface):
                 rm.config_reader.get('pushurl'
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
-            push_kwargs = dict(
-                refspec=refspec,
-                progress=self._get_progress_handler(progress, "Pushing %s" % rm.name ),
-                **kwargs
-            )
-            if is_ssh(push_url):
-                ssh_manager.get_connection(push_url).open()
-                # TODO: with git <= 2.3 keep old mechanism:
-                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
-                with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
-                    pi_list += rm.push(**push_kwargs)
+            with GitPythonProgressBar("Pushing %s" % rm.name) as git_progress:
+                git_kwargs = dict(
+                    refspec=refspec,
+                    progress=git_progress,
+                    **kwargs
+                )
+                if is_ssh(push_url):
+                    ssh_manager.get_connection(push_url).open()
+                    # TODO: with git <= 2.3 keep old mechanism:
+                    #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                    with rm.repo.git.custom_environment(**GitRepo.GIT_SSH_ENV):
+                        pi_list += rm.push(**git_kwargs)
+                        # TODO: +kwargs
+                else:
+                    pi_list += rm.push(**git_kwargs)
                     # TODO: +kwargs
-            else:
-                pi_list += rm.push(**push_kwargs)
-                # TODO: +kwargs
         return pi_list
 
     def get_remote_url(self, name, push=False):
