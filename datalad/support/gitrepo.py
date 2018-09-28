@@ -35,6 +35,7 @@ from os.path import sep
 import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
+from collections import OrderedDict
 
 
 from six import string_types
@@ -2474,6 +2475,9 @@ class GitRepo(RepoInterface):
 
     def get_content_info(self, paths=None, wtmode=False):
         """
+        Calling without any options given will always give the fastest
+        performance.
+
         Parameters
         ----------
         paths : list
@@ -2496,7 +2500,7 @@ class GitRepo(RepoInterface):
             tracked.
         """
         # TODO limit by file type to replace code in subdatasets command
-        info = {}
+        info = OrderedDict()
 
         mode_type_map = {
             '100644': 'file',
