@@ -510,7 +510,6 @@ def get_run_info(dset, message):
             default=op.join('.datalad', 'runinfo'))
         record_path = op.join(dset.path, record_dir, runinfo)
         if not op.lexists(record_path):
-            # too harsh IMHO, but same harshness as few lines further down
             raise ValueError("Run record sidecar file not found: {}".format(record_path))
         # TODO `get` the file
         recs = load_stream(record_path, compressed=True)
