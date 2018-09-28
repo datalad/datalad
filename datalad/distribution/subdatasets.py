@@ -91,7 +91,9 @@ def _parse_git_submodules(dspath):
         return
 
     ds = Dataset(dspath)
-
+    # get info on subdatasets, use GitRepo variant of the
+    # method directly to save some cycles, as we do not need
+    # any info from git-annex
     for p, props in iteritems(GitRepo.get_content_info(ds.repo)):
         if not props.get('type', None) == 'dataset':
             continue

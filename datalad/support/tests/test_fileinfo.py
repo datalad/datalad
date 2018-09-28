@@ -16,6 +16,7 @@ from datalad.tests.utils import (
     create_tree,
     assert_equal,
     assert_in,
+    assert_not_in,
     ok_clean_git,
 )
 
@@ -103,6 +104,15 @@ def test_get_content_info(path):
             assert_in(r['type'], ('file', 'symlink'))
         if 'file_ingit' in f:
             assert(r['type'] == 'file')
+        elif 'datalad' not in f and 'git' not in f and \
+                r['revision'] and 'subds' not in f:
+            # this should be known to annex, one way or another
+            assert_in('key', r)
+            assert_in('keyname', r)
+            assert_in('backend', r)
+            assert_in('bytesize', r)
+            # no duplication with path
+            assert_not_in('file', r)
 
     # query a single absolute path
     res = ds.repo.get_content_info(

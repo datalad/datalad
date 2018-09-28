@@ -3412,6 +3412,48 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files=files):
             yield jsn
 
+    def get_content_info(self, paths=None, wtmode=False):
+        """
+        Calling without any options given will always give the fastest
+        performance.
+
+        Parameters
+        ----------
+        paths : list
+          Specific paths to query info for. In none are given, info is
+          reported for all content.
+        wtmode : bool
+          If given, reports the result of `os.lstat()` as `stat_wt` property
+          for the work tree content.
+
+        Returns
+        -------
+        dict
+          Each content item has an entry under its relative path within
+          the repository. Each value is a dictionary with properties:
+
+          `type`
+            Can be 'file', 'symlink', 'dataset', 'directory'
+          `revision`
+            SHASUM is last commit affecting the item, or None, if not
+            tracked.
+        """
+        info = super(AnnexRepo, self).get_content_info(
+            paths=paths,
+            wtmode=wtmode,
+        )
+        for j in self._run_annex_command_json(
+                'findref', opts=['HEAD']):
+            path = j['file']
+            if path not in info:
+                # ignore anything that Git hasn't reported on
+                # TODO figure out when it is more efficient to query
+                # a particular set of paths, instead of all of them
+                # and just throwing away the results
+                continue
+            info[path].update({k: j[k] for k in j if k != 'file'})
+        return info
+
     @staticmethod
     def _is_annex_work_tree_message(out):
         return re.match(
