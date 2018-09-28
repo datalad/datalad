@@ -53,14 +53,30 @@ from datalad.metadata.metadata import query_aggregated_metadata
 _any2unicode = partial(as_unicode, cast_types=(int, float, tuple, list, dict))
 
 
-def _listdict2dictlist(lst):
+def _listdict2dictlist(lst, strict=True):
+    """Helper to deal with DataLad's unique value reports
+
+    Parameters
+    ----------
+    lst : list
+      List of dicts
+    strict : bool
+      In strict mode any dictionary items that doesn't have a simple value
+      (but another container) is discarded. In non-strict mode, arbitrary
+      levels of nesting are preserved, and no unique-ification of values
+      is performed. The latter can be used when it is mostly (or merely)
+      interesting to get a list of metadata keys.
+    """
     # unique values that we got, always a list
     if all(not isinstance(uval, dict) for uval in lst):
         # no nested structures, take as is
         return lst
 
+    type_excluder = (tuple, list)
+    if strict:
+        type_excluder += (dict,)
     # we need to turn them inside out, instead of a list of
-    # dicts, we want a dict where keys are lists, because we
+    # dicts, we want a dict where values are lists, because we
     # cannot handle hierarchies in a tabular search index
     # if you came here to find that out, go ahead and use a graph
     # DB/search
@@ -71,7 +87,7 @@ def _listdict2dictlist(lst):
             # in favor of the structured metadata
             continue
         for k, v in uv.items():
-            if isinstance(v, (tuple, list, dict)):
+            if isinstance(v, type_excluder):
                 # this is where we draw the line, two levels of
                 # nesting. whoosh can only handle string values
                 # injecting a stringified blob of something doesn't
@@ -80,8 +96,14 @@ def _listdict2dictlist(lst):
             if v == "":
                 # no cruft
                 continue
-            uvals = udict.get(k, set())
-            uvals.add(v)
+            if strict:
+                # no duplicate values, only hashable stuff
+                uvals = udict.get(k, set())
+                uvals.add(v)
+            else:
+                # whatever it is, we'll take it
+                uvals = udict.get(k, [])
+                uvals.append(v)
             udict[k] = uvals
     return {
         # set not good for JSON, have plain list
@@ -110,7 +132,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+                srcmeta[uk] = _listdict2dictlist(umeta[uk], strict=False) if umeta[uk] is not None else None
             if src not in meta and srcmeta:
                 meta[src] = srcmeta  # assign the new one back
 
@@ -798,6 +820,9 @@ class _EGrepCSSearch(_Search):
                 '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
                 k=k, stat=stat
             ))
+        # After #2156 datasets may not necessarily carry all
+        # keys in the "unique" summary
+        lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
 
     def get_query(self, query):
         query = assure_list(query)
