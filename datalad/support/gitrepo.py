@@ -16,6 +16,7 @@ import logging
 import re
 import shlex
 import time
+import stat
 import os
 import os.path as op
 from os import linesep
@@ -57,6 +58,7 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
+from datalad.utils import _path_
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -2470,6 +2472,89 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('{}\n'.format(attrline))
 
+    def get_content_info(self, paths=None, wtmode=False):
+        """
+        Parameters
+        ----------
+        paths : list
+          Specific paths to query info for. In none are given, info is
+          reported for all content.
+        wtmode : bool
+          If given, reports the result of `os.lstat()` as `stat_wt` property
+          for the work tree content.
+
+        Returns
+        -------
+        dict
+          Each content item has an entry under its relative path within
+          the repository. Each value is a dictionary with properties:
+
+          `type`
+            Can be 'file', 'symlink', 'dataset', 'directory'
+          `revision`
+            SHASUM is last commit affecting the item, or None, if not
+            tracked.
+        """
+        # TODO limit by file type to replace code in subdatasets command
+        info = {}
+
+        mode_type_map = {
+            '100644': 'file',
+            '100755': 'file',
+            '120000': 'symlink',
+            '160000': 'dataset',
+        }
+
+        # this will not work in direct mode, but everything else should be
+        # just fine
+        cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d']
+
+        stdout, stderr = self._git_custom_command(
+            [_normalize_path(self.path, p) for p in paths] if paths else [],
+            cmd,
+            log_stderr=True,
+            log_stdout=True,
+            # not sure why exactly, but log_online has to be false!
+            log_online=False,
+            expect_stderr=False,
+            shell=False,
+            # we don't want it to scream on stdout
+            expect_fail=True)
+
+        props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
+
+        for line in stdout.split('\0'):
+            if not line:
+                continue
+            inf = {}
+            props = props_re.match(line)
+            if not props:
+                # not known to Git
+                path = line
+                inf['revision'] = None
+            else:
+                path = props.group(4)
+                inf['revision'] = props.group(2)
+                inf['type'] = mode_type_map.get(
+                    props.group(1), props.group(1))
+            abspath_ = op.join(self.path, path)
+            if wtmode:
+                if not op.lexists(abspath_):
+                    inf['stat_wt'] = None
+                else:
+                    s = os.lstat(abspath_)
+                    inf['stat_wt'] = s
+                    if 'type' not in inf:
+                        s = s.st_mode
+                        if stat.S_ISDIR(s):
+                            inf['type'] = 'directory'
+                        elif stat.S_ISREG(s):
+                            inf['type'] = 'file'
+                        elif stat.S_ISLNK(s):
+                            inf['type'] = 'symlink'
+
+            info[path] = inf
+        return info
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove
