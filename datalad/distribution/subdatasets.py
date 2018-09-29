@@ -39,7 +39,6 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
-from datalad.support.gitrepo import GitRepo
 from datalad.utils import _path_
 from datalad.utils import path_startswith
 from datalad.utils import assure_list
@@ -94,7 +93,7 @@ def _parse_git_submodules(dspath):
     # get info on subdatasets, use GitRepo variant of the
     # method directly to save some cycles, as we do not need
     # any info from git-annex
-    for p, props in iteritems(GitRepo.get_content_info(ds.repo)):
+    for p, props in iteritems(ds.repo.get_content_info()):
         if not props.get('type', None) == 'dataset':
             continue
         subpath = _path_(dspath, p)

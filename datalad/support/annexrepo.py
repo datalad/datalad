@@ -3412,7 +3412,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                 files=files):
             yield jsn
 
-    def get_content_info(self, paths=None, wtmode=False):
+    def get_content_annexinfo(
+            self, paths=None, init='git', ref=None, **kwargs):
         """
         Calling without any options given will always give the fastest
         performance.
@@ -3422,9 +3423,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         paths : list
           Specific paths to query info for. In none are given, info is
           reported for all content.
-        wtmode : bool
-          If given, reports the result of `os.lstat()` as `stat_wt` property
-          for the work tree content.
+        init : 'git' or dict-like
+          If set to 'git' annex content info will ammend the output of
+          GitRepo.get_content_info(), otherwise the dict-like object
+          supplied will receive this information.
+        ref : gitref or None
+          If not None, annex content info for this Git reference will be
+          produced, otherwise for the content of the present worktree.
+        **kwargs :
+          Additional arguments for GitRepo.get_content_info(), if `init` is
+          set to 'git'.
 
         Returns
         -------
@@ -3438,12 +3446,19 @@ class AnnexRepo(GitRepo, RepoInterface):
             SHASUM is last commit affecting the item, or None, if not
             tracked.
         """
-        info = super(AnnexRepo, self).get_content_info(
-            paths=paths,
-            wtmode=wtmode,
-        )
-        for j in self._run_annex_command_json(
-                'findref', opts=['HEAD']):
+        if init == 'git':
+            info = super(AnnexRepo, self).get_content_info(
+                paths=paths, **kwargs)
+        else:
+            info = init
+        if ref:
+            cmd = 'findref'
+            opts = [ref]
+        else:
+            cmd = 'find'
+            # TODO maybe inform by `path`?
+            opts = ['--include', '*']
+        for j in self._run_annex_command_json(cmd, opts=opts):
             path = j['file']
             if path not in info:
                 # ignore anything that Git hasn't reported on
