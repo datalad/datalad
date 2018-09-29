@@ -2495,9 +2495,10 @@ class GitRepo(RepoInterface):
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
-          `revision`
-            SHASUM is last commit affecting the item, or None, if not
-            tracked.
+          `gitshasum`
+            SHASUM of the item as tracked by Git, or None, if not
+            tracked. This could be different from the SHASUM of the file
+            in the worktree, if it was modified.
         """
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
@@ -2535,10 +2536,10 @@ class GitRepo(RepoInterface):
             if not props:
                 # not known to Git
                 path = line
-                inf['revision'] = None
+                inf['gitshasum'] = None
             else:
                 path = props.group(4)
-                inf['revision'] = props.group(2)
+                inf['gitshasum'] = props.group(2)
                 inf['type'] = mode_type_map.get(
                     props.group(1), props.group(1))
             abspath_ = op.join(self.path, path)

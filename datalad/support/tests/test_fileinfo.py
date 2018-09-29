@@ -120,18 +120,18 @@ def test_get_content_info(path):
                 ref='HEAD',
                 wtmode=True)).items():
         if f.endswith('untracked'):
-            assert(r['revision'] is None)
+            assert(r['gitshasum'] is None)
         if f.endswith('deleted'):
             assert(r['stat_wt'] is None)
         if 'subds_' in f:
-                assert(r['type'] == 'dataset' if r['revision'] else 'directory')
+                assert(r['type'] == 'dataset' if r['gitshasum'] else 'directory')
         if 'file_' in f:
             # which one exactly depends on many things
             assert_in(r['type'], ('file', 'symlink'))
         if 'file_ingit' in f:
             assert(r['type'] == 'file')
         elif 'datalad' not in f and 'git' not in f and \
-                r['revision'] and 'subds' not in f:
+                r['gitshasum'] and 'subds' not in f:
             # this should be known to annex, one way or another
             # regardless of whether things add deleted or staged
             # or anything inbetween
