@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     with_tempfile,
     create_tree,
     assert_equal,
+    assert_dict_equal,
     assert_in,
     assert_not_in,
     ok_clean_git,
@@ -118,7 +119,7 @@ def test_get_content_info(path):
     for f, r in ds.repo.get_content_annexinfo(
             init=ds.repo.get_content_annexinfo(
                 ref='HEAD',
-                wtmode=True)).items():
+                stat_wt=True)).items():
         if f.endswith('untracked'):
             assert(r['gitshasum'] is None)
         if f.endswith('deleted'):
@@ -149,3 +150,11 @@ def test_get_content_info(path):
     assert_in(op.join('subdir', 'file_normal'), res)
 
 
+@with_tempfile
+def test_compare_content_info(path):
+    ds = Dataset(path).create()
+    ok_clean_git(path)
+
+    # for a clean repo HEAD and worktree query should yield identical results
+    wt = ds.repo.get_content_info(ref=None)
+    assert_dict_equal(wt, ds.repo.get_content_info(ref='HEAD'))

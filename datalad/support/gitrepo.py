@@ -2473,17 +2473,21 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('{}\n'.format(attrline))
 
-    def get_content_info(self, paths=None, wtmode=False):
-        """
-        Calling without any options given will always give the fastest
-        performance.
+    def get_content_info(self, paths=None, ref=None, stat_wt=False):
+        """Get identifier and type information from repository content.
+
+        This is simplified front-end for `git ls-files/tree`.
 
         Parameters
         ----------
         paths : list
           Specific paths to query info for. In none are given, info is
           reported for all content.
-        wtmode : bool
+        ref : gitref or None
+          If given, content information is retrieved for this Git reference
+          (via ls-tree), otherwise content information is produced for the
+          present work tree (via ls-files).
+        stat_wt : bool
           If given, reports the result of `os.lstat()` as `stat_wt` property
           for the work tree content.
 
@@ -2512,7 +2516,12 @@ class GitRepo(RepoInterface):
 
         # this will not work in direct mode, but everything else should be
         # just fine
-        cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d']
+        if not ref:
+            cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d']
+        else:
+            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree']
+        # works for both modes
+        props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
 
         stdout, stderr = self._git_custom_command(
             [_normalize_path(self.path, p) for p in paths] if paths else [],
@@ -2526,8 +2535,6 @@ class GitRepo(RepoInterface):
             # we don't want it to scream on stdout
             expect_fail=True)
 
-        props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
-
         for line in stdout.split('\0'):
             if not line:
                 continue
@@ -2539,11 +2546,11 @@ class GitRepo(RepoInterface):
                 inf['gitshasum'] = None
             else:
                 path = props.group(4)
-                inf['gitshasum'] = props.group(2)
+                inf['gitshasum'] = props.group(2 if not ref else 3)
                 inf['type'] = mode_type_map.get(
                     props.group(1), props.group(1))
             abspath_ = op.join(self.path, path)
-            if wtmode:
+            if stat_wt:
                 if not op.lexists(abspath_):
                     inf['stat_wt'] = None
                 else:
