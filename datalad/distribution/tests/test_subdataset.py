@@ -92,7 +92,7 @@ def test_get_subdatasets(path):
     assert_status('ok', res)
     for r in res:
         #for prop in ('gitmodule_url', 'state', 'revision', 'gitmodule_name'):
-        for prop in ('gitmodule_url', 'revision', 'gitmodule_name'):
+        for prop in ('gitmodule_url', 'gitshasum', 'gitmodule_name'):
             assert_in(prop, r)
         # random property is unknown
         assert_not_in('mike', r)
