@@ -40,6 +40,7 @@ from collections import OrderedDict
 
 from six import string_types
 from six import add_metaclass
+from six import iteritems
 from functools import wraps
 import git as gitpy
 from gitdb.exc import BadName
@@ -2542,10 +2543,10 @@ class GitRepo(RepoInterface):
             props = props_re.match(line)
             if not props:
                 # not known to Git
-                path = line
+                path = line.strip(op.sep)
                 inf['gitshasum'] = None
             else:
-                path = props.group(4)
+                path = props.group(4).strip(op.sep)
                 inf['gitshasum'] = props.group(2 if not ref else 3)
                 inf['type'] = mode_type_map.get(
                     props.group(1), props.group(1))
@@ -2567,6 +2568,41 @@ class GitRepo(RepoInterface):
 
             info[path] = inf
         return info
+
+    def status(self, paths=None):
+        """Simplified `git status` equivalent.
+
+        Yields a comparison of a get_content_info(stat_wt=True) with a
+        get_content_info(ref='HEAD')
+
+        Returns
+        -------
+        dict
+          Each content item has an entry under its relative path within
+          the repository. Each value is a dictionary with properties:
+
+          `type`
+            Can be 'file', 'symlink', 'dataset', 'directory'
+          `state`
+            Can be 'added', 'untracked', 'clean', 'deleted'.
+        """
+        # TODO report more info from get_content_info() calls in return
+        # value, those are cheap and possibly useful to a consumer
+        status = OrderedDict()
+        wt = self.get_content_info(paths=paths, ref=None, stat_wt=True)
+        head = self.get_content_info(paths=paths, ref='HEAD', stat_wt=False)
+        for f, wt_r in iteritems(wt):
+            if f not in head:
+                status[f] = dict(
+                    state='added' if wt_r['gitshasum'] else 'untracked',
+                    type=wt_r['type'],
+                )
+            elif wt_r['gitshasum'] == head[f]['gitshasum']:
+                status[f] = dict(
+                    state='clean' if wt_r['stat_wt'] else 'deleted',
+                    type=wt_r['type'],
+                )
+        return status
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove

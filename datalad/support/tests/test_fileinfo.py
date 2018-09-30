@@ -35,10 +35,10 @@ def _get_convoluted_situation(path):
         ds.path,
         {
             'subdir': {
-                'file_normal': 'file_normal',
+                'file_clean': 'file_clean',
                 'file_deleted': 'file_deleted',
             },
-            'file_normal': 'file_normal',
+            'file_clean': 'file_clean',
             'file_deleted': 'file_deleted',
         }
     )
@@ -53,15 +53,13 @@ def _get_convoluted_situation(path):
         }
     )
     ds.add('.', to_git=True)
-    ds.create('subds_available')
-    ds.create(op.join('subdir', 'subds_available'))
-    ds.create('subds_unavailable')
-    ds.create(op.join('subdir', 'subds_unavailable'))
-    ds.create('subds_deleted')
-    ds.create(op.join('subdir', 'subds_deleted'))
+    ds.create('subds_clean')
+    ds.create(op.join('subdir', 'subds_clean'))
+    ds.create('subds_unavailable_clean')
+    ds.create(op.join('subdir', 'subds_unavailable_clean'))
     ds.uninstall([
-        'subds_unavailable',
-        op.join('subdir', 'subds_unavailable')],
+        'subds_unavailable_clean',
+        op.join('subdir', 'subds_unavailable_clean')],
         check=False)
     ok_clean_git(ds.path)
     create(op.join(ds.path, 'subds_added'))
@@ -87,8 +85,6 @@ def _get_convoluted_situation(path):
     create(op.join(ds.path, 'subdir', 'subds_untracked'))
     os.remove(op.join(ds.path, 'file_deleted'))
     os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
-    shutil.rmtree(op.join(ds.path, 'subds_deleted'))
-    shutil.rmtree(op.join(ds.path, 'subdir', 'subds_deleted'))
     return ds
 
 
@@ -145,9 +141,23 @@ def test_get_content_info(path):
 
     # query a single absolute path
     res = ds.repo.get_content_info(
-        [op.join(ds.path, 'subdir', 'file_normal')])
+        [op.join(ds.path, 'subdir', 'file_clean')])
     assert_equal(len(res), 1)
-    assert_in(op.join('subdir', 'file_normal'), res)
+    assert_in(op.join('subdir', 'file_clean'), res)
+
+    status = ds.repo.status()
+    for t in ('subds', 'file'):
+        for s in ('untracked', 'added', 'deleted', 'clean'):
+            for l in ('', op.join('subdir', '')):
+                if t == 'subds' and s == 'deleted':
+                    # same as subds_unavailable
+                    continue
+                p = '{}{}_{}'.format(l, t, s)
+                assert p.endswith(status[p]['state']), p
+                if t == 'subds':
+                    assert_in(status[p]['type'], ('dataset', 'directory'), p)
+                else:
+                    assert_in(status[p]['type'], ('file', 'symlink'), p)
 
 
 @with_tempfile
