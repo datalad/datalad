@@ -7,6 +7,7 @@ environment:
       PYTHON_ARCH: "32"
       MINICONDA: C:\Miniconda35
       DATALAD_TESTS_SSH: 1
+      DATALAD_REPO_VERSION: 6
 
 cache:
   # cache the pip cache
@@ -62,7 +63,6 @@ install:
   - pip install colorama
   - git config --global user.email "test@appveyor.land"
   - git config --global user.name "Appveyor Almighty"
-  - git config --global --add datalad.repo.version 6
 
 test_script:
   # establish baseline, if annex doesn't work, we are not even trying
