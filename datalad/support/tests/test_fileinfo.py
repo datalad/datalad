@@ -9,7 +9,7 @@
 
 import os
 import os.path as op
-import shutil
+import posixpath
 
 from datalad.tests.utils import (
     with_tempfile,
@@ -168,12 +168,12 @@ def test_get_content_info(path):
     res = ds.repo.get_content_info(
         [op.join(ds.path, 'subdir', 'file_clean')])
     assert_equal(len(res), 1)
-    assert_in(op.join('subdir', 'file_clean'), res)
+    assert_in(posixpath.join('subdir', 'file_clean'), res)
 
     status = ds.repo.status()
     for t in ('subds', 'file'):
         for s in ('untracked', 'added', 'deleted', 'clean', 'modified'):
-            for l in ('', op.join('subdir', '')):
+            for l in ('', posixpath.join('subdir', '')):
                 if t == 'subds' and s == 'deleted':
                     # same as subds_unavailable -> clean
                     continue
