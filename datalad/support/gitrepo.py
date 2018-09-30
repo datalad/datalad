@@ -2474,7 +2474,8 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('{}\n'.format(attrline))
 
-    def get_content_info(self, paths=None, ref=None, stat_wt=False):
+    def get_content_info(self, paths=None, ref=None, stat_wt=False,
+                         untracked='all'):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2491,6 +2492,11 @@ class GitRepo(RepoInterface):
         stat_wt : bool
           If given, reports the result of `os.lstat()` as `stat_wt` property
           for the work tree content.
+        untracked : {'no', 'normal', 'all'}
+          If and how untracked content is reported when no `ref` was given:
+          'no': no untracked files are reported; 'normal': untracked files
+          and entire untracked directories are reported as such; 'all': report
+          individual files even in fully untracked directories.
 
         Returns
         -------
@@ -2518,7 +2524,17 @@ class GitRepo(RepoInterface):
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
-            cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d', '-m']
+            cmd = ['git', 'ls-files', '--stage', '-z', '-d', '-m']
+            # untracked report mode, using labels from `git diff` option style
+            if untracked == 'all':
+                cmd.append('-o')
+            elif untracked == 'normal':
+                cmd += ['-o', '--directory']
+            elif untracked == 'no':
+                pass
+            else:
+                raise ValueError(
+                    'unknown value for `untracked`: %s', untracked)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree']
         # works for both modes

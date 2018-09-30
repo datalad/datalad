@@ -170,6 +170,19 @@ def test_get_content_info(path):
     assert_equal(len(res), 1)
     assert_in(posixpath.join('subdir', 'file_clean'), res)
 
+    # query full untracked report
+    res = ds.repo.get_content_info()
+    assert_in(posixpath.join('dir_untracked', 'file_untracked'), res)
+    assert_not_in('dir_untracked', res)
+    # query for compact untracked report
+    res = ds.repo.get_content_info(untracked='normal')
+    assert_not_in(posixpath.join('dir_untracked', 'file_untracked'), res)
+    assert_in('dir_untracked', res)
+    # query no untracked report
+    res = ds.repo.get_content_info(untracked='no')
+    assert_not_in(posixpath.join('dir_untracked', 'file_untracked'), res)
+    assert_not_in('dir_untracked', res)
+
     status = ds.repo.status()
     for t in ('subds', 'file'):
         for s in ('untracked', 'added', 'deleted', 'clean', 'modified'):
