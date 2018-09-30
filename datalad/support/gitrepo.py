@@ -2585,7 +2585,7 @@ class GitRepo(RepoInterface):
             info[path] = inf
         return info
 
-    def status(self, paths=None):
+    def status(self, paths=None, untracked='all'):
         """Simplified `git status` equivalent.
 
         Performs a comparison of a get_content_info(stat_wt=True) with a
@@ -2594,6 +2594,14 @@ class GitRepo(RepoInterface):
         Importantly, this function will not detect modified subdatasets.
         This would require recursion into present subdatasets and query
         their status. This is left to higher-level commands.
+
+        Parameters
+        ----------
+        untracked : {'no', 'normal', 'all'}
+          If and how untracked content is reported when no `ref` was given:
+          'no': no untracked files are reported; 'normal': untracked files
+          and entire untracked directories are reported as such; 'all': report
+          individual files even in fully untracked directories.
 
         Returns
         -------
@@ -2612,7 +2620,8 @@ class GitRepo(RepoInterface):
         # we need three calls to git
         # 1. everything we know about the worktree, including os.stat
         # for each file
-        wt = self.get_content_info(paths=paths, ref=None, stat_wt=True)
+        wt = self.get_content_info(
+            paths=paths, ref=None, stat_wt=True, untracked=untracked)
         # 2. the last committed state
         head = self.get_content_info(paths=paths, ref='HEAD', stat_wt=False)
         # 3. we want Git to tell us what it considers modified and avoid
