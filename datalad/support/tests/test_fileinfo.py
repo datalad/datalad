@@ -31,41 +31,51 @@ from datalad.support.gitrepo import GitRepo
 
 def _get_convoluted_situation(path):
     ds = Dataset(path).create(force=True)
+    # base content, all into the annex
     create_tree(
         ds.path,
         {
             'subdir': {
                 'file_clean': 'file_clean',
                 'file_deleted': 'file_deleted',
+                'file_modified': 'file_clean',
             },
             'file_clean': 'file_clean',
             'file_deleted': 'file_deleted',
+            'file_modified': 'file_clean',
         }
     )
     ds.add('.')
+    # some files straight in git
     create_tree(
         ds.path,
         {
             'subdir': {
-                'file_ingit': 'file_ingit',
+                'file_ingit_clean': 'file_ingit_clean',
+                'file_ingit_modified': 'file_ingit_clean',
             },
-            'file_ingit': 'file_ingit',
+            'file_ingit_clean': 'file_ingit_clean',
+            'file_ingit_modified': 'file_ingit_clean',
         }
     )
     ds.add('.', to_git=True)
+    # clean and proper subdatasets
     ds.create('subds_clean')
     ds.create(op.join('subdir', 'subds_clean'))
     ds.create('subds_unavailable_clean')
     ds.create(op.join('subdir', 'subds_unavailable_clean'))
+    # uninstall some subdatasets (still clean)
     ds.uninstall([
         'subds_unavailable_clean',
         op.join('subdir', 'subds_unavailable_clean')],
         check=False)
     ok_clean_git(ds.path)
+    # staged subds, and files
     create(op.join(ds.path, 'subds_added'))
     ds.repo.add_submodule('subds_added')
     create(op.join(ds.path, 'subdir', 'subds_added'))
     ds.repo.add_submodule(op.join('subdir', 'subds_added'))
+    # some more untracked files
     create_tree(
         ds.path,
         {
@@ -81,10 +91,25 @@ def _get_convoluted_situation(path):
         }
     )
     ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    # untracked subdatasets
     create(op.join(ds.path, 'subds_untracked'))
     create(op.join(ds.path, 'subdir', 'subds_untracked'))
+    # deleted files
     os.remove(op.join(ds.path, 'file_deleted'))
     os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
+    # modified files
+    ds.repo.unlock(['file_modified', op.join('subdir', 'file_modified')])
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_modified': 'file_modified',
+                'file_ingit_modified': 'file_ingit_modified',
+            },
+            'file_modified': 'file_modified',
+            'file_ingit_modified': 'file_ingit_modified',
+        }
+    )
     return ds
 
 
@@ -147,10 +172,13 @@ def test_get_content_info(path):
 
     status = ds.repo.status()
     for t in ('subds', 'file'):
-        for s in ('untracked', 'added', 'deleted', 'clean'):
+        for s in ('untracked', 'added', 'deleted', 'clean', 'modified'):
             for l in ('', op.join('subdir', '')):
                 if t == 'subds' and s == 'deleted':
-                    # same as subds_unavailable
+                    # same as subds_unavailable -> clean
+                    continue
+                if t == 'subds' and s == 'modified':
+                    # GitRepo.status() doesn't do that ATM, needs recursion
                     continue
                 p = '{}{}_{}'.format(l, t, s)
                 assert p.endswith(status[p]['state']), p

@@ -2518,7 +2518,7 @@ class GitRepo(RepoInterface):
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
-            cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d']
+            cmd = ['git', 'ls-files', '--stage', '-z', '-o', '-d', '-m']
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree']
         # works for both modes
@@ -2572,8 +2572,12 @@ class GitRepo(RepoInterface):
     def status(self, paths=None):
         """Simplified `git status` equivalent.
 
-        Yields a comparison of a get_content_info(stat_wt=True) with a
-        get_content_info(ref='HEAD')
+        Performs a comparison of a get_content_info(stat_wt=True) with a
+        get_content_info(ref='HEAD').
+
+        Importantly, this function will not detect modified subdatasets.
+        This would require recursion into present subdatasets and query
+        their status. This is left to higher-level commands.
 
         Returns
         -------
@@ -2584,26 +2588,52 @@ class GitRepo(RepoInterface):
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
           `state`
-            Can be 'added', 'untracked', 'clean', 'deleted'.
+            Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
         # TODO report more info from get_content_info() calls in return
         # value, those are cheap and possibly useful to a consumer
         status = OrderedDict()
+        # we need three calls to git
+        # 1. everything we know about the worktree, including os.stat
+        # for each file
         wt = self.get_content_info(paths=paths, ref=None, stat_wt=True)
+        # 2. the last committed state
         head = self.get_content_info(paths=paths, ref='HEAD', stat_wt=False)
+        # 3. we want Git to tell us what it considers modified and avoid
+        # reimplementing logic ourselves
+        modified = set(
+            p for p in self._git_custom_command(
+                paths, ['git', 'ls-files', '-z', '-m'])[0].split('\0')
+            if p)
+
         for f, wt_r in iteritems(wt):
             if f not in head:
+                # this is new, or rather not known to the previous state
                 status[f] = dict(
                     state='added' if wt_r['gitshasum'] else 'untracked',
                     type=wt_r['type'],
                 )
-            elif wt_r['gitshasum'] == head[f]['gitshasum']:
+            elif wt_r['gitshasum'] == head[f]['gitshasum'] and f not in modified:
+                # no change in git record, and no change on disk
                 status[f] = dict(
                     state='clean' if wt_r['stat_wt'] else 'deleted',
                     type=wt_r['type'],
                 )
+            else:
+                # change in git record, or on disk
+                status[f] = dict(
+                    # TODO is 'modified' enough, should be report typechange?
+                    # often this will be a pointless detail, though...
+                    # TODO we could have a new file that is already staged
+                    # but had subsequent modifications done to it that are
+                    # unstaged. Such file would presently show up as 'added'
+                    # ATM I think this is OK, but worth stating...
+                    state='modified' if wt_r['stat_wt'] else 'deleted',
+                    # TODO record before and after state for diff-like use cases
+                    type=wt_r['type'],
+                )
+
         return status
 
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove
-# status?
