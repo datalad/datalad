@@ -15,6 +15,7 @@ import glob
 import logging
 import re
 import os
+import os.path as op
 from os.path import dirname
 from os.path import relpath
 from os.path import normpath
@@ -469,18 +470,17 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
     fullpathlist = paths
     if paths and isinstance(ds.repo, AnnexRepo):
-        # Ugly? Jep: #2055
-        content_info = zip(paths, ds.repo.file_has_content(paths), ds.repo.is_under_annex(paths))
-        paths = [p for p, c, a in content_info if not a or c]
-        nocontent = len(fullpathlist) - len(paths)
+        nocontent = [op.join(ds.path, f)
+                     for f, r in iteritems(
+                         ds.repo.annexstatus(paths=paths, untracked='no'))
+                     if 'key' in r and not r.get('has_content', False)]
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
             lgr.warn(
                 '{} files have no content present, '
                 'some extractors will not operate on {}'.format(
-                    nocontent,
-                    'them' if nocontent > 10
-                           else [p for p, c, a in content_info if not c and a])
+                    len(nocontent),
+                    'them' if len(nocontent) > 10 else nocontent)
             )
 
     # pull out potential metadata field blacklist config settings
