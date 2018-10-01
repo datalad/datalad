@@ -10,7 +10,6 @@
 """
 
 import logging
-from os.path import abspath
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
@@ -40,7 +39,6 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
 from datalad.utils import dlabspath
-from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.dataset')

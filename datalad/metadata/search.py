@@ -34,7 +34,7 @@ from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
-from datalad.distribution.utils import get_git_dir
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
@@ -241,7 +241,7 @@ class _WhooshSearch(_Search):
 
         self.idx_obj = None
         # where does the bunny have the eggs?
-        self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self.index_dir = opj(self.ds.path, GitRepo.get_git_dir(ds), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
     def show_keys(self, mode):

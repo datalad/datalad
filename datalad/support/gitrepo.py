@@ -811,6 +811,44 @@ class GitRepo(RepoInterface):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git'))
 
+    @staticmethod
+    def get_git_dir(repo):
+        """figure out a repo's gitdir
+
+        '.git' might be a  directory, a symlink or a file
+
+        Parameter
+        ---------
+        repo: path or Repo instance
+          currently expected to be the repos base dir
+
+        Returns
+        -------
+        str
+          relative path to the repo's git dir; So, default would be ".git"
+        """
+        if hasattr(repo, 'path'):
+            # repo instance like given
+            repo = repo.path
+        dot_git = op.join(repo, ".git")
+        if not op.exists(dot_git):
+            raise RuntimeError("Missing .git in %s." % repo)
+        elif op.islink(dot_git):
+            # readlink cannot be imported on windows, but there should also
+            # be no symlinks
+            from os import readlink
+            git_dir = readlink(dot_git)
+        elif op.isdir(dot_git):
+            git_dir = ".git"
+        elif op.isfile(dot_git):
+            with open(dot_git) as f:
+                git_dir = f.readline()
+                if git_dir.startswith("gitdir:"):
+                    git_dir = git_dir[7:]
+                git_dir = git_dir.strip()
+
+        return git_dir
+
     @property
     def config(self):
         """Get an instance of the parser for the persistent repository
