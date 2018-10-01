@@ -167,6 +167,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
     """
     from datalad.interface.diff import Diff
 
+    print("### DEBUG: aps: %s" % aps)
     # TODO needs recursion limit
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
@@ -205,14 +206,18 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
             result_renderer=None,
             # need to be able to yield the errors
             on_failure='ignore'):
+        print("### DEBUG ###:")
+        print(r)
         if r['status'] in ('impossible', 'error'):
             # something unexpected, tell daddy
+            print(" ### END ###: yield r")
             yield r
             continue
         # if asked, and no change in revision -- skip
         if not report_no_revision_change \
                 and (r.get('revision_src') or r.get('revision')) \
                 and (r.get('revision_src') == r.get('revision')):
+            print(" ### END ###: ignore r")
             continue
         r['status'] = ''
         modified.append(r)
@@ -223,18 +228,22 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
 
     # now we can grab the APs that are in this dataset and yield them
     for ap in aps:
+        print("### ap: %s" % ap)
         # need to preserve pristine info first
         ap = ap if isinstance(ap, dict) else rawpath2ap(ap, refds.path)
+        print("### ap: %s" % ap)
         for m in modified:
             if ap['path'] == m['path']:
                 # is directly modified, yield input AP
                 # but update with what we learned about the modification
                 ap.update(m)
+                print("### yield and break: %s" % ap)
                 yield ap
                 break
             if path_is_subpath(m['path'], ap['path']):
                 # a modified path is underneath this AP
                 # yield the modified one instead
+                print("### yield: %s" % ap)
                 yield m
                 continue
 
