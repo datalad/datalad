@@ -185,6 +185,11 @@ def _normalize_path(base_dir, path):
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
         path = opj(realpath(dirname(path)), basename(path))  # realpath OK
+        # deal with the specific situation described in #2885
+        # this is not a general solution, which would investigate whether we
+        # are actually dealing with an annexed file in a locked state
+        if realpath(path) == base_dir:  # realpath OK
+            path = base_dir
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
