@@ -1449,6 +1449,46 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
             except OSError:  # pragma: no cover
                 pass
 
+def is_windows_path(path):
+    win_split = win_splitdrive(path)
+    # Note, that ntpath.splitdrive also deals with UNC paths. In that case
+    # the "drive" wouldn't be a windows drive letter followed by a colon
+    if win_split[0] and win_split[1] and \
+            win_split[0].endswith(":") and len(win_split[0]) == 2:
+        # seems to be a windows path
+        return True
+    return False
+
+def posixpath(self):
+    if is_windows_path(self.path):
+        win_split = win_splitdrive(self.path)
+        return "/" + win_split[0][0] + win_split[1].replace('\\', '/')
+    else:
+        return self.path
+
+
+def _posixpath_(*p):
+    """Given paths in native notation, return a joined path in POSIX notation
+
+    Meant to allow for RF'ing path handling by replacing os.path.join. This is
+    particularly useful to avoid "mixed" paths, where one part originates from
+    some native path notation and the other from git output for example.
+    """
+    import posixpath
+
+    if on_windows:
+        from ntpath import splitdrive as win_splitdrive
+
+        # check only first part for windows notation, since we are in a join and
+        # later parts can only be relative. Therefore we can't decide what
+        # indicates a windows path.
+        win_split = win_splitdrive(p[0])
+        if win_split[0] and win_split[1] and \
+            win_split[0].endswith(":") and len(win_split[0]) == 2:
+            # looks like an actual windows path;
+            p = ('/' + win_split[0][0] + win_split[1].replace('\\', '/'),) + p[1:]
+
+    return posixpath.join(*p)
 
 def _path_(*p):
     """Given a path in POSIX" notation, regenerate one in native to the env one"""
