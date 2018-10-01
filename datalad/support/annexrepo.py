@@ -23,6 +23,7 @@ import time
 
 from itertools import chain
 from os import linesep
+import os.path as op
 from os.path import curdir
 from os.path import join as opj
 from os.path import exists
@@ -606,6 +607,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return modified_subs
 
+    # TODO only used by `untracked_files` and `is_dirty`
     def get_status(self, untracked=True, deleted=True, modified=True, added=True,
                    type_changed=True, submodules=True, path=None):
         """Return various aspects of the status of the annex repository
@@ -3472,8 +3474,27 @@ class AnnexRepo(GitRepo, RepoInterface):
     def annexstatus(self, paths=None, untracked='all'):
         info = self.get_content_annexinfo(
             init=self.get_content_annexinfo(
+                paths=paths,
                 ref='HEAD'))
-        for f, r in iteritems(self.status()):
+        # TODO RF into a separate function to be able to optimize
+        # for cases: 1) for all files, 2) for some files
+        # =================
+        # implementation to check for some paths
+        objectstore = op.join(
+            self.path, self.get_git_dir(self), 'annex', 'objects')
+        for f, r in iteritems(info):
+            if 'key' not in r:
+                # not annexed
+                continue
+            # test hasdirmixed first, as it is used in non-bare repos
+            # which be a more frequent target
+            # TODO optimize order based on some check that reveals
+            # what scheme is used in a given annex
+            r['has_content'] = \
+                op.exists(op.join(objectstore, r['hashdirmixed'], r['key'])) or \
+                op.exists(op.join(objectstore, r['hashdirlower'], r['key']))
+        # TODO RF == end ==
+        for f, r in iteritems(self.status(paths=paths)):
             info[f].update(r)
         return info
 

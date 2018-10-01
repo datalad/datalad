@@ -37,10 +37,12 @@ def _get_convoluted_situation(path):
         {
             'subdir': {
                 'file_clean': 'file_clean',
+                'file_dropped_clean': 'file_dropped_clean',
                 'file_deleted': 'file_deleted',
                 'file_modified': 'file_clean',
             },
             'file_clean': 'file_clean',
+            'file_dropped_clean': 'file_dropped_clean',
             'file_deleted': 'file_deleted',
             'file_modified': 'file_clean',
         }
@@ -68,6 +70,10 @@ def _get_convoluted_situation(path):
     ds.uninstall([
         'subds_unavailable_clean',
         op.join('subdir', 'subds_unavailable_clean')],
+        check=False)
+    ds.drop([
+        'file_dropped_clean',
+        op.join('subdir', 'file_dropped_clean')],
         check=False)
     ok_clean_git(ds.path)
     # staged subds, and files
@@ -183,10 +189,15 @@ def test_get_content_info(path):
     assert_not_in(posixpath.join('dir_untracked', 'file_untracked'), res)
     assert_not_in('dir_untracked', res)
 
+    # git status integrity
     status = ds.repo.status()
     for t in ('subds', 'file'):
-        for s in ('untracked', 'added', 'deleted', 'clean', 'modified'):
+        for s in ('untracked', 'added', 'deleted', 'clean',
+                  'ingit_clean', 'dropped_clean', 'modified', 'ingit_modified'):
             for l in ('', posixpath.join('subdir', '')):
+                if t == 'subds' and 'ingit' in s or 'dropped' in s:
+                    # invalid combination
+                    continue
                 if t == 'subds' and s == 'deleted':
                     # same as subds_unavailable -> clean
                     continue
@@ -199,6 +210,20 @@ def test_get_content_info(path):
                     assert_in(status[p]['type'], ('dataset', 'directory'), p)
                 else:
                     assert_in(status[p]['type'], ('file', 'symlink'), p)
+
+    # git annex status integrity
+    annexstatus = ds.repo.annexstatus()
+    for t in ('file',):
+        for s in ('untracked', 'added', 'deleted', 'clean',
+                  'ingit_clean', 'dropped_clean', 'modified', 'ingit_modified'):
+            for l in ('', posixpath.join('subdir', '')):
+                p = '{}{}_{}'.format(l, t, s)
+                if s in ('untracked', 'ingit_clean', 'ingit_modified'):
+                    # annex knows nothing about these things
+                    assert_not_in('key', annexstatus[p])
+                    continue
+                assert_in('key', annexstatus[p])
+                assert_equal(annexstatus[p]['has_content'], 'dropped' not in s)
 
 
 @with_tempfile
