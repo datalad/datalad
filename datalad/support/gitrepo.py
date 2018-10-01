@@ -2546,7 +2546,7 @@ class GitRepo(RepoInterface):
         props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
 
         stdout, stderr = self._git_custom_command(
-            [_normalize_path(self.path, p) for p in paths] if paths else [],
+            paths if paths else [],
             cmd,
             log_stderr=True,
             log_stdout=True,
