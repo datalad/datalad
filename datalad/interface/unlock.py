@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os.path import join as opj
+import os.path as op
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -129,13 +130,11 @@ class Unlock(Interface):
                 continue
 
             # only files in annex with their content present:
-            files = [ap['path'] for ap in content]
             to_unlock = []
-            for ap, under_annex, has_content in \
-                zip(content,
-                    ds.repo.is_under_annex(files),
-                    ds.repo.file_has_content(files)):
-
+            # get repo status, no untracked needed, cannot be unlocked
+            status = ds.repo.annexstatus(untracked='no')
+            for ap in content:
+                aprpath = op.relpath(ap['path'], ds.path)
                 # TODO: what about directories? Make sure, there is no
                 # situation like no file beneath with content or everything in
                 # git, that leads to a CommandError
@@ -145,10 +144,9 @@ class Unlock(Interface):
                     to_unlock.append(ap)
                     continue
 
-                # Note, that `file_has_content` is (planned to report) True on
-                # files in git. Therefore order matters: First check for annex!
-                if under_annex:
-                    if has_content:
+                ap_status = status[aprpath]
+                if 'key' in ap_status:
+                    if ap_status['has_content']:
                         to_unlock.append(ap)
                     # no content, no unlock:
                     else:
