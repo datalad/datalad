@@ -77,13 +77,10 @@ class ExportArchive(Interface):
         import tarfile
         import zipfile
         from mock import patch
-        from os.path import join as opj, dirname, normpath, isabs
         import os.path as op
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import file_basename
-        from datalad.support.annexrepo import AnnexRepo
-        from datalad.dochelpers import exc_str
 
         import logging
         lgr = logging.getLogger('datalad.plugin.export_archive')
@@ -136,7 +133,7 @@ class ExportArchive(Interface):
             add_method = archive.add if archivetype == 'tar' else archive.write
             repo_files = getattr(repo, 'annexstatus', repo.status)(untracked='no')
             for rpath, record in iteritems(repo_files):
-                fpath = opj(root, rpath)
+                fpath = op.join(root, rpath)
                 if 'key' in record:
                     if not record.get('has_content', None):
                         if missing_content in ('ignore', 'continue'):
@@ -147,14 +144,14 @@ class ExportArchive(Interface):
                             raise IOError('File %s has no content available' % fpath)
                     fpath = record['objloc']
                 # name in the archive
-                aname = normpath(opj(leading_dir, rpath))
+                aname = op.normpath(op.join(leading_dir, rpath))
                 add_method(
                     fpath,
                     arcname=aname,
                     **(tar_args if archivetype == 'tar' else {}))
 
-        if not isabs(filename):
-            filename = opj(os.getcwd(), filename)
+        if not op.isabs(filename):
+            filename = op.join(os.getcwd(), filename)
 
         yield dict(
             status='ok',
