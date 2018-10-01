@@ -11,18 +11,15 @@
 """
 
 import logging
-import re
 
-from os.path import exists
-from os.path import isdir
 from os.path import join as opj
-from os.path import islink
 from os.path import isabs
 from os.path import normpath
 import posixpath
 
 from six.moves.urllib.parse import unquote as urlunquote
 
+from datalad.support.annexrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
@@ -43,49 +40,12 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
     path = opj(ds.path, relativepath)
-    src_dotgit = get_git_dir(path)
+    src_dotgit = GitRepo.get_git_dir(path)
 
     # at this point install always yields the desired result
     # just make sure
     assert(src_dotgit == '.git')
 
-
-def get_git_dir(path):
-    """figure out a repo's gitdir
-
-    '.git' might be a  directory, a symlink or a file
-
-    Parameter
-    ---------
-    path: str
-      currently expected to be the repos base dir
-
-    Returns
-    -------
-    str
-      relative path to the repo's git dir; So, default would be ".git"
-    """
-
-    from os.path import isfile
-
-    dot_git = opj(path, ".git")
-    if not exists(dot_git):
-        raise RuntimeError("Missing .git in %s." % path)
-    elif islink(dot_git):
-        # readlink cannot be imported on windows, but there should also
-        # be no symlinks
-        from os import readlink
-        git_dir = readlink(dot_git)
-    elif isdir(dot_git):
-        git_dir = ".git"
-    elif isfile(dot_git):
-        with open(dot_git) as f:
-            git_dir = f.readline()
-            if git_dir.startswith("gitdir:"):
-                git_dir = git_dir[7:]
-            git_dir = git_dir.strip()
-
-    return git_dir
 
 
 def _get_git_url_from_source(source):
