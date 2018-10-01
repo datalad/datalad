@@ -1449,23 +1449,6 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
             except OSError:  # pragma: no cover
                 pass
 
-def is_windows_path(path):
-    win_split = win_splitdrive(path)
-    # Note, that ntpath.splitdrive also deals with UNC paths. In that case
-    # the "drive" wouldn't be a windows drive letter followed by a colon
-    if win_split[0] and win_split[1] and \
-            win_split[0].endswith(":") and len(win_split[0]) == 2:
-        # seems to be a windows path
-        return True
-    return False
-
-def posixpath(self):
-    if is_windows_path(self.path):
-        win_split = win_splitdrive(self.path)
-        return "/" + win_split[0][0] + win_split[1].replace('\\', '/')
-    else:
-        return self.path
-
 
 def _posixpath_(*p):
     """Given paths in native notation, return a joined path in POSIX notation
