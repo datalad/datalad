@@ -33,6 +33,7 @@ from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.cmd import GitRunner
+from datalad.utils import _posixpath_
 
 from datalad.distribution.dataset import (
     Dataset,
@@ -142,7 +143,7 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
             # a filename
             if 'path' in ap:
                 ap['path_src'] = ap['path']
-            ap['path'] = opj(dspath, line)
+            ap['path'] = _posixpath_(dspath, line)
     if ap:
         yield ap
 
