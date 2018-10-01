@@ -345,7 +345,7 @@ class Diff(Interface):
                 if r.get('state', None) != 'untracked':
                     continue
                 r.update(dict(
-                    path=op.join(ds_path, p),
+                    path=_posixpath_(ds_path, p),
                     parentds=ds_path,
                     action='diff',
                     logger=lgr))
