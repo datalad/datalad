@@ -3469,6 +3469,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             info[path].update({k: j[k] for k in j if k != 'file'})
         return info
 
+    def annexstatus(self, paths=None, untracked='all'):
+        info = self.get_content_annexinfo(
+            init=self.get_content_annexinfo(
+                ref='HEAD'))
+        for f, r in iteritems(self.status()):
+            info[f].update(r)
+        return info
+
     @staticmethod
     def _is_annex_work_tree_message(out):
         return re.match(
