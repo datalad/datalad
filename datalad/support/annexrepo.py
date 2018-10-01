@@ -3490,9 +3490,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             # which be a more frequent target
             # TODO optimize order based on some check that reveals
             # what scheme is used in a given annex
-            r['has_content'] = \
-                op.exists(op.join(objectstore, r['hashdirmixed'], r['key'])) or \
-                op.exists(op.join(objectstore, r['hashdirlower'], r['key']))
+            r['has_content'] = False
+            for testpath in (
+                    op.join(objectstore, r['hashdirmixed'], r['key']),
+                    op.join(objectstore, r['hashdirlower'], r['key'])):
+                if op.exists(testpath):
+                    r.pop('hashdirlower', None)
+                    r.pop('hashdirmixed', None)
+                    r['objloc'] = testpath
+                    r['has_content'] = True
+                    break
         # TODO RF == end ==
         for f, r in iteritems(self.status(paths=paths)):
             info[f].update(r)

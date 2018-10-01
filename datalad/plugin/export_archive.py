@@ -13,6 +13,8 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.support import path
+from six import iteritems
+
 
 @build_doc
 class ExportArchive(Interface):
@@ -132,33 +134,18 @@ class ExportArchive(Interface):
                     zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED) \
                 as archive:
             add_method = archive.add if archivetype == 'tar' else archive.write
-            repo_files = sorted(repo.get_indexed_files())
-            if isinstance(repo, AnnexRepo):
-                annexed = repo.is_under_annex(
-                    repo_files, allow_quick=True, batch=True)
-                # remember: returns False for files in Git!
-                has_content = repo.file_has_content(
-                    repo_files, allow_quick=True, batch=True)
-            else:
-                annexed = [False] * len(repo_files)
-                has_content = [True] * len(repo_files)
-            for i, rpath in enumerate(repo_files):
+            repo_files = getattr(repo, 'annexstatus', repo.status)(untracked='no')
+            for rpath, record in iteritems(repo_files):
                 fpath = opj(root, rpath)
-                if annexed[i]:
-                    if not has_content[i]:
+                if 'key' in record:
+                    if not record.get('has_content', None):
                         if missing_content in ('ignore', 'continue'):
                             (lgr.warning if missing_content == 'continue' else lgr.debug)(
                                 'File %s has no content available, skipped', fpath)
                             continue
                         else:
                             raise IOError('File %s has no content available' % fpath)
-
-                    # resolve to possible link target
-                    if op.islink(fpath):
-                        link_target = os.readlink(fpath)
-                        if not isabs(link_target):
-                            link_target = normpath(opj(dirname(fpath), link_target))
-                        fpath = link_target
+                    fpath = record['objloc']
                 # name in the archive
                 aname = normpath(opj(leading_dir, rpath))
                 add_method(
