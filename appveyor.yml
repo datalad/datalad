@@ -7,11 +7,6 @@ environment:
       PYTHON_ARCH: "32"
       MINICONDA: C:\Miniconda35
       DATALAD_TESTS_SSH: 1
-    - PYTHON: "C:\\Python35"
-      PYTHON_VERSION: "3.5.1"
-      PYTHON_ARCH: "32"
-      MINICONDA: C:\Miniconda35
-      DATALAD_TESTS_SSH: 1
       DATALAD_REPO_VERSION: 6
 
 cache:
@@ -97,7 +92,7 @@ test_script:
   # additional tests need module `dateutil`!!
   - python -m nose -s -v datalad.plugin.tests.test_check_dates
   # remaining fails: test_annexrepo test_digests test_gitrepo test_locking test_repodates test_sshrun 
-  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions datalad.support.tests.test_network datalad.support.tests.test_external_versions datalad.support.tests.test_sshconnector datalad.support.tests.test_json_py datalad.support.tests.test_vcr_ 
+  - python -m nose -s -v datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions datalad.support.tests.test_network datalad.support.tests.test_external_versions datalad.support.tests.test_sshconnector datalad.support.tests.test_json_py datalad.support.tests.test_vcr_ datalad.support.tests.test_fileinfo
   # remaining fails: test__main__ test_archives test_cmd test_log  test_protocols test_test_utils test_utils test_auto
   - python -m nose -s -v datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos 
 

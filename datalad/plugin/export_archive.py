@@ -13,6 +13,8 @@ __docformat__ = 'restructuredtext'
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.support import path
+from six import iteritems
+
 
 @build_doc
 class ExportArchive(Interface):
@@ -75,13 +77,10 @@ class ExportArchive(Interface):
         import tarfile
         import zipfile
         from mock import patch
-        from os.path import join as opj, dirname, normpath, isabs
         import os.path as op
 
         from datalad.distribution.dataset import require_dataset
         from datalad.utils import file_basename
-        from datalad.support.annexrepo import AnnexRepo
-        from datalad.dochelpers import exc_str
 
         import logging
         lgr = logging.getLogger('datalad.plugin.export_archive')
@@ -132,42 +131,27 @@ class ExportArchive(Interface):
                     zipfile.ZIP_STORED if not compression else zipfile.ZIP_DEFLATED) \
                 as archive:
             add_method = archive.add if archivetype == 'tar' else archive.write
-            repo_files = sorted(repo.get_indexed_files())
-            if isinstance(repo, AnnexRepo):
-                annexed = repo.is_under_annex(
-                    repo_files, allow_quick=True, batch=True)
-                # remember: returns False for files in Git!
-                has_content = repo.file_has_content(
-                    repo_files, allow_quick=True, batch=True)
-            else:
-                annexed = [False] * len(repo_files)
-                has_content = [True] * len(repo_files)
-            for i, rpath in enumerate(repo_files):
-                fpath = opj(root, rpath)
-                if annexed[i]:
-                    if not has_content[i]:
+            repo_files = getattr(repo, 'annexstatus', repo.status)(untracked='no')
+            for rpath, record in iteritems(repo_files):
+                fpath = op.join(root, rpath)
+                if 'key' in record:
+                    if not record.get('has_content', None):
                         if missing_content in ('ignore', 'continue'):
                             (lgr.warning if missing_content == 'continue' else lgr.debug)(
                                 'File %s has no content available, skipped', fpath)
                             continue
                         else:
                             raise IOError('File %s has no content available' % fpath)
-
-                    # resolve to possible link target
-                    if op.islink(fpath):
-                        link_target = os.readlink(fpath)
-                        if not isabs(link_target):
-                            link_target = normpath(opj(dirname(fpath), link_target))
-                        fpath = link_target
+                    fpath = record['objloc']
                 # name in the archive
-                aname = normpath(opj(leading_dir, rpath))
+                aname = op.normpath(op.join(leading_dir, rpath))
                 add_method(
                     fpath,
                     arcname=aname,
                     **(tar_args if archivetype == 'tar' else {}))
 
-        if not isabs(filename):
-            filename = opj(os.getcwd(), filename)
+        if not op.isabs(filename):
+            filename = op.join(os.getcwd(), filename)
 
         yield dict(
             status='ok',
