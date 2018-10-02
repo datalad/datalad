@@ -13,7 +13,8 @@ import os
 from os.path import join as opj
 
 from datalad.distribution.utils import _get_flexible_source_candidates
-from datalad.distribution.utils import get_git_dir
+
+from datalad.support.gitrepo import GitRepo
 
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import eq_
@@ -64,7 +65,7 @@ def test_get_flexible_source_candidates():
 @with_tempfile
 def test_get_git_dir(path):
     # minimal, only missing coverage
-    assert_raises(RuntimeError, get_git_dir, path)
+    assert_raises(RuntimeError, GitRepo.get_git_dir, path)
 
     srcpath = opj(path, 'src')
     targetpath = opj(path, 'target')
@@ -74,9 +75,9 @@ def test_get_git_dir(path):
     if not on_windows:
         # with PY3 would also work with Windows 6+
         os.symlink(srcpath, targetgitpath)
-        eq_(srcpath, get_git_dir(targetpath))
+        eq_(srcpath, GitRepo.get_git_dir(targetpath))
         # cleanup for following test
         unlink(targetgitpath)
     with open(targetgitpath, 'w') as f:
         f.write('gitdir: {}'.format(srcpath))
-    eq_(srcpath, get_git_dir(targetpath))
+    eq_(srcpath, GitRepo.get_git_dir(targetpath))
