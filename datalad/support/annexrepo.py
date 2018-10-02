@@ -23,6 +23,7 @@ import time
 
 from itertools import chain
 from os import linesep
+import os.path as op
 from os.path import curdir
 from os.path import join as opj
 from os.path import exists
@@ -606,6 +607,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return modified_subs
 
+    # TODO only used by `untracked_files` and `is_dirty`
     def get_status(self, untracked=True, deleted=True, modified=True, added=True,
                    type_changed=True, submodules=True, path=None):
         """Return various aspects of the status of the annex repository
@@ -3413,6 +3415,90 @@ class AnnexRepo(GitRepo, RepoInterface):
                 args,
                 files=files):
             yield jsn
+
+    def get_content_annexinfo(
+            self, paths=None, init='git', ref=None, **kwargs):
+        """
+        Calling without any options given will always give the fastest
+        performance.
+
+        Parameters
+        ----------
+        paths : list
+          Specific paths to query info for. In none are given, info is
+          reported for all content.
+        init : 'git' or dict-like
+          If set to 'git' annex content info will ammend the output of
+          GitRepo.get_content_info(), otherwise the dict-like object
+          supplied will receive this information.
+        ref : gitref or None
+          If not None, annex content info for this Git reference will be
+          produced, otherwise for the content of the present worktree.
+        **kwargs :
+          Additional arguments for GitRepo.get_content_info(), if `init` is
+          set to 'git'.
+
+        Returns
+        -------
+        dict
+          Each content item has an entry under its relative path within
+          the repository. Each value is a dictionary with properties:
+
+          `type`
+            Can be 'file', 'symlink', 'dataset', 'directory'
+          `revision`
+            SHASUM is last commit affecting the item, or None, if not
+            tracked.
+        """
+        if init == 'git':
+            info = super(AnnexRepo, self).get_content_info(
+                paths=paths, **kwargs)
+        else:
+            info = init
+        if ref:
+            cmd = 'findref'
+            opts = [ref]
+        else:
+            cmd = 'find'
+            # TODO maybe inform by `path`?
+            opts = ['--include', '*']
+        for j in self._run_annex_command_json(cmd, opts=opts):
+            path = j['file']
+            if path not in info:
+                # ignore anything that Git hasn't reported on
+                # TODO figure out when it is more efficient to query
+                # a particular set of paths, instead of all of them
+                # and just throwing away the results
+                continue
+            info[path].update({k: j[k] for k in j if k != 'file'})
+        return info
+
+    def annexstatus(self, paths=None, untracked='all'):
+        info = self.get_content_annexinfo(
+            init=self.get_content_annexinfo(
+                paths=paths,
+                ref='HEAD'))
+        # TODO RF into a separate function to be able to optimize
+        # for cases: 1) for all files, 2) for some files
+        # =================
+        # implementation to check for some paths
+        objectstore = op.join(
+            self.path, self.get_git_dir(self), 'annex', 'objects')
+        for f, r in iteritems(info):
+            if 'key' not in r:
+                # not annexed
+                continue
+            # test hasdirmixed first, as it is used in non-bare repos
+            # which be a more frequent target
+            # TODO optimize order based on some check that reveals
+            # what scheme is used in a given annex
+            r['has_content'] = \
+                op.exists(op.join(objectstore, r['hashdirmixed'], r['key'])) or \
+                op.exists(op.join(objectstore, r['hashdirlower'], r['key']))
+        # TODO RF == end ==
+        for f, r in iteritems(self.status(paths=paths)):
+            info[f].update(r)
+        return info
 
     @staticmethod
     def _is_annex_work_tree_message(out):

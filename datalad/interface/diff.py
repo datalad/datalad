@@ -13,11 +13,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import stat
+import os.path as op
 from os.path import join as opj
 from os.path import curdir
-from os.path import isdir
 from os.path import relpath
-from os.path import normpath
+from six import iteritems
 
 
 from datalad.interface.annotate_paths import AnnotatePaths
@@ -33,12 +33,14 @@ from datalad.support.param import Parameter
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.cmd import GitRunner
+from datalad.utils import _posixpath_
 
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import datasetmethod
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+)
 
-from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import path_startswith
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
@@ -76,59 +78,6 @@ def _translate_type(mode, ap, prop):
         ap[prop] = 'directory'
     else:
         ap[prop] = 'file'
-
-
-def _get_untracked_content(dspath, report_untracked, paths=None):
-    cmd = ['git', '--work-tree=.', 'status', '--porcelain',
-           # file names NULL terminated
-           '-z',
-           # we never want to touch submodules, they cannot be untracked
-           '--ignore-submodules=all',
-           # fully untracked dirs as such, the rest as files
-           '--untracked={}'.format(report_untracked)]
-    try:
-        stdout, stderr = GitRunner(cwd=dspath).run(
-            cmd,
-            log_stderr=True,
-            log_stdout=True,
-            log_online=False,
-            expect_stderr=False,
-            shell=False,
-            expect_fail=True)
-    except CommandError as e:
-        # TODO should we catch any and handle them in here?
-        raise e
-
-    if paths:
-        paths = [r['path'] for r in paths]
-        if len(paths) == 1 and paths[0] == dspath:
-            # nothing to filter
-            paths = None
-
-    from datalad.utils import assure_unicode
-
-    for line in stdout.split('\0'):
-        if not line:
-            continue
-        line = assure_unicode(line)
-        if not line.startswith('?? '):
-            # nothing untracked, ignore, task of `diff`
-            continue
-        apath = opj(
-            dspath,
-            # strip state marker
-            line[3:])
-        norm_apath = normpath(apath)
-        if paths and not any(norm_apath == p or path_startswith(apath, p)
-                             for p in paths):
-            # we got a whitelist for paths, don't report any other
-            continue
-        ap = dict(
-            path=norm_apath,
-            parentds=dspath,
-            state='untracked',
-            type='directory' if isdir(apath) else 'file')
-        yield ap
 
 
 def _parse_git_diff(dspath, diff_thingie=None, paths=None,
@@ -194,7 +143,7 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
             # a filename
             if 'path' in ap:
                 ap['path_src'] = ap['path']
-            ap['path'] = opj(dspath, line)
+            ap['path'] = _posixpath_(dspath, line)
     if ap:
         yield ap
 
@@ -388,11 +337,16 @@ class Diff(Interface):
             if (revision and '..' in revision) or report_untracked == 'no':
                 # don't look for untracked content, we got a revision range
                 continue
-            for r in _get_untracked_content(
-                    ds_path,
-                    report_untracked,
-                    paths=content_paths):
+            # report untracked content
+            for p, r in iteritems(Dataset(ds_path).repo.status(
+                    paths=[c['path'] for c in content_paths]
+                    if content_paths else None,
+                    untracked=report_untracked)):
+                if r.get('state', None) != 'untracked':
+                    continue
                 r.update(dict(
+                    path=_posixpath_(ds_path, p),
+                    parentds=ds_path,
                     action='diff',
                     logger=lgr))
                 if refds_path:

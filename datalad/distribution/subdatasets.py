@@ -19,6 +19,8 @@ from os.path import normpath
 from os.path import relpath
 from os.path import exists
 
+from six import iteritems
+
 from git import GitConfigParser
 
 from datalad.interface.base import Interface
@@ -29,6 +31,7 @@ from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import recursion_flag
@@ -36,7 +39,6 @@ from datalad.interface.common_opts import recursion_limit
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
-from datalad.support.gitrepo import GitRepo
 from datalad.utils import _path_
 from datalad.utils import path_startswith
 from datalad.utils import assure_list
@@ -87,36 +89,18 @@ def _parse_git_submodules(dspath):
         # we cannot have (functional) subdatasets
         return
 
-    # this will not work in direct mode, need better way #1422
-    cmd = ['git', 'ls-files', '--stage', '-z']
-
-    # need to go rogue  and cannot use proper helper in GitRepo
-    # as they also pull in all of GitPython's magic
-    try:
-        stdout, stderr = GitRunner(cwd=dspath).run(
-            cmd,
-            log_stderr=True,
-            log_stdout=True,
-            # not sure why exactly, but log_online has to be false!
-            log_online=False,
-            expect_stderr=False,
-            shell=False,
-            # we don't want it to scream on stdout
-            expect_fail=True)
-    except CommandError as e:
-        raise InvalidGitRepositoryError(exc_str(e))
-
-    for line in stdout.split('\0'):
-        if not line or not line.startswith('160000'):
+    ds = Dataset(dspath)
+    # get info on subdatasets, use GitRepo variant of the
+    # method directly to save some cycles, as we do not need
+    # any info from git-annex
+    for p, props in iteritems(ds.repo.get_content_info()):
+        if not props.get('type', None) == 'dataset':
             continue
-        sm = {}
-        props = submodule_full_props.match(line)
-        sm['revision'] = props.group(2)
-        subpath = _path_(dspath, props.group(4))
-        sm['path'] = subpath
+        subpath = _path_(dspath, p)
+        props['path'] = subpath
         if not exists(subpath) or not GitRepo.is_valid_repo(subpath):
-            sm['state'] = 'absent'
-        yield sm
+            props['state'] = 'absent'
+        yield props
 
 
 @build_doc
