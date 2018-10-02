@@ -58,7 +58,6 @@ from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import to_options
 from datalad.support.gitrepo import kwargs_to_options
 from datalad.support.gitrepo import _normalize_path
-from datalad.support.gitrepo import normalize_paths
 from datalad.support.gitrepo import split_remote_branch
 from datalad.support.gitrepo import gitpy
 from datalad.support.gitrepo import guard_BadName
@@ -166,7 +165,7 @@ def test_GitRepo_add(src, path):
         f.write("File to add to git")
     added = gr.add(filename)
 
-    eq_(added, {'success': True, 'file': filename})
+    eq_(added, [{'success': True, 'file': filename}])
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
     # uncommitted:
@@ -179,7 +178,7 @@ def test_GitRepo_add(src, path):
     # include committing:
     added2 = gr.add(filename)
     gr.commit(msg="Add two files.")
-    eq_(added2, {'success': True, 'file': filename})
+    eq_(added2, [{'success': True, 'file': filename}])
 
     assert_in(filename, gr.get_indexed_files(),
               "%s not successfully added to %s" % (filename, path))
@@ -325,61 +324,6 @@ def test_normalize_path(git_path):
 
         result = _normalize_path(gr.path, op.join(git_path, 'd1', 'testfile'))
         eq_(result, op.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
-
-
-def test_GitRepo_files_decorator():
-
-    class testclass(object):
-        def __init__(self):
-            self.path = op.join('some', 'where')
-
-        # TODO
-        # yoh:  logic is alien to me below why to have two since both look identical!
-        @normalize_paths
-        def decorated_many(self, files):
-            return files
-
-        @normalize_paths
-        def decorated_one(self, file_):
-            return file_
-
-    test_instance = testclass()
-
-    # When a single file passed -- single path returned
-    obscure_filename = get_most_obscure_supported_name()
-    file_to_test = op.join(test_instance.path, 'deep', obscure_filename)
-    # file doesn't exist
-    eq_(test_instance.decorated_one(file_to_test),
-                 _normalize_path(test_instance.path, file_to_test))
-    eq_(test_instance.decorated_one(file_to_test),
-                 _normalize_path(test_instance.path, file_to_test))
-
-    file_to_test = obscure_filename
-    eq_(test_instance.decorated_many(file_to_test),
-                 _normalize_path(test_instance.path, file_to_test))
-    eq_(test_instance.decorated_one(file_to_test),
-                 _normalize_path(test_instance.path, file_to_test))
-
-
-    file_to_test = op.join(obscure_filename, 'beyond', 'obscure')
-    eq_(test_instance.decorated_many(file_to_test),
-                 _normalize_path(test_instance.path, file_to_test))
-
-    file_to_test = op.join(getpwd(), 'somewhere', 'else', obscure_filename)
-    assert_raises(FileNotInRepositoryError, test_instance.decorated_many,
-                  file_to_test)
-
-    # If a list passed -- list returned
-    files_to_test = ['now', op.join('a list', 'of'), 'paths']
-    expect = []
-    for item in files_to_test:
-        expect.append(_normalize_path(test_instance.path, item))
-    eq_(test_instance.decorated_many(files_to_test), expect)
-
-    eq_(test_instance.decorated_many(''), [])
-
-    assert_raises(ValueError, test_instance.decorated_many, 1)
-    assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
 @skip_if_no_network
@@ -1286,7 +1230,7 @@ def test_gitattributes(path):
     eq_(gr.get_gitattributes(
         op.join(gr.path, 'relative', 'ikethemike', 'probe')),
         # always comes out relative to the repo root, even if abs goes in
-        {op.join('relative', 'ikethemike', 'probe'):
+        {op.join(gr.path, 'relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
     if get_encoding_info()['default'] != 'ascii':
         # do not perform this on obscure systems without anything like UTF

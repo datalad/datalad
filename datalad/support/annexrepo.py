@@ -67,7 +67,6 @@ from .gitrepo import GitRepo
 from .gitrepo import NoSuchPathError
 from .gitrepo import _normalize_path
 from .gitrepo import normalize_path
-from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
 from .gitrepo import to_options
 from . import ansi_colors
@@ -1076,7 +1075,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             env = self.add_fake_dates(env)
 
         if files:
-            cmd_list += ['--'] + files
+            # little dance, because our own code frequently
+            # uses the pattern of giving an empty string as `files`
+            cmd_list += ['--'] + assure_list(files if files else [])
         try:
             return self.cmd_call_wrapper.run(cmd_list, env=env, **kwargs)
         except CommandError as e:
@@ -1296,7 +1297,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         # on crippled filesystem for example (think so)?
         self.config.reload()
 
-    @normalize_paths
     def get(self, files, remote=None, options=None, jobs=None, key=False):
         """Get the actual content of files
 
@@ -1319,6 +1319,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         files : list of dict
         """
         options = options[:] if options else []
+        files = assure_list(files)
 
         if remote:
             if remote not in self.get_remotes():
@@ -1419,7 +1420,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 unknown_sizes.append(j['file'])
         return expected_files, fetch_files
 
-    @normalize_paths
     def add(self, files, git=None, backend=None, options=None, jobs=None,
             git_options=None, annex_options=None, update=False):
         """Add file(s) to the repository.
@@ -1452,7 +1452,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
 
         return list(self.add_(
-            files, git=git, backend=backend, options=options, jobs=jobs,
+            assure_list(files),
+            git=git, backend=backend, options=options, jobs=jobs,
             git_options=git_options, annex_options=annex_options, update=update
         ))
 
@@ -1601,7 +1602,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                                        annex_options=['--'] + git_cmd,
                                        **kwargs)
 
-    @normalize_paths
     def get_file_key(self, files):
         """Get key of an annexed file.
 
@@ -1617,6 +1617,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             in case of a list an empty string is returned if there was no key
             for that file
         """
+        files = assure_list(files)
 
         if len(files) > 1:
             return self._batched.get('lookupkey', path=self.path)(files)
@@ -1665,7 +1666,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise FileNotInAnnexError("Could not get a key for a file(s) %s -- empty output" % files)
             return entries[0]
 
-    @normalize_paths
     def lock(self, files, options=None):
         """undo unlock
 
@@ -1682,7 +1682,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         self._run_annex_command('lock', annex_options=options, files=files)
         # note: there seems to be no output by annex if success.
 
-    @normalize_paths
     def unlock(self, files, options=None):
         """unlock files for modification
 
@@ -1755,7 +1754,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else to_options(unlock=True)
         self._run_annex_command('adjust', annex_options=options)
 
-    @normalize_paths
     def unannex(self, files, options=None):
         """undo accidental add command
 
@@ -1782,7 +1780,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         return [line.split()[1] for line in std_out.splitlines()
                 if line.split()[0] == 'unannex' and line.split()[-1] == 'ok']
 
-    @normalize_paths(map_filenames_back=True)
     def find(self, files, batch=False):
         """Run `git annex find` on file(s).
 
@@ -1803,6 +1800,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         directory) will be returned as a list.
         """
         objects = {}
+        files = assure_list(files)
         # Ignore batch=True if any path is a directory because `git annex find
         # --batch` always returns an empty string for directories.
         if batch and not any(isdir(opj(self.path, f)) for f in files):
@@ -1834,14 +1832,13 @@ class AnnexRepo(GitRepo, RepoInterface):
             # `find` returns an empty string for unlocked files, and in direct
             # mode everything looks modified, so we don't even bother.
             modified = self.get_changed_files() if is_v6 else []
-            annex_res = fn(files, normalize_paths=False, batch=batch)
+            annex_res = fn(files, batch=batch)
             return [bool(annex_res.get(f) and
                          not (is_v6 and normpath(f) in modified))
                     for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             return [quick_fn(f) for f in files]
 
-    @normalize_paths
     def file_has_content(self, files, allow_quick=True, batch=False):
         """Check whether files have their content present under annex.
 
@@ -1860,6 +1857,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: Also provide option to look for key instead of path
 
+        files = assure_list(files)
+
         def quick_check(filename):
             filepath = opj(self.path, filename)
             if islink(filepath):                    # if symlink
@@ -1876,7 +1875,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         return self._check_files(self.find, quick_check,
                                  files, allow_quick, batch)
 
-    @normalize_paths
     def is_under_annex(self, files, allow_quick=True, batch=False):
         """Check whether files are under annex control
 
@@ -1893,6 +1891,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of bool
             For each input file states either file is under annex
         """
+        files = assure_list(files)
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
@@ -2202,9 +2201,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         key: bool, optional
             Either provided files are actually annex keys
         """
-        return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
+        return self.whereis(file_, output='full', batch=batch)[file_][AnnexRepo.WEB_UUID]['urls']
 
-    @normalize_paths
     def drop(self, files, options=None, key=False, jobs=None):
         """Drops the content of annexed files from this repository.
 
@@ -2239,11 +2237,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                                              "specify 'files' or 'options'")
 
         options = assure_list(options)
-
+        files = assure_list(files)
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
-            files = assure_list(files)
             options = options + ['--key']
             res = [
                 self._run_annex_command_json(
@@ -2479,7 +2476,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
-    @normalize_paths
     def whereis(self, files, output='uuids', key=False, options=None, batch=False):
         """Lists repositories that have actual content of file(s).
 
@@ -2531,7 +2527,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if key:
             kwargs = {'opts': options + ["--key"] + files}
         else:
-            kwargs = {'files': files}
+            kwargs = {'files': assure_list(files)}
 
         json_objects = self._run_annex_command_json('whereis', **kwargs)
         if output in {'descriptions', 'uuids'}:
@@ -2558,7 +2554,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     # then returned filenames would not need to be mapped, so we could easily work on dirs
     # and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
-    @normalize_paths(map_filenames_back=True)
     def info(self, files, batch=False, fast=False):
         """Provide annex info for file(s).
 
@@ -2573,6 +2568,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           Info for each file
         """
 
+        files = assure_list(files)
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
         if not batch:
@@ -2929,7 +2925,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if alt_index_file and os.path.exists(alt_index_file):
                     unlink(alt_index_file)
 
-    @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
         """Remove files from git/annex (works in direct mode as well)
 
@@ -2943,7 +2938,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.precommit()  # since might interfere
 
         return super(AnnexRepo, self).remove(files, force=force,
-                                             normalize_paths=False,
                                              **kwargs)
 
     def get_contentlocation(self, key, batch=False):
@@ -2982,7 +2976,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return self._batched.get('contentlocation', path=self.path)(key)
 
-    @normalize_paths(serialize=True)
     def is_available(self, file_, remote=None, key=False, batch=False):
         """Check if file or key is available (from a remote)
 
@@ -3046,7 +3039,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                     "Received output %r from annex, whenever expect 0 or 1" % out
                 )
 
-    @normalize_paths(match_return_type=False)
     def _annex_custom_command(
             self, files, cmd_str, log_stdout=True, log_stderr=True,
             log_online=False, expect_stderr=False, cwd=None, env=None,
@@ -3079,7 +3071,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             expect_stderr=expect_stderr,
             cwd=cwd, env=env, shell=shell, expect_fail=expect_fail)
 
-    @normalize_paths
     def migrate_backend(self, files, backend=None):
         """Changes the backend used for `file`.
 
@@ -3102,10 +3093,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 'git-annex migrate',
                 "Command 'migrate' is not available in direct mode.")
         self._run_annex_command('migrate',
-                                annex_options=files,
+                                annex_options=assure_list(files if files else []),
                                 backend=backend)
 
-    @normalize_paths
     def get_file_backend(self, files):
         """Get the backend currently used for file(s).
 
@@ -3120,7 +3110,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             like "SHA256E" or "MD5".
         """
 
-        return [self.get_file_key(f).split('-')[0] for f in files]
+        return [self.get_file_key(f).split('-')[0] for f in assure_list(files)]
 
     @property
     def default_backends(self):
@@ -3138,7 +3128,6 @@ class AnnexRepo(GitRepo, RepoInterface):
     # symlink's target instead of the actual content.
 
     # We need --auto and --fast having exposed  TODO
-    @normalize_paths(match_return_type=False)  # get a list even in case of a single item
     def copy_to(self, files, remote, options=None, jobs=None):
         """Copy the actual content of `files` to `remote`
 
@@ -3166,6 +3155,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = options[:] if options else []
 
+        files = assure_list(files)
         # Note:
         # In case of single path, 'annex copy' will fail, if it cannot copy it.
         # With multiple files, annex will just skip the ones, it cannot deal

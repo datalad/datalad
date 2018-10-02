@@ -365,7 +365,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
     # and the file itself was transferred
     ok_(lexists(opj(sub2_target.path, 'file.dat')))
-    nok_(sub2_target.file_has_content('file.dat'))
+    nok_(sub2_target.file_has_content('file.dat')[0])
 
     ## but now we can redo publish recursively, with explicitly requested data transfer
     res_ = publish(
@@ -373,7 +373,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
         recursive=True,
         transfer_data='all'
     )
-    ok_(sub2_target.file_has_content('file.dat'))
+    ok_(sub2_target.file_has_content('file.dat')[0])
     assert_result_count(
         res_, 1, status='ok', path=opj(sub2.path, 'file.dat'))
 
@@ -443,15 +443,15 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 
     # we need compare target/master:
     target.checkout("master")
-    ok_(target.file_has_content('test-annex.dat'))
+    ok_(target.file_has_content('test-annex.dat')[0])
 
     # make sure that whatever we published is actually consumable
     dst_clone = install(
         dst_clone_path, source=dst_path,
         result_xfm='datasets', return_type='item-or-list')
-    nok_(dst_clone.repo.file_has_content('test-annex.dat'))
+    nok_(dst_clone.repo.file_has_content('test-annex.dat')[0])
     res = dst_clone.get('test-annex.dat')
-    ok_(dst_clone.repo.file_has_content('test-annex.dat'))
+    ok_(dst_clone.repo.file_has_content('test-annex.dat')[0])
 
     res = publish(dataset=source, to="target", path=['.'])
     # there is nothing to publish on 2nd attempt
@@ -553,7 +553,7 @@ def test_publish_depends(
     ok_(lexists(opj(target3_path, 'probe1')))
     # but it has no data copied
     target3 = Dataset(target3_path)
-    nok_(target3.repo.file_has_content('probe1'))
+    nok_(target3.repo.file_has_content('probe1')[0])
 
     # but if we publish specifying its path, it gets copied
     source.publish('probe1', to='target3')

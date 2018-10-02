@@ -207,9 +207,6 @@ def _normalize_path(base_dir, path):
 def normalize_path(func):
     """Decorator to provide unified path conversion for a single file
 
-    Unlike normalize_paths, intended to be used for functions dealing with a
-    single filename at a time
-
     Note
     ----
     This is intended to be used within the repository classes and therefore
@@ -224,113 +221,6 @@ def normalize_path(func):
     def newfunc(self, file_, *args, **kwargs):
         file_new = _normalize_path(self.path, file_)
         return func(self, file_new, *args, **kwargs)
-
-    return newfunc
-
-
-@optional_args
-def normalize_paths(func, match_return_type=True, map_filenames_back=False,
-                    serialize=False):
-    """Decorator to provide unified path conversions.
-
-    Note
-    ----
-    This is intended to be used within the repository classes and therefore
-    returns a class method!
-
-    The decorated function is expected to take a path or a list of paths at
-    first positional argument (after 'self'). Additionally the class `func`
-    is a member of, is expected to have an attribute 'path'.
-
-    Accepts either a list of paths or a single path in a str. Passes a list
-    to decorated function either way, but would return based on the value of
-    match_return_type and possibly input argument.
-
-    If a call to the wrapped function includes normalize_path and it is False
-    no normalization happens for that function call (used for calls to wrapped
-    functions within wrapped functions, while possible CWD is within a
-    repository)
-
-    Parameters
-    ----------
-    match_return_type : bool, optional
-      If True, and a single string was passed in, it would return the first
-      element of the output (after verifying that it is a list of length 1).
-      It makes easier to work with single files input.
-    map_filenames_back : bool, optional
-      If True and returned value is a dictionary, it assumes to carry entries
-      one per file, and then filenames are mapped back to as provided from the
-      normalized (from the root of the repo) paths
-    serialize : bool, optional
-      Loop through files giving only a single one to the function one at a time.
-      This allows to simplify implementation and interface to annex commands
-      which do not take multiple args in the same call (e.g. checkpresentkey)
-    """
-
-    @wraps(func)
-    def newfunc(self, files, *args, **kwargs):
-
-        normalize = _normalize_path if kwargs.pop('normalize_paths', True) \
-            else lambda rpath, filepath: filepath
-
-        if files:
-            if isinstance(files, string_types) or not files:
-                files_new = [normalize(self.path, files)]
-                single_file = True
-            elif isinstance(files, list):
-                files_new = [normalize(self.path, path) for path in files]
-                single_file = False
-            else:
-                raise ValueError("_files_decorator: Don't know how to handle "
-                                 "instance of %s." % type(files))
-        else:
-            single_file = None
-            files_new = []
-
-        if map_filenames_back:
-            def remap_filenames(out):
-                """Helper to map files back to non-normalized paths"""
-                if isinstance(out, dict):
-                    assert(len(out) == len(files_new))
-                    files_ = [files] if single_file else files
-                    mapped = out.__class__()
-                    for fin, fout in zip(files_, files_new):
-                        mapped[fin] = out[fout]
-                    return mapped
-                else:
-                    return out
-        else:
-            remap_filenames = lambda x: x
-
-        if serialize:  # and not single_file:
-            result = [
-                func(self, f, *args, **kwargs)
-                for f in files_new
-            ]
-        else:
-            result = func(self, files_new, *args, **kwargs)
-
-        if single_file is None:
-            # no files were provided, nothing we can do really
-            return result
-        elif (result is None) or not match_return_type or not single_file:
-            # If function doesn't return anything or no denormalization
-            # was requested or it was not a single file
-            return remap_filenames(result)
-        elif single_file:
-            if len(result) != 1:
-                # Magic doesn't apply
-                return remap_filenames(result)
-            elif isinstance(result, (list, tuple)):
-                return result[0]
-            elif isinstance(result, dict) and tuple(result)[0] == files_new[0]:
-                # assume that returned dictionary has files as keys.
-                return tuple(result.values())[0]
-            else:
-                # no magic can apply
-                return remap_filenames(result)
-        else:
-            return RuntimeError("should have not got here... check logic")
 
     return newfunc
 
@@ -926,7 +816,6 @@ class GitRepo(RepoInterface):
             msg += "s"
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
-    @normalize_paths
     def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
 
@@ -1028,7 +917,6 @@ class GitRepo(RepoInterface):
         return [{u'file': f, u'success': True}
                 for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
-    @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):
         """Remove files.
 
@@ -1273,7 +1161,6 @@ class GitRepo(RepoInterface):
         assert(len(stdout) == 1)
         return stdout[0]
 
-    @normalize_paths(match_return_type=False)
     def get_last_commit_hash(self, files):
         """Return the hash of the last commit the modified any of the given
         paths"""
@@ -1608,7 +1495,6 @@ class GitRepo(RepoInterface):
 
         return std_out, std_err
 
-    @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
                             log_stdout=True, log_stderr=True, log_online=False,
                             expect_stderr=True, cwd=None, env=None,
@@ -1640,6 +1526,10 @@ class GitRepo(RepoInterface):
         else:
             if files and cmd_str[-1] != '--':
                 cmd_str.append('--')
+
+        # little dance, because our own code frequently
+        # uses the pattern of giving an empty string as `files`
+        files = assure_list(files if files else [])
 
         cmd = cmd_str + files
 
@@ -2452,7 +2342,7 @@ class GitRepo(RepoInterface):
         stdout, stderr = self._git_custom_command(path, cmd)
         # make sure we have one entry for each query path to
         # simplify work with the result
-        attributes = {_normalize_path(self.path, p): {} for p in path}
+        attributes = {p: {} for p in path}
         attr = []
         for item in stdout.split('\0'):
             attr.append(item)

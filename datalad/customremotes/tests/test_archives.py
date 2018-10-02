@@ -78,15 +78,15 @@ def test_basic_scenario(direct, d, d2):
     annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
     annex.drop(fn_extracted)
 
-    list_of_remotes = annex.whereis(fn_extracted, output='descriptions')
+    list_of_remotes = annex.whereis(fn_extracted, output='descriptions')[0]
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
-    assert_false(annex.file_has_content(fn_extracted))
+    assert_false(annex.file_has_content(fn_extracted)[0])
     annex.get(fn_extracted)
-    assert_true(annex.file_has_content(fn_extracted))
+    assert_true(annex.file_has_content(fn_extracted)[0])
 
     annex.rm_url(fn_extracted, file_url)
-    assert_false(annex.drop(fn_extracted)['success'])
+    assert_false(annex.drop(fn_extracted)[0]['success'])
 
     annex.add_url_to_file(fn_extracted, file_url)
     annex.drop(fn_extracted)
@@ -100,12 +100,12 @@ def test_basic_scenario(direct, d, d2):
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
-    assert_false(cloned_annex.file_has_content(fn_archive))
-    assert_false(cloned_annex.file_has_content(fn_extracted))
+    assert_false(cloned_annex.file_has_content(fn_archive)[0])
+    assert_false(cloned_annex.file_has_content(fn_extracted)[0])
     cloned_annex.get(fn_extracted)
-    assert_true(cloned_annex.file_has_content(fn_extracted))
+    assert_true(cloned_annex.file_has_content(fn_extracted)[0])
     # as a result it would also fetch tarball
-    assert_true(cloned_annex.file_has_content(fn_archive))
+    assert_true(cloned_annex.file_has_content(fn_archive)[0])
 
     # Check if protocol was collected
     if os.environ.get('DATALAD_TESTS_PROTOCOLREMOTE'):
@@ -138,9 +138,9 @@ def test_annex_get_from_subdir(topdir):
     with chpwd(opj(topdir, 'a', 'd')):
         runner = Runner()
         runner(['git', 'annex', 'drop', '--', fn_inarchive_obscure])  # run git annex drop
-        assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
+        assert_false(annex.file_has_content(fpath)[0])             # and verify if file deleted from directory
         runner(['git', 'annex', 'get', '--', fn_inarchive_obscure])   # run git annex get
-        assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
+        assert_true(annex.file_has_content(fpath)[0])              # and verify if file got into directory
 
 
 def test_get_git_environ_adjusted():

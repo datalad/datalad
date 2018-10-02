@@ -153,7 +153,7 @@ def test_clone_simple_local(src, path):
             {'test.dat', 'INFO.txt', 'test-annex.dat'})
         ok_clean_git(path, annex=True)
         # no content was installed:
-        ok_(not ds.repo.file_has_content('test-annex.dat'))
+        ok_(not ds.repo.file_has_content('test-annex.dat')[0])
         uuid_before = ds.repo.uuid
         eq_(ds.repo.get_description(), 'mydummy')
 

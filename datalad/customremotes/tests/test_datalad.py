@@ -34,15 +34,16 @@ def check_basic_scenario(direct, url, d):
     with swallow_outputs() as cmo:
         annex.add_urls([url])
         annex.commit("committing")
-        whereis1 = annex.whereis('3versions_allversioned.txt', output='full')
+        testfilename = '3versions_allversioned.txt'
+        whereis1 = annex.whereis(testfilename, output='full')[testfilename]
         eq_(len(whereis1), 2)  # here and datalad
-        annex.drop('3versions_allversioned.txt')
+        annex.drop(testfilename)
         if PY2:
             pass  # stopped appearing within the test  TODO
             #assert_in('100%', cmo.err)  # we do provide our progress indicator
         else:
             pass  # TODO:  not sure what happened but started to fail for me on my laptop under tox
-    whereis2 = annex.whereis('3versions_allversioned.txt', output='full')
+    whereis2 = annex.whereis(testfilename, output='full')[testfilename]
     eq_(len(whereis2), 1)  # datalad
 
     # if we provide some bogus address which we can't access, we shouldn't pollute output

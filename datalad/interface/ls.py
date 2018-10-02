@@ -326,10 +326,10 @@ class FsModel(AnnexModel):
 
         if type_ in ['file', 'link', 'link-broken']:
             # if node is under annex, ask annex for node size, ondisk_size
-            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path):
-                size = self.repo.info(self._path, batch=True)['size']
+            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path)[0]:
+                size = self.repo.info(self._path, batch=True)[self._path]['size']
                 ondisk_size = size \
-                    if self.repo.file_has_content(self._path) \
+                    if self.repo.file_has_content(self._path)[0] \
                     else 0
             # else ask fs for node size (= ondisk_size)
             else:

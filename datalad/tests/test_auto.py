@@ -137,21 +137,21 @@ def _test_proxying_open(generate_load, verify_load, repo):
         verify_load(fpath2_2)
         # and even if we drop it -- we still can get it no problem
         annex2.drop(fpath2_2)
-        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(annex2.file_has_content(fpath2_2)[0])
         verify_load(fpath2_2)
-        assert_true(annex2.file_has_content(fpath2_2))
+        assert_true(annex2.file_has_content(fpath2_2)[0])
         annex2.drop(fpath2_2)
-        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(annex2.file_has_content(fpath2_2)[0])
         assert_true(os.path.isfile(fpath2_2))
 
     # In check_once mode, if we drop it, it wouldn't be considered again
     annex2.drop(fpath2_2)
-    assert_false(annex2.file_has_content(fpath2_2))
+    assert_false(annex2.file_has_content(fpath2_2)[0])
     with AutomagicIO(check_once=True):
         verify_load(fpath2_2)
-        assert_true(annex2.file_has_content(fpath2_2))
+        assert_true(annex2.file_has_content(fpath2_2)[0])
         annex2.drop(fpath2_2)
-        assert_false(annex2.file_has_content(fpath2_2))
+        assert_false(annex2.file_has_content(fpath2_2)[0])
         assert_false(os.path.isfile(fpath2_2))
 
 
@@ -166,9 +166,9 @@ def _test_proxying_open(generate_load, verify_load, repo):
     with patch('sys.stdout', new_callable=StringIOfileno), \
          patch('sys.stderr', new_callable=StringIOfileno):
         with AutomagicIO():
-            assert_false(annex2.file_has_content(fpath2_2))
+            assert_false(annex2.file_has_content(fpath2_2)[0])
             verify_load(fpath2_2)
-            assert_true(annex2.file_has_content(fpath2_2))
+            assert_true(annex2.file_has_content(fpath2_2)[0])
 
 
 def test_proxying_open_h5py():

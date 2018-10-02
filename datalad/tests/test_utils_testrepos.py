@@ -30,10 +30,10 @@ def _test_BasicAnnexTestRepo(repodir):
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'INFO.txt')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
-    ok_(trepo.repo.file_has_content('test-annex.dat') is False)
+    ok_(trepo.repo.file_has_content('test-annex.dat')[0] is False)
     with swallow_outputs():
         trepo.repo.get('test-annex.dat')
-    ok_(trepo.repo.file_has_content('test-annex.dat'))
+    ok_(trepo.repo.file_has_content('test-annex.dat')[0])
 
 
 # Use of @with_tempfile() apparently is not friendly to test generators yet

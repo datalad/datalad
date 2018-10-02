@@ -241,8 +241,8 @@ def test_bf2458(src, dst):
     clone = install(source=ds.path, path=dst)
     # XXX whereis says nothing in direct mode
     # content is not here
-    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+    eq_(clone.repo.whereis('dummy'), [[ds.config.get('annex.uuid')]])
     # check that plain metadata access does not `get` stuff
     clone.metadata('.', on_failure='ignore')
     # XXX whereis says nothing in direct mode
-    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+    eq_(clone.repo.whereis('dummy'), [[ds.config.get('annex.uuid')]])

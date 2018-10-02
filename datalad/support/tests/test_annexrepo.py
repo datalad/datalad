@@ -10,8 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
-
 import logging
 from functools import partial
 import os
@@ -40,58 +38,65 @@ from datalad.support.external_versions import external_versions
 
 from datalad.support.sshconnector import get_connection_hash
 
-from datalad.utils import on_windows
-from datalad.utils import chpwd
-from datalad.utils import rmtree
-from datalad.utils import linux_distribution_name
-from datalad.utils import unlink
+from datalad.utils import (
+    on_windows,
+    chpwd,
+    rmtree,
+    linux_distribution_name,
+    unlink,
+)
 
-from datalad.tests.utils import ignore_nose_capturing_stdout
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_batch_direct
-from datalad.tests.utils import assert_dict_equal as deq_
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_is
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_not_equal
-from datalad.tests.utils import assert_equal
-from datalad.tests.utils import assert_true
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import ok_git_config_not_empty
-from datalad.tests.utils import ok_annex_get
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import local_testrepo_flavors
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import OBSCURE_FILENAME
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import find_files
+from datalad.tests.utils import (
+    assert_result_count,
+    ignore_nose_capturing_stdout,
+    assert_cwd_unchanged,
+    with_testrepos,
+    with_tempfile,
+    with_tree,
+    create_tree,
+    with_batch_direct,
+    assert_dict_equal as deq_,
+    assert_is_instance,
+    assert_false,
+    assert_in,
+    assert_is,
+    assert_not_in,
+    assert_re_in,
+    assert_raises,
+    assert_not_equal,
+    assert_equal,
+    assert_true,
+    eq_,
+    ok_,
+    ok_git_config_not_empty,
+    ok_annex_get,
+    ok_clean_git,
+    ok_file_has_content,
+    swallow_logs,
+    swallow_outputs,
+    local_testrepo_flavors,
+    serve_path_via_http,
+    get_most_obscure_supported_name,
+    OBSCURE_FILENAME,
+    SkipTest,
+    skip_ssh,
+    find_files,
+)
 
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import CommandNotAvailableError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.support.exceptions import FileNotInAnnexError
-from datalad.support.exceptions import FileInGitError
-from datalad.support.exceptions import OutOfSpaceError
-from datalad.support.exceptions import RemoteNotAvailableError
-from datalad.support.exceptions import OutdatedExternalDependency
-from datalad.support.exceptions import MissingExternalDependency
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import AnnexBatchCommandError
-from datalad.support.exceptions import IncompleteResultsError
+from datalad.support.exceptions import (
+    CommandError,
+    CommandNotAvailableError,
+    FileNotInRepositoryError,
+    FileNotInAnnexError,
+    FileInGitError,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+    OutdatedExternalDependency,
+    MissingExternalDependency,
+    InsufficientArgumentsError,
+    AnnexBatchCommandError,
+    IncompleteResultsError,
+)
 
 from datalad.support.gitrepo import GitRepo
 
@@ -316,7 +321,7 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     eq_(ar.file_has_content(testfiles + ["bogus.txt"], batch=batch),
         [True, False, False])
 
-    assert_false(ar.file_has_content("bogus.txt", batch=batch))
+    assert_false(ar.file_has_content("bogus.txt", batch=batch)[0])
     ok_(ar.file_has_content("test-annex.dat", batch=batch))
 
     if not direct:  # There's no unlock in direct mode.
@@ -352,8 +357,8 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     eq_(ar.is_under_annex(testfiles + ["bogus.txt"], batch=batch),
                  target_value + [False])
 
-    assert_false(ar.is_under_annex("bogus.txt", batch=batch))
-    ok_(ar.is_under_annex("test-annex.dat", batch=batch))
+    assert_false(ar.is_under_annex("bogus.txt", batch=batch)[0])
+    ok_(ar.is_under_annex("test-annex.dat", batch=batch)[0])
 
     if not direct:  # There's no unlock in direct mode.
         ar.unlock(["test-annex.dat"])
@@ -384,13 +389,13 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # get the file from remote
     with swallow_outputs() as cmo:
         ar.add_urls([testurl])
-    l = ar.whereis(testfile)
+    l = ar.whereis(testfile)[0]
     assert_in(ar.WEB_UUID, l)
     eq_(len(l), 2)
     ok_(ar.file_has_content(testfile))
 
     # output='full'
-    lfull = ar.whereis(testfile, output='full')
+    lfull = ar.whereis(testfile, output='full')[testfile]
     eq_(set(lfull), set(l))  # the same entries
     non_web_remote = l[1 - l.index(ar.WEB_UUID)]
     assert_in('urls', lfull[non_web_remote])
@@ -402,20 +407,20 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_raises(CommandError, ar.whereis, [], options='--all', output='full', key=True)
 
     # output='descriptions'
-    ldesc = ar.whereis(testfile, output='descriptions')
+    ldesc = ar.whereis(testfile, output='descriptions')[0]
     eq_(set(ldesc), set([v['description'] for v in lfull.values()]))
 
     # info w/ and w/o fast mode
     for fast in [True, False]:
-        info = ar.info(testfile, fast=fast)
+        info = ar.info(testfile, fast=fast)[testfile]
         eq_(info['size'], 14)
         assert(info['key'])  # that it is there
-        info_batched = ar.info(testfile, batch=True, fast=fast)
+        info_batched = ar.info(testfile, batch=True, fast=fast)[testfile]
         eq_(info, info_batched)
         # while at it ;)
         with swallow_outputs() as cmo:
-            eq_(ar.info('nonexistent', batch=False), None)
-            eq_(ar.info('nonexistent-batch', batch=True), None)
+            eq_(ar.info('nonexistent', batch=False)['nonexistent'], None)
+            eq_(ar.info('nonexistent-batch', batch=True)['nonexistent-batch'], None)
             eq_(cmo.out, '')
             eq_(cmo.err, '')
             ar.precommit()  # to stop all the batched processes for swallow_outputs
@@ -428,8 +433,6 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     repo_info_fast = ar.repo_info(fast=True)
     # doesn't give much testable info, so just comparing a subset for match with repo_info info
     eq_(repo_info_fast['semitrusted repositories'], repo_info['semitrusted repositories'])
-    #import pprint; pprint.pprint(repo_info)
-
     # remove the remote
     ar.rm_url(testfile, testurl)
     l = ar.whereis(testfile)
@@ -437,25 +440,25 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     eq_(len(l), 1)
 
     # now only 1 copy; drop should fail
-    res = ar.drop(testfile)
+    res = ar.drop(testfile)[0]
     eq_(res['command'], 'drop')
     eq_(res['success'], False)
     assert_in('adjust numcopies', res['note'])
 
     # read the url using different method
     ar.add_url_to_file(testfile, testurl)
-    l = ar.whereis(testfile)
+    l = ar.whereis(testfile)[0]
     assert_in(ar.WEB_UUID, l)
     eq_(len(l), 2)
     ok_(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.drop(testfile)
-    l = ar.whereis(testfile)
+    l = ar.whereis(testfile)[0]
     assert_in(ar.WEB_UUID, l)
     eq_(len(l), 1)
-    assert_false(ar.file_has_content(testfile))
-    lfull = ar.whereis(testfile, output='full')
+    assert_false(ar.file_has_content(testfile)[0])
+    lfull = ar.whereis(testfile, output='full')[testfile]
     assert_not_in(non_web_remote, lfull) # not present -- so not even listed
 
     # multiple files/urls
@@ -478,7 +481,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 
     someurl = "http://example.com/someurl"
     ar.add_url_to_file(testfile, someurl, options=['--relaxed'])
-    lfull = ar.whereis(testfile, output='full')
+    lfull = ar.whereis(testfile, output='full')[testfile]
     eq_(set(lfull[ar.WEB_UUID]['urls']), {testurl, someurl})
 
     # and now test with a file in subdirectory
@@ -487,8 +490,8 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     with swallow_outputs() as cmo:
         ar.add_url_to_file(testfile3, url=testurl3)
     ok_file_has_content(opj(dst, testfile3), 'more stuff')
-    eq_(set(ar.whereis(testfile3)), {ar.WEB_UUID, non_web_remote})
-    eq_(set(ar.whereis(testfile3, output='full').keys()), {ar.WEB_UUID, non_web_remote})
+    eq_(set(ar.whereis(testfile3)[0]), {ar.WEB_UUID, non_web_remote})
+    eq_(set(ar.whereis(testfile3, output='full')[testfile3].keys()), {ar.WEB_UUID, non_web_remote})
 
     # and if we ask for both files
     info2 = ar.info([testfile, testfile3])
@@ -498,17 +501,6 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     full = ar.whereis([], options='--all', output='full')
     eq_(len(full.keys()), 3)  # we asked for all files -- got 3 keys
     assert_in(ar.WEB_UUID, full['SHA256E-s10--a978713ea759207f7a6f9ebc9eaebd1b40a69ae408410ddf544463f6d33a30e1.txt'])
-
-    # which would work even if we cd to that subdir, but then we should use explicit curdir
-    with chpwd(subdir):
-        cur_subfile = opj(curdir, 'sub.txt')
-        eq_(set(ar.whereis(cur_subfile)), {ar.WEB_UUID, non_web_remote})
-        eq_(set(ar.whereis(cur_subfile, output='full').keys()), {ar.WEB_UUID, non_web_remote})
-        testfiles = [cur_subfile, opj(pardir, testfile)]
-        info2_ = ar.info(testfiles)
-        # Should maintain original relative file names
-        eq_(set(info2_), set(testfiles))
-        eq_(info2_[cur_subfile]['size'], 10)
 
 
 @with_tree(tree={"a.txt": "a",
@@ -582,8 +574,8 @@ def test_AnnexRepo_migrating_backends(src, dst):
     f.close()
 
     ar.add(filename, backend='MD5')
-    eq_(ar.get_file_backend(filename), 'MD5')
-    eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+    eq_(ar.get_file_backend(filename), ['MD5'])
+    eq_(ar.get_file_backend('test-annex.dat'), ['SHA256E'])
 
     # migrating will only do, if file is present
     ok_annex_get(ar, 'test-annex.dat')
@@ -593,13 +585,13 @@ def test_AnnexRepo_migrating_backends(src, dst):
         assert_raises(CommandNotAvailableError, ar.migrate_backend,
                       'test-annex.dat')
     else:
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+        eq_(ar.get_file_backend('test-annex.dat'), ['SHA256E'])
         ar.migrate_backend('test-annex.dat')
-        eq_(ar.get_file_backend('test-annex.dat'), 'MD5')
+        eq_(ar.get_file_backend('test-annex.dat'), ['MD5'])
 
         ar.migrate_backend('', backend='SHA1')
-        eq_(ar.get_file_backend(filename), 'SHA1')
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
+        eq_(ar.get_file_backend(filename), ['SHA1'])
+        eq_(ar.get_file_backend('test-annex.dat'), ['SHA1'])
 
 
 tree1args = dict(
@@ -626,7 +618,6 @@ def __test_get_md5s(path):
     files = [basename(f) for f in find_files('.*', path)]
     annex.add(files)
     annex.commit()
-    print({f: annex.get_file_key(f) for f in files})
 
 
 @with_batch_direct
@@ -658,13 +649,13 @@ def test_AnnexRepo_backend_option(path, url):
 
     ar.add('firstfile', backend='SHA1')
     ar.add('secondfile')
-    eq_(ar.get_file_backend('firstfile'), 'SHA1')
-    eq_(ar.get_file_backend('secondfile'), 'MD5')
+    eq_(ar.get_file_backend('firstfile'), ['SHA1'])
+    eq_(ar.get_file_backend('secondfile'), ['MD5'])
 
     with swallow_outputs() as cmo:
         # must be added under different name since annex 20160114
         ar.add_url_to_file('remotefile2', url + 'remotefile', backend='SHA1')
-    eq_(ar.get_file_backend('remotefile2'), 'SHA1')
+    eq_(ar.get_file_backend('remotefile2'), ['SHA1'])
 
     with swallow_outputs() as cmo:
         ar.add_urls([url + 'faraway'], backend='SHA1')
@@ -682,12 +673,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
 
     ar = AnnexRepo.clone(src, dst)
 
-    eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+    eq_(ar.get_file_backend('test-annex.dat'), ['SHA256E'])
     if not ar.is_direct_mode():
         # no migration in direct mode
         ok_annex_get(ar, 'test-annex.dat', network=False)
         ar.migrate_backend('test-annex.dat', backend='SHA1')
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
+        eq_(ar.get_file_backend('test-annex.dat'), ['SHA1'])
     else:
         assert_raises(CommandNotAvailableError, ar.migrate_backend,
                       'test-annex.dat', backend='SHA1')
@@ -769,10 +760,10 @@ def test_AnnexRepo_on_uninited_annex(origin, path):
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
     # and still can get our things
-    assert_false(annex.file_has_content('test-annex.dat'))
+    assert_false(annex.file_has_content('test-annex.dat')[0])
     with swallow_outputs():
         annex.get('test-annex.dat')
-        ok_(annex.file_has_content('test-annex.dat'))
+        ok_(annex.file_has_content('test-annex.dat')[0])
 
 
 @assert_cwd_unchanged
@@ -826,10 +817,8 @@ def test_AnnexRepo_add_to_annex(path):
     else:
         assert_false(os.path.islink(filename_abs),
                      "Annexed file is link in direct mode.")
-    assert_in('key', out_json)
     key = repo.get_file_key(filename)
-    assert_false(key == '')
-    assert_equal(key, out_json['key'])
+    assert_result_count(out_json, 1, key=key)
     ok_(repo.file_has_content(filename))
 
     # uncommitted:
@@ -928,7 +917,7 @@ def test_AnnexRepo_get(src, dst):
     assert_is_instance(annex, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = opj(dst, testfile)
-    assert_false(annex.file_has_content("test-annex.dat"))
+    assert_false(annex.file_has_content("test-annex.dat")[0])
     with swallow_outputs():
         annex.get(testfile)
     ok_(annex.file_has_content("test-annex.dat"))
@@ -1035,7 +1024,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     unlink(opj(dst, testfile))
     ar.add_url_to_file(testfile, testurl, batch=True)
 
-    info = ar.info(testfile)
+    info = ar.info(testfile)[testfile]
     eq_(info['size'], 14)
     assert(info['key'])
     # not even added to index yet since we this repo is with default batch_size
@@ -1064,11 +1053,11 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed
-    assert_in(ar.WEB_UUID, ar.whereis(testfile))
+    assert_in(ar.WEB_UUID, ar.whereis(testfile)[0])
     assert(not ar.dirty)
     ar.add_url_to_file(testfile2_, testurl2_, batch=True)
     assert(ar.info(testfile2_))
-    assert_in(ar.WEB_UUID, ar.whereis(testfile2_))
+    assert_in(ar.WEB_UUID, ar.whereis(testfile2_)[0])
 
     # add into a new file
     # filename = 'newfile.dat'
@@ -1087,13 +1076,13 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar2.precommit()  # to possibly stop batch process occupying the stdout
     ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
     assert_in(filename, ar2.get_files())
-    assert_in(ar.WEB_UUID, ar2.whereis(filename))
+    assert_in(ar.WEB_UUID, ar2.whereis(filename)[0])
 
     if not ar.is_direct_mode():
         # in direct mode there's nothing to commit
         ar.commit("actually committing new files")
     assert_in(filename, ar.get_files())
-    assert_in(ar.WEB_UUID, ar.whereis(filename))
+    assert_in(ar.WEB_UUID, ar.whereis(filename)[0])
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 
     # and closing the pipes now shoudn't anyhow affect things
@@ -1372,13 +1361,13 @@ def test_annex_copy_to(origin, clone):
 def test_annex_drop(src, dst):
     ar = AnnexRepo.clone(src, dst)
     testfile = 'test-annex.dat'
-    assert_false(ar.file_has_content(testfile))
+    assert_false(ar.file_has_content(testfile)[0])
     ar.get(testfile)
-    ok_(ar.file_has_content(testfile))
+    ok_(ar.file_has_content(testfile)[0])
 
     # drop file by name:
     result = ar.drop([testfile])
-    assert_false(ar.file_has_content(testfile))
+    assert_false(ar.file_has_content(testfile)[0])
     ok_(isinstance(result, list))
     eq_(len(result), 1)
     eq_(result[0]['command'], 'drop')
@@ -1390,7 +1379,7 @@ def test_annex_drop(src, dst):
     # drop file by key:
     testkey = ar.get_file_key(testfile)
     result = ar.drop([testkey], key=True)
-    assert_false(ar.file_has_content(testfile))
+    assert_false(ar.file_has_content(testfile)[0])
     ok_(isinstance(result, list))
     eq_(len(result), 1)
     eq_(result[0]['command'], 'drop')
@@ -1501,7 +1490,6 @@ def test_is_available(batch, direct, p):
 @with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
-    print(ar.path)
     assert_true(os.path.exists(ar.path))
     assert_false(ar.dirty)
     os.makedirs(opj(ar.path, '.datalad'))
@@ -1526,7 +1514,7 @@ def test_annex_add_no_dotfiles(path):
     # all committed
     assert_false(ar.dirty)
     # not known to annex
-    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
+    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile'))[0])
 
 
 @with_tempfile
@@ -1759,7 +1747,6 @@ def test_AnnexRepo_update_submodule():
     raise SkipTest("TODO")
 
 
-@known_failure_v6  #FIXME
 def test_AnnexRepo_get_submodules():
     raise SkipTest("TODO")
 
