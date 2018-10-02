@@ -61,6 +61,10 @@ def _get_convoluted_situation(path):
         }
     )
     ds.add('.', to_git=True)
+    ds.drop([
+        'file_dropped_clean',
+        op.join('subdir', 'file_dropped_clean')],
+        check=False)
     # clean and proper subdatasets
     ds.create('subds_clean')
     ds.create(op.join('subdir', 'subds_clean'))
@@ -70,10 +74,6 @@ def _get_convoluted_situation(path):
     ds.uninstall([
         'subds_unavailable_clean',
         op.join('subdir', 'subds_unavailable_clean')],
-        check=False)
-    ds.drop([
-        'file_dropped_clean',
-        op.join('subdir', 'file_dropped_clean')],
         check=False)
     ok_clean_git(ds.path)
     # staged subds, and files
