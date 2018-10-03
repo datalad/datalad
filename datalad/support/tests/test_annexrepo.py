@@ -2358,8 +2358,8 @@ def test_get_size_from_perc_complete():
     eq_(f(0, '0'), 0)
     eq_(f(100, '0'), 0)  # we do not know better
     eq_(f(1, '1'), 100)
-	# with no percentage info, we don't know better either:
-	eq_(f(1, ''), 0)
+    # with no percentage info, we don't know better either:
+    eq_(f(1, ''), 0)
 
 
 # to prevent regression
