@@ -3665,7 +3665,7 @@ def _get_size_from_perc_complete(count, perc):
     try:
         portion = (float(perc) / 100.)
     except ValueError:
-        return None
+        portion = None
     return int(math.ceil(int(count) / portion)) \
         if portion else 0
 
