@@ -2112,8 +2112,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     % str(out_json))
             # Make the output's structure match bcmd's.
             out_json = out_json[0]
-            # Don't capture stderr, since download progress provided by wget uses
-            # stderr.
+            # Don't capture stderr, since download progress provided by wget
+            # uses stderr.
         else:
             options += ['--with-files']
             if backend:
@@ -3661,7 +3661,11 @@ class BatchedAnnex(object):
 
 def _get_size_from_perc_complete(count, perc):
     """A helper to get full size if know % and corresponding size"""
-    portion = (float(perc) / 100.)
+
+    try:
+        portion = (float(perc) / 100.)
+    except ValueError:
+        portion = None
     return int(math.ceil(int(count) / portion)) \
         if portion else 0
 
