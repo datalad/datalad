@@ -69,6 +69,7 @@ _group_misc = (
         ('datalad.interface.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
         ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
+        ('datalad.interface.open', 'Open', 'open'),
     ])
 
 _group_plumbing = (
