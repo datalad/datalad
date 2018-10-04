@@ -2430,9 +2430,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # report it within JSON response:
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             not_existing = [
-                line.split()[1] for line in e.stderr.splitlines()
+                # cut the file path from the middle, no useful delimiter
+                # need to deal with spaces too!
+                line[11:-10] for line in e.stderr.splitlines()
                 if line.startswith('git-annex:') and
-                   line.endswith('not found')
+                line.endswith(' not found')
             ]
             if not_existing:
                 if out is None:
@@ -2445,8 +2447,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 out += linesep.join(
                     ['{{"command": "{cmd}", "file": "{path}", '
                      '"note": "{note}",'
-                     '"success":false}}'.format(
-                         cmd=command, path=f, note="not found")
+                     '"success": false}}'.format(
+                         cmd=command,
+                         # gotta quote backslashes that have taken over...
+                         # ... or the outcome is not valid JSON
+                         path=f.replace('\\', '\\\\'),
+                         note="not found")
                      for f in not_existing])
 
             # Note: insert additional code here to analyse failure and possibly
