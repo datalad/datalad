@@ -210,6 +210,9 @@ def open(
             # due to .gitattributes settings.
             # .save seems to be more resilient BUT! retains git/annex so
             # there would be no auto migrations
+            # self.all_results.extend(
+            #     dl.add(path=resolved_paths, save=save, message=message)
+            # )
             # TODO, see https://github.com/datalad/datalad/issues/1651
             if save:
                 # mneh -- even this one (may be due to paths specification?)
@@ -221,7 +224,12 @@ def open(
 
     class OpenAppend(OpenRewrite):
         def pre_open(self):
-            res = OpenRead.pre_open(self)
+            # Copy from OpenRead,
+            res = dl.get(resolved_paths,
+                 # TODO: what should we do with files not under git at all?
+                 # here on_failure is not effective - fails during "rendering"
+                 # , on_failure='continue'
+            )
             res.extend(dl.unlock(resolved_paths))
             return res
 
