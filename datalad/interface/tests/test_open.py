@@ -12,37 +12,28 @@
 
 __docformat__ = 'restructuredtext'
 
-import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-import datalad.api as dl
 from datalad.api import (
     clone,
     install,
     open,
 )
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandError
-from datalad.support.annexrepo import AnnexRepo
-from datalad.utils import chpwd
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import eq_
-from datalad.tests.utils import getpwd
-from datalad.tests.utils import chpwd
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import assert_cwd_unchanged
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import on_windows, skip_if
-from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
+from datalad.support.path import (
+    exists,
+    join as opj,
+)
 from datalad.tests.utils import (
+    assert_cwd_unchanged,
+    chpwd,
+    create_tree,
+    eq_,
+    ok_clean_git,
     ok_file_has_content,
     ok_file_under_git,
-    ok_clean_git,
+    with_tree,
 )
-from datalad.support.path import exists, join as opj
 
 from functools import wraps
 
@@ -57,7 +48,7 @@ def with_sample_ds(t):
             'in-annex': '',
             'in-git': 'text',
             'untracked': 'untracked',
-        # TODO: open of 'untracked' and 'outside' aren't "supported" yet
+            # TODO: open of 'untracked' and 'outside' aren't "supported" yet
         },
         'outside': 'content'
     })

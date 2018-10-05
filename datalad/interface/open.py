@@ -12,91 +12,13 @@ __docformat__ = 'restructuredtext'
 
 import os
 import logging
-from contextlib import contextmanager
 
-import json
-
-from argparse import REMAINDER
-import glob
-import os.path as op
-from os.path import join as opj
-from os.path import normpath
-from os.path import relpath
-from os.path import isabs
-
-from six.moves import shlex_quote
-
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import save_message_opt
-from datalad.interface.common_opts import if_dirty_opt
-from datalad.interface.common_opts import nosave_opt
-# TODO should be moved to common_opts may be?
-from datalad.distribution.drop import dataset_argument
-
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
-from datalad.support.exceptions import CommandError
-from datalad.support.param import Parameter
-from datalad.support.json_py import dump2stream
-
-from datalad.distribution.add import Add
-from datalad.distribution.get import Get
-from datalad.distribution.install import Install
-from datalad.distribution.remove import Remove
 from datalad.distribution.dataset import resolve_path
-from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.interface.unlock import Unlock
-
 from datalad.utils import assure_list
-from datalad.utils import chpwd
-# Rename get_dataset_pwds for the benefit of containers_run.
-from datalad.utils import get_dataset_pwds as get_command_pwds
-from datalad.utils import getpwd
-from datalad.utils import partition
-from datalad.utils import SequenceFormatter
+
 
 lgr = logging.getLogger('datalad.interface.open')
-
-
-# @build_doc
-# class Open(Interface):
-#     """Open files for reading or writing performing necessary git-annex actions.
-#
-#     TODO
-#     """
-#     _params_ = dict(
-#         dataset=dataset_argument,
-#         path=Parameter(
-#             args=("path",),
-#             metavar="PATH",
-#             doc="path to the file to be opened",
-#             nargs="+",
-#             constraints=EnsureStr() | EnsureNone(),
-#         ),
-#         mode=Parameter(
-#             default=None,
-#             doc="Mode as passed (if specified) to `open` call",
-#             constraints=EnsureStr() | EnsureNone(),
-#         ),
-#         buffering=Parameter(
-#             default=None,
-#             doc="Buffering argument as passed (if specified) to `open` call",
-#             constraints=EnsureInt() | EnsureNone(),
-#         ),
-#         save=nosave_opt,
-#         message=save_message_opt,
-#         # TODO: should we worry/bother eg checking dirtiness for those
-#         # specified files
-#         # if_dirty=if_dirty_opt,
-#     )
 
 _builtin_open = open
 
@@ -108,7 +30,6 @@ def open(
         dataset=None,
         save=True,
         message=None
-        # , if_dirty='save-before'
     ):
     """TODO"""
     # Pre-treat open parameters first
@@ -136,6 +57,15 @@ def open(
     import datalad.api as dl  # heavy import so delayed
 
     class OpenBase(object):
+        """The base class to provide context handler for open
+
+        It will also be used to store .all_results collected from running
+        all the DataLad commands for possible introspection and yielding.
+        To avoid passing all those wonderful arguments, it is defined within
+        the closure of the `open` function, to access its variables.
+        Derived classes should overload `pre_open` and `post_close` methods
+        with corresponding logic
+        """
         def __init__(self):
             self.all_results = []
             self.files = None
@@ -182,6 +112,7 @@ def open(
 
         def post_close(self):
             raise NotImplementedError
+
 
     class OpenRead(OpenBase):
         def pre_open(self):
