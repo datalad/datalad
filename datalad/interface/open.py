@@ -12,7 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
+from contextlib import contextmanager
 
 import json
 
@@ -50,12 +50,12 @@ from datalad.distribution.add import Add
 from datalad.distribution.get import Get
 from datalad.distribution.install import Install
 from datalad.distribution.remove import Remove
-from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
-from datalad.utils import assure_bytes
+from datalad.utils import assure_list
 from datalad.utils import chpwd
 # Rename get_dataset_pwds for the benefit of containers_run.
 from datalad.utils import get_dataset_pwds as get_command_pwds
@@ -66,42 +66,43 @@ from datalad.utils import SequenceFormatter
 lgr = logging.getLogger('datalad.interface.open')
 
 
-@build_doc
-class Open(Interface):
-    """Open files for reading or writing performing necessary git-annex actions.
+# @build_doc
+# class Open(Interface):
+#     """Open files for reading or writing performing necessary git-annex actions.
+#
+#     TODO
+#     """
+#     _params_ = dict(
+#         dataset=dataset_argument,
+#         path=Parameter(
+#             args=("path",),
+#             metavar="PATH",
+#             doc="path to the file to be opened",
+#             nargs="+",
+#             constraints=EnsureStr() | EnsureNone(),
+#         ),
+#         mode=Parameter(
+#             default=None,
+#             doc="Mode as passed (if specified) to `open` call",
+#             constraints=EnsureStr() | EnsureNone(),
+#         ),
+#         buffering=Parameter(
+#             default=None,
+#             doc="Buffering argument as passed (if specified) to `open` call",
+#             constraints=EnsureInt() | EnsureNone(),
+#         ),
+#         save=nosave_opt,
+#         message=save_message_opt,
+#         # TODO: should we worry/bother eg checking dirtiness for those
+#         # specified files
+#         # if_dirty=if_dirty_opt,
+#     )
 
-    TODO
-    """
-    _params_ = dict(
-        dataset=dataset_argument,
-        path=Parameter(
-            args=("path",),
-            metavar="PATH",
-            doc="path to the file to be opened",
-            nargs="+",
-            constraints=EnsureStr() | EnsureNone(),
-        ),
-        mode=Parameter(
-            default=None,
-            doc="Mode as passed (if specified) to `open` call",
-            constraints=EnsureStr() | EnsureNone(),
-        ),
-        buffering=Parameter(
-            default=None,
-            doc="Buffering argument as passed (if specified) to `open` call",
-            constraints=EnsureInt() | EnsureNone(),
-        ),
-        save=nosave_opt,
-        message=save_message_opt,
-        # TODO: should we worry/bother eg checking dirtiness for those
-        # specified files
-        # if_dirty=if_dirty_opt,
-    )
+_builtin_open = open
 
-    @staticmethod
+if True:
     @datasetmethod(name='open')
-    @eval_results
-    def __call__(
+    def open(
             path=None,
             mode=None,
             buffering=None,
@@ -110,40 +111,11 @@ class Open(Interface):
             message=None
             # , if_dirty='save-before'
         ):
+        """TODO"""
+        # Pre-treat open parameters first
         if mode is not None:
             if mode[0] not in 'rwa':
                 raise ValueError("Mode must be either None or start with r, w, or a")
-        # refds_path = Interface.get_refds_path(dataset)
-        # to_process = []
-        # for ap in AnnotatePaths.__call__(
-        #         path=path,
-        #         dataset=refds_path,
-        #         action='open',
-        #         unavailable_path_status='unavailable',
-        #         nondataset_path_status='',
-        #         return_type='generator',
-        #         on_failure='error'):
-        #     # if ap.get('status', None):
-        #     #     # this is done
-        #     #     yield ap
-        #     #     continue
-        #     # if ap.get('state', None) == 'absent' and \
-        #     #         ap.get('parentds', None) is None:
-        #     #     # nothing exists at location, and there is no parent to
-        #     #     # remove from
-        #     #     ap['status'] = 'notneeded'
-        #     #     ap['message'] = "path does not exist and is not in a dataset"
-        #     #     yield ap
-        #     #     continue
-        #     # if ap.get('raw_input', False) and ap.get('type', None) == 'dataset':
-        #     #     # make sure dataset sorting yields a dedicted entry for this one
-        #     #     ap['process_content'] = True
-        #     to_process.append(ap)
-        #
-        # if not to_process:
-        #     # nothing left to do, potentially all errored before
-        #     raise RuntimeError(
-        #         "There should have been something to do for paths %s" % (path,))
 
         open_args = []
         if mode is not None:
@@ -155,11 +127,16 @@ class Open(Interface):
             raise ValueError("When specifying buffering, provide mode for open")
 
         # Probably will be useless in Python mode since we cannot return a
-        # context manager an yield all the result records at the same time
+        # context manager an yield all the result records at the same time.
+        # But if we make it into a class, we could store them in the instance
+        # so they could be inspected later on if desired?
         all_results = []
+        path = assure_list(path)
+        resolved_paths = [resolve_path(p, dataset) for p in path] \
+            if dataset is not None else path
 
-        from contextlib import contextmanager
-        import datalad.api as dl
+        import datalad.api as dl  # heavy import so delayed
+
         @contextmanager
         def open_read():
             # TODO cannot yield all those wonderful reports here since it would
@@ -171,10 +148,10 @@ class Open(Interface):
             )
             all_results.extend(res)
             files = []
-            for p in path:
+            for p in resolved_paths:
                 # TODO: actually do all that full path deduction here probably
                 # since we allow for ds.open
-                files.append(open(p, *open_args))
+                files.append(_builtin_open(p, *open_args))
                 all_results.append({
                     'status': 'ok',
                     'action': 'open',
@@ -182,7 +159,7 @@ class Open(Interface):
                     'type': 'file'
                 })
 
-            yield files
+            yield files if len(files) > 1 else files[0]
 
             # Nothing more to do for reading operation besides closing those
             for f in files:
@@ -202,14 +179,4 @@ class Open(Interface):
             #'w': open_write(),
         }[mode_base]()
 
-        cmdline_mode = True
         return res
-        # TODO: in cmdline mode we should use it as a context manager here.
-        # In Python - we just need to return it I guess?
-        # with res as files:
-        #   # TODO: cmdline - start a shell?
-        #   print("files are: %s" % str(files))
-        # Since we are to use it as an actual context manager, and not as a
-        # generator of result records
-        #for r in all_results:
-        #    yield r

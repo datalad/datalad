@@ -35,3 +35,5 @@ _generate_func_api()
 
 # Be nice and clean up the namespace properly
 del _generate_func_api
+
+from .interface.open import open
