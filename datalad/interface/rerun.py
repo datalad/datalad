@@ -364,9 +364,7 @@ def _rerun(dset, results):
             dset.repo.checkout(res["commit"],
                                options=checkout_options)
         elif rerun_action == "pick":
-            dset.repo._git_custom_command(
-                None, ["git", "cherry-pick", res["commit"]],
-                check_fake_dates=True)
+            dset.repo.cherry_pick(res["commit"])
             yield res
         elif rerun_action == "run":
             hexsha = res["commit"]
