@@ -867,8 +867,7 @@ class GitRepo(RepoInterface):
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
         try:
-            if hasattr(self, 'repo') and exists(self.path) \
-                    and self._repo is not None:
+            if getattr(self, '_repo', None) is not None and exists(self.path):
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
                 self._repo.git.clear_cache()
