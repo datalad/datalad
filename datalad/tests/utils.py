@@ -172,9 +172,10 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
             # Instantiation failed => no annex
             try:
                 r = GitRepo(path, init=False, create=False)
-            except Exception:
-                raise AssertionError("Couldn't find an annex or a git "
-                                     "repository at {}.".format(path))
+            except Exception as exc:
+                raise AssertionError(
+                    "Failed to find an annex or a git "
+                    "repository at {}. Exception was: {}".format(path, exc_str(exc)))
             if annex is None:
                 annex = False
             # explicitly given GitRepo instance doesn't make sense with
