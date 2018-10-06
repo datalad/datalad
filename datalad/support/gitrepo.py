@@ -1376,19 +1376,21 @@ class GitRepo(RepoInterface):
         # compatibility across platforms.
         return stdout.rsplit("\0", 1)[0]
 
-    def get_hexsha(self, commitish=None):
+    def get_hexsha(self, commitish=None, short=False):
         """Return a hexsha for a given commitish.
 
         Parameters
         ----------
         commitish : str, optional
           Any identifier that refers to a commit (defaults to "HEAD").
+        short : bool, optional
+          Return the abbreviated form of the hexsha.
 
         Returns
         -------
         str or, if there are not commits yet, None.
         """
-        stdout = self.format_commit("%H",
+        stdout = self.format_commit("%{}".format('h' if short else 'H'),
                                     commitish)
         if stdout is not None:
             stdout = stdout.splitlines()
