@@ -562,6 +562,6 @@ def new_or_modified(diff_results):
 def commit_exists(dataset, commit):
     try:
         dataset.repo.repo.git.rev_parse("--verify", commit + "^{commit}")
-    except:
+    except GitCommandError:
         return False
     return True
