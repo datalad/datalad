@@ -1348,6 +1348,10 @@ class GitRepo(RepoInterface):
         ----------
         object: str, optional
           Any type of Git object identifier. See `git show`.
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
         """
         cmd = ['git', 'show', '--no-patch', "--format=%H"]
         if object:
