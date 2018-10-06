@@ -1384,6 +1384,29 @@ class GitRepo(RepoInterface):
                 return None
             raise
 
+    def commit_exists(self, commitish):
+        """Does `commitish` exist in the repo?
+
+        Parameters
+        ----------
+        commitish : str
+            A commit or an object that can be dereferenced to one.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            # Note: The peeling operator "^{commit}" is required so that
+            # rev-parse doesn't succeed if passed a full hexsha that is valid
+            # but doesn't exist.
+            self._git_custom_command(
+                "", ["git", "rev-parse", "--verify", commitish + "^{commit}"],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
+
     def get_merge_base(self, commitishes):
         """Get a merge base hexsha
 
