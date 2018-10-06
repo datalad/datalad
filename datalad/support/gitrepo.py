@@ -1341,20 +1341,22 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, commitish=None):
-        """Return a hexsha for a given commitish.
+    def format_commit(self, fmt, commitish=None):
+        """Return `git show` output for `commitish`.
 
         Parameters
         ----------
-        commitish : str, optional
+        fmt : str
+            A format string accepted by `git show`.
+        commitish: str, optional
           Any commit identifier (defaults to "HEAD").
 
         Returns
         -------
         str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '--no-patch', "--format=%H"]
-        if commitish:
+        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        if commitish is not None:
             cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
@@ -1368,9 +1370,30 @@ class GitRepo(RepoInterface):
                 return None
             else:
                 raise e
-        stdout = stdout.splitlines()
-        assert(len(stdout) == 1)
-        return stdout[0]
+        # This trailing null is coming from the -z above, which avoids the
+        # newline that Git would append to the output. We could drop -z and
+        # strip the newline directly, but then we'd have to worry about
+        # compatibility across platforms.
+        return stdout.rsplit("\0", 1)[0]
+
+    def get_hexsha(self, commitish=None):
+        """Return a hexsha for a given commitish.
+
+        Parameters
+        ----------
+        commitish : str, optional
+          Any identifier that refers to a commit (defaults to "HEAD").
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
+        """
+        stdout = self.format_commit("%H",
+                                    commitish)
+        if stdout is not None:
+            stdout = stdout.splitlines()
+            assert(len(stdout) == 1)
+            return stdout[0]
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hash(self, files):
