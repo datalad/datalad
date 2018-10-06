@@ -33,7 +33,6 @@ from datalad.interface.run import _format_cmd_shorty
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
 from datalad.support.constraints import EnsureNone, EnsureStr
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
 from datalad.support.json_py import load_stream
 
@@ -212,7 +211,7 @@ class Rerun(Interface):
                 message="branch '{}' already exists".format(branch))
             return
 
-        if not commit_exists(ds, revision + "^"):
+        if not ds.repo.commit_exists(revision + "^"):
             # Only a single commit is reachable from `revision`.  In
             # this case, --since has no effect on the range construction.
             revrange = revision
@@ -294,7 +293,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         # that, regardless of if and how --since is specified, the effective
         # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
-        if not commit_exists(dset, onto):
+        if not dset.repo.commit_exists(onto):
             # This is unlikely to happen in the wild because it means that the
             # first commit is a datalad run commit. Just abort rather than
             # trying to checkout on orphan branch or something like that.
@@ -537,7 +536,7 @@ def diff_revision(dataset, revision="HEAD"):
     -------
     Generator that yields AnnotatePaths instances
     """
-    if commit_exists(dataset, revision + "^"):
+    if dataset.repo.commit_exists(revision + "^"):
         revrange = "{rev}^..{rev}".format(rev=revision)
     else:
         # No other commits are reachable from this revision.  Diff
@@ -557,11 +556,3 @@ def new_or_modified(diff_results):
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r
-
-
-def commit_exists(dataset, commit):
-    try:
-        dataset.repo.repo.git.rev_parse("--verify", commit + "^{commit}")
-    except GitCommandError:
-        return False
-    return True
