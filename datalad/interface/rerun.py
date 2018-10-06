@@ -321,7 +321,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     def skip_or_pick(hexsha, result, msg):
         pick = hexsha in to_pick
         result["rerun_action"] = "pick" if pick else "skip"
-        shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+        shortrev = dset.repo.get_hexsha(hexsha, short=True)
         result["message"] = (
             "%s %s; %s",
             shortrev, msg, "cherry picking" if pick else "skipping")
