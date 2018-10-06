@@ -243,7 +243,7 @@ class Rerun(Interface):
 def _revs_as_results(dset, revs):
     for rev in revs:
         res = get_status_dict("run", ds=dset, commit=rev)
-        full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
+        full_msg = dset.repo.format_commit("%B", rev)
         try:
             msg, info = get_run_info(dset, full_msg)
         except ValueError as exc:
@@ -401,8 +401,7 @@ def _report(dset, results):
                 res["diff"] = list(res["diff"])
                 # Add extra information that is useful in the report but not
                 # needed for the rerun.
-                out = dset.repo.repo.git.show(
-                    "--no-patch", "--format=%an%x00%aI", res["commit"])
+                out = dset.repo.format_commit("%an%x00%aI", res["commit"])
                 res["author"], res["date"] = out.split("\0")
         yield res
 
