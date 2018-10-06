@@ -1355,7 +1355,7 @@ class GitRepo(RepoInterface):
         """
         cmd = ['git', 'show', '--no-patch', "--format=%H"]
         if commitish:
-            cmd.append(commitish)
+            cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:

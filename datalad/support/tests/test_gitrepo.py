@@ -1242,6 +1242,15 @@ def test_gitattributes(path):
 
 
 @with_tempfile(mkdir=True)
+def test_get_hexsha_tag(path):
+    gr = GitRepo(path, create=True)
+    gr.commit(msg="msg", options=["--allow-empty"])
+    gr.tag("atag", message="atag msg")
+    # get_hexsha() dereferences a tag to a commit.
+    eq_(gr.get_hexsha("atag"), gr.get_hexsha())
+
+
+@with_tempfile(mkdir=True)
 def test_get_tags(path):
     from mock import patch
 
