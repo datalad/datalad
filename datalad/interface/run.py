@@ -623,7 +623,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = assure_bytes(msg)
 
     if not rerun_info and cmd_exitcode:
-        msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
+        msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
+                               "COMMIT_EDITMSG"))
         with open(msg_path, "wb") as ofh:
             ofh.write(msg)
         lgr.info("The command had a non-zero exit code. "

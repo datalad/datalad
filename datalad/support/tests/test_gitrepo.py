@@ -1066,7 +1066,8 @@ def test_optimized_cloning(path):
         return dict(
             [(os.path.join(*o.split(os.sep)[-2:]),
               os.stat(o).st_ino)
-             for o in glob(os.path.join(repo.repo.git_dir,
+             for o in glob(os.path.join(repo.path,
+                                        repo.get_git_dir(repo),
                                         'objects', '*', '*'))])
 
     origin_inodes = _get_inodes(repo)

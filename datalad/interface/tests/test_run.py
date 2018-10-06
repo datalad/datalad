@@ -391,7 +391,7 @@ def test_run_failure(path):
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
-    msgfile = opj(ds.repo.repo.git_dir, "COMMIT_EDITMSG")
+    msgfile = opj(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
     ds.add(".", save=False)
