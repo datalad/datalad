@@ -1442,6 +1442,26 @@ class GitRepo(RepoInterface):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
+    def is_ancestor(self, reva, revb):
+        """Is `reva` an ancestor of `revb`?
+
+        Parameters
+        ----------
+        reva, revb : str
+            Revisions.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            self._git_custom_command(
+                "", ["git", "merge-base", "--is-ancestor", reva, revb],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
+
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)
 
