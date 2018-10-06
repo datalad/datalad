@@ -313,12 +313,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             status="ok")
 
     def rev_is_ancestor(rev):
-        try:
-            dset.repo.repo.git.merge_base("--is-ancestor", rev, start_point)
-        except GitCommandError:
-            # Revision is NOT an ancestor of the starting point.
-            return False
-        return True
+        return dset.repo.is_ancestor(rev, start_point)
 
     # We want to skip revs before the starting point and pick those after.
     to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
