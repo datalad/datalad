@@ -1341,21 +1341,21 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, object=None):
-        """Return a hexsha for a given object. If None - of current HEAD
+    def get_hexsha(self, commitish=None):
+        """Return a hexsha for a given commitish.
 
         Parameters
         ----------
-        object: str, optional
-          Any type of Git object identifier. See `git show`.
+        commitish : str, optional
+          Any commit identifier (defaults to "HEAD").
 
         Returns
         -------
         str or, if there are not commits yet, None.
         """
         cmd = ['git', 'show', '--no-patch', "--format=%H"]
-        if object:
-            cmd.append(object)
+        if commitish:
+            cmd.append(commitish)
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
@@ -1363,7 +1363,7 @@ class GitRepo(RepoInterface):
                 '', cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
-                raise ValueError("Unknown object identifier: %s" % object)
+                raise ValueError("Unknown commit identifier: %s" % commitish)
             elif 'does not have any commits yet' in e.stderr:
                 return None
             else:
