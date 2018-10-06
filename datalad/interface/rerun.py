@@ -422,7 +422,7 @@ def _get_script_handler(script, since, revision):
         ofh.write(header.format(
             script=script,
             since="" if since is None else " --since=" + since,
-            revision=dset.repo.repo.git.rev_parse(revision),
+            revision=dset.repo.get_hexsha(revision),
             ds='dataset {} at '.format(dset.id) if dset.id else '',
             path=dset.path))
 

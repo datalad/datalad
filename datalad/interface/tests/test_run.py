@@ -262,16 +262,16 @@ def test_rerun_onto(path):
     # same (but detached) place.
     ds.rerun(revision="static", onto="static")
     ok_(ds.repo.get_active_branch() is None)
-    eq_(ds.repo.repo.git.rev_parse("HEAD"),
-        ds.repo.repo.git.rev_parse("static"))
+    eq_(ds.repo.get_hexsha(),
+        ds.repo.get_hexsha("static"))
 
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
     ds.repo.checkout("master")
     ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
-    neq_(ds.repo.repo.git.rev_parse("HEAD"),
-         ds.repo.repo.git.rev_parse("static"))
+    neq_(ds.repo.get_hexsha(),
+         ds.repo.get_hexsha("static"))
     assert_result_count(ds.diff(revision="HEAD..static"), 0)
     for revrange in ["..static", "static.."]:
         assert_result_count(
@@ -282,8 +282,8 @@ def test_rerun_onto(path):
     ds.repo.checkout("master")
     ds.rerun(onto="HEAD")
     ok_(ds.repo.get_active_branch() is None)
-    neq_(ds.repo.repo.git.rev_parse("HEAD"),
-         ds.repo.repo.git.rev_parse("master"))
+    neq_(ds.repo.get_hexsha(),
+         ds.repo.get_hexsha("master"))
 
     # An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
@@ -300,7 +300,7 @@ def test_rerun_onto(path):
     eq_(ds.repo.get_active_branch(), "from-base")
     assert_result_count(ds.diff(revision="master..from-base"), 0)
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
-        ds.repo.repo.git.rev_parse("static^"))
+        ds.repo.get_hexsha("static^"))
 
 
 @ignore_nose_capturing_stdout
@@ -449,7 +449,7 @@ def test_rerun_branch(path):
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 3)
     eq_(ds.repo.get_merge_base(["master", "rerun"]),
-        ds.repo.repo.git.rev_parse("prerun"))
+        ds.repo.get_hexsha("prerun"))
 
     # Start rerun branch at tip of current branch.
     ds.repo.checkout("master")
