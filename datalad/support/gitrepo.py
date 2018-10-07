@@ -2066,6 +2066,17 @@ class GitRepo(RepoInterface):
             '', ['git', 'branch', '-D', branch]
         )
 
+    def cherry_pick(self, commit):
+        """Cherry pick `commit` to the current branch.
+
+        Parameters
+        ----------
+        commit : str
+            A single commit.
+        """
+        self._git_custom_command("", ["git", "cherry-pick", commit],
+                                 check_fake_dates=True)
+
     def ls_remote(self, remote, options=None):
         if options is None:
             options = []
