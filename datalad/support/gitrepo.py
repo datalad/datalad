@@ -1384,13 +1384,13 @@ class GitRepo(RepoInterface):
                 return None
             raise
 
-    def get_merge_base(self, treeishes):
+    def get_merge_base(self, commitishes):
         """Get a merge base hexsha
 
         Parameters
         ----------
-        treeishes: str or list of str
-          List of treeishes (branches, hexshas, etc) to determine the merge
+        commitishes: str or list of str
+          List of commitishes (branches, hexshas, etc) to determine the merge
           base of. If a single value provided, returns merge_base with the
           current branch.
 
@@ -1400,15 +1400,15 @@ class GitRepo(RepoInterface):
           If no merge-base for given commits, or specified treeish doesn't
           exist, None returned
         """
-        if isinstance(treeishes, string_types):
-            treeishes = [treeishes]
-        if not treeishes:
+        if isinstance(commitishes, string_types):
+            commitishes = [commitishes]
+        if not commitishes:
             raise ValueError("Provide at least a single value")
-        elif len(treeishes) == 1:
-            treeishes = treeishes + [self.get_active_branch()]
+        elif len(commitishes) == 1:
+            commitishes = commitishes + [self.get_active_branch()]
 
         try:
-            bases = self.repo.merge_base(*treeishes)
+            bases = self.repo.merge_base(*commitishes)
         except GitCommandError as exc:
             if "fatal: Not a valid object name" in str(exc):
                 return None
