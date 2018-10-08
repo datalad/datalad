@@ -19,9 +19,11 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
@@ -75,6 +77,7 @@ def test_basics(path):
     ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
 
 
+@known_failure_direct_mode
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -85,7 +88,8 @@ with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
 add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
-def test_procedure_discovery(path):
+@with_tempfile
+def test_procedure_discovery(path, super_path):
     ps = run_procedure(discover=True)
     # there are a few procedures coming with datalad, needs to find them
     assert_true(len(ps) > 2)
@@ -120,11 +124,37 @@ def test_procedure_discovery(path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
+    ds.save()
 
     # run discovery on the dataset:
     ps = ds.run_procedure(discover=True)
 
     # still needs to find procedures coming with datalad
     assert_true(len(ps) > 2)
+    # we get three essential properties
+    eq_(
+        sum(['procedure_type' in p and
+             'procedure_callfmt' in p and
+             'path' in p
+             for p in ps]),
+        len(ps))
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
+
+    # make it a subdataset and try again:
+    super = Dataset(super_path).create()
+    super.install('sub', source=ds.path)
+
+    ps = super.run_procedure(discover=True)
+    # still needs to find procedures coming with datalad
+    assert_true(len(ps) > 2)
+    # we get three essential properties
+    eq_(
+        sum(['procedure_type' in p and
+             'procedure_callfmt' in p and
+             'path' in p
+             for p in ps]),
+        len(ps))
+    # dataset's procedure needs to be in the results
+    assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
+                                       'datalad_test_proc.py'))

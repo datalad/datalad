@@ -64,9 +64,10 @@ def _get_procedure_implementation(name='*', ds=None):
             for m in _get_file_match(op.join(ds.path, dir), name):
                 yield m
         # 1.1. check subdatasets recursively
-        # for subds in ds.subdatasets(return_type='generator',
-        #                             result_xfm='datasets'):
-        #     yield _get_procedure_implementation(name=name, ds=subds)
+        for subds in ds.subdatasets(return_type='generator',
+                                    result_xfm='datasets'):
+            for m in _get_procedure_implementation(name=name, ds=subds):
+                yield m
 
     # 2. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
