@@ -2279,6 +2279,21 @@ class GitRepo(RepoInterface):
         if branch is not None:
             cmd += ['-b', branch]
         if url is None:
+            # repo must already exist locally
+            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            # check that it has a commit, and refuse
+            # to operate on it otherwise, or we would get a bastard
+            # submodule that cripples git operations
+            if not subm.get_hexsha():
+                raise InvalidGitRepositoryError(
+                    'cannot add subdataset %s with no commits', subm)
+            # make an attempt to configure a submodule source URL based on the
+            # discovered remote configuration
+            remote, branch = subm.get_tracking_branch()
+            url = subm.get_remote_url(remote) if remote else None
+
+        if url is None:
+            # had no luck with a remote URL
             if not isabs(path):
                 # need to recode into a relative path "URL" in POSIX
                 # style, even on windows
@@ -2287,6 +2302,8 @@ class GitRepo(RepoInterface):
                 url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # ensure supported setup
+        _fixup_submodule_dotgit_setup(self, path)
         # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
@@ -2611,3 +2628,19 @@ class GitRepo(RepoInterface):
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove
 # status?
+
+
+def _fixup_submodule_dotgit_setup(ds, relativepath):
+    """Implementation of our current of .git in a subdataset
+
+    Each subdataset/module has its own .git directory where a standalone
+    repository would have it. No gitdir files, no symlinks.
+    """
+    # move .git to superrepo's .git/modules, remove .git, create
+    # .git-file
+    path = opj(ds.path, relativepath)
+    src_dotgit = GitRepo.get_git_dir(path)
+
+    # at this point install always yields the desired result
+    # just make sure
+    assert(src_dotgit == '.git')
