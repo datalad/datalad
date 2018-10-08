@@ -1341,17 +1341,23 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, object=None):
-        """Return a hexsha for a given object. If None - of current HEAD
+    def format_commit(self, fmt, commitish=None):
+        """Return `git show` output for `commitish`.
 
         Parameters
         ----------
-        object: str, optional
-          Any type of Git object identifier. See `git show`.
+        fmt : str
+            A format string accepted by `git show`.
+        commitish: str, optional
+          Any commit identifier (defaults to "HEAD").
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '--no-patch', "--format=%H"]
-        if object:
-            cmd.append(object)
+        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        if commitish is not None:
+            cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
@@ -1359,14 +1365,37 @@ class GitRepo(RepoInterface):
                 '', cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
-                raise ValueError("Unknown object identifier: %s" % object)
+                raise ValueError("Unknown commit identifier: %s" % commitish)
             elif 'does not have any commits yet' in e.stderr:
                 return None
             else:
                 raise e
-        stdout = stdout.splitlines()
-        assert(len(stdout) == 1)
-        return stdout[0]
+        # This trailing null is coming from the -z above, which avoids the
+        # newline that Git would append to the output. We could drop -z and
+        # strip the newline directly, but then we'd have to worry about
+        # compatibility across platforms.
+        return stdout.rsplit("\0", 1)[0]
+
+    def get_hexsha(self, commitish=None, short=False):
+        """Return a hexsha for a given commitish.
+
+        Parameters
+        ----------
+        commitish : str, optional
+          Any identifier that refers to a commit (defaults to "HEAD").
+        short : bool, optional
+          Return the abbreviated form of the hexsha.
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
+        """
+        stdout = self.format_commit("%{}".format('h' if short else 'H'),
+                                    commitish)
+        if stdout is not None:
+            stdout = stdout.splitlines()
+            assert(len(stdout) == 1)
+            return stdout[0]
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hash(self, files):
@@ -1383,6 +1412,29 @@ class GitRepo(RepoInterface):
             if 'does not have any commits' in e.stderr:
                 return None
             raise
+
+    def commit_exists(self, commitish):
+        """Does `commitish` exist in the repo?
+
+        Parameters
+        ----------
+        commitish : str
+            A commit or an object that can be dereferenced to one.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            # Note: The peeling operator "^{commit}" is required so that
+            # rev-parse doesn't succeed if passed a full hexsha that is valid
+            # but doesn't exist.
+            self._git_custom_command(
+                "", ["git", "rev-parse", "--verify", commitish + "^{commit}"],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
 
     def get_merge_base(self, commitishes):
         """Get a merge base hexsha
@@ -1418,6 +1470,26 @@ class GitRepo(RepoInterface):
             return None
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
+
+    def is_ancestor(self, reva, revb):
+        """Is `reva` an ancestor of `revb`?
+
+        Parameters
+        ----------
+        reva, revb : str
+            Revisions.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            self._git_custom_command(
+                "", ["git", "merge-base", "--is-ancestor", reva, revb],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
 
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)
