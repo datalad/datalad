@@ -21,7 +21,7 @@ from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
-
+from datalad.tests.utils import assert_in_results
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
@@ -75,7 +75,17 @@ def test_basics(path):
     ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
 
 
-def test_procedure_discovery():
+@with_tree(tree={
+    'code': {'datalad_test_proc.py': """\
+import sys
+import os.path as op
+from datalad.api import add, Dataset
+
+with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
+    f.write('hello\\n')
+add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+"""}})
+def test_procedure_discovery(path):
     ps = run_procedure(discover=True)
     # there are a few procedures coming with datalad, needs to find them
     assert_true(len(ps) > 2)
@@ -86,3 +96,35 @@ def test_procedure_discovery():
              'path' in p
              for p in ps]),
         len(ps))
+
+    # set up dataset with registered procedure (c&p from test_basics):
+    ds = Dataset(path).create(force=True)
+    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
+    # input yet, so manual for now
+    # V6FACT: this leaves the file staged, but not committed
+    ds.add('code', to_git=True)
+    # V6FACT: even this leaves it staged
+    ds.add('.')
+    # V6FACT: but this finally commits it
+    ds.save()
+    # TODO remove above two lines
+    ds.run_procedure('setup_yoda_dataset')
+    ok_clean_git(ds.path)
+    # configure dataset to look for procedures in its code folder
+    ds.config.add(
+        'datalad.locations.dataset-procedures',
+        'code',
+        where='dataset')
+    # configure dataset to run the demo procedure prior to the clean command
+    ds.config.add(
+        'datalad.clean.proc-pre',
+        'datalad_test_proc',
+        where='dataset')
+
+    # run discovery on the dataset:
+    ps = ds.run_procedure(discover=True)
+
+    # still needs to find procedures coming with datalad
+    assert_true(len(ps) > 2)
+    # dataset's procedure needs to be in the results
+    assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))

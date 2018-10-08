@@ -32,11 +32,13 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.utils import assure_list
 
 # bound dataset methods
 from datalad.interface.run import Run
+from datalad.distribution.subdatasets import Subdatasets
 
 lgr = logging.getLogger('datalad.interface.run_procedures')
 
@@ -61,6 +63,11 @@ def _get_procedure_implementation(name='*', ds=None):
             # TODO `get` dirs if necessary
             for m in _get_file_match(op.join(ds.path, dir), name):
                 yield m
+        # 1.1. check subdatasets recursively
+        # for subds in ds.subdatasets(return_type='generator',
+        #                             result_xfm='datasets'):
+        #     yield _get_procedure_implementation(name=name, ds=subds)
+
     # 2. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
@@ -97,7 +104,7 @@ def _guess_exec(script_file):
     elif script_file.endswith('.py'):
         return (u'python_script', u'python "{script}" "{ds}" {args}')
     else:
-        return None
+        return None, None
 
 
 @build_doc
@@ -204,9 +211,12 @@ class RunProcedure(Interface):
         if not spec and not discover:
             raise InsufficientArgumentsError('requires at least a procedure name')
 
-        ds = require_dataset(
-            dataset, check_installed=False,
-            purpose='run a procedure') if dataset else None
+        try:
+            ds = require_dataset(
+                dataset, check_installed=False,
+                purpose='run a procedure')
+        except NoDatasetArgumentFound:
+            ds = None
 
         if discover:
             reported = set()
@@ -214,6 +224,9 @@ class RunProcedure(Interface):
                 if m in reported:
                     continue
                 cmd_type, cmd_tmpl = _guess_exec(m)
+                if cmd_type is None and cmd_tmpl is None:
+                    # doesn't seem like a match
+                    continue
                 res = get_status_dict(
                     action='run_procedure',
                     path=m,
