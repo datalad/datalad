@@ -58,6 +58,7 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
+from datalad.utils import assure_dir
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -2639,8 +2640,29 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
     path = opj(ds.path, relativepath)
+    subds_dotgit = opj(path, ".git")
     src_dotgit = GitRepo.get_git_dir(path)
 
-    # at this point install always yields the desired result
-    # just make sure
-    assert(src_dotgit == '.git')
+    if src_dotgit == '.git':
+        # this is what we want
+        return
+
+    # first we want to remove any conflicting worktree setup
+    # done by git to find the checkout at the mountpoint of the
+    # submodule, if we keep that, any git command will fail
+    # after we move .git
+    GitRepo(path, init=False).config.unset(
+        'core.worktree', where='local')
+    # what we have here is some kind of reference, remove and
+    # replace by the target
+    os.remove(subds_dotgit)
+    # make absolute
+    src_dotgit = opj(path, src_dotgit)
+    # move .git
+    from os import rename, listdir, rmdir
+    assure_dir(subds_dotgit)
+    for dot_git_entry in listdir(src_dotgit):
+        rename(opj(src_dotgit, dot_git_entry),
+               opj(subds_dotgit, dot_git_entry))
+    assert not listdir(src_dotgit)
+    rmdir(src_dotgit)
