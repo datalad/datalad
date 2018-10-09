@@ -2286,7 +2286,7 @@ class GitRepo(RepoInterface):
             # submodule that cripples git operations
             if not subm.get_hexsha():
                 raise InvalidGitRepositoryError(
-                    'cannot add subdataset %s with no commits', subm)
+                    'cannot add subdataset {} with no commits'.format(subm))
             # make an attempt to configure a submodule source URL based on the
             # discovered remote configuration
             remote, branch = subm.get_tracking_branch()
