@@ -31,23 +31,6 @@ from datalad.utils import knows_annex
 lgr = logging.getLogger('datalad.distribution.utils')
 
 
-def _fixup_submodule_dotgit_setup(ds, relativepath):
-    """Implementation of our current of .git in a subdataset
-
-    Each subdataset/module has its own .git directory where a standalone
-    repository would have it. No gitdir files, no symlinks.
-    """
-    # move .git to superrepo's .git/modules, remove .git, create
-    # .git-file
-    path = opj(ds.path, relativepath)
-    src_dotgit = GitRepo.get_git_dir(path)
-
-    # at this point install always yields the desired result
-    # just make sure
-    assert(src_dotgit == '.git')
-
-
-
 def _get_git_url_from_source(source):
     """Return URL for cloning associated with a source specification
 

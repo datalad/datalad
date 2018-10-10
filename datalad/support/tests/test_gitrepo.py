@@ -1146,6 +1146,10 @@ def test_GitRepo_gitignore(path):
 
     gr = GitRepo(path, create=True)
     sub = GitRepo(op.join(path, 'ignore-sub.me'))
+    # we need to commit something, otherwise add_submodule
+    # will already refuse the submodule for having no commit
+    sub.add('a_file.txt')
+    sub.commit()
 
     from ..exceptions import GitIgnoreError
 
