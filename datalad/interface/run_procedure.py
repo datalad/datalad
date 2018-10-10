@@ -55,10 +55,18 @@ def _get_file_match(dir, name='*'):
 
 def _get_procedure_implementation(name='*', ds=None):
     ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-    # 1. check dataset for procedure
+
+    # 1. check system and user account for procedure
+    for loc in (cfg.obtain('datalad.locations.user-procedures'),
+                cfg.obtain('datalad.locations.system-procedures')):
+        for dir in assure_list(loc):
+            for m in _get_file_match(dir, name):
+                yield m
+    # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
-        dirs = assure_list(ds.config.obtain('datalad.locations.dataset-procedures'))
+        dirs = assure_list(
+                ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary
             for m in _get_file_match(op.join(ds.path, dir), name):
@@ -69,12 +77,6 @@ def _get_procedure_implementation(name='*', ds=None):
             for m in _get_procedure_implementation(name=name, ds=subds):
                 yield m
 
-    # 2. check system and user account for procedure
-    for loc in (cfg.obtain('datalad.locations.user-procedures'),
-                cfg.obtain('datalad.locations.system-procedures')):
-        for dir in assure_list(loc):
-            for m in _get_file_match(dir, name):
-                yield m
     # 3. check extensions for procedure
     # delay heavy import until here
     from pkg_resources import iter_entry_points
