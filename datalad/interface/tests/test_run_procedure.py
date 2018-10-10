@@ -47,7 +47,8 @@ with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
 add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
-def test_basics(path):
+@with_tempfile
+def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
     # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
     # input yet, so manual for now
@@ -65,6 +66,8 @@ def test_basics(path):
         'datalad.locations.dataset-procedures',
         'code',
         where='dataset')
+    # commit this procedure config for later use in a clone:
+    ds.save()
     # configure dataset to run the demo procedure prior to the clean command
     ds.config.add(
         'datalad.clean.proc-pre',
@@ -75,6 +78,25 @@ def test_basics(path):
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
     ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
+
+    # make a fresh dataset:
+    super = Dataset(super_path).create()
+    # configure dataset to run the demo procedure prior to the clean command
+    super.config.add(
+        'datalad.clean.proc-pre',
+        'datalad_test_proc',
+        where='dataset')
+    # 'super' doesn't know any procedures but should get to know one by
+    # installing the above as a subdataset
+    super.install('sub', source=ds.path)
+    # run command that should trigger the demo procedure
+    super.clean()
+    # look for traces
+    ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
+    ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
+
+
+
 
 
 @known_failure_direct_mode
