@@ -67,7 +67,7 @@ def test_basics(path, super_path):
         'code',
         where='dataset')
     # commit this procedure config for later use in a clone:
-    ds.save()
+    ds.add(op.join('.datalad', 'config'))
     # configure dataset to run the demo procedure prior to the clean command
     ds.config.add(
         'datalad.clean.proc-pre',
@@ -96,10 +96,6 @@ def test_basics(path, super_path):
     ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
 
 
-
-
-
-@known_failure_direct_mode
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -146,7 +142,7 @@ def test_procedure_discovery(path, super_path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
-    ds.save()
+    ds.add(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
     ps = ds.run_procedure(discover=True)
