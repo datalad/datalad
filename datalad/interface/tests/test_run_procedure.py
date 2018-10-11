@@ -216,12 +216,12 @@ def test_configs(path):
         'code',
         where='dataset')
 
-    # run procedure based on execution guessing by run_procedure:
+    # 1. run procedure based on execution guessing by run_procedure:
     ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'some_arg\n')
 
-    # now configure specific call format including usage of substitution config
+    # 2. now configure specific call format including usage of substitution config
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
@@ -240,3 +240,16 @@ def test_configs(path):
     ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'dataset-call-config\n')
+
+    # 3. have a conflicting config at user-level, which should override the
+    # config on dataset level:
+    ds.config.add(
+        'datalad.procedures.datalad_test_proc.call-format',
+        'python "{script}" "{ds}" local {args}',
+        where='local'
+    )
+    ds.unlock("fromproc.txt")
+    # run again:
+    ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
+    # look for traces
+    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'local\n')

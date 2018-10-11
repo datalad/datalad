@@ -63,9 +63,9 @@ def _get_configured_call_format(name, ds=None):
     cm = cfg if ds is None else ds.config
     v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
     if isinstance(v, tuple):
-        # Note: This relies on the assumption, that ConfigManager returns
-        # values order from most general to most specific entries in case of
-        # multiple values (just like git-config)
+        # If multiple values are defined (at the same level), ConfigManager
+        # returns a tuple. Go with the last one.
+        # TODO: Should we issue a warning or fail entirely?
         return v[-1]
     else:
         return v
