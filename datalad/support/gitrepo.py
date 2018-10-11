@@ -58,6 +58,7 @@ from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
+from datalad.utils import assure_dir
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -867,8 +868,7 @@ class GitRepo(RepoInterface):
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
         try:
-            if hasattr(self, 'repo') and exists(self.path) \
-                    and self._repo is not None:
+            if getattr(self, '_repo', None) is not None and exists(self.path):
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
                 self._repo.git.clear_cache()
@@ -1341,17 +1341,23 @@ class GitRepo(RepoInterface):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def get_hexsha(self, object=None):
-        """Return a hexsha for a given object. If None - of current HEAD
+    def format_commit(self, fmt, commitish=None):
+        """Return `git show` output for `commitish`.
 
         Parameters
         ----------
-        object: str, optional
-          Any type of Git object identifier. See `git show`.
+        fmt : str
+            A format string accepted by `git show`.
+        commitish: str, optional
+          Any commit identifier (defaults to "HEAD").
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
         """
-        cmd = ['git', 'show', '--no-patch', "--format=%H"]
-        if object:
-            cmd.append(object)
+        cmd = ['git', 'show', '-z', '--no-patch', '--format=' + fmt]
+        if commitish is not None:
+            cmd.append(commitish + "^{commit}")
         # make sure Git takes our argument as a revision
         cmd.append('--')
         try:
@@ -1359,14 +1365,37 @@ class GitRepo(RepoInterface):
                 '', cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             if 'bad revision' in e.stderr:
-                raise ValueError("Unknown object identifier: %s" % object)
+                raise ValueError("Unknown commit identifier: %s" % commitish)
             elif 'does not have any commits yet' in e.stderr:
                 return None
             else:
                 raise e
-        stdout = stdout.splitlines()
-        assert(len(stdout) == 1)
-        return stdout[0]
+        # This trailing null is coming from the -z above, which avoids the
+        # newline that Git would append to the output. We could drop -z and
+        # strip the newline directly, but then we'd have to worry about
+        # compatibility across platforms.
+        return stdout.rsplit("\0", 1)[0]
+
+    def get_hexsha(self, commitish=None, short=False):
+        """Return a hexsha for a given commitish.
+
+        Parameters
+        ----------
+        commitish : str, optional
+          Any identifier that refers to a commit (defaults to "HEAD").
+        short : bool, optional
+          Return the abbreviated form of the hexsha.
+
+        Returns
+        -------
+        str or, if there are not commits yet, None.
+        """
+        stdout = self.format_commit("%{}".format('h' if short else 'H'),
+                                    commitish)
+        if stdout is not None:
+            stdout = stdout.splitlines()
+            assert(len(stdout) == 1)
+            return stdout[0]
 
     @normalize_paths(match_return_type=False)
     def get_last_commit_hash(self, files):
@@ -1384,13 +1413,36 @@ class GitRepo(RepoInterface):
                 return None
             raise
 
-    def get_merge_base(self, treeishes):
+    def commit_exists(self, commitish):
+        """Does `commitish` exist in the repo?
+
+        Parameters
+        ----------
+        commitish : str
+            A commit or an object that can be dereferenced to one.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            # Note: The peeling operator "^{commit}" is required so that
+            # rev-parse doesn't succeed if passed a full hexsha that is valid
+            # but doesn't exist.
+            self._git_custom_command(
+                "", ["git", "rev-parse", "--verify", commitish + "^{commit}"],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
+
+    def get_merge_base(self, commitishes):
         """Get a merge base hexsha
 
         Parameters
         ----------
-        treeishes: str or list of str
-          List of treeishes (branches, hexshas, etc) to determine the merge
+        commitishes: str or list of str
+          List of commitishes (branches, hexshas, etc) to determine the merge
           base of. If a single value provided, returns merge_base with the
           current branch.
 
@@ -1400,15 +1452,15 @@ class GitRepo(RepoInterface):
           If no merge-base for given commits, or specified treeish doesn't
           exist, None returned
         """
-        if isinstance(treeishes, string_types):
-            treeishes = [treeishes]
-        if not treeishes:
+        if isinstance(commitishes, string_types):
+            commitishes = [commitishes]
+        if not commitishes:
             raise ValueError("Provide at least a single value")
-        elif len(treeishes) == 1:
-            treeishes = treeishes + [self.get_active_branch()]
+        elif len(commitishes) == 1:
+            commitishes = commitishes + [self.get_active_branch()]
 
         try:
-            bases = self.repo.merge_base(*treeishes)
+            bases = self.repo.merge_base(*commitishes)
         except GitCommandError as exc:
             if "fatal: Not a valid object name" in str(exc):
                 return None
@@ -1418,6 +1470,26 @@ class GitRepo(RepoInterface):
             return None
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
+
+    def is_ancestor(self, reva, revb):
+        """Is `reva` an ancestor of `revb`?
+
+        Parameters
+        ----------
+        reva, revb : str
+            Revisions.
+
+        Returns
+        -------
+        bool
+        """
+        try:
+            self._git_custom_command(
+                "", ["git", "merge-base", "--is-ancestor", reva, revb],
+                expect_fail=True)
+        except CommandError:
+            return False
+        return True
 
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)
@@ -2066,6 +2138,17 @@ class GitRepo(RepoInterface):
             '', ['git', 'branch', '-D', branch]
         )
 
+    def cherry_pick(self, commit):
+        """Cherry pick `commit` to the current branch.
+
+        Parameters
+        ----------
+        commit : str
+            A single commit.
+        """
+        self._git_custom_command("", ["git", "cherry-pick", commit],
+                                 check_fake_dates=True)
+
     def ls_remote(self, remote, options=None):
         if options is None:
             options = []
@@ -2197,6 +2280,21 @@ class GitRepo(RepoInterface):
         if branch is not None:
             cmd += ['-b', branch]
         if url is None:
+            # repo must already exist locally
+            subm = GitRepo(op.join(self.path, path), create=False, init=False)
+            # check that it has a commit, and refuse
+            # to operate on it otherwise, or we would get a bastard
+            # submodule that cripples git operations
+            if not subm.get_hexsha():
+                raise InvalidGitRepositoryError(
+                    'cannot add subdataset {} with no commits'.format(subm))
+            # make an attempt to configure a submodule source URL based on the
+            # discovered remote configuration
+            remote, branch = subm.get_tracking_branch()
+            url = subm.get_remote_url(remote) if remote else None
+
+        if url is None:
+            # had no luck with a remote URL
             if not isabs(path):
                 # need to recode into a relative path "URL" in POSIX
                 # style, even on windows
@@ -2205,6 +2303,8 @@ class GitRepo(RepoInterface):
                 url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # ensure supported setup
+        _fixup_submodule_dotgit_setup(self, path)
         # TODO: return value
 
     def deinit_submodule(self, path, **kwargs):
@@ -2529,3 +2629,40 @@ class GitRepo(RepoInterface):
 # TODO
 # remove submodule: nope, this is just deinit_submodule + remove
 # status?
+
+
+def _fixup_submodule_dotgit_setup(ds, relativepath):
+    """Implementation of our current of .git in a subdataset
+
+    Each subdataset/module has its own .git directory where a standalone
+    repository would have it. No gitdir files, no symlinks.
+    """
+    # move .git to superrepo's .git/modules, remove .git, create
+    # .git-file
+    path = opj(ds.path, relativepath)
+    subds_dotgit = opj(path, ".git")
+    src_dotgit = GitRepo.get_git_dir(path)
+
+    if src_dotgit == '.git':
+        # this is what we want
+        return
+
+    # first we want to remove any conflicting worktree setup
+    # done by git to find the checkout at the mountpoint of the
+    # submodule, if we keep that, any git command will fail
+    # after we move .git
+    GitRepo(path, init=False).config.unset(
+        'core.worktree', where='local')
+    # what we have here is some kind of reference, remove and
+    # replace by the target
+    os.remove(subds_dotgit)
+    # make absolute
+    src_dotgit = opj(path, src_dotgit)
+    # move .git
+    from os import rename, listdir, rmdir
+    assure_dir(subds_dotgit)
+    for dot_git_entry in listdir(src_dotgit):
+        rename(opj(src_dotgit, dot_git_entry),
+               opj(subds_dotgit, dot_git_entry))
+    assert not listdir(src_dotgit)
+    rmdir(src_dotgit)

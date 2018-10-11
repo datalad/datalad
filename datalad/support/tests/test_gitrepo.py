@@ -1066,7 +1066,8 @@ def test_optimized_cloning(path):
         return dict(
             [(os.path.join(*o.split(os.sep)[-2:]),
               os.stat(o).st_ino)
-             for o in glob(os.path.join(repo.repo.git_dir,
+             for o in glob(os.path.join(repo.path,
+                                        repo.get_git_dir(repo),
                                         'objects', '*', '*'))])
 
     origin_inodes = _get_inodes(repo)
@@ -1145,6 +1146,10 @@ def test_GitRepo_gitignore(path):
 
     gr = GitRepo(path, create=True)
     sub = GitRepo(op.join(path, 'ignore-sub.me'))
+    # we need to commit something, otherwise add_submodule
+    # will already refuse the submodule for having no commit
+    sub.add('a_file.txt')
+    sub.commit()
 
     from ..exceptions import GitIgnoreError
 
@@ -1238,6 +1243,15 @@ def test_gitattributes(path):
             'tag': False,
             'sec.key': 'val',
         })
+
+
+@with_tempfile(mkdir=True)
+def test_get_hexsha_tag(path):
+    gr = GitRepo(path, create=True)
+    gr.commit(msg="msg", options=["--allow-empty"])
+    gr.tag("atag", message="atag msg")
+    # get_hexsha() dereferences a tag to a commit.
+    eq_(gr.get_hexsha("atag"), gr.get_hexsha())
 
 
 @with_tempfile(mkdir=True)

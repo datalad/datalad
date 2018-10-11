@@ -35,7 +35,7 @@ def test_check_dates(path):
         ar.commit("add foo")
         ar.tag("foo-tag", "tag before refdate")
         # We can't use ar.get_tags because that returns the commit's hexsha,
-        # not the tag's.
+        # not the tag's, and ar.get_hexsha is limited to commit objects.
         foo_tag = ar.repo.git.rev_parse("foo-tag")
         # Make a lightweight tag to make sure `tag_dates` doesn't choke on it.
         ar.tag("light")
