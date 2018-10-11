@@ -206,16 +206,15 @@ class RunProcedure(Interface):
       fully customizable format string to determine how to execute procedure
       NAME (see also datalad-run).
       It currently requires to include the following placeholders:
-      - '{script}'
-        will be replaced by the path to the procedure
-      - '{ds}'
-        will be replaced by the absolute path to the dataset the procedure
+
+      - '{script}': will be replaced by the path to the procedure
+      - '{ds}': will be replaced by the absolute path to the dataset the procedure
         shall operate on
-      - '{args}'
-        will be replaced by all additional arguments passed into run-procedure
-        after NAME
-      As an example the default format string for a call to a python script is:
-      "python {script} {ds} {args}"
+      - '{args}': will be replaced by [CMD: all additional arguments passed into
+        run-procedure after NAME CMD][PY: all but the first element of `spec` if
+        `spec` is a list or tuple PY]
+        As an example the default format string for a call to a python script is:
+        "python {script} {ds} {args}"
     - 'datalad.procedures.<NAME>.help'
       will be shown on `datalad run-procedure --help-proc NAME` to provide a
       description and/or usage info for procedure NAME
