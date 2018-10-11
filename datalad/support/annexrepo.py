@@ -327,15 +327,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
                 self.config.set('annex.backends', backend, where='local')
-                git_attributes_file = _path_(self.path, '.gitattributes')
-                git_attributes = ''
-                if exists(git_attributes_file):
-                    with open(git_attributes_file) as f:
-                        git_attributes = f.read()
-                with open(git_attributes_file, 'a') as f:
-                    if git_attributes and not git_attributes.endswith(os.linesep):
-                        f.write(os.linesep)
-                    f.write('* annex.backend=%s%s' % (backend, os.linesep))
+                git_attributes_file = '.gitattributes'
+                self.set_gitattributes(
+                    [('*', {'annex.backend': backend})],
+                    git_attributes_file)
                 self.add(git_attributes_file, git=True)
                 if commit:
                     self.commit(
