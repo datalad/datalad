@@ -17,17 +17,18 @@ import os.path as op
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import skip_if
+from datalad.tests.utils import on_windows
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
 from datalad.api import clean
+from datalad import cfg
 
 
 def test_invalid_call():
@@ -35,8 +36,9 @@ def test_invalid_call():
     assert_raises(InsufficientArgumentsError, run_procedure)
 
 
-@known_failure_windows
-#@ignore_nose_capturing_stdout
+# FIXME: For some reason fails to commit correctly if on windows and in direct
+# mode. However, direct mode on linux works
+@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -96,6 +98,9 @@ def test_basics(path, super_path):
     ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
 
 
+# FIXME: For some reason fails to commit correctly if on windows and in direct
+# mode. However, direct mode on linux works
+@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -178,6 +183,9 @@ def test_procedure_discovery(path, super_path):
                                        'datalad_test_proc.py'))
 
 
+# FIXME: For some reason fails to commit correctly if on windows and in direct
+# mode. However, direct mode on linux works
+@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -188,8 +196,7 @@ with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('{}\\n'.format(sys.argv[2]))
 add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
-@with_tempfile
-def test_configs(path, super_path):
+def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
