@@ -58,17 +58,26 @@ def _get_file_match(dir, name='*'):
                 yield m, name
 
 
-def _get_configured_call_format(name, ds=None):
+def _get_proc_config(name, ds=None):
+    """get configuration of named procedure
+
+    Returns
+    -------
+    tuple
+      (call format string, help string) or possibly None for either value,
+      if there's nothing configured
+    """
     # figure what ConfigManager to ask
     cm = cfg if ds is None else ds.config
     v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
+    h = cm.get('datalad.procedures.{}.help'.format(name), None)
     if isinstance(v, tuple):
         # If multiple values are defined (at the same level), ConfigManager
         # returns a tuple. Go with the last one.
         # TODO: Should we issue a warning or fail entirely?
-        return v[-1]
+        return v[-1], h
     else:
-        return v
+        return v, h
 
 
 def _get_procedure_implementation(name='*', ds=None):
@@ -79,7 +88,7 @@ def _get_procedure_implementation(name='*', ds=None):
                 cfg.obtain('datalad.locations.system-procedures')):
         for dir in assure_list(loc):
             for m, n in _get_file_match(dir, name):
-                yield m, _get_configured_call_format(n)
+                yield (m,) + _get_proc_config(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
@@ -88,12 +97,12 @@ def _get_procedure_implementation(name='*', ds=None):
         for dir in dirs:
             # TODO `get` dirs if necessary
             for m, n in _get_file_match(op.join(ds.path, dir), name):
-                yield m, _get_configured_call_format(n, ds=ds)
+                yield (m,) + _get_proc_config(n, ds=ds)
         # 1.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
                                     result_xfm='datasets'):
-            for m, c_f in _get_procedure_implementation(name=name, ds=subds):
-                yield m, c_f
+            for m, f, h in _get_procedure_implementation(name=name, ds=subds):
+                yield m, f, h
 
     # 3. check extensions for procedure
     # delay heavy import until here
@@ -108,12 +117,12 @@ def _get_procedure_implementation(name='*', ds=None):
                         entry_point.module_name,
                         'resources/procedures'),
                     name):
-                yield m, _get_configured_call_format(n)
+                yield (m,) + _get_proc_config(n)
     # 4. at last check datalad itself for procedure
     for m, n in _get_file_match(
             resource_filename('datalad', 'resources/procedures'),
             name):
-        yield m, _get_configured_call_format(n)
+        yield (m,) + _get_proc_config(n)
 
 
 def _guess_exec(script_file):
@@ -220,6 +229,14 @@ class RunProcedure(Interface):
             doc="""if given, all configured paths are searched for procedures
             and one result record per discovered procedure is yielded, but
             no procedure is executed"""),
+        help_proc=Parameter(
+            args=('--help-proc',),
+            action='store_true',
+            doc="""if given, get a help message for procedure NAME from config
+            setting datalad.procedures.NAME.help. [CMD: Note, that this 
+            parameter needs to be given before NAME, since it would be regarded 
+            as part of ARGS otherwise CMD]"""
+        )
     )
 
     @staticmethod
@@ -228,9 +245,12 @@ class RunProcedure(Interface):
     def __call__(
             spec=None,
             dataset=None,
-            discover=False):
+            discover=False,
+            help_proc=False):
         if not spec and not discover:
             raise InsufficientArgumentsError('requires at least a procedure name')
+        if help_proc and not spec:
+            raise InsufficientArgumentsError('requires a procedure name')
 
         try:
             ds = require_dataset(
@@ -241,7 +261,7 @@ class RunProcedure(Interface):
 
         if discover:
             reported = set()
-            for m, cmd_tmpl in _get_procedure_implementation('*', ds=ds):
+            for m, cmd_tmpl, cmd_help in _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
                 if not cmd_tmpl:
@@ -272,7 +292,7 @@ class RunProcedure(Interface):
 
         try:
             # get the first match an run with it
-            procedure_file, cmd_tmpl = \
+            procedure_file, cmd_tmpl, cmd_help = \
                 next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
             # TODO error result
@@ -284,6 +304,20 @@ class RunProcedure(Interface):
                 raise ValueError("No idea how to execute procedure %s. "
                                  "Missing 'execute' permissions?",
                                  procedure_file)
+
+        if help_proc:
+            res = get_status_dict(
+                    action='procedure_help',
+                    path=procedure_file,
+                    type='file',
+                    logger=lgr,
+                    refds=ds.path if ds else None,
+                    status='ok',
+                    procedure_callfmt=cmd_tmpl,
+                    message=cmd_help)
+            yield res
+            return
+
         cmd = cmd_tmpl.format(
             script=procedure_file,
             ds=ds.path if ds else '',

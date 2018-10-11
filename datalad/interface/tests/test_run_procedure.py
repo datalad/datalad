@@ -253,3 +253,14 @@ def test_configs(path):
     ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'local\n')
+
+    #
+    ds.config.add(
+        'datalad.procedures.datalad_test_proc.help',
+        "This is a help message",
+        where='dataset'
+    )
+
+    r = ds.run_procedure('datalad_test_proc', help_proc=True)
+    assert_true(len(r) == 1)
+    assert_in_results(r, message="This is a help message", status='ok')
