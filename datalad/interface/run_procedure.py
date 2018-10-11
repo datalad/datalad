@@ -49,8 +49,26 @@ def _get_file_match(dir, name='*'):
     for target in targets:
         for m in iglob(op.join(dir, target)):
             m_bn = op.basename(m)
-            if name == '*' or m_bn == name or m_bn.startswith('{}.'.format(name)):
-                yield m
+            if name == '*':
+                report_name = m_bn[:-3] if m_bn.endswith('.py') or \
+                                           m_bn.endswith('.sh') \
+                                        else m_bn
+                yield m, report_name
+            elif m_bn == name or m_bn.startswith('{}.'.format(name)):
+                yield m, name
+
+
+def _get_configured_call_format(name, ds=None):
+    # figure what ConfigManager to ask
+    cm = cfg if ds is None else ds.config
+    v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
+    if isinstance(v, tuple):
+        # Note: This relies on the assumption, that ConfigManager returns
+        # values order from most general to most specific entries in case of
+        # multiple values (just like git-config)
+        return v[-1]
+    else:
+        return v
 
 
 def _get_procedure_implementation(name='*', ds=None):
@@ -60,8 +78,8 @@ def _get_procedure_implementation(name='*', ds=None):
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
         for dir in assure_list(loc):
-            for m in _get_file_match(dir, name):
-                yield m
+            for m, n in _get_file_match(dir, name):
+                yield m, _get_configured_call_format(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
@@ -69,13 +87,13 @@ def _get_procedure_implementation(name='*', ds=None):
                 ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary
-            for m in _get_file_match(op.join(ds.path, dir), name):
-                yield m
+            for m, n in _get_file_match(op.join(ds.path, dir), name):
+                yield m, _get_configured_call_format(n, ds=ds)
         # 1.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
                                     result_xfm='datasets'):
-            for m in _get_procedure_implementation(name=name, ds=subds):
-                yield m
+            for m, c_f in _get_procedure_implementation(name=name, ds=subds):
+                yield m, c_f
 
     # 3. check extensions for procedure
     # delay heavy import until here
@@ -85,17 +103,17 @@ def _get_procedure_implementation(name='*', ds=None):
     for entry_point in iter_entry_points('datalad.extensions'):
         # use of '/' here is OK wrt to platform compatibility
         if resource_isdir(entry_point.module_name, 'resources/procedures'):
-            for m in _get_file_match(
+            for m, n in _get_file_match(
                     resource_filename(
                         entry_point.module_name,
                         'resources/procedures'),
                     name):
-                yield m
+                yield m, _get_configured_call_format(n)
     # 4. at last check datalad itself for procedure
-    for m in _get_file_match(
+    for m, n in _get_file_match(
             resource_filename('datalad', 'resources/procedures'),
             name):
-        yield m
+        yield m, _get_configured_call_format(n)
 
 
 def _guess_exec(script_file):
@@ -223,10 +241,11 @@ class RunProcedure(Interface):
 
         if discover:
             reported = set()
-            for m in _get_procedure_implementation('*', ds=ds):
+            for m, cmd_tmpl in _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
-                cmd_type, cmd_tmpl = _guess_exec(m)
+                if not cmd_tmpl:
+                    cmd_type, cmd_tmpl = _guess_exec(m)
                 if cmd_type is None and cmd_tmpl is None:
                     # doesn't seem like a match
                     continue
@@ -253,16 +272,18 @@ class RunProcedure(Interface):
 
         try:
             # get the first match an run with it
-            procedure_file = next(_get_procedure_implementation(name, ds=ds))
+            procedure_file, cmd_tmpl = \
+                next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
             # TODO error result
             raise ValueError("Cannot find procedure with name '%s'", name)
 
-        cmd_type, cmd_tmpl = _guess_exec(procedure_file)
-        if cmd_tmpl is None:
-            raise ValueError(
-                "No idea how to execute procedure %s. Missing 'execute' permissions?",
-                procedure_file)
+        if not cmd_tmpl:
+            cmd_type, cmd_tmpl = _guess_exec(procedure_file)
+            if cmd_tmpl is None:
+                raise ValueError("No idea how to execute procedure %s. "
+                                 "Missing 'execute' permissions?",
+                                 procedure_file)
         cmd = cmd_tmpl.format(
             script=procedure_file,
             ds=ds.path if ds else '',

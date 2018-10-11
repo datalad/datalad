@@ -176,3 +176,60 @@ def test_procedure_discovery(path, super_path):
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                        'datalad_test_proc.py'))
+
+
+@with_tree(tree={
+    'code': {'datalad_test_proc.py': """\
+import sys
+import os.path as op
+from datalad.api import add, Dataset
+
+with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
+    f.write('{}\\n'.format(sys.argv[2]))
+add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+"""}})
+@with_tempfile
+def test_configs(path, super_path):
+
+    # set up dataset with registered procedure (c&p from test_basics):
+    ds = Dataset(path).create(force=True)
+    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
+    # input yet, so manual for now
+    # V6FACT: this leaves the file staged, but not committed
+    ds.add('code', to_git=True)
+    # V6FACT: even this leaves it staged
+    ds.add('.')
+    # V6FACT: but this finally commits it
+    ds.save()
+    ds.run_procedure('setup_yoda_dataset')
+    ok_clean_git(ds.path)
+    # configure dataset to look for procedures in its code folder
+    ds.config.add(
+        'datalad.locations.dataset-procedures',
+        'code',
+        where='dataset')
+
+    # run procedure based on execution guessing by run_procedure:
+    ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
+    # look for traces
+    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'some_arg\n')
+
+    # now configure specific call format including usage of substitution config
+    # for run:
+    ds.config.add(
+        'datalad.procedures.datalad_test_proc.call-format',
+        'python "{script}" "{ds}" {{mysub}} {args}',
+        where='dataset'
+    )
+    ds.config.add(
+        'datalad.run.substitutions.mysub',
+        'dataset-call-config',
+        where='dataset'
+    )
+    # TODO: Should we allow for --inputs/--outputs arguments for run_procedure
+    #       (to be passed into run)?
+    ds.unlock("fromproc.txt")
+    # run again:
+    ds.run_procedure(spec=['datalad_test_proc', 'some_arg'])
+    # look for traces
+    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'dataset-call-config\n')
