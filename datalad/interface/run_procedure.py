@@ -264,8 +264,9 @@ class RunProcedure(Interface):
             for m, cmd_tmpl, cmd_help in _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
+                cmd_type, cmd_tmpl_g = _guess_exec(m)
                 if not cmd_tmpl:
-                    cmd_type, cmd_tmpl = _guess_exec(m)
+                    cmd_tmpl = cmd_tmpl_g
                 if cmd_type is None and cmd_tmpl is None:
                     # doesn't seem like a match
                     continue
@@ -295,15 +296,25 @@ class RunProcedure(Interface):
             procedure_file, cmd_tmpl, cmd_help = \
                 next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
-            # TODO error result
-            raise ValueError("Cannot find procedure with name '%s'", name)
+            res = get_status_dict(
+                    action='run_procedure',
+                    # TODO: Default renderer requires a key "path" to exist.
+                    # Doesn't make a lot of sense in this case
+                    path=name,
+                    logger=lgr,
+                    refds=ds.path if ds else None,
+                    status='impossible',
+                    message="Cannot find procedure with name '%s'" % name)
+            yield res
+            return
 
+        cmd_type, cmd_tmpl_g = _guess_exec(procedure_file)
         if not cmd_tmpl:
-            cmd_type, cmd_tmpl = _guess_exec(procedure_file)
-            if cmd_tmpl is None:
-                raise ValueError("No idea how to execute procedure %s. "
-                                 "Missing 'execute' permissions?",
-                                 procedure_file)
+            cmd_tmpl = cmd_tmpl_g
+        if not cmd_tmpl:
+            raise ValueError("No idea how to execute procedure %s. "
+                             "Missing 'execute' permissions?",
+                             procedure_file)
 
         if help_proc:
             res = get_status_dict(
@@ -313,6 +324,7 @@ class RunProcedure(Interface):
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
+                    procedure_type=cmd_type,
                     procedure_callfmt=cmd_tmpl,
                     message=cmd_help)
             yield res

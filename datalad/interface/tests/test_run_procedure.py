@@ -34,6 +34,9 @@ from datalad import cfg
 def test_invalid_call():
     # needs spec or discover
     assert_raises(InsufficientArgumentsError, run_procedure)
+    res = run_procedure('unknown', on_failure='ignore')
+    assert_true(len(res) == 1)
+    assert_in_results(res, status="impossible")
 
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
@@ -254,7 +257,7 @@ def test_configs(path):
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'local\n')
 
-    #
+    # 4. get configured help message:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.help',
         "This is a help message",
