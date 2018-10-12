@@ -2623,7 +2623,7 @@ class GitRepo(RepoInterface):
                         attrline += ' -{}'.format(a)
                     else:
                         attrline += ' {}={}'.format(a, val)
-                f.write('{}\n'.format(attrline))
+                f.write('\n{}'.format(attrline))
 
 
 # TODO
