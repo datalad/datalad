@@ -339,9 +339,12 @@ class GlobbedPaths(object):
         else:
             paths = self._paths["expanded"]
 
-        if full and "expanded_full" not in self._paths:
-            paths = [opj(self.pwd, p) for p in paths]
-            self._paths["expanded_full"] = paths
+        if full:
+            if refresh or "expanded_full" not in self._paths:
+                paths = [opj(self.pwd, p) for p in paths]
+                self._paths["expanded_full"] = paths
+            else:
+                paths = self._paths["expanded_full"]
 
         return maybe_dot + paths
 
