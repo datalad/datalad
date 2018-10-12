@@ -20,6 +20,8 @@ from datalad.utils import assure_unicode
 from datalad.utils import unlink
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
+from datalad.support.exceptions import CommandError
+
 
 lgr = logging.getLogger('datalad.plugin.wtf')
 
@@ -82,7 +84,13 @@ def _describe_annex():
     from datalad.cmd import get_runner
 
     runner = get_runner()
-    out, err = runner.run(['git', 'annex', 'version'])
+    try:
+        out, err = runner.run(['git', 'annex', 'version'])
+    except CommandError as e:
+        return dict(
+            version='not available',
+            message=exc_str(e),
+        )
     info = {}
     for line in out.split(os.linesep):
         key = line.split(':')[0]
