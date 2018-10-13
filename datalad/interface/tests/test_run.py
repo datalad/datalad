@@ -852,6 +852,13 @@ def test_run_explicit(path):
     ok_(ds.repo.is_dirty(path="dirt_modified"))
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
+    # Saving explicit outputs works from subdirectories.
+    subdir = opj(path, "subdir")
+    mkdir(subdir)
+    with chpwd(subdir):
+        run("echo insubdir >foo", explicit=True, outputs=["foo"])
+    ok_(ds.repo.file_has_content(opj("subdir", "foo")))
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
