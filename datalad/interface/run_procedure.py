@@ -129,15 +129,43 @@ def _get_procedure_implementation(name='*', ds=None):
 
 
 def _guess_exec(script_file):
+
+    state = None
+    try:
+        is_exec = os.stat(script_file).st_mode & stat.S_IEXEC
+    except OSError as e:
+        from errno import ENOENT
+        if e.errno == ENOENT:
+            # path does not exist or is a broken symlink
+            state = 'absent'
+            if op.islink(script_file):
+                # broken symlink;
+                # we can't figure whether it's executable:
+                is_exec = False
+                # apart from that proceed, since we can still tell in case of
+                # .py or .sh
+            else:
+                # does not exist; there's nothing to detect at all
+                return {'type': None, 'template': None, 'state': None}
+        else:
+            from six import reraise
+            reraise(e)
+
     # TODO check for exec permission and rely on interpreter
-    if os.stat(script_file).st_mode & stat.S_IEXEC:
-        return ('executable', u'"{script}" "{ds}" {args}')
+    if is_exec:
+        return {'type': u'executable',
+                'template': u'"{script}" "{ds}" {args}',
+                'state': state}
     elif script_file.endswith('.sh'):
-        return (u'bash_script', u'bash "{script}" "{ds}" {args}')
+        return {'type': u'bash_script',
+                'template': u'bash "{script}" "{ds}" {args}',
+                'state': state}
     elif script_file.endswith('.py'):
-        return (u'python_script', u'python "{script}" "{ds}" {args}')
+        return {'type': u'python_script',
+                'template': u'python "{script}" "{ds}" {args}',
+                'state': state}
     else:
-        return None, None
+        return {'type': None, 'template': None, 'state': None}
 
 
 @build_doc
@@ -294,12 +322,15 @@ class RunProcedure(Interface):
             for m, cmd_tmpl, cmd_help in _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
-                cmd_type, cmd_tmpl_g = _guess_exec(m)
-                if not cmd_tmpl:
-                    cmd_tmpl = cmd_tmpl_g
-                if cmd_type is None and cmd_tmpl is None:
+                ex = _guess_exec(m)
+                # configured template (call-format string) takes precedence:
+                if cmd_tmpl:
+                    ex['template'] = cmd_tmpl
+                if ex['type'] is None and ex['template'] is None:
                     # doesn't seem like a match
                     continue
+                message = ex['type'] if ex['type'] else 'unknown type'
+                message += ' (missing)' if ex['state'] == 'absent' else ''
                 res = get_status_dict(
                     action='run_procedure',
                     path=m,
@@ -307,9 +338,10 @@ class RunProcedure(Interface):
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
-                    procedure_type=cmd_type,
-                    procedure_callfmt=cmd_tmpl,
-                    message=cmd_type)
+                    state=ex['state'],
+                    procedure_type=ex['type'],
+                    procedure_callfmt=ex['template'],
+                    message=message)
                 reported.add(m)
                 yield res
             return
@@ -338,13 +370,10 @@ class RunProcedure(Interface):
             yield res
             return
 
-        cmd_type, cmd_tmpl_g = _guess_exec(procedure_file)
-        if not cmd_tmpl:
-            cmd_tmpl = cmd_tmpl_g
-        if not cmd_tmpl:
-            raise ValueError("No idea how to execute procedure %s. "
-                             "Missing 'execute' permissions?",
-                             procedure_file)
+        ex = _guess_exec(procedure_file)
+        # configured template (call-format string) takes precedence:
+        if cmd_tmpl:
+            ex['template'] = cmd_tmpl
 
         if help_proc:
             res = get_status_dict(
@@ -354,13 +383,18 @@ class RunProcedure(Interface):
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
-                    procedure_type=cmd_type,
-                    procedure_callfmt=cmd_tmpl,
-                    message=cmd_help)
+                    state=ex['state'],
+                    procedure_type=ex['type'],
+                    procedure_callfmt=ex['template'],
+                    message=cmd_help if cmd_help else "No help available")
             yield res
             return
 
-        cmd = cmd_tmpl.format(
+        if not ex['template']:
+            raise ValueError("No idea how to execute procedure %s. "
+                             "Missing 'execute' permissions?" % procedure_file)
+
+        cmd = ex['template'].format(
             script=procedure_file,
             ds=ds.path if ds else '',
             args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
