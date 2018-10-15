@@ -414,6 +414,12 @@ def test_run_failure(path):
     with assert_raises(CommandError):
         ds.rerun()
 
+    # We don't show instructions if the caller specified us not to save.
+    remove(msgfile)
+    with assert_raises(CommandError):
+        ds.run("false", explicit=True, outputs=None)
+    assert_false(op.exists(msgfile))
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
