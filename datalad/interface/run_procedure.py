@@ -112,7 +112,6 @@ def _get_procedure_implementation(name='*', ds=None):
       path, format string, help message
     """
 
-
     ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
 
     # 1. check system and user account for procedure
@@ -407,17 +406,31 @@ class RunProcedure(Interface):
             ex['template'] = cmd_tmpl
 
         if help_proc:
-            res = get_status_dict(
-                    action='procedure_help',
-                    path=procedure_file,
-                    type='file',
-                    logger=lgr,
-                    refds=ds.path if ds else None,
-                    status='ok',
-                    state=ex['state'],
-                    procedure_type=ex['type'],
-                    procedure_callfmt=ex['template'],
-                    message=cmd_help if cmd_help else "No help available")
+            if cmd_help:
+                res = get_status_dict(
+                        action='procedure_help',
+                        path=procedure_file,
+                        type='file',
+                        logger=lgr,
+                        refds=ds.path if ds else None,
+                        status='ok',
+                        state=ex['state'],
+                        procedure_type=ex['type'],
+                        procedure_callfmt=ex['template'],
+                        message=cmd_help)
+            else:
+                res = get_status_dict(
+                        action='procedure_help',
+                        path=procedure_file,
+                        type='file',
+                        logger=lgr,
+                        refds=ds.path if ds else None,
+                        status='impossible',
+                        state=ex['state'],
+                        procedure_type=ex['type'],
+                        procedure_callfmt=ex['template'],
+                        message="No help available for '%s'" % name)
+
             yield res
             return
 

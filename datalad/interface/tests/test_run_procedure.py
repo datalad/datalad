@@ -241,6 +241,11 @@ def test_configs(path):
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'local\n')
 
     # 4. get configured help message:
+    r = ds.run_procedure('datalad_test_proc', help_proc=True,
+                         on_failure='ignore')
+    assert_true(len(r) == 1)
+    assert_in_results(r, status="impossible")
+
     ds.config.add(
         'datalad.procedures.datalad_test_proc.help',
         "This is a help message",
