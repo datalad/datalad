@@ -101,7 +101,7 @@ def _get_procedure_implementation(name='*', ds=None):
             # TODO `get` dirs if necessary
             for m, n in _get_file_match(op.join(ds.path, dir), name):
                 yield (m,) + _get_proc_config(n, ds=ds)
-        # 1.1. check subdatasets recursively
+        # 2.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
                                     result_xfm='datasets'):
             for m, f, h in _get_procedure_implementation(name=name, ds=subds):
@@ -187,18 +187,18 @@ class RunProcedure(Interface):
 
     Directories identified by the configuration settings
 
-    - 'datalad.locations.dataset-procedures'
     - 'datalad.locations.user-procedures' (determined by
       appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
       on GNU/Linux systems)
     - 'datalad.locations.system-procedures' (determined by
       appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
       GNU/Linux systems)
+    - 'datalad.locations.dataset-procedures'
 
     and subsequently in the 'resources/procedures/' directories of any
     installed extension, and, lastly, of the DataLad installation itself.
 
-    Please note, that a dataset that defines
+    Please note that a dataset that defines
     'datalad.locations.dataset-procedures' provides its procedures to
     any dataset it is a subdataset of. That way you can have a collection of
     such procedures in a dedicated dataset and install it as a subdataset into
@@ -236,11 +236,11 @@ class RunProcedure(Interface):
       It currently requires to include the following placeholders:
 
       - '{script}': will be replaced by the path to the procedure
-      - '{ds}': will be replaced by the absolute path to the dataset the procedure
-        shall operate on
-      - '{args}': will be replaced by [CMD: all additional arguments passed into
-        run-procedure after NAME CMD][PY: all but the first element of `spec` if
-        `spec` is a list or tuple PY]
+      - '{ds}': will be replaced by the absolute path to the dataset the
+        procedure shall operate on
+      - '{args}': (not actually required) will be replaced by
+        [CMD: all additional arguments passed into run-procedure after NAME CMD]
+        [PY: all but the first element of `spec` if `spec` is a list or tuple PY]
         As an example the default format string for a call to a python script is:
         "python {script} {ds} {args}"
     - 'datalad.procedures.<NAME>.help'
@@ -273,7 +273,9 @@ class RunProcedure(Interface):
             metavar='NAME [ARGS]',
             nargs=REMAINDER,
             doc="""Name and possibly additional arguments of the
-            to-be-executed procedure."""),
+            to-be-executed procedure. [CMD: Note, that all options to
+            run-procedure need to be put before NAME, since all ARGS get
+            assigned to NAME CMD]"""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="PATH",
@@ -291,9 +293,7 @@ class RunProcedure(Interface):
             args=('--help-proc',),
             action='store_true',
             doc="""if given, get a help message for procedure NAME from config
-            setting datalad.procedures.NAME.help. [CMD: Note, that this 
-            parameter needs to be given before NAME, since it would be regarded 
-            as part of ARGS otherwise CMD]"""
+            setting datalad.procedures.NAME.help"""
         )
     )
 
@@ -328,6 +328,8 @@ class RunProcedure(Interface):
                     ex['template'] = cmd_tmpl
                 if ex['type'] is None and ex['template'] is None:
                     # doesn't seem like a match
+                    lgr.debug("Neither type nor execution template found for "
+                              "%s. Ignored.", m)
                     continue
                 message = ex['type'] if ex['type'] else 'unknown type'
                 message += ' (missing)' if ex['state'] == 'absent' else ''
