@@ -625,6 +625,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record_id) if use_sidecar else record)
     msg = assure_bytes(msg)
 
+    outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
         msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
                                "COMMIT_EDITMSG"))
@@ -635,8 +636,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                  "'datalad save -r -F %s .'",
                  msg_path)
         raise exc
-    else:
-        outputs_to_save = outputs.expand(full=True) if explicit else '.'
-        if outputs_to_save:
-            for r in ds.add(outputs_to_save, recursive=True, message=msg):
-                yield r
+    elif outputs_to_save:
+        for r in ds.add(outputs_to_save, recursive=True, message=msg):
+            yield r
