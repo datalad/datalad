@@ -22,6 +22,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_in_results
+from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import on_windows
 from datalad.distribution.dataset import Dataset
@@ -172,6 +173,27 @@ def test_procedure_discovery(path, super_path):
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                        'datalad_test_proc.py'))
+
+    if not on_windows:  # no symlinks
+        import os
+        # create a procedure which is a broken symlink, but recognizable as a
+        # python script:
+        os.symlink(op.join(super.path, 'sub', 'not_existent'),
+                   op.join(super.path, 'sub', 'code', 'broken_link_proc.py'))
+        # broken symlink at procedure location, but we can't tell, whether it is
+        # an actual procedure without any guess on how to execute it:
+        os.symlink(op.join(super.path, 'sub', 'not_existent'),
+                   op.join(super.path, 'sub', 'code', 'unknwon_broken_link'))
+
+        ps = super.run_procedure(discover=True)
+        # still needs to find procedures coming with datalad and the dataset
+        # procedure registered before
+        assert_true(len(ps) > 3)
+        assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
+                                           'broken_link_proc.py'),
+                          state='absent')
+        assert_not_in_results(ps, path=op.join(super.path, 'sub', 'code',
+                                               'unknwon_broken_link'))
 
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
