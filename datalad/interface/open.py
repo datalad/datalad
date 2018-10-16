@@ -10,6 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import io
 import os
 import logging
 
@@ -20,18 +21,24 @@ from datalad.utils import assure_list
 
 lgr = logging.getLogger('datalad.interface.open')
 
-_builtin_open = open
 
 @datasetmethod(name='open')
 def open(
         path,
         mode=None,
-        buffering=None,
         dataset=None,
         save=True,
-        message=None
+        message=None,
+        **open_kwargs
     ):
-    """TODO"""
+    """TODO
+
+    Parameters
+    ----------
+
+    **kwargs:
+      Passed to io.open as is
+    """
     # Pre-treat open parameters first
     if mode is not None:
         if mode[0] not in 'rwa':
@@ -40,11 +47,6 @@ def open(
     open_args = []
     if mode is not None:
         open_args.append(mode)
-        if buffering is not None:
-            open_args.append(buffering)
-    elif buffering is not None:
-        # Do not bother messing with it
-        raise ValueError("When specifying buffering, provide mode for open")
 
     # Probably will be useless in Python mode since we cannot return a
     # context manager an yield all the result records at the same time.
@@ -79,7 +81,7 @@ def open(
             for p in resolved_paths:
                 # TODO: actually do all that full path deduction here probably
                 # since we allow for ds.open
-                self.files.append(_builtin_open(p, *open_args))
+                self.files.append(io.open(p, *open_args, **open_kwargs))
                 self.all_results.append({
                     'status': 'ok',
                     'action': 'open',
