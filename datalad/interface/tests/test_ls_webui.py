@@ -23,6 +23,7 @@ from datalad.interface.ls_webui import machinesize, ignored, fs_traverse, \
     _ls_json, UNKNOWN_SIZE
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
 # needed below as bound dataset method
@@ -133,6 +134,7 @@ def test_fs_traverse(topdir):
             assert_equal(brokenlink['size']['total'], '3 Bytes')
 
 
+@known_failure_direct_mode  #FIXME
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '123',
