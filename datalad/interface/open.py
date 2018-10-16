@@ -24,20 +24,53 @@ lgr = logging.getLogger('datalad.interface.open')
 
 @datasetmethod(name='open')
 def open(
-        path,
+        paths,
         mode=None,
         dataset=None,
         save=True,
         message=None,
+        callable=io.open,
         **open_kwargs
     ):
-    """TODO
+    """A git-annex aware io.open() (or another open-like callable) context manager
+
+    This function provides a context manager around io.open() (or regular `open`
+    if provided as `callable`) to do 'annex' operations (get, unlock, etc) on
+    the paths as appropriate depending on the `mode` parameter.
+    For "w"rite and "a"ppend operations introduced changes will be datalad saved
+    (see `save` and `message` arguments).  In case of "w"rite mode, we simply
+    remove file without bothering unlocking it to avoid unnecessary traffic and
+    file copying (just to have it rewritten from scratch).
+    Permissions and authorship are (attempted) to be transfered to the new file
+    (TODO).
+
+    In "a" and "r" mode file first gets `get`'ed and then `unlock`ed in "a" mode.
+
+    Notes:
+    - unlike `io.open` this context manager can take multiple paths as input
+    - we introduced addnitional keyword parameters, so any `io.open` argument
+      besides `mode` should be provided as the keyword argument
 
     Parameters
     ----------
-
-    **kwargs:
-      Passed to io.open as is
+    paths: str or list of str
+      A single or multiple paths to be opene'ed
+    mode: str, optional
+      Passed to the callable as the first argument
+    dataset: dataset, optional
+      If specified, non-explicit relative paths will be taken from the top of
+      the dataset, and an explicit against current directory.  See `resolve_path`
+      for more information.
+    save: bool, optional
+      Either to save the changes introduced by "a" or "w" mode of operation
+    message: str, optional
+      Message for `save`
+    callable: callable, optional
+      An "open" function (like `io.open` or regular `open` in PY2) or any other
+      which takes standard's open `mode` as the first argument, and returns an
+      object with `.name` and `.closed` properties and `.close()` method.
+    **open_kwargs:
+      Passed to the callable as is
     """
     # Pre-treat open parameters first
     if mode is not None:
@@ -52,9 +85,9 @@ def open(
     # context manager an yield all the result records at the same time.
     # But if we make it into a class, we could store them in the instance
     # so they could be inspected later on if desired?
-    path = assure_list(path)
-    resolved_paths = [resolve_path(p, dataset) for p in path] \
-        if dataset is not None else path
+    paths = assure_list(paths)
+    resolved_paths = [resolve_path(p, dataset) for p in paths] \
+        if dataset is not None else paths
 
     import datalad.api as dl  # heavy import so delayed
 
@@ -81,7 +114,7 @@ def open(
             for p in resolved_paths:
                 # TODO: actually do all that full path deduction here probably
                 # since we allow for ds.open
-                self.files.append(io.open(p, *open_args, **open_kwargs))
+                self.files.append(callable(p, *open_args, **open_kwargs))
                 self.all_results.append({
                     'status': 'ok',
                     'action': 'open',

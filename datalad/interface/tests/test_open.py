@@ -30,6 +30,8 @@ from datalad.tests.utils import (
     chpwd,
     create_tree,
     eq_,
+    ok_,
+    nok_,
     ok_clean_git,
     ok_file_has_content,
     ok_file_under_git,
@@ -157,3 +159,40 @@ def test_append(ds):
     ok_clean_git(ds.repo, untracked=['untracked'])
 
     # # TODO: make code work also with 'untracked' and 'outside'
+
+    # test a dummy custom "open" to make sure that it is called appropriately
+    calls = []
+
+    class myfile:
+        def __init__(self, name):
+            self.name = name
+            self.closed = False
+        def close(self):
+            self.closed = True
+
+    def myopen(f, mode, fancy1, fancy2=None, fullpath=True):
+        if fullpath:  # e.g. when operating with ds.
+            eq_(f, opj(ds.path, 'in-annex'))
+        else:
+            # Let's try to keep things relative... all the "fullpath"ing brings
+            # cramps
+            eq_(f, 'in-annex')
+        eq_(mode, 'append')  # we do not care about anything but first letter
+        eq_(fancy1, 1)
+        eq_(fancy2, '2')
+        calls.append("ok")
+        return myfile(f)
+
+    with ds.open('in-annex', 'append', callable=myopen, fancy2='2', fancy1=1, fullpath=True) as f:
+        assert isinstance(f, myfile)
+        nok_(f.closed)
+        eq_(calls, ['ok'])
+    ok_(f.closed)
+
+    # and now with relative path
+    with chpwd(ds.path):
+        with open('in-annex', 'append', callable=myopen, fancy2='2', fancy1=1, fullpath=False) as f:
+            assert isinstance(f, myfile)
+            nok_(f.closed)
+            eq_(calls, ['ok', 'ok'])
+    ok_(f.closed)
