@@ -97,6 +97,16 @@ def test_read(ds):
             eq_(f1.read(), '')
             eq_(f2.read(), 'text')
 
+    # Let's test for error being "handled" separately
+    cm = ds.open("in-git")
+    try:
+        with cm as f:
+            raise RuntimeError("Evil exception which should abort everything")
+    except RuntimeError:
+        pass
+    eq_(cm.all_results[-1]['status'], 'error')
+    eq_(len(cm.all_results[-1]['exception']), 3)  # all details of the exception
+
 
 @with_sample_ds
 def test_rewrite(ds):

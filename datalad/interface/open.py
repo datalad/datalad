@@ -125,7 +125,6 @@ def open(
             return self.files if len(self.files) > 1 else self.files[0]
 
         def __exit__(self, exc_type, exc_val, exc_tb):
-            # TODO: handle if exception happened - I think we should "abort"
             for f in self.files:
                 if not f.closed:
                     f.close()
@@ -137,10 +136,20 @@ def open(
                             'type': 'file'
                         }
                     )
-
-            post_close = self.post_close()
-            if post_close:
-                self.all_results.extend(post_close)
+            if exc_type:
+                self.all_results.append(
+                    {
+                        'status': 'error',
+                        'action': 'open',
+                        'path': None,
+                        # TODO: "proper" way to channel exeption into results
+                        'exception': (exc_type, exc_val, exc_tb)
+                    }
+                )
+            else:
+                post_close = self.post_close()
+                if post_close:
+                    self.all_results.extend(post_close)
 
         def pre_open(self):
             raise NotImplementedError
