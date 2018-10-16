@@ -179,7 +179,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
       Path to a start or top-level dataset. Really has to be a path to a
       dataset!
     targetpaths : list(path)
-      Any non-zero number of path that are termination points for the
+      Any non-zero number of paths that are termination points for the
       search algorithm. Can be paths to datasets, directories, or files
       (and any combination thereof).
     current_trace : list
