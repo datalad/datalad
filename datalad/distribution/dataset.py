@@ -53,7 +53,7 @@ def resolve_path(path, ds=None):
     Any explicit path (absolute or relative) is returned as an absolute path.
     In case of an explicit relative path, the current working directory is
     used as a reference. Any non-explicit relative path is resolved against
-    as dataset location, i.e. considered relative to the location of the
+    dataset location, i.e. considered relative to the location of the
     dataset. If no dataset is provided, the current working directory is
     used.
 
