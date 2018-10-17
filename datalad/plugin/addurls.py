@@ -691,6 +691,11 @@ class Addurls(Interface):
             action="store_true",
             doc="""If True, add the URLs, but don't download their content.
             Underneath, this passes the --fast flag to `git annex addurl`."""),
+        relaxed=Parameter(
+            args=("--relaxed",),
+            action="store_true",
+            doc="""If True, skip git annex size check.
+            Underneath, this passes the --relaxed flag to `git annex addurl`."""),
         ifexists=Parameter(
             args=("--ifexists",),
             metavar="ACTION",
@@ -719,8 +724,9 @@ class Addurls(Interface):
     @eval_results
     def __call__(dataset, urlfile, urlformat, filenameformat,
                  input_type="ext", exclude_autometa=None, meta=None,
-                 message=None, dry_run=False, fast=False, ifexists=None,
-                 missing_value=None, save=True, version_urls=False):
+                 message=None, dry_run=False, fast=False, relaxed=False,
+                 ifexists=None, missing_value=None, save=True,
+                 version_urls=False):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
@@ -792,6 +798,7 @@ class Addurls(Interface):
                 yield r
 
         annex_options = ["--fast"] if fast else []
+        annex_options += ["--relaxed"] if relaxed else []
 
         for spath in subpaths:
             if os.path.exists(os.path.join(dataset.path, spath)):
