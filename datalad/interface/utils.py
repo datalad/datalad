@@ -565,7 +565,8 @@ def _process_results(
                 {k: v for k, v in res.items()
                  if k not in ('message', 'logger')},
                 sort_keys=True,
-                indent=2 if result_renderer.endswith('_pp') else None))
+                indent=2 if result_renderer.endswith('_pp') else None,
+                default=lambda x: str(x)))
         elif result_renderer == 'tailored':
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **kwargs)
