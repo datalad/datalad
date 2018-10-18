@@ -548,18 +548,19 @@ def _process_results(
             pass
         elif result_renderer == 'default':
             # TODO have a helper that can expand a result message
-            ui.message('{action}({status}): {path}{type}{msg}'.format(
-                action=ac.color_word(res['action'], ac.BOLD),
-                status=ac.color_status(res['status']),
-                path=relpath(res['path'],
-                             res['refds']) if res.get('refds', None) else res['path'],
-                type=' ({})'.format(
-                    ac.color_word(res['type'], ac.MAGENTA)
+            if res.get('status', None) != 'notneeded':
+                ui.message('{action}({status}): {path}{type}{msg}'.format(
+                    action=ac.color_word(res['action'], ac.BOLD),
+                    status=ac.color_status(res['status']),
+                    path=relpath(res['path'],
+                                 res['refds']) if res.get('refds', None) else res['path'],
+                    type=' ({})'.format(
+                        ac.color_word(res['type'], ac.MAGENTA)
                     ) if 'type' in res else '',
-                msg=' [{}]'.format(
-                    res['message'][0] % res['message'][1:]
-                    if isinstance(res['message'], tuple) else res['message'])
-                if 'message' in res else ''))
+                    msg=' [{}]'.format(
+                        res['message'][0] % res['message'][1:]
+                        if isinstance(res['message'], tuple) else res['message'])
+                    if 'message' in res else ''))
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()
