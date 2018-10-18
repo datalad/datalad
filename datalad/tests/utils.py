@@ -1189,7 +1189,7 @@ def assert_status(label, results):
                 i + 1,
                 len(results),
                 label,
-                dumps(results, indent=1, default=lambda x: str(x)")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_message(message, results):
