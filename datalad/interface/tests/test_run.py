@@ -921,6 +921,10 @@ def test_placeholders(path):
     ds.config.add("datalad.run.substitutions.license", "gpl3", where="local")
     ds.run("echo {license} >configured-license")
     ok_file_has_content(opj(path, "configured-license"), "gpl3", strip=True)
+    # --script handles configured placeholders.
+    with patch("sys.stdout", new_callable=StringIO) as cmout:
+        ds.rerun(script="-")
+        assert_in("gpl3", cmout.getvalue())
 
 
 @ignore_nose_capturing_stdout

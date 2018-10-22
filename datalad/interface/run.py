@@ -433,11 +433,12 @@ def normalize_command(command):
     return command
 
 
-def format_command(command, **kwds):
+def format_command(dset, command, **kwds):
     """Plug in placeholders in `command`.
 
     Parameters
     ----------
+    dset : Dataset
     command : str or list
 
     `kwds` is passed to the `format` call. `inputs` and `outputs` are converted
@@ -449,6 +450,11 @@ def format_command(command, **kwds):
     """
     command = normalize_command(command)
     sfmt = SequenceFormatter()
+
+    for k, v in dset.config.items("datalad.run.substitutions"):
+        sub_key = k.replace("datalad.run.substitutions.", "")
+        if sub_key not in kwds:
+            kwds[sub_key] = v
 
     for name in ["inputs", "outputs"]:
         io_val = kwds.pop(name, None)
@@ -526,15 +532,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         for res in _unlock_or_remove(ds, rerun_outputs):
             yield res
 
-    sub_namespace = {k.replace("datalad.run.substitutions.", ""): v
-                     for k, v in ds.config.items("datalad.run.substitutions")}
     try:
-        cmd_expanded = format_command(cmd,
+        cmd_expanded = format_command(ds, cmd,
                                       pwd=pwd,
                                       dspath=ds.path,
                                       inputs=inputs,
-                                      outputs=outputs,
-                                      **sub_namespace)
+                                      outputs=outputs)
     except KeyError as exc:
         yield get_status_dict(
             'run',
