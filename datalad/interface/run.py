@@ -387,6 +387,32 @@ def _install_and_reglob(dset, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
+def prepare_inputs(dset, inputs):
+    """Prepare `inputs` for running a command.
+
+    This consists of installing required subdatasets and getting the input
+    files.
+
+    Parameters
+    ----------
+    dset : Dataset
+    inputs : GlobbedPaths object
+
+    Returns
+    -------
+    Generator with the result records.
+    """
+    if inputs:
+        lgr.info('Making sure inputs are available (this may take some time)')
+        for res in _install_and_reglob(dset, inputs):
+            yield res
+        for res in dset.get(inputs.expand(full=True), on_failure="ignore"):
+            if res.get("state") == "absent":
+                lgr.warning("Input does not exist: %s", res["path"])
+            else:
+                yield res
+
+
 def _unlock_or_remove(dset, paths):
     """Unlock `paths` if content is present; remove otherwise.
 
@@ -505,16 +531,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
-
-    if inputs:
-        lgr.info('Making sure inputs are available (this may take some time)')
-        for res in _install_and_reglob(ds, inputs):
-            yield res
-        for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
-            if res.get("state") == "absent":
-                lgr.warning("Input does not exist: %s", res["path"])
-            else:
-                yield res
+    for res in prepare_inputs(ds, inputs):
+        yield res
 
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
