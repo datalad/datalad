@@ -490,6 +490,45 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
+def _execute_command(command, pwd, expected_exit=None):
+    from datalad.cmd import Runner
+
+    exc = None
+    cmd_exitcode = None
+    runner = Runner(cwd=pwd)
+    try:
+        lgr.info("== Command start (output follows) =====")
+        runner.run(
+            command,
+            # immediate output
+            log_online=True,
+            # not yet sure what we should do with the command output
+            # IMHO `run` itself should be very silent and let the command talk
+            log_stdout=False,
+            log_stderr=False,
+            expect_stderr=True,
+            expect_fail=True,
+            # TODO stdin
+        )
+    except CommandError as e:
+        # strip our own info from the exception. The original command output
+        # went to stdout/err -- we just have to exitcode in the same way
+        exc = e
+        cmd_exitcode = e.code
+
+        if expected_exit is not None and expected_exit != cmd_exitcode:
+            # we failed in a different way during a rerun.  This can easily
+            # happen if we try to alter a locked file
+            #
+            # TODO add the ability to `git reset --hard` the dataset tree on failure
+            # we know that we started clean, so we could easily go back, needs gh-1424
+            # to be able to do it recursively
+            raise exc
+
+    lgr.info("== Command exit (modification check follows) =====")
+    return cmd_exitcode, exc
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
@@ -532,9 +571,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     # not needed ATM
     #refds_path = ds.path
-
-    # delayed imports
-    from datalad.cmd import Runner
 
     lgr.debug('tracking command output underneath %s', ds)
 
@@ -589,41 +625,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      exc))
         return
 
-    # we have a clean dataset, let's run things
-    exc = None
-    cmd_exitcode = None
-    runner = Runner(cwd=pwd)
-    try:
-        lgr.info("== Command start (output follows) =====")
-        runner.run(
-            cmd_expanded,
-            # immediate output
-            log_online=True,
-            # not yet sure what we should do with the command output
-            # IMHO `run` itself should be very silent and let the command talk
-            log_stdout=False,
-            log_stderr=False,
-            expect_stderr=True,
-            expect_fail=True,
-            # TODO stdin
-        )
-    except CommandError as e:
-        # strip our own info from the exception. The original command output
-        # went to stdout/err -- we just have to exitcode in the same way
-        exc = e
-        cmd_exitcode = e.code
-
-        if rerun_info and rerun_info.get("exit", 0) != cmd_exitcode:
-            # we failed in a different way during a rerun.  This can easily
-            # happen if we try to alter a locked file
-            #
-            # TODO add the ability to `git reset --hard` the dataset tree on failure
-            # we know that we started clean, so we could easily go back, needs gh-1424
-            # to be able to do it recursively
-            raise exc
-
-    lgr.info("== Command exit (modification check follows) =====")
-
+    cmd_exitcode, exc = _execute_command(
+        cmd_expanded, pwd,
+        expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
