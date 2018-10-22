@@ -490,10 +490,28 @@ def format_command(dset, command, **kwds):
     return sfmt.format(command, **kwds)
 
 
-# This helper function is used to add the rerun_info argument.
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 rerun_info=None, rerun_outputs=None):
+    """Run `cmd` in `dataset` and record the results.
+
+    `Run.__call__` is a simple wrapper over this function. Aside from backward
+    compatibility kludges, the only difference is that `Run.__call__` doesn't
+    expose all the parameters of this function. The unexposed parameters are
+    listed below.
+
+    Parameters
+    ----------
+    rerun_info : dict, optional
+        Record from a previous run. This is used internally by `rerun`.
+    rerun_outputs : list, optional
+        Outputs, in addition to those in `outputs`, determined automatically
+        from a previous run. This is used internally by `rerun`.
+
+    Yields
+    ------
+    Result records for the run.
+    """
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
