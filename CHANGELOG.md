@@ -46,7 +46,7 @@ We would recommend to consult log of the
 - `__del__` should not access `.repo` but `._repo` to avoid attempts
   for reinstantiation etc ([#2901])
 - Fix up submodule `.git` right in `GitRepo.add_submodule` to avoid
-  added added submodules being non git-annex friendly ([#2909]), ([#2904])
+  added submodules being non git-annex friendly ([#2909]), ([#2904])
 - [run-procedure] ([#2905])
   - now will provide dataset into the procedure if called within dataset
   - will not crash if procedure is an executable without `.py` or `.sh`
