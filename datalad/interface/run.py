@@ -591,11 +591,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
-    for res in prepare_inputs(ds, inputs):
-        yield res
-
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
+
+    for res in prepare_inputs(ds, inputs):
+        yield res
 
     if outputs:
         for res in _install_and_reglob(ds, outputs):
