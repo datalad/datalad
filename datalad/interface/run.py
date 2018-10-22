@@ -365,7 +365,7 @@ def _install_and_reglob(dset, gpaths):
     Parameters
     ----------
     dset : Dataset
-    gpaths : list of GlobbedPaths objects
+    gpaths : GlobbedPaths object
 
     Returns
     -------
