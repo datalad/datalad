@@ -526,7 +526,7 @@ def _execute_command(command, pwd, expected_exit=None):
             raise exc
 
     lgr.info("== Command exit (modification check follows) =====")
-    return cmd_exitcode, exc
+    return cmd_exitcode or 0, exc
 
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
@@ -634,7 +634,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     # - exit code of the command
     run_info = {
         'cmd': cmd,
-        'exit': cmd_exitcode if cmd_exitcode is not None else 0,
+        'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
         'outputs': outputs.paths,
