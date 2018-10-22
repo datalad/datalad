@@ -53,7 +53,8 @@ We would recommend to consult log of the
     suffixes
 - Use centralized `.gitattributes` handling while setting annex backend
   ([#2912])
-- Fixed `GlobbedPaths.expand` to use stored expanded paths ([#2921])
+- `GlobbedPaths.expand(..., full=True)` incorrectly returned relative
+   paths when called more than once ([#2921])
 
 ### Enhancements and new features
 
