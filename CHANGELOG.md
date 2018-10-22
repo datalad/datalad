@@ -21,7 +21,8 @@ We would recommend to consult log of the
 
 - `"notneeded"` messages are no longer reported by default results
   renderer
-- [run] would no longer show "commit instructions" if run failed ([#2922])
+- [run] no longer shows commit instructions upon command failure when
+  `explicit` is true and no outputs are specified ([#2922])
 - `get_git_dir` moved into GitRepo ([#2886])
 - `_gitpy_custom_call` removed from GitRepo ([#2894])
 - Eliminated majority of uses of GitPython's `.repo.rev_parse` by
