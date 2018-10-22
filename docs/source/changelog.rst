@@ -15,6 +15,99 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the `DataLad git
 repository <http://github.com/datalad/datalad>`__ for more details.
 
+0.10.4 (Oct 23, 2018) -- Soon-to-be-perfect
+-------------------------------------------
+
+Major refactoring and deprecations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  ``datalad.consts.LOCAL_CENTRAL_PATH`` constant was deprecated in
+   favor of ``datalad.locations.default-dataset``
+   `configuration <http://docs.datalad.org/en/latest/config.html>`__
+   variable (`#2835 <https://github.com/datalad/datalad/issues/2835>`__)
+
+Minor refactoring
+~~~~~~~~~~~~~~~~~
+
+-  ``"notneeded"`` messages are no longer reported by default results
+   renderer
+-  `run <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html>`__
+   would no longer show "commit instructions" if run failed
+   (`#2922 <https://github.com/datalad/datalad/issues/2922>`__)
+-  ``get_git_dir`` moved into GitRepo
+   (`#2886 <https://github.com/datalad/datalad/issues/2886>`__)
+-  ``_gitpy_custom_call`` removed from GitRepo
+   (`#2894 <https://github.com/datalad/datalad/issues/2894>`__)
+-  Eliminated majority of uses of GitPython's ``.repo.rev_parse`` by
+   adding ``GitRepo.format_commit``
+   (`#2902 <https://github.com/datalad/datalad/issues/2902>`__)
+-  ``GitRepo.get_merge_base`` argument is now called ``commitishes``
+   instead of ``treeishes``
+   (`#2903 <https://github.com/datalad/datalad/issues/2903>`__)
+
+Fixes
+~~~~~
+
+-  `update <http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html>`__
+   should not leave the dataset in non-clean state
+   (`#2858 <https://github.com/datalad/datalad/issues/2858>`__) and some
+   other enhancements
+   (`#2859 <https://github.com/datalad/datalad/issues/2859>`__)
+-  Fixed chunking of the long command lines to account for decorators
+   and other arguments
+   (`#2864 <https://github.com/datalad/datalad/issues/2864>`__)
+-  Progress bar should not crash the process on some missing progress
+   information
+   (`#2891 <https://github.com/datalad/datalad/issues/2891>`__)
+-  Default value for ``jobs`` set to be ``"auto"`` (not ``None``) to
+   take advantage of possible parallel get if in ``-g`` mode
+   (`#2861 <https://github.com/datalad/datalad/issues/2861>`__)
+-  [wtf] must not crash if ``git-annex`` is not installed etc
+   (`#2865 <https://github.com/datalad/datalad/issues/2865>`__),
+   (`#2865 <https://github.com/datalad/datalad/issues/2865>`__),
+   ([#2918]),
+   (`#2917 <https://github.com/datalad/datalad/issues/2917>`__)
+-  Fixed paths (with spaces etc) handling while reporting annex error
+   output ([#2892]),
+   (`#2893 <https://github.com/datalad/datalad/issues/2893>`__)
+-  ``__del__`` should not access ``.repo`` but ``._repo`` to avoid
+   attempts for reinstantiation etc
+   (`#2901 <https://github.com/datalad/datalad/issues/2901>`__)
+-  Fix up submodule ``.git`` right in ``GitRepo.add_submodule`` to avoid
+   added added submodules being non git-annex friendly ([#2909]),
+   (`#2904 <https://github.com/datalad/datalad/issues/2904>`__)
+-  `run-procedure <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html>`__
+   (`#2905 <https://github.com/datalad/datalad/issues/2905>`__)
+-  now will provide dataset into the procedure if called within dataset
+-  will not crash if procedure is an executable without ``.py`` or
+   ``.sh`` suffixes
+-  Use centralized ``.gitattributes`` handling while setting annex
+   backend (`#2912 <https://github.com/datalad/datalad/issues/2912>`__)
+-  Fixed ``GlobbedPaths.expand`` to use stored expanded paths
+   (`#2921 <https://github.com/datalad/datalad/issues/2921>`__)
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  Report progress on
+   `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
+   when installing from "smart" git servers
+   (`#2876 <https://github.com/datalad/datalad/issues/2876>`__)
+-  Stale/unused ``sth_like_file_has_content`` was removed
+   (`#2860 <https://github.com/datalad/datalad/issues/2860>`__)
+-  Enhancements to
+   `search <http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html>`__
+   to operate on "improved" metadata layouts
+   (`#2878 <https://github.com/datalad/datalad/issues/2878>`__)
+-  Output of ``git annex init`` operation is now logged
+   (`#2881 <https://github.com/datalad/datalad/issues/2881>`__)
+-  New ``GitRepo.cherry_pick`` method
+   (`#2900 <https://github.com/datalad/datalad/issues/2900>`__)
+-  `run-procedure <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html>`__
+   (`#2905 <https://github.com/datalad/datalad/issues/2905>`__)
+-  procedures can now recursively be discovered in subdatasets as well.
+   The uppermost has highest priority
+
 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 ---------------------------------------------
 
