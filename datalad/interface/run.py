@@ -532,7 +532,8 @@ def _execute_command(command, pwd, expected_exit=None):
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
-                rerun_info=None, rerun_outputs=None):
+                rerun_info=None, rerun_outputs=None,
+                inject=False):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -552,6 +553,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     rerun_outputs : list, optional
         Outputs, in addition to those in `outputs`, determined automatically
         from a previous run. This is used internally by `rerun`.
+    inject : bool, optional
+        Record results as if a command was run, skipping input and output
+        preparation and command execution. In this mode, the caller is
+        responsible for ensuring that the state of the working tree is
+        appropriate for recording the command's results.
 
     Yields
     ------
@@ -574,7 +580,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     lgr.debug('tracking command output underneath %s', ds)
 
-    if not rerun_info:  # Rerun already takes care of this.
+    if not (rerun_info or inject):  # Rerun already takes care of this.
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
@@ -594,40 +600,46 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
 
-    for res in prepare_inputs(ds, inputs):
-        yield res
-
-    if outputs:
-        for res in _install_and_reglob(ds, outputs):
-            yield res
-        for res in _unlock_or_remove(ds, outputs.expand(full=True)):
+    if not inject:
+        for res in prepare_inputs(ds, inputs):
             yield res
 
-    if rerun_outputs is not None:
-        # These are files we need to unlock/remove for a rerun that aren't
-        # included in the explicit outputs. Unlike inputs/outputs, these are
-        # full paths, so we can pass them directly to unlock.
-        for res in _unlock_or_remove(ds, rerun_outputs):
-            yield res
+        if outputs:
+            for res in _install_and_reglob(ds, outputs):
+                yield res
+            for res in _unlock_or_remove(ds, outputs.expand(full=True)):
+                yield res
 
-    try:
-        cmd_expanded = format_command(ds, cmd,
-                                      pwd=pwd,
-                                      dspath=ds.path,
-                                      inputs=inputs,
-                                      outputs=outputs)
-    except KeyError as exc:
-        yield get_status_dict(
-            'run',
-            ds=ds,
-            status='impossible',
-            message=('command has an unrecognized placeholder: %s',
-                     exc))
-        return
+        if rerun_outputs is not None:
+            # These are files we need to unlock/remove for a rerun that aren't
+            # included in the explicit outputs. Unlike inputs/outputs, these are
+            # full paths, so we can pass them directly to unlock.
+            for res in _unlock_or_remove(ds, rerun_outputs):
+                yield res
 
-    cmd_exitcode, exc = _execute_command(
-        cmd_expanded, pwd,
-        expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+        try:
+            cmd_expanded = format_command(ds, cmd,
+                                          pwd=pwd,
+                                          dspath=ds.path,
+                                          inputs=inputs,
+                                          outputs=outputs)
+        except KeyError as exc:
+            yield get_status_dict(
+                'run',
+                ds=ds,
+                status='impossible',
+                message=('command has an unrecognized placeholder: %s',
+                         exc))
+            return
+
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+    else:
+        # If an inject=True caller wants to override the exit code, they can do
+        # so in extra_info.
+        cmd_exitcode = 0
+        exc = None
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself

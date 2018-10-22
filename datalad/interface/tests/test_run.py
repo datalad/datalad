@@ -37,6 +37,7 @@ from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
 from datalad.interface.run import GlobbedPaths
+from datalad.interface.run import run_command
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
 from datalad.tests.utils import assert_raises
@@ -952,6 +953,21 @@ def test_inputs_quotes_needed(path):
     cmd_list = [sys.executable, "-c", cmd, "{inputs}", "{outputs[0]}"]
     ds.run(cmd_list, inputs=["*.txt"], outputs=["out0"])
     ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
+
+
+@ignore_nose_capturing_stdout
+@known_failure_windows
+@with_tree(tree={"foo": "f", "bar": "b"})
+def test_inject(path):
+    ds = Dataset(path).create(force=True)
+    ok_(ds.repo.is_dirty())
+    list(run_command("nonsense command",
+                     dataset=ds,
+                     inject=True,
+                     extra_info={"custom_key": "custom_field"}))
+    msg = ds.repo.format_commit("%B")
+    assert_in("custom_key", msg)
+    assert_in("nonsense command", msg)
 
 
 def test_globbedpaths_get_sub_patterns():
