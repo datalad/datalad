@@ -41,11 +41,13 @@ from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.save import Save
-from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import CommandError
@@ -130,8 +132,7 @@ class Add(Interface):
             args=("path",),
             metavar='PATH',
             doc="""path/name of the component to be added. The component
-            must either exist on the filesystem already, or a `source`
-            has to be provided.""",
+            must exist on the filesystem already.""",
             nargs="+",
             constraints=EnsureStr() | EnsureNone()),
         to_git=Parameter(
@@ -356,24 +357,11 @@ class Add(Interface):
                         **dict(common_report, **ap))
                     continue
                 subds = Dataset(ap['path'])
-                # check that the subds has a commit, and refuse
-                # to operate on it otherwise, or we would get a bastard
-                # submodule that cripples git operations
-                if not subds.repo.get_hexsha():
-                    yield get_status_dict(
-                        ds=subds, status='impossible',
-                        message='cannot add subdataset with no commits',
-                        **dict(common_report, **ap))
-                    continue
                 subds_relpath = relpath(ap['path'], ds_path)
-                # make an attempt to configure a submodule source URL based on the
-                # discovered remote configuration
-                remote, branch = subds.repo.get_tracking_branch()
-                subds_url = subds.repo.get_remote_url(remote) if remote else None
                 # Register the repository in the repo tree as a submodule
                 try:
-                    ds.repo.add_submodule(subds_relpath, url=subds_url, name=None)
-                except CommandError as e:
+                    ds.repo.add_submodule(subds_relpath, url=None, name=None)
+                except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         ds=subds, status='error', message=e.stderr,
                         **dict(common_report, **ap))
@@ -391,7 +379,6 @@ class Add(Interface):
                 # slow down
                 #ap['staged'] = True
                 to_save.append(ap)
-                _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it
                 yield get_status_dict(
                     ds=subds,

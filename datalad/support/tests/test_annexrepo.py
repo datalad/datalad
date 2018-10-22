@@ -75,6 +75,7 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import get_most_obscure_supported_name
+from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
@@ -318,6 +319,15 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     assert_false(ar.file_has_content("bogus.txt", batch=batch))
     ok_(ar.file_has_content("test-annex.dat", batch=batch))
 
+    if not direct:  # There's no unlock in direct mode.
+        ar.unlock(["test-annex.dat"])
+        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+            [ar.config.get("annex.version") == "6"])
+        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+            ofh.write("more")
+        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+            [False])
+
 
 # 1 is enough to test
 @with_batch_direct
@@ -344,6 +354,15 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
 
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     ok_(ar.is_under_annex("test-annex.dat", batch=batch))
+
+    if not direct:  # There's no unlock in direct mode.
+        ar.unlock(["test-annex.dat"])
+        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+            [ar.config.get("annex.version") == "6"])
+        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+            ofh.write("more")
+        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+            [False])
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
@@ -490,6 +509,60 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         # Should maintain original relative file names
         eq_(set(info2_), set(testfiles))
         eq_(info2_[cur_subfile]['size'], 10)
+
+
+@with_tree(tree={"a.txt": "a",
+                 "b": "b",
+                 OBSCURE_FILENAME: "c",
+                 "subdir": {"d": "d", "e": "e"}})
+def test_find_batch_equivalence(path):
+    ar = AnnexRepo(path)
+    files = ["a.txt", "b", OBSCURE_FILENAME]
+    ar.add(files + ["subdir"])
+    ar.commit("add files")
+    query = ["not-there"] + files
+    expected = {f: f for f in files}
+    expected.update({"not-there": ""})
+    eq_(expected, ar.find(query, batch=True))
+    eq_(expected, ar.find(query))
+    # If we give a subdirectory, we split that output.
+    eq_(set(ar.find(["subdir"])["subdir"]), {"subdir/d", "subdir/e"})
+    eq_(ar.find(["subdir"]), ar.find(["subdir"], batch=True))
+
+
+@with_tempfile(mkdir=True)
+def test_repo_info(path):
+    repo = AnnexRepo(path)
+    info = repo.repo_info()  # works in empty repo without crashing
+    eq_(info['local annex size'], 0)
+    eq_(info['size of annexed files in working tree'], 0)
+
+    def get_custom(custom={}):
+        """Need a helper since repo_info modifies in place so we should generate
+        new each time
+        """
+        custom_json = {
+            'available local disk space': 'unknown',
+            'size of annexed files in working tree': "0",
+            'success': True,
+            'command': 'info',
+        }
+        if custom:
+            custom_json.update(custom)
+        return [custom_json]
+
+    with patch.object(
+            repo, '_run_annex_command_json',
+            return_value=get_custom()):
+        info = repo.repo_info()
+        eq_(info['available local disk space'], None)
+
+    with patch.object(
+        repo, '_run_annex_command_json',
+        return_value=get_custom({
+            "available local disk space": "19193986496 (+100000 reserved)"})):
+        info = repo.repo_info()
+        eq_(info['available local disk space'], 19193986496)
 
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
@@ -2285,6 +2358,8 @@ def test_get_size_from_perc_complete():
     eq_(f(0, '0'), 0)
     eq_(f(100, '0'), 0)  # we do not know better
     eq_(f(1, '1'), 100)
+    # with no percentage info, we don't know better either:
+    eq_(f(1, ''), 0)
 
 
 # to prevent regression
@@ -2307,3 +2382,19 @@ def _test_add_under_subdir(path):
         # gr.commit('important') #
         runner(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
+
+
+# https://github.com/datalad/datalad/issues/2892
+@with_tempfile(mkdir=True)
+def test_error_reporting(path):
+    ar = AnnexRepo(path, create=True)
+    res = ar._run_annex_command_json('add', files='gl\\orious BS')
+    eq_(
+        res,
+        [{
+            'command': 'add',
+            # whole thing, despite space, properly quotes backslash
+            'file': 'gl\\orious BS',
+            'note': 'not found',
+            'success': False}]
+    )

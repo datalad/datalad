@@ -276,7 +276,7 @@ def test_save_message_file(path):
                        "msg": "add foo"})
     ds.add("foo", save=False)
     ds.save(message_file=opj(ds.path, "msg"))
-    assert_equal(ds.repo.repo.git.show("--format=%s", "--no-patch"),
+    assert_equal(ds.repo.format_commit("%s"),
                  "add foo")
 
 

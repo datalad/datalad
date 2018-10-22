@@ -34,9 +34,7 @@ try:
     colorama.init()
     atexit.register(colorama.deinit)
 except ImportError as e:
-    # To not interfer with carefully crafted order of imports
-    # delay possibly issuing a warning until all needed imports are done
-    colorama = None
+    pass
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
@@ -53,21 +51,12 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import on_windows, get_encoding_info, get_envvars_info
+from datalad.utils import get_encoding_info, get_envvars_info
 
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
-
-if on_windows and colorama is None:
-    from datalad.dochelpers import exc_str
-
-    lgr.warning(
-        "'colorama' Python module missing, terminal output may look garbled ["
-        "%s]",
-        exc_str(e))
-
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__

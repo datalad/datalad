@@ -14,10 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from datalad.tests.utils import (
-    known_failure_direct_mode,
-    known_failure_v6,
-)
+from datalad.tests.utils import known_failure_direct_mode
 
 import os.path as op
 from os.path import join as opj
@@ -244,7 +241,6 @@ def test_rerun_empty_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_rerun_onto(path):
     ds = Dataset(path).create()
 
@@ -266,16 +262,16 @@ def test_rerun_onto(path):
     # same (but detached) place.
     ds.rerun(revision="static", onto="static")
     ok_(ds.repo.get_active_branch() is None)
-    eq_(ds.repo.repo.git.rev_parse("HEAD"),
-        ds.repo.repo.git.rev_parse("static"))
+    eq_(ds.repo.get_hexsha(),
+        ds.repo.get_hexsha("static"))
 
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
     ds.repo.checkout("master")
     ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
-    neq_(ds.repo.repo.git.rev_parse("HEAD"),
-         ds.repo.repo.git.rev_parse("static"))
+    neq_(ds.repo.get_hexsha(),
+         ds.repo.get_hexsha("static"))
     assert_result_count(ds.diff(revision="HEAD..static"), 0)
     for revrange in ["..static", "static.."]:
         assert_result_count(
@@ -286,8 +282,8 @@ def test_rerun_onto(path):
     ds.repo.checkout("master")
     ds.rerun(onto="HEAD")
     ok_(ds.repo.get_active_branch() is None)
-    neq_(ds.repo.repo.git.rev_parse("HEAD"),
-         ds.repo.repo.git.rev_parse("master"))
+    neq_(ds.repo.get_hexsha(),
+         ds.repo.get_hexsha("master"))
 
     # An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
@@ -304,7 +300,7 @@ def test_rerun_onto(path):
     eq_(ds.repo.get_active_branch(), "from-base")
     assert_result_count(ds.diff(revision="master..from-base"), 0)
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
-        ds.repo.repo.git.rev_parse("static^"))
+        ds.repo.get_hexsha("static^"))
 
 
 @ignore_nose_capturing_stdout
@@ -349,7 +345,6 @@ def test_rerun_old_flag_compatibility(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
 
@@ -396,7 +391,7 @@ def test_run_failure(path):
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
-    msgfile = opj(ds.repo.repo.git_dir, "COMMIT_EDITMSG")
+    msgfile = opj(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
     ds.add(".", save=False)
@@ -418,6 +413,12 @@ def test_run_failure(path):
     ok_clean_git(ds.path)
     with assert_raises(CommandError):
         ds.rerun()
+
+    # We don't show instructions if the caller specified us not to save.
+    remove(msgfile)
+    with assert_raises(CommandError):
+        ds.run("false", explicit=True, outputs=None)
+    assert_false(op.exists(msgfile))
 
 
 @ignore_nose_capturing_stdout
@@ -454,7 +455,7 @@ def test_rerun_branch(path):
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 3)
     eq_(ds.repo.get_merge_base(["master", "rerun"]),
-        ds.repo.repo.git.rev_parse("prerun"))
+        ds.repo.get_hexsha("prerun"))
 
     # Start rerun branch at tip of current branch.
     ds.repo.checkout("master")
@@ -477,7 +478,6 @@ def test_rerun_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
 
@@ -514,7 +514,6 @@ def test_rerun_outofdate_tree(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_rerun_ambiguous_revision_file(path):
     ds = Dataset(path).create()
     ds.run('echo ambig > ambig')
@@ -526,7 +525,6 @@ def test_rerun_ambiguous_revision_file(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_v6  #FIXME
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -666,7 +664,6 @@ def test_rerun_script(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_run_inputs_outputs(src, path):
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
@@ -861,10 +858,16 @@ def test_run_explicit(path):
     ok_(ds.repo.is_dirty(path="dirt_modified"))
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
+    # Saving explicit outputs works from subdirectories.
+    subdir = opj(path, "subdir")
+    mkdir(subdir)
+    with chpwd(subdir):
+        run("echo insubdir >foo", explicit=True, outputs=["foo"])
+    ok_(ds.repo.file_has_content(opj("subdir", "foo")))
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@known_failure_v6  #FIXME
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):

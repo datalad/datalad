@@ -43,9 +43,6 @@ DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
 if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
 
-# Centralized deployment
-LOCAL_CENTRAL_PATH = join(expanduser('~'), 'datalad')
-
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')
 WEB_HTML_DIR = join(DATALAD_GIT_DIR, 'web')

@@ -8,6 +8,7 @@
 
 import sys
 import platform
+import os
 from os.path import dirname
 from os.path import join as opj
 from os.path import sep as pathsep
@@ -48,6 +49,10 @@ keyring_requires = ['keyring>=8.0', 'keyrings.alt']
 pbar_requires = ['tqdm']
 
 dist = platform.dist()
+# Identical to definition in datalad.utils
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+
 # on oldstable Debian let's ask for lower versions of keyring
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
@@ -72,7 +77,9 @@ requires = {
         'patool>=1.7',
         'six>=1.8.0',
         'wrapt',
-    ] + pbar_requires,
+    ] +
+    pbar_requires +
+    (['colorama'] if on_windows else []),
     'downloaders': [
         'boto',
         'msgpack',

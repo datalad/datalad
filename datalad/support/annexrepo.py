@@ -23,6 +23,7 @@ import time
 
 from itertools import chain
 from os import linesep
+from os.path import curdir
 from os.path import join as opj
 from os.path import exists
 from os.path import islink
@@ -114,7 +115,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20161210 -- annex add  to add also changes (not only new files) to git
     # 6.20170220 -- annex status provides --ignore-submodules
     # 6.20180416 -- annex handles unicode filenames more uniformly
-    GIT_ANNEX_MIN_VERSION = '6.20170220'
+    # 6.20180913 -- annex fixes all known to us issues for v6
+    GIT_ANNEX_MIN_VERSION = '6.20180913'
     git_annex_version = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
@@ -325,15 +327,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
                 self.config.set('annex.backends', backend, where='local')
-                git_attributes_file = _path_(self.path, '.gitattributes')
-                git_attributes = ''
-                if exists(git_attributes_file):
-                    with open(git_attributes_file) as f:
-                        git_attributes = f.read()
-                with open(git_attributes_file, 'a') as f:
-                    if git_attributes and not git_attributes.endswith(os.linesep):
-                        f.write(os.linesep)
-                    f.write('* annex.backend=%s%s' % (backend, os.linesep))
+                git_attributes_file = '.gitattributes'
+                self.set_gitattributes(
+                    [('*', {'annex.backend': backend})],
+                    git_attributes_file)
                 self.add(git_attributes_file, git=True)
                 if commit:
                     self.commit(
@@ -1228,12 +1225,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             if old is not False:
                 self.config.set('core.bare', 'False', where='local')
 
-            out, err = super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
-
-            if old is None:
-                self.config.unset('core.bare', where='local')
-            elif old:
-                self.config.set('core.bare', old, where='local')
+            try:
+                out, err = super(AnnexRepo, self)._git_custom_command(
+                    *args, **kwargs)
+            finally:
+                if old is None:
+                    self.config.unset('core.bare', where='local')
+                elif old:
+                    self.config.set('core.bare', old, where='local')
             return out, err
 
         else:
@@ -1286,8 +1285,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 value=new_value,
                                 where='local',
                                 reload=False)
-
-        self._run_annex_command('init', annex_options=opts)
+        self._run_annex_command(
+            'init',
+            log_stderr=lambda s: lgr.info(s.rstrip()), log_online=True,
+            annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
         self.config.reload()
@@ -1529,15 +1530,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # if None -- leave it to annex to decide
         if git is not None:
-            if 'annex.version' in self.config and \
-                    self.config.getint("annex", "version") == 6:
-                # Note: For now ugly workaround to prevent unexpected
-                # outcome when adding to git. See:
-                # <http://git-annex.branchable.com/bugs/mysterious_dependency_of_git_annex_status_output_of_the_added_file/>
-                lgr.warning("Workaround: Wait for {} to add to git ({})."
-                            "".format(files, self))
-                time.sleep(1)
-
             options += [
                 '-c',
                 'annex.largefiles=%s' % (('anything', 'nothing')[int(git)])
@@ -1789,7 +1781,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     @normalize_paths(map_filenames_back=True)
     def find(self, files, batch=False):
-        """Provide annex info for file(s).
+        """Run `git annex find` on file(s).
 
         Parameters
         ----------
@@ -1797,27 +1789,54 @@ class AnnexRepo(GitRepo, RepoInterface):
             files to find under annex
         batch: bool, optional
             initiate or continue with a batched run of annex find, instead of just
-            calling a single git annex find command
+            calling a single git annex find command. If any items in `files`
+            are directories, this value is treated as False.
 
         Returns
         -------
-        list
-          list with filename if file found else empty string
+        A dictionary the maps each item in `files` to its `git annex find`
+        result. Items without a successful result will be an empty string, and
+        multi-item results (which can occur for if `files` includes a
+        directory) will be returned as a list.
         """
-        objects = []
-        if batch:
-            objects = self._batched.get('find', path=self.path)(files)
+        objects = {}
+        # Ignore batch=True if any path is a directory because `git annex find
+        # --batch` always returns an empty string for directories.
+        if batch and not any(isdir(opj(self.path, f)) for f in files):
+            find = self._batched.get('find', json=True, path=self.path)
+            objects = {f: json_out.get("file", "")
+                       for f, json_out in zip(files, find(files))}
         else:
             for f in files:
                 try:
                     obj, er = self._run_annex_command(
-                        'find', files=[f], expect_fail=True
+                        'find', files=[f],
+                        annex_options=["--print0"],
+                        expect_fail=True
                     )
-                    objects.append(obj)
+                    items = obj.rstrip("\0").split("\0")
+                    objects[f] = items[0] if len(items) == 1 else items
                 except CommandError:
-                    objects.append('')
+                    objects[f] = ''
 
         return objects
+
+    def _check_files(self, fn, quick_fn, files, allow_quick, batch):
+        # Helper that isolates the common logic in `file_has_content` and
+        # `is_under_annex`. `fn` is the annex command used to do the check, and
+        # `quick_fn` is the non-annex variant.
+        is_v6 = self.config.get("annex.version") == "6"
+        if is_v6 or self.is_direct_mode() or batch or not allow_quick:
+            # We're only concerned about modified files in V6 mode. In V5
+            # `find` returns an empty string for unlocked files, and in direct
+            # mode everything looks modified, so we don't even bother.
+            modified = self.get_changed_files() if is_v6 else []
+            annex_res = fn(files, normalize_paths=False, batch=batch)
+            return [bool(annex_res.get(f) and
+                         not (is_v6 and normpath(f) in modified))
+                    for f in files]
+        else:  # ad-hoc check which should be faster than call into annex
+            return [quick_fn(f) for f in files]
 
     @normalize_paths
     def file_has_content(self, files, allow_quick=True, batch=False):
@@ -1838,26 +1857,21 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         # TODO: Also provide option to look for key instead of path
 
-        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
-            # TODO: Also provide option to look for key instead of path
-            find = self.find(files, normalize_paths=False, batch=batch)
-            return [bool(filename) for filename in find]
-        else:  # ad-hoc check which should be faster than call into annex
-            out = []
-            for f in files:
-                filepath = opj(self.path, f)
-                if islink(filepath):                    # if symlink
-                    # find abspath of node pointed to by symlink
-                    target_path = realpath(filepath)  # realpath OK
-                    # TODO: checks for being not outside of this repository
-                    # Note: ben removed '.git/' from '.git/annex/objects',
-                    # since it is not true for submodules, whose '.git' is a
-                    # symlink and being resolved to some
-                    # '.git/modules/.../annex/objects'
-                    out.append(exists(target_path) and 'annex/objects' in str(target_path))
-                else:
-                    out.append(False)
-            return out
+        def quick_check(filename):
+            filepath = opj(self.path, filename)
+            if islink(filepath):                    # if symlink
+                # find abspath of node pointed to by symlink
+                target_path = realpath(filepath)  # realpath OK
+                # TODO: checks for being not outside of this repository
+                # Note: ben removed '.git/' from '.git/annex/objects',
+                # since it is not true for submodules, whose '.git' is a
+                # symlink and being resolved to some
+                # '.git/modules/.../annex/objects'
+                return exists(target_path) and 'annex/objects' in str(target_path)
+            return False
+
+        return self._check_files(self.find, quick_check,
+                                 files, allow_quick, batch)
 
     @normalize_paths
     def is_under_annex(self, files, allow_quick=True, batch=False):
@@ -1879,25 +1893,32 @@ class AnnexRepo(GitRepo, RepoInterface):
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
-        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
-            # no other way but to call whereis and if anything returned for it
-            info = self.info(files, normalize_paths=False, batch=batch)
-            # info is a dict... khe khe -- "thanks" Yarik! ;)
-            return [bool(info[f]) for f in files]
-        else:  # ad-hoc check which should be faster than call into annex
-            out = []
-            for f in files:
-                filepath = opj(self.path, f)
-                # todo checks for being not outside of this repository
-                # Note: ben removed '.git/' from '.git/annex/objects',
-                # since it is not true for submodules, whose '.git' is a
-                # symlink and being resolved to some
-                # '.git/modules/.../annex/objects'
-                out.append(
-                    islink(filepath)
-                    and 'annex/objects' in str(realpath(filepath))  # realpath OK
-                )
-            return out
+
+        # This is an ugly hack to prevent files from being treated as
+        # remotes by `git annex info`. See annex's `nameToUUID'`.
+        files = [opj(curdir, f) for f in files]
+
+        def check(files, **kwargs):
+            # Filter out directories because it doesn't make sense to ask if
+            # they are under annex control and `info` can only handle
+            # non-directories.
+            return self.info([f for f in files if not isdir(f)],
+                             fast=True, **kwargs)
+
+        def quick_check(filename):
+            filepath = opj(self.path, filename)
+            # todo checks for being not outside of this repository
+            # Note: ben removed '.git/' from '.git/annex/objects',
+            # since it is not true for submodules, whose '.git' is a
+            # symlink and being resolved to some
+            # '.git/modules/.../annex/objects'
+            return (
+                islink(filepath)
+                and 'annex/objects' in str(realpath(filepath))  # realpath OK
+            )
+
+        return self._check_files(check, quick_check,
+                                 files, allow_quick, batch)
 
     def init_remote(self, name, options):
         """Creates a new special remote
@@ -2088,8 +2109,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     % str(out_json))
             # Make the output's structure match bcmd's.
             out_json = out_json[0]
-            # Don't capture stderr, since download progress provided by wget uses
-            # stderr.
+            # Don't capture stderr, since download progress provided by wget
+            # uses stderr.
         else:
             options += ['--with-files']
             if backend:
@@ -2336,7 +2357,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 files = assure_list(files)
                 maxl = max(map(len, files))
-                chunk_size = CMD_MAX_ARG // maxl
+                chunk_size = max(
+                    1,  # should at least be 1. If blows then - not our fault
+                    (CMD_MAX_ARG
+                     - len(command)
+                     - sum((len(x) + 3) for x in annex_options)
+                     - 4   # for '--' below
+                     - 50  # for safety since we are to add more options
+                    // (maxl + 3)  # +3 for possible quotes and a space
+                    )
+                )
                 file_chunks = generate_chunks(files, chunk_size)
             out, err = "", ""
             for file_chunk in file_chunks:
@@ -2397,9 +2427,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # report it within JSON response:
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             not_existing = [
-                line.split()[1] for line in e.stderr.splitlines()
+                # cut the file path from the middle, no useful delimiter
+                # need to deal with spaces too!
+                line[11:-10] for line in e.stderr.splitlines()
                 if line.startswith('git-annex:') and
-                   line.endswith('not found')
+                line.endswith(' not found')
             ]
             if not_existing:
                 if out is None:
@@ -2412,8 +2444,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 out += linesep.join(
                     ['{{"command": "{cmd}", "file": "{path}", '
                      '"note": "{note}",'
-                     '"success":false}}'.format(
-                         cmd=command, path=f, note="not found")
+                     '"success": false}}'.format(
+                         cmd=command,
+                         # gotta quote backslashes that have taken over...
+                         # ... or the outcome is not valid JSON
+                         path=f.replace('\\', '\\\\'),
+                         note="not found")
                      for f in not_existing])
 
             # Note: insert additional code here to analyse failure and possibly
@@ -2588,7 +2624,12 @@ class AnnexRepo(GitRepo, RepoInterface):
         info = json_records[0]
         for k in info:
             if k.endswith(' size') or k.endswith(' disk space') or k.startswith('size of '):
-                info[k] = int(info[k].split()[0])
+                size = info[k].split()[0]
+                if size.isdigit():
+                    info[k] = int(size)
+                else:
+                    lgr.debug("Size %r reported to be %s, setting to None", k, size)
+                    info[k] = None
         assert(info.pop('success'))
         assert(info.pop('command') == 'info')
         return info  # just as is for now
@@ -3464,7 +3505,8 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
 
 
 def readline_json(stdout):
-    return json_loads(stdout.readline().strip())
+    toload = stdout.readline().strip()
+    return json_loads(toload) if toload else {}
 
 
 @auto_repr
@@ -3622,7 +3664,11 @@ class BatchedAnnex(object):
 
 def _get_size_from_perc_complete(count, perc):
     """A helper to get full size if know % and corresponding size"""
-    portion = (float(perc) / 100.)
+
+    try:
+        portion = (float(perc) / 100.)
+    except ValueError:
+        portion = None
     return int(math.ceil(int(count) / portion)) \
         if portion else 0
 

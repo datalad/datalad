@@ -48,12 +48,13 @@ class Update(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path to be updated",
+            doc="path to a dataset that shall be updated",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         sibling=Parameter(
             args=("-s", "--sibling",),
-            doc="""name of the sibling to update from""",
+            doc="""name of the sibling to update from. If no sibling
+            is given, updates from all siblings are obtained.""",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -71,11 +72,13 @@ class Update(Interface):
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
-            doc="fetch updates from all known siblings", ),
+            doc="""this option has no effect and will be removed in a future version.
+            When no siblings are given, an all-sibling update will be performed.""", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
-            doc="TODO"), )
+            doc="""if enabled, file content that was present before an update
+            will be re-obtained in case a file was changed by the update."""), )
 
     @staticmethod
     @datasetmethod(name='update')
@@ -87,10 +90,12 @@ class Update(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None,
-            fetch_all=False,
+            fetch_all=None,
             reobtain_data=False):
         """
         """
+        if fetch_all is not None:
+            lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
 
         if not dataset and not path:
             # try to find a dataset in PWD
@@ -101,6 +106,7 @@ class Update(Interface):
             # act on the whole dataset if nothing else was specified
             path = refds_path
 
+        save_paths = []
         for ap in AnnotatePaths.__call__(
                 dataset=refds_path,
                 path=path,
@@ -134,13 +140,16 @@ class Update(Interface):
             # special remotes)
             remotes = repo.get_remotes(
                 **({'exclude_special_remotes': True} if isinstance(repo, AnnexRepo) else {}))
-            if not remotes:
+            if not remotes and not sibling:
                 res['message'] = ("No siblings known to dataset at %s\nSkipping",
                                   repo.path)
                 res['status'] = 'notneeded'
                 yield res
                 continue
-            if not sibling:
+            if not sibling and len(remotes) == 1:
+                # there is only one remote, must be this one
+                sibling_ = remotes[0]
+            elif not sibling:
                 # nothing given, look for tracking branch
                 sibling_ = repo.get_tracking_branch()[0]
             else:
@@ -151,21 +160,21 @@ class Update(Interface):
                 res['status'] = 'impossible'
                 yield res
                 continue
-            if not sibling_ and len(remotes) == 1:
-                # there is only one remote, must be this one
-                sibling_ = remotes[0]
             if not sibling_ and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple siblings:\n%s" % remotes)
                 res['status'] = 'impossible'
-                res['error'] = NotImplementedError(
-                    "Multiple siblings, please specify from which to update.")
+                res['message'] = "Multiple siblings, please specify from which to update."
                 yield res
                 continue
-            lgr.info("Updating dataset '%s' ..." % repo.path)
+            lgr.info("Fetching updates for %s", ds)
             # fetch remote
             fetch_kwargs = dict(
-                remote=None if fetch_all else sibling_,
-                all_=fetch_all,
+                # test against user-provided value!
+                remote=None if sibling is None else sibling_,
+                all_=sibling is None,
+                # required to not trip over submodules that
+                # were removed in the origin clone
+                recurse_submodules="no",
                 prune=True)  # prune to not accumulate a mess over time
             repo.fetch(**fetch_kwargs)
             # NOTE if any further acces to `repo` is needed, reevaluate
@@ -176,12 +185,27 @@ class Update(Interface):
                     yield fr
             res['status'] = 'ok'
             yield res
+            save_paths.append(ap['path'])
+        if recursive:
+            save_paths = [p for p in save_paths if p != refds_path]
+            if not save_paths:
+                return
+            lgr.debug(
+                'Subdatasets where updated state may need to be '
+                'saved in the parent dataset: %s', save_paths)
+            for r in Dataset(refds_path).add(
+                    path=save_paths,
+                    recursive=False,
+                    message='[DATALAD] Save updated subdatasets'):
+                yield r
 
 
 def _update_repo(ds, remote, reobtain_data):
+    # Just an ugly workaround for the late bindings of ds.get below
+    from datalad.distribution.get import Get
     repo = ds.repo
 
-    lgr.info("Merging updates...")
+    lgr.info("Applying updates to %s", ds)
     if isinstance(repo, AnnexRepo):
         if reobtain_data:
             # get all annexed files that have data present

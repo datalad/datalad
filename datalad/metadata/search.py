@@ -34,12 +34,11 @@ from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
-from datalad.distribution.utils import get_git_dir
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
 from datalad.utils import assure_unicode
@@ -54,14 +53,30 @@ from datalad.metadata.metadata import query_aggregated_metadata
 _any2unicode = partial(as_unicode, cast_types=(int, float, tuple, list, dict))
 
 
-def _listdict2dictlist(lst):
+def _listdict2dictlist(lst, strict=True):
+    """Helper to deal with DataLad's unique value reports
+
+    Parameters
+    ----------
+    lst : list
+      List of dicts
+    strict : bool
+      In strict mode any dictionary items that doesn't have a simple value
+      (but another container) is discarded. In non-strict mode, arbitrary
+      levels of nesting are preserved, and no unique-ification of values
+      is performed. The latter can be used when it is mostly (or merely)
+      interesting to get a list of metadata keys.
+    """
     # unique values that we got, always a list
     if all(not isinstance(uval, dict) for uval in lst):
         # no nested structures, take as is
         return lst
 
+    type_excluder = (tuple, list)
+    if strict:
+        type_excluder += (dict,)
     # we need to turn them inside out, instead of a list of
-    # dicts, we want a dict where keys are lists, because we
+    # dicts, we want a dict where values are lists, because we
     # cannot handle hierarchies in a tabular search index
     # if you came here to find that out, go ahead and use a graph
     # DB/search
@@ -72,7 +87,7 @@ def _listdict2dictlist(lst):
             # in favor of the structured metadata
             continue
         for k, v in uv.items():
-            if isinstance(v, (tuple, list, dict)):
+            if isinstance(v, type_excluder):
                 # this is where we draw the line, two levels of
                 # nesting. whoosh can only handle string values
                 # injecting a stringified blob of something doesn't
@@ -81,8 +96,14 @@ def _listdict2dictlist(lst):
             if v == "":
                 # no cruft
                 continue
-            uvals = udict.get(k, set())
-            uvals.add(v)
+            if strict:
+                # no duplicate values, only hashable stuff
+                uvals = udict.get(k, set())
+                uvals.add(v)
+            else:
+                # whatever it is, we'll take it
+                uvals = udict.get(k, [])
+                uvals.append(v)
             udict[k] = uvals
     return {
         # set not good for JSON, have plain list
@@ -111,7 +132,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+                srcmeta[uk] = _listdict2dictlist(umeta[uk], strict=False) if umeta[uk] is not None else None
             if src not in meta and srcmeta:
                 meta[src] = srcmeta  # assign the new one back
 
@@ -176,14 +197,15 @@ def _search_from_virgin_install(dataset, query):
         # none was provided so we could ask user either he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        if os.path.exists(LOCAL_CENTRAL_PATH):
-            central_ds = Dataset(LOCAL_CENTRAL_PATH)
-            if central_ds.is_installed():
+        DEFAULT_DATASET_PATH = cfg.obtain('datalad.locations.default-dataset')
+        if os.path.exists(DEFAULT_DATASET_PATH):
+            default_ds = Dataset(DEFAULT_DATASET_PATH)
+            if default_ds.is_installed():
                 if ui.yesno(
                     title="No DataLad dataset found at current location",
                     text="Would you like to search the DataLad "
                          "superdataset at %r?"
-                          % LOCAL_CENTRAL_PATH):
+                          % DEFAULT_DATASET_PATH):
                     pass
                 else:
                     reraise(*exc_info)
@@ -192,14 +214,14 @@ def _search_from_virgin_install(dataset, query):
                     "No DataLad dataset found at current location. "
                     "The DataLad superdataset location %r exists, "
                     "but does not contain an dataset."
-                    % LOCAL_CENTRAL_PATH)
+                    % DEFAULT_DATASET_PATH)
         elif ui.yesno(
                 title="No DataLad dataset found at current location",
                 text="Would you like to install the DataLad "
                      "superdataset at %r?"
-                     % LOCAL_CENTRAL_PATH):
+                     % DEFAULT_DATASET_PATH):
             from datalad.api import install
-            central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+            default_ds = install(DEFAULT_DATASET_PATH, source='///')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -209,9 +231,9 @@ def _search_from_virgin_install(dataset, query):
 
         lgr.info(
             "Performing search using DataLad superdataset %r",
-            central_ds.path
+            default_ds.path
         )
-        for res in central_ds.search(query):
+        for res in default_ds.search(query):
             yield res
         return
     else:
@@ -241,7 +263,7 @@ class _WhooshSearch(_Search):
 
         self.idx_obj = None
         # where does the bunny have the eggs?
-        self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self.index_dir = opj(self.ds.path, GitRepo.get_git_dir(ds), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
     def show_keys(self, mode):
@@ -798,6 +820,9 @@ class _EGrepCSSearch(_Search):
                 '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
                 k=k, stat=stat
             ))
+        # After #2156 datasets may not necessarily carry all
+        # keys in the "unique" summary
+        lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
 
     def get_query(self, query):
         query = assure_list(query)

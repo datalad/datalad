@@ -10,7 +10,6 @@
 """
 
 import logging
-from os.path import abspath
 from os.path import curdir
 from os.path import exists
 from os.path import join as opj
@@ -24,8 +23,8 @@ from six import string_types
 from six import add_metaclass
 import wrapt
 
+from datalad import cfg
 from datalad.config import ConfigManager
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
@@ -40,7 +39,6 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
 from datalad.utils import dlabspath
-from datalad.distribution.utils import get_git_dir
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -130,9 +128,9 @@ class Dataset(object):
             # might have its ideas on what to do with ^, so better use as -d^
             path_ = Dataset(curdir).get_superdataset(topmost=True).path
         elif path == '///':
-            # TODO: logic/UI on installing a central dataset could move here
+            # TODO: logic/UI on installing a default dataset could move here
             # from search?
-            path_ = LOCAL_CENTRAL_PATH
+            path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
 
