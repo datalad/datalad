@@ -69,7 +69,8 @@ We would recommend to consult log of the
 - [run-procedure] ([#2905])
   - procedures can now recursively be discovered in subdatasets as well.
     The uppermost has highest priority
-
+  - Procedures in user and system locations now take precedence over
+    those in datasets.
 
 ## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 
