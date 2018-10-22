@@ -12,8 +12,8 @@ Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -75,7 +75,7 @@ requires = {
-     ] + pbar_requires,
+@@ -82,7 +82,7 @@ requires = {
+     (['colorama'] if on_windows else []),
      'downloaders': [
          'boto',
 -        'msgpack',
