@@ -492,6 +492,7 @@ def format_command(dset, command, **kwds):
 
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
+                extra_info=None,
                 rerun_info=None, rerun_outputs=None):
     """Run `cmd` in `dataset` and record the results.
 
@@ -502,6 +503,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     Parameters
     ----------
+    extra_info : dict, optional
+        Additional information to dump with the json run record. Any value
+        given here will take precedence over the standard run key. Warning:
+        Callers should try to use fairly specific key names to avoid collisions
+        with future keys added by `run`.
     rerun_info : dict, optional
         Record from a previous run. This is used internally by `rerun`.
     rerun_outputs : list, optional
@@ -634,6 +640,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info['pwd'] = rel_pwd
     if ds.id:
         run_info["dsid"] = ds.id
+    if extra_info:
+        run_info.update(extra_info)
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
