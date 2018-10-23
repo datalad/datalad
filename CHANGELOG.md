@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.10.4 (Oct 23, 2018) -- Soon-to-be-perfect
+## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
 
 Upgrade of [git-annex] to the most recent available to your release is
 advisable since a number of issues were resolved at that level.
