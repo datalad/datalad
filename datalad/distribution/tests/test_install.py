@@ -28,6 +28,7 @@ from datalad.utils import getpwd
 
 from datalad.api import create
 from datalad.api import install
+from datalad.api import remove
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
@@ -908,15 +909,21 @@ def test_install_subds_from_another_remote(topdir):
         # print("Installing within updated dataset -- should be able to install from clone2")
         clone1.install('subds1')
 
+
 # Takes > 2 sec
 # Do not use cassette
 @skip_if_no_network
 @with_tempfile
-def test_datasets_datalad_org(tdir):
+def check_datasets_datalad_org(suffix, tdir):
     # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
     # Apparently things can break, especially with introduction of the
     # smart HTTP backend for apache2 etc
-    ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w')
+    ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
     eq_(ds.config.get('remote.origin.annex-ignore', None), None)
-    out = ds.get('001-anat-scout_ses-{date}/000001.dcm')
-    eq_(out[0]['status'], 'ok')
+    assert_status('ok', ds.get('001-anat-scout_ses-{date}/000001.dcm'))
+    assert_status('ok', ds.remove())
+
+
+def test_datasets_datalad_org():
+    yield check_datasets_datalad_org, ''
+    yield check_datasets_datalad_org, '/.git'
