@@ -907,3 +907,16 @@ def test_install_subds_from_another_remote(topdir):
         clone1.update(merge=True, sibling=clone2_)
         # print("Installing within updated dataset -- should be able to install from clone2")
         clone1.install('subds1')
+
+# Takes > 2 sec
+# Do not use cassette
+@skip_if_no_network
+@with_tempfile
+def test_datasets_datalad_org(tdir):
+    # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
+    # Apparently things can break, especially with introduction of the
+    # smart HTTP backend for apache2 etc
+    ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w')
+    eq_(ds.config.get('remote.origin.annex-ignore', None), None)
+    out = ds.get('001-anat-scout_ses-{date}/000001.dcm')
+    eq_(out[0]['status'], 'ok')
