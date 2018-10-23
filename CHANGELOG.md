@@ -9,7 +9,10 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.10.4 (Oct 23, 2018) -- Soon-to-be-perfect
+## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
+
+Upgrade of [git-annex] to the most recent available to your release is
+advisable since a number of issues were resolved at that level.
 
 ### Major refactoring and deprecations
 
@@ -21,11 +24,10 @@ We would recommend to consult log of the
 
 - `"notneeded"` messages are no longer reported by default results
   renderer
-- [run] would no longer show "commit instructions" if run failed ([#2922])
+- [run] no longer shows commit instructions upon command failure when
+  `explicit` is true and no outputs are specified ([#2922])
 - `get_git_dir` moved into GitRepo ([#2886])
 - `_gitpy_custom_call` removed from GitRepo ([#2894])
-- Eliminated majority of uses of GitPython's `.repo.rev_parse` by
-  adding `GitRepo.format_commit` ([#2902])
 - `GitRepo.get_merge_base` argument is now called `commitishes` instead
   of `treeishes` ([#2903])
 
@@ -46,14 +48,15 @@ We would recommend to consult log of the
 - `__del__` should not access `.repo` but `._repo` to avoid attempts
   for reinstantiation etc ([#2901])
 - Fix up submodule `.git` right in `GitRepo.add_submodule` to avoid
-  added added submodules being non git-annex friendly ([#2909]), ([#2904])
+  added submodules being non git-annex friendly ([#2909]), ([#2904])
 - [run-procedure] ([#2905])
   - now will provide dataset into the procedure if called within dataset
   - will not crash if procedure is an executable without `.py` or `.sh`
     suffixes
 - Use centralized `.gitattributes` handling while setting annex backend
   ([#2912])
-- Fixed `GlobbedPaths.expand` to use stored expanded paths ([#2921])
+- `GlobbedPaths.expand(..., full=True)` incorrectly returned relative
+   paths when called more than once ([#2921])
 
 ### Enhancements and new features
 
@@ -63,11 +66,14 @@ We would recommend to consult log of the
 - Enhancements to [search] to operate on "improved" metadata layouts
   ([#2878])
 - Output of `git annex init` operation is now logged ([#2881])
-- New `GitRepo.cherry_pick` method ([#2900])
+- New
+  - `GitRepo.cherry_pick` ([#2900])
+  - `GitRepo.format_commit` ([#2902])
 - [run-procedure] ([#2905])
   - procedures can now recursively be discovered in subdatasets as well.
     The uppermost has highest priority
-
+  - Procedures in user and system locations now take precedence over
+    those in datasets.
 
 ## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 
