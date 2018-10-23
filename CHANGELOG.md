@@ -11,6 +11,9 @@ We would recommend to consult log of the
 
 ## 0.10.4 (Oct 23, 2018) -- Soon-to-be-perfect
 
+Upgrade of [git-annex] to the most recent available to your release is
+advisable since a number of issues were resolved at that level.
+
 ### Major refactoring and deprecations
 
 - `datalad.consts.LOCAL_CENTRAL_PATH` constant was deprecated in favor
@@ -25,8 +28,6 @@ We would recommend to consult log of the
   `explicit` is true and no outputs are specified ([#2922])
 - `get_git_dir` moved into GitRepo ([#2886])
 - `_gitpy_custom_call` removed from GitRepo ([#2894])
-- Eliminated majority of uses of GitPython's `.repo.rev_parse` by
-  adding `GitRepo.format_commit` ([#2902])
 - `GitRepo.get_merge_base` argument is now called `commitishes` instead
   of `treeishes` ([#2903])
 
@@ -65,7 +66,9 @@ We would recommend to consult log of the
 - Enhancements to [search] to operate on "improved" metadata layouts
   ([#2878])
 - Output of `git annex init` operation is now logged ([#2881])
-- New `GitRepo.cherry_pick` method ([#2900])
+- New
+  - `GitRepo.cherry_pick` ([#2900])
+  - `GitRepo.format_commit` ([#2902])
 - [run-procedure] ([#2905])
   - procedures can now recursively be discovered in subdatasets as well.
     The uppermost has highest priority
