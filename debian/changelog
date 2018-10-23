@@ -1,12 +1,12 @@
-datalad (0.10.3.1+git167-gfb2bfb8f-1) UNRELEASED; urgency=medium
+datalad (0.11.0-1) unstable; urgency=medium
 
   [ Jelmer Vernooĳ ]
   * Move source package lintian overrides to debian/source.
 
   [ Yaroslav Halchenko ]
-  * New upstream snapshot from 0.10.3.1-167-gfb2bfb8f
+  * New upstream release
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 22 Oct 2018 13:04:50 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 23 Oct 2018 09:30:36 -0400
 
 datalad (0.10.3.1-2) neurodebian; urgency=medium
 
