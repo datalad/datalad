@@ -11,8 +11,8 @@ We would recommend to consult log of the
 
 ## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
 
-Upgrade of [git-annex] to the most recent available to your release is
-advisable since a number of issues were resolved at that level.
+[git-annex] 6.20180913 (or later) is now required - provides a number of
+fixes for v6 mode operations etc.
 
 ### Major refactoring and deprecations
 
