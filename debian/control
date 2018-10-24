@@ -8,7 +8,7 @@ Uploaders:
 Build-Depends:
  debhelper (>= 9),
  dh-python,
- git-annex (>= 6.20180509~) | git-annex-standalone (>= 6.20180509~),
+ git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
  help2man,
  patool,
  python-all,

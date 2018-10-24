@@ -5,6 +5,7 @@ datalad (0.11.0-1) unstable; urgency=medium
 
   [ Yaroslav Halchenko ]
   * New upstream release
+    - requires git-annex >= 6.20180913
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 23 Oct 2018 09:30:36 -0400
 
