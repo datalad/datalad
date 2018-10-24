@@ -501,6 +501,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                           expand=expand in ["inputs", "both"])
 
     if inputs:
+        lgr.info('Making sure inputs are available (this may take some time)')
         for res in _install_and_reglob(ds, inputs):
             yield res
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
