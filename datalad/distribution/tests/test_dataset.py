@@ -323,3 +323,83 @@ def test_Dataset_flyweight(path1, path2):
             ds3 = Dataset('linked')
             ok_(ds3 == ds1)
             ok_(ds3 is not ds1)
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
+
+    from os.path import lexists
+    from datalad.tests.utils import ok_clean_git
+
+    ds = Dataset(repo1)
+    assert (ds.repo is None)
+    first_config = ds.config
+    assert (ds._cfg_bound is False)
+
+    ds.create()
+    ok_clean_git(repo1)
+    # after creation, we have `repo` and `config` was reevaluated to point
+    # to the repo's config:
+    assert (ds.repo is not None)
+    second_config = ds.config
+    assert (ds._cfg_bound is True)
+    assert (ds.config is ds.repo.config)
+    assert (first_config is not second_config)
+
+    ds.remove()
+    # repo is gone, and config is again reevaluated to only provide user/system
+    # level config:
+    assert(not lexists(ds.path))
+    assert (ds.repo is None)
+    third_config = ds.config
+    assert (ds._cfg_bound is False)
+    assert (second_config is not third_config)
+
+    ds.create()
+    ok_clean_git(repo1)
+    # after recreation everything is sane again:
+    assert (ds.repo is not None)
+    assert (ds.config is ds.repo.config)
+    forth_config = ds.config
+    assert (ds._cfg_bound is True)
+    assert (third_config is not forth_config)
+
+    # no symlinks on windows:
+    if not on_windows:
+        # now, let ds be a symlink and change that symlink to point to different
+        # things:
+        ar2 = AnnexRepo(repo2)
+        ar3 = AnnexRepo(repo3)
+        assert (os.path.isabs(non_repo))
+
+        os.symlink(repo1, symlink)
+        ds_link = Dataset(symlink)
+        assert (ds_link.repo is ds.repo)  # same Repo instance
+        assert (ds_link is not ds)  # but not the same Dataset instance
+        assert (ds_link.config is ds.repo.config)
+        assert (ds._cfg_bound is True)
+
+        os.unlink(symlink)
+        os.symlink(repo2, symlink)
+
+        assert (ds_link.repo is ar2)  # same Repo instance
+        assert (ds_link.config is ar2.config)
+        assert (ds_link._cfg_bound is True)
+
+        os.unlink(symlink)
+        os.symlink(repo3, symlink)
+
+        assert (ds_link.repo is ar3)  # same Repo instance
+        assert (ds_link.config is ar3.config)
+        assert (ds_link._cfg_bound is True)
+
+        os.unlink(symlink)
+        os.symlink(non_repo, symlink)
+
+        assert (ds_link.repo is None)
+        assert (ds_link.config is not ar3.config)
+        assert (ds_link._cfg_bound is False)

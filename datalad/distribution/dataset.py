@@ -161,6 +161,7 @@ class Dataset(object):
         self._repo = None
         self._id = None
         self._cfg = None
+        self._cfg_bound = False
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -218,8 +219,10 @@ class Dataset(object):
                     lgr.log(5,
                             "Oops -- guess on repo type was wrong?: %s",
                             exc_str(exc))
-                    pass
+                    self._repo = None
                 # version problems come as RuntimeError: DO NOT CATCH!
+            else:
+                self._repo = None
         if self._repo is None:
             # Often .repo is requested to 'sense' if anything is installed
             # under, and if so -- to proceed forward. Thus log here only
@@ -255,12 +258,20 @@ class Dataset(object):
         -------
         ConfigManager
         """
-        if self._cfg is None:
-            if self.repo is None:
-                # associate with this dataset and read the entire config hierarchy
-                self._cfg = ConfigManager(dataset=self, dataset_only=False)
-            else:
-                self._cfg = self.repo.config
+
+        if self.repo is None:
+            # if there's no repo (yet or anymore), we can't read/write config at
+            # dataset level, but only at user/system level
+            # However, if this was the case before as well, we don't want a new
+            # instance of ConfigManager
+            if self._cfg_bound:
+                self._cfg = ConfigManager(dataset=None, dataset_only=False)
+                self._cfg_bound = False
+
+        else:
+            self._cfg = self.repo.config
+            self._cfg_bound = True
+
         return self._cfg
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
