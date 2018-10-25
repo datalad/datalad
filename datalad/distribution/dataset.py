@@ -239,6 +239,12 @@ class Dataset(object):
         for different versions of the same dataset (that have all been derived
         from the same original dataset repository).
 
+        Note, that a plain git/git-annex repository doesn't necessarily have
+        a dataset id yet. It is create by `Dataset.create()` and stored in
+        .datalad/config. If None is returned while there is a valid repository,
+        there may have never been a call to `create` in the history of commit
+        HEAD.
+
         Returns
         -------
         str
