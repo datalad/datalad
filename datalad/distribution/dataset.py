@@ -161,7 +161,7 @@ class Dataset(object):
         self._repo = None
         self._id = None
         self._cfg = None
-        self._cfg_bound = False
+        self._cfg_bound = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -264,7 +264,7 @@ class Dataset(object):
             # dataset level, but only at user/system level
             # However, if this was the case before as well, we don't want a new
             # instance of ConfigManager
-            if self._cfg_bound:
+            if self._cfg_bound in (True, None):
                 self._cfg = ConfigManager(dataset=None, dataset_only=False)
                 self._cfg_bound = False
 

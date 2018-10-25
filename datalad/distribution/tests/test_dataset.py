@@ -337,6 +337,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
 
     ds = Dataset(repo1)
     assert (ds.repo is None)
+    assert (ds.config is not None)
     first_config = ds.config
     assert (ds._cfg_bound is False)
 
@@ -345,6 +346,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     # after creation, we have `repo` and `config` was reevaluated to point
     # to the repo's config:
     assert (ds.repo is not None)
+    assert (ds.config is not None)
     second_config = ds.config
     assert (ds._cfg_bound is True)
     assert (ds.config is ds.repo.config)
@@ -355,6 +357,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     # level config:
     assert(not lexists(ds.path))
     assert (ds.repo is None)
+    assert (ds.config is not None)
     third_config = ds.config
     assert (ds._cfg_bound is False)
     assert (second_config is not third_config)
@@ -363,6 +366,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     ok_clean_git(repo1)
     # after recreation everything is sane again:
     assert (ds.repo is not None)
+    assert (ds.config is not None)
     assert (ds.config is ds.repo.config)
     forth_config = ds.config
     assert (ds._cfg_bound is True)
