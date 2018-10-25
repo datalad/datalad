@@ -2117,6 +2117,8 @@ class GitRepo(RepoInterface):
         cmd += [str(name)]
 
         self._git_custom_command('', cmd, expect_stderr=True)
+        # Note: force=True shouldn't be needed, since mtime changes on checkout:
+        self.config.reload()
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
