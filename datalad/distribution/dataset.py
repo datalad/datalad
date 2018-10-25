@@ -244,11 +244,8 @@ class Dataset(object):
         str
           This is either a stored UUID, or `None`.
         """
-        if self._id is None:
-            # if we have one on record, stick to it!
-            self.config.reload()
-            self._id = self.config.get('datalad.dataset.id', None)
-        return self._id
+
+        return self.config.get('datalad.dataset.id', None)
 
     @property
     def config(self):

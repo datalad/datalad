@@ -340,6 +340,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     assert (ds.config is not None)
     first_config = ds.config
     assert (ds._cfg_bound is False)
+    assert (ds.id is None)
 
     ds.create()
     ok_clean_git(repo1)
@@ -351,6 +352,8 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     assert (ds._cfg_bound is True)
     assert (ds.config is ds.repo.config)
     assert (first_config is not second_config)
+    assert (ds.id is not None)
+    first_id = ds.id
 
     ds.remove()
     # repo is gone, and config is again reevaluated to only provide user/system
@@ -361,6 +364,7 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     third_config = ds.config
     assert (ds._cfg_bound is False)
     assert (second_config is not third_config)
+    assert (ds.id is None)
 
     ds.create()
     ok_clean_git(repo1)
@@ -371,6 +375,9 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     forth_config = ds.config
     assert (ds._cfg_bound is True)
     assert (third_config is not forth_config)
+    assert (ds.id is not None)
+    assert (ds.id != first_id)
+    second_id = ds.id
 
     # no symlinks on windows:
     if not on_windows:
@@ -385,7 +392,10 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
         assert (ds_link.repo is ds.repo)  # same Repo instance
         assert (ds_link is not ds)  # but not the same Dataset instance
         assert (ds_link.config is ds.repo.config)
-        assert (ds._cfg_bound is True)
+        assert (ds_link._cfg_bound is True)
+        assert (ds_link.id is not None)
+        # same id, although different Dataset instance:
+        assert (ds_link.id == second_id)
 
         os.unlink(symlink)
         os.symlink(repo2, symlink)
@@ -393,6 +403,9 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
         assert (ds_link.repo is ar2)  # same Repo instance
         assert (ds_link.config is ar2.config)
         assert (ds_link._cfg_bound is True)
+        # id is None again, since this repository is an annex but there was no
+        # Dataset.create() called yet.
+        assert (ds_link.id is None)
 
         os.unlink(symlink)
         os.symlink(repo3, symlink)
@@ -400,6 +413,9 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
         assert (ds_link.repo is ar3)  # same Repo instance
         assert (ds_link.config is ar3.config)
         assert (ds_link._cfg_bound is True)
+        # id is None again, since this repository is an annex but there was no
+        # Dataset.create() called yet.
+        assert (ds_link.id is None)
 
         os.unlink(symlink)
         os.symlink(non_repo, symlink)
@@ -407,3 +423,4 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
         assert (ds_link.repo is None)
         assert (ds_link.config is not ar3.config)
         assert (ds_link._cfg_bound is False)
+        assert (ds_link.id is None)
