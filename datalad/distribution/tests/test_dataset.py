@@ -379,48 +379,46 @@ def test_property_reevaluation(repo1, repo2, repo3, non_repo, symlink):
     assert (ds.id != first_id)
     second_id = ds.id
 
-    # no symlinks on windows:
-    if not on_windows:
-        # now, let ds be a symlink and change that symlink to point to different
-        # things:
-        ar2 = AnnexRepo(repo2)
-        ar3 = AnnexRepo(repo3)
-        assert (os.path.isabs(non_repo))
+    # now, let ds be a symlink and change that symlink to point to different
+    # things:
+    ar2 = AnnexRepo(repo2)
+    ar3 = AnnexRepo(repo3)
+    assert (os.path.isabs(non_repo))
 
-        os.symlink(repo1, symlink)
-        ds_link = Dataset(symlink)
-        assert (ds_link.repo is ds.repo)  # same Repo instance
-        assert (ds_link is not ds)  # but not the same Dataset instance
-        assert (ds_link.config is ds.repo.config)
-        assert (ds_link._cfg_bound is True)
-        assert (ds_link.id is not None)
-        # same id, although different Dataset instance:
-        assert (ds_link.id == second_id)
+    os.symlink(repo1, symlink)
+    ds_link = Dataset(symlink)
+    assert (ds_link.repo is ds.repo)  # same Repo instance
+    assert (ds_link is not ds)  # but not the same Dataset instance
+    assert (ds_link.config is ds.repo.config)
+    assert (ds_link._cfg_bound is True)
+    assert (ds_link.id is not None)
+    # same id, although different Dataset instance:
+    assert (ds_link.id == second_id)
 
-        os.unlink(symlink)
-        os.symlink(repo2, symlink)
+    os.unlink(symlink)
+    os.symlink(repo2, symlink)
 
-        assert (ds_link.repo is ar2)  # same Repo instance
-        assert (ds_link.config is ar2.config)
-        assert (ds_link._cfg_bound is True)
-        # id is None again, since this repository is an annex but there was no
-        # Dataset.create() called yet.
-        assert (ds_link.id is None)
+    assert (ds_link.repo is ar2)  # same Repo instance
+    assert (ds_link.config is ar2.config)
+    assert (ds_link._cfg_bound is True)
+    # id is None again, since this repository is an annex but there was no
+    # Dataset.create() called yet.
+    assert (ds_link.id is None)
 
-        os.unlink(symlink)
-        os.symlink(repo3, symlink)
+    os.unlink(symlink)
+    os.symlink(repo3, symlink)
 
-        assert (ds_link.repo is ar3)  # same Repo instance
-        assert (ds_link.config is ar3.config)
-        assert (ds_link._cfg_bound is True)
-        # id is None again, since this repository is an annex but there was no
-        # Dataset.create() called yet.
-        assert (ds_link.id is None)
+    assert (ds_link.repo is ar3)  # same Repo instance
+    assert (ds_link.config is ar3.config)
+    assert (ds_link._cfg_bound is True)
+    # id is None again, since this repository is an annex but there was no
+    # Dataset.create() called yet.
+    assert (ds_link.id is None)
 
-        os.unlink(symlink)
-        os.symlink(non_repo, symlink)
+    os.unlink(symlink)
+    os.symlink(non_repo, symlink)
 
-        assert (ds_link.repo is None)
-        assert (ds_link.config is not ar3.config)
-        assert (ds_link._cfg_bound is False)
-        assert (ds_link.id is None)
+    assert (ds_link.repo is None)
+    assert (ds_link.config is not ar3.config)
+    assert (ds_link._cfg_bound is False)
+    assert (ds_link.id is None)
