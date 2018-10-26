@@ -241,6 +241,7 @@ audio.music-channels
 audio.music-sample_rate
 audio.name
 audio.tracknumber
+datalad_core.annex_key
 datalad_core.id
 datalad_core.refcommit
 id
