@@ -102,7 +102,9 @@ class MetadataExtractor(BaseMetadataExtractor):
         # Availability information
         for file, whereis in self.ds.repo.whereis(
                 self.paths if self.paths and valid_paths is None else '.',
-                output='full').items():
+                output='full',
+                add_key=True
+            ).items():
             if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
@@ -119,6 +121,12 @@ class MetadataExtractor(BaseMetadataExtractor):
                     # "web" remote
                     if remote == "00000000-0000-0000-0000-000000000001" and
                     whereis[remote].get('urls', None)}
+            # Also record its key.  Since we used `add_key` above, key
+            # should be present in a record for each remote, so we will take
+            # just first one.  `add_key` was added to avoid separate call to
+            # get_file_key which would need to be ran separately
+            if whereis:
+                meta['annex-key'] = list(whereis.values())[0]['key']
             yield (file, meta)
         log_progress(
             lgr.info,

@@ -54,6 +54,13 @@ def check_api(no_annex, path):
         # precious file
         if extractor_ep.name == 'datalad_core':
             assert 'file.dat' in cm
+            if not no_annex:
+                # verify correct key, which is the same for all files of 0 size
+                assert_equal(
+                    cm['file.dat']['annex-key'],
+                    'MD5E-s0--d41d8cd98f00b204e9800998ecf8427e.dat')
+            else:
+                assert 'annex-key' not in cm['file.dat']
         processed_extractors.append(extractor_ep.name)
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"

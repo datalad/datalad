@@ -2295,7 +2295,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             assert j.get('success', True)
 
     # TODO: a dedicated unit-test
-    def _whereis_json_to_dict(self, j):
+    def _whereis_json_to_dict(self, j, add_key=False):
         """Convert json record returned by annex whereis --json to our dict representation for it
         """
         assert (j.get('success', True) is True)
@@ -2304,6 +2304,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                                     for x in ('description', 'here', 'urls')
                                     }
                    for remote in j.get('whereis')}
+        key = j.get('key', None)
+        if add_key and key:
+            for r in remotes.values():
+                r['key'] = key
         if self.WEB_UUID in remotes:
             assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
@@ -2483,7 +2487,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def whereis(self, files, output='uuids', key=False, options=None, batch=False):
+    def whereis(self, files, output='uuids', key=False, options=None,
+                batch=False, add_key=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -2496,6 +2501,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             is returned as returned by annex
         key: bool, optional
             Either provided files are actually annex keys
+        add_key: bool, optional
+            Add annex key for the file to the returned record for each remote.
+            This is a workaround for the fact that even in "full" mode annex key
+            is not returned as output mapping maps from file names (if `key=False`)
+            and would require an additional (unnecessary) call to figure it out
         options: list, optional
             Options to pass into git-annex call
 
@@ -2548,7 +2558,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # same so we could just reuse them instead of brewing copies
             return {
                 j['key' if (key or '--all' in options) else 'file']
-                : self._whereis_json_to_dict(j)
+                : self._whereis_json_to_dict(j, add_key=add_key)
                 for j in json_objects
                 if not j.get('key').endswith('.this-is-a-test-key')
             }
