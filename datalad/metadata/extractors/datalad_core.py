@@ -126,7 +126,7 @@ class MetadataExtractor(BaseMetadataExtractor):
             # just first one.  `add_key` was added to avoid separate call to
             # get_file_key which would need to be ran separately
             if whereis:
-                meta['annex-key'] = list(whereis.values())[0]['key']
+                meta['annex_key'] = list(whereis.values())[0]['key']
             yield (file, meta)
         log_progress(
             lgr.info,
