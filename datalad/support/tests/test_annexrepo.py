@@ -246,15 +246,16 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
 
     # test-annex.dat should return the correct key:
-    eq_(
-        ar.get_file_key("test-annex.dat"),
-        'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat')
+    test_annex_key = \
+        'SHA256E-s28' \
+        '--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat'
+    eq_(ar.get_file_key("test-annex.dat"), test_annex_key)
 
     # and should take a list with an empty string as result, if a file wasn't
     # in annex:
     eq_(
         ar.get_file_key(["filenotpresent.wtf", "test-annex.dat"]),
-        ['', 'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat']
+        ['', test_annex_key]
     )
 
     # test.dat is actually in git
@@ -265,6 +266,12 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+    # if we force batch mode, no failure for not present or not annexed files
+    eq_(ar.get_file_key("filenotpresent.wtf", batch=True), '')
+    eq_(ar.get_file_key("test.dat", batch=True), '')
+    eq_(ar.get_file_key("test-annex.dat", batch=True), test_annex_key)
+
 
 
 @with_tempfile(mkdir=True)
