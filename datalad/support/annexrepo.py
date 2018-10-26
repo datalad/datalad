@@ -86,6 +86,7 @@ from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
 from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
+from .exceptions import InvalidAnnexRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -236,6 +237,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # Check whether an annex already exists at destination
         # XXX this doesn't work for a submodule!
+
+        # NOTE/TODO: following should be cheaper. We are in __init__ here and
+        # already know that GitRepo.is_valid_repo is True, since super.__init__
+        # was called. Calling AnnexRepo.is_valid will unnecessarily check that
+        # again:
         if not AnnexRepo.is_valid_repo(self.path):
             # so either it is not annex at all or just was not yet initialized
             if self.is_with_annex():
@@ -248,7 +254,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.debug('Initializing annex repository at %s...' % self.path)
                 self._init(version=version, description=description)
             else:
-                raise RuntimeError("No annex found at %s." % self.path)
+                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
 
         self._direct_mode = None  # we don't know yet
 

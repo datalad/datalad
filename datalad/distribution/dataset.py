@@ -34,6 +34,7 @@ from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.repo import Flyweight
 from datalad.support.network import RI
+from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
@@ -224,7 +225,8 @@ class Dataset(object):
                     lgr.log(5, "Detected %s at %s", cls, self._path)
                     self._repo = cls(self._path, create=False, **kw)
                     break
-                except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                except (InvalidGitRepositoryError, NoSuchPathError,
+                        InvalidAnnexRepositoryError) as exc:
                     lgr.log(5,
                             "Oops -- guess on repo type was wrong?: %s",
                             exc_str(exc))
