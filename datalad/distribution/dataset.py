@@ -188,22 +188,31 @@ class Dataset(object):
     @property
     def repo(self):
         """Get an instance of the version control system/repo for this dataset,
-        or None if there is none yet.
+        or None if there is none yet (or none anymore).
 
-        If creating an instance of GitRepo is guaranteed to be really cheap
-        this could also serve as a test whether a repo is present.
+        If testing the validity of an instance of GitRepo is guaranteed to be
+        really cheap this could also serve as a test whether a repo is present.
 
         Returns
         -------
-        GitRepo
+        GitRepo or AnnexRepo
         """
 
         # Note: lazy loading was disabled, since this is provided by the
         # flyweight pattern already and a possible invalidation of an existing
         # instance has to be done therein.
         # TODO: Still this is somewhat problematic. We can't invalidate strong
-        # references
+        #
+        # TODO: However, the costly part here is is_valid_repo. We might be able
+        # to figure a cheaper way to detect relevant change.
 
+        # Note: Although it looks like the "self._repo = None" assignments
+        # within the following block could be done right before this block once,
+        # that's a big difference! The *Repo instances are flyweights, not
+        # singletons. self._repo might be the last reference, which would lead
+        # to those objects being destroyed and therefore the constructor call
+        # would result in an actually new instance. This is unnecessarily
+        # costly.
         for cls, ckw, kw in (
                 # TODO: Do we really want to allow_noninitialized=True here?
                 # And if so, leave a proper comment!
@@ -240,10 +249,10 @@ class Dataset(object):
         from the same original dataset repository).
 
         Note, that a plain git/git-annex repository doesn't necessarily have
-        a dataset id yet. It is create by `Dataset.create()` and stored in
+        a dataset id yet. It is created by `Dataset.create()` and stored in
         .datalad/config. If None is returned while there is a valid repository,
-        there may have never been a call to `create` in the history of commit
-        HEAD.
+        there may have never been a call to `create` in this branch before
+        current commit.
 
         Returns
         -------
