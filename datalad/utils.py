@@ -1272,7 +1272,16 @@ def getpwd():
     if _pwd_mode == 'cwd':
         return os.getcwd()
     elif _pwd_mode == 'PWD':
-        cwd = os.getcwd()
+        try:
+            cwd = os.getcwd()
+        except OSError as exc:
+            if "o such file" in str(exc):
+                # directory was removed but we promised to be robust and
+                # still report the path we might know since we are still in PWD
+                # mode
+                cwd = None
+            else:
+                raise
         try:
             pwd = os.environ['PWD']
             pwd_real = op.realpath(pwd)
@@ -1284,7 +1293,7 @@ def getpwd():
             # $> python -c 'import os; os.chdir("/tmp"); from datalad.utils import getpwd; print(getpwd(), os.getcwd())'
             # ('/home/yoh/.tmp/tmp', '/tmp')
             # but I guess that should not be too harmful
-            if pwd_real != cwd:
+            if cwd is not None and pwd_real != cwd:
                 _switch_to_getcwd(
                     "realpath of PWD=%s is %s whenever os.getcwd()=%s",
                     pwd, pwd_real, cwd
