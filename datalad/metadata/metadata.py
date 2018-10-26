@@ -517,7 +517,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 'Failed %s metadata extraction from %s', mtype_key, ds,
             )
             raise ValueError(
-                'Enable metadata extractor %s is not available in this installation',
+                'Enabled metadata extractor %s is not available in this installation',
                 mtype_key)
         try:
             extractor_cls = extractors[mtype_key].load()
