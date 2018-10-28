@@ -194,6 +194,10 @@ class Dataset(object):
         If testing the validity of an instance of GitRepo is guaranteed to be
         really cheap this could also serve as a test whether a repo is present.
 
+        Note, that this property is evaluated every time it is used. If used
+        multiple times within a function it's probably a good idea to store its
+        value in a local variable and use this variable instead.
+
         Returns
         -------
         GitRepo or AnnexRepo
@@ -283,6 +287,10 @@ class Dataset(object):
         there may have never been a call to `create` in this branch before
         current commit.
 
+        Note, that this property is evaluated every time it is used. If used
+        multiple times within a function it's probably a good idea to store its
+        value in a local variable and use this variable instead.
+
         Returns
         -------
         str
@@ -294,6 +302,10 @@ class Dataset(object):
     @property
     def config(self):
         """Get an instance of the parser for the persistent dataset configuration.
+
+        Note, that this property is evaluated every time it is used. If used
+        multiple times within a function it's probably a good idea to store its
+        value in a local variable and use this variable instead.
 
         Returns
         -------
