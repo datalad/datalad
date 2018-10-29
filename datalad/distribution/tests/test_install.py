@@ -921,7 +921,14 @@ def check_datasets_datalad_org(suffix, tdir):
     # smart HTTP backend for apache2 etc
     ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
     eq_(ds.config.get('remote.origin.annex-ignore', None), None)
-    assert_status('ok', ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')))
+    # assert_result_count and not just assert_status since for some reason on
+    # Windows we get two records due to a duplicate attempt (as res[1]) to get it
+    # again, which is reported as "notneeded".  For the purpose of this test
+    # it doesn't make a difference.
+    assert_result_count(
+        ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
+        1,
+        status='ok')
     assert_status('ok', ds.remove())
 
 
