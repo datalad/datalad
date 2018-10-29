@@ -1066,7 +1066,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         # record previous state of PWD handling
         utils_pwd_mode = utils._pwd_mode
         try:
-            func(*args, **kwargs)
+            ret = func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
@@ -1095,6 +1095,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if exc_info is not None:
             reraise(*exc_info)
+
+        return ret
 
     return newfunc
 

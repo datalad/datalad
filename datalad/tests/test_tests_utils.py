@@ -326,18 +326,21 @@ def _test_assert_Xwd_unchanged_ok_chdir(func):
     @assert_cwd_unchanged(ok_to_chdir=True)
     def do_chdir_value_error():
         func(os.pardir)
+        return "a value"
 
     with swallow_logs() as cml:
-        do_chdir_value_error()
+        eq_(do_chdir_value_error(), "a value")
         eq_(orig_cwd, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_cwd)
         eq_(orig_pwd, getpwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_pwd)
         assert_not_in("Mitigating and changing back", cml.out)
 
+
 def test_assert_Xwd_unchanged_ok_chdir():
     yield _test_assert_Xwd_unchanged_ok_chdir, os.chdir
     yield _test_assert_Xwd_unchanged_ok_chdir, chpwd
+
 
 def test_assert_cwd_unchanged_not_masking_exceptions():
     # Test that we are not masking out other "more important" exceptions
