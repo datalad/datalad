@@ -545,9 +545,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     ----------
     extra_info : dict, optional
         Additional information to dump with the json run record. Any value
-        given here will take precedence over the standard run key. Warning:
-        Callers should try to use fairly specific key names to avoid collisions
-        with future keys added by `run`.
+        given here will take precedence over the standard run key. Warning: To
+        avoid collisions with future keys added by `run`, callers should try to
+        use fairly specific key names and are encouraged to nest fields under a
+        top-level "namespace" key (e.g., the project or extension name).
     rerun_info : dict, optional
         Record from a previous run. This is used internally by `rerun`.
     rerun_outputs : list, optional
