@@ -683,19 +683,7 @@ class GitRepo(RepoInterface):
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-
-            try:
-                lgr.debug(
-                    "Initialize empty Git repository at '%s'%s",
-                    path,
-                    ' %s' % git_opts if git_opts else '')
-                self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
-                                                   mkdir=True,
-                                                   odbt=default_git_odbt,
-                                                   **git_opts)
-            except GitCommandError as e:
-                lgr.error(exc_str(e))
-                raise
+            self._repo = self._create_empty_repo(path, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -725,6 +713,21 @@ class GitRepo(RepoInterface):
             self.configure_fake_dates()
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
+
+    def _create_empty_repo(self, path, **kwargs):
+        try:
+            lgr.debug(
+                "Initialize empty Git repository at '%s'%s",
+                path,
+                ' %s' % kwargs if kwargs else '')
+            repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                                         mkdir=True,
+                                         odbt=default_git_odbt,
+                                         **kwargs)
+        except GitCommandError as e:
+            lgr.error(exc_str(e))
+            raise
+        return repo
 
     @property
     def repo(self):
