@@ -1079,6 +1079,9 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if cwd_after != cwd_before:
             chpwd(pwd_before)
+            # Above chpwd could also trigger the change of _pwd_mode, so we
+            # would need to reset it again since we know that it is all kosher
+            utils._pwd_mode = utils_pwd_mode
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
