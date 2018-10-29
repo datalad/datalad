@@ -33,6 +33,7 @@ from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
 from datalad.utils import on_windows
+from datalad.support import path as op
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -920,7 +921,7 @@ def check_datasets_datalad_org(suffix, tdir):
     # smart HTTP backend for apache2 etc
     ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
     eq_(ds.config.get('remote.origin.annex-ignore', None), None)
-    assert_status('ok', ds.get('001-anat-scout_ses-{date}/000001.dcm'))
+    assert_status('ok', ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')))
     assert_status('ok', ds.remove())
 
 
