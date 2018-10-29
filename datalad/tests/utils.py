@@ -1190,7 +1190,7 @@ def assert_status(label, results):
                 i + 1,
                 len(results),
                 label,
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_message(message, results):
@@ -1221,7 +1221,7 @@ def assert_result_count(results, n, **kwargs):
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_in_results(results, **kwargs):

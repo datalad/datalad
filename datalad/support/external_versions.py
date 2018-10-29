@@ -125,6 +125,8 @@ class ExternalVersions(object):
         'gitdb',
         'humanize',
         'iso8601',
+        'keyring',
+        'keyrings.alt',
         'msgpack',
         'mutagen',
         'patool',

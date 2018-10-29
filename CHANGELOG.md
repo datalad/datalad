@@ -9,13 +9,89 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.10.4 (??? ??, 2018) -- Soon-to-be-perfect
+
+## 0.11.1 (??? ??, 2018) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
+
+[git-annex] 6.20180913 (or later) is now required - provides a number of
+fixes for v6 mode operations etc.
 
 ### Major refactoring and deprecations
 
 - `datalad.consts.LOCAL_CENTRAL_PATH` constant was deprecated in favor
   of `datalad.locations.default-dataset` [configuration] variable
-  (#2835)
+  ([#2835])
+
+### Minor refactoring
+
+- `"notneeded"` messages are no longer reported by default results
+  renderer
+- [run] no longer shows commit instructions upon command failure when
+  `explicit` is true and no outputs are specified ([#2922])
+- `get_git_dir` moved into GitRepo ([#2886])
+- `_gitpy_custom_call` removed from GitRepo ([#2894])
+- `GitRepo.get_merge_base` argument is now called `commitishes` instead
+  of `treeishes` ([#2903])
+
+### Fixes
+
+- [update] should not leave the dataset in non-clean state ([#2858])
+  and some other enhancements ([#2859])
+- Fixed chunking of the long command lines to account for decorators
+  and other arguments ([#2864])
+- Progress bar should not crash the process on some missing progress
+  information ([#2891])
+- Default value for `jobs` set to be `"auto"` (not `None`) to take
+  advantage of possible parallel get if in `-g` mode ([#2861])
+- [wtf] must not crash if `git-annex` is not installed etc ([#2865]),
+  ([#2865]), ([#2918]), ([#2917])
+- Fixed paths (with spaces etc) handling while reporting annex error
+  output ([#2892]), ([#2893])
+- `__del__` should not access `.repo` but `._repo` to avoid attempts
+  for reinstantiation etc ([#2901])
+- Fix up submodule `.git` right in `GitRepo.add_submodule` to avoid
+  added submodules being non git-annex friendly ([#2909]), ([#2904])
+- [run-procedure] ([#2905])
+  - now will provide dataset into the procedure if called within dataset
+  - will not crash if procedure is an executable without `.py` or `.sh`
+    suffixes
+- Use centralized `.gitattributes` handling while setting annex backend
+  ([#2912])
+- `GlobbedPaths.expand(..., full=True)` incorrectly returned relative
+   paths when called more than once ([#2921])
+
+### Enhancements and new features
+
+- Report progress on [clone] when installing from "smart" git servers
+  ([#2876])
+- Stale/unused `sth_like_file_has_content` was removed ([#2860])
+- Enhancements to [search] to operate on "improved" metadata layouts
+  ([#2878])
+- Output of `git annex init` operation is now logged ([#2881])
+- New
+  - `GitRepo.cherry_pick` ([#2900])
+  - `GitRepo.format_commit` ([#2902])
+- [run-procedure] ([#2905])
+  - procedures can now recursively be discovered in subdatasets as well.
+    The uppermost has highest priority
+  - Procedures in user and system locations now take precedence over
+    those in datasets.
 
 ## 0.10.3.1 (Sep 13, 2018) -- Nothing-is-perfect
 
@@ -844,3 +920,27 @@ publishing
 [#2796]: https://github.com/datalad/datalad/issues/2796
 [#2798]: https://github.com/datalad/datalad/issues/2798
 [#2815]: https://github.com/datalad/datalad/issues/2815
+[#2835]: https://github.com/datalad/datalad/issues/2835
+[#2858]: https://github.com/datalad/datalad/issues/2858
+[#2859]: https://github.com/datalad/datalad/issues/2859
+[#2860]: https://github.com/datalad/datalad/issues/2860
+[#2861]: https://github.com/datalad/datalad/issues/2861
+[#2864]: https://github.com/datalad/datalad/issues/2864
+[#2865]: https://github.com/datalad/datalad/issues/2865
+[#2876]: https://github.com/datalad/datalad/issues/2876
+[#2878]: https://github.com/datalad/datalad/issues/2878
+[#2881]: https://github.com/datalad/datalad/issues/2881
+[#2886]: https://github.com/datalad/datalad/issues/2886
+[#2891]: https://github.com/datalad/datalad/issues/2891
+[#2893]: https://github.com/datalad/datalad/issues/2893
+[#2894]: https://github.com/datalad/datalad/issues/2894
+[#2900]: https://github.com/datalad/datalad/issues/2900
+[#2901]: https://github.com/datalad/datalad/issues/2901
+[#2902]: https://github.com/datalad/datalad/issues/2902
+[#2903]: https://github.com/datalad/datalad/issues/2903
+[#2904]: https://github.com/datalad/datalad/issues/2904
+[#2905]: https://github.com/datalad/datalad/issues/2905
+[#2912]: https://github.com/datalad/datalad/issues/2912
+[#2917]: https://github.com/datalad/datalad/issues/2917
+[#2921]: https://github.com/datalad/datalad/issues/2921
+[#2922]: https://github.com/datalad/datalad/issues/2922

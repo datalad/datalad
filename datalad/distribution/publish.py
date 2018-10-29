@@ -584,7 +584,7 @@ class Publish(Interface):
     .. note::
       Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
       to publish a dataset. Publication targets are either configured remote
-      Git repositories, or git-annex special remotes (if their support data
+      Git repositories, or git-annex special remotes (if they support data
       upload).
     """
     # XXX prevent common args from being added to the docstring

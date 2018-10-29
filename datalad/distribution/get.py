@@ -40,7 +40,10 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    _fixup_submodule_dotgit_setup,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
@@ -61,7 +64,6 @@ from .dataset import datasetmethod
 from .clone import Clone
 from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
-from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
 

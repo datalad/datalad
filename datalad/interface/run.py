@@ -339,9 +339,12 @@ class GlobbedPaths(object):
         else:
             paths = self._paths["expanded"]
 
-        if full and "expanded_full" not in self._paths:
-            paths = [opj(self.pwd, p) for p in paths]
-            self._paths["expanded_full"] = paths
+        if full:
+            if refresh or "expanded_full" not in self._paths:
+                paths = [opj(self.pwd, p) for p in paths]
+                self._paths["expanded_full"] = paths
+            else:
+                paths = self._paths["expanded_full"]
 
         return maybe_dot + paths
 
@@ -498,6 +501,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                           expand=expand in ["inputs", "both"])
 
     if inputs:
+        lgr.info('Making sure inputs are available (this may take some time)')
         for res in _install_and_reglob(ds, inputs):
             yield res
         for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
@@ -622,17 +626,18 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         '"{}"'.format(record_id) if use_sidecar else record)
     msg = assure_bytes(msg)
 
+    outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
-        msg_path = opj(relpath(ds.repo.repo.git_dir), "COMMIT_EDITMSG")
-        with open(msg_path, "wb") as ofh:
-            ofh.write(msg)
-        lgr.info("The command had a non-zero exit code. "
-                 "If this is expected, you can save the changes with "
-                 "'datalad save -r -F %s .'",
-                 msg_path)
-        raise exc
-    else:
-        outputs_to_save = outputs.expand(full=True) if explicit else '.'
         if outputs_to_save:
-            for r in ds.add(outputs_to_save, recursive=True, message=msg):
-                yield r
+            msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
+                                   "COMMIT_EDITMSG"))
+            with open(msg_path, "wb") as ofh:
+                ofh.write(msg)
+            lgr.info("The command had a non-zero exit code. "
+                     "If this is expected, you can save the changes with "
+                     "'datalad save -r -F %s .'",
+                     msg_path)
+        raise exc
+    elif outputs_to_save:
+        for r in ds.add(outputs_to_save, recursive=True, message=msg):
+            yield r

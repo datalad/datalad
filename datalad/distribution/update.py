@@ -201,6 +201,8 @@ class Update(Interface):
 
 
 def _update_repo(ds, remote, reobtain_data):
+    # Just an ugly workaround for the late bindings of ds.get below
+    from datalad.distribution.get import Get
     repo = ds.repo
 
     lgr.info("Applying updates to %s", ds)

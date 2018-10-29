@@ -2382,3 +2382,19 @@ def _test_add_under_subdir(path):
         # gr.commit('important') #
         runner(['git', 'commit', '-m', 'important'])
         ar.is_under_annex(subfile)
+
+
+# https://github.com/datalad/datalad/issues/2892
+@with_tempfile(mkdir=True)
+def test_error_reporting(path):
+    ar = AnnexRepo(path, create=True)
+    res = ar._run_annex_command_json('add', files='gl\\orious BS')
+    eq_(
+        res,
+        [{
+            'command': 'add',
+            # whole thing, despite space, properly quotes backslash
+            'file': 'gl\\orious BS',
+            'note': 'not found',
+            'success': False}]
+    )

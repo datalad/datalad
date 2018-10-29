@@ -32,11 +32,13 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.utils import assure_list
 
 # bound dataset methods
 from datalad.interface.run import Run
+from datalad.distribution.subdatasets import Subdatasets
 
 lgr = logging.getLogger('datalad.interface.run_procedures')
 
@@ -47,26 +49,92 @@ def _get_file_match(dir, name='*'):
     for target in targets:
         for m in iglob(op.join(dir, target)):
             m_bn = op.basename(m)
-            if name == '*' or m_bn == name or m_bn.startswith('{}.'.format(name)):
-                yield m
+            if name == '*':
+                report_name = m_bn[:-3] if m_bn.endswith('.py') or \
+                                           m_bn.endswith('.sh') \
+                                        else m_bn
+                yield m, report_name
+            elif m_bn == name or m_bn.startswith('{}.'.format(name)):
+                yield m, name
+
+
+def _get_proc_config(name, ds=None):
+    """get configuration of named procedure
+
+    Figures call format string and help message for a given procedure name,
+    based on dataset.
+
+    Returns
+    -------
+    tuple
+      (call format string, help string) or possibly None for either value,
+      if there's nothing configured
+    """
+    # figure what ConfigManager to ask
+    cm = cfg if ds is None else ds.config
+    v = cm.get('datalad.procedures.{}.call-format'.format(name), None)
+    h = cm.get('datalad.procedures.{}.help'.format(name), None)
+    if isinstance(v, tuple):
+        # ConfigManager might return a tuple for different reasons.
+        # The config might have been defined multiple times in the same location
+        # (within .datalad/config for example) or there are multiple values for
+        # it on different levels of git-config (system, user, repo). git-config
+        # in turn does report such things ordered from most general to most
+        # specific configuration. We do want the most specific one here, so we
+        # go with the last entry of that tuple.
+        # TODO: At this point we cannot determine whether it was actually
+        # configured to yield several values by the very same config, in which
+        # case we should actually issue a warning, since we then have no idea
+        # of a priority. But ConfigManager isn't able yet to tell us or to
+        # restrict the possibility to define multiple values to particular items
+        return v[-1], h
+    else:
+        return v, h
 
 
 def _get_procedure_implementation(name='*', ds=None):
+    """get potential procedure path and configuration
+
+    Order of consideration is user-level, system-level, dataset,
+    datalad extensions, datalad. First one found according to this order is the
+    one to be returned. Therefore local definitions/configurations take
+    precedence over ones, that come from outside (via a datalad-extension or a
+    dataset with its .datalad/config). If a dataset had precedence (as it was
+    before), the addition (or just an update) of a (sub-)dataset would otherwise
+    surprisingly cause you do execute code different from what you defined
+    within ~/.gitconfig or your local repository's .git/config.
+    So, local definitions take precedence over remote ones and more specific
+    ones over more general ones.
+
+    Returns
+    -------
+    tuple
+      path, format string, help message
+    """
+
     ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-    # 1. check dataset for procedure
-    if ds is not None and ds.is_installed():
-        # could be more than one
-        dirs = assure_list(ds.config.obtain('datalad.locations.dataset-procedures'))
-        for dir in dirs:
-            # TODO `get` dirs if necessary
-            for m in _get_file_match(op.join(ds.path, dir), name):
-                yield m
-    # 2. check system and user account for procedure
+
+    # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
         for dir in assure_list(loc):
-            for m in _get_file_match(dir, name):
-                yield m
+            for m, n in _get_file_match(dir, name):
+                yield (m,) + _get_proc_config(n)
+    # 2. check dataset for procedure
+    if ds is not None and ds.is_installed():
+        # could be more than one
+        dirs = assure_list(
+                ds.config.obtain('datalad.locations.dataset-procedures'))
+        for dir in dirs:
+            # TODO `get` dirs if necessary
+            for m, n in _get_file_match(op.join(ds.path, dir), name):
+                yield (m,) + _get_proc_config(n, ds=ds)
+        # 2.1. check subdatasets recursively
+        for subds in ds.subdatasets(return_type='generator',
+                                    result_xfm='datasets'):
+            for m, f, h in _get_procedure_implementation(name=name, ds=subds):
+                yield m, f, h
+
     # 3. check extensions for procedure
     # delay heavy import until here
     from pkg_resources import iter_entry_points
@@ -75,29 +143,57 @@ def _get_procedure_implementation(name='*', ds=None):
     for entry_point in iter_entry_points('datalad.extensions'):
         # use of '/' here is OK wrt to platform compatibility
         if resource_isdir(entry_point.module_name, 'resources/procedures'):
-            for m in _get_file_match(
+            for m, n in _get_file_match(
                     resource_filename(
                         entry_point.module_name,
                         'resources/procedures'),
                     name):
-                yield m
+                yield (m,) + _get_proc_config(n)
     # 4. at last check datalad itself for procedure
-    for m in _get_file_match(
+    for m, n in _get_file_match(
             resource_filename('datalad', 'resources/procedures'),
             name):
-        yield m
+        yield (m,) + _get_proc_config(n)
 
 
 def _guess_exec(script_file):
+
+    state = None
+    try:
+        is_exec = os.stat(script_file).st_mode & stat.S_IEXEC
+    except OSError as e:
+        from errno import ENOENT
+        if e.errno == ENOENT:
+            # path does not exist or is a broken symlink
+            state = 'absent'
+            if op.islink(script_file):
+                # broken symlink;
+                # we can't figure whether it's executable:
+                is_exec = False
+                # apart from that proceed, since we can still tell in case of
+                # .py or .sh
+            else:
+                # does not exist; there's nothing to detect at all
+                return {'type': None, 'template': None, 'state': None}
+        else:
+            from six import reraise
+            reraise(e)
+
     # TODO check for exec permission and rely on interpreter
-    if os.stat(script_file).st_mode & stat.S_IEXEC:
-        return ('executable', u'"{script}" "{ds}" {args}')
+    if is_exec:
+        return {'type': u'executable',
+                'template': u'"{script}" "{ds}" {args}',
+                'state': state}
     elif script_file.endswith('.sh'):
-        return (u'bash_script', u'bash "{script}" "{ds}" {args}')
+        return {'type': u'bash_script',
+                'template': u'bash "{script}" "{ds}" {args}',
+                'state': state}
     elif script_file.endswith('.py'):
-        return (u'python_script', u'python "{script}" "{ds}" {args}')
+        return {'type': u'python_script',
+                'template': u'python "{script}" "{ds}" {args}',
+                'state': state}
     else:
-        return None
+        return {'type': None, 'template': None, 'state': None}
 
 
 @build_doc
@@ -114,21 +210,29 @@ class RunProcedure(Interface):
 
     Implementations of some procedures are shipped together with DataLad,
     but additional procedures can be provided by 1) any DataLad extension,
-    2) any dataset, 3) a local user, or 4) a local system administrator.
+    2) any (sub-)dataset, 3) a local user, or 4) a local system administrator.
     DataLad will look for procedures in the following locations and order:
 
     Directories identified by the configuration settings
 
-    - 'datalad.locations.dataset-procedures'
     - 'datalad.locations.user-procedures' (determined by
       appdirs.user_config_dir; defaults to '$HOME/.config/datalad/procedures'
       on GNU/Linux systems)
     - 'datalad.locations.system-procedures' (determined by
       appdirs.site_config_dir; defaults to '/etc/xdg/datalad/procedures' on
       GNU/Linux systems)
+    - 'datalad.locations.dataset-procedures'
 
     and subsequently in the 'resources/procedures/' directories of any
     installed extension, and, lastly, of the DataLad installation itself.
+
+    Please note that a dataset that defines
+    'datalad.locations.dataset-procedures' provides its procedures to
+    any dataset it is a subdataset of. That way you can have a collection of
+    such procedures in a dedicated dataset and install it as a subdataset into
+    any dataset you want to use those procedures with. In case of a naming
+    conflict with such a dataset hierarchy, the dataset you're calling
+    run-procedures on will take precedence over its subdatasets and so on.
 
     Each configuration setting can occur multiple times to indicate multiple
     directories to be searched. If a procedure matching a given name is found
@@ -151,6 +255,25 @@ class RunProcedure(Interface):
     of taking at least one positional argument (the absolute path to the
     dataset they shall operate on).
 
+    For further customization there are two configuration settings per procedure
+    available:
+
+    - 'datalad.procedures.<NAME>.call-format'
+      fully customizable format string to determine how to execute procedure
+      NAME (see also datalad-run).
+      It currently requires to include the following placeholders:
+
+      - '{script}': will be replaced by the path to the procedure
+      - '{ds}': will be replaced by the absolute path to the dataset the
+        procedure shall operate on
+      - '{args}': (not actually required) will be replaced by
+        [CMD: all additional arguments passed into run-procedure after NAME CMD]
+        [PY: all but the first element of `spec` if `spec` is a list or tuple PY]
+        As an example the default format string for a call to a python script is:
+        "python {script} {ds} {args}"
+    - 'datalad.procedures.<NAME>.help'
+      will be shown on `datalad run-procedure --help-proc NAME` to provide a
+      description and/or usage info for procedure NAME
 
     *Customize other commands with procedures*
 
@@ -178,7 +301,9 @@ class RunProcedure(Interface):
             metavar='NAME [ARGS]',
             nargs=REMAINDER,
             doc="""Name and possibly additional arguments of the
-            to-be-executed procedure."""),
+            to-be-executed procedure. [CMD: Note, that all options to
+            run-procedure need to be put before NAME, since all ARGS get
+            assigned to NAME CMD]"""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar="PATH",
@@ -192,6 +317,12 @@ class RunProcedure(Interface):
             doc="""if given, all configured paths are searched for procedures
             and one result record per discovered procedure is yielded, but
             no procedure is executed"""),
+        help_proc=Parameter(
+            args=('--help-proc',),
+            action='store_true',
+            doc="""if given, get a help message for procedure NAME from config
+            setting datalad.procedures.NAME.help"""
+        )
     )
 
     @staticmethod
@@ -200,20 +331,36 @@ class RunProcedure(Interface):
     def __call__(
             spec=None,
             dataset=None,
-            discover=False):
+            discover=False,
+            help_proc=False):
         if not spec and not discover:
             raise InsufficientArgumentsError('requires at least a procedure name')
+        if help_proc and not spec:
+            raise InsufficientArgumentsError('requires a procedure name')
 
-        ds = require_dataset(
-            dataset, check_installed=False,
-            purpose='run a procedure') if dataset else None
+        try:
+            ds = require_dataset(
+                dataset, check_installed=False,
+                purpose='run a procedure')
+        except NoDatasetArgumentFound:
+            ds = None
 
         if discover:
             reported = set()
-            for m in _get_procedure_implementation('*', ds=ds):
+            for m, cmd_tmpl, cmd_help in _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
-                cmd_type, cmd_tmpl = _guess_exec(m)
+                ex = _guess_exec(m)
+                # configured template (call-format string) takes precedence:
+                if cmd_tmpl:
+                    ex['template'] = cmd_tmpl
+                if ex['type'] is None and ex['template'] is None:
+                    # doesn't seem like a match
+                    lgr.debug("Neither type nor execution template found for "
+                              "%s. Ignored.", m)
+                    continue
+                message = ex['type'] if ex['type'] else 'unknown type'
+                message += ' (missing)' if ex['state'] == 'absent' else ''
                 res = get_status_dict(
                     action='run_procedure',
                     path=m,
@@ -221,9 +368,10 @@ class RunProcedure(Interface):
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
-                    procedure_type=cmd_type,
-                    procedure_callfmt=cmd_tmpl,
-                    message=cmd_type)
+                    state=ex['state'],
+                    procedure_type=ex['type'],
+                    procedure_callfmt=ex['template'],
+                    message=message)
                 reported.add(m)
                 yield res
             return
@@ -237,17 +385,60 @@ class RunProcedure(Interface):
 
         try:
             # get the first match an run with it
-            procedure_file = next(_get_procedure_implementation(name, ds=ds))
+            procedure_file, cmd_tmpl, cmd_help = \
+                next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
-            # TODO error result
-            raise ValueError("Cannot find procedure with name '%s'", name)
+            res = get_status_dict(
+                    action='run_procedure',
+                    # TODO: Default renderer requires a key "path" to exist.
+                    # Doesn't make a lot of sense in this case
+                    path=name,
+                    logger=lgr,
+                    refds=ds.path if ds else None,
+                    status='impossible',
+                    message="Cannot find procedure with name '%s'" % name)
+            yield res
+            return
 
-        cmd_type, cmd_tmpl = _guess_exec(procedure_file)
-        if cmd_tmpl is None:
-            raise ValueError(
-                "No idea how to execute procedure %s. Missing 'execute' permissions?",
-                procedure_file)
-        cmd = cmd_tmpl.format(
+        ex = _guess_exec(procedure_file)
+        # configured template (call-format string) takes precedence:
+        if cmd_tmpl:
+            ex['template'] = cmd_tmpl
+
+        if help_proc:
+            if cmd_help:
+                res = get_status_dict(
+                        action='procedure_help',
+                        path=procedure_file,
+                        type='file',
+                        logger=lgr,
+                        refds=ds.path if ds else None,
+                        status='ok',
+                        state=ex['state'],
+                        procedure_type=ex['type'],
+                        procedure_callfmt=ex['template'],
+                        message=cmd_help)
+            else:
+                res = get_status_dict(
+                        action='procedure_help',
+                        path=procedure_file,
+                        type='file',
+                        logger=lgr,
+                        refds=ds.path if ds else None,
+                        status='impossible',
+                        state=ex['state'],
+                        procedure_type=ex['type'],
+                        procedure_callfmt=ex['template'],
+                        message="No help available for '%s'" % name)
+
+            yield res
+            return
+
+        if not ex['template']:
+            raise ValueError("No idea how to execute procedure %s. "
+                             "Missing 'execute' permissions?" % procedure_file)
+
+        cmd = ex['template'].format(
             script=procedure_file,
             ds=ds.path if ds else '',
             args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
@@ -262,5 +453,6 @@ class RunProcedure(Interface):
                 outputs=None,
                 # pass through here
                 on_failure='ignore',
+                return_type='generator'
         ):
             yield r

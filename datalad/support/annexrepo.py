@@ -327,15 +327,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 lgr.debug("Setting annex backend to %s (persistently)", backend)
                 self.config.set('annex.backends', backend, where='local')
-                git_attributes_file = _path_(self.path, '.gitattributes')
-                git_attributes = ''
-                if exists(git_attributes_file):
-                    with open(git_attributes_file) as f:
-                        git_attributes = f.read()
-                with open(git_attributes_file, 'a') as f:
-                    if git_attributes and not git_attributes.endswith(os.linesep):
-                        f.write(os.linesep)
-                    f.write('* annex.backend=%s%s' % (backend, os.linesep))
+                git_attributes_file = '.gitattributes'
+                self.set_gitattributes(
+                    [('*', {'annex.backend': backend})],
+                    git_attributes_file)
                 self.add(git_attributes_file, git=True)
                 if commit:
                     self.commit(
@@ -1230,12 +1225,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             if old is not False:
                 self.config.set('core.bare', 'False', where='local')
 
-            out, err = super(AnnexRepo, self)._git_custom_command(*args, **kwargs)
-
-            if old is None:
-                self.config.unset('core.bare', where='local')
-            elif old:
-                self.config.set('core.bare', old, where='local')
+            try:
+                out, err = super(AnnexRepo, self)._git_custom_command(
+                    *args, **kwargs)
+            finally:
+                if old is None:
+                    self.config.unset('core.bare', where='local')
+                elif old:
+                    self.config.set('core.bare', old, where='local')
             return out, err
 
         else:
@@ -2430,9 +2427,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             # report it within JSON response:
             # see http://git-annex.branchable.com/bugs/copy_does_not_reflect_some_failed_copies_in_--json_output/
             not_existing = [
-                line.split()[1] for line in e.stderr.splitlines()
+                # cut the file path from the middle, no useful delimiter
+                # need to deal with spaces too!
+                line[11:-10] for line in e.stderr.splitlines()
                 if line.startswith('git-annex:') and
-                   line.endswith('not found')
+                line.endswith(' not found')
             ]
             if not_existing:
                 if out is None:
@@ -2445,8 +2444,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 out += linesep.join(
                     ['{{"command": "{cmd}", "file": "{path}", '
                      '"note": "{note}",'
-                     '"success":false}}'.format(
-                         cmd=command, path=f, note="not found")
+                     '"success": false}}'.format(
+                         cmd=command,
+                         # gotta quote backslashes that have taken over...
+                         # ... or the outcome is not valid JSON
+                         path=f.replace('\\', '\\\\'),
+                         note="not found")
                      for f in not_existing])
 
             # Note: insert additional code here to analyse failure and possibly
