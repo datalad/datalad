@@ -334,6 +334,23 @@ def test_getpwd_basic():
         assert_false(oschdir.called)
 
 
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tempfile(mkdir=True)
+def test_getpwd_change_mode(tdir):
+    from datalad import utils
+    if utils._pwd_mode != 'PWD':
+        raise SkipTest("Makes sense to be tested only in PWD mode, "
+                       "but we seems to be beyond that already")
+    # The evil plain chdir call
+    os.chdir(tdir)
+    # Just testing the logic of switching to cwd mode and issuing a warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        pwd = getpwd()
+        eq_(pwd, os.path.realpath(pwd))  # might have symlinks, thus realpath
+    assert_in("symlinks in the paths will be resolved", cml.out)
+    eq_(utils._pwd_mode, 'cwd')
+
+
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @assert_cwd_unchanged
