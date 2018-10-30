@@ -13,6 +13,8 @@ from __future__ import unicode_literals
 
 __docformat__ = 'restructuredtext'
 
+import os
+import stat
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -112,6 +114,7 @@ def test_read(ds):
 def test_rewrite(ds):
     in_annex = opj(ds.path, 'in-annex')
     in_git = opj(ds.path, 'in-git')
+    new_file = opj(ds.path, 'new_file')
     ok_clean_git(ds.repo, untracked=['untracked'])
 
     assert not exists(in_annex)
@@ -129,10 +132,21 @@ def test_rewrite(ds):
     ok_file_has_content(in_annex, "12")
     ok_clean_git(ds.repo, untracked=['untracked'])
 
+    # in-git change and also check that we transfer executable permission
+    os.chmod(in_git, os.stat(in_git).st_mode | stat.S_IEXEC)
+    assert os.stat(in_git).st_mode & stat.S_IEXEC
     with ds.open('in-git', 'w') as f:
         f.write("1")
+    assert os.stat(in_git).st_mode & stat.S_IEXEC
     ok_file_under_git(in_git, annexed=True) # Automigrates to annex! both with add or save
     ok_file_has_content(in_git, "1")
+    ok_clean_git(ds.repo, untracked=['untracked'])
+
+    # New file and we will test with full path
+    with ds.open(new_file, "w") as f:
+        f.write("1")
+    ok_file_under_git(new_file, annexed=True)
+    ok_file_has_content(new_file, "1")
     ok_clean_git(ds.repo, untracked=['untracked'])
 
     # TODO: test that commit messages could be passed and save=False

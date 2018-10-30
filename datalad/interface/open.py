@@ -17,7 +17,8 @@ import logging
 from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import datasetmethod
 from datalad.utils import assure_list
-
+from datalad.dochelpers import exc_str
+from datalad.support import path as op
 
 lgr = logging.getLogger('datalad.interface.open')
 
@@ -40,15 +41,16 @@ def open(
     For "w"rite and "a"ppend operations introduced changes will be datalad saved
     (see `save` and `message` arguments).  In case of "w"rite mode, we simply
     remove file without bothering unlocking it to avoid unnecessary traffic and
-    file copying (just to have it rewritten from scratch).
-    Permissions and authorship are (attempted) to be transfered to the new file
-    (TODO).
+    file copying (just to have it rewritten from scratch). We attempt to transfer
+    permissions (executable bit) and authorship to the new file if file existed
+    before to mimic original "w" (in-place modification) behavior.
 
     In "a" and "r" mode file first gets `get`'ed and then `unlock`ed in "a" mode.
 
     Notes:
+
     - unlike `io.open` this context manager can take multiple paths as input
-    - we introduced addnitional keyword parameters, so any `io.open` argument
+    - we introduced additional keyword parameters, so any `io.open` argument
       besides `mode` should be provided as the keyword argument
 
     Parameters
@@ -104,6 +106,7 @@ def open(
         def __init__(self):
             self.all_results = []
             self.files = None
+            self.stats = {}  # Files .stat records in case needed (e.g. for 'w')
 
         def __enter__(self):
             pre_open = self.pre_open()
@@ -142,7 +145,7 @@ def open(
                         'status': 'error',
                         'action': 'open',
                         'path': None,
-                        # TODO: "proper" way to channel exeption into results
+                        # TODO: "proper" way to channel exception into results
                         'exception': (exc_type, exc_val, exc_tb)
                     }
                 )
@@ -172,15 +175,62 @@ def open(
 
     class OpenRewrite(OpenBase):
         def pre_open(self):
+            self.stats = {}
             for p in resolved_paths:
-                # TODO: do we need to store/apply to the new files anything?
-                # If file is under git - the only thing we could (re)store is
-                # executable bit
-                # If file is outside of git/annex control - we might better even
-                # not remove it at all
+                if not op.lexists(p):
+                    # New file, nothing we need to do about it ATM
+                    continue
+                if op.exists(p):
+                    # TODO: If file is outside of git/annex control - may be
+                    # better not remove it at all?
+                    # Here we just store full stat record for the file whenever we
+                    # could (e.g. impossible for an annexed file which has no data
+                    # locally).  But Git ATM cares only about executable bit
+                    # git-annex would reset it anyways, but may be some additional
+                    # layer potentially cares (or will) about it
+                    try:
+                        # realpath it so we get permissions of the file symlink points to
+                        self.stats[p] = os.stat(op.realpath(p))
+                    except OSError as exc:
+                        # Nothing we could do
+                        lgr.debug("Cannot stat %s: %s", p, exc)
                 os.unlink(p)
 
         def post_close(self):
+            # Apply relevant ownership/permissions (executable bit(s)) as
+            # original files had them
+            for p, st in self.stats.items():
+                # In shared repos or other cases may be original file
+                # belonged to another user/group so any of those could fail,
+                # thus we guard and only issue a warning if setting UID or GID
+                # doesn't work out
+                try:
+                    os.chown(p, st.st_uid, -1)
+                except OSError as exc:
+                    lgr.warning(
+                        "Failed to set owner for %s to be %d: %s",
+                        p, st.st_uid, exc_str(exc))
+                try:
+                    os.chown(p, -1, st.st_gid)
+                except OSError as exc:
+                    lgr.warning(
+                        "Failed to set group for %s to be %d: %s",
+                        p, st.st_gid, exc_str(exc))
+
+                # Git can care only about executable bit. So even though
+                # git-annex ATM doesn't care about it either, we better transfer
+                # it as it and readability as it was in the original file
+                # (4-read, 1-exec)
+                mode = os.stat(p).st_mode
+                new_mode = mode | (st.st_mode & 0o555)
+                if new_mode != mode and hasattr(os, 'chmod'):
+                    try:
+                        os.chmod(p, new_mode)
+                    except OSError as exc:
+                        lgr.warning(
+                            "Failed to set permissions group for %s to be %d: %s",
+                            p, new_mode, exc_str(exc))
+
             # add would crash in case file jumps between git and annex
             # due to .gitattributes settings.
             # .save seems to be more resilient BUT! retains git/annex so
