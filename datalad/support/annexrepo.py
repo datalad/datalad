@@ -2203,7 +2203,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         -------
         A list of URLs
         """
-        return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
+        locations = self.whereis(file_, output='full', key=key, batch=batch)
+        return locations[AnnexRepo.WEB_UUID]['urls']
 
     @normalize_paths
     def drop(self, files, options=None, key=False, jobs=None):

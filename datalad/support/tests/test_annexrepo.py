@@ -1491,6 +1491,7 @@ def test_is_available(batch, direct, p):
     # remove url
     urls = annex.get_urls(fname) #, **bkw)
     assert(len(urls) == 1)
+    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
