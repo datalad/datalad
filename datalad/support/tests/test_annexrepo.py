@@ -1500,6 +1500,14 @@ def test_is_available(batch, direct, p):
 
 
 @with_tempfile(mkdir=True)
+def test_get_urls_none(path):
+    ar = AnnexRepo(path, create=True)
+    with open(opj(ar.path, "afile"), "w") as f:
+        f.write("content")
+    eq_(ar.get_urls("afile"), [])
+
+
+@with_tempfile(mkdir=True)
 def test_annex_add_no_dotfiles(path):
     ar = AnnexRepo(path, create=True)
     print(ar.path)
