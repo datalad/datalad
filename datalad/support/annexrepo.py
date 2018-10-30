@@ -2198,6 +2198,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         file_: str
         key: bool, optional
             Either provided files are actually annex keys
+
+        Returns
+        -------
+        A list of URLs
         """
         return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
 
