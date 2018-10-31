@@ -440,7 +440,7 @@ class HTTPDownloader(BaseDownloader):
         ----------
         allow_old: bool, optional
           If a Downloader allows for persistent sessions by some means -- flag
-          instructs either to use previous session, or establish a new one
+          instructs whether to use previous session, or establish a new one
 
         Returns
         -------
@@ -477,7 +477,7 @@ class HTTPDownloader(BaseDownloader):
                                headers=None):
         # TODO: possibly make chunk size adaptive
         # TODO: make it not this ugly -- but at the moment we are testing end-file size
-        # while can't know for sure if content was gunziped and either it all went ok.
+        # while can't know for sure if content was gunziped and whether it all went ok.
         # So safer option -- just request to not have it gzipped
         if headers is None:
             headers = {}

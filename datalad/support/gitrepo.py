@@ -767,7 +767,7 @@ class GitRepo(RepoInterface):
         url : str
         path : str
         expect_fail : bool
-          Either expect that command might fail, so error should be logged then
+          Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
         """
 
@@ -1137,7 +1137,7 @@ class GitRepo(RepoInterface):
         files: str
           list of paths to remove
         recursive: False
-          either to allow recursive removal from subdirectories
+          whether to allow recursive removal from subdirectories
         kwargs:
           see `__init__`
 

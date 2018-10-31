@@ -335,7 +335,7 @@ class Dataset(object):
         Parameters
         ----------
         datalad_only : bool, optional
-          Either to consider only "datalad datasets" (with non-None
+          Whether to consider only "datalad datasets" (with non-None
           id), or (if False, which is default) - any git repository
         topmost : bool, optional
           Return the topmost super-dataset. Might then be the current one.

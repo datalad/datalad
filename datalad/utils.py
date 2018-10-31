@@ -226,7 +226,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
-      Either to match directories as well as files
+      Whether to match directories as well as files
     """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
@@ -288,9 +288,9 @@ def rotree(path, ro=True, chmod_files=True):
     path : string
       Path to the tree/directory to chmod
     ro : bool, optional
-      Either to make it R/O (default) or RW
+      Whether to make it R/O (default) or RW
     chmod_files : bool, optional
-      Either to operate also on files (not just directories)
+      Whether to operate also on files (not just directories)
     """
     if ro:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
@@ -313,7 +313,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     Parameters
     ----------
     chmod_files : string or bool, optional
-       Either to make files writable also before removal.  Usually it is just
+       Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
     children_only : bool, optional
@@ -1064,7 +1064,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
                 rmtemp(out_name)
 
         def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
-            """Provide assertion on either a msg was logged at a given level
+            """Provide assertion on whether a msg was logged at a given level
 
             If neither `msg` nor `level` provided, checks if anything was logged
             at all.

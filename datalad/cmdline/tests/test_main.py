@@ -46,7 +46,7 @@ def run_main(args, exit_code=0, expect_stderr=False):
     exit_code : int
         Expected exit code. Would raise AssertionError if differs
     expect_stderr : bool or string
-        Either to expect stderr output. If string -- match
+        Whether to expect stderr output. If string -- match
 
     Returns
     -------

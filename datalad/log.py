@@ -139,7 +139,7 @@ class MemoryInfo(object):
 
 # Recipe from http://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
 # by Brandon Thomson
-# Adjusted for automagic determination either coloring is needed and
+# Adjusted for automagic determination whether coloring is needed and
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
 

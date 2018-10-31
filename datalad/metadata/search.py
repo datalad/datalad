@@ -194,7 +194,7 @@ def _search_from_virgin_install(dataset, query):
                 "searched, or run interactively to get assistance "
                 "installing a queriable superdataset."
             )
-        # none was provided so we could ask user either he possibly wants
+        # none was provided so we could ask user whether he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
         DEFAULT_DATASET_PATH = cfg.obtain('datalad.locations.default-dataset')
