@@ -158,7 +158,7 @@ class S3Downloader(BaseDownloader):
         # We are often working with urlencoded URLs so we could safely interact
         # with git-annex via its text based protocol etc.  So, if URL looks like
         # it was urlencoded the filepath, we should revert back to an original key
-        # name.  Since we did not demarkate either it was urlencoded, we will do
+        # name.  Since we did not demarcate either it was urlencoded, we will do
         # magical check, which would fail if someone had % followed by two digits
         filepath = rec.path.lstrip('/')
         if re.search('%[0-9a-fA-F]{2}', filepath):

@@ -1398,7 +1398,7 @@ def get_path_prefix(path, pwd=None):
 
 def _get_normalized_paths(path, prefix):
     if isabs(path) != isabs(prefix):
-        raise ValueError("Bot paths must either be absolute or relative. "
+        raise ValueError("Both paths must either be absolute or relative. "
                          "Got %r and %r" % (path, prefix))
     path = with_pathsep(path)
     prefix = with_pathsep(prefix)

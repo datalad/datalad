@@ -156,7 +156,7 @@ class Runner(object):
         self.protocol = protocol
         # Various options for logging
         self._log_opts = {}
-        # we don't know yet either we need ot log every output or not
+        # we don't know yet either we need to log every output or not
         if log_outputs is not None:
             self._log_opts['outputs'] = log_outputs
 
