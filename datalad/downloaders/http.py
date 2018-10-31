@@ -126,7 +126,7 @@ class HTTPBaseAuthenticator(Authenticator):
           which will be provided to the __call__ of the authenticator will be used
         failure_re : str or list of str, optional
         success_re : str or list of str, optional
-          Regular expressions to determine either login has failed or succeeded.
+          Regular expressions to determine if login has failed or succeeded.
           TODO: we might condition when it gets ran
         session_cookies : str or list of str, optional
           Session cookies to store (besides auth response cookies)
