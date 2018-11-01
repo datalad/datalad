@@ -231,6 +231,7 @@ type
 
     target_out = """\
 annex.importance
+annex.key
 audio.bitrate
 audio.duration(s)
 audio.format
