@@ -1498,11 +1498,20 @@ def test_is_available(batch, direct, p):
     # remove url
     urls = annex.get_urls(fname) #, **bkw)
     assert(len(urls) == 1)
+    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
     assert is_available(fname, remote='web') is False
+
+
+@with_tempfile(mkdir=True)
+def test_get_urls_none(path):
+    ar = AnnexRepo(path, create=True)
+    with open(opj(ar.path, "afile"), "w") as f:
+        f.write("content")
+    eq_(ar.get_urls("afile"), [])
 
 
 @with_tempfile(mkdir=True)
