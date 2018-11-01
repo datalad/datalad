@@ -365,7 +365,7 @@ def _install_and_reglob(dset, gpaths):
     Parameters
     ----------
     dset : Dataset
-    gpaths : list of GlobbedPaths objects
+    gpaths : GlobbedPaths object
 
     Returns
     -------
@@ -385,6 +385,32 @@ def _install_and_reglob(dset, gpaths):
             else:
                 yield res
         dirs, dirs_new = dirs_new, glob_dirs()
+
+
+def prepare_inputs(dset, inputs):
+    """Prepare `inputs` for running a command.
+
+    This consists of installing required subdatasets and getting the input
+    files.
+
+    Parameters
+    ----------
+    dset : Dataset
+    inputs : GlobbedPaths object
+
+    Returns
+    -------
+    Generator with the result records.
+    """
+    if inputs:
+        lgr.info('Making sure inputs are available (this may take some time)')
+        for res in _install_and_reglob(dset, inputs):
+            yield res
+        for res in dset.get(inputs.expand(full=True), on_failure="ignore"):
+            if res.get("state") == "absent":
+                lgr.warning("Input does not exist: %s", res["path"])
+            else:
+                yield res
 
 
 def _unlock_or_remove(dset, paths):
@@ -433,11 +459,12 @@ def normalize_command(command):
     return command
 
 
-def format_command(command, **kwds):
+def format_command(dset, command, **kwds):
     """Plug in placeholders in `command`.
 
     Parameters
     ----------
+    dset : Dataset
     command : str or list
 
     `kwds` is passed to the `format` call. `inputs` and `outputs` are converted
@@ -450,6 +477,11 @@ def format_command(command, **kwds):
     command = normalize_command(command)
     sfmt = SequenceFormatter()
 
+    for k, v in dset.config.items("datalad.run.substitutions"):
+        sub_key = k.replace("datalad.run.substitutions.", "")
+        if sub_key not in kwds:
+            kwds[sub_key] = v
+
     for name in ["inputs", "outputs"]:
         io_val = kwds.pop(name, None)
         if not isinstance(io_val, GlobbedPaths):
@@ -458,100 +490,16 @@ def format_command(command, **kwds):
     return sfmt.format(command, **kwds)
 
 
-# This helper function is used to add the rerun_info argument.
-def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
-                explicit=False, message=None, sidecar=None,
-                rerun_info=None, rerun_outputs=None):
-    rel_pwd = rerun_info.get('pwd') if rerun_info else None
-    if rel_pwd and dataset:
-        # recording is relative to the dataset
-        pwd = normpath(opj(dataset.path, rel_pwd))
-        rel_pwd = relpath(pwd, dataset.path)
-    else:
-        pwd, rel_pwd = get_command_pwds(dataset)
-
-    ds = require_dataset(
-        dataset, check_installed=True,
-        purpose='tracking outcomes of a command')
-
-    # not needed ATM
-    #refds_path = ds.path
-
-    # delayed imports
+def _execute_command(command, pwd, expected_exit=None):
     from datalad.cmd import Runner
 
-    lgr.debug('tracking command output underneath %s', ds)
-
-    if not rerun_info:  # Rerun already takes care of this.
-        # For explicit=True, we probably want to check whether any inputs have
-        # modifications. However, we can't just do is_dirty(..., path=inputs)
-        # because we need to consider subdatasets and untracked files.
-        if not explicit and ds.repo.dirty:
-            yield get_status_dict(
-                'run',
-                ds=ds,
-                status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
-            return
-
-    cmd = normalize_command(cmd)
-
-    inputs = GlobbedPaths(inputs, pwd=pwd,
-                          expand=expand in ["inputs", "both"])
-
-    if inputs:
-        lgr.info('Making sure inputs are available (this may take some time)')
-        for res in _install_and_reglob(ds, inputs):
-            yield res
-        for res in ds.get(inputs.expand(full=True), on_failure="ignore"):
-            if res.get("state") == "absent":
-                lgr.warning("Input does not exist: %s", res["path"])
-            else:
-                yield res
-
-    outputs = GlobbedPaths(outputs, pwd=pwd,
-                           expand=expand in ["outputs", "both"])
-
-    if outputs:
-        for res in _install_and_reglob(ds, outputs):
-            yield res
-        for res in _unlock_or_remove(ds, outputs.expand(full=True)):
-            yield res
-
-    if rerun_outputs is not None:
-        # These are files we need to unlock/remove for a rerun that aren't
-        # included in the explicit outputs. Unlike inputs/outputs, these are
-        # full paths, so we can pass them directly to unlock.
-        for res in _unlock_or_remove(ds, rerun_outputs):
-            yield res
-
-    sub_namespace = {k.replace("datalad.run.substitutions.", ""): v
-                     for k, v in ds.config.items("datalad.run.substitutions")}
-    try:
-        cmd_expanded = format_command(cmd,
-                                      pwd=pwd,
-                                      dspath=ds.path,
-                                      inputs=inputs,
-                                      outputs=outputs,
-                                      **sub_namespace)
-    except KeyError as exc:
-        yield get_status_dict(
-            'run',
-            ds=ds,
-            status='impossible',
-            message=('command has an unrecognized placeholder: %s',
-                     exc))
-        return
-
-    # we have a clean dataset, let's run things
     exc = None
     cmd_exitcode = None
     runner = Runner(cwd=pwd)
     try:
         lgr.info("== Command start (output follows) =====")
         runner.run(
-            cmd_expanded,
+            command,
             # immediate output
             log_online=True,
             # not yet sure what we should do with the command output
@@ -568,7 +516,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         exc = e
         cmd_exitcode = e.code
 
-        if rerun_info and rerun_info.get("exit", 0) != cmd_exitcode:
+        if expected_exit is not None and expected_exit != cmd_exitcode:
             # we failed in a different way during a rerun.  This can easily
             # happen if we try to alter a locked file
             #
@@ -578,14 +526,128 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             raise exc
 
     lgr.info("== Command exit (modification check follows) =====")
+    return cmd_exitcode or 0, exc
 
+
+def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
+                explicit=False, message=None, sidecar=None,
+                extra_info=None,
+                rerun_info=None, rerun_outputs=None,
+                inject=False):
+    """Run `cmd` in `dataset` and record the results.
+
+    `Run.__call__` is a simple wrapper over this function. Aside from backward
+    compatibility kludges, the only difference is that `Run.__call__` doesn't
+    expose all the parameters of this function. The unexposed parameters are
+    listed below.
+
+    Parameters
+    ----------
+    extra_info : dict, optional
+        Additional information to dump with the json run record. Any value
+        given here will take precedence over the standard run key. Warning: To
+        avoid collisions with future keys added by `run`, callers should try to
+        use fairly specific key names and are encouraged to nest fields under a
+        top-level "namespace" key (e.g., the project or extension name).
+    rerun_info : dict, optional
+        Record from a previous run. This is used internally by `rerun`.
+    rerun_outputs : list, optional
+        Outputs, in addition to those in `outputs`, determined automatically
+        from a previous run. This is used internally by `rerun`.
+    inject : bool, optional
+        Record results as if a command was run, skipping input and output
+        preparation and command execution. In this mode, the caller is
+        responsible for ensuring that the state of the working tree is
+        appropriate for recording the command's results.
+
+    Yields
+    ------
+    Result records for the run.
+    """
+    rel_pwd = rerun_info.get('pwd') if rerun_info else None
+    if rel_pwd and dataset:
+        # recording is relative to the dataset
+        pwd = normpath(opj(dataset.path, rel_pwd))
+        rel_pwd = relpath(pwd, dataset.path)
+    else:
+        pwd, rel_pwd = get_command_pwds(dataset)
+
+    ds = require_dataset(
+        dataset, check_installed=True,
+        purpose='tracking outcomes of a command')
+
+    # not needed ATM
+    #refds_path = ds.path
+
+    lgr.debug('tracking command output underneath %s', ds)
+
+    if not (rerun_info or inject):  # Rerun already takes care of this.
+        # For explicit=True, we probably want to check whether any inputs have
+        # modifications. However, we can't just do is_dirty(..., path=inputs)
+        # because we need to consider subdatasets and untracked files.
+        if not explicit and ds.repo.dirty:
+            yield get_status_dict(
+                'run',
+                ds=ds,
+                status='impossible',
+                message=('unsaved modifications present, '
+                         'cannot detect changes by command'))
+            return
+
+    cmd = normalize_command(cmd)
+
+    inputs = GlobbedPaths(inputs, pwd=pwd,
+                          expand=expand in ["inputs", "both"])
+    outputs = GlobbedPaths(outputs, pwd=pwd,
+                           expand=expand in ["outputs", "both"])
+
+    if not inject:
+        for res in prepare_inputs(ds, inputs):
+            yield res
+
+        if outputs:
+            for res in _install_and_reglob(ds, outputs):
+                yield res
+            for res in _unlock_or_remove(ds, outputs.expand(full=True)):
+                yield res
+
+        if rerun_outputs is not None:
+            # These are files we need to unlock/remove for a rerun that aren't
+            # included in the explicit outputs. Unlike inputs/outputs, these are
+            # full paths, so we can pass them directly to unlock.
+            for res in _unlock_or_remove(ds, rerun_outputs):
+                yield res
+
+        try:
+            cmd_expanded = format_command(ds, cmd,
+                                          pwd=pwd,
+                                          dspath=ds.path,
+                                          inputs=inputs,
+                                          outputs=outputs)
+        except KeyError as exc:
+            yield get_status_dict(
+                'run',
+                ds=ds,
+                status='impossible',
+                message=('command has an unrecognized placeholder: %s',
+                         exc))
+            return
+
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+    else:
+        # If an inject=True caller wants to override the exit code, they can do
+        # so in extra_info.
+        cmd_exitcode = 0
+        exc = None
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
     # - exit code of the command
     run_info = {
         'cmd': cmd,
-        'exit': cmd_exitcode if cmd_exitcode is not None else 0,
+        'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
         'outputs': outputs.paths,
@@ -595,6 +657,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         run_info['pwd'] = rel_pwd
     if ds.id:
         run_info["dsid"] = ds.id
+    if extra_info:
+        run_info.update(extra_info)
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
