@@ -1216,25 +1216,99 @@ def updated(d, update):
     return d
 
 
+_pwd_mode = None
+
+
+def _switch_to_getcwd(msg, *args):
+    global _pwd_mode
+    _pwd_mode = 'cwd'
+    lgr.warning(
+        msg + ". From now on will be returning os.getcwd(). Directory"
+               " symlinks in the paths will be resolved",
+        *args
+    )
+    # TODO:  we might want to mitigate by going through all flywheighted
+    # repos and tuning up their .paths to be resolved?
+
+
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
 
-    If no PWD found in the env, output of getcwd() is returned
+    This function will try to use PWD environment variable to provide a current
+    working directory, possibly with some directories along the path being
+    symlinks to other directories.  Unfortunately, PWD is used/set only by the
+    shell and such functions as `os.chdir` and `os.getcwd` nohow use or modify
+    it, thus `os.getcwd()` returns path with links dereferenced.
+
+    While returning current working directory based on PWD env variable we
+    verify that the directory is the same as `os.getcwd()` after resolving all
+    symlinks.  If that verification fails, we fall back to always use
+    `os.getcwd()`.
+
+    Initial decision to either use PWD env variable or os.getcwd() is done upon
+    the first call of this function.
     """
-    try:
-        pwd = os.environ['PWD']
-        if on_windows and pwd and pwd.startswith('/'):
-            # It should be a path from MSYS.
-            # - it might start with a drive letter or not
-            # - it seems to be "illegal" to have a single letter directories
-            #   under / path, i.e. if created - they aren't found
-            # - 'ln -s' does not fail to create a "symlink" but it just copies!
-            #   so we are not likely to need original PWD purpose on those systems
-            # Verdict:
-            return os.getcwd()
-        return pwd
-    except KeyError:
+    global _pwd_mode
+    if _pwd_mode is None:
+        # we need to decide!
+        try:
+            pwd = os.environ['PWD']
+            if on_windows and pwd and pwd.startswith('/'):
+                # It should be a path from MSYS.
+                # - it might start with a drive letter or not
+                # - it seems to be "illegal" to have a single letter directories
+                #   under / path, i.e. if created - they aren't found
+                # - 'ln -s' does not fail to create a "symlink" but it just
+                # copies!
+                #   so we are not likely to need original PWD purpose on
+                # those systems
+                # Verdict:
+                _pwd_mode = 'cwd'
+            else:
+                _pwd_mode = 'PWD'
+        except KeyError:
+            _pwd_mode = 'cwd'
+
+    if _pwd_mode == 'cwd':
         return os.getcwd()
+    elif _pwd_mode == 'PWD':
+        try:
+            cwd = os.getcwd()
+        except OSError as exc:
+            if "o such file" in str(exc):
+                # directory was removed but we promised to be robust and
+                # still report the path we might know since we are still in PWD
+                # mode
+                cwd = None
+            else:
+                raise
+        try:
+            pwd = os.environ['PWD']
+            pwd_real = op.realpath(pwd)
+            # This logic would fail to catch the case where chdir did happen
+            # to the directory where current PWD is pointing to, e.g.
+            # $> ls -ld $PWD
+            # lrwxrwxrwx 1 yoh yoh 5 Oct 11 13:27 /home/yoh/.tmp/tmp -> /tmp//
+            # hopa:~/.tmp/tmp
+            # $> python -c 'import os; os.chdir("/tmp"); from datalad.utils import getpwd; print(getpwd(), os.getcwd())'
+            # ('/home/yoh/.tmp/tmp', '/tmp')
+            # but I guess that should not be too harmful
+            if cwd is not None and pwd_real != cwd:
+                _switch_to_getcwd(
+                    "realpath of PWD=%s is %s whenever os.getcwd()=%s",
+                    pwd, pwd_real, cwd
+                )
+                return cwd
+            return pwd
+        except KeyError:
+            _switch_to_getcwd("PWD env variable is no longer available")
+            return cwd  # Must not happen, but may be someone
+                        # evil purges PWD from environ?
+    else:
+        raise RuntimeError(
+            "Must have not got here. "
+            "pwd_mode must be either cwd or PWD. And it is now %r" % (_pwd_mode,)
+        )
 
 
 class chpwd(object):
