@@ -59,6 +59,7 @@ from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
+from datalad.utils import parse_raw_diff
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -1493,6 +1494,76 @@ class GitRepo(RepoInterface):
         except CommandError:
             return False
         return True
+
+    def get_object(self, obj):
+        """Flexible front-end to `git show`
+
+        Capable of reporting nicely structured data on commit-like
+        objects (branches, tags, commits), trees, and blobs, addressed
+        in any way that `git show` can handle.
+
+        Example object identifiers: 'HEAD' (commit), 'master:' (tree),
+        'master:README' (blob).
+
+        Parameters
+        ----------
+        obj : str
+          A single Git object specification
+
+        Returns
+        -------
+        str, dict, list
+          Tree content as a list, commit properties as a dict, blobs
+          as strings
+        """
+        stdout, stderr = self._git_custom_command(
+            "",
+            ["git", "show", "--no-abbrev", "--format=raw", "-z", "--raw",
+             obj, '--'],
+            expect_fail=True)
+        if obj.endswith(':'):
+            # a tree object
+            return [l for l in stdout.split('\n')[1:] if l]
+        elif ':' in obj:
+            # a straight blob
+            return stdout
+        else:
+            # some kind of commit reference
+            props = {}
+            prop = None
+            for line in stdout.split('\n'):
+                if prop == 'tag':
+                    if not line.startswith('\0'):
+                        props[prop]['message'] += u'\n' + line
+                        continue
+                    line = line[1:]
+                if not len(line):
+                    continue
+                elif line.startswith(':'):
+                    props['diff'] = list(parse_raw_diff(line))
+                elif line.startswith('    '):
+                    prop = 'message'
+                    msg = props.get(prop, u'')
+                    msg += line[4:]
+                    msg += u'\n'
+                    props[prop] = msg
+                else:
+                    if not line.startswith(' '):
+                        l = line.split(' ')
+                        prop = l[0]
+                        val = line[len(prop) + 1:].rstrip('\n')
+                        if prop == 'tag':
+                            props[prop] = dict(name=val, message=u'')
+                        elif prop in ('author', 'committer'):
+                            val = val.split(' ')
+                            props[prop] = dict(zip(
+                                ('name', 'date', 'timezone'),
+                                (u' '.join(val[:-2]), val[-2], val[-1])))
+                        else:
+                            props[prop] = val
+                    else:
+                        props[prop] += u'\n' + line[1:]
+            return props
 
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)
