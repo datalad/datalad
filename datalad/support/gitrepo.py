@@ -1580,15 +1580,12 @@ class GitRepo(RepoInterface):
           None if no commit
         """
         try:
-            if branch:
-                commit = next(self.get_branch_commits(branch))
-            else:
-                commit = self.repo.head.commit
+            obj = self.get_object(branch if branch else 'HEAD')
         except Exception as exc:
             lgr.debug("Got exception while trying to get last commit: %s",
                       exc_str(exc))
             return None
-        return getattr(commit, "%s_date" % date)
+        return int(obj['author' if date == 'authored' else 'committed']['date'])
 
     def get_active_branch(self):
         try:
