@@ -130,7 +130,7 @@ class Runner(object):
         protocol: ProtocolInterface
              Protocol object to write to.
         log_outputs : bool, optional
-             Switch to instruct either outputs should be logged or not.  If not
+             Switch to instruct whether outputs should be logged or not.  If not
              set (default), config 'datalad.log.outputs' would be consulted
         """
 
@@ -156,7 +156,7 @@ class Runner(object):
         self.protocol = protocol
         # Various options for logging
         self._log_opts = {}
-        # we don't know yet either we need ot log every output or not
+        # we don't know yet whether we need to log every output or not
         if log_outputs is not None:
             self._log_opts['outputs'] = log_outputs
 
@@ -394,7 +394,7 @@ class Runner(object):
             If True, stderr is logged. Goes to sys.stderr otherwise.
 
         log_online: bool, optional
-            Either to log as output comes in.  Setting to True is preferable
+            Whether to log as output comes in.  Setting to True is preferable
             for running user-invoked actions to provide timely output
 
         expect_stderr: bool, optional

@@ -464,9 +464,9 @@ Refer datalad/config.py for information on how to add these environment variable
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
 - *DATALAD_LOG_CMD_STDIN*:
-  Either to log stdin for the command
+  Whether to log stdin for the command
 - *DATALAD_LOG_CMD_CWD*:
-  Either to log cwd where command to be executed
+  Whether to log cwd where command to be executed
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
 - *DATALAD_LOG_TARGET*

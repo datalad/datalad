@@ -200,7 +200,7 @@ definitions = {
     },
     'datalad.log.outputs': {
         'ui': ('question', {
-               'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+               'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
