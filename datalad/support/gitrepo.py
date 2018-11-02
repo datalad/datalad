@@ -1341,7 +1341,8 @@ class GitRepo(RepoInterface):
         list
             list of paths rooting in git's base dir
         """
-
+        # XXX this is `git ls-files` and implemented in
+        # -revolution as get_content_info()
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
@@ -1521,7 +1522,7 @@ class GitRepo(RepoInterface):
             ["git", "show", "--no-abbrev", "--format=raw", "-z", "--raw",
              obj, '--'],
             expect_fail=True)
-        if obj.endswith(':'):
+        if obj.endswith(':') or obj.endswith('/'):
             # a tree object
             return [l for l in stdout.split('\n')[1:] if l]
         elif ':' in obj:
@@ -1669,7 +1670,7 @@ class GitRepo(RepoInterface):
             ]
         return remotes
 
-    def get_files(self, branch=None):
+    def get_files(self, branch=None, tree=None):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -1684,14 +1685,18 @@ class GitRepo(RepoInterface):
         [str]
           list of files.
         """
-        # TODO: RF codes base and melt get_indexed_files() in
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
+        branch = 'HEAD' if branch is None else branch
+        tree = '' if tree is None else tree
+        files = []
+        for f in self.get_object('{}:{}'.format(
+                branch, tree)):
+            if f.endswith('/'):
+                files.extend(
+                    (tree + s) if tree else s for s in self.get_files(
+                        branch, '{}{}'.format(tree, f)))
+            else:
+                files.append(f)
+        return files
 
     def get_file_content(self, file_, branch='HEAD'):
         """
