@@ -1867,6 +1867,84 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 yield dict(zip(header, row_unicode))
 
 
+# diff parse helpers
+# from Git docs
+diff_state_map = {
+    'A': 'added',
+    'C': 'copied',
+    'D': 'deleted',
+    'M': 'modified',
+    'R': 'renamed',
+    'T': 'typechange',
+    'U': 'unmerged',
+    'X': 'unknown_potentialbug',
+}
+
+
+def _translate_status(label, ap):
+    if label[0] in ('C', 'R', 'M') and len(label) > 1:
+        ap['perc_similarity'] = float(label[1:])
+        label = label[0]
+    ap['state'] = diff_state_map[label]
+
+
+def _translate_type(mode, ap, prop):
+    if mode == 0:
+        ap[prop] = None
+    elif mode == stat.S_IFDIR | stat.S_IFLNK:
+        ap[prop] = 'dataset'
+    elif stat.S_ISDIR(mode):
+        # not sure if this can happen at all, at least not in the tests...
+        ap[prop] = 'directory'
+    else:
+        ap[prop] = 'file'
+
+
+def parse_raw_diff(diff):
+    """Helper to parse Git's raw diff output
+
+    as it can be obtained from `diff` or `show`.
+
+    Parameters
+    ----------
+    diff : str
+      Null-byte separated diff output.
+
+    Yields
+    ------
+    dict
+      One dict per diff item.
+    """
+    ap = None
+    for line in diff.split('\0'):
+        if not line:
+            continue
+        if line.startswith(':'):
+            # a new path
+            # yield any existing one
+            if ap:
+                yield ap
+                ap = None
+            # start new record
+            m_src, m_dst, sha_src, sha_dst, status = \
+                line[1:].split()
+            ap = dict(
+                mode_src=int(m_src, base=8),
+                mode=int(m_dst, base=8),
+                revision_src=sha_src if sha_src != '0' * 40 else None,
+                revision=sha_dst if sha_dst != '0' * 40 else None)
+            _translate_status(status, ap)
+            _translate_type(ap['mode'], ap, 'type')
+            _translate_type(ap['mode_src'], ap, 'type_src')
+        else:
+            # a filename
+            if 'path' in ap:
+                ap['path_src'] = ap['path']
+            ap['path'] = line
+    if ap:
+        yield ap
+
+
 def import_modules(modnames, pkg, msg="Failed to import {module}", log=lgr.debug):
     """Helper to import a list of modules without failing if N/A
 
