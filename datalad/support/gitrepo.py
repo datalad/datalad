@@ -1701,17 +1701,7 @@ class GitRepo(RepoInterface):
         [str]
           content of file_ as a list of lines.
         """
-        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
-
-        # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
+        return self.get_object('{}:{}'.format(branch, file_)).splitlines()
         # TODO: keep splitlines?
 
     def _get_files_history(self, files, branch='HEAD'):
