@@ -1599,13 +1599,19 @@ class AnnexRepo(GitRepo, RepoInterface):
                                        **kwargs)
 
     @normalize_paths
-    def get_file_key(self, files):
+    def get_file_key(self, files, batch=None):
         """Get key of an annexed file.
 
         Parameters
         ----------
         files: str or list
             file(s) to look up
+        batch: None or bool, optional
+            If True, `lookupkey --batch` process will be used, which would
+            not crash even if provided file is not under annex (but directly
+            under git), but rather just return an empty string. If False,
+            invokes without --batch. If None, use batch mode if more than a
+            single file is provided.
 
         Returns
         -------
@@ -1613,9 +1619,16 @@ class AnnexRepo(GitRepo, RepoInterface):
             keys used by git-annex for each of the files;
             in case of a list an empty string is returned if there was no key
             for that file
+
+        Raises
+        ------
+        FileInGitError
+             If running in non-batch mode and a file is under git, not annex
+        FileNotInAnnexError
+             If running in non-batch mode and a file is not under git at all
         """
 
-        if len(files) > 1:
+        if batch or (batch is None and len(files) > 1):
             return self._batched.get('lookupkey', path=self.path)(files)
         else:
             files = files[0]
@@ -2198,8 +2211,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         file_: str
         key: bool, optional
             Either provided files are actually annex keys
+
+        Returns
+        -------
+        A list of URLs
         """
-        return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
+        locations = self.whereis(file_, output='full', key=key, batch=batch)
+        return locations.get(AnnexRepo.WEB_UUID, {}).get('urls', [])
 
     @normalize_paths
     def drop(self, files, options=None, key=False, jobs=None):

@@ -50,6 +50,7 @@ from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
+from .. import utils
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
@@ -1062,11 +1063,14 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
+        # record previous state of PWD handling
+        utils_pwd_mode = utils._pwd_mode
         try:
-            func(*args, **kwargs)
+            ret = func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
+            utils._pwd_mode = utils_pwd_mode
             try:
                 cwd_after = os.getcwd()
             except OSError as e:
@@ -1075,6 +1079,9 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if cwd_after != cwd_before:
             chpwd(pwd_before)
+            # Above chpwd could also trigger the change of _pwd_mode, so we
+            # would need to reset it again since we know that it is all kosher
+            utils._pwd_mode = utils_pwd_mode
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
@@ -1088,6 +1095,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if exc_info is not None:
             reraise(*exc_info)
+
+        return ret
 
     return newfunc
 

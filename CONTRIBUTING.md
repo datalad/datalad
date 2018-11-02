@@ -527,7 +527,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.10.3 (??? ??, 2018) -- will be better than ever
+## 0.11.2 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

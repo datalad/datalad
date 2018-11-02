@@ -177,6 +177,14 @@ matrix:
     - TESTS_TO_PERFORM=datalad_container
     - NOSE_SELECTION_OP=
 
+  - python: 3.5
+    # test with extension datalad-container
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-revolution
+    - DATALAD_REPO_VERSION=6
+    - TESTS_TO_PERFORM=datalad_revolution
+    - NOSE_SELECTION_OP=
+
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5

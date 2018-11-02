@@ -51,7 +51,10 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import get_encoding_info, get_envvars_info
+from datalad.utils import get_encoding_info, get_envvars_info, getpwd
+
+# To analyze/initiate our decision making on what current directory to return
+getpwd()
 
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
