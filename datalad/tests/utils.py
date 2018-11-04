@@ -987,18 +987,18 @@ def known_failure_windows(func):
 
 
 @optional_args
-def skip_v6(func, method='raise'):
-    """Skips tests if datalad is configured to use v6 mode
-    (DATALAD_REPO_VERSION=6)
+def skip_v6_or_later(func, method='raise'):
+    """Skips tests if datalad is configured to use v6 mode or later
+    (e.g., DATALAD_REPO_VERSION=6)
     """
 
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
+    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
     @wraps(func)
-    @attr('skip_v6')
-    @attr('v6')
+    @attr('skip_v6_or_later')
+    @attr('v6_or_later')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc

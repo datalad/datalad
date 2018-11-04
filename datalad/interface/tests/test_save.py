@@ -41,7 +41,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
-from datalad.tests.utils import skip_v6
+from datalad.tests.utils import skip_v6_or_later
 from datalad.tests.utils import known_failure_windows
 
 
@@ -437,14 +437,14 @@ def test_gh2043p1(path):
         save('.')  #  because the first arg is the dataset
     # state of the file (unlocked/locked) is committed as well, and the
     # test doesn't lock the file again
-    skip_v6(method='pass')(ok_clean_git)(ds.path, untracked=['2', '3'])
+    skip_v6_or_later(method='pass')(ok_clean_git)(ds.path, untracked=['2', '3'])
     with chpwd(path):
         # but when a path is given, anything that matches this path
         # untracked or not is added/saved
         save(path='.')
     # state of the file (unlocked/locked) is committed as well, and the
     # test doesn't lock the file again
-    skip_v6(method='pass')(ok_clean_git)(ds.path)
+    skip_v6_or_later(method='pass')(ok_clean_git)(ds.path)
 
 
 @with_tree({
