@@ -1286,13 +1286,14 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    eq_(version, 6)
+    # Note: Since git-annex 7.20181031, v6 repos upgrade to v7.
+    assert_in(version, [6, 7])
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
         version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 6)
+        assert_in(version, [6, 7])
 
         # parameter `version` still has priority over default config:
         annex = AnnexRepo(path3, create=True, version=5)
