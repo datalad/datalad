@@ -905,7 +905,7 @@ def test_AnnexRepo_add_unexpected_direct_mode(path):
     # superproject is not.
     # There is no point in this test, if direct mode was enforced in the
     # superproject already (either by test run configuration or FS) or if the
-    # repositories are in V6 by default (where there is no direct mode)
+    # repositories are in V6+ by default (where there is no direct mode)
 
     top = AnnexRepo(path)
 
@@ -1835,7 +1835,7 @@ def _test_status(ar):
 
     def sync_wrapper(push=False, pull=False, commit=False):
         # wraps common annex-sync call, since it currently fails under
-        # mysterious circumstances in V6 adjusted branch setups
+        # mysterious circumstances in V6+ adjusted branch setups
         try:
             ar.sync(push=push, pull=pull, commit=commit)
         except CommandError as e:
@@ -1860,7 +1860,7 @@ def _test_status(ar):
                 # But it almost works - so apperently nothing to do
                 import logging
                 lgr = logging.getLogger("datalad.support.tests.test-status")
-                lgr.warning("DEBUG: v6 sync failure")
+                lgr.warning("DEBUG: v6+ sync failure")
 
     stat = {'untracked': [],
             'deleted': [],
@@ -2331,7 +2331,7 @@ def test_AnnexRepo_is_managed_branch(path):
     if ar.is_direct_mode():
         ok_(ar.is_managed_branch())
     else:
-        # ATM only direct mode and v6 adjusted branches should return True.
+        # ATM only direct mode and v6+ adjusted branches should return True.
         # Adjusted branch requires a call of git-annex-adjust and shouldn't
         # be the state of a fresh clone
         ok_(not ar.is_managed_branch())

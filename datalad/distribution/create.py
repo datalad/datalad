@@ -377,7 +377,7 @@ class Create(Interface):
 
         add_to_git.append('.datalad')
 
-        # make sure that v6 annex repos never commit content under .datalad
+        # make sure that v6+ annex repos never commit content under .datalad
         attrs_cfg = (
             ('config', 'annex.largefiles', 'nothing'),
             ('metadata/aggregate*', 'annex.largefiles', 'nothing'),

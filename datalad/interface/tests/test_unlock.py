@@ -83,7 +83,7 @@ def test_unlock(path):
         assert_result_count(res, 1)
         assert_status('notneeded', res)
 
-    # in V6 we can unlock even if the file's content isn't present:
+    # in V6+ we can unlock even if the file's content isn't present:
     elif ds.repo.supports_unlocked_pointers():
         res = ds.unlock()
         assert_result_count(res, 1)
@@ -107,7 +107,7 @@ def test_unlock(path):
         f.write("change content")
 
     ds.repo.add('test-annex.dat')
-    # in V6 we need to explicitly re-lock it:
+    # in V6+ we need to explicitly re-lock it:
     if ds.repo.supports_unlocked_pointers():
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:
@@ -135,7 +135,7 @@ def test_unlock(path):
         f.write("change content again")
 
     ds.repo.add('test-annex.dat')
-    # in V6 we need to explicitly re-lock it:
+    # in V6+ we need to explicitly re-lock it:
     if ds.repo.supports_unlocked_pointers():
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:

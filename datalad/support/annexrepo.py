@@ -414,11 +414,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         """Whether `branch` is managed by git-annex.
 
         ATM this returns true in direct mode (branch 'annex/direct/my_branch')
-        and if on an adjusted branch (annex v6 repository:
+        and if on an adjusted branch (annex v6+ repository:
         either 'adjusted/my_branch(unlocked)' or 'adjusted/my_branch(fixed)'
 
         Note: The term 'managed branch' is used to make clear it's meant to be
-        more general than the v6 'adjusted branch'.
+        more general than the v6+ 'adjusted branch'.
 
         Parameters
         ----------
@@ -715,7 +715,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if working_tree:
             # Note: annex repos don't always have a git working tree and the
-            # behaviour in direct mode or V6 repos is fundamentally different
+            # behaviour in direct mode or V6+ repos is fundamentally different
             # from that concept. There are no unstaged changes in direct mode
             # for example. Therefore the need to call this method with
             # 'working_tree=True' indicates invalid assumptions in the
@@ -1754,7 +1754,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def adjust(self, options=None):
         """enter an adjusted branch
 
-        This command is only available in a v6 git-annex repository.
+        This command is only available in a v6+ git-annex repository.
 
         Parameters
         ----------
@@ -1851,7 +1851,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # `quick_fn` is the non-annex variant.
         pointers = self.supports_unlocked_pointers()
         if pointers or self.is_direct_mode() or batch or not allow_quick:
-            # We're only concerned about modified files in V6 mode. In V5
+            # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files, and in direct
             # mode everything looks modified, so we don't even bother.
             modified = self.get_changed_files() if pointers else []
