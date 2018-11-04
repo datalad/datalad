@@ -270,7 +270,7 @@ def test_nested_create(path):
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself
     assert_status(
-        'ok' if ds.repo.config.getint("annex", "version") == 6 else 'notneeded',
+        'ok' if ds.repo.supports_unlocked_pointers() else 'notneeded',
         ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"

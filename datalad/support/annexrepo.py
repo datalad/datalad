@@ -1152,6 +1152,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
         return self.config.getbool("annex", "crippledfilesystem", False)
 
+    def supports_unlocked_pointers(self):
+        """Return True if repository version supports unlocked pointers.
+        """
+        try:
+            return self.config.getint("annex", "version") >= 6
+        except KeyError:
+            # If annex.version isn't set (e.g., an uninitialized repo), assume
+            # that unlocked pointers aren't supported.
+            return False
+
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
 
@@ -1757,10 +1767,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # just check it out? Or fail like annex itself does?
 
         # version check:
-        if not self.config.get("annex.version") == '6':
-            raise CommandNotAvailableError(cmd='git annex adjust',
-                                           msg='git-annex-adjust requires a '
-                                               'version 6 repository')
+        if not self.supports_unlocked_pointers():
+            raise CommandNotAvailableError(
+                cmd='git annex adjust',
+                msg=('git-annex-adjust requires a '
+                     'version that supports unlocked pointers'))
 
         options = options[:] if options else to_options(unlock=True)
         self._run_annex_command('adjust', annex_options=options)
@@ -1838,15 +1849,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Helper that isolates the common logic in `file_has_content` and
         # `is_under_annex`. `fn` is the annex command used to do the check, and
         # `quick_fn` is the non-annex variant.
-        is_v6 = self.config.get("annex.version") == "6"
-        if is_v6 or self.is_direct_mode() or batch or not allow_quick:
+        pointers = self.supports_unlocked_pointers()
+        if pointers or self.is_direct_mode() or batch or not allow_quick:
             # We're only concerned about modified files in V6 mode. In V5
             # `find` returns an empty string for unlocked files, and in direct
             # mode everything looks modified, so we don't even bother.
-            modified = self.get_changed_files() if is_v6 else []
+            modified = self.get_changed_files() if pointers else []
             annex_res = fn(files, normalize_paths=False, batch=batch)
             return [bool(annex_res.get(f) and
-                         not (is_v6 and normpath(f) in modified))
+                         not (pointers and normpath(f) in modified))
                     for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             return [quick_fn(f) for f in files]
