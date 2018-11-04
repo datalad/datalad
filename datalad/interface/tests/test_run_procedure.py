@@ -43,7 +43,7 @@ def test_invalid_call():
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") != 6)
 @known_failure_direct_mode  #FIXME
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -100,7 +100,7 @@ def test_basics(path, super_path):
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") != 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -200,7 +200,7 @@ def test_procedure_discovery(path, super_path):
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") != 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
