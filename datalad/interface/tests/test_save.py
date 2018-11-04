@@ -368,7 +368,7 @@ def test_symlinked_relpath(path):
         ds.repo.add(later, git=True)
         ds.save("committing", path=later)
 
-    skip_v6(method='pass')(ok_clean_git)(dspath)
+    ok_clean_git(dspath)
 
 
 # two subdatasets not possible in direct mode
