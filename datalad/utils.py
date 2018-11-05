@@ -88,12 +88,13 @@ CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
     CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
 except Exception as exc:
-    # yoh: do not know when it might/will fail but I would prefer to play
-    # safe while querying `sysconf`
+    # ATM (20181005) SC_ARG_MAX available only on POSIX systems
+    # so exception would be thrown e.g. on Windows.
+    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
     lgr.debug(
         "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
         exc)
-    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
+lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
 
 #
 # Little helpers
