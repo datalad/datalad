@@ -353,6 +353,7 @@ def test_rerun_just_one_commit(path):
     # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo.repo.git.reset("--hard")
+    ds.repo.config.reload()
 
     ds.run('echo static-content > static')
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)

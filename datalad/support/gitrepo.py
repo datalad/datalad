@@ -1689,7 +1689,8 @@ class GitRepo(RepoInterface):
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
                             check_fake_dates=False,
-                            index_file=None):
+                            index_file=None,
+                            updates_tree=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1700,7 +1701,10 @@ class GitRepo(RepoInterface):
         ----------
         files: list of files
         cmd_str: str or list
-            arbitrary command str. `files` is appended to that string.
+          arbitrary command str. `files` is appended to that string.
+        updates_tree: bool
+          whether or not command updates the working tree. If True, triggers
+          necessary reevaluations like self.config.reload()
 
         Returns
         -------
@@ -1749,6 +1753,11 @@ class GitRepo(RepoInterface):
                                      stderr=e.stderr,
                                      paths=ignored.groups()[0].splitlines())
             raise
+
+        if updates_tree:
+            lgr.debug("Reloading config due to supposed working tree update")
+            self.config.reload()
+
         return out, err
 
 # TODO: --------------------------------------------------------------------
@@ -2119,7 +2128,7 @@ class GitRepo(RepoInterface):
             cmd += options
         cmd += [str(name)]
 
-        self._git_custom_command('', cmd, expect_stderr=True)
+        self._git_custom_command('', cmd, expect_stderr=True, updates_tree=True)
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge

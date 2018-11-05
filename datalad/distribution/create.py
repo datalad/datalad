@@ -360,8 +360,13 @@ class Create(Interface):
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
+
+        # Note, that Dataset property `id` will change when we unset the
+        # respective config. Therefore store it before:
+        tbds_id = tbds.id
         if id_var in tbds.config:
-            # make sure we reset this variable completely, in case of a re-create
+            # make sure we reset this variable completely, in case of a
+            # re-create
             tbds.config.unset(id_var, where='dataset')
 
         if _seed is None:
@@ -372,7 +377,7 @@ class Create(Interface):
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
         tbds.config.add(
             id_var,
-            tbds.id if tbds.id is not None else uuid_id,
+            tbds_id if tbds_id is not None else uuid_id,
             where='dataset')
 
         add_to_git.append('.datalad')
