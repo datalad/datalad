@@ -81,7 +81,7 @@ from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
-    probe_known_failure, skip_known_failure, known_failure,
+    probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
     known_failure_direct_mode, skip_if
 )
 
@@ -913,6 +913,34 @@ def test_known_failure():
         failing()
     else:
         # not skipping and not probing results in the original failure:
+        assert_raises(AssertionError, failing)
+
+
+def test_known_failure_v6():
+
+    @known_failure_v6
+    def failing():
+        raise AssertionError("Failed")
+
+    from datalad import cfg
+
+    v6 = cfg.obtain("datalad.repo.version") == 6
+    skip = cfg.obtain("datalad.tests.knownfailures.skip")
+    probe = cfg.obtain("datalad.tests.knownfailures.probe")
+
+    if v6:
+        if skip:
+            # skipping takes precedence over probing
+            failing()
+        elif probe:
+            # if we probe a known failure it's okay to fail:
+            failing()
+        else:
+            # not skipping and not probing results in the original failure:
+            assert_raises(AssertionError, failing)
+
+    else:
+        # behaves as if it wasn't decorated at all, no matter what
         assert_raises(AssertionError, failing)
 
 
