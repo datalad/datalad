@@ -939,28 +939,32 @@ def known_failure(func):
     return newfunc
 
 
-def known_failure_v6(func):
-    """Test decorator marking a test as known to fail in a v6 test run
+def known_failure_v6_or_later(func):
+    """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
-    the original (undecorated) function is returned.
+    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
     """
 
     from datalad import cfg
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version == 6:
+    if version and version >= 6:
 
         @known_failure
         @wraps(func)
-        @attr('known_failure_v6')
-        @attr('v6')
+        @attr('known_failure_v6_or_later')
+        @attr('v6_or_later')
         def v6_func(*args, **kwargs):
             return func(*args, **kwargs)
 
         return v6_func
 
     return func
+
+
+# TODO: Remove once the released version of datalad-crawler no longer uses it.
+known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
