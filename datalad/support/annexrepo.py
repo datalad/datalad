@@ -1152,6 +1152,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.config.reload()
         return self.config.getbool("annex", "crippledfilesystem", False)
 
+    @property
     def supports_unlocked_pointers(self):
         """Return True if repository version supports unlocked pointers.
         """
@@ -1767,7 +1768,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # just check it out? Or fail like annex itself does?
 
         # version check:
-        if not self.supports_unlocked_pointers():
+        if not self.supports_unlocked_pointers:
             raise CommandNotAvailableError(
                 cmd='git annex adjust',
                 msg=('git-annex-adjust requires a '
@@ -1849,7 +1850,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Helper that isolates the common logic in `file_has_content` and
         # `is_under_annex`. `fn` is the annex command used to do the check, and
         # `quick_fn` is the non-annex variant.
-        pointers = self.supports_unlocked_pointers()
+        pointers = self.supports_unlocked_pointers
         if pointers or self.is_direct_mode() or batch or not allow_quick:
             # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files, and in direct
