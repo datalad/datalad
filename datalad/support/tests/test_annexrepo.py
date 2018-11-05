@@ -1286,7 +1286,9 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    # Note: Since git-annex 7.20181031, v6 repos upgrade to v7.
+    # TODO: Since git-annex 7.20181031, v6 repos upgrade to v7. Once that
+    # version or later is our minimum required version, update this test and
+    # the one below to eq_(version, 7).
     assert_in(version, [6, 7])
 
     # default from config item (via env var):
