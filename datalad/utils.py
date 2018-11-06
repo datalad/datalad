@@ -81,10 +81,20 @@ except:  # pragma: no cover
     linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
-# Did not find anything in Python which could tell at run time and
+# Query the system and use hardcoded "knowledge" if None
 # probably   getconf ARG_MAX   might not be available
 # The last one would be the most conservative/Windows
-CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
+try:
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+except Exception as exc:
+    # ATM (20181005) SC_ARG_MAX available only on POSIX systems
+    # so exception would be thrown e.g. on Windows.
+    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
+    lgr.debug(
+        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
+        exc)
+lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
 
 #
 # Little helpers

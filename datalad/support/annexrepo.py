@@ -2400,8 +2400,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                      - sum((len(x) + 3) for x in annex_options)
                      - 4   # for '--' below
                      - 50  # for safety since we are to add more options
-                    // (maxl + 3)  # +3 for possible quotes and a space
-                    )
+                     ) // (maxl + 3)  # +3 for possible quotes and a space
                 )
                 file_chunks = generate_chunks(files, chunk_size)
             out, err = "", ""
