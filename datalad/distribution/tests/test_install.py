@@ -391,6 +391,12 @@ def test_install_recursive(src, path_nr, path_r):
     # no unfulfilled subdatasets:
     ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
 
+    # check if we can install recursively into a dataset
+    # https://github.com/datalad/datalad/issues/2982
+    subds = ds.install('recursive-in-ds', source=src, recursive=True)
+    ok_(subds.is_installed())
+    for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
+        ok_(subsub.is_installed())
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
