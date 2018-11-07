@@ -1091,8 +1091,7 @@ class Search(Interface):
             args=("--mode",),
             choices=('egrep', 'textblob', 'autofield'),
             doc="""Mode of search index structure and content. See section
-            SEARCH MODES for details.
-            """),
+            SEARCH MODES for details."""),
         full_record=Parameter(
             args=("--full-record", '-f'),
             action='store_true',
