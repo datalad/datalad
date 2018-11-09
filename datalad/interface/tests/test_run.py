@@ -149,6 +149,13 @@ def test_sidecar(path):
     ds.run(["touch", "dummy1"], message="sidecar config")
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
+    # Don't break when config.get() returns multiple values. Here it's two
+    # values in .gitconfig, but a more realistic scenario is a value in
+    # $repo/.git/config that overrides a setting in ~/.config/git/config.
+    ds.config.add("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy2"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
+
 
 @slow  # 17.1880s
 @ignore_nose_capturing_stdout
