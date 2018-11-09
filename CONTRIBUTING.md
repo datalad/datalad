@@ -282,6 +282,8 @@ Note that the same path/venv is reused for all the PRs, so you might want
 first to check using `git show` under the `build/` directory if it corresponds
 to the commit you are interested to troubleshoot.
 
+For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
+
 ### Coverage
 
 You can also check for common programming errors with the following tools:
