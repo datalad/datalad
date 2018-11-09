@@ -141,15 +141,8 @@ def test_sidecar(path):
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    real_get = ds.config.get
-
-    def mocked_get(key, default=None):
-        if key == "datalad.run.record-sidecar":
-            return True
-        return real_get(key, default)
-
-    with patch.object(ds.config, "get", mocked_get):
-        ds.run(["touch", "dummy1"], message="sidecar config")
+    ds.config.set("datalad.run.record-sidecar", "true", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
 
