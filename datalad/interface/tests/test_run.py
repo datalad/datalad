@@ -141,6 +141,10 @@ def test_sidecar(path):
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
+    ds.config.set("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
+
     ds.config.set("datalad.run.record-sidecar", "true", where="local")
     ds.run(["touch", "dummy1"], message="sidecar config")
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))

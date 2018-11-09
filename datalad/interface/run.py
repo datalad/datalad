@@ -664,7 +664,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     use_sidecar = sidecar or (
         sidecar is None and
-        ds.config.get('datalad.run.record-sidecar', default=False))
+        ds.config.getbool('datalad.run', 'record-sidecar', default=False))
 
     if use_sidecar:
         # record ID is hash of record itself
