@@ -184,7 +184,7 @@ matrix:
     - NOSE_SELECTION_OP=
 
   - python: 3.5
-    # test with extension datalad-container
+    # test with extension datalad-revolution
     env:
     - BUILD_DATALAD_EXTENSION=datalad-revolution
     - DATALAD_REPO_VERSION=6
