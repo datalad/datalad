@@ -132,6 +132,11 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+def test_sidecar(path):
+    ds = Dataset(path).create()
     # Simple sidecar message checks.
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
