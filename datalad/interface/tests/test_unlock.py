@@ -67,7 +67,7 @@ def test_unlock_raises(path, path2, path3):
 
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
-@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
+@skip_if(cond=on_windows or os.geteuid() == 0)  # uid not available on windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 
