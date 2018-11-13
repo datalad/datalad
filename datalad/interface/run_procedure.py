@@ -35,6 +35,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.utils import assure_list
+import datalad.support.ansi_colors as ac
 
 # bound dataset methods
 from datalad.interface.run import Run
@@ -325,6 +326,8 @@ class RunProcedure(Interface):
         )
     )
 
+    result_renderer = 'tailored'
+
     @staticmethod
     @datasetmethod(name='run_procedure')
     @eval_results
@@ -363,7 +366,7 @@ class RunProcedure(Interface):
                 message = ex['type'] if ex['type'] else 'unknown type'
                 message += ' (missing)' if ex['state'] == 'absent' else ''
                 res = get_status_dict(
-                    action='run_procedure',
+                    action='discover_procedure',
                     path=m,
                     type='file',
                     logger=lgr,
@@ -388,7 +391,7 @@ class RunProcedure(Interface):
 
         try:
             # get the first match an run with it
-            procedure_file, _, cmd_tmpl, cmd_help = \
+            procedure_file, cmd_name, cmd_tmpl, cmd_help = \
                 next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
             res = get_status_dict(
@@ -418,6 +421,7 @@ class RunProcedure(Interface):
                         refds=ds.path if ds else None,
                         status='ok',
                         state=ex['state'],
+                        procedure_name=cmd_name,
                         procedure_type=ex['type'],
                         procedure_callfmt=ex['template'],
                         message=cmd_help)
@@ -430,6 +434,7 @@ class RunProcedure(Interface):
                         refds=ds.path if ds else None,
                         status='impossible',
                         state=ex['state'],
+                        procedure_name=cmd_name,
                         procedure_type=ex['type'],
                         procedure_callfmt=ex['template'],
                         message="No help available for '%s'" % name)
@@ -459,3 +464,47 @@ class RunProcedure(Interface):
                 return_type='generator'
         ):
             yield r
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.ui import ui
+        from datalad.interface.utils import default_result_renderer
+
+        if res['status'] != 'ok':
+            # logging complained about this already
+            return
+
+        if 'procedure' not in res.get('action', ''):
+            # it's not our business
+            default_result_renderer(res)
+            return
+
+        if kwargs.get('discover', None):
+            ui.message('{name} ({path}){msg}'.format(
+                name=ac.color_word(res['procedure_name'], ac.BOLD),
+                path=op.relpath(
+                    res['path'],
+                    res['refds'])
+                if res.get('refds', None) else res['path'],
+                msg=' [{}]'.format(
+                    res['message'][0] % res['message'][1:]
+                    if isinstance(res['message'], tuple) else res['message'])
+                if 'message' in res else ''
+            ))
+
+        elif kwargs.get('help_proc', None):
+            ui.message('{name} ({path}){help}'.format(
+                name=ac.color_word(res['procedure_name'], ac.BOLD),
+                path=op.relpath(
+                    res['path'],
+                    res['refds'])
+                if res.get('refds', None) else res['path'],
+                help='{nl}{msg}'.format(
+                    nl=os.linesep,
+                    msg=res['message'][0] % res['message'][1:]
+                    if isinstance(res['message'], tuple) else res['message'])
+                if 'message' in res else ''
+            ))
+
+        else:
+            default_result_renderer(res)
