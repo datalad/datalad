@@ -1,0 +1,93 @@
+{
+  "creators": [
+    {
+      "affiliation": "Dartmouth College",
+      "name": "Visconti di Oleggio Castello, Matteo",
+      "orcid": "0000-0001-7931-5272"
+    },
+    {
+      "affiliation": "Dartmouth College: Hanover, NH, United States",
+      "name": "Halchenko, Yaroslav O.",
+      "orcid": "0000-0003-3456-2493"
+    },
+    {
+      "affiliation": "Otto-von-Guericke-University Magdeburg, Germany",
+      "name": "Hanke, Michael",
+      "orcid": "0000-0001-6398-6370"
+    },
+    { 
+      "name": "Poldrack, Benjamin"
+    },
+    { 
+      "name": "Meyer, Kyle"
+    },
+    { 
+      "name": "Solanky, Debanjum Singh"
+    },
+    { 
+      "name": "Alteva, Gergana"
+    },
+    { 
+      "name": "Gors, Jason"
+    },
+    { 
+      "name": "MacFarlane, Dave"
+    },
+    { 
+      "name": "Olaf Häusler, Christian"
+    },
+    { 
+      "name": "Olson, Taylor"
+    },
+    { 
+      "name": "Waite, Alex"
+    },
+    { 
+      "name": "de la Vega, Alejandro"
+    },
+    { 
+      "name": "Sochat, Vanessa"
+    },
+    { 
+      "name": "Keshavan, Anisha"
+    },
+    { 
+      "name": "Yarchael"
+    },
+    { 
+      "name": "Ma, Feilong"
+    },
+    { 
+      "name": "Christian, Horea"
+    },
+    { 
+      "name": "Poelen, Jorrit"
+    },
+    { 
+      "name": "Skytén, Kusti"
+    },
+    { 
+      "name": "Visconti dOC, Matteo"
+    },
+    { 
+      "name": "Hardcastle, Nell"
+    },
+    { 
+      "name": "Stoeter, Torsten"
+    },
+    { 
+      "name": "C Lau, Vicky"
+    }
+  ],
+  "grants": [
+    {"id": "10.13039/501100000925"}
+  ],
+  "keywords": [
+    "data version control",
+    "data distribution",
+    "execution provenance tracking"
+  ],
+  "access_right": "open",
+  "license": "MIT",
+  "upload_type": "software"
+}
