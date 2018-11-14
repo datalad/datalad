@@ -1,0 +1,25 @@
+Bootstrap:docker
+From:neurodebian:buster
+
+%post
+    echo "Configuring the environment"
+    apt-get -y update
+
+    # setup the container sources themselves
+    apt-get -y install eatmydata vim less devscripts
+
+    sed -i -e 's,^deb \(.*\),deb \1\ndeb-src \1,g' /etc/apt/sources.list /etc/apt/*.d/*.list \
+     && apt-get -y update \
+     && eatmydata apt-get -y build-dep git git-annex git-annex-standalone
+
+    # we need a UTF locale for DataLad to work properly
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
+     && locale-gen
+
+    # clean up
+    apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+
+
+%environments
+    unset PYTHONPATH
