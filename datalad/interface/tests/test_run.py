@@ -99,7 +99,7 @@ def test_basics(path, nodspath):
         # TODO 'state' is still untracked!!!
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
-        commit_msg = ds.repo.repo.head.commit.message
+        commit_msg = ds.repo.format_commit("%B")
         ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
@@ -132,20 +132,29 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+def test_sidecar(path):
+    ds = Dataset(path).create()
     # Simple sidecar message checks.
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
-    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+    assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    real_get = ds.config.get
+    ds.config.set("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
 
-    def mocked_get(key, default=None):
-        if key == "datalad.run.record-sidecar":
-            return True
-        return real_get(key, default)
+    ds.config.set("datalad.run.record-sidecar", "true", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    with patch.object(ds.config, "get", mocked_get):
-        ds.run(["touch", "dummy1"], message="sidecar config")
-    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+    # Don't break when config.get() returns multiple values. Here it's two
+    # values in .gitconfig, but a more realistic scenario is a value in
+    # $repo/.git/config that overrides a setting in ~/.config/git/config.
+    ds.config.add("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy2"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
 
 
 @slow  # 17.1880s
@@ -199,7 +208,7 @@ def test_rerun(path, nodspath):
     ds.rerun(revision="HEAD~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
-    eq_(ds.repo.repo.head.commit.message.splitlines()[0],
+    eq_(ds.repo.format_commit("%B").splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
@@ -318,11 +327,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
+        _, info = get_run_info(ds, ds.repo.format_commit("%B"))
         assert info["chain"] == commits
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
+    _, info = get_run_info(ds, ds.repo.format_commit("%B"))
     assert info["chain"] == commits[:1]
 
 
@@ -545,7 +554,7 @@ def test_rerun_subdir(path):
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
-    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -560,7 +569,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
-    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -718,7 +727,7 @@ def test_run_inputs_outputs(src, path):
         ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
-        assert_in(inputs_arg[0], ds.repo.repo.head.commit.message)
+        assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
         ds.repo.drop(inputs, options=["--force"])
 
     # --input can be passed a subdirectory.
@@ -779,8 +788,8 @@ def test_run_inputs_outputs(src, path):
 
     # --input/--output globs can be stored in expanded form.
     ds.run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
-    assert_in("a.dat", ds.repo.repo.head.commit.message)
-    assert_in("b.dat", ds.repo.repo.head.commit.message)
+    assert_in("a.dat", ds.repo.format_commit("%B"))
+    assert_in("b.dat", ds.repo.format_commit("%B"))
 
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
@@ -898,7 +907,7 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
-    eq_(get_run_info(ds, ds.repo.repo.head.commit.message)[1]["pwd"],
+    eq_(get_run_info(ds, ds.repo.format_commit("%B"))[1]["pwd"],
         "subdir")
 
     # Double brackets can be used to escape placeholders.
