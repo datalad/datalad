@@ -5,16 +5,9 @@
 # to bisect git-annex using a build environment in singularity image
 #
 set -eu
-ANNEX_REPO="$1"
-SINGULARITY_IMAGE="$2"
+SINGULARITY_IMAGE="$1"
 # The rest of cmdline is to execute
 shift
-shift
-
-if [ ! -e "$ANNEX_REPO" ]; then
-    echo "I: Cloning since $ANNEX_REPO doesn't exit"
-    git clone git://git.kitenet.net/git-annex "$ANNEX_REPO"
-fi
 
 if [ ! -e "$SINGULARITY_IMAGE" ]; then
     echo "I: trying to fetch singularity image with build env"
@@ -22,12 +15,14 @@ if [ ! -e "$SINGULARITY_IMAGE" ]; then
 fi
 
 SINGULARITY_IMAGE=$(readlink -f "$SINGULARITY_IMAGE")
-cd "$ANNEX_REPO"
 annex_gitver=$(git describe)
-logfile=$ANNEX_REPO/.git/logs/git-annex-build-$annex_gitver.log
+logfile=$PWD/.git/logs/git-annex-build-$annex_gitver.log
 
+[ -e Annex.hs ]  # just to make sure that it is invoked in the correct location
+echo "I: cleaning $PWD"
+git clean -dfx
 echo "I: building $annex_gitver"
-if ! singularity exec $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
+if ! singularity exec -e $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
     echo "E: failed to build, can't test this one See $logfile"
     exit 125
 fi
