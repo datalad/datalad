@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# A helper script which would take actual bisection script to be executed.
+# It will first build git-annex using Singularity image, assuming that
+# to bisect git-annex using a build environment in singularity image
+#
+set -eu
+ANNEX_REPO="$1"
+SINGULARITY_IMAGE="$2"
+# The rest of cmdline is to execute
+shift
+shift
+
+if [ ! -e "$ANNEX_REPO" ]; then
+    echo "I: Cloning since $ANNEX_REPO doesn't exit"
+    git clone git://git.kitenet.net/git-annex "$ANNEX_REPO"
+fi
+
+if [ ! -e "$SINGULARITY_IMAGE" ]; then
+    echo "I: trying to fetch singularity image with build env"
+    singularity pull --name "$SINGULARITY_IMAGE" shub://datalad/datalad:git-annex-dev
+fi
+
+SINGULARITY_IMAGE=$(readlink -f "$SINGULARITY_IMAGE")
+cd "$ANNEX_REPO"
+annex_gitver=$(git describe)
+logfile=$ANNEX_REPO/.git/logs/git-annex-build-$annex_gitver.log
+
+echo "I: building $annex_gitver"
+if ! singularity exec $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
+    echo "E: failed to build, can't test this one See $logfile"
+    exit 125
+fi
+export PATH=$PWD/tmp/git-annex.linux/:$PATH
+
+echo "I: running the script"
+eval "$@"
