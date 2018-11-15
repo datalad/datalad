@@ -23,7 +23,7 @@ echo "I: cleaning $PWD"
 git clean -dfx
 echo "I: building $annex_gitver"
 if ! singularity exec -e $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
-    echo "E: failed to build, can't test this one See $logfile"
+    echo "E: failed to build, can't test this one. See $logfile"
     exit 125
 fi
 export PATH=$PWD/tmp/git-annex.linux/:$PATH
