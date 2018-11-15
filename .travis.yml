@@ -121,6 +121,12 @@ matrix:
     env:
     - _DL_DEVEL_ANNEX=1
     - _DL_CRON=1
+  # Run with latest git rather than the bundled one.
+  - python: 3.5
+    env:
+    - DATALAD_USE_DEFAULT_GIT=1
+    - _DL_UPSTREAM_GIT=1
+    - _DL_CRON=1
   - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
@@ -184,7 +190,7 @@ matrix:
     - NOSE_SELECTION_OP=
 
   - python: 3.5
-    # test with extension datalad-container
+    # test with extension datalad-revolution
     env:
     - BUILD_DATALAD_EXTENSION=datalad-revolution
     - DATALAD_REPO_VERSION=6
@@ -244,6 +250,8 @@ before_install:
   - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
+  # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then sudo tools/ci/install-latest-git.sh || [ $? -eq 100 ] && exit 0; fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
