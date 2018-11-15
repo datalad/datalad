@@ -431,6 +431,21 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+Recognizing contributions
+-------------------------
+
+We welcome and recognize all contributions from documentation to testing to code development.
+
+You can see a list of current contributors in our [zenodo file][link_zenodo].
+If you are new to the project, don't forget to add your name and affiliation there!
+
+Thank you!
+----------
+
+You're awesome. :wave::smiley:
+
+
+
 Various hints for developers
 ----------------------------
 
@@ -545,3 +560,5 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+
+[link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json
