@@ -1,9 +1,15 @@
 #!/bin/bash
 #
-# A helper script which would take actual bisection script to be executed.
-# It will first build git-annex using Singularity image, assuming that
-# to bisect git-annex using a build environment in singularity image
+# A helper script that first builds git-annex using a Singularity image before
+# running the bisection command. It should be called from the git-annex source
+# tree as
 #
+#     $ git bisect run /path/to/bisect-git-annex IMAGE CMD...
+#
+# where IMAGE is the singularity image or, if an image doesn't exist, the path
+# to which the Singularity image should be downloaded. CMD will be executed if
+# the build completes successfully.
+
 set -eu
 SINGULARITY_IMAGE="$1"
 # The rest of cmdline is to execute
