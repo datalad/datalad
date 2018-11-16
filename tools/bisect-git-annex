@@ -26,7 +26,8 @@ logfile=$PWD/.git/logs/git-annex-build-$annex_gitver.log
 
 [ -e Annex.hs ]  # just to make sure that it is invoked in the correct location
 echo "I: cleaning $PWD"
-git clean -dfx
+git clean -dfx >/dev/null 2>&1
+
 echo "I: building $annex_gitver"
 if ! singularity exec -e $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
     echo "E: failed to build, can't test this one. See $logfile"
