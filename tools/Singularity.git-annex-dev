@@ -4,9 +4,14 @@ From:neurodebian:buster
 %post
     echo "Configuring the environment"
     apt-get -y update
+    apt-get install neurodebian-freeze   # upgrade it
+
+    echo "Freezing the environment"
+    #nd_freeze 2018/05/18  # I thought incorrectly that it is when ghc upgraded in testing
+    nd_freeze 2017/09/01  # 20170902 is when ghc moved from 8.0.1-17 to 8.0.2-9 in testing
 
     # setup the container sources themselves
-    apt-get -y install eatmydata vim less devscripts
+    apt-get -y install vim less devscripts locales
 
     sed -i -e 's,^deb \(.*\),deb \1\ndeb-src \1,g' /etc/apt/sources.list /etc/apt/*.d/*.list \
      && apt-get -y update \
