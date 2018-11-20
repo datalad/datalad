@@ -94,7 +94,15 @@ except Exception as exc:
     lgr.debug(
         "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
         exc)
-lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
+# Even with all careful computations we do, due to necessity to account for
+# environment and what not, we still could not figure out "exact" way to
+# estimate it, but it was shown that 300k safety margin on linux was sufficient.
+# https://github.com/datalad/datalad/pull/2977#issuecomment-436264710
+# 300k is ~15%, so to be safe, we will just use up to 80% of the length
+CMD_MAX_ARG = int(0.8 * CMD_MAX_ARG)
+lgr.debug(
+    "Maximal length of cmdline string (adjusted for safety margin): %d",
+    CMD_MAX_ARG)
 
 #
 # Little helpers
