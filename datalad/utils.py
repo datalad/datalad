@@ -81,10 +81,20 @@ except:  # pragma: no cover
     linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
-# Did not find anything in Python which could tell at run time and
+# Query the system and use hardcoded "knowledge" if None
 # probably   getconf ARG_MAX   might not be available
 # The last one would be the most conservative/Windows
-CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
+try:
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+except Exception as exc:
+    # ATM (20181005) SC_ARG_MAX available only on POSIX systems
+    # so exception would be thrown e.g. on Windows.
+    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
+    lgr.debug(
+        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
+        exc)
+lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
 
 #
 # Little helpers
@@ -226,7 +236,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
-      Either to match directories as well as files
+      Whether to match directories as well as files
     """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
@@ -288,9 +298,9 @@ def rotree(path, ro=True, chmod_files=True):
     path : string
       Path to the tree/directory to chmod
     ro : bool, optional
-      Either to make it R/O (default) or RW
+      Whether to make it R/O (default) or RW
     chmod_files : bool, optional
-      Either to operate also on files (not just directories)
+      Whether to operate also on files (not just directories)
     """
     if ro:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
@@ -313,7 +323,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     Parameters
     ----------
     chmod_files : string or bool, optional
-       Either to make files writable also before removal.  Usually it is just
+       Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
     children_only : bool, optional
@@ -1064,7 +1074,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
                 rmtemp(out_name)
 
         def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
-            """Provide assertion on either a msg was logged at a given level
+            """Provide assertion on whether a msg was logged at a given level
 
             If neither `msg` nor `level` provided, checks if anything was logged
             at all.
@@ -1398,7 +1408,7 @@ def get_path_prefix(path, pwd=None):
 
 def _get_normalized_paths(path, prefix):
     if isabs(path) != isabs(prefix):
-        raise ValueError("Bot paths must either be absolute or relative. "
+        raise ValueError("Both paths must either be absolute or relative. "
                          "Got %r and %r" % (path, prefix))
     path = with_pathsep(path)
     prefix = with_pathsep(prefix)

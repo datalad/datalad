@@ -20,7 +20,7 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- [install]: be able to install recursively into a dataset ([#2982])
 
 ### Enhancements and new features
 
@@ -944,3 +944,4 @@ publishing
 [#2917]: https://github.com/datalad/datalad/issues/2917
 [#2921]: https://github.com/datalad/datalad/issues/2921
 [#2922]: https://github.com/datalad/datalad/issues/2922
+[#2982]: https://github.com/datalad/datalad/issues/2982

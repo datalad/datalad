@@ -261,6 +261,11 @@ class InvalidInstanceRequestError(RuntimeError):
         self.msg = msg
 
 
+class InvalidAnnexRepositoryError(RuntimeError):
+    """Thrown if AnnexRepo was instantiated on a non-annex and
+    without init=True"""
+
+
 class IncompleteResultsError(RuntimeError):
     """Exception to be raised whenever results are incomplete.
 

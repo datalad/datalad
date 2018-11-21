@@ -481,6 +481,24 @@ def eval_results(func):
     return eval_func(func)
 
 
+def default_result_renderer(res):
+    if res.get('status', None) != 'notneeded':
+        ui.message('{action}({status}): {path}{type}{msg}'.format(
+                action=ac.color_word(res['action'], ac.BOLD),
+                status=ac.color_status(res['status']),
+                path=relpath(res['path'],
+                             res['refds']) if res.get('refds', None) else res[
+                    'path'],
+                type=' ({})'.format(
+                        ac.color_word(res['type'], ac.MAGENTA)
+                ) if 'type' in res else '',
+                msg=' [{}]'.format(
+                        res['message'][0] % res['message'][1:]
+                        if isinstance(res['message'], tuple) else res[
+                            'message'])
+                if 'message' in res else ''))
+
+
 def _process_results(
         results, cmd_class,
         action_summary, on_failure, incomplete_results,
@@ -547,20 +565,7 @@ def _process_results(
         if result_renderer is None or result_renderer == 'disabled':
             pass
         elif result_renderer == 'default':
-            # TODO have a helper that can expand a result message
-            if res.get('status', None) != 'notneeded':
-                ui.message('{action}({status}): {path}{type}{msg}'.format(
-                    action=ac.color_word(res['action'], ac.BOLD),
-                    status=ac.color_status(res['status']),
-                    path=relpath(res['path'],
-                                 res['refds']) if res.get('refds', None) else res['path'],
-                    type=' ({})'.format(
-                        ac.color_word(res['type'], ac.MAGENTA)
-                    ) if 'type' in res else '',
-                    msg=' [{}]'.format(
-                        res['message'][0] % res['message'][1:]
-                        if isinstance(res['message'], tuple) else res['message'])
-                    if 'message' in res else ''))
+            default_result_renderer(res)
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()

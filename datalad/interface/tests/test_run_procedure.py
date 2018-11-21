@@ -43,7 +43,7 @@ def test_invalid_call():
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @known_failure_direct_mode  #FIXME
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -58,9 +58,6 @@ add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 @with_tempfile
 def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
@@ -100,7 +97,7 @@ def test_basics(path, super_path):
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -126,9 +123,6 @@ def test_procedure_discovery(path, super_path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
@@ -200,7 +194,7 @@ def test_procedure_discovery(path, super_path):
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
 # mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.get("datalad.repo.version", None) != 6)
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -215,9 +209,6 @@ def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder

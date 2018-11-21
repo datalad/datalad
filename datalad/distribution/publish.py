@@ -617,7 +617,7 @@ class Publish(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
             from which to look for changes
-            to decide either updated publishing is necessary for this and which children.
+            to decide whether updated publishing is necessary for this and which children.
             If empty argument is provided, then we would take from the previously 
             published to that remote/sibling state (for the current branch)"""),
         # since: commit => .gitmodules diff to head => submodules to publish

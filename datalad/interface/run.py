@@ -30,6 +30,8 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
+from datalad.config import anything2bool
+
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
@@ -662,9 +664,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
-    use_sidecar = sidecar or (
-        sidecar is None and
-        ds.config.get('datalad.run.record-sidecar', default=False))
+    if sidecar is None:
+        use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
+        # If ConfigManager gets the ability to say "return single value",
+        # update this code to use that.
+        if isinstance(use_sidecar, tuple):
+            # Use same precedence as 'git config'.
+            use_sidecar = use_sidecar[-1]
+        use_sidecar = anything2bool(use_sidecar)
+    else:
+        use_sidecar = sidecar
+
 
     if use_sidecar:
         # record ID is hash of record itself

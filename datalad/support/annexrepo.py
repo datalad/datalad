@@ -86,6 +86,7 @@ from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
 from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
+from .exceptions import InvalidAnnexRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -236,6 +237,11 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # Check whether an annex already exists at destination
         # XXX this doesn't work for a submodule!
+
+        # NOTE/TODO: following should be cheaper. We are in __init__ here and
+        # already know that GitRepo.is_valid_repo is True, since super.__init__
+        # was called. Calling AnnexRepo.is_valid will unnecessarily check that
+        # again:
         if not AnnexRepo.is_valid_repo(self.path):
             # so either it is not annex at all or just was not yet initialized
             if self.is_with_annex():
@@ -248,7 +254,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.debug('Initializing annex repository at %s...' % self.path)
                 self._init(version=version, description=description)
             else:
-                raise RuntimeError("No annex found at %s." % self.path)
+                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
 
         self._direct_mode = None  # we don't know yet
 
@@ -414,11 +420,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         """Whether `branch` is managed by git-annex.
 
         ATM this returns true in direct mode (branch 'annex/direct/my_branch')
-        and if on an adjusted branch (annex v6 repository:
+        and if on an adjusted branch (annex v6+ repository:
         either 'adjusted/my_branch(unlocked)' or 'adjusted/my_branch(fixed)'
 
         Note: The term 'managed branch' is used to make clear it's meant to be
-        more general than the v6 'adjusted branch'.
+        more general than the v6+ 'adjusted branch'.
 
         Parameters
         ----------
@@ -715,7 +721,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if working_tree:
             # Note: annex repos don't always have a git working tree and the
-            # behaviour in direct mode or V6 repos is fundamentally different
+            # behaviour in direct mode or V6+ repos is fundamentally different
             # from that concept. There are no unstaged changes in direct mode
             # for example. Therefore the need to call this method with
             # 'working_tree=True' indicates invalid assumptions in the
@@ -936,7 +942,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         )
 
     def is_special_annex_remote(self, remote, check_if_known=True):
-        """Return either remote is a special annex remote
+        """Return whether remote is a special annex remote
 
         Decides based on the presence of diagnostic annex- options
         for the remote
@@ -1151,6 +1157,17 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         self.config.reload()
         return self.config.getbool("annex", "crippledfilesystem", False)
+
+    @property
+    def supports_unlocked_pointers(self):
+        """Return True if repository version supports unlocked pointers.
+        """
+        try:
+            return self.config.getint("annex", "version") >= 6
+        except KeyError:
+            # If annex.version isn't set (e.g., an uninitialized repo), assume
+            # that unlocked pointers aren't supported.
+            return False
 
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
@@ -1518,7 +1535,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # Theoretically we could have done for git as well, if it could have
         # been batched
-        # Call git annex add for any to have full control of either to go
+        # Call git annex add for any to have full control of whether to go
         # to git or to annex
         # 1. Figure out what actually will be added
         to_be_added_recs = _get_to_be_added_recs(files)
@@ -1744,7 +1761,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def adjust(self, options=None):
         """enter an adjusted branch
 
-        This command is only available in a v6 git-annex repository.
+        This command is only available in a v6+ git-annex repository.
 
         Parameters
         ----------
@@ -1757,10 +1774,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # just check it out? Or fail like annex itself does?
 
         # version check:
-        if not self.config.get("annex.version") == '6':
-            raise CommandNotAvailableError(cmd='git annex adjust',
-                                           msg='git-annex-adjust requires a '
-                                               'version 6 repository')
+        if not self.supports_unlocked_pointers:
+            raise CommandNotAvailableError(
+                cmd='git annex adjust',
+                msg=('git-annex-adjust requires a '
+                     'version that supports unlocked pointers'))
 
         options = options[:] if options else to_options(unlock=True)
         self._run_annex_command('adjust', annex_options=options)
@@ -1838,15 +1856,15 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Helper that isolates the common logic in `file_has_content` and
         # `is_under_annex`. `fn` is the annex command used to do the check, and
         # `quick_fn` is the non-annex variant.
-        is_v6 = self.config.get("annex.version") == "6"
-        if is_v6 or self.is_direct_mode() or batch or not allow_quick:
-            # We're only concerned about modified files in V6 mode. In V5
+        pointers = self.supports_unlocked_pointers
+        if pointers or self.is_direct_mode() or batch or not allow_quick:
+            # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files, and in direct
             # mode everything looks modified, so we don't even bother.
-            modified = self.get_changed_files() if is_v6 else []
+            modified = self.get_changed_files() if pointers else []
             annex_res = fn(files, normalize_paths=False, batch=batch)
             return [bool(annex_res.get(f) and
-                         not (is_v6 and normpath(f) in modified))
+                         not (pointers and normpath(f) in modified))
                     for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             return [quick_fn(f) for f in files]
@@ -1866,7 +1884,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         list of bool
-            For each input file states either file has content locally
+            For each input file states whether file has content locally
         """
         # TODO: Also provide option to look for key instead of path
 
@@ -1901,7 +1919,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         list of bool
-            For each input file states either file is under annex
+            For each input file states whether file is under annex
         """
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
@@ -2210,7 +2228,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         ----------
         file_: str
         key: bool, optional
-            Either provided files are actually annex keys
+            Whether provided files are actually annex keys
 
         Returns
         -------
@@ -2382,8 +2400,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                      - sum((len(x) + 3) for x in annex_options)
                      - 4   # for '--' below
                      - 50  # for safety since we are to add more options
-                    // (maxl + 3)  # +3 for possible quotes and a space
-                    )
+                     ) // (maxl + 3)  # +3 for possible quotes and a space
                 )
                 file_chunks = generate_chunks(files, chunk_size)
             out, err = "", ""
@@ -2513,7 +2530,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             each file. If 'full', for each file a dictionary of all fields
             is returned as returned by annex
         key: bool, optional
-            Either provided files are actually annex keys
+            Whether provided files are actually annex keys
         options: list, optional
             Options to pass into git-annex call
 
@@ -2699,7 +2716,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         str
-          Either the setting is returned, or an empty string if there
+          Whether the setting is returned, or an empty string if there
           is none.
 
         Raises
@@ -3018,7 +3035,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             Remote which to check.  If None, possibly multiple remotes are checked
             before positive result is reported
         key: bool, optional
-            Either provided files are actually annex keys
+            Whether provided files are actually annex keys
         batch: bool, optional
             Initiate or continue with a batched run of annex checkpresentkey
 
