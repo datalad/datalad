@@ -220,24 +220,44 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
 
     # check if we have the extracted metadata for this state already
     # either in the source or in the destination dataset
-    metafound = {
-        s: d
-        # look in targetds last to not have to move things
-        # unnecessarily
-        for d in (aggfrom_ds, agginto_ds)
-        for s in metasources
-        # important to test for lexists() as we do not need to
-        # or want to `get()` metadata files for this test
-        # info on identity is sufficient
-        if op.lexists(
-            op.join(
-                d.path,
-                dirname(agginfo_relpath),
-                _get_obj_location(objid, s)))
-    } if not force_extraction else False
+    # The situation is trickier!  Extracted metadata could change for the same
+    # state (commit etc), e.g. if extractors changed.
+    # The "correct" thing would be either
+    # - to inspect git history either there were changes
+    #   within aggfrom_ds since agginto_ds got the metadata committed OR
+    # - check by content - if file is under git - compute checksum,
+    #   if under annex -- take checksum from the key without asking for the
+    #   content
+    metafound = {}  # defaultdict(list)
+    if not force_extraction:
+        for s in metasources:
+            smetafound = [
+                # important to test for lexists() as we do not need to
+                # or want to `get()` metadata files for this test.
+                # Info on identity is NOT sufficient - later compare content if
+                # multiple found
+                op.lexists(
+                        op.join(
+                            d.path,
+                            dirname(agginfo_relpath),
+                            _get_obj_location(objid, s)))
+                # Order of dss matters later
+                for d in (aggfrom_ds, agginto_ds)
+            ]
+            if all(smetafound):
+                # both have it, but are they the same?
+                #
+                # TODO
+                pass
+                metafound[s] = smetafound
 
-    if not metafound:
-        lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
+    if len(metafound) != len(metasources):
+        # found some (either ds or cn) metadata missing entirely in both
+        # from and into datasets
+        lgr.debug(
+            "Incomplete or absent metadata while aggregating %s <- %s: %s",
+              agginto_ds, aggfrom_ds, metafound
+        )
         # no metadata found -> extract
         # this places metadata dump files into the configured
         # target dataset and lists them in `to_save`, as well
@@ -256,7 +276,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     # assemble an aggregation record from the existing pieces
     # that we found
     # simple case: the target dataset has all the records already:
-    if all(d is agginto_ds for s, d in metafound.items()):
+    if all(d[1] for d in metafound.values()):
         lgr.debug('Sticking with up-to-date metadata for %s', aggfrom_ds)
         # no change, use old record from the target dataset
         db[aggfrom_ds.path] = old_agginfo
@@ -306,6 +326,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
 
 
 def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, refcommit, subds_relpaths):
+    lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
     # we will replace any conflicting info on this dataset with fresh stuff
     agginfo = db.get(aggfrom_ds.path, {})
     # paths to extract from
