@@ -16,6 +16,8 @@ import os
 import os.path as op
 
 from functools import wraps
+from itertools import dropwhile
+
 from ..utils import (
     assure_bytes,
     getpwd,
@@ -73,3 +75,38 @@ def robust_abspath(p):
             except:
                 return normpath(join(getpwd(), p))
         raise
+
+
+def split_ext(filename):
+    """Use git-annex's splitShortExtensions rule for splitting extensions.
+
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    A tuple with (root, extension)
+
+    Examples
+    --------
+    >>> from datalad.plugin.addurls import split_ext
+    >>> split_ext("filename.py")
+    ('filename', '.py')
+
+    >>> split_ext("filename.tar.gz")
+    ('filename', '.tar.gz')
+
+    >>> split_ext("filename.above4chars.ext")
+    ('filename.above4chars', '.ext')
+    """
+    parts = filename.split(".")
+    if len(parts) == 1:
+        return filename, ""
+
+    tail = list(dropwhile(lambda x: len(x) < 5,
+                          reversed(parts[1:])))
+
+    file_parts = parts[:1] + tail[::-1]
+    ext_parts = parts[1+len(tail):]
+    return ".".join(file_parts), "." + ".".join(ext_parts)
