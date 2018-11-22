@@ -34,6 +34,7 @@ from datalad.distribution.subdatasets import Subdatasets
 from datalad.interface.unlock import Unlock
 
 import datalad
+from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -60,6 +61,7 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
+from datalad.support.path import split_ext
 
 from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
@@ -132,6 +134,114 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # somewhere, because we cannot rediscover them on the filesystem
     # when updating the datasets later on
     return hits
+
+def _the_same(*items):
+    return all(x==items[0] for x in items[1:])
+
+def _the_same_across_datasets(relpath, *dss):
+    """Check if the file (present content or not) is identical across two datasets
+
+    Compares files by content if under git, or by checksum if under annex
+
+    Parameters
+    ----------
+    *ds: Datasets
+    relpath: str
+        path within datasets
+
+    Returns
+    -------
+    bool or None
+      True if identical, False if not, None if cannot be decided
+      (e.g. different git-annex backend used)
+    """
+    from datalad.utils import md5sum, unique
+    from datalad.support.exceptions import FileInGitError
+    from datalad.support.digests import Digester
+
+    paths = [op.join(ds.path, relpath) for ds in dss]
+    # The simplest check first -- exist in both and content is the same.
+    # Even if content is just a symlink file on windows, the same content
+    # condition would be correct
+    if all(map(exists, paths)) and _the_same(*map(md5sum, paths)):
+        return True
+
+    # We first need to find problematic ones which are annexed and
+    # have no content locally, and take their
+    keys = []
+    backends = []
+    presents = []
+    for ds in dss:
+        repo = ds.repo
+        key = None
+        present = True
+        if isinstance(repo, AnnexRepo):
+            try:
+                key = repo.get_file_key(relpath)
+            except FileInGitError:
+                continue
+            if not key:
+                raise ValueError(
+                    "Must have got a key, unexpectedly got %r for %s within %s"
+                    % (key, relpath, ds)
+                )
+            # For now the rest (e.g. not tracked) remains an error
+            if not repo.file_has_content(relpath):
+                present = False
+                backends.append(repo.get_key_backend(key))
+        keys.append(key)
+        presents.append(present)
+
+    if all(presents):
+        return _the_same(*map(md5sum, paths))
+
+    backends = unique(backends)
+    assert backends, "Since not all present - some must be under annex, and thus must have a backend!"
+    # so some files are missing!
+    assert not all(presents)
+    NeedContentError = RuntimeError
+    if len(backends) > 1:
+        # TODO: or signal otherwise somehow that we just need to get at least some
+        # of those files to do the check!...
+        raise NeedContentError(
+            "Following paths are missing conent and have different annex "
+            "backends: %s. Cannot determine here if the same or not!"
+            % ", ".join(p for (p, b) in zip(paths, presents) if not b)
+        )
+    backend = backends[0].lower()
+    if backend.endswith('E'):
+        backend = backend[':-1']
+
+    if backend not in Digester.DEFAULT_DIGESTS:
+        raise NeedContentError(
+            "Do not know how to figure out content check for backend %s" % backend
+        )
+
+    checksums = [
+        split_ext(key).split('--', 1)[1] if key else key
+        for key in keys
+    ]
+    thechecksum = set(
+        checksum
+        for present, checksum in zip(presents, checksums)
+        if present
+    )
+    if len(thechecksum) > 1:
+        # Different checksum (with the same backend)
+        return False
+    elif not thechecksum:
+        raise RuntimeError("We must have had at least one key since prior logic"
+                           " showed that not all files have content here")
+    thechecksum = thechecksum[0]
+    if any(presents):
+        # We do need to extract checksum from the key and check the present
+        # files' content to match
+        digester = Digester([backend])
+        for present, path in zip(presents, paths):
+            if present and digester(path)[backend] != thechecksum:
+                return False
+        return True
+    return False
 
 
 def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extraction):
@@ -231,25 +341,25 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     metafound = {}  # defaultdict(list)
     if not force_extraction:
         for s in metasources:
+            objloc = op.join(dirname(agginfo_relpath),
+                             _get_obj_location(objid, s))
             smetafound = [
                 # important to test for lexists() as we do not need to
                 # or want to `get()` metadata files for this test.
                 # Info on identity is NOT sufficient - later compare content if
                 # multiple found
-                op.lexists(
-                        op.join(
-                            d.path,
-                            dirname(agginfo_relpath),
-                            _get_obj_location(objid, s)))
+                op.lexists(op.join(d.path, objloc))
                 # Order of dss matters later
                 for d in (aggfrom_ds, agginto_ds)
             ]
             if all(smetafound):
                 # both have it, but are they the same?
-                #
-                # TODO
-                pass
-                metafound[s] = smetafound
+                try:
+                    if _the_same_across_datasets(objloc, aggfrom_ds, agginto_ds):
+                        metafound[s] = smetafound
+                except RuntimeError as exc:
+                    lgr.debug("For now will just do re-extraction since caught %s",
+                              exc_str(exc))
 
     if len(metafound) != len(metasources):
         # found some (either ds or cn) metadata missing entirely in both
