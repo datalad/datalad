@@ -3143,6 +3143,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 annex_options=files,
                                 backend=backend)
 
+    @classmethod
+    def get_key_backend(cls, key):
+        """Get the backend from a given key"""
+        return key.split('-', 1)[0]
+
     @normalize_paths
     def get_file_backend(self, files):
         """Get the backend currently used for file(s).
@@ -3158,7 +3163,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             like "SHA256E" or "MD5".
         """
 
-        return [self.get_file_key(f).split('-')[0] for f in files]
+        return [
+            self.get_key_backend(self.get_file_key(f))
+            for f in files
+        ]
 
     @property
     def default_backends(self):
