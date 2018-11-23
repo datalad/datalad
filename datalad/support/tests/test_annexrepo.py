@@ -14,6 +14,7 @@ from datalad.tests.utils import known_failure_v6
 
 import logging
 from functools import partial
+from glob import glob
 import os
 from os import mkdir
 from os.path import join as opj
@@ -37,6 +38,7 @@ import gc
 from datalad.cmd import Runner
 
 from datalad.support.external_versions import external_versions
+from datalad.support import path as op
 
 from datalad.support.sshconnector import get_connection_hash
 
@@ -69,6 +71,7 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
@@ -2417,3 +2420,61 @@ def test_error_reporting(path):
             'note': 'not found',
             'success': False}]
     )
+
+
+# http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
+# https://github.com/datalad/datalad/issues/1651
+@with_tree(tree={
+    '.gitattributes': "** annex.largefiles=(largerthan=4b)",
+    'alwaysbig': 'a'*10,
+    'willnotgetshort': 'b'*10,
+    'tobechanged-git': 'a',
+    'tobechanged-annex': 'a'*10,
+})
+def test_commit_annex_commit_changed(path):
+    # Here we test commit working correctly if file was just removed
+    # (not unlocked), edited and committed back
+    ar = AnnexRepo(path, create=True)
+    ar.add('.gitattributes')
+    ar.add('.')
+    ar.commit("initial commit")
+    ok_clean_git(path)
+    # Now let's change all but commit only some
+    files = [op.basename(p) for p in glob(op.join(path, '*'))]
+    # os.unlink(files)
+    create_tree(
+        path
+        , {
+            'alwaysbig': 'a'*11,
+            'willnotgetshort': 'b',
+            'tobechanged-git': 'aa',
+            'tobechanged-annex': 'a'*11,
+            'untracked': 'unique'
+        }
+        , remove_existing=True
+    )
+    ok_clean_git(
+        path
+        , index_modified=files
+        , untracked=['untracked']
+    )
+
+    ar.commit("message", files=['alwaysbig', 'willnotgetshort'])
+    ok_clean_git(
+        path
+        , index_modified=['tobechanged-git', 'tobechanged-annex']
+        , untracked=['untracked']
+    )
+    ok_file_under_git(path, 'alwaysbig', annexed=True)
+    # This one is actually "questionable" since might be "correct" either way
+    # but it would be nice to have it at least consistent
+    ok_file_under_git(path, 'willnotgetshort', annexed=True)
+
+    ar.commit("message2", options=['-a']) # commit all changed
+    ok_clean_git(
+        path
+        , untracked=['untracked']
+    )
+    ok_file_under_git(path, 'tobechanged-git', annexed=False)
+    # TODO: direct mode gotcha!!!
+    ok_file_under_git(path, 'tobechanged-annex', annexed=not ar.is_direct_mode())
