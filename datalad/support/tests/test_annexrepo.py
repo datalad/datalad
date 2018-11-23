@@ -2434,6 +2434,11 @@ def test_error_reporting(path):
 def check_commit_annex_commit_changed(unlock, path):
     # Here we test commit working correctly if file was just removed
     # (not unlocked), edited and committed back
+
+    # TODO: an additional possible interaction to check/solidify - if files
+    # first get unannexed (after being optionally unlocked first)
+    unannex = False
+
     ar = AnnexRepo(path, create=True)
     ar.add('.gitattributes')
     ar.add('.')
@@ -2443,6 +2448,8 @@ def check_commit_annex_commit_changed(unlock, path):
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
     if unlock:
         ar.unlock(files)
+    if unannex:
+        ar.unannex(files)
     create_tree(
         path
         , {
@@ -2456,8 +2463,10 @@ def check_commit_annex_commit_changed(unlock, path):
     )
     ok_clean_git(
         path
-        , index_modified=files
-        , untracked=['untracked']
+        , index_modified=files if not unannex else ['tobechanged-git']
+        , untracked=['untracked'] if not unannex else
+          # all but the one in git now
+          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willnotgetshort']
     )
 
     ar.commit("message", files=['alwaysbig', 'willnotgetshort'])
@@ -2482,5 +2491,5 @@ def check_commit_annex_commit_changed(unlock, path):
 
 
 def test_commit_annex_commit_changed():
-    yield check_commit_annex_commit_changed, False
-    yield check_commit_annex_commit_changed, True
+    for unlock in True, False:
+        yield check_commit_annex_commit_changed, unlock
