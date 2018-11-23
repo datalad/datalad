@@ -209,13 +209,14 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                 eq_(head_diffs, [])
                 eq_(index_diffs, [])
             else:
+                # TODO: These names are confusing/non-descriptive.  REDO
                 if head_modified:
                     # we did ask for interrogating changes
                     head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(head_modified_, head_modified)
+                    eq_(sorted(head_modified_), sorted(head_modified))
                 if index_modified:
                     index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(index_modified_, index_modified)
+                    eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
