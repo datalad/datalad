@@ -425,6 +425,11 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
             objdir = dirname(objpath)
             if not exists(objdir):
                 makedirs(objdir)
+            if lexists(objpath):
+                os.unlink(objpath)  # remove previous version first
+                # was a wild thought as a workaround for 
+                # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec1
+                # agginto_ds.repo.remove(objpath)
             # XXX TODO once we have a command that can copy/move files
             # from one dataset to another including file availability
             # info, this should be used here
