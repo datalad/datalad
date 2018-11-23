@@ -2937,7 +2937,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                             super(AnnexRepo, self).commit(
                                 msg, options,
                                 _datalad_msg=_datalad_msg,
-                                careless=False, # careless,
+                                careless=careless,
                                 index_file=alt_index_file)
 
                             if files_changed_notstaged:
