@@ -357,8 +357,13 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
                     if _the_same_across_datasets(objloc, aggfrom_ds, agginto_ds):
                         metafound[s] = smetafound
                 except RuntimeError as exc:
+                    # TODO: dedicated test - when meta content changes
                     lgr.debug("For now will just do re-extraction since caught %s",
                               exc_str(exc))
+            elif smetafound[0]:
+                # source one has it, so we might be able to copy it
+                # TODO: dedicated test - when it is sufficient to copy we do not re-extract
+                metafound[s] = smetafound
 
     if len(metafound) != len(metasources):
         # found some (either ds or cn) metadata missing entirely in both
