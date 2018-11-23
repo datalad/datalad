@@ -340,7 +340,10 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     # - check by content - if file is under git - compute checksum,
     #   if under annex -- take checksum from the key without asking for the
     #   content
-    metafound = {}  # defaultdict(list)
+    metafound = {}
+    uptodatemeta = []  # record which meta not only found but matching in content
+    # TODO: current fixes might break logic for when fromds is not installed
+    #       when I guess we just need to skip it?
     if not force_extraction:
         for s, sprop in metasources.items():
             objloc = op.join(dirname(agginfo_relpath),
@@ -355,18 +358,18 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
                 for d in (aggfrom_ds, agginto_ds)
             ]
             if all(smetafound):
-                # both have it, but are they the same?
+                # both have it
+                metafound[s] = smetafound
+                # but are they the same?
                 try:
                     if _the_same_across_datasets(objloc, aggfrom_ds, agginto_ds):
-                        metafound[s] = smetafound
+                        uptodatemeta.append(s)
                 except RuntimeError as exc:
                     # TODO: dedicated test - when meta content changes
                     lgr.debug("For now will just do re-extraction since caught %s",
                               exc_str(exc))
-            elif smetafound[0]:
-                # source one has it, so we might be able to copy it
-                # TODO: dedicated test - when it is sufficient to copy we do not re-extract
-                metafound[s] = smetafound
+            # source one has it, so we might be able to copy it
+            # TODO: dedicated test - when it is sufficient to copy we do not re-extract
 
     if len(metafound) != len(metasources):
         # found some (either ds or cn) metadata missing entirely in both
@@ -392,8 +395,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     # we did not actually run an extraction, so we need to
     # assemble an aggregation record from the existing pieces
     # that we found
-    # simple case: the target dataset has all the records already:
-    if all(d[1] for d in metafound.values()):
+    # simple case: the target dataset has all the records already and they are up to date:
+    if len(uptodatemeta) == len(metasources):
         lgr.debug('Sticking with up-to-date metadata for %s', aggfrom_ds)
         # no change, use old record from the target dataset
         db[aggfrom_ds.path] = old_agginfo
