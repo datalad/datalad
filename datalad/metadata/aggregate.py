@@ -13,6 +13,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
+from itertools import imap as map
+
 from os import makedirs
 from os import listdir
 import os.path as op
@@ -63,7 +65,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 from datalad.support.path import split_ext
 
-from datalad.utils import path_is_subpath
+from datalad.utils import path_is_subpath, all_same
 from datalad.utils import assure_list
 
 
@@ -135,9 +137,6 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # when updating the datasets later on
     return hits
 
-def _the_same(*items):
-    return all(x==items[0] for x in items[1:])
-
 def _the_same_across_datasets(relpath, *dss):
     """Check if the file (present content or not) is identical across two datasets
 
@@ -163,7 +162,7 @@ def _the_same_across_datasets(relpath, *dss):
     # The simplest check first -- exist in both and content is the same.
     # Even if content is just a symlink file on windows, the same content
     # condition would be correct
-    if all(map(exists, paths)) and _the_same(*map(md5sum, paths)):
+    if all(map(exists, paths)) and all_same(map(md5sum, paths)):
         return True
 
     # We first need to find problematic ones which are annexed and
@@ -193,7 +192,7 @@ def _the_same_across_datasets(relpath, *dss):
         presents.append(present)
 
     if all(presents):
-        return _the_same(*map(md5sum, paths))
+        return all_same(map(md5sum, paths))
 
     backends = unique(backends)
     assert backends, "Since not all present - some must be under annex, and thus must have a backend!"
