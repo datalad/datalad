@@ -13,7 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from itertools import imap as map
+from itertools import (
+    imap as map,
+    ifilter as filter,
+)
 
 from os import makedirs
 from os import listdir
@@ -339,15 +342,15 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     #   content
     metafound = {}  # defaultdict(list)
     if not force_extraction:
-        for s in metasources:
+        for s, sprop in metasources.items():
             objloc = op.join(dirname(agginfo_relpath),
-                             _get_obj_location(objid, s))
+                             _get_obj_location(objid, s, sprop['dumper']))
             smetafound = [
                 # important to test for lexists() as we do not need to
                 # or want to `get()` metadata files for this test.
                 # Info on identity is NOT sufficient - later compare content if
                 # multiple found
-                op.lexists(op.join(d.path, objloc))
+                objloc if op.lexists(op.join(d.path, objloc)) else None
                 # Order of dss matters later
                 for d in (aggfrom_ds, agginto_ds)
             ]
@@ -400,10 +403,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         lgr.debug('Reusing previously extracted metadata for %s', aggfrom_ds)
         # we need to move the metadata dump(s) into the target dataset
         objrelpaths = {
-            label: op.join(
-                dirname(agginfo_relpath),
-                _get_obj_location(objid, label))
-            for label in metafound
+            label: next(filter(bool, smetafound))
+            for label, smetafound in metafound.items()
         }
         # make sure all the to-be-moved metadata records are present
         # locally
@@ -482,9 +483,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, r
         if not meta[label]:
             continue
         # only write to disk if there is something
-        objrelpath = _get_obj_location(objid, label)
-        if props['dumper'] is json_py.dump2xzstream:
-            objrelpath += '.xz'
+        objrelpath = _get_obj_location(objid, label, props['dumper'])
         # place metadata object into the source dataset
         objpath = opj(dest.path, dirname(agginfo_relpath), objrelpath)
 
@@ -577,13 +576,18 @@ def _get_latest_refcommit(ds, subds_relpaths):
     return ds.repo.get_last_commit_hash(relevant_paths)
 
 
-def _get_obj_location(hash_str, ref_type):
-    return opj(
+def _get_obj_location(hash_str, ref_type, dumper):
+    objrelpath = opj(
         'objects',
         hash_str[:2],
         '{}-{}'.format(
             ref_type,
             hash_str[2:]))
+
+    if dumper is json_py.dump2xzstream:
+        objrelpath += '.xz'
+
+    return objrelpath
 
 
 def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db, to_save):
