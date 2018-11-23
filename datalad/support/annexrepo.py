@@ -2896,7 +2896,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 direct_mode = self.is_direct_mode()
                 # we might need to avoid explicit paths
                 files_to_commit = None if direct_mode else files
-                if direct_mode and files:
+                if files:
                     # In direct mode, if we commit file(s) they would get
                     # committed directly into git ignoring possibly being
                     # staged by annex.  So, if not all files are committed, and
@@ -2905,45 +2905,47 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # commit without specifying any paths
                     changed_files = {
                         staged: set(self.get_changed_files(staged=staged))
-                        for staged in (True,) #  False}
+                        for staged in (True, False)
                     }
                     files_set = {
                         _normalize_path(self.path, f) if isabs(f) else f
-                        for f in files}
-                    files_notstaged = files_set.difference(changed_files[True])
-                    # Lazy .add('.') results in ALL (performance?) files listed
-                    # here even if they are not changed at all and could be ignored
-                    #files_changed_notstaged = files_notstaged.difference(changed_files[False])
-                    # if files_changed_notstaged:
-                    #     # To be safe(r), let's just blow for now!
-                    #     # We could be smart(er) and do all the git or annex add
-                    #     # but let's see if we run into those cases first
-                    #     import pdb; pdb.set_trace()
-                    #     raise RuntimeError(
-                    #         "To commit files in direct mode, please first git "
-                    #         "or git-annex add them first!  Files: %s"
-                    #         % ', '.join(files_changed_notstaged)
-                    #     )
+                        for f in files
+                    }
+                    # files_notstaged = files_set.difference(changed_files[True])
+                    files_changed_notstaged = files_set.intersection(changed_files[False])
+
                     # Files which were staged but not among files
                     staged_not_to_commit = changed_files[True].difference(files_set)
-                    if staged_not_to_commit:
+                    if staged_not_to_commit or files_changed_notstaged:
                         # Need an alternative index_file
                         with make_tempfile() as index_file:
+                            # First add those which were changed but not staged yet
+                            if files_changed_notstaged:
+                                self.add(files=list(files_changed_notstaged))
+
                             alt_index_file = index_file
                             index_tree = self.repo.git.write_tree()
                             self.repo.git.read_tree(index_tree,
                                                     index_output=index_file)
                             # Reset the files we are not to be committed
-                            self._git_custom_command(
-                                list(staged_not_to_commit),
-                                ['git', 'reset'],
-                                index_file=alt_index_file)
+                            if staged_not_to_commit:
+                                self._git_custom_command(
+                                    list(staged_not_to_commit),
+                                    ['git', 'reset'],
+                                    index_file=alt_index_file)
 
                             super(AnnexRepo, self).commit(
                                 msg, options,
                                 _datalad_msg=_datalad_msg,
-                                careless=careless,
+                                careless=False, # careless,
                                 index_file=alt_index_file)
+
+                            if files_changed_notstaged:
+                                # reset current index to reflect the changes annex might have done
+                                self._git_custom_command(
+                                    list(files_changed_notstaged),
+                                    ['git', 'reset']
+                                )
 
                     # in any case we will not specify files explicitly
                     files_to_commit = None
