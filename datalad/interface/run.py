@@ -529,11 +529,21 @@ def _execute_command(command, pwd, expected_exit=None):
     return cmd_exitcode or 0, exc
 
 
+def _save_outputs(ds, to_save, msg):
+    """Helper to save results after command execution is completed"""
+    return ds.add(
+        to_save,
+        recursive=True,
+        message=msg,
+        return_type='generator')
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
                 rerun_info=None, rerun_outputs=None,
-                inject=False):
+                inject=False,
+                saver=_save_outputs):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -559,6 +569,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
+    saver : callable, optional
+        Must take a dataset instance, a list of paths to save, and a
+        message string as arguments and must record any changes done
+        to any content matching an entry in the path list.
 
     Yields
     ------
@@ -703,5 +717,5 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      msg_path)
         raise exc
     elif outputs_to_save:
-        for r in ds.add(outputs_to_save, recursive=True, message=msg):
+        for r in saver(ds, outputs_to_save, msg):
             yield r
