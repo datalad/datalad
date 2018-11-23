@@ -2431,7 +2431,7 @@ def test_error_reporting(path):
     'tobechanged-git': 'a',
     'tobechanged-annex': 'a'*10,
 })
-def test_commit_annex_commit_changed(path):
+def check_commit_annex_commit_changed(unlock, path):
     # Here we test commit working correctly if file was just removed
     # (not unlocked), edited and committed back
     ar = AnnexRepo(path, create=True)
@@ -2441,7 +2441,8 @@ def test_commit_annex_commit_changed(path):
     ok_clean_git(path)
     # Now let's change all but commit only some
     files = [op.basename(p) for p in glob(op.join(path, '*'))]
-    # os.unlink(files)
+    if unlock:
+        ar.unlock(files)
     create_tree(
         path
         , {
@@ -2478,3 +2479,8 @@ def test_commit_annex_commit_changed(path):
     ok_file_under_git(path, 'tobechanged-git', annexed=False)
     # TODO: direct mode gotcha!!!
     ok_file_under_git(path, 'tobechanged-annex', annexed=not ar.is_direct_mode())
+
+
+def test_commit_annex_commit_changed():
+    yield check_commit_annex_commit_changed, False
+    yield check_commit_annex_commit_changed, True
