@@ -2074,7 +2074,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -2095,11 +2095,18 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
+        if remove_existing and op.lexists(full_name):
+            rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+                create_tree_archive(
+                    path, name, load,
+                    archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+                create_tree(
+                    full_name, load,
+                    archives_leading_dir=archives_leading_dir,
+                    remove_existing=remove_existing)
         else:
             if PY2:
                 open_kwargs = {'mode': "w"}
