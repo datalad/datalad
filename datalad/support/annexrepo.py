@@ -2896,7 +2896,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 direct_mode = self.is_direct_mode()
                 # we might need to avoid explicit paths
                 files_to_commit = None if direct_mode else files
-                if files:
+                if files and self.config.getint("annex", "version") < 6:
                     # In direct mode, if we commit file(s) they would get
                     # committed directly into git ignoring possibly being
                     # staged by annex.  So, if not all files are committed, and
