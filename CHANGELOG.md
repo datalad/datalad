@@ -10,9 +10,10 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.11.1 (??? ??, 2018) -- will be better than ever
+## 0.11.1 (Nov 25, 2018) -- v7-better-than-v6
 
-bet we will fix some bugs and make a world even a better place.
+Rushed out bugfix release to stay fully compatible with recent
+[git-annex] which introduced v7 to replace v6.
 
 ### Major refactoring and deprecations
 
@@ -21,10 +22,44 @@ bet we will fix some bugs and make a world even a better place.
 ### Fixes
 
 - [install]: be able to install recursively into a dataset ([#2982])
+- [aggregate-metadata]:
+  - dataset's itself is now not "aggregated" if specific paths are
+    provided for aggregation ([#3002]). That resolves the issue of
+    `-r` invocation aggregating all subdatasets of the specified dataset
+    as well
+- `annex` commands are now chunked assuming 50% "safety margin" on the
+  maximal command line length. Should resolve crashes while operating
+  ot too many files at ones ([#3001])
+- `run` sidecar config processing ([#2991])
+- no double trailing period in docs ([#2984])
+- correct identification of the repository with symlinks in the paths
+  in the tests ([#2972])
+- re-evaluation of dataset properties in case of dataset changes ([#2946])
+- [text2git] procedure to use `ds.repo.set_gitattributes`
+  ([#2974]) ([#2954])
+- Switch to use plain `os.getcwd()` if inconsistency with env var
+  `$PWD` is detected ([#2914])
+- Make sure that credential defined in env var takes precedence
+  ([#2960]) ([#2950])
 
 ### Enhancements and new features
 
-?
+- [shub://datalad/datalad:git-annex-dev](https://singularity-hub.org/containers/5663/view)
+  provides a Debian buster Singularity image with build environment for
+  [git-annex]. [tools/bisect-git-annex]() provides a helper for running
+  `git bisect` on git-annex using that Singularity container ([#2995])
+- Added [.zenodo.json]() for better integration with Zenodo for citation
+- [run-procedure] now provides names and help messages with a custom
+  renderer for ([#2993])
+- Documentation: point to [datalad-revolution] extension (prototype of
+  the greater DataLad future)
+- [run]
+  - support injecting of a detached command ([#2937])
+- `annex` metadata extractor now extracts `annex.key` metadata record.
+  Should allow now to identify uses of specific files etc ([#2952])
+- Test that we can install from http://datasets.datalad.org
+- Proper rendering of `CommandError` (e.g. in case of "out of space"
+  error) ([#2958])
 
 
 ## 0.11.0 (Oct 23, 2018) -- Soon-to-be-perfect
@@ -871,6 +906,7 @@ publishing
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
+[datalad-revolution]: http://github.com/datalad/datalad-revolution
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
 [export_tarball]: http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html
@@ -941,7 +977,21 @@ publishing
 [#2904]: https://github.com/datalad/datalad/issues/2904
 [#2905]: https://github.com/datalad/datalad/issues/2905
 [#2912]: https://github.com/datalad/datalad/issues/2912
+[#2914]: https://github.com/datalad/datalad/issues/2914
 [#2917]: https://github.com/datalad/datalad/issues/2917
 [#2921]: https://github.com/datalad/datalad/issues/2921
 [#2922]: https://github.com/datalad/datalad/issues/2922
+[#2937]: https://github.com/datalad/datalad/issues/2937
+[#2946]: https://github.com/datalad/datalad/issues/2946
+[#2950]: https://github.com/datalad/datalad/issues/2950
+[#2952]: https://github.com/datalad/datalad/issues/2952
+[#2954]: https://github.com/datalad/datalad/issues/2954
+[#2958]: https://github.com/datalad/datalad/issues/2958
+[#2972]: https://github.com/datalad/datalad/issues/2972
 [#2982]: https://github.com/datalad/datalad/issues/2982
+[#2984]: https://github.com/datalad/datalad/issues/2984
+[#2991]: https://github.com/datalad/datalad/issues/2991
+[#2993]: https://github.com/datalad/datalad/issues/2993
+[#2995]: https://github.com/datalad/datalad/issues/2995
+[#3001]: https://github.com/datalad/datalad/issues/3001
+[#3002]: https://github.com/datalad/datalad/issues/3002
