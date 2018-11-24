@@ -42,6 +42,7 @@ from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import all_same
 from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
@@ -597,6 +598,28 @@ def test_unique():
                key=itemgetter(0)), [(1, 2), (0, 3)])
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
                key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_all_same():
+    ok_(all_same([0, 0, 0]))
+    ok_(not all_same([0, 0, '0']))
+    ok_(not all_same([]))
+
+    def never_get_to_not_needed():
+        yield 'a'
+        yield 'a'
+        yield 'b'
+        raise ValueError("Should not get here since on b should return")
+
+    ok_(not all_same(never_get_to_not_needed()))
+
+    def gen1(n):
+        for x in range(n):
+            yield 'a'
+    ok_(not all_same(gen1(0)))
+    ok_(all_same(gen1(1)))
+    ok_(all_same(gen1(2)))
+    ok_(all_same(gen1(10)))
 
 
 def test_partition():

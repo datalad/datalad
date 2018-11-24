@@ -13,6 +13,11 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
+from six.moves import (
+    filter,
+    map,
+)
+
 from os import makedirs
 from os import listdir
 import os.path as op
@@ -34,6 +39,7 @@ from datalad.distribution.subdatasets import Subdatasets
 from datalad.interface.unlock import Unlock
 
 import datalad
+from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -60,8 +66,9 @@ from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
+from datalad.support.path import split_ext
 
-from datalad.utils import path_is_subpath
+from datalad.utils import path_is_subpath, all_same
 from datalad.utils import assure_list
 
 
@@ -132,6 +139,111 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # somewhere, because we cannot rediscover them on the filesystem
     # when updating the datasets later on
     return hits
+
+def _the_same_across_datasets(relpath, *dss):
+    """Check if the file (present content or not) is identical across two datasets
+
+    Compares files by content if under git, or by checksum if under annex
+
+    Parameters
+    ----------
+    *ds: Datasets
+    relpath: str
+        path within datasets
+
+    Returns
+    -------
+    bool or None
+      True if identical, False if not, None if cannot be decided
+      (e.g. different git-annex backend used)
+    """
+    from datalad.utils import md5sum, unique
+    from datalad.support.exceptions import FileInGitError
+    from datalad.support.digests import Digester
+
+    paths = [op.join(ds.path, relpath) for ds in dss]
+    # The simplest check first -- exist in both and content is the same.
+    # Even if content is just a symlink file on windows, the same content
+    # condition would be correct
+    if all(map(exists, paths)) and all_same(map(md5sum, paths)):
+        return True
+
+    # We first need to find problematic ones which are annexed and
+    # have no content locally, and take their
+    keys = []
+    backends = []
+    presents = []
+    for ds in dss:
+        repo = ds.repo
+        key = None
+        present = True
+        if isinstance(repo, AnnexRepo):
+            try:
+                key = repo.get_file_key(relpath)
+            except FileInGitError:
+                continue
+            if not key:
+                raise ValueError(
+                    "Must have got a key, unexpectedly got %r for %s within %s"
+                    % (key, relpath, ds)
+                )
+            # For now the rest (e.g. not tracked) remains an error
+            if not repo.file_has_content(relpath):
+                present = False
+                backends.append(repo.get_key_backend(key))
+        keys.append(key)
+        presents.append(present)
+
+    if all(presents):
+        return all_same(map(md5sum, paths))
+
+    backends = unique(backends)
+    assert backends, "Since not all present - some must be under annex, and thus must have a backend!"
+    # so some files are missing!
+    assert not all(presents)
+    NeedContentError = RuntimeError
+    if len(backends) > 1:
+        # TODO: or signal otherwise somehow that we just need to get at least some
+        # of those files to do the check!...
+        raise NeedContentError(
+            "Following paths are missing conent and have different annex "
+            "backends: %s. Cannot determine here if the same or not!"
+            % ", ".join(p for (p, b) in zip(paths, presents) if not b)
+        )
+    backend = backends[0].lower()
+    if backend.endswith('E'):
+        backend = backend[':-1']
+
+    if backend not in Digester.DEFAULT_DIGESTS:
+        raise NeedContentError(
+            "Do not know how to figure out content check for backend %s" % backend
+        )
+
+    checksums = [
+        split_ext(key).split('--', 1)[1] if key else key
+        for key in keys
+    ]
+    thechecksum = set(
+        checksum
+        for present, checksum in zip(presents, checksums)
+        if present
+    )
+    if len(thechecksum) > 1:
+        # Different checksum (with the same backend)
+        return False
+    elif not thechecksum:
+        raise RuntimeError("We must have had at least one key since prior logic"
+                           " showed that not all files have content here")
+    thechecksum = thechecksum[0]
+    if any(presents):
+        # We do need to extract checksum from the key and check the present
+        # files' content to match
+        digester = Digester([backend])
+        for present, path in zip(presents, paths):
+            if present and digester(path)[backend] != thechecksum:
+                return False
+        return True
+    return False
 
 
 def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extraction):
@@ -220,24 +332,52 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
 
     # check if we have the extracted metadata for this state already
     # either in the source or in the destination dataset
-    metafound = {
-        s: d
-        # look in targetds last to not have to move things
-        # unnecessarily
-        for d in (aggfrom_ds, agginto_ds)
-        for s in metasources
-        # important to test for lexists() as we do not need to
-        # or want to `get()` metadata files for this test
-        # info on identity is sufficient
-        if op.lexists(
-            op.join(
-                d.path,
-                dirname(agginfo_relpath),
-                _get_obj_location(objid, s)))
-    } if not force_extraction else False
+    # The situation is trickier!  Extracted metadata could change for the same
+    # state (commit etc), e.g. if extractors changed.
+    # The "correct" thing would be either
+    # - to inspect git history either there were changes
+    #   within aggfrom_ds since agginto_ds got the metadata committed OR
+    # - check by content - if file is under git - compute checksum,
+    #   if under annex -- take checksum from the key without asking for the
+    #   content
+    metafound = {}
+    uptodatemeta = []  # record which meta not only found but matching in content
+    # TODO: current fixes might break logic for when fromds is not installed
+    #       when I guess we just need to skip it?
+    if not force_extraction:
+        for s, sprop in metasources.items():
+            objloc = op.join(dirname(agginfo_relpath),
+                             _get_obj_location(objid, s, sprop['dumper']))
+            smetafound = [
+                # important to test for lexists() as we do not need to
+                # or want to `get()` metadata files for this test.
+                # Info on identity is NOT sufficient - later compare content if
+                # multiple found
+                objloc if op.lexists(op.join(d.path, objloc)) else None
+                # Order of dss matters later
+                for d in (aggfrom_ds, agginto_ds)
+            ]
+            if all(smetafound):
+                # both have it
+                metafound[s] = smetafound
+                # but are they the same?
+                try:
+                    if _the_same_across_datasets(objloc, aggfrom_ds, agginto_ds):
+                        uptodatemeta.append(s)
+                except RuntimeError as exc:
+                    # TODO: dedicated test - when meta content changes
+                    lgr.debug("For now will just do re-extraction since caught %s",
+                              exc_str(exc))
+            # source one has it, so we might be able to copy it
+            # TODO: dedicated test - when it is sufficient to copy we do not re-extract
 
-    if not metafound:
-        lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
+    if len(metafound) != len(metasources):
+        # found some (either ds or cn) metadata missing entirely in both
+        # from and into datasets
+        lgr.debug(
+            "Incomplete or absent metadata while aggregating %s <- %s: %s",
+              agginto_ds, aggfrom_ds, metafound
+        )
         # no metadata found -> extract
         # this places metadata dump files into the configured
         # target dataset and lists them in `to_save`, as well
@@ -255,8 +395,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     # we did not actually run an extraction, so we need to
     # assemble an aggregation record from the existing pieces
     # that we found
-    # simple case: the target dataset has all the records already:
-    if all(d is agginto_ds for s, d in metafound.items()):
+    # simple case: the target dataset has all the records already and they are up to date:
+    if len(uptodatemeta) == len(metasources):
         lgr.debug('Sticking with up-to-date metadata for %s', aggfrom_ds)
         # no change, use old record from the target dataset
         db[aggfrom_ds.path] = old_agginfo
@@ -266,10 +406,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         lgr.debug('Reusing previously extracted metadata for %s', aggfrom_ds)
         # we need to move the metadata dump(s) into the target dataset
         objrelpaths = {
-            label: op.join(
-                dirname(agginfo_relpath),
-                _get_obj_location(objid, label))
-            for label in metafound
+            label: next(filter(bool, smetafound))
+            for label, smetafound in metafound.items()
         }
         # make sure all the to-be-moved metadata records are present
         # locally
@@ -287,6 +425,11 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
             objdir = dirname(objpath)
             if not exists(objdir):
                 makedirs(objdir)
+            if lexists(objpath):
+                os.unlink(objpath)  # remove previous version first
+                # was a wild thought as a workaround for 
+                # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec1
+                # agginto_ds.repo.remove(objpath)
             # XXX TODO once we have a command that can copy/move files
             # from one dataset to another including file availability
             # info, this should be used here
@@ -306,6 +449,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
 
 
 def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, refcommit, subds_relpaths):
+    lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
     # we will replace any conflicting info on this dataset with fresh stuff
     agginfo = db.get(aggfrom_ds.path, {})
     # paths to extract from
@@ -347,9 +491,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, r
         if not meta[label]:
             continue
         # only write to disk if there is something
-        objrelpath = _get_obj_location(objid, label)
-        if props['dumper'] is json_py.dump2xzstream:
-            objrelpath += '.xz'
+        objrelpath = _get_obj_location(objid, label, props['dumper'])
         # place metadata object into the source dataset
         objpath = opj(dest.path, dirname(agginfo_relpath), objrelpath)
 
@@ -442,13 +584,18 @@ def _get_latest_refcommit(ds, subds_relpaths):
     return ds.repo.get_last_commit_hash(relevant_paths)
 
 
-def _get_obj_location(hash_str, ref_type):
-    return opj(
+def _get_obj_location(hash_str, ref_type, dumper):
+    objrelpath = opj(
         'objects',
         hash_str[:2],
         '{}-{}'.format(
             ref_type,
             hash_str[2:]))
+
+    if dumper is json_py.dump2xzstream:
+        objrelpath += '.xz'
+
+    return objrelpath
 
 
 def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db, to_save):
