@@ -438,9 +438,10 @@ def _get_script_handler(script, since, revision):
                 msg = ''
 
             expanded_cmd = format_command(
-                cmd, **dict(run_info,
-                            dspath=dset.path,
-                            pwd=op.join(dset.path, run_info["pwd"])))
+                dset, cmd,
+                **dict(run_info,
+                       dspath=dset.path,
+                       pwd=op.join(dset.path, run_info["pwd"])))
 
             ofh.write(
                 "\n" + "".join("# " + ln

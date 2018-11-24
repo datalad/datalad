@@ -683,19 +683,7 @@ class GitRepo(RepoInterface):
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-
-            try:
-                lgr.debug(
-                    "Initialize empty Git repository at '%s'%s",
-                    path,
-                    ' %s' % git_opts if git_opts else '')
-                self._repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
-                                                   mkdir=True,
-                                                   odbt=default_git_odbt,
-                                                   **git_opts)
-            except GitCommandError as e:
-                lgr.error(exc_str(e))
-                raise
+            self._repo = self._create_empty_repo(path, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -725,6 +713,21 @@ class GitRepo(RepoInterface):
             self.configure_fake_dates()
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
+
+    def _create_empty_repo(self, path, **kwargs):
+        try:
+            lgr.debug(
+                "Initialize empty Git repository at '%s'%s",
+                path,
+                ' %s' % kwargs if kwargs else '')
+            repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                                         mkdir=True,
+                                         odbt=default_git_odbt,
+                                         **kwargs)
+        except GitCommandError as e:
+            lgr.error(exc_str(e))
+            raise
+        return repo
 
     @property
     def repo(self):
@@ -764,7 +767,7 @@ class GitRepo(RepoInterface):
         url : str
         path : str
         expect_fail : bool
-          Either expect that command might fail, so error should be logged then
+          Whether expect that command might fail, so error should be logged then
           at DEBUG level instead of ERROR
         """
 
@@ -1134,7 +1137,7 @@ class GitRepo(RepoInterface):
         files: str
           list of paths to remove
         recursive: False
-          either to allow recursive removal from subdirectories
+          whether to allow recursive removal from subdirectories
         kwargs:
           see `__init__`
 
@@ -1686,7 +1689,8 @@ class GitRepo(RepoInterface):
                             expect_stderr=True, cwd=None, env=None,
                             shell=None, expect_fail=False,
                             check_fake_dates=False,
-                            index_file=None):
+                            index_file=None,
+                            updates_tree=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -1697,7 +1701,10 @@ class GitRepo(RepoInterface):
         ----------
         files: list of files
         cmd_str: str or list
-            arbitrary command str. `files` is appended to that string.
+          arbitrary command str. `files` is appended to that string.
+        updates_tree: bool
+          whether or not command updates the working tree. If True, triggers
+          necessary reevaluations like self.config.reload()
 
         Returns
         -------
@@ -1746,6 +1753,11 @@ class GitRepo(RepoInterface):
                                      stderr=e.stderr,
                                      paths=ignored.groups()[0].splitlines())
             raise
+
+        if updates_tree:
+            lgr.debug("Reloading config due to supposed working tree update")
+            self.config.reload()
+
         return out, err
 
 # TODO: --------------------------------------------------------------------
@@ -2116,7 +2128,7 @@ class GitRepo(RepoInterface):
             cmd += options
         cmd += [str(name)]
 
-        self._git_custom_command('', cmd, expect_stderr=True)
+        self._git_custom_command('', cmd, expect_stderr=True, updates_tree=True)
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge

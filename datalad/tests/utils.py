@@ -50,6 +50,7 @@ from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
+from .. import utils
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
@@ -208,13 +209,14 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                 eq_(head_diffs, [])
                 eq_(index_diffs, [])
             else:
+                # TODO: These names are confusing/non-descriptive.  REDO
                 if head_modified:
                     # we did ask for interrogating changes
                     head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(head_modified_, head_modified)
+                    eq_(sorted(head_modified_), sorted(head_modified))
                 if index_modified:
                     index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(index_modified_, index_modified)
+                    eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -279,7 +281,10 @@ def _prep_file_under_git(path, filename):
             raise
 
     # path to the file within the repository
-    file_repo_dir = os.path.relpath(path, repo.path)
+    # repo.path is a "realpath" so to get relpath working correctly
+    # we need to realpath our path as well
+    path = op.realpath(path)  # intentional realpath to match GitRepo behavior
+    file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
 
@@ -938,28 +943,32 @@ def known_failure(func):
     return newfunc
 
 
-def known_failure_v6(func):
-    """Test decorator marking a test as known to fail in a v6 test run
+def known_failure_v6_or_later(func):
+    """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
-    the original (undecorated) function is returned.
+    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
     """
 
     from datalad import cfg
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version == 6:
+    if version and version >= 6:
 
         @known_failure
         @wraps(func)
-        @attr('known_failure_v6')
-        @attr('v6')
+        @attr('known_failure_v6_or_later')
+        @attr('v6_or_later')
         def v6_func(*args, **kwargs):
             return func(*args, **kwargs)
 
         return v6_func
 
     return func
+
+
+# TODO: Remove once the released version of datalad-crawler no longer uses it.
+known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
@@ -1010,18 +1019,18 @@ def known_failure_windows(func):
 
 
 @optional_args
-def skip_v6(func, method='raise'):
-    """Skips tests if datalad is configured to use v6 mode
-    (DATALAD_REPO_VERSION=6)
+def skip_v6_or_later(func, method='raise'):
+    """Skips tests if datalad is configured to use v6 mode or later
+    (e.g., DATALAD_REPO_VERSION=6)
     """
 
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
+    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
     @wraps(func)
-    @attr('skip_v6')
-    @attr('v6')
+    @attr('skip_v6_or_later')
+    @attr('v6_or_later')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1062,11 +1071,14 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
+        # record previous state of PWD handling
+        utils_pwd_mode = utils._pwd_mode
         try:
-            func(*args, **kwargs)
+            ret = func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
+            utils._pwd_mode = utils_pwd_mode
             try:
                 cwd_after = os.getcwd()
             except OSError as e:
@@ -1075,6 +1087,9 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if cwd_after != cwd_before:
             chpwd(pwd_before)
+            # Above chpwd could also trigger the change of _pwd_mode, so we
+            # would need to reset it again since we know that it is all kosher
+            utils._pwd_mode = utils_pwd_mode
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
@@ -1088,6 +1103,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if exc_info is not None:
             reraise(*exc_info)
+
+        return ret
 
     return newfunc
 

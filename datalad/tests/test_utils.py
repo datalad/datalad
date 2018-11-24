@@ -42,6 +42,7 @@ from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import all_same
 from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
@@ -334,6 +335,23 @@ def test_getpwd_basic():
         assert_false(oschdir.called)
 
 
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tempfile(mkdir=True)
+def test_getpwd_change_mode(tdir):
+    from datalad import utils
+    if utils._pwd_mode != 'PWD':
+        raise SkipTest("Makes sense to be tested only in PWD mode, "
+                       "but we seems to be beyond that already")
+    # The evil plain chdir call
+    os.chdir(tdir)
+    # Just testing the logic of switching to cwd mode and issuing a warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        pwd = getpwd()
+        eq_(pwd, os.path.realpath(pwd))  # might have symlinks, thus realpath
+    assert_in("symlinks in the paths will be resolved", cml.out)
+    eq_(utils._pwd_mode, 'cwd')
+
+
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
 @assert_cwd_unchanged
@@ -580,6 +598,28 @@ def test_unique():
                key=itemgetter(0)), [(1, 2), (0, 3)])
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
                key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_all_same():
+    ok_(all_same([0, 0, 0]))
+    ok_(not all_same([0, 0, '0']))
+    ok_(not all_same([]))
+
+    def never_get_to_not_needed():
+        yield 'a'
+        yield 'a'
+        yield 'b'
+        raise ValueError("Should not get here since on b should return")
+
+    ok_(not all_same(never_get_to_not_needed()))
+
+    def gen1(n):
+        for x in range(n):
+            yield 'a'
+    ok_(not all_same(gen1(0)))
+    ok_(all_same(gen1(1)))
+    ok_(all_same(gen1(2)))
+    ok_(all_same(gen1(10)))
 
 
 def test_partition():

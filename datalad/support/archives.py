@@ -201,7 +201,7 @@ def compress_files(files, archive, path=None, overwrite=True):
       Alternative directory under which compressor will be invoked, to e.g.
       take into account relative paths of files and/or archive
     overwrite : bool
-      Either to allow overwriting the target archive file if one already exists
+      Whether to allow overwriting the target archive file if one already exists
     """
     with swallow_outputs() as cmo:
         with chpwd(path):

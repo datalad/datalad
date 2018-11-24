@@ -517,8 +517,9 @@ def main(args=None):
             except CommandError as exc:
                 # behave as if the command ran directly, importantly pass
                 # exit code as is
-                if exc.msg:
-                    msg = exc.msg.encode() if isinstance(exc.msg, text_type) else exc.msg
+                exc_msg = str(exc)
+                if exc_msg:
+                    msg = exc_msg.encode() if isinstance(exc_msg, text_type) else exc_msg
                     os.write(2, msg + b"\n")
                 if exc.stdout:
                     os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)

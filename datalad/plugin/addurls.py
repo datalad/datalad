@@ -11,7 +11,6 @@
 
 from collections import Mapping
 from functools import partial
-from itertools import dropwhile
 import logging
 import os
 import re
@@ -28,6 +27,7 @@ from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.interface.common_opts import nosave_opt
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
+from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     assure_list,
@@ -277,41 +277,6 @@ def _format_filenames(format_fn, rows, row_infos):
         info["filename"] = filename
         info["subpath"] = spaths[-1] if spaths else None
     return subpaths
-
-
-def split_ext(filename):
-    """Use git-annex's splitShortExtensions rule for splitting extensions.
-
-    Parameters
-    ----------
-    filename : str
-
-    Returns
-    -------
-    A tuple with (root, extension)
-
-    Examples
-    --------
-    >>> from datalad.plugin.addurls import split_ext
-    >>> split_ext("filename.py")
-    ('filename', '.py')
-
-    >>> split_ext("filename.tar.gz")
-    ('filename', '.tar.gz')
-
-    >>> split_ext("filename.above4chars.ext")
-    ('filename.above4chars', '.ext')
-    """
-    parts = filename.split(".")
-    if len(parts) == 1:
-        return filename, ""
-
-    tail = list(dropwhile(lambda x: len(x) < 5,
-                          reversed(parts[1:])))
-
-    file_parts = parts[:1] + tail[::-1]
-    ext_parts = parts[1+len(tail):]
-    return ".".join(file_parts), "." + ".".join(ext_parts)
 
 
 def get_file_parts(filename, prefix="name"):
@@ -727,8 +692,6 @@ class Addurls(Interface):
 
         from requests.exceptions import RequestException
 
-        from datalad.distribution.add import Add
-        from datalad.distribution.create import Create
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo

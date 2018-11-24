@@ -1,0 +1,36 @@
+Bootstrap:docker
+From:neurodebian:buster
+
+%post
+    echo "Configuring the environment"
+    apt-get -y update
+
+    # If needed to replicate some prior build environment, use nd_freeze
+    #apt-get install neurodebian-freeze   # upgrade it
+    #echo "Freezing the environment"
+    #nd_freeze 2018/05/18  # I thought incorrectly that it is when ghc upgraded in testing
+    #nd_freeze 2017/09/01  # 20170902 is when ghc moved from 8.0.1-17 to 8.0.2-9 in testing
+
+    # setup the container sources themselves
+    apt-get -y install vim less devscripts locales
+
+    sed -i -e 's,^deb \(.*\),deb \1\ndeb-src \1,g' /etc/apt/sources.list /etc/apt/*.d/*.list \
+     && apt-get -y update \
+     && eatmydata apt-get -y build-dep git git-annex git-annex-standalone
+
+    # we need a UTF locale for DataLad to work properly
+    echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
+     && locale-gen
+
+    # clean up
+    apt-get clean \
+     && rm -rf /var/lib/apt/lists/*
+
+%runscript
+    #exec /bin/bash "$@"
+    # Or let's just build the beast assuming we are in the directory with git-annex
+    # sources
+    make linuxstandalone
+
+%environments
+    unset PYTHONPATH

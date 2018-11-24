@@ -14,6 +14,7 @@ from datalad.tests.utils import known_failure_v6
 
 import logging
 from functools import partial
+from glob import glob
 import os
 from os import mkdir
 from os.path import join as opj
@@ -37,6 +38,7 @@ import gc
 from datalad.cmd import Runner
 
 from datalad.support.external_versions import external_versions
+from datalad.support import path as op
 
 from datalad.support.sshconnector import get_connection_hash
 
@@ -69,6 +71,7 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
@@ -201,7 +204,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
     ar = AnnexRepo.clone(src, dst)
 
-    if ar.config.getint("annex", "version") >= 6:
+    if ar.supports_unlocked_pointers:
         # there's no direct mode available:
         assert_raises(CommandError, ar.set_direct_mode, True)
         raise SkipTest("Test not applicable in repository version >= 6")
@@ -223,7 +226,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
-    if ar.config.getint("annex", "version") >= 6:
+    if ar.supports_unlocked_pointers:
         # there's no direct mode available and therefore no 'annex proxy':
         assert_raises(CommandError, ar.proxy, ['git', 'status'])
         raise SkipTest("Test not applicable in repository version >= 6")
@@ -246,15 +249,16 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     ar = AnnexRepo.clone(src, annex_path)
 
     # test-annex.dat should return the correct key:
-    eq_(
-        ar.get_file_key("test-annex.dat"),
-        'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat')
+    test_annex_key = \
+        'SHA256E-s28' \
+        '--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat'
+    eq_(ar.get_file_key("test-annex.dat"), test_annex_key)
 
     # and should take a list with an empty string as result, if a file wasn't
     # in annex:
     eq_(
         ar.get_file_key(["filenotpresent.wtf", "test-annex.dat"]),
-        ['', 'SHA256E-s28--2795fb26981c5a687b9bf44930cc220029223f472cea0f0b17274f4473181e7b.dat']
+        ['', test_annex_key]
     )
 
     # test.dat is actually in git
@@ -265,6 +269,12 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+    # if we force batch mode, no failure for not present or not annexed files
+    eq_(ar.get_file_key("filenotpresent.wtf", batch=True), '')
+    eq_(ar.get_file_key("test.dat", batch=True), '')
+    eq_(ar.get_file_key("test-annex.dat", batch=True), test_annex_key)
+
 
 
 @with_tempfile(mkdir=True)
@@ -322,7 +332,7 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     if not direct:  # There's no unlock in direct mode.
         ar.unlock(["test-annex.dat"])
         eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-            [ar.config.get("annex.version") == "6"])
+            [ar.supports_unlocked_pointers])
         with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
             ofh.write("more")
         eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
@@ -358,7 +368,7 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     if not direct:  # There's no unlock in direct mode.
         ar.unlock(["test-annex.dat"])
         eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-            [ar.config.get("annex.version") == "6"])
+            [ar.supports_unlocked_pointers])
         with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
             ofh.write("more")
         eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
@@ -900,11 +910,11 @@ def test_AnnexRepo_add_unexpected_direct_mode(path):
     # superproject is not.
     # There is no point in this test, if direct mode was enforced in the
     # superproject already (either by test run configuration or FS) or if the
-    # repositories are in V6 by default (where there is no direct mode)
+    # repositories are in V6+ by default (where there is no direct mode)
 
     top = AnnexRepo(path)
 
-    if top.is_direct_mode() or top.config.get("annex.version") == '6':
+    if top.is_direct_mode() or top.supports_unlocked_pointers:
         raise SkipTest("Nothing to test for")
 
     top.update_submodule('subm 1', init=True)
@@ -1217,7 +1227,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     # but socket was not touched:
     if localhost_was_open:
         # FIXME: occasionally(?) fails in V6:
-        if not ar.config.getint("annex", "version") == 6:
+        if not ar.supports_unlocked_pointers:
             ok_(exists(socket_2))
     else:
         ok_(not exists(socket_2))
@@ -1279,13 +1289,16 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    eq_(version, 6)
+    # TODO: Since git-annex 7.20181031, v6 repos upgrade to v7. Once that
+    # version or later is our minimum required version, update this test and
+    # the one below to eq_(version, 7).
+    assert_in(version, [6, 7])
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
         version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 6)
+        assert_in(version, [6, 7])
 
         # parameter `version` still has priority over default config:
         annex = AnnexRepo(path3, create=True, version=5)
@@ -1491,11 +1504,20 @@ def test_is_available(batch, direct, p):
     # remove url
     urls = annex.get_urls(fname) #, **bkw)
     assert(len(urls) == 1)
+    eq_(urls, annex.get_urls(annex.get_file_key(fname), key=True))
     annex.rm_url(fname, urls[0])
 
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
     assert is_available(fname, remote='web') is False
+
+
+@with_tempfile(mkdir=True)
+def test_get_urls_none(path):
+    ar = AnnexRepo(path, create=True)
+    with open(opj(ar.path, "afile"), "w") as f:
+        f.write("content")
+    eq_(ar.get_urls("afile"), [])
 
 
 @with_tempfile(mkdir=True)
@@ -1784,7 +1806,7 @@ def test_AnnexRepo_dirty(path):
     # modify to be the same
     with open(opj(path, 'file1.txt'), 'w') as f:
         f.write('whatever')
-    if not repo.config.getint("annex", "version") == 6:
+    if not repo.supports_unlocked_pointers:
         ok_(not repo.dirty)
     # modified file
     with open(opj(path, 'file1.txt'), 'w') as f:
@@ -1821,7 +1843,7 @@ def _test_status(ar):
 
     def sync_wrapper(push=False, pull=False, commit=False):
         # wraps common annex-sync call, since it currently fails under
-        # mysterious circumstances in V6 adjusted branch setups
+        # mysterious circumstances in V6+ adjusted branch setups
         try:
             ar.sync(push=push, pull=pull, commit=commit)
         except CommandError as e:
@@ -1846,7 +1868,7 @@ def _test_status(ar):
                 # But it almost works - so apperently nothing to do
                 import logging
                 lgr = logging.getLogger("datalad.support.tests.test-status")
-                lgr.warning("DEBUG: v6 sync failure")
+                lgr.warning("DEBUG: v6+ sync failure")
 
     stat = {'untracked': [],
             'deleted': [],
@@ -2061,7 +2083,7 @@ def _test_status(ar):
     ar.add('fifth')
     sync_wrapper()
 
-    if ar.config.getint("annex", "version") == 6:
+    if ar.supports_unlocked_pointers:
         # mixed annexed/not-annexed files ATm can't be committed with explicitly
         # given paths in v6
         # See:
@@ -2115,7 +2137,7 @@ def test_AnnexRepo_status(path, path2):
 
     ar = AnnexRepo(path, create=True)
     _test_status(ar)
-    if ar.config.getint("annex", "version") == 6:
+    if ar.supports_unlocked_pointers:
         # in case of v6 have a second run with adjusted branch feature:
         ar2 = AnnexRepo(path2, create=True)
         ar2.commit(msg="empty commit to create branch 'master'",
@@ -2291,7 +2313,7 @@ def test_AnnexRepo_get_corresponding_branch(path):
     eq_('master', ar.get_corresponding_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
-    if ar.config.getint("annex", "version") == 6:
+    if ar.supports_unlocked_pointers:
         ar.adjust()
         # as above, we still want to get 'master', while being on
         # 'adjusted/master(unlocked)'
@@ -2317,11 +2339,11 @@ def test_AnnexRepo_is_managed_branch(path):
     if ar.is_direct_mode():
         ok_(ar.is_managed_branch())
     else:
-        # ATM only direct mode and v6 adjusted branches should return True.
+        # ATM only direct mode and v6+ adjusted branches should return True.
         # Adjusted branch requires a call of git-annex-adjust and shouldn't
         # be the state of a fresh clone
         ok_(not ar.is_managed_branch())
-    if ar.config.getint("annex", "version") == 6:
+    if ar.supports_unlocked_pointers:
         ar.adjust()
         ok_(ar.is_managed_branch())
 
@@ -2398,3 +2420,76 @@ def test_error_reporting(path):
             'note': 'not found',
             'success': False}]
     )
+
+
+# http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
+# https://github.com/datalad/datalad/issues/1651
+@with_tree(tree={
+    '.gitattributes': "** annex.largefiles=(largerthan=4b)",
+    'alwaysbig': 'a'*10,
+    'willnotgetshort': 'b'*10,
+    'tobechanged-git': 'a',
+    'tobechanged-annex': 'a'*10,
+})
+def check_commit_annex_commit_changed(unlock, path):
+    # Here we test commit working correctly if file was just removed
+    # (not unlocked), edited and committed back
+
+    # TODO: an additional possible interaction to check/solidify - if files
+    # first get unannexed (after being optionally unlocked first)
+    unannex = False
+
+    ar = AnnexRepo(path, create=True)
+    ar.add('.gitattributes')
+    ar.add('.')
+    ar.commit("initial commit")
+    ok_clean_git(path)
+    # Now let's change all but commit only some
+    files = [op.basename(p) for p in glob(op.join(path, '*'))]
+    if unlock:
+        ar.unlock(files)
+    if unannex:
+        ar.unannex(files)
+    create_tree(
+        path
+        , {
+            'alwaysbig': 'a'*11,
+            'willnotgetshort': 'b',
+            'tobechanged-git': 'aa',
+            'tobechanged-annex': 'a'*11,
+            'untracked': 'unique'
+        }
+        , remove_existing=True
+    )
+    ok_clean_git(
+        path
+        , index_modified=files if not unannex else ['tobechanged-git']
+        , untracked=['untracked'] if not unannex else
+          # all but the one in git now
+          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willnotgetshort']
+    )
+
+    ar.commit("message", files=['alwaysbig', 'willnotgetshort'])
+    ok_clean_git(
+        path
+        , index_modified=['tobechanged-git', 'tobechanged-annex']
+        , untracked=['untracked']
+    )
+    ok_file_under_git(path, 'alwaysbig', annexed=True)
+    # This one is actually "questionable" since might be "correct" either way
+    # but it would be nice to have it at least consistent
+    ok_file_under_git(path, 'willnotgetshort', annexed=True)
+
+    ar.commit("message2", options=['-a']) # commit all changed
+    ok_clean_git(
+        path
+        , untracked=['untracked']
+    )
+    ok_file_under_git(path, 'tobechanged-git', annexed=False)
+    # TODO: direct mode gotcha!!!
+    ok_file_under_git(path, 'tobechanged-annex', annexed=not ar.is_direct_mode())
+
+
+def test_commit_annex_commit_changed():
+    for unlock in True, False:
+        yield check_commit_annex_commit_changed, unlock

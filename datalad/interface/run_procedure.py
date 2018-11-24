@@ -35,6 +35,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.utils import assure_list
+import datalad.support.ansi_colors as ac
 
 # bound dataset methods
 from datalad.interface.run import Run
@@ -119,7 +120,7 @@ def _get_procedure_implementation(name='*', ds=None):
                 cfg.obtain('datalad.locations.system-procedures')):
         for dir in assure_list(loc):
             for m, n in _get_file_match(dir, name):
-                yield (m,) + _get_proc_config(n)
+                yield (m, n,) + _get_proc_config(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
@@ -128,12 +129,12 @@ def _get_procedure_implementation(name='*', ds=None):
         for dir in dirs:
             # TODO `get` dirs if necessary
             for m, n in _get_file_match(op.join(ds.path, dir), name):
-                yield (m,) + _get_proc_config(n, ds=ds)
+                yield (m, n,) + _get_proc_config(n, ds=ds)
         # 2.1. check subdatasets recursively
         for subds in ds.subdatasets(return_type='generator',
                                     result_xfm='datasets'):
-            for m, f, h in _get_procedure_implementation(name=name, ds=subds):
-                yield m, f, h
+            for m, n, f, h in _get_procedure_implementation(name=name, ds=subds):
+                yield m, n, f, h
 
     # 3. check extensions for procedure
     # delay heavy import until here
@@ -148,12 +149,12 @@ def _get_procedure_implementation(name='*', ds=None):
                         entry_point.module_name,
                         'resources/procedures'),
                     name):
-                yield (m,) + _get_proc_config(n)
+                yield (m, n,) + _get_proc_config(n)
     # 4. at last check datalad itself for procedure
     for m, n in _get_file_match(
             resource_filename('datalad', 'resources/procedures'),
             name):
-        yield (m,) + _get_proc_config(n)
+        yield (m, n,) + _get_proc_config(n)
 
 
 def _guess_exec(script_file):
@@ -325,6 +326,8 @@ class RunProcedure(Interface):
         )
     )
 
+    result_renderer = 'tailored'
+
     @staticmethod
     @datasetmethod(name='run_procedure')
     @eval_results
@@ -347,7 +350,8 @@ class RunProcedure(Interface):
 
         if discover:
             reported = set()
-            for m, cmd_tmpl, cmd_help in _get_procedure_implementation('*', ds=ds):
+            for m, cmd_name, cmd_tmpl, cmd_help in \
+                    _get_procedure_implementation('*', ds=ds):
                 if m in reported:
                     continue
                 ex = _guess_exec(m)
@@ -362,15 +366,17 @@ class RunProcedure(Interface):
                 message = ex['type'] if ex['type'] else 'unknown type'
                 message += ' (missing)' if ex['state'] == 'absent' else ''
                 res = get_status_dict(
-                    action='run_procedure',
+                    action='discover_procedure',
                     path=m,
                     type='file',
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
                     state=ex['state'],
+                    procedure_name=cmd_name,
                     procedure_type=ex['type'],
                     procedure_callfmt=ex['template'],
+                    procedure_help=cmd_help,
                     message=message)
                 reported.add(m)
                 yield res
@@ -385,7 +391,7 @@ class RunProcedure(Interface):
 
         try:
             # get the first match an run with it
-            procedure_file, cmd_tmpl, cmd_help = \
+            procedure_file, cmd_name, cmd_tmpl, cmd_help = \
                 next(_get_procedure_implementation(name, ds=ds))
         except StopIteration:
             res = get_status_dict(
@@ -415,6 +421,7 @@ class RunProcedure(Interface):
                         refds=ds.path if ds else None,
                         status='ok',
                         state=ex['state'],
+                        procedure_name=cmd_name,
                         procedure_type=ex['type'],
                         procedure_callfmt=ex['template'],
                         message=cmd_help)
@@ -427,6 +434,7 @@ class RunProcedure(Interface):
                         refds=ds.path if ds else None,
                         status='impossible',
                         state=ex['state'],
+                        procedure_name=cmd_name,
                         procedure_type=ex['type'],
                         procedure_callfmt=ex['template'],
                         message="No help available for '%s'" % name)
@@ -453,5 +461,50 @@ class RunProcedure(Interface):
                 outputs=None,
                 # pass through here
                 on_failure='ignore',
+                return_type='generator'
         ):
             yield r
+
+    @staticmethod
+    def custom_result_renderer(res, **kwargs):
+        from datalad.ui import ui
+        from datalad.interface.utils import default_result_renderer
+
+        if res['status'] != 'ok':
+            # logging complained about this already
+            return
+
+        if 'procedure' not in res.get('action', ''):
+            # it's not our business
+            default_result_renderer(res)
+            return
+
+        if kwargs.get('discover', None):
+            ui.message('{name} ({path}){msg}'.format(
+                name=ac.color_word(res['procedure_name'], ac.BOLD),
+                path=op.relpath(
+                    res['path'],
+                    res['refds'])
+                if res.get('refds', None) else res['path'],
+                msg=' [{}]'.format(
+                    res['message'][0] % res['message'][1:]
+                    if isinstance(res['message'], tuple) else res['message'])
+                if 'message' in res else ''
+            ))
+
+        elif kwargs.get('help_proc', None):
+            ui.message('{name} ({path}){help}'.format(
+                name=ac.color_word(res['procedure_name'], ac.BOLD),
+                path=op.relpath(
+                    res['path'],
+                    res['refds'])
+                if res.get('refds', None) else res['path'],
+                help='{nl}{msg}'.format(
+                    nl=os.linesep,
+                    msg=res['message'][0] % res['message'][1:]
+                    if isinstance(res['message'], tuple) else res['message'])
+                if 'message' in res else ''
+            ))
+
+        else:
+            default_result_renderer(res)

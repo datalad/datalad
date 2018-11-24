@@ -66,9 +66,9 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
+    Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(Dataset(path)), [])
-    os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
     open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
     assert_equal(get_metadata_type(Dataset(path)), [])
@@ -137,8 +137,9 @@ def test_aggregation(path):
     # store clean direct result
     origres = ds.metadata(recursive=True)
     # basic sanity check
-    assert_result_count(origres, 3)
+    assert_result_count(origres, 6)
     assert_result_count(origres, 3, type='dataset')
+    assert_result_count(origres, 3, type='file')  # Now that we have annex.key
     # three different IDs
     assert_equal(3, len(set([s['dsid'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
@@ -158,8 +159,9 @@ def test_aggregation(path):
     # get fresh metadata
     cloneres = clone.metadata()
     # basic sanity check
-    assert_result_count(cloneres, 1)
+    assert_result_count(cloneres, 2)
     assert_result_count(cloneres, 1, type='dataset')
+    assert_result_count(cloneres, 1, type='file')
 
     # now loop over the previous results from the direct metadata query of
     # origin and make sure we get the extact same stuff from the clone

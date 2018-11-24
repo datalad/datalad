@@ -255,7 +255,7 @@ class BaseDownloader(object):
         Raises
         ------
         DownloadError
-          If either no known credentials type, or user refuses to update
+          If no known credentials type or user refuses to update
         """
         title = "{msg} access to {url} has failed.".format(
             msg=denied_msg, url=url)
@@ -498,9 +498,9 @@ class BaseDownloader(object):
         url: str
           URL to download
         cache: bool, optional
-          If None, config is consulted either results should be cached.
-          Cache is operating based on url, so no verification of any kind
-          is carried out
+          If None, config is consulted to determine whether results should be
+          cached. Cache is operating based on url, so no verification of any
+          kind is carried out
 
         Returns
         -------

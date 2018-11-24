@@ -28,10 +28,12 @@ from datalad.utils import getpwd
 
 from datalad.api import create
 from datalad.api import install
+from datalad.api import remove
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
 from datalad.utils import on_windows
+from datalad.support import path as op
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -389,6 +391,12 @@ def test_install_recursive(src, path_nr, path_r):
     # no unfulfilled subdatasets:
     ok_(top_ds.subdatasets(recursive=True, fulfilled=False) == [])
 
+    # check if we can install recursively into a dataset
+    # https://github.com/datalad/datalad/issues/2982
+    subds = ds.install('recursive-in-ds', source=src, recursive=True)
+    ok_(subds.is_installed())
+    for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
+        ok_(subsub.is_installed())
 
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -907,3 +915,29 @@ def test_install_subds_from_another_remote(topdir):
         clone1.update(merge=True, sibling=clone2_)
         # print("Installing within updated dataset -- should be able to install from clone2")
         clone1.install('subds1')
+
+
+# Takes > 2 sec
+# Do not use cassette
+@skip_if_no_network
+@with_tempfile
+def check_datasets_datalad_org(suffix, tdir):
+    # Test that git annex / datalad install, get work correctly on our datasets.datalad.org
+    # Apparently things can break, especially with introduction of the
+    # smart HTTP backend for apache2 etc
+    ds = install(tdir, source='///dicoms/dartmouth-phantoms/bids_test6-PD+T2w' + suffix)
+    eq_(ds.config.get('remote.origin.annex-ignore', None), None)
+    # assert_result_count and not just assert_status since for some reason on
+    # Windows we get two records due to a duplicate attempt (as res[1]) to get it
+    # again, which is reported as "notneeded".  For the purpose of this test
+    # it doesn't make a difference.
+    assert_result_count(
+        ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
+        1,
+        status='ok')
+    assert_status('ok', ds.remove())
+
+
+def test_datasets_datalad_org():
+    yield check_datasets_datalad_org, ''
+    yield check_datasets_datalad_org, '/.git'

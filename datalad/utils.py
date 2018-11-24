@@ -81,10 +81,30 @@ except:  # pragma: no cover
     linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
-# Did not find anything in Python which could tell at run time and
+# Query the system and use hardcoded "knowledge" if None
 # probably   getconf ARG_MAX   might not be available
 # The last one would be the most conservative/Windows
-CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
+try:
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+except Exception as exc:
+    # ATM (20181005) SC_ARG_MAX available only on POSIX systems
+    # so exception would be thrown e.g. on Windows.
+    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
+    lgr.debug(
+        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
+        exc)
+# Even with all careful computations we do, due to necessity to account for
+# environment and what not, we still could not figure out "exact" way to
+# estimate it, but it was shown that 300k safety margin on linux was sufficient.
+# https://github.com/datalad/datalad/pull/2977#issuecomment-436264710
+# 300k is ~15%, so to be safe, and for paranoid us we will just use up to 50%
+# of the length for "safety margin".  We might probably still blow due to
+# env vars, unicode, etc...  so any hard limit imho is not a proper solution
+CMD_MAX_ARG = int(0.5 * CMD_MAX_ARG)
+lgr.debug(
+    "Maximal length of cmdline string (adjusted for safety margin): %d",
+    CMD_MAX_ARG)
 
 #
 # Little helpers
@@ -226,7 +246,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
-      Either to match directories as well as files
+      Whether to match directories as well as files
     """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
@@ -288,9 +308,9 @@ def rotree(path, ro=True, chmod_files=True):
     path : string
       Path to the tree/directory to chmod
     ro : bool, optional
-      Either to make it R/O (default) or RW
+      Whether to make it R/O (default) or RW
     chmod_files : bool, optional
-      Either to operate also on files (not just directories)
+      Whether to operate also on files (not just directories)
     """
     if ro:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
@@ -313,7 +333,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     Parameters
     ----------
     chmod_files : string or bool, optional
-       Either to make files writable also before removal.  Usually it is just
+       Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
     children_only : bool, optional
@@ -740,6 +760,27 @@ def unique(seq, key=None):
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
 
+def all_same(items):
+    """Quick check if all items are the same.
+
+    Identical to a check like len(set(items)) == 1 but
+    should be more efficient while working on generators, since would
+    return False as soon as any difference detected thus possibly avoiding
+    unnecessary evaluations
+    """
+    first = True
+    first_item = None
+    for item in items:
+        if first:
+            first = False
+            first_item = item
+        else:
+            if item != first_item:
+                return False
+    # So we return False if was empty
+    return not first
+
+
 def map_items(func, v):
     """A helper to apply `func` to all elements (keys and values) within dict
 
@@ -1064,7 +1105,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
                 rmtemp(out_name)
 
         def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
-            """Provide assertion on either a msg was logged at a given level
+            """Provide assertion on whether a msg was logged at a given level
 
             If neither `msg` nor `level` provided, checks if anything was logged
             at all.
@@ -1216,25 +1257,99 @@ def updated(d, update):
     return d
 
 
+_pwd_mode = None
+
+
+def _switch_to_getcwd(msg, *args):
+    global _pwd_mode
+    _pwd_mode = 'cwd'
+    lgr.warning(
+        msg + ". From now on will be returning os.getcwd(). Directory"
+               " symlinks in the paths will be resolved",
+        *args
+    )
+    # TODO:  we might want to mitigate by going through all flywheighted
+    # repos and tuning up their .paths to be resolved?
+
+
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
 
-    If no PWD found in the env, output of getcwd() is returned
+    This function will try to use PWD environment variable to provide a current
+    working directory, possibly with some directories along the path being
+    symlinks to other directories.  Unfortunately, PWD is used/set only by the
+    shell and such functions as `os.chdir` and `os.getcwd` nohow use or modify
+    it, thus `os.getcwd()` returns path with links dereferenced.
+
+    While returning current working directory based on PWD env variable we
+    verify that the directory is the same as `os.getcwd()` after resolving all
+    symlinks.  If that verification fails, we fall back to always use
+    `os.getcwd()`.
+
+    Initial decision to either use PWD env variable or os.getcwd() is done upon
+    the first call of this function.
     """
-    try:
-        pwd = os.environ['PWD']
-        if on_windows and pwd and pwd.startswith('/'):
-            # It should be a path from MSYS.
-            # - it might start with a drive letter or not
-            # - it seems to be "illegal" to have a single letter directories
-            #   under / path, i.e. if created - they aren't found
-            # - 'ln -s' does not fail to create a "symlink" but it just copies!
-            #   so we are not likely to need original PWD purpose on those systems
-            # Verdict:
-            return os.getcwd()
-        return pwd
-    except KeyError:
+    global _pwd_mode
+    if _pwd_mode is None:
+        # we need to decide!
+        try:
+            pwd = os.environ['PWD']
+            if on_windows and pwd and pwd.startswith('/'):
+                # It should be a path from MSYS.
+                # - it might start with a drive letter or not
+                # - it seems to be "illegal" to have a single letter directories
+                #   under / path, i.e. if created - they aren't found
+                # - 'ln -s' does not fail to create a "symlink" but it just
+                # copies!
+                #   so we are not likely to need original PWD purpose on
+                # those systems
+                # Verdict:
+                _pwd_mode = 'cwd'
+            else:
+                _pwd_mode = 'PWD'
+        except KeyError:
+            _pwd_mode = 'cwd'
+
+    if _pwd_mode == 'cwd':
         return os.getcwd()
+    elif _pwd_mode == 'PWD':
+        try:
+            cwd = os.getcwd()
+        except OSError as exc:
+            if "o such file" in str(exc):
+                # directory was removed but we promised to be robust and
+                # still report the path we might know since we are still in PWD
+                # mode
+                cwd = None
+            else:
+                raise
+        try:
+            pwd = os.environ['PWD']
+            pwd_real = op.realpath(pwd)
+            # This logic would fail to catch the case where chdir did happen
+            # to the directory where current PWD is pointing to, e.g.
+            # $> ls -ld $PWD
+            # lrwxrwxrwx 1 yoh yoh 5 Oct 11 13:27 /home/yoh/.tmp/tmp -> /tmp//
+            # hopa:~/.tmp/tmp
+            # $> python -c 'import os; os.chdir("/tmp"); from datalad.utils import getpwd; print(getpwd(), os.getcwd())'
+            # ('/home/yoh/.tmp/tmp', '/tmp')
+            # but I guess that should not be too harmful
+            if cwd is not None and pwd_real != cwd:
+                _switch_to_getcwd(
+                    "realpath of PWD=%s is %s whenever os.getcwd()=%s",
+                    pwd, pwd_real, cwd
+                )
+                return cwd
+            return pwd
+        except KeyError:
+            _switch_to_getcwd("PWD env variable is no longer available")
+            return cwd  # Must not happen, but may be someone
+                        # evil purges PWD from environ?
+    else:
+        raise RuntimeError(
+            "Must have not got here. "
+            "pwd_mode must be either cwd or PWD. And it is now %r" % (_pwd_mode,)
+        )
 
 
 class chpwd(object):
@@ -1324,7 +1439,7 @@ def get_path_prefix(path, pwd=None):
 
 def _get_normalized_paths(path, prefix):
     if isabs(path) != isabs(prefix):
-        raise ValueError("Bot paths must either be absolute or relative. "
+        raise ValueError("Both paths must either be absolute or relative. "
                          "Got %r and %r" % (path, prefix))
     path = with_pathsep(path)
     prefix = with_pathsep(prefix)
@@ -1980,7 +2095,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -2001,11 +2116,18 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
+        if remove_existing and op.lexists(full_name):
+            rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+                create_tree_archive(
+                    path, name, load,
+                    archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+                create_tree(
+                    full_name, load,
+                    archives_leading_dir=archives_leading_dir,
+                    remove_existing=remove_existing)
         else:
             if PY2:
                 open_kwargs = {'mode': "w"}

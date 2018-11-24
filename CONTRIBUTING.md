@@ -282,6 +282,8 @@ Note that the same path/venv is reused for all the PRs, so you might want
 first to check using `git show` under the `build/` directory if it corresponds
 to the commit you are interested to troubleshoot.
 
+For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
+
 ### Coverage
 
 You can also check for common programming errors with the following tools:
@@ -429,6 +431,21 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+Recognizing contributions
+-------------------------
+
+We welcome and recognize all contributions from documentation to testing to code development.
+
+You can see a list of current contributors in our [zenodo file][link_zenodo].
+If you are new to the project, don't forget to add your name and affiliation there!
+
+Thank you!
+----------
+
+You're awesome. :wave::smiley:
+
+
+
 Various hints for developers
 ----------------------------
 
@@ -464,9 +481,9 @@ Refer datalad/config.py for information on how to add these environment variable
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
 - *DATALAD_LOG_CMD_STDIN*:
-  Either to log stdin for the command
+  Whether to log stdin for the command
 - *DATALAD_LOG_CMD_CWD*:
-  Either to log cwd where command to be executed
+  Whether to log cwd where command to be executed
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
 - *DATALAD_LOG_TARGET*
@@ -527,7 +544,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.10.3 (??? ??, 2018) -- will be better than ever
+## 0.11.2 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -543,3 +560,5 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+
+[link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json

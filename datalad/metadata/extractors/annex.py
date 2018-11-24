@@ -36,7 +36,8 @@ class MetadataExtractor(BaseMetadataExtractor):
             label='Annex metadata extraction',
             unit=' Files',
         )
-        if not isinstance(self.ds.repo, AnnexRepo):
+        repo = self.ds.repo   # OPT: .repo could be relatively expensive
+        if not isinstance(repo, AnnexRepo):
             log_progress(
                 lgr.info,
                 'extractorannex',
@@ -47,7 +48,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         valid_paths = None
         if self.paths and sum(len(i) for i in self.paths) > 500000:
             valid_paths = set(self.paths)
-        for file, meta in self.ds.repo.get_metadata(
+        for file, meta in repo.get_metadata(
                 self.paths if self.paths and valid_paths is None else '.'):
             if file.startswith('.datalad') or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
@@ -60,6 +61,9 @@ class MetadataExtractor(BaseMetadataExtractor):
                 increment=True)
             meta = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
                     for k, v in meta.items()}
+            key = repo.get_file_key(file, batch=True)
+            if key:
+                meta['key'] = key
             yield (file, meta)
         log_progress(
             lgr.info,
