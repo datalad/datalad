@@ -2907,19 +2907,22 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # files "jumped" between git/annex.  Then also preparing a
                     # custom index and calling "commit" without files resolves
                     # the issue
-                    changed_files = {
-                        staged: set(self.get_changed_files(staged=staged))
-                        for staged in (True, False)
-                    }
+                    changed_files_staged = \
+                        set(self.get_changed_files(staged=True))
+                    changed_files_notstaged = \
+                        set() \
+                        if direct_mode \
+                        else set(self.get_changed_files(staged=False))
+
                     files_set = {
                         _normalize_path(self.path, f) if isabs(f) else f
                         for f in files
                     }
-                    # files_notstaged = files_set.difference(changed_files[True])
-                    files_changed_notstaged = files_set.intersection(changed_files[False])
+                    # files_notstaged = files_set.difference(changed_files_staged)
+                    files_changed_notstaged = files_set.intersection(changed_files_notstaged)
 
                     # Files which were staged but not among files
-                    staged_not_to_commit = changed_files[True].difference(files_set)
+                    staged_not_to_commit = changed_files_staged.difference(files_set)
                     if staged_not_to_commit or files_changed_notstaged:
                         # Need an alternative index_file
                         with make_tempfile() as index_file:
