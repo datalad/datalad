@@ -5,7 +5,7 @@
 
 # --recurse-stdlib  leads to some "fancy" errors
 
-#nuitka --exe --python-flag=no_site --recurse-directory=datalad --recurse-to={datalad{,.distribution,.support,.interface},wrapt,six,git,gitdb,argcomplete,iso8601,requests,keyring,appdirs,msgpack,smmap,tqdm,pyld,colorama,docopt,patoolib,urllib3,chardet,_patool_configdata,pkg_resources,backports.ssl_match_hostname,scrapy,cssselect,cssselect.xpath,lxml,lxml.html,w3lib.url,w3lib.http,w3lib.html,w3lib{,.encoding,.util},simplejson,nibabel,humanize,yaml,httpretty,github,jsmin,h5py,bs4,mock,nose,numpy} --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} `which datalad` 2>&1 | tee $0.log
+#nuitka --exe --python-flag=no_site --recurse-to={datalad{,.distribution,.metadata,.support,.interface},wrapt,six,git,gitdb,argcomplete,iso8601,requests,keyring,appdirs,msgpack,smmap,tqdm,pyld,colorama,docopt,patoolib,urllib3,chardet,_patool_configdata,pkg_resources,backports.ssl_match_hostname,scrapy,cssselect,cssselect.xpath,lxml,lxml.html,w3lib.url,w3lib.http,w3lib.html,w3lib{,.encoding,.util},simplejson,nibabel,humanize,yaml,httpretty,github,jsmin,h5py,bs4,mock,nose,numpy} --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} `which datalad` 2>&1 | tee $0.log
 
 set -eu
 
@@ -15,8 +15,9 @@ distdir=dist/nuitka-${os}
 version=$(git describe --tags --match '[0-9].*' | sed -e 's,-,+git,')
 tarfile=datalad-${os}_${version}.tgz
 
-nuitka_version=$(nuitka --version)
 python_version=$(python --version 2>&1)
+NUITKA=nuitka3
+nuitka_version=$(${NUITKA} --version)
 
 # Start clean up
 rm -rf datalad.dist "$distdir"
@@ -37,9 +38,7 @@ done
 
 # removed per Kay's recommendation --recurse-stdlib 
 set -x
-nuitka -j 8 --recurse-all --python-flag=no_site \
-   --recurse-directory=datalad \
-   --explain-imports \
+${NUITKA} -j 8 --recurse-all --python-flag=no_site \
    --recurse-to=setuptools,distribute,nose,mock,httpretty,scrapy,jsmin,github,pkg_resources \
    --recurse-not-to={boto,gtk,pyglet,tornado,matplotlib,twisted,numpy,scipy,pandas,vcr,sphinx,zmq,PIL,IPython,OpenGL} \
    $mode
