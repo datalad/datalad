@@ -13,9 +13,9 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from itertools import (
-    imap as map,
-    ifilter as filter,
+from six.moves import (
+    filter,
+    map,
 )
 
 from os import makedirs
