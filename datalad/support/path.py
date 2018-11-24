@@ -42,6 +42,7 @@ def _get_unicode_robust_version(f):
 
 
 abspath = op.abspath
+basename = op.basename
 curdir = op.curdir
 dirname = op.dirname
 exists = _get_unicode_robust_version(op.exists)

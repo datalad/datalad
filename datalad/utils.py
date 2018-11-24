@@ -94,7 +94,17 @@ except Exception as exc:
     lgr.debug(
         "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
         exc)
-lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
+# Even with all careful computations we do, due to necessity to account for
+# environment and what not, we still could not figure out "exact" way to
+# estimate it, but it was shown that 300k safety margin on linux was sufficient.
+# https://github.com/datalad/datalad/pull/2977#issuecomment-436264710
+# 300k is ~15%, so to be safe, and for paranoid us we will just use up to 50%
+# of the length for "safety margin".  We might probably still blow due to
+# env vars, unicode, etc...  so any hard limit imho is not a proper solution
+CMD_MAX_ARG = int(0.5 * CMD_MAX_ARG)
+lgr.debug(
+    "Maximal length of cmdline string (adjusted for safety margin): %d",
+    CMD_MAX_ARG)
 
 #
 # Little helpers
@@ -2085,7 +2095,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -2106,11 +2116,18 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
+        if remove_existing and op.lexists(full_name):
+            rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+                create_tree_archive(
+                    path, name, load,
+                    archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+                create_tree(
+                    full_name, load,
+                    archives_leading_dir=archives_leading_dir,
+                    remove_existing=remove_existing)
         else:
             if PY2:
                 open_kwargs = {'mode': "w"}
