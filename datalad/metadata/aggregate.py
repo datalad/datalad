@@ -750,7 +750,8 @@ class AggregateMetaData(Interface):
             metavar="PATH",
             doc="""path to datasets that shall be aggregated.
             When a given path is pointing into a dataset, the metadata of the
-            containing dataset will be aggregated.""",
+            containing dataset will be aggregated.  If no paths given, current
+            dataset metadata is aggregated.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
@@ -795,9 +796,12 @@ class AggregateMetaData(Interface):
         # it really doesn't work without a dataset
         ds = require_dataset(
             dataset, check_installed=True, purpose='metadata aggregation')
-        # always include the reference dataset
         path = assure_list(path)
-        path.append(ds.path)
+        if not path:
+            # then current/reference dataset is "aggregated"
+            # We should not add ds.path always since then --recursive would
+            # also recurse current even if paths are given
+            path.append(ds.path)
 
         agginfo_db = _load_agginfo_db(ds.path)
 
