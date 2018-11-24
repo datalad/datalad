@@ -22,11 +22,15 @@ Rushed out bugfix release to stay fully compatible with recent
 ### Fixes
 
 - [install]: be able to install recursively into a dataset ([#2982])
+- [save]: be able to commit/save changes whenever files potentially
+  could have swapped their storage between git and annex ([#1651]) ([#2752])
 - [aggregate-metadata]:
   - dataset's itself is now not "aggregated" if specific paths are
     provided for aggregation ([#3002]). That resolves the issue of
     `-r` invocation aggregating all subdatasets of the specified dataset
     as well
+  - also compare/verify the actual content checksum of aggregated metadata
+    while considering subdataset metadata for re-aggregation ([#3007])
 - `annex` commands are now chunked assuming 50% "safety margin" on the
   maximal command line length. Should resolve crashes while operating
   ot too many files at ones ([#3001])
@@ -946,6 +950,7 @@ publishing
 [#2738]: https://github.com/datalad/datalad/issues/2738
 [#2741]: https://github.com/datalad/datalad/issues/2741
 [#2744]: https://github.com/datalad/datalad/issues/2744
+[#2752]: https://github.com/datalad/datalad/issues/2752
 [#2761]: https://github.com/datalad/datalad/issues/2761
 [#2770]: https://github.com/datalad/datalad/issues/2770
 [#2773]: https://github.com/datalad/datalad/issues/2773
@@ -995,3 +1000,4 @@ publishing
 [#2995]: https://github.com/datalad/datalad/issues/2995
 [#3001]: https://github.com/datalad/datalad/issues/3001
 [#3002]: https://github.com/datalad/datalad/issues/3002
+[#3007]: https://github.com/datalad/datalad/issues/3007
