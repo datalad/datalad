@@ -2902,7 +2902,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # staged by annex.  So, if not all files are committed, and
                     # assuming that what is to be committed is staged (!could be
                     # wrong assumption), we need to prepare a custom index, and
-                    # commit without specifying any paths
+                    # commit without specifying any paths.
+                    # In indirect mode, "git commit files" might fail if some
+                    # files "jumped" between git/annex.  Then also preparing a
+                    # custom index and calling "commit" without files resolves
+                    # the issue
                     changed_files = {
                         staged: set(self.get_changed_files(staged=staged))
                         for staged in (True, False)
