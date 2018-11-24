@@ -1,3 +1,11 @@
+datalad (0.11.1-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix/minor release
+    - compatibility with the recent annex
+    - variety of fixes (long command lines, metadata aggregation, etc)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 24 Nov 2018 13:23:29 -0500
+
 datalad (0.11.0-1) unstable; urgency=medium
 
   [ Jelmer Vernooĳ ]
