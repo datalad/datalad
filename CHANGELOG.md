@@ -10,7 +10,7 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.11.1 (Nov 25, 2018) -- v7-better-than-v6
+## 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
 
 Rushed out bugfix release to stay fully compatible with recent
 [git-annex] which introduced v7 to replace v6.
