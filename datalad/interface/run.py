@@ -572,7 +572,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     saver : callable, optional
         Must take a dataset instance, a list of paths to save, and a
         message string as arguments and must record any changes done
-        to any content matching an entry in the path list.
+        to any content matching an entry in the path list. Must yield
+        result dictionaries as a generator.
 
     Yields
     ------
