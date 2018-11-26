@@ -10,20 +10,17 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.11.1 (Nov 25, 2018) -- v7-better-than-v6
+## 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
 
 Rushed out bugfix release to stay fully compatible with recent
 [git-annex] which introduced v7 to replace v6.
-
-### Major refactoring and deprecations
-
-- hopefully none
 
 ### Fixes
 
 - [install]: be able to install recursively into a dataset ([#2982])
 - [save]: be able to commit/save changes whenever files potentially
-  could have swapped their storage between git and annex ([#1651]) ([#2752])
+  could have swapped their storage between git and annex
+  ([#1651]) ([#2752]) ([#3009])
 - [aggregate-metadata]:
   - dataset's itself is now not "aggregated" if specific paths are
     provided for aggregation ([#3002]). That resolves the issue of
@@ -931,6 +928,7 @@ publishing
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 
+[#2752]: https://github.com/datalad/datalad/issues/2752
 [#1350]: https://github.com/datalad/datalad/issues/1350
 [#2692]: https://github.com/datalad/datalad/issues/2692
 [#2702]: https://github.com/datalad/datalad/issues/2702
@@ -950,7 +948,6 @@ publishing
 [#2738]: https://github.com/datalad/datalad/issues/2738
 [#2741]: https://github.com/datalad/datalad/issues/2741
 [#2744]: https://github.com/datalad/datalad/issues/2744
-[#2752]: https://github.com/datalad/datalad/issues/2752
 [#2761]: https://github.com/datalad/datalad/issues/2761
 [#2770]: https://github.com/datalad/datalad/issues/2770
 [#2773]: https://github.com/datalad/datalad/issues/2773
@@ -1001,3 +998,4 @@ publishing
 [#3001]: https://github.com/datalad/datalad/issues/3001
 [#3002]: https://github.com/datalad/datalad/issues/3002
 [#3007]: https://github.com/datalad/datalad/issues/3007
+[#3009]: https://github.com/datalad/datalad/issues/3009
