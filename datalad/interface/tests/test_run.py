@@ -247,11 +247,9 @@ def test_run_inputs_outputs(src, path):
                   ("s0", "s1_1"),
                   ("s0", "ss"),
                   ("s0",)]:
-        Dataset(op.join(*((src,) + subds))).rev_create(force=True)
+        Dataset(op.join(*((src,) + subds))).rev_create(force=True).rev_save()
     src_ds = Dataset(src).rev_create(force=True)
-    # TODO this chaneg would break the test! A bug is hidden somewhere
-    #src_ds.rev_save(recursive=True)
-    src_ds.add('.', recursive=True)
+    src_ds.rev_save(recursive=True)
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
