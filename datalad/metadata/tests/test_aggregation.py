@@ -407,3 +407,9 @@ def test_partial_aggregation(path):
     #res = ds.metadata(get_aggregates=True)
     #assert_result_count(res, 3)
     #assert_result_count(res, 1, path=sub2.path)
+
+
+def test_aggregate_changed_meta():
+    # supplements https://github.com/datalad/datalad/pull/3007 merged for
+    # 0.11.1 release without dedicated unittest (but extensively tested in RL)
+    raise AssertionError('TODO')
