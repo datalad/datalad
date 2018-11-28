@@ -32,7 +32,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError, GitRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
@@ -311,6 +311,13 @@ def test_rerun_onto(path):
     assert_result_count(ds.diff(revision="master..from-base"), 0)
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
+
+    # We give abort when an explicitly specified onto doesn't exists.
+    ds.repo.checkout("master")
+    assert_result_count(
+        ds.rerun(since="", onto="doesnotexist", branch="from-base",
+                 on_failure="ignore"),
+        1, status="error", action="run")
 
 
 @ignore_nose_capturing_stdout
