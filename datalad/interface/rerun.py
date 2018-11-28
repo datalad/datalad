@@ -292,14 +292,18 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         # that, regardless of if and how --since is specified, the effective
         # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
-        if not dset.repo.commit_exists(onto):
-            # This is unlikely to happen in the wild because it means that the
-            # first commit is a datalad run commit. Just abort rather than
-            # trying to checkout an orphan branch or something like that.
-            yield get_status_dict(
-                "run", ds=dset, status="error",
-                message="Commit for --onto does not exist.")
-            return
+
+    if onto and not dset.repo.commit_exists(onto):
+        # This happens either because the user specifies a value that doesn't
+        # exists or the results first parent doesn't exist. The latter is
+        # unlikely to happen in the wild because it means that the first commit
+        # is a datalad run commit. Just abort rather than trying to checkout an
+        # orphan branch or something like that.
+        yield get_status_dict(
+            "run", ds=dset, status="error",
+            message=("Revision specified for --onto (%s) does not exist.",
+                     onto))
+        return
 
     start_point = onto or "HEAD"
     if branch or onto:

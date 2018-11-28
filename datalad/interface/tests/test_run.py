@@ -312,6 +312,13 @@ def test_rerun_onto(path):
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
+    # We give abort when an explicitly specified onto doesn't exists.
+    ds.repo.checkout("master")
+    assert_result_count(
+        ds.rerun(since="", onto="doesnotexist", branch="from-base",
+                 on_failure="ignore"),
+        1, status="error", action="run")
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
