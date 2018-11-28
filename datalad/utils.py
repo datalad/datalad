@@ -86,14 +86,17 @@ except:  # pragma: no cover
 # The last one would be the most conservative/Windows
 CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
-    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
+    assert CMD_MAX_ARG > 0
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
-    # so exception would be thrown e.g. on Windows.
+    # so exception would be thrown e.g. on Windows, or
+    # somehow during Debian build for nd14.04 it is coming up with -1:
+    # https://github.com/datalad/datalad/issues/3015
     CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
     lgr.debug(
-        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
-        exc)
+        "Failed to query or got useless SC_ARG_MAX sysconf, "
+        "will use hardcoded value: %s", exc)
 # Even with all careful computations we do, due to necessity to account for
 # environment and what not, we still could not figure out "exact" way to
 # estimate it, but it was shown that 300k safety margin on linux was sufficient.
