@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import dropwhile
 import json
-import os
 import os.path as op
 import re
 import sys
