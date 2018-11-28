@@ -461,7 +461,7 @@ Largely a bugfix release with a few enhancements.
   and the system
 
 
-# 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
+## 0.9.1 (Oct 01, 2017) -- "DATALAD!"(JBTM)
 
 Minor bugfix release
 
