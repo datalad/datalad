@@ -1339,6 +1339,9 @@ def test_annex_copy_to(origin, clone):
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
 {"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
 """, ""
+    # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
+    # which is in turn invoked first by copy_to for "find" operation.
+    # TODO: provide a dedicated handling within above ok_copy for 'find' command
     with patch.object(repo, '_run_annex_command', ok_copy):
         eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
             ["copied1", "copied2"])
