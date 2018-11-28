@@ -15,6 +15,7 @@ from ..version import (
     __hardcoded_version__,
 )
 from ..support import path as op
+from ..utils import assure_unicode
 from .utils import (
     assert_equal,
     assert_greater,
@@ -40,10 +41,10 @@ def test__version__():
     with open(CHANGELOG_filename, 'rb') as f:
         for line in f:
             line = line.rstrip()
-            if not line.startswith('## '):
+            if not line.startswith(b'## '):
                 # The first section header we hit, must be our changelog entry
                 continue
-            reg = regex.match(line)
+            reg = regex.match(assure_unicode(line))
             if not reg:  # first one at that level is the one
                 raise AssertionError(
                     "Following line must have matched our regex: %r" % line)
