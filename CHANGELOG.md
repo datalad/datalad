@@ -406,7 +406,7 @@ Some important bug fixes which should improve usability
   and provide reproducible UUIDs etc (useful for testing and demos)
 
 
-## 0.9.2 (Mar 04, 2017) -- it is (again) better than ever
+## 0.9.2 (Mar 04, 2018) -- it is (again) better than ever
 
 Largely a bugfix release with a few enhancements.
 
