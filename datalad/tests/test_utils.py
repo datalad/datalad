@@ -62,9 +62,17 @@ from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
 from ..utils import map_items
 from ..utils import unlink
+from ..utils import CMD_MAX_ARG
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_true,
+    eq_,
+    ok_,
+)
 from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
@@ -1172,3 +1180,10 @@ def test_map_items():
     c_mapped = map_items(add10, c)
     assert type(c) is type(c_mapped)
     eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
+
+
+def test_CMD_MAX_ARG():
+    # 100 is arbitrarily large small integer ;)
+    # if fails -- we are unlikely to be able to work on this system
+    # and something went really wrong!
+    assert_greater(CMD_MAX_ARG, 100)
