@@ -32,7 +32,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError, GitRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
