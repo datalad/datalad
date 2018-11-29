@@ -221,13 +221,13 @@ def test_new_or_modified(path):
     ds.rev_save(["to_modify", "d/to_modify"])
 
     eq_(set(get_new_or_modified(ds, "HEAD")),
-        {"to_modify", "d/to_modify"})
+        {"to_modify", op.join("d", "to_modify")})
 
     # Non-HEAD revisions work.
     ds.repo.commit("empty", options=["--allow-empty"])
     assert_false(get_new_or_modified(ds, "HEAD"))
     eq_(set(get_new_or_modified(ds, "HEAD~")),
-        {"to_modify", "d/to_modify"})
+        {"to_modify", op.join("d", "to_modify")})
 
 
 @slow  # ~10s
