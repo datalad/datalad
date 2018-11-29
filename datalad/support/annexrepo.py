@@ -988,7 +988,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Keys are special remore UUIDs, values are dicts with arguments
+          Keys are special remote UUIDs, values are dicts with arguments
           for `git-annex enableremote`. This includes at least the 'type'
           and 'name' of a special remote. Each type of special remote
           may require addition arguments that will be available in the
