@@ -958,7 +958,7 @@ def test_inputs_quotes_needed(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
     expected = u"!".join(
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
