@@ -27,6 +27,7 @@ from mock import patch
 from datalad.utils import (
     assure_unicode,
     chpwd,
+    on_windows,
 )
 
 from datalad_revolution.dataset import RevolutionDataset as Dataset
@@ -102,7 +103,7 @@ def test_basics(path, nodspath):
             ok_(cme.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
-        res = ds.rev_run('touch empty', message='TEST')
+        res = ds.rev_run('cd .> empty', message='TEST')
         assert_repo_status(ds.path)
         assert_result_count(res, 2)
         # TODO 'state' is still untracked!!!
@@ -114,7 +115,8 @@ def test_basics(path, nodspath):
         assert_in('"pwd": "."', commit_msg)
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
-        res = ds.rev_run('touch empty', message='NOOP_TEST')
+        noop_cmd = 'call' if on_windows else 'touch empty'
+        res = ds.rev_run(noop_cmd, message='NOOP_TEST')
         # When in direct mode, check at the level of save rather than add
         # because the annex files show up as typechanges and adding them won't
         # necessarily have a "notneeded" status.
@@ -123,14 +125,14 @@ def test_basics(path, nodspath):
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
-        res = ds.rev_run(['touch empty'], message='NOOP_TEST')
+        res = ds.rev_run([noop_cmd], message='NOOP_TEST')
         assert_result_count(res, 1, action='save',
                             status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
             swallow_outputs():
-        res = ds.rev_run(['touch', 'empty2'], message='TEST')
+        res = ds.rev_run('cd . > empty2', message='TEST')
         assert_result_count(res, 1, action='add', path=op.join(ds.path, 'empty2'), type='file',
                             status='ok')
         assert_result_count(res, 1, action='save', status='ok')
@@ -142,7 +144,7 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
     # Simple sidecar message checks.
-    ds.rev_run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
+    ds.rev_run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
 
     real_get = ds.config.get
@@ -153,7 +155,7 @@ def test_basics(path, nodspath):
         return real_get(key, default)
 
     with patch.object(ds.config, "get", mocked_get):
-        ds.rev_run(["touch", "dummy1"], message="sidecar config")
+        ds.rev_run("cd .> dummy1", message="sidecar config")
     assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
 
 
@@ -272,7 +274,7 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("test-annex.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
-        ds.rev_run("touch dummy", inputs=["not-there"])
+        ds.rev_run("cd .> dummy", inputs=["not-there"])
         assert_in("Input does not exist: ", cml.out)
 
     # Test different combinations of globs and explicit files.
@@ -290,7 +292,7 @@ def test_run_inputs_outputs(src, path):
     for idx, (inputs_arg, expected_present) in enumerate(test_cases):
         assert_false(any(ds.repo.file_has_content(i) for i in inputs))
 
-        ds.rev_run("touch dummy{}".format(idx), inputs=inputs_arg)
+        ds.rev_run("cd .> dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
         assert_in(inputs_arg[0], ds.repo.repo.head.commit.message)
@@ -302,17 +304,17 @@ def test_run_inputs_outputs(src, path):
     ds.rev_save("subdir")
     ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
     ds.repo.drop("subdir", options=["--force"])
-    ds.rev_run("touch subdir-dummy", inputs=[op.join(ds.path, "subdir")])
+    ds.rev_run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
     ok_(all(ds.repo.file_has_content(op.join("subdir", f)) for f in ["a", "b"]))
 
     # Inputs are specified relative to a dataset's subdirectory.
     ds.repo.drop(op.join("subdir", "a"), options=["--force"])
     with chpwd(op.join(path, "subdir")):
-        run("touch subdir-dummy1", inputs=["a"])
+        run("cd .> subdir-dummy1", inputs=["a"])
     ok_(ds.repo.file_has_content(op.join("subdir", "a")))
 
     # --input=. runs "datalad get ."
-    ds.rev_run("touch dot-dummy", inputs=["."])
+    ds.rev_run("cd .> dot-dummy", inputs=["."])
     eq_(ds.repo.get_annexed_files(),
         ds.repo.get_annexed_files(with_content_only=True))
     # On rerun, we get all files, even those that weren't in the tree at the
@@ -353,7 +355,7 @@ def test_run_inputs_outputs(src, path):
     ds.rev_run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
 
     # --input/--output globs can be stored in expanded form.
-    ds.rev_run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
+    ds.rev_run("cd .> expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
     assert_in("a.dat", ds.repo.repo.head.commit.message)
     assert_in("b.dat", ds.repo.repo.head.commit.message)
 
@@ -384,7 +386,7 @@ def test_run_inputs_outputs(src, path):
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).rev_create(no_annex=True)
     # Running --input in a plain Git repo doesn't fail.
-    ds.rev_run("touch dummy", inputs=["*"])
+    ds.rev_run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
     ds.rerun()
 
@@ -478,7 +480,7 @@ def test_placeholders(path):
         "subdir")
 
     # Double brackets can be used to escape placeholders.
-    ds.rev_run("touch {{inputs}}", inputs=["*.in"])
+    ds.rev_run("cd .> {{inputs}}", inputs=["*.in"])
     ok_exists(op.join(path, "{inputs}"))
 
     # rerun --script expands the placeholders.
