@@ -259,7 +259,7 @@ def test_run_inputs_outputs(src, path):
 
     # If we specify test-annex.dat as an input, it will be retrieved before the
     # run.
-    ds.rev_run("cat test-annex.dat test-annex.dat >doubled.dat",
+    ds.rev_run("{} test-annex.dat test-annex.dat >doubled.dat".format('type' if on_windows else 'cat'),
            inputs=["test-annex.dat"])
 
     assert_repo_status(ds.path)
@@ -329,13 +329,13 @@ def test_run_inputs_outputs(src, path):
     ds.repo.get("a.dat")
     ds.rev_run("echo ' appended' >>a.dat", outputs=["a.dat"])
     with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), "a.dat appended\n")
+        eq_(fh.read(), "a.dat' appended' \n" if on_windows else "a.dat appended\n" )
 
     # --output will remove files that are not present.
     ds.repo.drop(["a.dat", "d.txt"], options=["--force"])
     ds.rev_run("echo ' appended' >>a.dat", outputs=["a.dat"])
     with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), " appended\n")
+        eq_(fh.read(), "' appended' \n" if on_windows else " appended\n" )
 
     # --input can be combined with --output.
     ds.repo.repo.git.reset("--hard", "HEAD~2")
@@ -380,7 +380,6 @@ def test_run_inputs_outputs(src, path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).rev_create(no_annex=True)
