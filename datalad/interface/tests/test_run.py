@@ -87,7 +87,6 @@ def test_invalid_call(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
