@@ -114,7 +114,7 @@ def test_basics(path, nodspath):
         assert_in('"pwd": "."', commit_msg)
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
-        noop_cmd = 'call' if on_windows else 'touch empty'
+        noop_cmd = ':'
         res = ds.rev_run(noop_cmd, message='NOOP_TEST')
         # When in direct mode, check at the level of save rather than add
         # because the annex files show up as typechanges and adding them won't
