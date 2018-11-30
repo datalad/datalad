@@ -367,7 +367,6 @@ def test_symlinked_relpath(path):
     ok_clean_git(dspath)
 
 
-# two subdatasets not possible in direct mode
 @with_tempfile(mkdir=True)
 def test_bf1886(path):
     parent = Dataset(path).create()
