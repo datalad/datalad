@@ -1364,14 +1364,13 @@ def skip_httpretty_on_problematic_pythons(func):
 
 
 @optional_args
-def with_batch_direct(t):
+def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
     def newfunc():
         for batch in (False, True):
-            for direct in (False, True) if not on_windows else (True,):
-                yield t, batch, direct
+                yield t, batch
 
     return newfunc
 

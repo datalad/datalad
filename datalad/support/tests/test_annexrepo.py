@@ -54,7 +54,7 @@ from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_batch_direct
+from datalad.tests.utils import with_parametric_batch
 from datalad.tests.utils import assert_dict_equal as deq_
 from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_false
@@ -312,11 +312,11 @@ def test_AnnexRepo_get_remote_na(path):
 
 
 # 1 is enough to test file_has_content
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
-    ar = AnnexRepo.clone(src, annex_path, direct=direct)
+def test_AnnexRepo_file_has_content(batch, src, annex_path):
+    ar = AnnexRepo.clone(src, annex_path)
     testfiles = ["test-annex.dat", "test.dat"]
 
     eq_(ar.file_has_content(testfiles), [False, False])
@@ -331,22 +331,21 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     assert_false(ar.file_has_content("bogus.txt", batch=batch))
     ok_(ar.file_has_content("test-annex.dat", batch=batch))
 
-    if not direct:  # There's no unlock in direct mode.
-        ar.unlock(["test-annex.dat"])
-        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-            [ar.supports_unlocked_pointers])
-        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
-            ofh.write("more")
-        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-            [False])
+    ar.unlock(["test-annex.dat"])
+    eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+        [ar.supports_unlocked_pointers])
+    with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+        ofh.write("more")
+    eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+        [False])
 
 
 # 1 is enough to test
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
-    ar = AnnexRepo.clone(src, annex_path, direct=direct)
+def test_AnnexRepo_is_under_annex(batch, src, annex_path):
+    ar = AnnexRepo.clone(src, annex_path)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
         f.write("aaa")
@@ -367,14 +366,13 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     ok_(ar.is_under_annex("test-annex.dat", batch=batch))
 
-    if not direct:  # There's no unlock in direct mode.
-        ar.unlock(["test-annex.dat"])
-        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-            [ar.supports_unlocked_pointers])
-        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
-            ofh.write("more")
-        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-            [False])
+    ar.unlock(["test-annex.dat"])
+    eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+        [ar.supports_unlocked_pointers])
+    with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+        ofh.write("more")
+    eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+        [False])
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
@@ -641,11 +639,11 @@ def __test_get_md5s(path):
     print({f: annex.get_file_key(f) for f in files})
 
 
-@with_batch_direct
+@with_parametric_batch
 @with_tree(**tree1args)
-def test_dropkey(batch, direct, path):
+def test_dropkey(batch, path):
     kw = {'batch': batch}
-    annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
+    annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
     annex.add(files)
     annex.commit()
@@ -1479,9 +1477,9 @@ def test_annex_remove(path):
     eq_(out[0], "rm-test.dat")
 
 
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch, direct, p):
+def test_is_available(batch, p):
     annex = AnnexRepo(p)
 
     # bkw = {'batch': batch}
