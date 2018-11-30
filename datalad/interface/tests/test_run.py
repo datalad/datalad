@@ -159,7 +159,6 @@ def test_basics(path, nodspath):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).rev_create()
@@ -167,7 +166,12 @@ def test_run_failure(path):
     hexsha_initial = ds.repo.get_hexsha()
 
     with assert_raises(CommandError):
-        ds.rev_run("echo x$(cat grows) > grows && false")
+        if on_windows:
+            # this does not do exactly the same as the cmd on other systems
+            # but is close enough to make running the test worthwhile
+            ds.rev_run("echo x>grows & false")
+        else:
+            ds.rev_run("echo x$(cat grows) > grows && false")
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -179,7 +183,7 @@ def test_run_failure(path):
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     outfile = op.join(ds.path, "grows")
-    eq_('x\n', open(outfile).read())
+    eq_('x \n' if on_windows else 'x\n', open(outfile).read())
 
 
 @with_tree(tree={"d": {"to_modify": "content1"},
@@ -233,7 +237,6 @@ def test_new_or_modified(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tree(tree={"test-annex.dat": "content",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
@@ -334,18 +337,24 @@ def test_run_inputs_outputs(src, path):
     # --output will remove files that are not present.
     ds.repo.drop(["a.dat", "d.txt"], options=["--force"])
     ds.rev_run("echo ' appended' >>a.dat", outputs=["a.dat"])
-    with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), "' appended' \n" if on_windows else " appended\n" )
+    if not on_windows:
+        # MIH doesn't yet understand how to port this
+        with open(op.join(path, "a.dat")) as fh:
+            eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
     ds.repo.repo.git.reset("--hard", "HEAD~2")
     ds.rev_run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
-    with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), "a.dat appended\n")
+    if not on_windows:
+        # MIH doesn't yet understand how to port this
+        with open(op.join(path, "a.dat")) as fh:
+            eq_(fh.read(), "a.dat appended\n")
 
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        ds.rev_run("echo blah", outputs=["not-there"])
-        assert_in("Filtered out non-existing path: ", cml.out)
+    if not on_windows:
+        # see datalad#2606
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            ds.rev_run("echo blah", outputs=["not-there"])
+            assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.rev_create('sub')
     ds.rev_run("echo sub_orig >sub/subfile")
@@ -366,9 +375,11 @@ def test_run_inputs_outputs(src, path):
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.rev_run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
-    ok_file_has_content(op.join(ds.path, "globbed-subds"),
-                        "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
-                        strip=True)
+    ok_file_has_content(
+        op.join(ds.path, "globbed-subds"),
+        "'s0\\s1_0\\s2\\a.dat' 's0\\s1_1\\s2\\c.dat'" if on_windows
+        else "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
+        strip=True)
 
     ds_ss = Dataset(op.join(path, "s0", "ss"))
     assert_false(ds_ss.is_installed())
@@ -391,7 +402,7 @@ def test_run_inputs_no_annex_repo(path):
 
 @slow  # ~10s
 @ignore_nose_capturing_stdout
-@known_failure_windows
+# use of testrepos is broken on Windows and causes this test to be skipped there
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -507,7 +518,7 @@ def test_placeholders(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
+@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
@@ -534,7 +545,6 @@ def test_inputs_quotes_needed(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tree(tree={"foo": "f", "bar": "b"})
 def test_inject(path):
     ds = Dataset(path).rev_create(force=True)
