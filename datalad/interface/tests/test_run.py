@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -1015,6 +1015,8 @@ def test_globbedpaths_get_sub_patterns():
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
+                 # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+                 u"bβ.dat": "",
                  "subdir": {"1.txt": "", "2.txt": ""}})
 def test_globbedpaths(path):
     dotdir = op.curdir + op.sep
@@ -1022,9 +1024,9 @@ def test_globbedpaths(path):
     for patterns, expected in [
             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
-             {dotdir + "1.txt", "2.dat", dotdir + "3.txt"}),
+             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
             (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
             ([dotdir + "subdir/*.txt"],
              {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
@@ -1050,12 +1052,12 @@ def test_globbedpaths(path):
 
     # Full patterns still get returned as relative to pwd.
     gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat"])
+    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
 
     # "." gets special treatment.
     gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat"])
+    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
+    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
     gp = GlobbedPaths(["."], pwd=path, expand=False)
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
@@ -1068,7 +1070,8 @@ def test_globbedpaths(path):
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
+    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
+                             (False, ["*.dat"])]:
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)
 
