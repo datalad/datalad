@@ -1363,29 +1363,6 @@ def with_testsui(t, responses=None, interactive=True):
 with_testsui.__test__ = False
 
 
-@optional_args
-def with_direct(func):
-    """To test functions under both direct and indirect mode
-
-    Unlike fancy generators would just fail on the first failure
-    """
-    @wraps(func)
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        if on_windows or on_travis:
-            # since on windows would become indirect anyways
-            # on travis -- we have a dedicated matrix run
-            # which would select one or another based on config
-            # if we specify None
-            directs = [None]
-        else:
-            # otherwise we assume that we have to test both modes
-            directs = [True, False]
-        for direct in directs:
-            func(*(args + (direct,)), **kwargs)
-    return newfunc
-
-
 def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
