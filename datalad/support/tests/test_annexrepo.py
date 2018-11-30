@@ -1822,14 +1822,7 @@ def _test_status(ar):
 
     ar.add('fifth')
     sync_wrapper()
-    # TODO:
-    # Note: For some reason this seems to be the only place, where we actually
-    # need to call commit via annex-proxy. If called via '-c core.bare=False'
-    # and/or '--work-tree=.' the file ends up in git instead of annex.
-    # Note 2: This is only if we explicitly pass a path. Otherwise it works
-    # without annex-proxy.
-    ar.commit(msg="fifth to be unannexed", files='fifth',
-              proxy=ar.is_direct_mode())
+    ar.commit(msg="fifth to be unannexed", files='fifth')
     eq_(stat, ar.get_status())
 
     ar.unannex('fifth')
@@ -2015,9 +2008,6 @@ def _test_status(ar):
     stat['modified'].append('.gitmodules')
     eq_(stat, ar.get_status())
 
-    # Note: Here again we need to use annex-proxy; This contradicts the addition
-    # of the very same submodule, which we needed to commit via
-    # -c core.bare=False instead. Otherwise the very same failure happens.
     # Just vice versa. See above where 'submod' is added.
     ar.commit("submod removed", files=['submod', '.gitmodules'])
     stat['modified'].remove('.gitmodules')
