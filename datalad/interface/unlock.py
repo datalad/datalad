@@ -119,15 +119,6 @@ class Unlock(Interface):
                     yield ap
                 continue
 
-            # direct mode, no unlock:
-            elif ds.repo.is_direct_mode():
-                for ap in content:
-                    ap['status'] = 'notneeded'
-                    ap['message'] = "direct mode, nothing to unlock"
-                    ap.update(res_kwargs)
-                    yield ap
-                continue
-
             # only files in annex with their content present:
             files = [ap['path'] for ap in content]
             to_unlock = []

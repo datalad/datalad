@@ -443,10 +443,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
-    if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
-        ok_(exists(opj(subds.path, '.git')))
-    else:
-        ok_(isdir(opj(subds.path, '.git')))
+    ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
     # sub is clean:
