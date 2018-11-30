@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
@@ -313,7 +312,6 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
@@ -385,7 +383,6 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -502,7 +499,6 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     eq_(len(logs_post), len(logs_prior) + 1)
 
 
-@known_failure_direct_mode  #FIXME
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)

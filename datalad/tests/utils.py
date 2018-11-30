@@ -1000,30 +1000,6 @@ def known_failure_v6_or_later(func):
 known_failure_v6 = known_failure_v6_or_later
 
 
-def known_failure_direct_mode(func):
-    """Test decorator marking a test as known to fail in a direct mode test run
-
-    If datalad.repo.direct is set to True behaves like `known_failure`.
-    Otherwise the original (undecorated) function is returned.
-    """
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct") or on_windows
-    if direct:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_direct_mode')
-        @attr('direct_mode')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return dm_func
-
-    return func
-
-
 def known_failure_windows(func):
     """Test decorator marking a test as known to fail on windows
 

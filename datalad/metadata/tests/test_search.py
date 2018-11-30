@@ -25,7 +25,6 @@ from datalad.utils import (
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git

@@ -10,7 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from copy import deepcopy
 
@@ -224,7 +223,6 @@ def test_annotate_paths(dspath, nodspath):
 
 @slow  # 11.0891s
 @with_tree(demo_hierarchy['b'])
-@known_failure_direct_mode  #FIXME
 def test_get_modified_subpaths(path):
     ds = Dataset(path).create(force=True)
     suba = ds.create('ba', force=True)
@@ -330,7 +328,6 @@ def test_get_modified_subpaths(path):
 @slow  # 41.5367s
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_recurseinto(dspath, dest):
     # make fresh dataset hierarchy
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)

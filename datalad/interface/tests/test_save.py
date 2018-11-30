@@ -13,7 +13,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os
 from os.path import pardir
@@ -47,7 +46,6 @@ from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
-@known_failure_direct_mode  #FIXME
 def test_save(path):
 
     ds = Dataset(path)
@@ -119,7 +117,6 @@ def test_save(path):
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
@@ -297,7 +294,6 @@ def test_renamed_file():
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_subdataset_save(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
@@ -373,7 +369,6 @@ def test_symlinked_relpath(path):
 
 
 # two subdatasets not possible in direct mode
-@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_bf1886(path):
     parent = Dataset(path).create()

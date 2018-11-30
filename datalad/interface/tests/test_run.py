@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os.path as op
 from os.path import join as opj
@@ -187,7 +186,6 @@ def test_sidecar(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_rerun(path, nodspath):
     ds = Dataset(path).create()
     sub = ds.create('sub')
@@ -275,7 +273,6 @@ def test_rerun_empty_branch(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_rerun_onto(path):
     ds = Dataset(path).create()
 
@@ -423,7 +420,6 @@ def test_rerun_just_one_commit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@known_failure_direct_mode
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -468,7 +464,6 @@ def test_run_failure(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_rerun_branch(path):
     ds = Dataset(path).create()
 
@@ -521,7 +516,6 @@ def test_rerun_branch(path):
 @ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_rerun_cherry_pick(path):
     ds = Dataset(path).create()
 
@@ -708,7 +702,6 @@ def test_rerun_script(path):
                                         "d.txt": "d"}},
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_run_inputs_outputs(src, path):
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),

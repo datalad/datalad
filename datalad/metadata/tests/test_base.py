@@ -35,7 +35,6 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
 from datalad.tests.utils import swallow_logs
@@ -97,7 +96,6 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
-@known_failure_direct_mode  #FIXME
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
