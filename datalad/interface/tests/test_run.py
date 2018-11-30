@@ -106,9 +106,6 @@ def test_basics(path, nodspath):
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
         res = ds.run('touch empty', message='NOOP_TEST')
-        # When in direct mode, check at the level of save rather than add
-        # because the annex files show up as typechanges and adding them won't
-        # necessarily have a "notneeded" status.
         assert_result_count(res, 1, action='add', status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is

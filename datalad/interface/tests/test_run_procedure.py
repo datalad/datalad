@@ -47,8 +47,6 @@ def test_invalid_call(path):
         assert_in_results(res, status="impossible")
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -101,8 +99,6 @@ def test_basics(path, super_path):
     ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -202,8 +198,6 @@ def test_procedure_discovery(path, super_path):
                                                'unknwon_broken_link'))
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
