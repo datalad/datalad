@@ -10,7 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import logging
 import os
@@ -124,7 +123,6 @@ def test_add_files(path):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
@@ -145,7 +143,6 @@ def test_update_known_submodule(path):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_add_recursive(path):
     # make simple hierarchy
     parent = Dataset(path).create()
@@ -177,7 +174,6 @@ def test_add_recursive(path):
 
 
 @with_tree(**tree_arg)
-@known_failure_direct_mode  #FIXME
 def test_add_dirty_tree(path):
     ds = Dataset(path)
     ds.create(force=True, save=False)
@@ -334,7 +330,6 @@ def test_add_source(path, url, ds_dir):
 
 @with_tree(**tree_arg)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_add_subdataset(path, other):
     subds = create(opj(path, 'dir'), force=True)
     ds = create(path, force=True)
@@ -371,7 +366,6 @@ def test_add_subdataset(path, other):
     'file2.txt': 'some text to go to annex',
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
-@known_failure_direct_mode  #FIXME
 def test_add_mimetypes(path):
     # XXX apparently there is symlinks dereferencing going on while deducing repo
     #    type there!!!! so can't use following invocation  -- TODO separately
@@ -412,7 +406,6 @@ def test_gh1597_simpler(path):
 
 
 # Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree
-@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
     ds = Dataset(path).create()

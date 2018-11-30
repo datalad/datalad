@@ -8,7 +8,6 @@
 """Test create testdataset helpers
 
 """
-from datalad.tests.utils import known_failure_direct_mode
 
 from glob import glob
 from os.path import join as opj
@@ -39,7 +38,6 @@ def test_parse_spec():
 
 
 # Note: This randomly fails in direct mode due to gh-issue #1852
-@known_failure_direct_mode  #FIXME
 def test_create_test_dataset():
     # rudimentary smoke test
     from datalad.api import create_test_dataset
@@ -52,7 +50,6 @@ def test_create_test_dataset():
 
 
 # Note: This randomly fails in direct mode due to gh-issue #1852
-@known_failure_direct_mode  #FIXME
 def test_create_1test_dataset():
     # and just a single dataset
     from datalad.api import create_test_dataset
@@ -63,7 +60,6 @@ def test_create_1test_dataset():
 
 
 # Note: This randomly fails in direct mode due to gh-issue #1852
-@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_new_relpath(topdir):
     from datalad.api import create_test_dataset
@@ -76,7 +72,6 @@ def test_new_relpath(topdir):
 
 
 # Note: This randomly fails in direct mode due to gh-issue #1852
-@known_failure_direct_mode  #FIXME
 @with_tempfile()
 def test_hierarchy(topdir):
     # GH 1178

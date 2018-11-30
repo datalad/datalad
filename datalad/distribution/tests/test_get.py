@@ -10,7 +10,6 @@
 """
 
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from os import curdir
 from os.path import join as opj, basename
@@ -369,7 +368,6 @@ def test_get_install_missing_subdataset(src, path):
 #                  'subds': {'file_in_annex.txt': 'content'}})
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_mixed_hierarchy(src, path):
 
     origin = Dataset(src).create(no_annex=True)

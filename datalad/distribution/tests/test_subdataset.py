@@ -7,7 +7,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test subdataset command"""
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os
 from os.path import join as opj
@@ -25,10 +24,8 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
-from datalad.tests.utils import known_failure_direct_mode
 
 
-@known_failure_direct_mode  #FIXME
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
@@ -195,7 +192,6 @@ def test_state(path):
         ds.subdatasets(), 1, path=sub.path, state='absent')
 
 
-@known_failure_direct_mode  #FIXME same issue as gh-2113
 @with_tempfile
 def test_get_subdatasets_types(path):
     from datalad.api import create

@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import logging
@@ -425,11 +424,6 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
-# @known_failure_direct_mode  #FIXME:
-# If we use all testrepos, we get a mixed hierarchy. Therefore ok_clean_git
-# fails if we are in direct mode and run into a plain git beneath an annex, due
-# to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
-
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -475,7 +469,6 @@ def test_install_into_dataset(source, top_path):
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
 
@@ -533,7 +526,6 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_implicit_install(src, dst):
 
     origin_top = create(src)
@@ -795,7 +787,6 @@ def test_install_source_relpath(src, dest):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_install_consistent_state(src, dest, dest2, dest3):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)

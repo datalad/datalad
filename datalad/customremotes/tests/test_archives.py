@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 from ..archives import ArchiveAnnexCustomRemote
@@ -126,7 +125,6 @@ def test_basic_scenario(direct, d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
-@known_failure_direct_mode  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
