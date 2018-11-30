@@ -201,11 +201,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                 raise e
 
         # Below was initially introduced for setting for direct mode workaround,
-        # where we changed _GIT_COMMON_OPTIONS.
-        # But we should not pass workarounds such as --worktree=.
-        # -c core.bare=False to git annex commands, so for their
-        # invocation we will keep and use pristine version of the
-        # common options
+        # where we changed _GIT_COMMON_OPTIONS and had to avoid passing
+        # --worktree=. -c core.bare=False to git annex commands, so for their
+        # invocation we kept and used pristine version of the
+        # common options.  yoh thought it would be good to keep this as a copy
+        # just in case we do need to pass annex specific options, even if
+        # there is no need ATM
         self._ANNEX_GIT_COMMON_OPTIONS = self._GIT_COMMON_OPTIONS[:]
 
         # check for possible SSH URLs of the remotes in order to set up
@@ -1313,6 +1314,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
+
+        # TODO: RM DIRECT? not clear if this code didn't become "generic" and
+        #       not only "direct mode" specific, so kept for now.
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
@@ -1337,22 +1341,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                     yield r
                     return
             except CommandError as e:
+                # TODO: RM DIRECT?  left for detection of direct mode submodules
                 if AnnexRepo._is_annex_work_tree_message(e.stderr):
-                    lgr.warning(
-                        "Known bug in direct mode."
-                        "We can't use --dry-run when there are submodules in "
-                        "direct mode, because the internal call to git status "
-                        "fails. To be resolved by using (Dataset's) status "
-                        "instead of a git-add --dry-run altogether.")
-                    # fake the return for now
-                    for r in self._process_git_get_output(
-                            linesep.join(["'{}'".format(f)
-                            for f in files])):
-                        yield r
-                        return
-                else:
-                    # unexpected failure
-                    raise e
+                    raise DirectModeNoLongerSupportedError(
+                        self, exc_str(e)
+                    )
+                raise
 
         # Theoretically we could have done for git as well, if it could have
         # been batched
