@@ -292,16 +292,15 @@ class GlobbedPaths(object):
         return sub_patterns
 
     def _expand_globs(self):
-        def normalize_hits(hs):
-            return [relpath(h) + ("" if op.basename(h) else op.sep)
-                    for h in sorted(hs)]
+        def normalize_hit(h):
+            return relpath(h) + ("" if op.basename(h) else op.sep)
 
         expanded = []
         with chpwd(self.pwd):
             for pattern in self._paths["patterns"]:
                 hits = glob.glob(pattern)
                 if hits:
-                    expanded.extend(normalize_hits(hits))
+                    expanded.extend(sorted(map(normalize_hit, hits)))
                 else:
                     lgr.debug("No matching files found for '%s'", pattern)
                     # We didn't find a hit for the complete pattern. If we find
@@ -310,7 +309,8 @@ class GlobbedPaths(object):
                     for sub_pattern in self._get_sub_patterns(pattern):
                         sub_hits = glob.glob(sub_pattern)
                         if sub_hits:
-                            expanded.extend(normalize_hits(sub_hits))
+                            expanded.extend(
+                                sorted(map(normalize_hit, sub_hits)))
                             break
                     # ... but we still want to retain the original pattern
                     # because we don't know for sure at this point, and it
