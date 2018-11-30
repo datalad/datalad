@@ -229,10 +229,7 @@ def test_clone_into_dataset(source, top_path):
 
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
-    if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
-        ok_(exists(opj(subds.path, '.git')))
-    else:
-        ok_(isdir(opj(subds.path, '.git')))
+    ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:

@@ -185,39 +185,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     eq_(sorted(r.untracked_files), sorted(untracked))
 
-    if annex and r.is_direct_mode():
-        if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not supported "
-                        "for direct mode repositories!")
+    repo = r.repo
+
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
         else:
-            test_untracked = not untracked
-            test_submodules = not ignore_submodules
-            ok_(not r.is_dirty(untracked_files=test_untracked,
-                               submodules=test_submodules),
-                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
-                    test_untracked, test_submodules))
-    else:
-        repo = r.repo
-
-        if repo.index.entries.keys():
-            ok_(repo.head.is_valid())
-
-            if not head_modified and not index_modified:
-                # get string representations of diffs with index to ease
-                # troubleshooting
-                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-                index_diffs = [str(d) for d in repo.index.diff(None)]
-                eq_(head_diffs, [])
-                eq_(index_diffs, [])
-            else:
-                # TODO: These names are confusing/non-descriptive.  REDO
-                if head_modified:
-                    # we did ask for interrogating changes
-                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(sorted(head_modified_), sorted(head_modified))
-                if index_modified:
-                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(sorted(index_modified_), sorted(index_modified))
+            # TODO: These names are confusing/non-descriptive.  REDO
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                eq_(sorted(head_modified_), sorted(head_modified))
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):

@@ -77,12 +77,6 @@ def test_unlock(path):
     # TODO: use get_annexed_files instead of hardcoded filename
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
-    # in direct mode there is no unlock:
-    if ds.repo.is_direct_mode():
-        res = ds.unlock()
-        assert_result_count(res, 1)
-        assert_status('notneeded', res)
-
     # in V6+ we can unlock even if the file's content isn't present:
     elif ds.repo.supports_unlocked_pointers:
         res = ds.unlock()
@@ -98,10 +92,7 @@ def test_unlock(path):
     ds.repo.get('test-annex.dat')
     result = ds.unlock()
     assert_result_count(result, 1)
-    if ds.repo.is_direct_mode():
-        assert_status('notneeded', result)
-    else:
-        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
+    assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
@@ -114,9 +105,8 @@ def test_unlock(path):
         ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
-    if not ds.repo.is_direct_mode():
-        # after commit, file is locked again:
-        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    # after commit, file is locked again:
+    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:
@@ -126,10 +116,7 @@ def test_unlock(path):
     result = ds.unlock(path='test-annex.dat')
     assert_result_count(result, 1)
 
-    if ds.repo.is_direct_mode():
-        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='notneeded')
-    else:
-        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
+    assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")
@@ -148,9 +135,8 @@ def test_unlock(path):
     # and locked it again?
     # Also: After opening the file is empty.
 
-    if not ds.repo.is_direct_mode():
-        # after commit, file is locked again:
-        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    # after commit, file is locked again:
+    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:
