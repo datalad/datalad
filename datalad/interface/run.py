@@ -293,7 +293,11 @@ class GlobbedPaths(object):
 
     def _expand_globs(self):
         def normalize_hit(h):
-            return relpath(h) + ("" if op.basename(h) else op.sep)
+            normalized = relpath(h) + ("" if op.basename(h) else op.sep)
+            if h == op.curdir + op.sep + normalized:
+                # Don't let relpath prune "./fname" (gh-3034).
+                return h
+            return normalized
 
         expanded = []
         with chpwd(self.pwd):
