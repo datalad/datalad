@@ -63,7 +63,7 @@ lgr = logging.getLogger('datalad.interface.run')
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
     cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = '{}{}'.format(
+    cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty

@@ -133,6 +133,26 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@with_tempfile(mkdir=True)
+def test_py2_unicode_command(path):
+    # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+    ds = Dataset(path).create()
+    touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
+    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+                                        touch_cmd,
+                                        u"bβ0.dat")
+    ds.run(cmd_str)
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ0.dat"))
+
+    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ1.dat"))
+
+    with assert_raises(CommandError), swallow_outputs():
+        ds.run(u"bβ2.dat")
+
+
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
