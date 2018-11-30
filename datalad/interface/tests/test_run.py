@@ -444,21 +444,22 @@ def test_run_explicit(path):
 
 
 @ignore_nose_capturing_stdout
-@known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):
     ds = Dataset(path).rev_create(force=True)
     ds.rev_save()
     assert_repo_status(ds.path, untracked=['subdir'])
-    ds.rev_run("echo {inputs} >{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
+    # ATTN windows is sensitive to spaces before redirect symbol
+    ds.rev_run("echo {inputs}>{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
     ok_file_has_content(op.join(path, "c.out"), "a.in b.in\n")
 
     hexsha_before = ds.repo.get_hexsha()
     ds.rerun()
     eq_(hexsha_before, ds.repo.get_hexsha())
 
-    ds.rev_run("echo {inputs[0]} >getitem", inputs=["*.in"])
+    # ATTN windows is sensitive to spaces before redirect symbol
+    ds.rev_run("echo {inputs[0]}>getitem", inputs=["*.in"])
     ok_file_has_content(op.join(path, "getitem"), "a.in\n")
 
     ds.rev_run("echo {pwd} >expanded-pwd")
@@ -485,7 +486,7 @@ def test_placeholders(path):
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-", since="")
         script_out = cmout.getvalue()
-        assert_in("echo a.in b.in >c.out", script_out)
+        assert_in("echo a.in b.in>c.out", script_out)
         assert_in("echo {} >expanded-pwd".format(subdir_path),
                   script_out)
         assert_in("echo {} >expanded-dspath".format(ds.path),
