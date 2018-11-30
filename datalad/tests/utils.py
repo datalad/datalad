@@ -1042,25 +1042,6 @@ def skip_v6_or_later(func, method='raise'):
 
 
 @optional_args
-def skip_direct_mode(func, method='raise'):
-    """Skips tests if datalad is configured to use direct mode
-    (set DATALAD_REPO_DIRECT)
-    """
-
-    from datalad import cfg
-
-    @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run",
-             method=method)
-    @wraps(func)
-    @attr('skip_direct_mode')
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
-    return newfunc
-
-
-@optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
 
