@@ -386,7 +386,7 @@ def _install_and_reglob(dset, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset, inputs):
+def prepare_inputs(dset, inputs, extra_inputs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -396,16 +396,19 @@ def prepare_inputs(dset, inputs):
     ----------
     dset : Dataset
     inputs : GlobbedPaths object
+    extra_inputs : GlobbedPaths object, optional
 
     Returns
     -------
     Generator with the result records.
     """
-    if inputs:
+    gps = list(filter(bool, [inputs, extra_inputs]))
+    if gps:
         lgr.info('Making sure inputs are available (this may take some time)')
-        for res in _install_and_reglob(dset, inputs):
+    for gp in gps:
+        for res in _install_and_reglob(dset, gp):
             yield res
-        for res in dset.get(inputs.expand(full=True), on_failure="ignore"):
+        for res in dset.get(gp.expand(full=True), on_failure="ignore"):
             if res.get("state") == "absent":
                 lgr.warning("Input does not exist: %s", res["path"])
             else:
@@ -540,7 +543,9 @@ def _save_outputs(ds, to_save, msg):
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
-                rerun_info=None, rerun_outputs=None,
+                rerun_info=None,
+                extra_inputs=None,
+                rerun_outputs=None,
                 inject=False,
                 saver=_save_outputs):
     """Run `cmd` in `dataset` and record the results.
@@ -560,6 +565,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         top-level "namespace" key (e.g., the project or extension name).
     rerun_info : dict, optional
         Record from a previous run. This is used internally by `rerun`.
+    extra_inputs : list, optional
+        Inputs to use in addition to those specified by `inputs`. Unlike
+        `inputs`, these will not be injected into the {inputs} format field.
     rerun_outputs : list, optional
         Outputs, in addition to those in `outputs`, determined automatically
         from a previous run. This is used internally by `rerun`.
@@ -616,11 +624,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
+    extra_inputs = GlobbedPaths(extra_inputs, pwd=pwd,
+                                # Follow same expansion rules as `inputs`.
+                                expand=expand in ["inputs", "both"])
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
 
     if not inject:
-        for res in prepare_inputs(ds, inputs):
+        for res in prepare_inputs(ds, inputs, extra_inputs):
             yield res
 
         if outputs:
@@ -668,6 +679,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
+        'extra_inputs': extra_inputs.paths,
         'outputs': outputs.paths,
     }
     if rel_pwd is not None:

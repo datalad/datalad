@@ -674,7 +674,8 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@with_tree(tree={"test-annex.dat": "content",
+@with_tree(tree={"input.dat": "input",
+                 "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
                         "s1_1": {"s2": {"c.dat": "c",
@@ -695,22 +696,31 @@ def test_run_inputs_outputs(src, path):
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
 
-    # If we specify test-annex.dat as an input, it will be retrieved before the
-    # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"])
+    # The specified inputs and extra inputs will be retrieved before the run.
+    # (Use run_command() to access the extra_inputs argument.)
+    list(run_command("cat {inputs} {inputs} >doubled.dat",
+                     dataset=ds,
+                     inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
 
     ok_clean_git(ds.path)
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
     ok_(ds.repo.file_has_content("doubled.dat"))
+    with open(opj(path, "doubled.dat")) as fh:
+        content = fh.read()
+        assert_in("input", content)
+        assert_not_in("extra-input", content)
 
     # Rerunning the commit will also get the input file.
-    ds.repo.drop("test-annex.dat", options=["--force"])
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    ds.repo.drop(["input.dat", "extra-input.dat"], options=["--force"])
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
     ds.rerun()
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["not-there"])
