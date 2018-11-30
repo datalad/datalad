@@ -213,16 +213,13 @@ class Run(Interface):
             for r in Rerun.__call__(dataset=dataset, message=message):
                 yield r
         else:
-            if cmd:
-                for r in run_command(cmd, dataset=dataset,
-                                     inputs=inputs, outputs=outputs,
-                                     expand=expand,
-                                     explicit=explicit,
-                                     message=message,
-                                     sidecar=sidecar):
-                    yield r
-            else:
-                lgr.warning("No command given")
+            for r in run_command(cmd, dataset=dataset,
+                                 inputs=inputs, outputs=outputs,
+                                 expand=expand,
+                                 explicit=explicit,
+                                 message=message,
+                                 sidecar=sidecar):
+                yield r
 
 
 class GlobbedPaths(object):
@@ -581,6 +578,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     ------
     Result records for the run.
     """
+    if not cmd:
+        lgr.warning("No command given")
+        return
+
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
