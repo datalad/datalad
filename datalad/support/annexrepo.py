@@ -86,6 +86,7 @@ from .exceptions import IncompleteResultsError
 from .exceptions import AccessDeniedError
 from .exceptions import AccessFailedError
 from .exceptions import InvalidAnnexRepositoryError
+from .exceptions import DirectModeNoLongerSupportedError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -260,12 +261,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Could happen in case we didn't specify anything, but annex forced
         # direct mode due to FS or an already existing repo was in direct mode,
         if self._is_direct_mode_from_config():
-            self._fail_direct_mode(
+            raise DirectModeNoLongerSupportedError(
+                self,
                 "Git configuration reports repository being in direct mode"
             )
 
         if self.config.getbool("datalad", "repo.direct", default=False):
-            self._fail_direct_mode(
+            raise DirectModeNoLongerSupportedError(
+                self,
                 "datalad.repo.direct configuration instructs to use direct mode"
             )
 
@@ -281,14 +284,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self._ALLOW_LOCAL_URLS:
             self._allow_local_urls()
 
-    def _fail_direct_mode(self, msg=None):
-        raise RuntimeError(
-            ("direct mode of operation is no longer supported.  "
-            "Please use 'git annex upgrade' under %s to upgrade your direct "
-            "mode repository to annex v6 (or later) which should provide a "
-            "better operation on your system." % self.path) +
-            msg if msg else ''
-        )
     def _allow_local_urls(self):
         """Allow URL schemes and addresses which potentially could be harmful.
 
@@ -1069,7 +1064,11 @@ class AnnexRepo(GitRepo, RepoInterface):
     #       migration to v6+ mode and testing. For now is made protected to
     #       avoid use by users
     def _set_direct_mode(self, enable_direct_mode=True):
-        """Switch to direct or indirect mode (to be used only internally)
+        """Switch to direct or indirect mode
+
+        WARNING!  To be used only for internal development purposes.
+                  We no longer support direct mode and thus setting it in a
+                  repository would render it unusable for DataLad
 
         Parameters
         ----------
