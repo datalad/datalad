@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+import os
 import os.path as op
 from os import (
     mkdir,
@@ -72,6 +73,7 @@ from datalad.tests.utils import (
     slow,
     with_testrepos,
     OBSCURE_FILENAME,
+    SkipTest,
 )
 
 
@@ -245,6 +247,12 @@ def test_new_or_modified(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 def test_run_inputs_outputs(src, path):
+    if 'APPVEYOR' in os.environ:
+        # issue only happens on appveyor, Python itself implodes
+        # cannot be reproduced on a real win7 box
+        raise SkipTest(
+            'test causes appveyor (only) to crash, reason unknown')
+
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
                   ("s0", "s1_0"),
