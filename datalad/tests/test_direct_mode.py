@@ -81,6 +81,9 @@ def test_direct_cfg(path1, path2):
         with assert_raises(DirectModeNoLongerSupportedError) as cme:
             AnnexRepo(path1, create=False)
 
+
+    # TODO: RM DIRECT decide what should we here -- should we test/blow?
+    #   ATM both tests below just pass
     ar2 = AnnexRepo(path2, create=True)
     # happily can do it since it doesn't need a worktree to do the clone
     ar2.add_submodule('sub1', url=path1)
@@ -89,7 +92,13 @@ def test_direct_cfg(path1, path2):
     assert not ar2sub1.is_direct_mode()
     ar2sub1._set_direct_mode(True)
     assert ar2sub1.is_direct_mode()
+    del ar2; del ar2sub1; AnnexRepo._unique_instances.clear()  # fight flyweight
+
+    ar2 = AnnexRepo(path2)
     ar2.get_submodules()
 
-    # TODO: RM DIRECT decide what should we here -- should we test/blow?
-    #   ATM just passes
+    # And what if we are trying to add pre-cloned repo in direct mode?
+    ar2sub2 = AnnexRepo.clone(path1, op.join(path2, 'sub2'))
+    ar2sub2._set_direct_mode(True)
+    del ar2sub2; AnnexRepo._unique_instances.clear()  # fight flyweight
+    ar2.add('sub2')
