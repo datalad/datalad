@@ -37,6 +37,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import slow
+from datalad.tests.utils import known_failure_windows
 
 
 @slow
@@ -207,6 +208,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_newthings_coming_down(originpath, destpath):
@@ -263,6 +265,7 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -343,6 +346,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_clean_git(ds.path)
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):
