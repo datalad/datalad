@@ -1014,16 +1014,39 @@ def test_globbedpaths_get_sub_patterns():
 
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
-                 "3.txt": ""})
+                 "3.txt": "",
+                 "subdir": {"1.txt": "", "2.txt": ""}})
 def test_globbedpaths(path):
+    dotdir = op.curdir + op.sep
+
     for patterns, expected in [
             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
+            ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
             (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
+            ([dotdir + "*.txt", "*.dat"],
+             {dotdir + "1.txt", "2.dat", dotdir + "3.txt"}),
+            (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
+            ([dotdir + "subdir/*.txt"],
+             {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
             (["*.txt"], {"1.txt", "3.txt"})]:
         gp = GlobbedPaths(patterns, pwd=path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
             {opj(path, p) for p in expected})
+
+    pardir = op.pardir + op.sep
+    subdir_path = op.join(path, "subdir")
+    for patterns, expected in [
+            (["*.txt"], {"1.txt", "2.txt"}),
+            ([dotdir + "*.txt"], {dotdir + p for p in ["1.txt", "2.txt"]}),
+            ([pardir + "*.txt"], {pardir + p for p in ["1.txt", "3.txt"]}),
+            ([dotdir + pardir + "*.txt"],
+             {dotdir + pardir + p for p in ["1.txt", "3.txt"]}),
+            (["subdir/"], {"subdir/"})]:
+        gp = GlobbedPaths(patterns, pwd=subdir_path)
+        eq_(set(gp.expand()), expected)
+        eq_(set(gp.expand(full=True)),
+            {opj(subdir_path, p) for p in expected})
 
     # Full patterns still get returned as relative to pwd.
     gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
