@@ -78,7 +78,7 @@ def test_unlock(path):
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # in V6+ we can unlock even if the file's content isn't present:
-    elif ds.repo.supports_unlocked_pointers:
+    if ds.repo.supports_unlocked_pointers:
         res = ds.unlock()
         assert_result_count(res, 1)
         assert_status('ok', res)
