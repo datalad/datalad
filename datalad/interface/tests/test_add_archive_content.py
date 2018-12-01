@@ -77,7 +77,7 @@ def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     with chpwd(repo_path):
         # create annex repo
-        repo = AnnexRepo(repo_path, create=True, direct=False)
+        repo = AnnexRepo(repo_path, create=True)
 
         # add archive to the repo so we could test
         with swallow_outputs():
@@ -166,13 +166,12 @@ tree4uargs = dict(
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def test_add_archive_content(path_orig, url, repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
     with chpwd(repo_path):
         # TODO we need to be able to pass path into add_archive_content
         # We could mock but I mean for the API
         assert_raises(RuntimeError, add_archive_content, "nonexisting.tar.gz") # no repo yet
 
-        repo = AnnexRepo(repo_path, create=True, direct=direct)
+        repo = AnnexRepo(repo_path, create=True)
         assert_raises(ValueError, add_archive_content, "nonexisting.tar.gz")
         # we can't add a file from outside the repo ATM
         assert_raises(FileNotInRepositoryError, add_archive_content, opj(path_orig, '1.tar.gz'))
@@ -305,9 +304,8 @@ def test_add_archive_content(path_orig, url, repo_path):
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def test_add_archive_content_strip_leading(path_orig, url, repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
     with chpwd(repo_path):
-        repo = AnnexRepo(repo_path, create=True, direct=direct)
+        repo = AnnexRepo(repo_path, create=True)
 
         # Let's add first archive to the repo so we could test
         with swallow_outputs():
@@ -338,8 +336,7 @@ def test_add_archive_content_zip(repo_path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree4uargs)
 def test_add_archive_use_archive_dir(repo_path):
-    direct = False  # TODO: test on undirect, but too long ATM
-    repo = AnnexRepo(repo_path, create=True, direct=direct)
+    repo = AnnexRepo(repo_path, create=True)
     with chpwd(repo_path):
         # Let's add first archive to the repo with default setting
         archive_path = opj('4u', '1.tar.gz')
@@ -378,8 +375,7 @@ class TestAddArchiveOptions():
                delete=False)
     def setup(self, repo_path):
         self.pwd = getpwd()
-        direct = False  # TODO: test on undirect, but too long ATM
-        self.annex = annex = AnnexRepo(repo_path, create=True, direct=direct)
+        self.annex = annex = AnnexRepo(repo_path, create=True)
         # Let's add first archive to the annex so we could test
         annex.add('1.tar')
         annex.commit(msg="added 1.tar")

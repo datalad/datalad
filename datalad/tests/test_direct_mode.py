@@ -70,7 +70,7 @@ def test_direct_cfg(path1, path2):
     # check if we somehow didn't reset the flag
     assert not ar.is_direct_mode()
 
-    if ar.config.get("datalad.repo.version", 5) >= 6:
+    if ar.config.obtain("datalad.repo.version") >= 6:
         raise SkipTest("Created repo not v5, cannot test detection of direct mode repos")
     # and if repo existed before and was in direct mode, we fail too
     # Since direct= option was deprecated entirely, we use protected method now
