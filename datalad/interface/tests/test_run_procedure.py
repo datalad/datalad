@@ -26,6 +26,7 @@ from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import on_windows
+from datalad.tests.utils import known_failure_windows
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
@@ -41,7 +42,7 @@ def test_invalid_call():
     assert_in_results(res, status="impossible")
 
 
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@known_failure_windows  #FIXME
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
