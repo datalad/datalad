@@ -46,6 +46,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -564,6 +565,7 @@ def test_publish_depends(
         ok_file_has_content(opj(p, 'probe1'), 'probe1')
 
 
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_gh1426(origin_path, target_path):

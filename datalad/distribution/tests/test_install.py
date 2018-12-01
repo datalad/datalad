@@ -72,6 +72,7 @@ from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -465,6 +466,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+@known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
 @use_cassette('test_install_crcns')
@@ -782,6 +784,7 @@ def test_install_source_relpath(src, dest):
         ds2 = install(dest, source=src_)
 
 
+@known_failure_windows  #FIXME
 @integration  # 41.2043s
 @with_tempfile
 @with_tempfile

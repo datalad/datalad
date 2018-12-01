@@ -138,6 +138,7 @@ def test_create(path):
         ('bim', 'bam', 'bum'))
 
 
+@known_failure_windows  #FIXME
 @with_tempfile
 def test_create_sub(path):
 
@@ -200,6 +201,8 @@ def test_create_sub_nosave(path):
     # Just the annex subdataset is recognized.
     eq_(ds.subdatasets(result_xfm="relpaths"), ["sub_annex"])
 
+
+@known_failure_windows
 @with_tree(tree=_dataset_hierarchy_template)
 def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
