@@ -459,6 +459,7 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
+        command = list(map(assure_unicode, command))
         if len(command) == 1:
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
@@ -472,6 +473,8 @@ def normalize_command(command):
             command = command[0]
         else:
             command = " ".join(shlex_quote(c) for c in command)
+    else:
+        command = assure_unicode(command)
     return command
 
 
