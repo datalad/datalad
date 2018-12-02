@@ -743,7 +743,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
         '"{}"'.format(record_id) if use_sidecar else record)
-    msg = assure_bytes(msg)
 
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
@@ -751,7 +750,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
                                    "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(msg)
+                ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -r -F %s .'",
