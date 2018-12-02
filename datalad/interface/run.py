@@ -49,6 +49,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
+from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 # Rename get_dataset_pwds for the benefit of containers_run.
 from datalad.utils import get_dataset_pwds as get_command_pwds
@@ -62,7 +63,7 @@ lgr = logging.getLogger('datalad.interface.run')
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
     cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = '{}{}'.format(
+    cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty
@@ -246,6 +247,7 @@ class GlobbedPaths(object):
             self._maybe_dot = []
             self._paths = {"patterns": [], "sub_patterns": {}}
         else:
+            patterns = list(map(assure_unicode, patterns))
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {

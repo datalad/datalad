@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -131,6 +131,26 @@ def test_basics(path, nodspath):
         with swallow_logs(new_level=logging.WARN) as cml:
             ds.run()
             assert_in("No command given", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_py2_unicode_command(path):
+    # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+    ds = Dataset(path).create()
+    touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
+    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+                                        touch_cmd,
+                                        u"bβ0.dat")
+    ds.run(cmd_str)
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ0.dat"))
+
+    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ1.dat"))
+
+    with assert_raises(CommandError), swallow_outputs():
+        ds.run(u"bβ2.dat")
 
 
 @known_failure_windows
@@ -968,7 +988,7 @@ def test_inputs_quotes_needed(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
     expected = u"!".join(
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
@@ -1025,6 +1045,8 @@ def test_globbedpaths_get_sub_patterns():
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
+                 # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+                 u"bβ.dat": "",
                  "subdir": {"1.txt": "", "2.txt": ""}})
 def test_globbedpaths(path):
     dotdir = op.curdir + op.sep
@@ -1032,9 +1054,9 @@ def test_globbedpaths(path):
     for patterns, expected in [
             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
-             {dotdir + "1.txt", "2.dat", dotdir + "3.txt"}),
+             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
             (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
             ([dotdir + "subdir/*.txt"],
              {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
@@ -1060,12 +1082,12 @@ def test_globbedpaths(path):
 
     # Full patterns still get returned as relative to pwd.
     gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat"])
+    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
 
     # "." gets special treatment.
     gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat"])
+    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
+    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
     gp = GlobbedPaths(["."], pwd=path, expand=False)
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
@@ -1078,7 +1100,8 @@ def test_globbedpaths(path):
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
+    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
+                             (False, ["*.dat"])]:
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)
 
