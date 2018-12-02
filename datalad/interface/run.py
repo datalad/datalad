@@ -461,6 +461,13 @@ def normalize_command(command):
         if len(command) == 1:
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
+            #
+            # FIXME: This covers the predominant command-line case, but, for
+            # Python API callers, it means values like ["./script with spaces"]
+            # requires additional string-like escaping, which is inconsistent
+            # with the handling of multi-item lists (and subprocess's
+            # handling). Once we have a way to detect "running from Python API"
+            # (discussed in gh-2986), update this.
             command = command[0]
         else:
             command = " ".join(shlex_quote(c) for c in command)
