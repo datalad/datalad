@@ -530,7 +530,7 @@ class Runner(object):
                            "" if log_online else " out=%s" % out[0],
                            "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(text_type(cmd), msg, status, out[0], out[1])
+                    raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)

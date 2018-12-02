@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -131,26 +131,6 @@ def test_basics(path, nodspath):
         with swallow_logs(new_level=logging.WARN) as cml:
             ds.run()
             assert_in("No command given", cml.out)
-
-
-@with_tempfile(mkdir=True)
-def test_py2_unicode_command(path):
-    # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
-    ds = Dataset(path).create()
-    touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
-    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
-                                        touch_cmd,
-                                        u"bβ0.dat")
-    ds.run(cmd_str)
-    ok_clean_git(ds.path)
-    ok_exists(op.join(path, u"bβ0.dat"))
-
-    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
-    ok_clean_git(ds.path)
-    ok_exists(op.join(path, u"bβ1.dat"))
-
-    with assert_raises(CommandError), swallow_outputs():
-        ds.run(u"bβ2.dat")
 
 
 @known_failure_windows
@@ -694,8 +674,7 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@with_tree(tree={"input.dat": "input",
-                 "extra-input.dat": "extra input",
+@with_tree(tree={"test-annex.dat": "content",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
                         "s1_1": {"s2": {"c.dat": "c",
@@ -716,31 +695,22 @@ def test_run_inputs_outputs(src, path):
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
-    assert_false(ds.repo.file_has_content("input.dat"))
-    assert_false(ds.repo.file_has_content("extra-input.dat"))
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
 
-    # The specified inputs and extra inputs will be retrieved before the run.
-    # (Use run_command() to access the extra_inputs argument.)
-    list(run_command("cat {inputs} {inputs} >doubled.dat",
-                     dataset=ds,
-                     inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
+    # If we specify test-annex.dat as an input, it will be retrieved before the
+    # run.
+    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
+           inputs=["test-annex.dat"])
 
     ok_clean_git(ds.path)
-    ok_(ds.repo.file_has_content("input.dat"))
-    ok_(ds.repo.file_has_content("extra-input.dat"))
+    ok_(ds.repo.file_has_content("test-annex.dat"))
     ok_(ds.repo.file_has_content("doubled.dat"))
-    with open(opj(path, "doubled.dat")) as fh:
-        content = fh.read()
-        assert_in("input", content)
-        assert_not_in("extra-input", content)
 
     # Rerunning the commit will also get the input file.
-    ds.repo.drop(["input.dat", "extra-input.dat"], options=["--force"])
-    assert_false(ds.repo.file_has_content("input.dat"))
-    assert_false(ds.repo.file_has_content("extra-input.dat"))
+    ds.repo.drop("test-annex.dat", options=["--force"])
+    assert_false(ds.repo.file_has_content("test-annex.dat"))
     ds.rerun()
-    ok_(ds.repo.file_has_content("input.dat"))
-    ok_(ds.repo.file_has_content("extra-input.dat"))
+    ok_(ds.repo.file_has_content("test-annex.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["not-there"])
@@ -988,7 +958,7 @@ def test_inputs_quotes_needed(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
     expected = u"!".join(
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
@@ -1045,8 +1015,6 @@ def test_globbedpaths_get_sub_patterns():
 @with_tree(tree={"1.txt": "",
                  "2.dat": "",
                  "3.txt": "",
-                 # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
-                 u"bβ.dat": "",
                  "subdir": {"1.txt": "", "2.txt": ""}})
 def test_globbedpaths(path):
     dotdir = op.curdir + op.sep
@@ -1054,9 +1022,9 @@ def test_globbedpaths(path):
     for patterns, expected in [
             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
+            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
             ([dotdir + "*.txt", "*.dat"],
-             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
+             {dotdir + "1.txt", "2.dat", dotdir + "3.txt"}),
             (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
             ([dotdir + "subdir/*.txt"],
              {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
@@ -1082,12 +1050,12 @@ def test_globbedpaths(path):
 
     # Full patterns still get returned as relative to pwd.
     gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
+    eq_(gp.expand(), ["2.dat"])
 
     # "." gets special treatment.
     gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
+    eq_(set(gp.expand()), {"2.dat", "."})
+    eq_(gp.expand(dot=False), ["2.dat"])
     gp = GlobbedPaths(["."], pwd=path, expand=False)
     eq_(gp.expand(), ["."])
     eq_(gp.paths, ["."])
@@ -1100,8 +1068,7 @@ def test_globbedpaths(path):
         eq_(gp.expand(), ["z", "b", "d", "x"])
 
     # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
-                             (False, ["*.dat"])]:
+    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
         eq_(gp.paths, expected)
 

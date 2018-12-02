@@ -93,13 +93,6 @@ lgr = logging.getLogger('datalad.annex')
 # Limit to # of CPUs and up to 8, but at least 3 to start with
 N_AUTO_JOBS = min(8, max(3, cpu_count()))
 
-# This is a map between an auto-upgradeable version and the version that it
-# upgrades to. It should track autoUpgradeableVersions in Annex.Version.
-_AUTO_UPGRADEABLE_VERSIONS = {3: 5, 4: 5}
-# TODO: Adjust once GIT_ANNEX_VERSION is at least 7.20181031.
-if external_versions['cmd:annex'] >= '7.20181031':
-    _AUTO_UPGRADEABLE_VERSIONS[6] = 7
-
 
 class AnnexRepo(GitRepo, RepoInterface):
     """Representation of an git-annex repository.
@@ -1283,10 +1276,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         if description is not None:
             opts += [description]
         if version is not None:
-            upgraded_version = _AUTO_UPGRADEABLE_VERSIONS.get(version)
-            if upgraded_version:
-                lgr.info("Annex repository version %s will be upgraded to %s",
-                         version, upgraded_version)
             opts += ['--version', '{0}'.format(version)]
         if not len(opts):
             opts = None

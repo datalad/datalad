@@ -388,7 +388,6 @@ def _rerun(dset, results):
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
-                                 extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
                                  rerun_outputs=auto_outputs,
                                  message=message,

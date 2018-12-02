@@ -295,14 +295,6 @@ def test_runner_failure(dir_):
 
 
 @with_tempfile(mkdir=True)
-def test_runner_failure_unicode(path):
-    # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
-    runner = Runner()
-    with assert_raises(CommandError), swallow_logs():
-        runner.run(u"β-command-doesnt-exist", cwd=path)
-
-
-@with_tempfile(mkdir=True)
 def test_git_path(dir_):
     from ..support.gitrepo import GitRepo
     # As soon as we use any GitRepo we should get _GIT_PATH set in the Runner
