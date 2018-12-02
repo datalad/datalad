@@ -1166,8 +1166,9 @@ def test_annex_backends(path):
 def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     from datalad import ssh_manager
     # create remotes:
-    rm1 = AnnexRepo(remote_1_path, create=False)
-    rm2 = AnnexRepo(remote_2_path, create=False)
+    with swallow_outputs():  # Avoid stalling on Travis (gh-3041).
+        rm1 = AnnexRepo(remote_1_path, create=False)
+        rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
     socket_1 = opj(ssh_manager.socket_dir, get_connection_hash('datalad-test'))
