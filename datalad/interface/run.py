@@ -22,6 +22,7 @@ from os.path import normpath
 from os.path import relpath
 from os.path import isabs
 
+from six.moves import map
 from six.moves import shlex_quote
 
 from datalad.interface.base import Interface
@@ -458,12 +459,22 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
+        command = list(map(assure_unicode, command))
         if len(command) == 1:
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
+            #
+            # FIXME: This covers the predominant command-line case, but, for
+            # Python API callers, it means values like ["./script with spaces"]
+            # requires additional string-like escaping, which is inconsistent
+            # with the handling of multi-item lists (and subprocess's
+            # handling). Once we have a way to detect "running from Python API"
+            # (discussed in gh-2986), update this.
             command = command[0]
         else:
             command = " ".join(shlex_quote(c) for c in command)
+    else:
+        command = assure_unicode(command)
     return command
 
 
@@ -732,7 +743,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
         '"{}"'.format(record_id) if use_sidecar else record)
-    msg = assure_bytes(msg)
 
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
@@ -740,7 +750,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
                                    "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(msg)
+                ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -r -F %s .'",
