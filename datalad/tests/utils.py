@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import gzip
 import inspect
 import shutil
 import stat
@@ -391,19 +392,30 @@ def ok_exists(path):
     assert exists(path), 'path %s does not exist' % path
 
 
-def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
+def ok_file_has_content(path, content, strip=False, re_=False,
+                        decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
     ok_exists(path)
-    with open(path, 'r') as f:
-        content_ = f.read()
+    if decompress:
+        if path.endswith('.gz'):
+            open_func = gzip.open
+        else:
+            raise NotImplementedError("Don't know how to decompress %s" % path)
+    else:
+        open_func = open
+
+    with open_func(path, 'rb') as f:
+        file_content = f.read()
+        if isinstance(content, text_type):
+            file_content = assure_unicode(file_content)
 
         if strip:
-            content_ = content_.strip()
+            file_content = file_content.strip()
 
         if re_:
-            assert_re_in(content, content_, **kwargs)
+            assert_re_in(content, file_content, **kwargs)
         else:
-            assert_equal(content, content_, **kwargs)
+            assert_equal(content, file_content, **kwargs)
 
 
 #
