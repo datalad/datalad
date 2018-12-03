@@ -22,6 +22,7 @@ from os.path import normpath
 from os.path import relpath
 from os.path import isabs
 
+from six.moves import map
 from six.moves import shlex_quote
 
 from datalad.interface.base import Interface
