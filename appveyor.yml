@@ -7,12 +7,12 @@ environment:
       PYTHON_ARCH: "32"
       MINICONDA: C:\Miniconda35
       DATALAD_TESTS_SSH: 1
-    - PYTHON: "C:\\Python35"
-      PYTHON_VERSION: "3.5.1"
-      PYTHON_ARCH: "32"
-      MINICONDA: C:\Miniconda35
-      DATALAD_TESTS_SSH: 1
-      DATALAD_REPO_VERSION: 6
+#    - PYTHON: "C:\\Python35"
+#      PYTHON_VERSION: "3.5.1"
+#      PYTHON_ARCH: "32"
+#      MINICONDA: C:\Miniconda35
+#      DATALAD_TESTS_SSH: 1
+#      DATALAD_REPO_VERSION: 6
 
 cache:
   # cache the pip cache
@@ -108,4 +108,4 @@ test_script:
 
 on_finish:
   # enable the next to let the build VM block for up to 60min to log in via RDP and debug
-  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
