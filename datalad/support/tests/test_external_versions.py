@@ -85,6 +85,12 @@ def test_external_versions_basic():
     assert_equal(ev[our_module], __version__)
 
 
+def test_external_version_contains():
+    ev = ExternalVersions()
+    assert_true("datalad" in ev)
+    assert_false("does not exist" in ev)
+
+
 def test_external_versions_unknown():
     assert_equal(str(ExternalVersions.UNKNOWN), 'UNKNOWN')
 
