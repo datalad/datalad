@@ -151,7 +151,7 @@ matrix:
     # Test on a crippled FS (vfat) while on Linux to detangle issues from
     # Windows specific ones on appveyor
     env:
-    - NOSE_WRAPPER="tools/eval_under_testloopfs"
+    - NOSE_WRAPPER="$PWD/tools/eval_under_testloopfs"
     # eventually should be moved to cron runs, but for now let it be a part
     # of the main fun
     # _DL_CRON=1
