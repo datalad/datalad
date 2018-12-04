@@ -42,6 +42,7 @@ from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import all_same
 from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
@@ -61,9 +62,17 @@ from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
 from ..utils import map_items
 from ..utils import unlink
+from ..utils import CMD_MAX_ARG
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_true,
+    eq_,
+    ok_,
+)
 from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
@@ -597,6 +606,28 @@ def test_unique():
                key=itemgetter(0)), [(1, 2), (0, 3)])
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
                key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_all_same():
+    ok_(all_same([0, 0, 0]))
+    ok_(not all_same([0, 0, '0']))
+    ok_(not all_same([]))
+
+    def never_get_to_not_needed():
+        yield 'a'
+        yield 'a'
+        yield 'b'
+        raise ValueError("Should not get here since on b should return")
+
+    ok_(not all_same(never_get_to_not_needed()))
+
+    def gen1(n):
+        for x in range(n):
+            yield 'a'
+    ok_(not all_same(gen1(0)))
+    ok_(all_same(gen1(1)))
+    ok_(all_same(gen1(2)))
+    ok_(all_same(gen1(10)))
 
 
 def test_partition():
@@ -1149,3 +1180,10 @@ def test_map_items():
     c_mapped = map_items(add10, c)
     assert type(c) is type(c_mapped)
     eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
+
+
+def test_CMD_MAX_ARG():
+    # 100 is arbitrarily large small integer ;)
+    # if fails -- we are unlikely to be able to work on this system
+    # and something went really wrong!
+    assert_greater(CMD_MAX_ARG, 100)

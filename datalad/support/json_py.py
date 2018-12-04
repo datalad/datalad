@@ -13,8 +13,11 @@
 import io
 import codecs
 from six import PY2
-from os.path import dirname
-from os.path import exists
+from os.path import (
+    dirname,
+    exists,
+    lexists,
+)
 from os import makedirs
 import os
 import os.path as op
@@ -51,6 +54,8 @@ def dump(obj, fname):
     indir = dirname(fname)
     if not exists(indir):
         makedirs(indir)
+    if lexists(fname):
+        os.unlink(fname)
     with io.open(fname, 'wb') as f:
         return dump2fileobj(obj, f)
 

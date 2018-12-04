@@ -22,6 +22,7 @@ from os.path import normpath
 from os.path import relpath
 from os.path import isabs
 
+from six.moves import map
 from six.moves import shlex_quote
 
 from datalad.interface.base import Interface
@@ -49,6 +50,7 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
+from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 # Rename get_dataset_pwds for the benefit of containers_run.
 from datalad.utils import get_dataset_pwds as get_command_pwds
@@ -62,7 +64,7 @@ lgr = logging.getLogger('datalad.interface.run')
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
     cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = '{}{}'.format(
+    cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty
@@ -213,16 +215,13 @@ class Run(Interface):
             for r in Rerun.__call__(dataset=dataset, message=message):
                 yield r
         else:
-            if cmd:
-                for r in run_command(cmd, dataset=dataset,
-                                     inputs=inputs, outputs=outputs,
-                                     expand=expand,
-                                     explicit=explicit,
-                                     message=message,
-                                     sidecar=sidecar):
-                    yield r
-            else:
-                lgr.warning("No command given")
+            for r in run_command(cmd, dataset=dataset,
+                                 inputs=inputs, outputs=outputs,
+                                 expand=expand,
+                                 explicit=explicit,
+                                 message=message,
+                                 sidecar=sidecar):
+                yield r
 
 
 class GlobbedPaths(object):
@@ -249,6 +248,7 @@ class GlobbedPaths(object):
             self._maybe_dot = []
             self._paths = {"patterns": [], "sub_patterns": {}}
         else:
+            patterns = list(map(assure_unicode, patterns))
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
@@ -292,16 +292,19 @@ class GlobbedPaths(object):
         return sub_patterns
 
     def _expand_globs(self):
-        def normalize_hits(hs):
-            return [relpath(h) + ("" if op.basename(h) else op.sep)
-                    for h in sorted(hs)]
+        def normalize_hit(h):
+            normalized = relpath(h) + ("" if op.basename(h) else op.sep)
+            if h == op.curdir + op.sep + normalized:
+                # Don't let relpath prune "./fname" (gh-3034).
+                return h
+            return normalized
 
         expanded = []
         with chpwd(self.pwd):
             for pattern in self._paths["patterns"]:
                 hits = glob.glob(pattern)
                 if hits:
-                    expanded.extend(normalize_hits(hits))
+                    expanded.extend(sorted(map(normalize_hit, hits)))
                 else:
                     lgr.debug("No matching files found for '%s'", pattern)
                     # We didn't find a hit for the complete pattern. If we find
@@ -310,7 +313,8 @@ class GlobbedPaths(object):
                     for sub_pattern in self._get_sub_patterns(pattern):
                         sub_hits = glob.glob(sub_pattern)
                         if sub_hits:
-                            expanded.extend(normalize_hits(sub_hits))
+                            expanded.extend(
+                                sorted(map(normalize_hit, sub_hits)))
                             break
                     # ... but we still want to retain the original pattern
                     # because we don't know for sure at this point, and it
@@ -389,7 +393,7 @@ def _install_and_reglob(dset, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset, inputs):
+def prepare_inputs(dset, inputs, extra_inputs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -399,16 +403,19 @@ def prepare_inputs(dset, inputs):
     ----------
     dset : Dataset
     inputs : GlobbedPaths object
+    extra_inputs : GlobbedPaths object, optional
 
     Returns
     -------
     Generator with the result records.
     """
-    if inputs:
+    gps = list(filter(bool, [inputs, extra_inputs]))
+    if gps:
         lgr.info('Making sure inputs are available (this may take some time)')
-        for res in _install_and_reglob(dset, inputs):
+    for gp in gps:
+        for res in _install_and_reglob(dset, gp):
             yield res
-        for res in dset.get(inputs.expand(full=True), on_failure="ignore"):
+        for res in dset.get(gp.expand(full=True), on_failure="ignore"):
             if res.get("state") == "absent":
                 lgr.warning("Input does not exist: %s", res["path"])
             else:
@@ -452,12 +459,22 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
+        command = list(map(assure_unicode, command))
         if len(command) == 1:
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
+            #
+            # FIXME: This covers the predominant command-line case, but, for
+            # Python API callers, it means values like ["./script with spaces"]
+            # requires additional string-like escaping, which is inconsistent
+            # with the handling of multi-item lists (and subprocess's
+            # handling). Once we have a way to detect "running from Python API"
+            # (discussed in gh-2986), update this.
             command = command[0]
         else:
             command = " ".join(shlex_quote(c) for c in command)
+    else:
+        command = assure_unicode(command)
     return command
 
 
@@ -531,11 +548,23 @@ def _execute_command(command, pwd, expected_exit=None):
     return cmd_exitcode or 0, exc
 
 
+def _save_outputs(ds, to_save, msg):
+    """Helper to save results after command execution is completed"""
+    return ds.add(
+        to_save,
+        recursive=True,
+        message=msg,
+        return_type='generator')
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
-                rerun_info=None, rerun_outputs=None,
-                inject=False):
+                rerun_info=None,
+                extra_inputs=None,
+                rerun_outputs=None,
+                inject=False,
+                saver=_save_outputs):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -553,6 +582,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         top-level "namespace" key (e.g., the project or extension name).
     rerun_info : dict, optional
         Record from a previous run. This is used internally by `rerun`.
+    extra_inputs : list, optional
+        Inputs to use in addition to those specified by `inputs`. Unlike
+        `inputs`, these will not be injected into the {inputs} format field.
     rerun_outputs : list, optional
         Outputs, in addition to those in `outputs`, determined automatically
         from a previous run. This is used internally by `rerun`.
@@ -561,11 +593,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
+    saver : callable, optional
+        Must take a dataset instance, a list of paths to save, and a
+        message string as arguments and must record any changes done
+        to any content matching an entry in the path list. Must yield
+        result dictionaries as a generator.
 
     Yields
     ------
     Result records for the run.
     """
+    if not cmd:
+        lgr.warning("No command given")
+        return
+
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -600,11 +641,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
+    extra_inputs = GlobbedPaths(extra_inputs, pwd=pwd,
+                                # Follow same expansion rules as `inputs`.
+                                expand=expand in ["inputs", "both"])
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
 
     if not inject:
-        for res in prepare_inputs(ds, inputs):
+        for res in prepare_inputs(ds, inputs, extra_inputs):
             yield res
 
         if outputs:
@@ -652,6 +696,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
+        'extra_inputs': extra_inputs.paths,
         'outputs': outputs.paths,
     }
     if rel_pwd is not None:
@@ -698,7 +743,6 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     msg = msg.format(
         message if message is not None else _format_cmd_shorty(cmd),
         '"{}"'.format(record_id) if use_sidecar else record)
-    msg = assure_bytes(msg)
 
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
@@ -706,12 +750,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
                                    "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(msg)
+                ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
                      "'datalad save -r -F %s .'",
                      msg_path)
         raise exc
     elif outputs_to_save:
-        for r in ds.add(outputs_to_save, recursive=True, message=msg):
+        for r in saver(ds, outputs_to_save, msg):
             yield r
