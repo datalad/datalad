@@ -514,7 +514,7 @@ class AddArchiveContent(Interface):
                 if annex.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
-                        (origin, archive, commit_stats.as_str(mode='full')),
+                        (origin, archive_rpath, commit_stats.as_str(mode='full')),
                         _datalad_msg=True
                     )
                     commit_stats.reset()

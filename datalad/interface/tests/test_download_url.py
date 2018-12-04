@@ -20,6 +20,7 @@ from ...utils import chpwd
 from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
     assert_in, assert_false, assert_message, assert_result_count, \
     with_tempfile
+from ...tests.utils import assert_not_in
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
 
@@ -127,3 +128,5 @@ def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).create()
     ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
+    assert_not_in(opj(ds.path, "archive.tar.gz"),
+                  ds.repo.format_commit("%B"))
