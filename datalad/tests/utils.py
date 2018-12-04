@@ -406,16 +406,17 @@ def ok_file_has_content(path, content, strip=False, re_=False,
 
     with open_func(path, 'rb') as f:
         file_content = f.read()
-        if isinstance(content, text_type):
-            file_content = assure_unicode(file_content)
 
-        if strip:
-            file_content = file_content.strip()
+    if isinstance(content, text_type):
+        file_content = assure_unicode(file_content)
 
-        if re_:
-            assert_re_in(content, file_content, **kwargs)
-        else:
-            assert_equal(content, file_content, **kwargs)
+    if strip:
+        file_content = file_content.strip()
+
+    if re_:
+        assert_re_in(content, file_content, **kwargs)
+    else:
+        assert_equal(content, file_content, **kwargs)
 
 
 #
