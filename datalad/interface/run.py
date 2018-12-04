@@ -224,7 +224,7 @@ class Run(Interface):
 
 
 class GlobbedPaths(object):
-    """Helper for inputs and outputs.
+    """Helper for globbing paths.
 
     Parameters
     ----------
