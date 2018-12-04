@@ -410,6 +410,12 @@ def ok_file_has_content(path, content, strip=False, re_=False,
     if isinstance(content, text_type):
         file_content = assure_unicode(file_content)
 
+    if os.linesep != '\n':
+        # for consistent comparisons etc. Apparently when reading in `b` mode
+        # on Windows we would also get \r
+        # https://github.com/datalad/datalad/pull/3049#issuecomment-444128715
+        file_content = file_content.replace(os.linesep, '\n')
+
     if strip:
         file_content = file_content.strip()
 
