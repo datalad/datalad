@@ -20,7 +20,6 @@ import os.path as op
 from os.path import join as opj
 from os.path import normpath
 from os.path import relpath
-from os.path import isabs
 
 from six.moves import map
 from six.moves import shlex_quote
@@ -252,7 +251,7 @@ class GlobbedPaths(object):
             patterns, dots = partition(patterns, lambda i: i.strip() == ".")
             self._maybe_dot = ["."] if list(dots) else []
             self._paths = {
-                "patterns": [relpath(p, start=pwd) if isabs(p) else p
+                "patterns": [op.relpath(p, start=pwd) if op.isabs(p) else p
                              for p in patterns],
                 "sub_patterns": {}}
 
@@ -293,7 +292,7 @@ class GlobbedPaths(object):
 
     def _expand_globs(self):
         def normalize_hit(h):
-            normalized = relpath(h) + ("" if op.basename(h) else op.sep)
+            normalized = op.relpath(h) + ("" if op.basename(h) else op.sep)
             if h == op.curdir + op.sep + normalized:
                 # Don't let relpath prune "./fname" (gh-3034).
                 return h
@@ -347,7 +346,7 @@ class GlobbedPaths(object):
 
         if full:
             if refresh or "expanded_full" not in self._paths:
-                paths = [opj(self.pwd, p) for p in paths]
+                paths = [op.join(self.pwd, p) for p in paths]
                 self._paths["expanded_full"] = paths
             else:
                 paths = self._paths["expanded_full"]

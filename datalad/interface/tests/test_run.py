@@ -1070,7 +1070,7 @@ def test_globbedpaths(path):
         gp = GlobbedPaths(patterns, pwd=path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
-            {opj(path, p) for p in expected})
+            {op.join(path, p) for p in expected})
 
     pardir = op.pardir + op.sep
     subdir_path = op.join(path, "subdir")
@@ -1084,10 +1084,10 @@ def test_globbedpaths(path):
         gp = GlobbedPaths(patterns, pwd=subdir_path)
         eq_(set(gp.expand()), expected)
         eq_(set(gp.expand(full=True)),
-            {opj(subdir_path, p) for p in expected})
+            {op.join(subdir_path, p) for p in expected})
 
     # Full patterns still get returned as relative to pwd.
-    gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
+    gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
     eq_(gp.expand(), ["2.dat", u"bβ.dat"])
 
     # "." gets special treatment.
