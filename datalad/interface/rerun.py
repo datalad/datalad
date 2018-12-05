@@ -487,7 +487,7 @@ def get_run_info(dset, message):
     ------
     A ValueError if the information in `message` is invalid.
     """
-    cmdrun_regex = r'\[DATALAD RUNCMD\] (.*)=== Do not change lines below ' \
+    cmdrun_regex = r'\[DATALAD ?\S*\] (.*)=== Do not change lines below ' \
                    r'===\n(.*)\n\^\^\^ Do not change lines above \^\^\^'
     runinfo = re.match(cmdrun_regex, message, re.MULTILINE | re.DOTALL)
     if not runinfo:

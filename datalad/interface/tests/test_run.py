@@ -99,7 +99,7 @@ def test_basics(path, nodspath):
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
         commit_msg = ds.repo.format_commit("%B")
-        ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
+        ok_(commit_msg.startswith('[DATALAD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
         last_state = ds.repo.get_hexsha()
@@ -234,7 +234,7 @@ def test_rerun(path, nodspath):
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
     eq_(ds.repo.format_commit("%B").splitlines()[0],
-        "[DATALAD RUNCMD] rerun buried")
+        "[DATALAD] rerun buried")
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
     eq_('xxxxx\n', open(probe_path).read())
@@ -1027,7 +1027,7 @@ def test_rerun_commit_message_check():
                   get_run_info,
                   None,
                   """\
-[DATALAD RUNCMD] no command
+[DATALAD] no command
 
 === Do not change lines below ===
 {
@@ -1040,7 +1040,7 @@ def test_rerun_commit_message_check():
                   get_run_info,
                   None,
                   """\
-[DATALAD RUNCMD] junk json
+[DATALAD] junk json
 
 === Do not change lines below ===
 {
@@ -1053,7 +1053,7 @@ def test_rerun_commit_message_check():
     subject, info = get_run_info(
         None,
         """\
-[DATALAD RUNCMD] fine
+[DATALAD] fine
 
 === Do not change lines below ===
 {

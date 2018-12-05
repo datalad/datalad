@@ -589,7 +589,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     # compose commit message
     msg = u"""\
-[DATALAD RUNCMD] {}
+[DATALAD] {}
 
 === Do not change lines below ===
 {}
