@@ -518,30 +518,33 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             # full paths, so we can pass them directly to unlock.
             for res in _unlock_or_remove(ds, rerun_outputs):
                 yield res
-
-        try:
-            cmd_expanded = format_command(ds, cmd,
-                                          pwd=pwd,
-                                          dspath=ds.path,
-                                          inputs=inputs,
-                                          outputs=outputs)
-        except KeyError as exc:
-            yield get_status_dict(
-                'run',
-                ds=ds,
-                status='impossible',
-                message=('command has an unrecognized placeholder: %s',
-                         exc))
-            return
-
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
         cmd_exitcode = 0
         exc = None
+
+    try:
+        cmd_expanded = format_command(ds, cmd,
+                                      pwd=pwd,
+                                      dspath=ds.path,
+                                      inputs=inputs,
+                                      outputs=outputs)
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=('command has an unrecognized placeholder: %s',
+                     exc))
+        return
+
+    if not inject:
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+
+
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
