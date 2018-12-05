@@ -437,15 +437,16 @@ def _get_script_handler(script, since, revision):
 
             run_info = res["run_info"]
             cmd = run_info["cmd"]
-            msg = res["run_message"]
-            if msg == _format_cmd_shorty(cmd):
-                msg = ''
 
             expanded_cmd = format_command(
                 dset, cmd,
                 **dict(run_info,
                        dspath=dset.path,
                        pwd=op.join(dset.path, run_info["pwd"])))
+
+            msg = res["run_message"]
+            if msg == _format_cmd_shorty(expanded_cmd):
+                msg = ''
 
             ofh.write(
                 "\n" + "".join("# " + ln
