@@ -599,7 +599,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 ^^^ Do not change lines above ^^^
 """
     msg = msg.format(
-        message if message is not None else _format_cmd_shorty(cmd),
+        message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
