@@ -136,7 +136,7 @@ class Run(Interface):
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         inputs=Parameter(
-            args=("--input",),
+            args=("-i", "--input"),
             dest="inputs",
             metavar=("PATH"),
             action='append',
@@ -145,7 +145,7 @@ class Run(Interface):
             :command:`datalad get .`". The value can also be a glob. [CMD: This
             option can be given more than once. CMD]"""),
         outputs=Parameter(
-            args=("--output",),
+            args=("-o", "--output"),
             dest="outputs",
             metavar=("PATH"),
             action='append',
