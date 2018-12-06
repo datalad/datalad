@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import known_failure_windows
 
 
@@ -139,8 +138,8 @@ def test_create(path):
         ('bim', 'bam', 'bum'))
 
 
+@known_failure_windows  #FIXME
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_create_sub(path):
 
     ds = Dataset(path)
@@ -178,7 +177,6 @@ def test_create_sub(path):
 
 
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_create_sub_nosave(path):
     ds = Dataset(path)
     ds.create()
@@ -203,8 +201,9 @@ def test_create_sub_nosave(path):
     # Just the annex subdataset is recognized.
     eq_(ds.subdatasets(result_xfm="relpaths"), ["sub_annex"])
 
+
+@known_failure_windows
 @with_tree(tree=_dataset_hierarchy_template)
-@known_failure_direct_mode  #FIXME
 def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
     # an existing directory tree
@@ -233,7 +232,6 @@ def test_create_subdataset_hierarchy_from_top(path):
 
 
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_nested_create(path):
     # to document some more organic usage pattern
     ds = Dataset(path).create()

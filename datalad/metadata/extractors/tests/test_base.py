@@ -14,7 +14,6 @@ from datalad.api import Dataset
 from datalad.utils import on_osx
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_direct_mode
 
 from nose import SkipTest
 from nose.tools import assert_equal

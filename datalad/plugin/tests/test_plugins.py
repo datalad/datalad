@@ -10,7 +10,6 @@
 """Test plugin interface mechanics"""
 
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from os.path import join as opj
 

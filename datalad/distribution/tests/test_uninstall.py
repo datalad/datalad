@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
@@ -74,7 +73,6 @@ def test_uninstall_uninstalled(path):
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_clean_subds_removal(path):
     ds = Dataset(path).create()
     subds1 = ds.create('one')
@@ -224,7 +222,6 @@ def test_uninstall_subdataset(src, dst):
             'keep': 'keep1', 'kill': 'kill1'}},
     'keep': 'keep2',
     'kill': 'kill2'})
-@known_failure_direct_mode  #FIXME
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
     subds = ds.create('deep', force=True)
@@ -274,7 +271,6 @@ def test_uninstall_dataset(path):
 
 
 @with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
-@known_failure_direct_mode  #FIXME
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
     ds.add(os.curdir)
@@ -304,7 +300,6 @@ def test_remove_file_handle_only(path):
 
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
-@known_failure_direct_mode  #FIXME
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)
     subds = ds.create('deep', force=True)
@@ -369,7 +364,6 @@ def test_remove_dataset_hierarchy(path):
 
 
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_careless_subdataset_uninstall(path):
     # nested datasets
     ds = Dataset(path).create()
@@ -469,7 +463,6 @@ def test_remove_recursive_2(tdir):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_failon_nodrop(path):
     # test to make sure that we do not wipe out data when checks are enabled
     # despite the general error behavior mode
@@ -531,7 +524,6 @@ def test_drop_nocrash_absent_subds(path):
         assert_status('notneeded', drop('.', recursive=True))
 
 
-@known_failure_direct_mode  #FIXME
 @with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
 def test_remove_more_than_one(path):
     ds = Dataset(path).create(force=True)

@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 from ..archives import ArchiveAnnexCustomRemote
@@ -33,16 +32,15 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
-@with_direct
 @with_tree(
     tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
           ('simple.txt', '123'),
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
 @with_tempfile()
-def test_basic_scenario(direct, d, d2):
+def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure, fn_extracted_obscure
-    annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
+    annex = AnnexRepo(d, runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -94,9 +92,7 @@ def test_basic_scenario(direct, d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo.clone(d, d2,
-                                   runner=_get_custom_runner(d2),
-                                   direct=direct)
+    cloned_annex = AnnexRepo.clone(d, d2, runner=_get_custom_runner(d2))
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
@@ -126,7 +122,6 @@ def test_basic_scenario(direct, d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
-@known_failure_direct_mode  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)

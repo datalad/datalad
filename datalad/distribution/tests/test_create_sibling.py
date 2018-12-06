@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
@@ -308,7 +307,6 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_target_ssh_recursive(origin, src_path, target_path):
 
     # prepare src
@@ -380,7 +378,6 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_target_ssh_since(origin, src_path, target_path):
     # prepare src
     source = install(src_path, source=origin, recursive=True)
@@ -558,4 +555,4 @@ def test_target_ssh_inherit():
     #   https://github.com/datalad/datalad/issues/1274
     #yield _test_target_ssh_inherit, None      # no wanted etc
     #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield known_failure_direct_mode(_test_target_ssh_inherit), 'backup'  # backup -- all data files  #FIXME
+    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files  #FIXME

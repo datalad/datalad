@@ -21,6 +21,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import warnings
 from six import PY2, text_type, iteritems
 from six import binary_type
 from six import string_types
@@ -184,39 +185,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     eq_(sorted(r.untracked_files), sorted(untracked))
 
-    if annex and r.is_direct_mode():
-        if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not supported "
-                        "for direct mode repositories!")
+    repo = r.repo
+
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
         else:
-            test_untracked = not untracked
-            test_submodules = not ignore_submodules
-            ok_(not r.is_dirty(untracked_files=test_untracked,
-                               submodules=test_submodules),
-                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
-                    test_untracked, test_submodules))
-    else:
-        repo = r.repo
-
-        if repo.index.entries.keys():
-            ok_(repo.head.is_valid())
-
-            if not head_modified and not index_modified:
-                # get string representations of diffs with index to ease
-                # troubleshooting
-                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-                index_diffs = [str(d) for d in repo.index.diff(None)]
-                eq_(head_diffs, [])
-                eq_(index_diffs, [])
-            else:
-                # TODO: These names are confusing/non-descriptive.  REDO
-                if head_modified:
-                    # we did ask for interrogating changes
-                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(sorted(head_modified_), sorted(head_modified))
-                if index_modified:
-                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(sorted(index_modified_), sorted(index_modified))
+            # TODO: These names are confusing/non-descriptive.  REDO
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                eq_(sorted(head_modified_), sorted(head_modified))
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -972,26 +961,22 @@ known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
-    """Test decorator marking a test as known to fail in a direct mode test run
+    """DEPRECATED.  Stop using.  Does nothing
+
+    Test decorator marking a test as known to fail in a direct mode test run
 
     If datalad.repo.direct is set to True behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
     """
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct") or on_windows
-    if direct:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_direct_mode')
-        @attr('direct_mode')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return dm_func
-
+    # TODO: consider adopting   nibabel/deprecated.py  nibabel/deprecator.py
+    # mechanism to consistently deprecate functionality and ensure they are
+    # displayed.
+    # Since 2.7 Deprecation warnings aren't displayed by default
+    # and thus kinda pointless to issue a warning here, so we will just log
+    msg = "Direct mode support is deprecated, so no point in using " \
+          "@known_failure_direct_mode for %r since glorious future " \
+          "DataLad 0.12" % func.__name__
+    lgr.warning(msg)
     return func
 
 
@@ -1031,25 +1016,6 @@ def skip_v6_or_later(func, method='raise'):
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')
-    def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
-    return newfunc
-
-
-@optional_args
-def skip_direct_mode(func, method='raise'):
-    """Skips tests if datalad is configured to use direct mode
-    (set DATALAD_REPO_DIRECT)
-    """
-
-    from datalad import cfg
-
-    @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run",
-             method=method)
-    @wraps(func)
-    @attr('skip_direct_mode')
-    @attr('direct_mode')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1323,14 +1289,13 @@ def skip_httpretty_on_problematic_pythons(func):
 
 
 @optional_args
-def with_batch_direct(t):
+def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
     def newfunc():
         for batch in (False, True):
-            for direct in (False, True) if not on_windows else (True,):
-                yield t, batch, direct
+                yield t, batch
 
     return newfunc
 
@@ -1417,29 +1382,6 @@ def with_testsui(t, responses=None, interactive=True):
     return newfunc
 
 with_testsui.__test__ = False
-
-
-@optional_args
-def with_direct(func):
-    """To test functions under both direct and indirect mode
-
-    Unlike fancy generators would just fail on the first failure
-    """
-    @wraps(func)
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        if on_windows or on_travis:
-            # since on windows would become indirect anyways
-            # on travis -- we have a dedicated matrix run
-            # which would select one or another based on config
-            # if we specify None
-            directs = [None]
-        else:
-            # otherwise we assume that we have to test both modes
-            directs = [True, False]
-        for direct in directs:
-            func(*(args + (direct,)), **kwargs)
-    return newfunc
 
 
 def assert_no_errors_logged(func, skip_re=None):
