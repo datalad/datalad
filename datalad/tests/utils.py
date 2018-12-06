@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import warnings
 from six import PY2, text_type, iteritems
 from six import binary_type
 from six import string_types
@@ -998,6 +999,26 @@ def known_failure_v6_or_later(func):
 
 # TODO: Remove once the released version of datalad-crawler no longer uses it.
 known_failure_v6 = known_failure_v6_or_later
+
+
+def known_failure_direct_mode(func):
+    """DEPRECATED.  Stop using.  Does nothing
+
+    Test decorator marking a test as known to fail in a direct mode test run
+
+    If datalad.repo.direct is set to True behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+    # TODO: consider adopting   nibabel/deprecated.py  nibabel/deprecator.py
+    # mechanism to consistently deprecate functionality and ensure they are
+    # displayed.
+    # Since 2.7 Deprecation warnings aren't displayed by default
+    # and thus kinda pointless to issue a warning here, so we will just log
+    msg = "Direct mode support is deprecated, so no point in using " \
+          "@known_failure_direct_mode for %r since glorious future " \
+          "DataLad 0.12" % func.__name__
+    lgr.warning(msg)
+    return func
 
 
 def known_failure_windows(func):

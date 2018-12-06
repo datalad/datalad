@@ -980,6 +980,22 @@ def test_known_failure_v6():
 from datalad.utils import read_csv_lines
 
 
+def test_known_failure_direct_mode():
+    # Decorator is deprecated now and that is what we check
+    from .utils import known_failure_direct_mode
+
+    x = []
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        @known_failure_direct_mode
+        def failing():
+            x.append('ok')
+            raise AssertionError("Failed")
+
+        assert_raises(AssertionError, failing)  # nothing is swallowed
+        eq_(x, ['ok'])  # everything runs
+        assert_in("Direct mode support is deprecated", cml.out)
+
+
 @with_tempfile(content="h1 h2\nv1 2\nv2 3")
 def test_read_csv_lines_basic(infile):
     # Just a basic test, next one with unicode
