@@ -1,4 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -273,11 +274,11 @@ def test_save_message_file(path):
         ds.save("blah", message="me", message_file="and me")
 
     create_tree(path, {"foo": "x",
-                       "msg": "add foo"})
+                       "msg": u"add β"})
     ds.add("foo", save=False)
     ds.save(message_file=opj(ds.path, "msg"))
     assert_equal(ds.repo.format_commit("%s"),
-                 "add foo")
+                 u"add β")
 
 
 def test_renamed_file():
