@@ -103,8 +103,11 @@ test_script:
 
   - python -m nose -s -v datalad.ui
 
-#after_test:
-#  - bash <(curl -s https://codecov.io/bash)
+after_test:
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
 
 on_finish:
   # enable the next to let the build VM block for up to 60min to log in via RDP and debug
