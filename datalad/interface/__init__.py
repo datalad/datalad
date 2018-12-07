@@ -89,3 +89,5 @@ _known_extension_commands = {
     'datalad-crawler': ('crawl', 'crawl-init'),
     'datalad-neuroimaging': ('bids2scidata',)
 }
+
+from ..revolution import command_suite as _group_revolution_commands
