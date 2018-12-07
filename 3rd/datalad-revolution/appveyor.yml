@@ -48,13 +48,6 @@ test_script:
   # first sign of life
   - datalad wtf
   # and now this...
-  - python -m nose -s -v --with-cov --cover-package datalad_revolution --cover-xml --cover-xml-file=coverage.xml datalad_revolution
-
-after_test:
-  - ps: |
-      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
-      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
-      bash codecov.sh -f "coverage.xml"
 
 on_finish:
   # enable the next to let the build VM block for up to 60min to log in via RDP and debug
