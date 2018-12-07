@@ -15,7 +15,7 @@ from datalad.tests.utils import known_failure_windows
 import os
 import os.path as op
 
-from datalad_revolution.dataset import (
+from ..dataset import (
     RevolutionDataset as Dataset
 )
 from datalad.api import rev_create as create
@@ -37,7 +37,7 @@ from datalad.tests.utils import (
     with_tree,
 )
 
-from datalad_revolution.tests.utils import assert_repo_status
+from .utils import assert_repo_status
 
 
 _dataset_hierarchy_template = {

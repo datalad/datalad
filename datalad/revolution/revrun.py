@@ -19,11 +19,11 @@ from datalad.interface.run import (
     build_doc,
     eval_results,
 )
-from datalad_revolution.dataset import (
+from .dataset import (
     RevolutionDataset as Dataset,
     datasetmethod,
 )
-from datalad_revolution.revsave import RevSave
+from .revsave import RevSave
 
 lgr = logging.getLogger('datalad.revolution.run')
 

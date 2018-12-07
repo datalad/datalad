@@ -16,7 +16,7 @@ from weakref import WeakValueDictionary
 from datalad.utils import assure_list
 
 from datalad.dochelpers import exc_str
-import datalad_revolution.utils as ut
+from . import utils as ut
 from datalad.support.gitrepo import (
     GitRepo,
     InvalidGitRepositoryError,

@@ -38,15 +38,15 @@ from datalad.support.exceptions import CommandError
 from datalad.utils import (
     assure_list,
 )
-import datalad_revolution.utils as ut
+from . import utils as ut
 
-from datalad_revolution.dataset import (
+from .dataset import (
     RevolutionDataset as Dataset,
     EnsureDataset,
     datasetmethod,
     require_dataset,
 )
-from datalad_revolution.revstatus import (
+from .revstatus import (
     RevStatus as Status,
 )
 

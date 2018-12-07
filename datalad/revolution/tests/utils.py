@@ -12,9 +12,9 @@ from datalad.api import (
     rev_create as create,
 )
 
-from datalad_revolution.gitrepo import RevolutionGitRepo as GitRepo
-from datalad_revolution.annexrepo import RevolutionAnnexRepo as AnnexRepo
-from datalad_revolution.dataset import RevolutionDataset as Dataset
+from ..gitrepo import RevolutionGitRepo as GitRepo
+from ..annexrepo import RevolutionAnnexRepo as AnnexRepo
+from ..dataset import RevolutionDataset as Dataset
 
 from datalad.tests.utils import (
     assert_is,
@@ -23,7 +23,7 @@ from datalad.tests.utils import (
     SkipTest,
 )
 
-import datalad_revolution.utils as ut
+from .. import utils as ut
 
 
 def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
