@@ -44,7 +44,6 @@ setup(
     packages=[pkg for pkg in find_packages('.') if pkg.startswith('datalad')],
     install_requires=[
         'datalad',
-        'pathlib2; python_version < "3.0"',
     ],
     entry_points = {
         'datalad.extensions': [
