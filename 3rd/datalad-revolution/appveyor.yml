@@ -1,0 +1,61 @@
+build: false
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+      DATALAD_REPO_VERSION: 6
+
+init:
+  - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH% %MINICONDA%"
+  # this will display login RDP info for the build VM, but if the build VM should block
+  # see on_finish below instead
+  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  #- "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy matplotlib pytest pandas"
+  - "conda create -q -n test-environment python=%PYTHON_VERSION%"
+  - activate test-environment
+  - mkdir resources
+  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  # TODO get dcm2niix
+  # extract git annex into the system Git installation path
+  - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  # info on how python is ticking
+  - python -c "import sys; print(sys.path)"
+  - pip install -r requirements.txt
+  - pip install -e ".[full]"
+  # fixup
+  - pip install nose
+  - git config --global user.email "test@appveyor.land"
+  - git config --global user.name "Appveyor Almighty"
+
+test_script:
+  # establish baseline, if annex doesn't work, we are not even trying
+  #- git annex test
+  # run tests on installed module, not source tree files
+  - mkdir __testhome__
+  - cd __testhome__
+  # report basic info
+  - git version
+  - git annex version
+  # first sign of life
+  - datalad wtf
+  # and now this...
+  - python -m nose -s -v --with-cov --cover-package datalad_revolution --cover-xml --cover-xml-file=coverage.xml datalad_revolution
+
+after_test:
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
+
+on_finish:
+  # enable the next to let the build VM block for up to 60min to log in via RDP and debug
+  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
