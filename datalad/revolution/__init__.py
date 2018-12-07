@@ -14,7 +14,7 @@ command_suite = (
         # specification of a command, any number of commands can be defined
         (
             # importable module that contains the command implementation
-            'datalad_revolution.revsave',
+            'datalad.revolution.revsave',
             # name of the command class implementation in above module
             'RevSave',
             # optional name of the command in the cmdline API
@@ -23,19 +23,19 @@ command_suite = (
             'rev_save'
         ),
         (
-            'datalad_revolution.revcreate',
+            'datalad.revolution.revcreate',
             'RevCreate',
             'rev-create',
             'rev_create'
         ),
         (
-            'datalad_revolution.revstatus',
+            'datalad.revolution.revstatus',
             'RevStatus',
             'rev-status',
             'rev_status'
         ),
         (
-            'datalad_revolution.revrun',
+            'datalad.revolution.revrun',
             'RevRun',
             'rev-run',
             'rev_run'
