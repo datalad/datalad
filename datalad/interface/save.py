@@ -34,6 +34,7 @@ from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import message_file_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -187,11 +188,7 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
-        message_file=Parameter(
-            args=("-F", "--message-file"),
-            doc="""take the commit message from this file. This flag is
-            mutually exclusive with -m.""",
-            constraints=EnsureStr() | EnsureNone()),
+        message_file=message_file_opt,
         # switch not functional from cmdline: default True, action=store_true
         # TODO remove from API? all_updated=False is not used anywhere in the codebase
         all_updated=Parameter(
