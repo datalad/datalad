@@ -35,15 +35,15 @@ from datalad.tests.utils import (
 )
 from datalad.distribution.tests.test_add import tree_arg
 
-from datalad_revolution.dataset import RevolutionDataset as Dataset
-from datalad_revolution.annexrepo import RevolutionAnnexRepo as AnnexRepo
+from ..dataset import RevolutionDataset as Dataset
+from ..annexrepo import RevolutionAnnexRepo as AnnexRepo
 from datalad.api import (
     rev_save as save,
     rev_create as create,
     install,
 )
 
-from datalad_revolution.tests.utils import (
+from .utils import (
     assert_repo_status,
     skip_wo_symlink_capability,
 )

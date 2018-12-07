@@ -31,8 +31,8 @@ from datalad.utils import (
     on_windows,
 )
 
-from datalad_revolution.dataset import RevolutionDataset as Dataset
-from datalad_revolution.tests.utils import assert_repo_status
+from ..dataset import RevolutionDataset as Dataset
+from .utils import assert_repo_status
 from datalad.support.exceptions import (
     NoDatasetArgumentFound,
     CommandError,
@@ -41,7 +41,7 @@ from datalad.api import (
     install,
     rev_run as run,
 )
-from datalad_revolution.revrun import (
+from ..revrun import (
     GlobbedPaths,
     run_command,
 )

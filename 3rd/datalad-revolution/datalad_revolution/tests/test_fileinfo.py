@@ -8,7 +8,7 @@
 """Test file info getters"""
 
 import os.path as op
-import datalad_revolution.utils as ut
+from .. import utils as ut
 
 from datalad.tests.utils import (
     with_tempfile,
@@ -19,9 +19,9 @@ from datalad.tests.utils import (
     assert_raises,
 )
 
-from datalad_revolution.dataset import RevolutionDataset as Dataset
-from datalad_revolution.gitrepo import RevolutionGitRepo as GitRepo
-from datalad_revolution.tests.utils import (
+from ..dataset import RevolutionDataset as Dataset
+from ..gitrepo import RevolutionGitRepo as GitRepo
+from .utils import (
     assert_repo_status,
     get_convoluted_situation,
 )

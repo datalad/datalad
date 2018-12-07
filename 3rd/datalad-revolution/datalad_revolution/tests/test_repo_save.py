@@ -17,10 +17,10 @@ from datalad.tests.utils import (
     eq_,
 )
 
-from datalad_revolution.dataset import RevolutionDataset as Dataset
-from datalad_revolution.gitrepo import RevolutionGitRepo as GitRepo
-from datalad_revolution.annexrepo import RevolutionAnnexRepo as AnnexRepo
-from datalad_revolution.tests.utils import (
+from ..dataset import RevolutionDataset as Dataset
+from ..gitrepo import RevolutionGitRepo as GitRepo
+from ..annexrepo import RevolutionAnnexRepo as AnnexRepo
+from .utils import (
     assert_repo_status,
     get_convoluted_situation,
 )

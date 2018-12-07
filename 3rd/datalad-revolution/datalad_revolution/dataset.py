@@ -10,7 +10,7 @@ from six import (
 import wrapt
 from weakref import WeakValueDictionary
 import logging
-import datalad_revolution.utils as ut
+from . import utils as ut
 
 from datalad.distribution.dataset import (
     Dataset as _Dataset,
@@ -28,8 +28,8 @@ from datalad.utils import (
     getpwd,
 )
 
-from datalad_revolution.gitrepo import RevolutionGitRepo
-from datalad_revolution.annexrepo import RevolutionAnnexRepo
+from .gitrepo import RevolutionGitRepo
+from .annexrepo import RevolutionAnnexRepo
 
 lgr = logging.getLogger('datalad.revolution.dataset')
 

@@ -37,7 +37,7 @@ from datalad.support.constraints import (
 from datalad.support.param import Parameter
 from datalad.utils import getpwd
 
-from datalad_revolution.dataset import (
+from .dataset import (
     RevolutionDataset as Dataset,
     datasetmethod,
     EnsureDataset,
@@ -47,11 +47,11 @@ from datalad_revolution.dataset import (
     require_dataset,
 )
 # for bound dataset method
-from datalad_revolution.revsave import RevSave
+from .revsave import RevSave
 
-from datalad_revolution.gitrepo import RevolutionGitRepo as GitRepo
-from datalad_revolution.annexrepo import RevolutionAnnexRepo as AnnexRepo
-import datalad_revolution.utils as ut
+from .gitrepo import RevolutionGitRepo as GitRepo
+from .annexrepo import RevolutionAnnexRepo as AnnexRepo
+from . import utils as ut
 
 
 __docformat__ = 'restructuredtext'
