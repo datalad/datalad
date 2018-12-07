@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -eu
+revrepopath=${1:-../datalad-revolution}
+revrepostate=$(git -C "$revrepopath" describe --long)
+revpath=3rd/datalad-revolution
+
+# should be clean
+if git -C "$revrepopath" diff --cached | grep -q . ; then
+    echo "E: DIRTY revolution"
+    git -C "$revrepopath" status
+    exit 1
+fi
+
+echo "I: injesting $revrepopath"
+rm -rf "$revpath" 
+mkdir -p "$revpath"
+git -C $revrepopath archive HEAD | tar -C $revpath -xf-
+echo "$revrepostate" > $revpath/GIT_DESCRIBE
+echo "I: done $revpath"
