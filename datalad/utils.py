@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import gzip
 import string
 import wrapt
 
@@ -2132,15 +2133,11 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
                     archives_leading_dir=archives_leading_dir,
                     remove_existing=remove_existing)
         else:
-            if PY2:
-                open_kwargs = {'mode': "w"}
-                if isinstance(load, text_type):
-                    load = load.encode('utf-8')
-            else:
-                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
-
-            with open(full_name, **open_kwargs) as f:
-                f.write(load)
+            open_func = open
+            if full_name.endswith('.gz'):
+                open_func = gzip.open
+            with open_func(full_name, "wb") as f:
+                f.write(assure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
