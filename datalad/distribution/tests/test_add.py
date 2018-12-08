@@ -28,6 +28,7 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
@@ -60,6 +61,19 @@ def test_add_insufficient_args(path):
     with open(opj(path, 'outside'), 'w') as f:
         f.write('doesnt matter')
     assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
+
+
+@with_tempfile
+def test_add_message_file(path):
+    ds = Dataset(path).create()
+    with assert_raises(ValueError):
+        ds.add("blah", message="me", message_file="and me")
+
+    create_tree(path, {"foo": "x",
+                       "msg": u"add β"})
+    ds.add("foo", message_file=opj(ds.path, "msg"))
+    assert_equal(ds.repo.format_commit("%s"),
+                 u"add β")
 
 
 tree_arg = dict(tree={'test.txt': 'some',
