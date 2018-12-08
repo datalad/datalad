@@ -59,7 +59,10 @@ install:
   - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
   # info on how python is ticking
   - python -c "import sys; print(sys.path)"
-  - pip install -e ".[devel]"
+  # cannot do full, e.g. because libxmp is N/A, causes unguarded ERRORs
+  #- pip install ".[full]"
+  - pip install ".[tests]"
+  - pip install ".[devel-utils]"
   # fixup
   # ATM datalad does not pull in colorama, which is needed for color output
   # on windows
