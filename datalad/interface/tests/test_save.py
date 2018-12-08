@@ -270,7 +270,7 @@ def test_recursive_save(path):
 @with_tempfile()
 def test_save_message_file(path):
     ds = Dataset(path).create()
-    with assert_raises(IncompleteResultsError):
+    with assert_raises(ValueError):
         ds.save("blah", message="me", message_file="and me")
 
     create_tree(path, {"foo": "x",

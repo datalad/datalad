@@ -225,13 +225,7 @@ class Save(Interface):
         refds_path = Interface.get_refds_path(dataset)
 
         if message and message_file:
-            yield get_status_dict(
-                'save',
-                status='error',
-                path=refds_path,
-                message="Both a message and message file were specified",
-                logger=lgr)
-            return
+            raise ValueError("Both a message and message file were specified")
 
         if message_file:
             with open(message_file, "rb") as mfh:
