@@ -59,9 +59,7 @@ install:
   - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
   # info on how python is ticking
   - python -c "import sys; print(sys.path)"
-  # when something works we can go full
-  #- pip install -e ".[full]"
-  - pip install ".[tests]"
+  - pip install -e ".[devel]"
   # fixup
   # ATM datalad does not pull in colorama, which is needed for color output
   # on windows
