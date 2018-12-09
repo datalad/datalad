@@ -23,6 +23,7 @@ Dataset operations
 
    generated/man/datalad-add
    generated/man/datalad-create
+   generated/man/datalad-rev-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
    generated/man/datalad-drop
@@ -31,6 +32,7 @@ Dataset operations
    generated/man/datalad-publish
    generated/man/datalad-remove
    generated/man/datalad-save
+   generated/man/datalad-rev-save
    generated/man/datalad-update
    generated/man/datalad-uninstall
    generated/man/datalad-unlock
@@ -53,6 +55,7 @@ Reproducible execution
    :maxdepth: 1
 
    generated/man/datalad-run
+   generated/man/datalad-rev-run
    generated/man/datalad-rerun
    generated/man/datalad-run-procedure
 
@@ -94,5 +97,6 @@ Plumbing commands
    generated/man/datalad-create-test-dataset
    generated/man/datalad-diff
    generated/man/datalad-sshrun
+   generated/man/datalad-rev-status
    generated/man/datalad-siblings
    generated/man/datalad-subdatasets
