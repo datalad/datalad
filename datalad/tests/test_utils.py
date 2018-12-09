@@ -63,6 +63,7 @@ from ..utils import get_open_files
 from ..utils import map_items
 from ..utils import unlink
 from ..utils import CMD_MAX_ARG
+from ..utils import create_tree
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import (
@@ -91,7 +92,8 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    skip_if
+    skip_if,
+    ok_file_has_content
 )
 
 
@@ -1175,3 +1177,21 @@ def test_CMD_MAX_ARG():
     # if fails -- we are unlikely to be able to work on this system
     # and something went really wrong!
     assert_greater(CMD_MAX_ARG, 100)
+
+
+@with_tempfile(mkdir=True)
+def test_create_tree(path):
+    content = u"мама мыла раму"
+    create_tree(path, OrderedDict([
+        ('1', content),
+        ('sd', OrderedDict(
+            [
+            # right away an obscure case where we have both 1 and 1.gz
+                ('1', content*2),
+                ('1.gz', content*3),
+            ]
+        )),
+    ]))
+    ok_file_has_content(op.join(path, '1'), content)
+    ok_file_has_content(op.join(path, 'sd', '1'), content*2)
+    ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)

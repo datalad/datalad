@@ -22,6 +22,7 @@ from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
 from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_false
+from ...tests.utils import assert_not_in
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import slow
@@ -331,6 +332,25 @@ def test_add_archive_content_zip(repo_path):
         ok_file_under_git(opj(repo.path, "1", "foo"), annexed=True)
         ok_file_under_git(opj("1", "dir", "bar"), annexed=True)
         ok_archives_caches(repo.path, 0)
+
+
+@with_tree(tree={"ds": {"1.tar.gz": {"foo": "abc"}},
+                 "notds": {"2.tar.gz": {"bar": "def"}}})
+def test_add_archive_content_absolute_path(path):
+    repo = AnnexRepo(opj(path, "ds"), create=True)
+    repo.add(["1.tar.gz"])
+    repo.commit("1.tar.gz")
+    abs_tar_gz = opj(path, "ds", "1.tar.gz")
+    add_archive_content(abs_tar_gz, annex=repo)
+    ok_file_under_git(opj(path, "ds", "1", "foo"), annexed=True)
+    commit_msg = repo.format_commit("%B")
+    # The commit message uses relative paths.
+    assert_not_in(abs_tar_gz, commit_msg)
+    assert_in("1.tar.gz", commit_msg)
+
+    with assert_raises(FileNotInRepositoryError):
+        add_archive_content(opj(path, "notds", "2.tar.gz"),
+                            annex=repo)
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
