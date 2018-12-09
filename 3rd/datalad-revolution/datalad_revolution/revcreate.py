@@ -139,6 +139,17 @@ class RevCreate(Interface):
             Use `force` to create a dataset in a non-empty directory.""",
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
+        initopts=Parameter(
+            args=("initopts",),
+            metavar='INIT OPTIONS',
+            nargs=REMAINDER,
+            doc="""options to pass to :command:`git init`. [PY: Options can be
+            given as a list of command line arguments or as a GitPython-style
+            option dictionary PY][CMD: Any argument specified after the
+            destination path of the repository will be passed to git-init
+            as-is CMD]. Note that not all options will lead to viable results.
+            For example '--bare' will not yield a repository where DataLad
+            can adjust files in its worktree."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             metavar='DATASET',
@@ -155,17 +166,6 @@ class RevCreate(Interface):
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
-        initopts=Parameter(
-            args=("initopts",),
-            metavar='INIT OPTIONS',
-            nargs=REMAINDER,
-            doc="""options to pass to :command:`git init`. [PY: Options can be
-            given as a list of command line arguments or as a GitPython-style
-            option dictionary PY][CMD: Any argument specified after the
-            destination path of the repository will be passed to git-init
-            as-is CMD]. Note that not all options will lead to viable results.
-            For example '--bare' will not yield a repository where DataLad
-            can adjust files in its worktree."""),
         # TODO seems to only cause a config flag to be set, this could be done
         # in a procedure
         fake_dates=Parameter(
@@ -181,12 +181,12 @@ class RevCreate(Interface):
     @eval_results
     def __call__(
             path=None,
+            initopts=None,
             force=False,
             description=None,
             dataset=None,
             no_annex=False,
-            fake_dates=False,
-            initopts=None
+            fake_dates=False
     ):
         refds_path = dataset.path if hasattr(dataset, 'path') else dataset
         orig_path = path
