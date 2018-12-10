@@ -499,8 +499,8 @@ def _pyout_output(dsms, fast, long_):
     if long_:
         columns += [
             # TODO: columns renames?
-            'annex_local',
-            'annex_worktree'
+            'annex_local_size',
+            'annex_worktree_size'
         ]
 
     def fancy_bool(v):
@@ -587,8 +587,8 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                 aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
                 delayed="group-git"
             )),
-            ('annex_local', size_style),
-            ('annex_worktree', size_style),
+            ('annex_local_size', size_style),
+            ('annex_worktree_size', size_style),
             ('date', dict(
                 transform=datefmt,
                 aggregate=summary_dates,
