@@ -206,12 +206,6 @@ class AbsentRepoModel(object):
         self.path = path
         self.repo = None
 
-    @property
-    def type(self):
-        return "N/A"
-
-    # TODO: waiting for https://github.com/pyout/pyout/issues/37
-
 
 @auto_repr
 class GitModel(object):
@@ -588,8 +582,9 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
                     #summary=lambda x: "TOTAL: %d" % len(x)
                 )),
                 ('type', dict(
-                    transform=lambda s: "[%s]" % s,
+                    transform=lambda s: "%s" % s,
                     aggregate=counts,
+                    missing='-',
                     #summary=summary_counts
                 )),
                 ('describe', dict(
