@@ -557,46 +557,48 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
         delayed="group-annex"
     )
 
+    # Needs to stay here due to use of  counds/mapped_counts
+    PYOUT_STYLE = OrderedDict(
+        [
+            ('summary_', {"bold": True}),
+            ('header_', dict(bold=True, transform=str.upper)),
+            # ('default_', dict(align="center")),
+            ('default_', dict(missing="")),
+            ('path', dict(
+                bold=True,
+                align="left",
+                underline=True,
+                aggregate=lambda _: "Summary:"
+                # TODO: seems to be wrong
+                # width='auto'
+                # summary=lambda x: "TOTAL: %d" % len(x)
+            )),
+            ('type', dict(
+                transform=lambda s: "%s" % s,
+                aggregate=counts,
+                missing='-',
+                # summary=summary_counts
+            )),
+            ('describe', dict(
+                transform=empty_for_none)),
+            ('clean', dict(
+                color='green',
+                transform=fancy_bool,
+                aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
+                delayed="group-git"
+            )),
+            ('annex_local', size_style),
+            ('annex_worktree', size_style),
+            ('date', dict(
+                transform=datefmt,
+                aggregate=summary_dates,
+                # summary=summary_dates
+            ))
+        ]
+    )
     out = pyout.Tabular(
         columns=columns,
-        style=OrderedDict(
-            [
-                ('summary_', {"bold": True}),
-                ('header_', dict(bold=True, transform=str.upper)),
-                #('default_', dict(align="center")),
-                ('default_', dict(missing="")),
-                ('path', dict(
-                    bold=True,
-                    align="left",
-                    underline=True,
-                    aggregate=lambda _: "Summary:"
-                    # TODO: seems to be wrong
-                    #width='auto'
-                    #summary=lambda x: "TOTAL: %d" % len(x)
-                )),
-                ('type', dict(
-                    transform=lambda s: "%s" % s,
-                    aggregate=counts,
-                    missing='-',
-                    #summary=summary_counts
-                )),
-                ('describe', dict(
-                    transform=empty_for_none)),
-                ('clean', dict(
-                    color='green',
-                    transform=fancy_bool,
-                    aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
-                    delayed="group-git"
-                )),
-                ('annex_local', size_style),
-                ('annex_worktree', size_style),
-                ('date', dict(
-                    transform=datefmt,
-                    aggregate=summary_dates,
-                    #summary=summary_dates
-                ))
-            ]
-        )
+        style=PYOUT_STYLE
         # , stream=...
     )
     with out:
