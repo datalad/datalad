@@ -22,10 +22,15 @@ from os.path import curdir, isfile, islink, isdir, realpath
 from os.path import relpath
 from os import lstat
 
+from six.moves import map
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
 
-from ..utils import auto_repr
+from .. import cfg
+from ..utils import (
+    auto_repr,
+    on_windows,
+)
 from .base import Interface
 from datalad.interface.base import build_doc
 from ..ui import ui
@@ -466,8 +471,8 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 # from joblib import Parallel, delayed
 
 
-def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
-    from itertools import chain, imap
+def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False, backend=None):
+    from itertools import chain
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
@@ -497,9 +502,28 @@ def _ls_dataset(loc, fast=False, recursive=False, all_=False, long_=False):
         dsm.path = path
         return dsm
 
-    dsms = imap(prepare_model, dss)
+    dsms = map(prepare_model, dss)
 
-    (_pyout_output if pyout else _format_output)(dsms, fast, long_)
+    if not backend:
+        backend = cfg.obtain('datalad.ls.backend')
+    if backend == 'auto':
+        if pyout and not on_windows:
+            # pyout as of upcoming 0.2.0 has no Windows support
+            backend = 'pyout'
+        else:
+            backend = 'original'
+
+    KNOWN_OUTPUT_BACKENDS = {
+        'pyout': _pyout_output,
+        'original': _original_output,
+    }
+    if backend not in KNOWN_OUTPUT_BACKENDS:
+        raise ValueError(
+            "We have only following ls output backends: %s. Got %s",
+            ', '.join(KNOWN_OUTPUT_BACKENDS),
+            backend
+        )
+    KNOWN_OUTPUT_BACKENDS[backend](dsms, fast, long_)
 
 
 def _pyout_output(dsms, fast, long_):
@@ -638,8 +662,9 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             #     pass
 
 
-def _format_output(dsms, fast, long_):
+def _original_output(dsms, fast, long_):
     """Format listing of datasets using regular format"""
+    dsms = list(dsms)  # original one is not kind to iterators
     maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = u"{ds.path!U:<%d}" % (
             maxpath + (11 if is_interactive() else 0)

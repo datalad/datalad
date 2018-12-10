@@ -294,4 +294,13 @@ definitions = {
         'default': 256,
         'type': EnsureInt(),
     },
+    'datalad.ls.backend': {
+        'ui': ('question', {
+            'title': 'With output backend to use',
+            'text': "ATM `pyout` backend will be used on non-Windows systems "
+                    "if pyout is installed."}),
+        'type': EnsureChoice('auto', 'original', 'pyout'),
+        'default': 'auto',
+    },
+
 }
