@@ -616,6 +616,15 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             ))
         ]
     )
+    if not sys.stdout.isatty():
+        # TODO: ATM width in the final mode is hardcoded
+        #  https://github.com/pyout/pyout/issues/70
+        # and depending on how it would be resolved, there might be a
+        # need to specify it here as "max" or smth like that.
+        # For now hardcoding to hopefully wide enough 200 if stdout is not
+        # a tty
+        PYOUT_STYLE['width_'] = 200
+
     out = pyout.Tabular(
         columns=columns,
         style=PYOUT_STYLE
