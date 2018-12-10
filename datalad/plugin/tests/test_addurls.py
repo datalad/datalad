@@ -151,20 +151,6 @@ def test_fmt_to_name():
     assert_false(au.fmt_to_name("{}", {}))
 
 
-def test_split_ext():
-    eq_(au.split_ext("file"), ("file", ""))
-
-    eq_(au.split_ext("file.py"), ("file", ".py"))
-    eq_(au.split_ext("file.tar.gz"), ("file", ".tar.gz"))
-    eq_(au.split_ext("file.toolong.gz"), ("file.toolong", ".gz"))
-
-    eq_(au.split_ext("file.a.b.c.d"), ("file", ".a.b.c.d"))
-    eq_(au.split_ext("file.a.b.cccc.d"), ("file", ".a.b.cccc.d"))
-    eq_(au.split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
-
-    eq_(au.split_ext("file.a.b..c"), ("file", ".a.b..c"))
-
-
 def test_get_file_parts():
     assert_dict_equal(au.get_file_parts("file.tar.gz", "prefix"),
                       {"prefix": "file.tar.gz",

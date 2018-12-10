@@ -19,6 +19,7 @@ from os.path import relpath
 from os.path import lexists
 
 
+from datalad.utils import assure_unicode
 from datalad.utils import unique
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
@@ -33,6 +34,7 @@ from datalad.interface.annotate_paths import annotated2content_by_ds
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import super_datasets_flag
 from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import message_file_opt
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -186,11 +188,7 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=save_message_opt,
-        message_file=Parameter(
-            args=("-F", "--message-file"),
-            doc="""take the commit message from this file. This flag is
-            mutually exclusive with -m.""",
-            constraints=EnsureStr() | EnsureNone()),
+        message_file=message_file_opt,
         # switch not functional from cmdline: default True, action=store_true
         # TODO remove from API? all_updated=False is not used anywhere in the codebase
         all_updated=Parameter(
@@ -224,17 +222,11 @@ class Save(Interface):
         refds_path = Interface.get_refds_path(dataset)
 
         if message and message_file:
-            yield get_status_dict(
-                'save',
-                status='error',
-                path=refds_path,
-                message="Both a message and message file were specified",
-                logger=lgr)
-            return
+            raise ValueError("Both a message and message file were specified")
 
         if message_file:
-            with open(message_file) as mfh:
-                message = mfh.read()
+            with open(message_file, "rb") as mfh:
+                message = assure_unicode(mfh.read())
 
         to_process = []
         got_nothing = True

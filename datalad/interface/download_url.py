@@ -91,12 +91,14 @@ class DownloadURL(Interface):
 
         pwd, rel_pwd = get_dataset_pwds(dataset)
 
-        try:
-            ds = require_dataset(
-                dataset, check_installed=True,
-                purpose='downloading urls')
-        except NoDatasetArgumentFound:
-            ds = None
+        ds = None
+        if save or dataset:
+            try:
+                ds = require_dataset(
+                    dataset, check_installed=True,
+                    purpose='downloading urls')
+            except NoDatasetArgumentFound:
+                pass
 
         common_report = {"action": "download_url",
                          "ds": ds}
@@ -116,7 +118,7 @@ class DownloadURL(Interface):
 
         if dataset:  # A dataset was explicitly given.
             path = op.normpath(op.join(ds.path, path or op.curdir))
-        elif ds:
+        elif save and ds:
             path = op.normpath(op.join(ds.path, rel_pwd, path or op.curdir))
         elif not path:
             path = op.curdir

@@ -366,6 +366,16 @@ def test_partial_aggregation(path):
     sub1 = ds.create('sub1', force=True)
     sub2 = ds.create('sub2', force=True)
     ds.add('.', recursive=True)
+
+    # if we aggregate a path(s) and say to recurse, we must not recurse into
+    # the dataset itself and aggregate others
+    ds.aggregate_metadata(path='sub1', recursive=True)
+    res = ds.metadata(get_aggregates=True)
+    assert_result_count(res, 1, path=ds.path)
+    assert_result_count(res, 1, path=sub1.path)
+    # so no metadata aggregates for sub2 yet
+    assert_result_count(res, 0, path=sub2.path)
+
     ds.aggregate_metadata(recursive=True)
     # baseline, recursive aggregation gets us something for all three datasets
     res = ds.metadata(get_aggregates=True)

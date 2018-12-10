@@ -41,6 +41,7 @@ from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
+from ..utils import get_dataset_root
 
 from datalad.customremotes.base import init_datalad_remote
 
@@ -227,7 +228,11 @@ class AddArchiveContent(Interface):
         annex_path = annex.path
 
         # _rpath below should depict paths relative to the top of the annex
-        archive_rpath = relpath(archive_path, annex_path)
+        archive_rpath = relpath(
+            archive_path,
+            # Use `get_dataset_root` to avoid resolving the leading path. If no
+            # repo is found, downstream code will raise FileNotInRepositoryError.
+            get_dataset_root(archive_path) or ".")
 
         if archive in annex.untracked_files:
             raise RuntimeError(
@@ -509,7 +514,7 @@ class AddArchiveContent(Interface):
                 if annex.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
-                        (origin, archive, commit_stats.as_str(mode='full')),
+                        (origin, archive_rpath, commit_stats.as_str(mode='full')),
                         _datalad_msg=True
                     )
                     commit_stats.reset()

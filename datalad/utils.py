@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import gzip
 import string
 import wrapt
 
@@ -86,15 +87,28 @@ except:  # pragma: no cover
 # The last one would be the most conservative/Windows
 CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
-    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
+    assert CMD_MAX_ARG > 0
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
-    # so exception would be thrown e.g. on Windows.
+    # so exception would be thrown e.g. on Windows, or
+    # somehow during Debian build for nd14.04 it is coming up with -1:
+    # https://github.com/datalad/datalad/issues/3015
     CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
     lgr.debug(
-        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
-        exc)
-lgr.debug("Maximal length of cmdline string: %d", CMD_MAX_ARG)
+        "Failed to query or got useless SC_ARG_MAX sysconf, "
+        "will use hardcoded value: %s", exc)
+# Even with all careful computations we do, due to necessity to account for
+# environment and what not, we still could not figure out "exact" way to
+# estimate it, but it was shown that 300k safety margin on linux was sufficient.
+# https://github.com/datalad/datalad/pull/2977#issuecomment-436264710
+# 300k is ~15%, so to be safe, and for paranoid us we will just use up to 50%
+# of the length for "safety margin".  We might probably still blow due to
+# env vars, unicode, etc...  so any hard limit imho is not a proper solution
+CMD_MAX_ARG = int(0.5 * CMD_MAX_ARG)
+lgr.debug(
+    "Maximal length of cmdline string (adjusted for safety margin): %d",
+    CMD_MAX_ARG)
 
 #
 # Little helpers
@@ -748,6 +762,27 @@ def unique(seq, key=None):
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
         return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+
+
+def all_same(items):
+    """Quick check if all items are the same.
+
+    Identical to a check like len(set(items)) == 1 but
+    should be more efficient while working on generators, since would
+    return False as soon as any difference detected thus possibly avoiding
+    unnecessary evaluations
+    """
+    first = True
+    first_item = None
+    for item in items:
+        if first:
+            first = False
+            first_item = item
+        else:
+            if item != first_item:
+                return False
+    # So we return False if was empty
+    return not first
 
 
 def map_items(func, v):
@@ -2064,7 +2099,7 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -2085,21 +2120,24 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
+        if remove_existing and op.lexists(full_name):
+            rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+                create_tree_archive(
+                    path, name, load,
+                    archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+                create_tree(
+                    full_name, load,
+                    archives_leading_dir=archives_leading_dir,
+                    remove_existing=remove_existing)
         else:
-            if PY2:
-                open_kwargs = {'mode': "w"}
-                if isinstance(load, text_type):
-                    load = load.encode('utf-8')
-            else:
-                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
-
-            with open(full_name, **open_kwargs) as f:
-                f.write(load)
+            open_func = open
+            if full_name.endswith('.gz'):
+                open_func = gzip.open
+            with open_func(full_name, "wb") as f:
+                f.write(assure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 

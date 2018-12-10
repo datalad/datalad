@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import dropwhile
 import json
-import os
 import os.path as op
 import re
 import sys
@@ -293,14 +292,18 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         # that, regardless of if and how --since is specified, the effective
         # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
-        if not dset.repo.commit_exists(onto):
-            # This is unlikely to happen in the wild because it means that the
-            # first commit is a datalad run commit. Just abort rather than
-            # trying to checkout on orphan branch or something like that.
-            yield get_status_dict(
-                "run", ds=dset, status="error",
-                message="Commit for --onto does not exist.")
-            return
+
+    if onto and not dset.repo.commit_exists(onto):
+        # This happens either because the user specifies a value that doesn't
+        # exists or the results first parent doesn't exist. The latter is
+        # unlikely to happen in the wild because it means that the first commit
+        # is a datalad run commit. Just abort rather than trying to checkout an
+        # orphan branch or something like that.
+        yield get_status_dict(
+            "run", ds=dset, status="error",
+            message=("Revision specified for --onto (%s) does not exist.",
+                     onto))
+        return
 
     start_point = onto or "HEAD"
     if branch or onto:
@@ -385,6 +388,7 @@ def _rerun(dset, results):
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
+                                 extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
                                  rerun_outputs=auto_outputs,
                                  message=message,
@@ -433,15 +437,16 @@ def _get_script_handler(script, since, revision):
 
             run_info = res["run_info"]
             cmd = run_info["cmd"]
-            msg = res["run_message"]
-            if msg == _format_cmd_shorty(cmd):
-                msg = ''
 
             expanded_cmd = format_command(
                 dset, cmd,
                 **dict(run_info,
                        dspath=dset.path,
                        pwd=op.join(dset.path, run_info["pwd"])))
+
+            msg = res["run_message"]
+            if msg == _format_cmd_shorty(expanded_cmd):
+                msg = ''
 
             ofh.write(
                 "\n" + "".join("# " + ln

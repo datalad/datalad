@@ -21,6 +21,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
@@ -58,11 +59,9 @@ add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 @with_tempfile
 def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
+    assert_false(ds.repo.is_under_annex("README.md"))
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -126,9 +125,6 @@ def test_procedure_discovery(path, super_path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
@@ -215,9 +211,6 @@ def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
-    # TODO: this procedure would leave a clean dataset, but `run` cannot handle dirty
-    # input yet, so manual for now
-    ds.add('code', to_git=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder

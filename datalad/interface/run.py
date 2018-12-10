@@ -15,13 +15,12 @@ import logging
 import json
 
 from argparse import REMAINDER
-import glob
 import os.path as op
 from os.path import join as opj
 from os.path import normpath
 from os.path import relpath
-from os.path import isabs
 
+from six.moves import map
 from six.moves import shlex_quote
 
 from datalad.interface.base import Interface
@@ -30,10 +29,13 @@ from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import save_message_opt
 
+from datalad.config import anything2bool
+
 from datalad.support.constraints import EnsureChoice
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureBool
 from datalad.support.exceptions import CommandError
+from datalad.support.globbedpaths import GlobbedPaths
 from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
 
@@ -47,11 +49,9 @@ from datalad.distribution.dataset import datasetmethod
 from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
-from datalad.utils import chpwd
+from datalad.utils import assure_unicode
 # Rename get_dataset_pwds for the benefit of containers_run.
 from datalad.utils import get_dataset_pwds as get_command_pwds
-from datalad.utils import getpwd
-from datalad.utils import partition
 from datalad.utils import SequenceFormatter
 
 lgr = logging.getLogger('datalad.interface.run')
@@ -60,7 +60,7 @@ lgr = logging.getLogger('datalad.interface.run')
 def _format_cmd_shorty(cmd):
     """Get short string representation from a cmd argument list"""
     cmd_shorty = (' '.join(cmd) if isinstance(cmd, list) else cmd)
-    cmd_shorty = '{}{}'.format(
+    cmd_shorty = u'{}{}'.format(
         cmd_shorty[:40],
         '...' if len(cmd_shorty) > 40 else '')
     return cmd_shorty
@@ -136,7 +136,7 @@ class Run(Interface):
             executed in the root directory of this dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         inputs=Parameter(
-            args=("--input",),
+            args=("-i", "--input"),
             dest="inputs",
             metavar=("PATH"),
             action='append',
@@ -145,7 +145,7 @@ class Run(Interface):
             :command:`datalad get .`". The value can also be a glob. [CMD: This
             option can be given more than once. CMD]"""),
         outputs=Parameter(
-            args=("--output",),
+            args=("-o", "--output"),
             dest="outputs",
             metavar=("PATH"),
             action='append',
@@ -211,152 +211,13 @@ class Run(Interface):
             for r in Rerun.__call__(dataset=dataset, message=message):
                 yield r
         else:
-            if cmd:
-                for r in run_command(cmd, dataset=dataset,
-                                     inputs=inputs, outputs=outputs,
-                                     expand=expand,
-                                     explicit=explicit,
-                                     message=message,
-                                     sidecar=sidecar):
-                    yield r
-            else:
-                lgr.warning("No command given")
-
-
-class GlobbedPaths(object):
-    """Helper for inputs and outputs.
-
-    Parameters
-    ----------
-    patterns : list of str
-        Call `glob.glob` with each of these patterns. "." is considered as
-        datalad's special "." path argument; it is not passed to glob and is
-        always left unexpanded. Each set of glob results is sorted
-        alphabetically.
-    pwd : str, optional
-        Glob in this directory.
-    expand : bool, optional
-       Whether the `paths` property returns unexpanded or expanded paths.
-    """
-
-    def __init__(self, patterns, pwd=None, expand=False):
-        self.pwd = pwd or getpwd()
-        self._expand = expand
-
-        if patterns is None:
-            self._maybe_dot = []
-            self._paths = {"patterns": [], "sub_patterns": {}}
-        else:
-            patterns, dots = partition(patterns, lambda i: i.strip() == ".")
-            self._maybe_dot = ["."] if list(dots) else []
-            self._paths = {
-                "patterns": [relpath(p, start=pwd) if isabs(p) else p
-                             for p in patterns],
-                "sub_patterns": {}}
-
-    def __bool__(self):
-        return bool(self._maybe_dot or self.expand())
-
-    __nonzero__ = __bool__  # py2
-
-    def _get_sub_patterns(self, pattern):
-        """Extract sub-patterns from the leading path of `pattern`.
-
-        The right-most path component is successively peeled off until there
-        are no patterns left.
-        """
-        if pattern in self._paths["sub_patterns"]:
-            return self._paths["sub_patterns"][pattern]
-
-        head, tail = op.split(pattern)
-        if not tail:
-            # Pattern ended with a separator. Take the first directory as the
-            # base.
-            head, tail = op.split(head)
-
-        sub_patterns = []
-        seen_magic = glob.has_magic(tail)
-        while head:
-            new_head, tail = op.split(head)
-            if seen_magic and not glob.has_magic(head):
-                break
-            elif not seen_magic and glob.has_magic(tail):
-                seen_magic = True
-
-            if seen_magic:
-                sub_patterns.append(head + op.sep)
-            head = new_head
-        self._paths["sub_patterns"][pattern] = sub_patterns
-        return sub_patterns
-
-    def _expand_globs(self):
-        def normalize_hits(hs):
-            return [relpath(h) + ("" if op.basename(h) else op.sep)
-                    for h in sorted(hs)]
-
-        expanded = []
-        with chpwd(self.pwd):
-            for pattern in self._paths["patterns"]:
-                hits = glob.glob(pattern)
-                if hits:
-                    expanded.extend(normalize_hits(hits))
-                else:
-                    lgr.debug("No matching files found for '%s'", pattern)
-                    # We didn't find a hit for the complete pattern. If we find
-                    # a sub-pattern hit, that may mean we have an uninstalled
-                    # subdataset.
-                    for sub_pattern in self._get_sub_patterns(pattern):
-                        sub_hits = glob.glob(sub_pattern)
-                        if sub_hits:
-                            expanded.extend(normalize_hits(sub_hits))
-                            break
-                    # ... but we still want to retain the original pattern
-                    # because we don't know for sure at this point, and it
-                    # won't bother the "install, reglob" routine.
-                    expanded.extend([pattern])
-        return expanded
-
-    def expand(self, full=False, dot=True, refresh=False):
-        """Return paths with the globs expanded.
-
-        Parameters
-        ----------
-        full : bool, optional
-            Return full paths rather than paths relative to `pwd`.
-        dot : bool, optional
-            Include the "." pattern if it was specified.
-        refresh : bool, optional
-            Run glob regardless of whether there are cached values. This is
-            useful if there may have been changes on the file system.
-        """
-        maybe_dot = self._maybe_dot if dot else []
-        if not self._paths["patterns"]:
-            return maybe_dot + []
-
-        if refresh or "expanded" not in self._paths:
-            paths = self._expand_globs()
-            self._paths["expanded"] = paths
-        else:
-            paths = self._paths["expanded"]
-
-        if full:
-            if refresh or "expanded_full" not in self._paths:
-                paths = [opj(self.pwd, p) for p in paths]
-                self._paths["expanded_full"] = paths
-            else:
-                paths = self._paths["expanded_full"]
-
-        return maybe_dot + paths
-
-    @property
-    def paths(self):
-        """Return paths relative to `pwd`.
-
-        Globs are expanded if `expand` was set to true during instantiation.
-        """
-        if self._expand:
-            return self.expand()
-        return self._maybe_dot + self._paths["patterns"]
+            for r in run_command(cmd, dataset=dataset,
+                                 inputs=inputs, outputs=outputs,
+                                 expand=expand,
+                                 explicit=explicit,
+                                 message=message,
+                                 sidecar=sidecar):
+                yield r
 
 
 def _install_and_reglob(dset, gpaths):
@@ -387,7 +248,7 @@ def _install_and_reglob(dset, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset, inputs):
+def prepare_inputs(dset, inputs, extra_inputs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -397,16 +258,19 @@ def prepare_inputs(dset, inputs):
     ----------
     dset : Dataset
     inputs : GlobbedPaths object
+    extra_inputs : GlobbedPaths object, optional
 
     Returns
     -------
     Generator with the result records.
     """
-    if inputs:
+    gps = list(filter(bool, [inputs, extra_inputs]))
+    if gps:
         lgr.info('Making sure inputs are available (this may take some time)')
-        for res in _install_and_reglob(dset, inputs):
+    for gp in gps:
+        for res in _install_and_reglob(dset, gp):
             yield res
-        for res in dset.get(inputs.expand(full=True), on_failure="ignore"):
+        for res in dset.get(gp.expand(full=True), on_failure="ignore"):
             if res.get("state") == "absent":
                 lgr.warning("Input does not exist: %s", res["path"])
             else:
@@ -450,12 +314,22 @@ def normalize_command(command):
     """Convert `command` to the string representation.
     """
     if isinstance(command, list):
+        command = list(map(assure_unicode, command))
         if len(command) == 1:
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
+            #
+            # FIXME: This covers the predominant command-line case, but, for
+            # Python API callers, it means values like ["./script with spaces"]
+            # requires additional string-like escaping, which is inconsistent
+            # with the handling of multi-item lists (and subprocess's
+            # handling). Once we have a way to detect "running from Python API"
+            # (discussed in gh-2986), update this.
             command = command[0]
         else:
             command = " ".join(shlex_quote(c) for c in command)
+    else:
+        command = assure_unicode(command)
     return command
 
 
@@ -529,11 +403,23 @@ def _execute_command(command, pwd, expected_exit=None):
     return cmd_exitcode or 0, exc
 
 
+def _save_outputs(ds, to_save, msg):
+    """Helper to save results after command execution is completed"""
+    return ds.add(
+        to_save,
+        recursive=True,
+        message=msg,
+        return_type='generator')
+
+
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
-                rerun_info=None, rerun_outputs=None,
-                inject=False):
+                rerun_info=None,
+                extra_inputs=None,
+                rerun_outputs=None,
+                inject=False,
+                saver=_save_outputs):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -551,6 +437,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         top-level "namespace" key (e.g., the project or extension name).
     rerun_info : dict, optional
         Record from a previous run. This is used internally by `rerun`.
+    extra_inputs : list, optional
+        Inputs to use in addition to those specified by `inputs`. Unlike
+        `inputs`, these will not be injected into the {inputs} format field.
     rerun_outputs : list, optional
         Outputs, in addition to those in `outputs`, determined automatically
         from a previous run. This is used internally by `rerun`.
@@ -559,11 +448,20 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
+    saver : callable, optional
+        Must take a dataset instance, a list of paths to save, and a
+        message string as arguments and must record any changes done
+        to any content matching an entry in the path list. Must yield
+        result dictionaries as a generator.
 
     Yields
     ------
     Result records for the run.
     """
+    if not cmd:
+        lgr.warning("No command given")
+        return
+
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
         # recording is relative to the dataset
@@ -598,11 +496,14 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     inputs = GlobbedPaths(inputs, pwd=pwd,
                           expand=expand in ["inputs", "both"])
+    extra_inputs = GlobbedPaths(extra_inputs, pwd=pwd,
+                                # Follow same expansion rules as `inputs`.
+                                expand=expand in ["inputs", "both"])
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
 
     if not inject:
-        for res in prepare_inputs(ds, inputs):
+        for res in prepare_inputs(ds, inputs, extra_inputs):
             yield res
 
         if outputs:
@@ -617,30 +518,33 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             # full paths, so we can pass them directly to unlock.
             for res in _unlock_or_remove(ds, rerun_outputs):
                 yield res
-
-        try:
-            cmd_expanded = format_command(ds, cmd,
-                                          pwd=pwd,
-                                          dspath=ds.path,
-                                          inputs=inputs,
-                                          outputs=outputs)
-        except KeyError as exc:
-            yield get_status_dict(
-                'run',
-                ds=ds,
-                status='impossible',
-                message=('command has an unrecognized placeholder: %s',
-                         exc))
-            return
-
-        cmd_exitcode, exc = _execute_command(
-            cmd_expanded, pwd,
-            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
         cmd_exitcode = 0
         exc = None
+
+    try:
+        cmd_expanded = format_command(ds, cmd,
+                                      pwd=pwd,
+                                      dspath=ds.path,
+                                      inputs=inputs,
+                                      outputs=outputs)
+    except KeyError as exc:
+        yield get_status_dict(
+            'run',
+            ds=ds,
+            status='impossible',
+            message=('command has an unrecognized placeholder: %s',
+                     exc))
+        return
+
+    if not inject:
+        cmd_exitcode, exc = _execute_command(
+            cmd_expanded, pwd,
+            expected_exit=rerun_info.get("exit", 0) if rerun_info else None)
+
+
     # amend commit message with `run` info:
     # - pwd if inside the dataset
     # - the command itself
@@ -650,6 +554,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         'exit': cmd_exitcode,
         'chain': rerun_info["chain"] if rerun_info else [],
         'inputs': inputs.paths,
+        'extra_inputs': extra_inputs.paths,
         'outputs': outputs.paths,
     }
     if rel_pwd is not None:
@@ -662,9 +567,17 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 
     record = json.dumps(run_info, indent=1, sort_keys=True, ensure_ascii=False)
 
-    use_sidecar = sidecar or (
-        sidecar is None and
-        ds.config.get('datalad.run.record-sidecar', default=False))
+    if sidecar is None:
+        use_sidecar = ds.config.get('datalad.run.record-sidecar', default=False)
+        # If ConfigManager gets the ability to say "return single value",
+        # update this code to use that.
+        if isinstance(use_sidecar, tuple):
+            # Use same precedence as 'git config'.
+            use_sidecar = use_sidecar[-1]
+        use_sidecar = anything2bool(use_sidecar)
+    else:
+        use_sidecar = sidecar
+
 
     if use_sidecar:
         # record ID is hash of record itself
@@ -686,9 +599,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
 ^^^ Do not change lines above ^^^
 """
     msg = msg.format(
-        message if message is not None else _format_cmd_shorty(cmd),
+        message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
-    msg = assure_bytes(msg)
 
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
@@ -696,12 +608,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
             msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
                                    "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
-                ofh.write(msg)
+                ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
-                     "'datalad save -r -F %s .'",
+                     "'datalad add -d . -r -F %s .'",
                      msg_path)
         raise exc
     elif outputs_to_save:
-        for r in ds.add(outputs_to_save, recursive=True, message=msg):
+        for r in saver(ds, outputs_to_save, msg):
             yield r

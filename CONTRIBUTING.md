@@ -431,6 +431,21 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+Recognizing contributions
+-------------------------
+
+We welcome and recognize all contributions from documentation to testing to code development.
+
+You can see a list of current contributors in our [zenodo file][link_zenodo].
+If you are new to the project, don't forget to add your name and affiliation there!
+
+Thank you!
+----------
+
+You're awesome. :wave::smiley:
+
+
+
 Various hints for developers
 ----------------------------
 
@@ -529,7 +544,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.11.2 (??? ??, 2018) -- will be better than ever
+## 0.11.3 (??? ??, 2018) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -545,3 +560,5 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+
+[link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json

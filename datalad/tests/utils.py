@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import gzip
 import inspect
 import shutil
 import stat
@@ -209,13 +210,14 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                 eq_(head_diffs, [])
                 eq_(index_diffs, [])
             else:
+                # TODO: These names are confusing/non-descriptive.  REDO
                 if head_modified:
                     # we did ask for interrogating changes
                     head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(head_modified_, head_modified)
+                    eq_(sorted(head_modified_), sorted(head_modified))
                 if index_modified:
                     index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(index_modified_, index_modified)
+                    eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -390,19 +392,37 @@ def ok_exists(path):
     assert exists(path), 'path %s does not exist' % path
 
 
-def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
+def ok_file_has_content(path, content, strip=False, re_=False,
+                        decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
     ok_exists(path)
-    with open(path, 'r') as f:
-        content_ = f.read()
-
-        if strip:
-            content_ = content_.strip()
-
-        if re_:
-            assert_re_in(content, content_, **kwargs)
+    if decompress:
+        if path.endswith('.gz'):
+            open_func = gzip.open
         else:
-            assert_equal(content, content_, **kwargs)
+            raise NotImplementedError("Don't know how to decompress %s" % path)
+    else:
+        open_func = open
+
+    with open_func(path, 'rb') as f:
+        file_content = f.read()
+
+    if isinstance(content, text_type):
+        file_content = assure_unicode(file_content)
+
+    if os.linesep != '\n':
+        # for consistent comparisons etc. Apparently when reading in `b` mode
+        # on Windows we would also get \r
+        # https://github.com/datalad/datalad/pull/3049#issuecomment-444128715
+        file_content = file_content.replace(os.linesep, '\n')
+
+    if strip:
+        file_content = file_content.strip()
+
+    if re_:
+        assert_re_in(content, file_content, **kwargs)
+    else:
+        assert_equal(content, file_content, **kwargs)
 
 
 #

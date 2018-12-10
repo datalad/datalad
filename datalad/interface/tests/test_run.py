@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -32,11 +32,10 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError, GitRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
-from datalad.interface.run import GlobbedPaths
 from datalad.interface.run import run_command
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
@@ -99,7 +98,7 @@ def test_basics(path, nodspath):
         # TODO 'state' is still untracked!!!
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
-        commit_msg = ds.repo.repo.head.commit.message
+        commit_msg = ds.repo.format_commit("%B")
         ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
@@ -132,20 +131,55 @@ def test_basics(path, nodspath):
             ds.run()
             assert_in("No command given", cml.out)
 
+
+@with_tempfile(mkdir=True)
+def test_py2_unicode_command(path):
+    # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+    ds = Dataset(path).create()
+    touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
+    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+                                        touch_cmd,
+                                        u"bβ0.dat")
+    ds.run(cmd_str)
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ0.dat"))
+
+    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ1.dat"))
+
+    # Send in a list of byte-strings to mimic a py2 command-line invocation.
+    ds.run([s.encode("utf-8")
+            for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u" β1 "))
+
+    with assert_raises(CommandError), swallow_outputs():
+        ds.run(u"bβ2.dat")
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+def test_sidecar(path):
+    ds = Dataset(path).create()
     # Simple sidecar message checks.
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
-    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+    assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    real_get = ds.config.get
+    ds.config.set("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
 
-    def mocked_get(key, default=None):
-        if key == "datalad.run.record-sidecar":
-            return True
-        return real_get(key, default)
+    ds.config.set("datalad.run.record-sidecar", "true", where="local")
+    ds.run(["touch", "dummy1"], message="sidecar config")
+    assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
-    with patch.object(ds.config, "get", mocked_get):
-        ds.run(["touch", "dummy1"], message="sidecar config")
-    assert_not_in('"cmd":', ds.repo.repo.head.commit.message)
+    # Don't break when config.get() returns multiple values. Here it's two
+    # values in .gitconfig, but a more realistic scenario is a value in
+    # $repo/.git/config that overrides a setting in ~/.config/git/config.
+    ds.config.add("datalad.run.record-sidecar", "false", where="local")
+    ds.run(["touch", "dummy2"], message="sidecar config")
+    assert_in('"cmd":', ds.repo.format_commit("%B"))
 
 
 @slow  # 17.1880s
@@ -199,7 +233,7 @@ def test_rerun(path, nodspath):
     ds.rerun(revision="HEAD~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
     # Also check that the messasge override worked.
-    eq_(ds.repo.repo.head.commit.message.splitlines()[0],
+    eq_(ds.repo.format_commit("%B").splitlines()[0],
         "[DATALAD RUNCMD] rerun buried")
     # Or a range of commits, skipping non-run commits.
     ds.rerun(since="HEAD~3")
@@ -303,6 +337,13 @@ def test_rerun_onto(path):
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
+    # We abort when an explicitly specified `onto` doesn't exist.
+    ds.repo.checkout("master")
+    assert_result_count(
+        ds.rerun(since="", onto="doesnotexist", branch="from-base",
+                 on_failure="ignore"),
+        1, status="error", action="run")
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
@@ -318,11 +359,11 @@ def test_rerun_chain(path):
     for _ in range(3):
         commits.append(ds.repo.get_hexsha())
         ds.rerun()
-        _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
+        _, info = get_run_info(ds, ds.repo.format_commit("%B"))
         assert info["chain"] == commits
 
     ds.rerun(revision="first-run")
-    _, info = get_run_info(ds, ds.repo.repo.head.commit.message)
+    _, info = get_run_info(ds, ds.repo.format_commit("%B"))
     assert info["chain"] == commits[:1]
 
 
@@ -382,26 +423,27 @@ def test_rerun_just_one_commit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
+@known_failure_direct_mode
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
+    subds = ds.create("sub")
 
     hexsha_initial = ds.repo.get_hexsha()
 
     with assert_raises(CommandError):
-        ds.run("echo x$(cat grows) > grows && false")
+        ds.run("echo x$(cat sub/grows) > sub/grows && false")
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
     msgfile = opj(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
-    ds.add(".", save=False)
-    ds.save(message_file=msgfile)
+    ds.add(".", recursive=True, message_file=msgfile)
     ok_clean_git(ds.path)
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
-    outfile = opj(ds.path, "grows")
+    outfile = opj(subds.path, "grows")
     eq_('x\n', open(outfile).read())
 
     # There is no CommandError on rerun if the non-zero error matches the
@@ -545,7 +587,7 @@ def test_rerun_subdir(path):
 
     ok_file_under_git_kludge(subdir, "test.dat")
 
-    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
     eq_(runinfo['pwd'], 'subdir')
     # now, rerun within root of the dataset
     with chpwd(ds.path):
@@ -560,7 +602,7 @@ def test_rerun_subdir(path):
         ds.run("touch test2.dat")
     ok_clean_git(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
-    rec_msg, runinfo = get_run_info(ds, ds.repo.repo.head.commit.message)
+    rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
     eq_(runinfo['pwd'], '.')
     # now, rerun within subdir -- smoke for now
     with chpwd(subdir):
@@ -658,7 +700,8 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@with_tree(tree={"test-annex.dat": "content",
+@with_tree(tree={"input.dat": "input",
+                 "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
                         "s1_1": {"s2": {"c.dat": "c",
@@ -679,22 +722,31 @@ def test_run_inputs_outputs(src, path):
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
 
-    # If we specify test-annex.dat as an input, it will be retrieved before the
-    # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"])
+    # The specified inputs and extra inputs will be retrieved before the run.
+    # (Use run_command() to access the extra_inputs argument.)
+    list(run_command("cat {inputs} {inputs} >doubled.dat",
+                     dataset=ds,
+                     inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
 
     ok_clean_git(ds.path)
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
     ok_(ds.repo.file_has_content("doubled.dat"))
+    with open(opj(path, "doubled.dat")) as fh:
+        content = fh.read()
+        assert_in("input", content)
+        assert_not_in("extra-input", content)
 
     # Rerunning the commit will also get the input file.
-    ds.repo.drop("test-annex.dat", options=["--force"])
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    ds.repo.drop(["input.dat", "extra-input.dat"], options=["--force"])
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
     ds.rerun()
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["not-there"])
@@ -718,7 +770,7 @@ def test_run_inputs_outputs(src, path):
         ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
-        assert_in(inputs_arg[0], ds.repo.repo.head.commit.message)
+        assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
         ds.repo.drop(inputs, options=["--force"])
 
     # --input can be passed a subdirectory.
@@ -779,8 +831,8 @@ def test_run_inputs_outputs(src, path):
 
     # --input/--output globs can be stored in expanded form.
     ds.run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
-    assert_in("a.dat", ds.repo.repo.head.commit.message)
-    assert_in("b.dat", ds.repo.repo.head.commit.message)
+    assert_in("a.dat", ds.repo.format_commit("%B"))
+    assert_in("b.dat", ds.repo.format_commit("%B"))
 
     res = ds.rerun(report=True, return_type='item-or-list')
     eq_(res["run_info"]['inputs'], ["a.dat"])
@@ -898,7 +950,7 @@ def test_placeholders(path):
         run("echo {pwd} >expanded-pwd")
     ok_file_has_content(opj(path, "subdir", "expanded-pwd"), subdir_path,
                         strip=True)
-    eq_(get_run_info(ds, ds.repo.repo.head.commit.message)[1]["pwd"],
+    eq_(get_run_info(ds, ds.repo.format_commit("%B"))[1]["pwd"],
         "subdir")
 
     # Double brackets can be used to escape placeholders.
@@ -942,7 +994,7 @@ def test_inputs_quotes_needed(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
     expected = u"!".join(
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
@@ -969,73 +1021,6 @@ def test_inject(path):
     msg = ds.repo.format_commit("%B")
     assert_in("custom_key", msg)
     assert_in("nonsense command", msg)
-
-
-def test_globbedpaths_get_sub_patterns():
-    gp = GlobbedPaths([], "doesn't matter")
-    for pat, expected in [
-            # If there are no patterns in the directory component, we get no
-            # sub-patterns.
-            ("", []),
-            ("nodir", []),
-            (op.join("nomagic", "path"), []),
-            (op.join("nomagic", "path*"), []),
-            # Create sub-patterns from leading path, successively dropping the
-            # right-most component.
-            (op.join("s*", "path"), ["s*" + op.sep]),
-            (op.join("s", "ss*", "path"), [op.join("s", "ss*") + op.sep]),
-            (op.join("s", "ss*", "path*"), [op.join("s", "ss*") + op.sep]),
-            (op.join("s", "ss*" + op.sep), []),
-            (op.join("s*", "ss", "path*"),
-             [op.join("s*", "ss") + op.sep,
-              "s*" + op.sep]),
-            (op.join("s?", "ss", "sss*", "path*"),
-             [op.join("s?", "ss", "sss*") + op.sep,
-              op.join("s?", "ss") + op.sep,
-              "s?" + op.sep])]:
-        eq_(gp._get_sub_patterns(pat), expected)
-
-
-@with_tree(tree={"1.txt": "",
-                 "2.dat": "",
-                 "3.txt": ""})
-def test_globbedpaths(path):
-    for patterns, expected in [
-            (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
-            (["*.txt"], {"1.txt", "3.txt"})]:
-        gp = GlobbedPaths(patterns, pwd=path)
-        eq_(set(gp.expand()), expected)
-        eq_(set(gp.expand(full=True)),
-            {opj(path, p) for p in expected})
-
-    # Full patterns still get returned as relative to pwd.
-    gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat"])
-
-    # "." gets special treatment.
-    gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat"])
-    gp = GlobbedPaths(["."], pwd=path, expand=False)
-    eq_(gp.expand(), ["."])
-    eq_(gp.paths, ["."])
-
-    # We can the glob outputs.
-    glob_results = {"z": "z",
-                    "a": ["x", "d", "b"]}
-    with patch('glob.glob', glob_results.get):
-        gp = GlobbedPaths(["z", "a"])
-        eq_(gp.expand(), ["z", "b", "d", "x"])
-
-    # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
-        gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
-        eq_(gp.paths, expected)
-
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        GlobbedPaths(["not here"], pwd=path).expand()
-        assert_in("No matching files found for 'not here'", cml.out)
 
 
 def test_rerun_commit_message_check():

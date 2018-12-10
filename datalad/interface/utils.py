@@ -414,6 +414,12 @@ def eval_results(func):
                             **_kwargs):
                         yield r
 
+            # if a custom summary is to be provided, collect the results
+            # of the command execution
+            results = []
+            do_custom_result_summary = result_renderer == 'tailored' \
+                and hasattr(_func_class, 'custom_result_summary_renderer')
+
             # process main results
             for r in _process_results(
                     wrapped(*_args, **_kwargs),
@@ -421,6 +427,9 @@ def eval_results(func):
                     on_failure, incomplete_results,
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
+                # collect if summary is desired
+                if do_custom_result_summary:
+                    results.append(r)
 
             if proc_post and cmdline_name != 'run-procedure':
                 from datalad.interface.run_procedure import RunProcedure
@@ -438,7 +447,10 @@ def eval_results(func):
                         yield r
 
             # result summary before a potential exception
-            if result_renderer == 'default' and action_summary and \
+            # custom first
+            if do_custom_result_summary:
+                _func_class.custom_result_summary_renderer(results)
+            elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
@@ -479,6 +491,24 @@ def eval_results(func):
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
+
+
+def default_result_renderer(res):
+    if res.get('status', None) != 'notneeded':
+        ui.message('{action}({status}): {path}{type}{msg}'.format(
+                action=ac.color_word(res['action'], ac.BOLD),
+                status=ac.color_status(res['status']),
+                path=relpath(res['path'],
+                             res['refds']) if res.get('refds', None) else res[
+                    'path'],
+                type=' ({})'.format(
+                        ac.color_word(res['type'], ac.MAGENTA)
+                ) if 'type' in res else '',
+                msg=' [{}]'.format(
+                        res['message'][0] % res['message'][1:]
+                        if isinstance(res['message'], tuple) else res[
+                            'message'])
+                if 'message' in res else ''))
 
 
 def _process_results(
@@ -547,20 +577,7 @@ def _process_results(
         if result_renderer is None or result_renderer == 'disabled':
             pass
         elif result_renderer == 'default':
-            # TODO have a helper that can expand a result message
-            if res.get('status', None) != 'notneeded':
-                ui.message('{action}({status}): {path}{type}{msg}'.format(
-                    action=ac.color_word(res['action'], ac.BOLD),
-                    status=ac.color_status(res['status']),
-                    path=relpath(res['path'],
-                                 res['refds']) if res.get('refds', None) else res['path'],
-                    type=' ({})'.format(
-                        ac.color_word(res['type'], ac.MAGENTA)
-                    ) if 'type' in res else '',
-                    msg=' [{}]'.format(
-                        res['message'][0] % res['message'][1:]
-                        if isinstance(res['message'], tuple) else res['message'])
-                    if 'message' in res else ''))
+            default_result_renderer(res)
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()

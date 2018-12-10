@@ -119,6 +119,12 @@ save_message_opt = Parameter(
     doc="""a description of the state or the changes made to a dataset.""",
     constraints=EnsureStr() | EnsureNone())
 
+message_file_opt = Parameter(
+    args=("-F", "--message-file"),
+    doc="""take the commit message from this file. This flag is
+    mutually exclusive with -m.""",
+    constraints=EnsureStr() | EnsureNone())
+
 reckless_opt = Parameter(
     args=("--reckless",),
     action="store_true",
