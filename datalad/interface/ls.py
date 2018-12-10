@@ -561,7 +561,14 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
     PYOUT_STYLE = OrderedDict(
         [
             ('summary_', {"bold": True}),
-            ('header_', dict(bold=True, transform=str.upper)),
+            ('header_', dict(
+                bold=True,
+                transform=lambda x: {
+                    # shortening for some fields
+                    'annex_local_size': 'annex(present)',
+                    'annex_worktree_size': 'annex(worktree)',
+                }.get(x, x).upper()
+            )),
             # ('default_', dict(align="center")),
             ('default_', dict(missing="")),
             ('path', dict(
