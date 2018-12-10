@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.11.1
+#  - Update to get a fresh build, also with fixed up git-annex
 # 0.10.2
 #  - Update after initial "burn-in" time for 0.10 series
 # 0.10.rc5
