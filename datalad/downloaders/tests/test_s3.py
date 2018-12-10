@@ -38,7 +38,7 @@ skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
-
+url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
 
 @use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
@@ -47,9 +47,9 @@ def test_s3_download_basic():
         (url_2versions_nonversioned1, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
+        (url_1version_bucketwithdot, 'version1', 'nothing')
     ]:
         yield check_download_external_url, url, failed_str, success_str
-
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @use_cassette('test_s3_mtime')

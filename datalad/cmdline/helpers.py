@@ -20,7 +20,10 @@ from tempfile import NamedTemporaryFile
 
 from ..cmd import Runner
 from ..log import is_interactive
-from ..utils import getpwd
+from ..utils import (
+    getpwd,
+    unlink,
+)
 from ..version import __version__
 from ..dochelpers import exc_str
 
@@ -165,20 +168,7 @@ queue
         Runner().run(['condor_submit', f.name])
         lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
     finally:
-        os.unlink(f.name)
-
-
-class RegexpType(object):
-    """Factory for creating regular expression types for argparse
-
-    DEPRECATED AFAIK -- now things are in the config file,
-    but we might provide a mode where we operate solely from cmdline
-    """
-    def __call__(self, string):
-        if string:
-            return re.compile(string)
-        else:
-            return None
+        unlink(f.name)
 
 
 # TODO: useful also outside of cmdline, move to support/

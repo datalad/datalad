@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 
 
@@ -47,6 +46,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import skip_if_on_windows
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -78,13 +78,15 @@ def test_invalid_call(origin, tdir):
         type='dataset')
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile
 @with_tempfile
 def test_smth_about_not_supported(p1, p2):
     source = Dataset(p1).create()
+    from datalad.support.network import PathRI
     source.create_sibling(
-        'ssh://localhost' + p2,
+        'ssh://localhost' + PathRI(p2).posixpath,
         name='target1')
     # source.publish(to='target1')
     with chpwd(p1):
@@ -104,7 +106,6 @@ def test_smth_about_not_supported(p1, p2):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -145,8 +146,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
-                    commit=True, msg="Modified.")
+    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+               message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
@@ -202,8 +203,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
-                    commit=True, msg="Modified.")
+    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+               message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
@@ -230,7 +231,6 @@ def test_publish_plain_git(origin, src_path, dst_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
     # we will be publishing back to origin, so to not alter testrepo
@@ -398,7 +398,6 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 @with_tempfile(mkdir=True)
 @with_tempfile
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
@@ -485,6 +484,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     assert_result_count(res, 1, status='notneeded', path=source.path)
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -492,7 +492,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 @with_tempfile()
 @with_tempfile()
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_publish_depends(
         origin,
         src_path,
@@ -597,11 +596,11 @@ def test_gh1426(origin_path, target_path):
     eq_(origin.repo.get_hexsha(), target.get_hexsha())
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_v6  #FIXME
 def test_publish_gh1691(origin, src_path, dst_path):
 
     # prepare src; no subdatasets installed, but mount points present
@@ -629,6 +628,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
     assert_result_count(results, 1, status='impossible', type='dataset', action='publish')
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
@@ -646,6 +646,7 @@ def test_publish_target_url(src, desttop, desturl):
     ok_file_has_content(_path_(desttop, 'subdir/1'), '123')
 
 
+@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile()

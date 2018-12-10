@@ -19,6 +19,7 @@ from os.path import join as opj
 from ...api import clean
 from ...consts import ARCHIVES_TEMP_DIR
 from ...consts import ANNEX_TEMP_DIR
+from ...consts import SEARCH_INDEX_DOTGITDIR
 from ...distribution.dataset import Dataset
 from ...support.annexrepo import AnnexRepo
 from ...tests.utils import with_tempfile
@@ -61,3 +62,13 @@ def test_clean(d):
         assert_equal(res['path'], opj(d, ANNEX_TEMP_DIR))
         assert_equal(res['message'][0] % tuple(res['message'][1:]),
                      "Removed 1 temporary annex file: somebogus")
+
+    # search index
+    sidir = opj(d, '.git', SEARCH_INDEX_DOTGITDIR)
+    makedirs(sidir)
+    open(opj(sidir, "MAIN_r55n3hiyvxkdf1fi.seg, _MAIN_1.toc"), "w").write("noop")
+
+    with chpwd(d):
+        res = clean(return_type='item-or-list',
+                    result_filter=lambda x: x['status'] == 'ok')
+        assert_equal(res['path'], sidir)

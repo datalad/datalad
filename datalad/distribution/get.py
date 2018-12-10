@@ -15,8 +15,6 @@ import logging
 from os.path import join as opj
 from os.path import relpath
 
-from six.moves.urllib.parse import quote as urlquote
-
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -42,18 +40,23 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    _fixup_submodule_dotgit_setup,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import urlquote
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import unique
 from datalad.utils import path_startswith
+from datalad.utils import path_is_subpath
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
@@ -61,7 +64,6 @@ from .dataset import datasetmethod
 from .clone import Clone
 from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
-from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
 
@@ -301,10 +303,10 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 "subdataset %s is configured to be skipped on recursive installation",
                 sub['path'])
             continue
-        if start is not None and not path_startswith(subds.path, start):
+        if start is not None and not path_is_subpath(subds.path, start):
             # this one we can ignore, not underneath the start path
             continue
-        if sub['state'] != 'absent':
+        if sub.get('state', None) != 'absent':
             # dataset was already found to exist
             yield get_status_dict(
                 'install', ds=subds, status='notneeded', logger=lgr,
@@ -430,7 +432,7 @@ class Get(Interface):
             #git_opts=None,
             #annex_opts=None,
             #annex_get_opts=None,
-            jobs=None,
+            jobs='auto',
             verbose=False,
     ):
         # IMPLEMENTATION CONCEPT:
@@ -592,8 +594,7 @@ class Get(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_get,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # hand over to git-annex, get files content,

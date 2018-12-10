@@ -7,8 +7,34 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """DataLad aims to expose (scientific) data available online as a unified data
-distribution with the convenience of git-annex repositories as a backend."""
+distribution with the convenience of git-annex repositories as a backend.
 
+Commands are exposed through both a command-line interface and a Python API. On
+the command line, run 'datalad --help' for a summary of the available commands.
+From an interactive Python session, import `datalad.api` and inspect its
+documentation with `help`.
+"""
+
+# For reproducible demos/tests
+import os
+_seed = os.environ.get('DATALAD_SEED', None)
+if _seed:
+    import random
+    random.seed(_seed)
+
+import atexit
+# Colorama (for Windows terminal colors) must be imported before we use/bind
+# any sys.stdout
+try:
+    # this will fix the rendering of ANSI escape sequences
+    # for colored terminal output on windows
+    # it will do nothing on any other platform, hence it
+    # is safe to call unconditionally
+    import colorama
+    colorama.init()
+    atexit.register(colorama.deinit)
+except ImportError as e:
+    pass
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
@@ -25,33 +51,15 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-import atexit
-from datalad.utils import on_windows
+from datalad.utils import get_encoding_info, get_envvars_info, getpwd
 
-if not on_windows:
-    lgr.log(5, "Instantiating ssh manager")
-    from .support.sshconnector import SSHManager
-    ssh_manager = SSHManager()
-    atexit.register(ssh_manager.close, allow_fail=False)
-else:
-    ssh_manager = None
+# To analyze/initiate our decision making on what current directory to return
+getpwd()
 
-try:
-    # this will fix the rendering of ANSI escape sequences
-    # for colored terminal output on windows
-    # it will do nothing on any other platform, hence it
-    # is safe to call unconditionally
-    import colorama
-    colorama.init()
-    atexit.register(colorama.deinit)
-except ImportError as e:
-    if on_windows:
-        from datalad.dochelpers import exc_str
-        lgr.warning(
-            "'colorama' Python module missing, terminal output may look garbled [%s]",
-            exc_str(e))
-    pass
-
+lgr.log(5, "Instantiating ssh manager")
+from .support.sshconnector import SSHManager
+ssh_manager = SSHManager()
+atexit.register(ssh_manager.close, allow_fail=False)
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
@@ -131,6 +139,12 @@ def setup_package():
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
 
+    # During tests we allow for "insecure" access to local file:// and
+    # http://localhost URLs since all of them either generated as tests
+    # fixtures or cloned from trusted sources
+    from datalad.support.annexrepo import AnnexRepo
+    AnnexRepo._ALLOW_LOCAL_URLS = True
+
     DATALAD_LOG_LEVEL = os.environ.get('DATALAD_LOG_LEVEL', None)
     if DATALAD_LOG_LEVEL is None:
         # very very silent.  Tests introspecting logs should use
@@ -154,6 +168,22 @@ def setup_package():
 
 def teardown_package():
     import os
+    from datalad.tests.utils import rmtemp, OBSCURE_FILENAME
+
+    lgr.debug("Printing versioning information collected so far")
+    from datalad.support.external_versions import external_versions as ev
+    print(ev.dumps(query=True))
+    try:
+        print("Obscure filename: str=%s repr=%r"
+                % (OBSCURE_FILENAME.encode('utf-8'), OBSCURE_FILENAME))
+    except UnicodeEncodeError as exc:
+        from .dochelpers import exc_str
+        print("Obscure filename failed to print: %s" % exc_str(exc))
+    def print_dict(d):
+        return " ".join("%s=%r" % v for v in d.items())
+    print("Encodings: %s" % print_dict(get_encoding_info()))
+    print("Environment: %s" % print_dict(get_envvars_info()))
+
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
     from datalad.ui import ui
@@ -167,7 +197,6 @@ def teardown_package():
             os.environ['DATALAD_LOG_LEVEL'] = _test_states['DATALAD_LOG_LEVEL']
 
     from datalad.tests import _TEMP_PATHS_GENERATED
-    from datalad.tests.utils import rmtemp
     if len(_TEMP_PATHS_GENERATED):
         msg = "Removing %d dirs/files: %s" % (len(_TEMP_PATHS_GENERATED), ', '.join(_TEMP_PATHS_GENERATED))
     else:
@@ -183,8 +212,10 @@ def teardown_package():
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
-    lgr.debug("Printing versioning information collected so far")
-    from datalad.support.external_versions import external_versions as ev
-    print(ev.dumps(query=True))
+    from datalad.support.cookies import cookies_db
+    cookies_db.close()
+    from datalad.support.annexrepo import AnnexRepo
+    AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
+
 
 lgr.log(5, "Done importing main __init__")
