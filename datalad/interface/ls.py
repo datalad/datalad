@@ -42,11 +42,24 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import GitRepo
 from datalad.utils import is_interactive
 
+import logging
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
 
+# Workaround to just log for everything including pyout
+# logging.basicConfig(format='%(levelname)s: %(message)s',
+#                     level=logging.DEBUG)
 try:
     import pyout
+    # TODO: unify with other similar handling we have elsewhere eg keyring
+    # and it is not in effect here for some reason anyways -- getting
+    #  No handlers could be found for logger "pyout.interface"
+    _log_level = lgr.getEffectiveLevel()
+    if _log_level <= logging.DEBUG:
+        lgr.debug("Adding our handlers to pyout's handlers")
+        _pyout_lgr = getLogger('pyout')
+        _pyout_lgr.setLevel(_log_level)
+        _pyout_lgr.handlers = lgr.handlers
 except ImportError:
     pyout = None
 
