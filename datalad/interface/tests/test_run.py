@@ -414,26 +414,27 @@ def test_rerun_just_one_commit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
+@known_failure_direct_mode
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
+    subds = ds.create("sub")
 
     hexsha_initial = ds.repo.get_hexsha()
 
     with assert_raises(CommandError):
-        ds.run("echo x$(cat grows) > grows && false")
+        ds.run("echo x$(cat sub/grows) > sub/grows && false")
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
     msgfile = opj(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
-    ds.add(".", save=False)
-    ds.save(message_file=msgfile)
+    ds.add(".", recursive=True, message_file=msgfile)
     ok_clean_git(ds.path)
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
-    outfile = opj(ds.path, "grows")
+    outfile = opj(subds.path, "grows")
     eq_('x\n', open(outfile).read())
 
     # There is no CommandError on rerun if the non-zero error matches the
