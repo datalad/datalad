@@ -621,8 +621,10 @@ def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
     from datalad import cfg
+    # local ones would have problems on Windows ATM due to addurl not working with file:///
+    # http://git-annex.branchable.com/bugs/Unable_to_addurl_file__58____47____47____47___on_Windows/
     flavors_ = (['local', 'clone', 'local-url', 'network']
-                if not on_windows or cfg.obtain('datalad.repo.version') > 5
+                if not on_windows
                 else ['network', 'network-clone']
                 ) \
                if flavors == 'auto' else flavors
