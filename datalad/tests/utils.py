@@ -772,8 +772,6 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @attr('with_testrepos')
     def newfunc(*arg, **kw):
         from datalad import cfg
-        if on_windows and not cfg.obtain('datalad.repo.version') > 5:
-            raise SkipTest("Testrepo setup is broken on Windows")
 
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
