@@ -175,21 +175,25 @@ class Ls(Interface):
         elif lexists(loc):
             if isdir(loc):
                 ds = Dataset(loc)
-                if ds.is_installed():
-                    return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
-                    loc_type = False
-                else:
-                    loc_type = "dir"  # we know that so far for sure
-                    # it might have been an uninstalled dataset within super-dataset
-                    superds = ds.get_superdataset()
-                    if superds:
-                        try:
-                            subdatasets = Ls._cached_subdatasets[superds.path]
-                        except KeyError:
-                            subdatasets = Ls._cached_subdatasets[superds.path] \
-                                = superds.subdatasets(result_xfm='relpaths')
-                        if relpath(ds.path, superds.path) in subdatasets:
-                            loc_type = "not installed"
+                try:
+                    is_installed = ds.is_installed()
+                    if is_installed:
+                        return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
+                        loc_type = False
+                    else:
+                        loc_type = "dir"  # we know that so far for sure
+                        # it might have been an uninstalled dataset within super-dataset
+                        superds = ds.get_superdataset()
+                        if superds:
+                            try:
+                                subdatasets = Ls._cached_subdatasets[superds.path]
+                            except KeyError:
+                                subdatasets = Ls._cached_subdatasets[superds.path] \
+                                    = superds.subdatasets(result_xfm='relpaths')
+                            if relpath(ds.path, superds.path) in subdatasets:
+                                loc_type = "not installed"
+                except Exception as exc:
+                    loc_type = "ERROR: %s" % exc_str(exc)
             else:
                 loc_type = "file"
                 # could list properties -- under annex or git, either clean/dirty
@@ -206,7 +210,7 @@ class Ls(Interface):
                     ansi_colors.color_word(
                         loc_type,
                         ansi_colors.RED
-                        if loc_type in {'unknown', 'not installed'}
+                        if (loc_type in {'unknown', 'not installed'}) or loc_type.lower().startswith('error')
                         else ansi_colors.BLUE)
                 )
             )
