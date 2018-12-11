@@ -67,7 +67,8 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
     status = ds.repo.diffstatus(
         fr='HEAD' if ds.repo.get_hexsha() else None,
         to=None,
-        paths=paths if paths else None,
+        # recode paths with repo reference for low-level API
+        paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
         untracked=untracked,
         # TODO think about potential optimizations in case of
         # recursive processing, as this will imply a semi-recursive

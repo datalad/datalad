@@ -82,7 +82,6 @@ class YieldDatasets(ResultXFM):
             lgr.debug('rejected by return value configuration: %s', res)
 
 
-
 @build_doc
 class RevCreate(Interface):
     """Create a new dataset from scratch.
@@ -124,8 +123,9 @@ class RevCreate(Interface):
     # result_xfm = 'datasets'
     result_xfm = YieldDatasets()
     # result filter
-    result_filter = EnsureKeyChoice('action', ('create',)) & \
-                    EnsureKeyChoice('status', ('ok', 'notneeded'))
+    result_filter = \
+        EnsureKeyChoice('action', ('create',)) & \
+        EnsureKeyChoice('status', ('ok', 'notneeded'))
 
     _params_ = dict(
         path=Parameter(
@@ -189,7 +189,6 @@ class RevCreate(Interface):
             fake_dates=False
     ):
         refds_path = dataset.path if hasattr(dataset, 'path') else dataset
-        orig_path = path
 
         # two major cases
         # 1. we got a `dataset` -> we either want to create it (path is None),
@@ -245,11 +244,14 @@ class RevCreate(Interface):
         parentds_path = get_dataset_root(
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
+            prepo = GitRepo(parentds_path)
+            parentds_path = ut.Path(parentds_path)
             # we cannot get away with a simple
             # GitRepo.get_content_info(), as we need to detect
             # uninstalled/added subdatasets too
-            subds_status = {k for k, v in iteritems(
-                GitRepo(parentds_path).status(untracked='no'))
+            subds_status = {
+                parentds_path / k.relative_to(prepo.path)
+                for k, v in iteritems(prepo.status(untracked='no'))
                 if v.get('type', None) == 'dataset'}
             check_paths = [ut.Path(path)]
             check_paths.extend(ut.Path(path).parents)
@@ -260,7 +262,7 @@ class RevCreate(Interface):
                     'message': (
                         'collision with %s (dataset) in dataset %s',
                         str(conflict[0]),
-                        parentds_path)})
+                        str(parentds_path))})
                 yield res
                 return
 
@@ -288,14 +290,14 @@ class RevCreate(Interface):
         # create and configure desired repository
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
-            GitRepo(
+            tbrepo = GitRepo(
                 tbds.path,
                 url=None,
                 create=True,
                 git_opts=initopts,
                 fake_dates=fake_dates)
             # place a .noannex file to indicate annex to leave this repo alone
-            stamp_path = ut.Path(tbds.path) / '.noannex'
+            stamp_path = ut.Path(tbrepo.path) / '.noannex'
             stamp_path.touch()
             add_to_git[stamp_path] = {
                 'type': 'file',
@@ -419,8 +421,8 @@ class RevCreate(Interface):
     def custom_result_renderer(res, **kwargs):  # pragma: no cover
         from datalad.ui import ui
         if res.get('action', None) == 'create' and \
-               res.get('status', None) == 'ok' and \
-               res.get('type', None) == 'dataset':
+                res.get('status', None) == 'ok' and \
+                res.get('type', None) == 'dataset':
             ui.message("Created dataset at {}.".format(res['path']))
         else:
             ui.message("Nothing was created")

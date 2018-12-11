@@ -10,6 +10,7 @@ from datalad.tests.utils import (
     with_tempfile,
     eq_,
     on_windows,
+    SkipTest,
 )
 
 from ..dataset import (
@@ -22,6 +23,8 @@ from .. import utils as ut
 
 @with_tempfile(mkdir=True)
 def test_resolve_path(path):
+    if op.realpath(path) != path:
+        raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
     opath = op.join(path, "origin")
     os.makedirs(opath)
