@@ -414,7 +414,6 @@ def test_rerun_just_one_commit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@known_failure_direct_mode
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
