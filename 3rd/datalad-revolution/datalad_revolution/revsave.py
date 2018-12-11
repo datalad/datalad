@@ -260,7 +260,11 @@ class RevSave(Interface):
                     # version
                     for k in ('path', 'refds'):
                         if k in res:
-                            res[k] = str(res[k])
+                            res[k] = str(
+                                # recode path back to dataset path anchor
+                                pds.pathobj / res[k].relative_to(
+                                    pds.repo.pathobj)
+                            )
                     yield res
             # report on the dataset itself
             dsres = dict(

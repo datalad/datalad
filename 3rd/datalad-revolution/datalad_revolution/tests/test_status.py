@@ -32,6 +32,7 @@ from ..annexrepo import RevolutionAnnexRepo as AnnexRepo
 from .utils import (
     get_deeply_nested_structure,
     has_symlink_capability,
+    assert_repo_status,
 )
 from datalad.api import (
     rev_status as status,
@@ -210,3 +211,23 @@ def test_status(_path, linkpath):
         ds.rev_status(recursive=True, recursion_limit=-1),
         ds.rev_status(recursive=True)
     )
+
+
+# https://github.com/datalad/datalad-revolution/issues/64
+# breaks when the tempdir is a symlink
+@with_tempfile(mkdir=True)
+def test_subds_status(path):
+    ds = Dataset(path).rev_create()
+    subds = ds.rev_create('subds')
+    assert_repo_status(ds.path)
+    subds.rev_create('someotherds')
+    assert_repo_status(subds.path)
+    assert_repo_status(ds.path, modified=['subds'])
+    assert_result_count(
+        ds.rev_status(path='subds'),
+        1,
+        # must be modified, not added (ds was clean after it was added)
+        state='modified',
+        type='dataset',
+        path=subds.path,
+        refds=ds.path)

@@ -26,6 +26,12 @@ env:
     - DATALAD_REPO_VERSION=5
     - DATALAD_REPO_VERSION=6
 
+matrix:
+  include:
+  - python: 3.5
+    env:
+    # eventually: - TMPDIR="/var/tmp/sym ссылка"
+    - TMPDIR="/var/tmp/sym link"
 
 before_install:
   # Just in case we need to check if nfs is there etc
@@ -49,6 +55,9 @@ install:
   #- pip install 'sphinx>=1.6.2'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
+  # TMPDIRs
+  - if [[ "${TMPDIR:-}" =~ .*/sym\ link ]]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
+  - if [[ "${TMPDIR:-}" =~ .*/d\ i\ r ]]; then echo "mkdir $TMPDIR"; mkdir -p "$TMPDIR"; fi
 
 script:
   # Verify that setup.py build doesn't puke

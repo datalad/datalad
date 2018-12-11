@@ -109,7 +109,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
             'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
-    ds = Dataset(repo.path).rev_create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     # base content
     create_tree(
         ds.path,

@@ -404,7 +404,8 @@ def test_add_mimetypes(path):
            ('empty', True),
            ('file.txt', False),
            ('file2.txt', True)):
-        p = ds.pathobj / path
+        # low-level API report -> repo path reference, no ds path
+        p = ds.repo.pathobj / path
         assert_in(p, annexinfo)
         if in_annex:
             assert_in('key', annexinfo[p], p)

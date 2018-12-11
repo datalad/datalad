@@ -37,7 +37,7 @@ def test_get_content_info(path):
     ds = get_convoluted_situation(path)
     repopath = ds.repo.pathobj
 
-    assert_equal(ds.pathobj, repopath)
+    assert_equal(ds.repo.pathobj, repopath)
     assert_equal(ds.pathobj, ut.Path(path))
 
     # verify general rules on fused info records that are incrementally
