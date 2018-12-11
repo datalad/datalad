@@ -783,7 +783,14 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
         # we should always have at least one repo to test on, unless explicitly only
         # network was requested by we are running without networked tests
         if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
-            assert(testrepos_uris)
+            if regex == '.*':
+                # At least some should be available always
+                assert(testrepos_uris)
+            else:
+                raise SkipTest(
+                    "No test datasets found matching regex %r of flavors %s",
+                    regex, flavors_
+                )
         else:
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
