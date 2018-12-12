@@ -618,19 +618,17 @@ def with_tempfile(t, **tkwargs):
 
 
 def _get_resolved_flavors(flavors):
-    #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
-    #           if flavors == 'auto' else flavors
-    from datalad import cfg
-    # local ones would have problems on Windows ATM due to addurl not working with file:///
-    # http://git-annex.branchable.com/bugs/Unable_to_addurl_file__58____47____47____47___on_Windows/
-    flavors_ = (['local', 'clone', 'local-url', 'network']
-                if not on_windows
-                else ['network', 'network-clone']
-                ) \
+    flavors_ = ['local', 'clone', 'local-url', 'network'] \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
         flavors_ = [flavors_]
+
+    if on_windows:
+        # local ones would have problems on Windows ATM due to addurl not working
+        # with file:///
+        # http://git-annex.branchable.com/bugs/Unable_to_addurl_file__58____47____47____47___on_Windows/
+        flavors_ = [f for f in flavors_ if 'network' in f]
 
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
