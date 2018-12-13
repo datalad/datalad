@@ -2142,4 +2142,24 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
 
+def get_suggestions_msg(values, known, sep="\n        "):
+    """Return a formatted string with suggestions for values given the known ones
+    """
+    import difflib
+    suggestions = []
+    for value in assure_list(values):  # might not want to do it if we change presentation below
+        suggestions += difflib.get_close_matches(value, known)
+    suggestions = unique(suggestions)
+    msg = "Did you mean any of these?"
+    if suggestions:
+        if '\n' in sep:
+            # if separator includes new line - we add entire separator right away
+            msg += sep
+        else:
+            msg += ' '
+        return msg + "%s\n" % sep.join(suggestions)
+    return ''
+
+
+
 lgr.log(5, "Done importing datalad.utils")
