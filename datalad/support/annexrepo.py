@@ -2926,10 +2926,25 @@ class AnnexRepo(GitRepo, RepoInterface):
                         if direct_mode \
                         else set(self.get_changed_files(staged=False))
 
-                    files_set = {
+                    files_normalized = [
                         _normalize_path(self.path, f) if isabs(f) else f
                         for f in files
-                    }
+                    ]
+                    # Some paths might be directories, so we should expand
+                    # them to the actual set of files known to git/index. Here
+                    # we are not aiming to add untracked files, so should be good
+                    # XXXX? submodules?
+                    files_set = set(
+                        filter(
+                            bool,
+                            self._git_custom_command(
+                                files=files_normalized,
+                                cmd_str=['git', 'ls-files', '-z'])
+                                [0]
+                                .split('\0')
+                        )
+                    )
+
                     # files_notstaged = files_set.difference(changed_files_staged)
                     files_changed_notstaged = files_set.intersection(changed_files_notstaged)
 
