@@ -218,7 +218,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                    % (', '.join(info_files))
             upgrade_msg = ", upgrade datalad"
         msg += " You will likely need to either update the dataset from its " \
-               "original location,%s or reaggregate metadata locally." \
+               "original location%s or reaggregate metadata locally." \
                % upgrade_msg
         lgr.warning(msg)
 
