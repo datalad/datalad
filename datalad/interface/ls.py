@@ -568,19 +568,21 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
 
     def summary_dates(values):
         return [
-            "earliest: %s" % datefmt(min(values)),
-            "latest:   %s" % datefmt(max(values))
+            "%s>" % datefmt(min(values)),
+            "%s<" % datefmt(max(values))
         ]
 
     def counts(values):
         return [
-            " {}: {:d}".format(k, v)
+            "{:d} {}".format(v, k)
             for k, v in Counter(values).items()
         ]
 
     class mapped_counts(object):
+
         def __init__(self, mapping):
             self._mapping = mapping
+
         def __call__(self, values):
             mapped = [self._mapping.get(v, v) for v in values]
             return counts(mapped)
@@ -632,7 +634,8 @@ $> datalad ls -rLa  ~/datalad/openfmri/ds000001
             ('clean', dict(
                 color='green',
                 transform=fancy_bool,
-                aggregate=mapped_counts({False: 'dirty', True: 'clean'}),
+                aggregate=mapped_counts({False: fancy_bool(False),
+                                         True: fancy_bool(True)}),
                 delayed="group-git"
             )),
             ('annex_local_size', size_style),
