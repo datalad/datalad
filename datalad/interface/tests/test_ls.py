@@ -18,15 +18,17 @@ from glob import glob
 from collections import Counter
 from mock import patch
 
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.distribution.dataset import Dataset
+from ...support.gitrepo import GitRepo
+from ...support.annexrepo import AnnexRepo
+from ...support.external_versions import external_versions
+from ...distribution.dataset import Dataset
 from ...api import ls
 from ...utils import swallow_outputs, chpwd
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
+from ...tests.utils import patch_config
 from ...tests.utils import skip_if_no_network
 from ..ls import LsFormatter
 from os.path import relpath
@@ -60,24 +62,41 @@ def test_ls_repos(toppath):
     repos = glob(toppath + '*')
     # now make that sibling directory from which we will ls later
     mkdir(toppath)
-    def _test(*args_):
+    def _test(*args_, **kwargs_):
         #print args_
+        backend = kwargs_.pop('backend')
         for args in args_:
             for recursive in [False, True]:
                 # in both cases shouldn't fail
                 with swallow_outputs() as cmo:
-                    ls(args, recursive=recursive)
-                    assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
-                    assert_in('[annex]', cmo.out)
-                    assert_in('[git]', cmo.out)
-                    assert_in('master', cmo.out)
-                    if "bogus" in args:
-                        assert_in('unknown', cmo.out)
+                    ls(args, recursive=recursive, **kwargs_)
+                    if backend == 'original':
+                        assert_in('master', cmo.out)
+                        if "bogus" in args:
+                            assert_in('unknown', cmo.out)
+                        assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
+                        assert_in('[annex]', cmo.out)
+                        assert_in('[git]', cmo.out)
+                    elif backend == 'pyout':
+                        # just a smoke test for now, see
+                        # https://github.com/pyout/pyout/issues/73
+                        pass
+                    else:
+                        raise ValueError('unknown backend %s' % backend)
 
-    _test(repos, repos + ["/some/bogus/file"])
-    # check from within a sibling directory with relative paths
-    with chpwd(toppath):
-        _test([relpath(x, toppath) for x in repos])
+    if external_versions['pyout'] and external_versions['pyout'] >= '0.2.0':
+        # should be pyout by default
+        _test(repos, repos + ["/some/bogus/file"], backend='pyout')
+        # and the same if forced
+        with patch_config({'datalad.ls.backend': 'pyout'}):
+            _test(repos, repos + ["/some/bogus/file"], backend='pyout')
+
+    with patch_config({'datalad.ls.backend': 'original'}):
+        # test original
+        _test(repos, repos + ["/some/bogus/file"], backend='original')
+        # check from within a sibling directory with relative paths
+        with chpwd(toppath):
+            _test([relpath(x, toppath) for x in repos], backend='original')
 
 
 @with_tempfile
@@ -99,10 +118,19 @@ def test_ls_noarg(toppath):
     # this test is pointless for now and until ls() actually returns
     # something
     with swallow_outputs():
-        ls_out = ls(toppath)
-        with chpwd(toppath):
-            assert_equal(ls_out, ls([]))
-            assert_equal(ls_out, ls('.'))
+        for backend in ('original', 'pyout'):
+            with patch_config({'datalad.ls.backend': backend}):
+                ls_out = ls(toppath)
+                with chpwd(toppath):
+                    ls1 = ls([])
+                    ls2 = ls('.')
+                    if backend == 'original':
+                        assert_equal(ls_out, ls1)
+                        assert_equal(ls_out, ls2)
+                    elif backend == 'pyout':
+                        # only smoke test for now
+                        # TODO
+                        pass
 
 
 def test_ls_formatter():
