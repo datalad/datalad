@@ -16,7 +16,7 @@ version=$(git describe --tags --match '[0-9].*' | sed -e 's,-,+git,')
 tarfile=datalad-${os}_${version}.tgz
 
 python_version=$(python --version 2>&1)
-NUITKA=nuitka3
+NUITKA=nuitka
 nuitka_version=$(${NUITKA} --version)
 
 # Start clean up
