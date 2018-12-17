@@ -1,15 +1,15 @@
-FROM neurodebian:jessie
+FROM neurodebian:buster
 
 MAINTAINER DataLad Team <team@datalad.org>
 
 ARG DEBIAN_FRONTEND=noninteractive
 # Update packages and install the minimal set of tools
+RUN sed -e  's,^deb ,deb-src ,g' /etc/apt/sources.list > /etc/apt/sources.list.d/sources.list
 RUN apt-get update && \
-    apt-get install -y eatmydata
-# Now install all needed goodness for its depends and purge  so we could work from out of git
-RUN eatmydata apt-get install -y datalad nuitka && dpkg --purge datalad nuitka
-# Helper tools
-RUN eatmydata apt-get install -y python-pip vim less git
+    apt-get install -y eatmydata python-pip vim less git && \
+    eatmydata apt-get install -y datalad nuitka && dpkg --purge datalad nuitka && \
+    eatmydata apt-get build-dep -y datalad nuitka && \
+    rm -rf /var/lib/apt/*
 
 WORKDIR /root
 
@@ -30,7 +30,7 @@ WORKDIR /root/datalad
 # ATM pip freaks out with obnoxious message 
 #  of parse error at "'__placeh'". So we better upgrade pip while at it
 #  see https://github.com/pypa/pip/issues/3659
-RUN pip install -U pip --force-reinstall
+# RUN pip install -U pip --force-reinstall
 # now we should be able to install datalad
 RUN pip install -e '.[full]'
 
