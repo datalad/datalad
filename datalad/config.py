@@ -9,6 +9,7 @@
 """
 """
 
+import datalad
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
 from distutils.version import LooseVersion
@@ -92,7 +93,7 @@ def _parse_env(store):
     for k in os.environ:
         if not k.startswith('DATALAD_'):
             continue
-        dct[k.replace('_', '.').lower()] = os.environ[k]
+        dct[k.replace('__', '-').replace('_', '.').lower()] = os.environ[k]
     store.update(dct)
     return store
 
@@ -167,7 +168,12 @@ class ConfigManager(object):
         self._cfgmtimes = None
         # public dict to store variables that always override any setting
         # read from a file
-        self.overrides = {} if overrides is None else overrides
+        # `hasattr()` is needed because `datalad.cfg` is generated upon first module
+        # import, hence when this code runs first, there cannot be any config manager
+        # to inherit from
+        self.overrides = datalad.cfg.overrides.copy() if hasattr(datalad, 'cfg') else {}
+        if overrides is not None:
+            self.overrides.update(overrides)
         if dataset is None:
             self._dataset_path = None
             self._dataset_cfgfname = None
@@ -415,6 +421,7 @@ class ConfigManager(object):
         """Returns list of configuration item names"""
         return self._store.keys()
 
+    # XXX should this be *args?
     def get(self, key, default=None):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
         return self._store.get(key, default)

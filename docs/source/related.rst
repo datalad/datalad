@@ -75,9 +75,9 @@ availability, and level of adoption that would be comparable to that of
 git-annex.
 
 .. _git-annex: http://git-annex.branchable.com
-.. _comparison: http://git-annex.branchable.com/not}
+.. _comparison: http://git-annex.branchable.com/not
 .. _git-media: https://github.com/schacon/git-media
-.. _git-fat: https://github.com/jedbrown/git-fat}
+.. _git-fat: https://github.com/jedbrown/git-fat
 
 .. _chap-git-annex-datalad-comparison:
 

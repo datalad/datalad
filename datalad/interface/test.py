@@ -15,7 +15,11 @@ __docformat__ = 'restructuredtext'
 import datalad
 from .base import Interface
 from datalad.interface.base import build_doc
+from datalad.utils import assure_list
 from ..support.param import Parameter
+
+import logging
+lgr = logging.getLogger('datalad.interface.test')
 
 
 @build_doc
@@ -23,7 +27,7 @@ class Test(Interface):
     """Run internal DataLad (unit)tests.
 
     This can be used to verify correct operation on the system.
-    It is just a thin wrapper around a call to nose, so number of 
+    It is just a thin wrapper around a call to nose, so number of
     exposed options is minimal
     """
     # XXX prevent common args from being added to the docstring
@@ -48,10 +52,18 @@ class Test(Interface):
             doc="stop running tests after the first error or failure"),
         module=Parameter(
             args=("module",),
-            nargs="?",
-            doc="be verbose - list test names"),
+            nargs="*",
+            doc="""test name(s), by default all tests of DataLad core and any
+            installed extensions are executed"""),
     )
 
     @staticmethod
-    def __call__(module='datalad', verbose=False, nocapture=False, pdb=False, stop=False):
-        datalad.test(module=module, verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)
+    def __call__(module=None, verbose=False, nocapture=False, pdb=False, stop=False):
+        if not module:
+            from pkg_resources import iter_entry_points
+            module = ['datalad']
+            module.extend(ep.module_name for ep in iter_entry_points('datalad.tests'))
+        module = assure_list(module)
+        lgr.info('Starting test run for module(s): %s', module)
+        for mod in module:
+            datalad.test(module=mod, verbose=verbose, nocapture=nocapture, pdb=pdb, stop=stop)

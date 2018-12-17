@@ -31,10 +31,14 @@ class InteractiveUI(object):
         pass
 
     def yesno(self, *args, **kwargs):
+        # Provide some default sugaring
+        default = kwargs.pop('default', None)
+        if default is not None:
+            if default in {True}:
+                default = 'yes'
+            elif default in {False}:
+                default = 'no'
+            kwargs['default'] = default
         response = self.question(*args, choices=['yes', 'no'], **kwargs).rstrip('\n')
-        if response == 'yes':
-            return True
-        elif response == 'no':
-            return False
-        else:
-            raise RuntimeError("must not happen but did")
+        assert response in {'yes', 'no'}, "shouldn't happen; question() failed"
+        return response == 'yes'

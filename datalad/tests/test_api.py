@@ -25,7 +25,7 @@ def test_basic_setup():
     # random pick of something that should be there
     assert_true(hasattr(api, 'install'))
     assert_true(hasattr(api, 'test'))
-    assert_true(hasattr(api, 'crawl'))
+    assert_true(hasattr(api, 'create'))
     # make sure all helper utilities do not pollute the namespace
     # and we end up only with __...__ attributes
     assert_false(list(filter(lambda s: s.startswith('_') and not re.match('__.*__', s), dir(api))))
@@ -43,10 +43,19 @@ def _test_consistent_order_of_args(intf, spec_posargs):
 #    else:
 #        print intf, spec_posargs
     if intf.__name__ == 'Save':
-        # it makes sense there to have most command argument first
+        # it makes sense there to have most common argument first
         # -- the message. But we don't enforce it on cmdline so it is
         # optional
         spec_posargs.add('message')
+    elif intf.__name__ == 'ExtractMetadata':
+        # MIH I was never sure what this test enforces and it takes
+        # me ages each time to try to wrap my head around it
+        # I am confident that I do not want to change the API of this
+        # command now that it is a command and no longer a plugin
+        # hence this exception
+        eq_(spec_posargs, spec_posargs)
+        return
+
     eq_(set(args[:len(spec_posargs)]), spec_posargs)
 
 

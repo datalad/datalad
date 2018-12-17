@@ -24,6 +24,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_is_instance
+from datalad.tests.utils import skip_if_on_windows
 
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
@@ -33,7 +34,10 @@ from ..sshconnector import get_connection_hash
 def test_ssh_get_connection():
 
     manager = SSHManager()
+    assert manager._socket_dir is None, \
+        "Should be unset upon initialization. Got %s" % str(manager._socket_dir)
     c1 = manager.get_connection('ssh://localhost')
+    assert manager._socket_dir, "Should be set after interactions with the manager"
     assert_is_instance(c1, SSHConnection)
 
     # subsequent call returns the very same instance:
@@ -41,7 +45,15 @@ def test_ssh_get_connection():
 
     # fail on malformed URls (meaning: our fancy URL parser can't correctly
     # deal with them):
-    assert_raises(ValueError, manager.get_connection, 'localhost')
+    #assert_raises(ValueError, manager.get_connection, 'localhost')
+    # we now allow those simple specifications of host to get_connection
+    c2 = manager.get_connection('localhost')
+    assert_is_instance(c2, SSHConnection)
+
+    # but should fail if it looks like something else
+    assert_raises(ValueError, manager.get_connection, 'localhost/')
+    assert_raises(ValueError, manager.get_connection, ':localhost')
+
     # we can do what urlparse cannot
     # assert_raises(ValueError, manager.get_connection, 'someone@localhost')
     # next one is considered a proper url by urlparse (netloc:'',
@@ -52,6 +64,7 @@ def test_ssh_get_connection():
     manager.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
@@ -70,10 +83,12 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path))
 
     # use connection to execute remote command:
-    out, err = c1('ls -a')
+    local_home = os.path.expanduser('~')
+    # we list explicitly local HOME since we override it in module_setup
+    out, err = c1('ls -a %r' % local_home)
     remote_ls = [entry for entry in out.splitlines()
                  if entry != '.' and entry != '..']
-    local_ls = os.listdir(os.path.expanduser('~'))
+    local_ls = os.listdir(local_home)
     eq_(set(remote_ls), set(local_ls))
 
     # now test for arguments containing spaces and other pleasant symbols
@@ -86,6 +101,7 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path) == existed_before)
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_manager_close():
 
@@ -130,6 +146,8 @@ def test_ssh_manager_close_no_throw(bogus_socket):
                 f.write("whatever")
             return bogus_socket
 
+    # since we are digging into protected area - should also set _prev_connections
+    manager._prev_connections = {}
     manager._connections['bogus'] = bogus()
     assert_raises(Exception, manager.close)
     assert_raises(Exception, manager.close)
@@ -140,6 +158,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
+@skip_if_on_windows  # our test setup has no `scp` command
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
@@ -182,6 +201,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     ssh.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
@@ -190,6 +210,7 @@ def test_ssh_compound_cmds():
     ssh.close()  # so we get rid of the possibly lingering connections
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_git_props():
     remote_url = 'ssh://localhost'

@@ -1,4 +1,5 @@
 #!/bin/sh
+# SKIP_IN_V6
 
 set -e
 
@@ -13,8 +14,8 @@ SERVER_URL=localhost:$(readlink -f "$(mktemp --tmpdir -u -d datalad_demo_testpub
 
 #% EXAMPLE START
 #
-# A typical data management workflow
-# **********************************
+# A typical collaborative data management workflow 
+# ************************************************
 
 # In this demo we will look at how datalad can be used in a rather common data
 # management workflow: A 3rd-party dataset is obtained to serve as input for an
@@ -115,7 +116,7 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 #%
 
 mkdir code
-echo "nib-ls src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # In order to definitively document which data file his analysis needs at this
@@ -151,14 +152,16 @@ bash code/get_required_data.sh
 bash code/run_analysis.sh
 
 #%
-# and add generated results to the dataset but to not save automatically
-# this addition, so he could provide a custom message to depict a better
-# description of the accomplished work:
+# and add generated results to the dataset and provide a custom message to
+# better describe accomplished work:
 #%
-datalad add --nosave result.txt
+datalad add  -m "First analysis results" result.txt
 
-# and save current state
-datalad save -m "First analysis results"
+#%
+# You could also use ``--nosave`` option with add, and invoke ``datalad save``
+# later on to group multiple changes into a single commit.
+#%
+
 # git log
 
 #%
@@ -213,7 +216,7 @@ datalad get result.txt
 # She can modify Bob's code to help him with his analysis...
 #%
 
-echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
 
 #%
 # ... and execute it.

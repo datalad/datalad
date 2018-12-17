@@ -9,8 +9,8 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import known_failure_windows
 
 
 import os
@@ -34,6 +34,7 @@ from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_exists
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_file_under_git
@@ -176,6 +177,32 @@ def test_create_sub(path):
     assert_in("third", ds.subdatasets(result_xfm='relpaths'))
 
 
+@with_tempfile
+@known_failure_direct_mode  #FIXME
+def test_create_sub_nosave(path):
+    ds = Dataset(path)
+    ds.create()
+
+    sub_annex = ds.create("sub_annex", save=False)
+    ok_(ds.repo.dirty)
+    ok_(sub_annex.repo.dirty)
+    ok_exists(opj(ds.path, ".gitmodules"))
+    ds.save(recursive=True)
+    ok_clean_git(ds.path)
+    ok_clean_git(sub_annex.path)
+
+    sub_noannex = ds.create("sub_noannex", save=False, no_annex=True)
+    ok_(ds.repo.dirty)
+    ok_(sub_noannex.repo.dirty)
+    # Save has no effect because the non-annex subdataset wasn't registered as
+    # a submodule.
+    ds.save(recursive=True)
+    ok_(ds.repo.dirty)
+    ok_(sub_noannex.repo.dirty)
+
+    # Just the annex subdataset is recognized.
+    eq_(ds.subdatasets(result_xfm="relpaths"), ["sub_annex"])
+
 @with_tree(tree=_dataset_hierarchy_template)
 @known_failure_direct_mode  #FIXME
 def test_create_subdataset_hierarchy_from_top(path):
@@ -207,7 +234,6 @@ def test_create_subdataset_hierarchy_from_top(path):
 
 @with_tempfile
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_nested_create(path):
     # to document some more organic usage pattern
     ds = Dataset(path).create()
@@ -243,7 +269,9 @@ def test_nested_create(path):
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
     # nothing to save, git-annex commits the unannex itself
-    assert_status('notneeded', ds.save())
+    assert_status(
+        'ok' if ds.repo.supports_unlocked_pointers else 'notneeded',
+        ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_in_results(
@@ -276,8 +304,9 @@ def test_saving_prior(topdir):
     assert_in('ds2', ds1.subdatasets(result_xfm='relpaths'))
 
 
+@known_failure_windows  # https://github.com/datalad/datalad/issues/2606
 @with_tempfile(mkdir=True)
-def test_create_withplugin(path):
+def test_create_withprocedure(path):
     # first without
     ds = create(path)
     assert(not lexists(opj(ds.path, 'README.rst')))
@@ -286,18 +315,18 @@ def test_create_withplugin(path):
     # now for reals...
     ds = create(
         # needs to identify the dataset, otherwise post-proc
-        # plugin doesn't no what to run on
+        # procedure doesn't know what to run on
         dataset=path,
-        run_after=[['add_readme', 'filename=with hole.txt']])
+        proc_post=[['cfg_metadatatypes', 'xmp', 'datacite']])
     ok_clean_git(path)
-    # README wil lend up in annex by default
-    # TODO implement `nice_dataset` plugin to give sensible
-    # default and avoid that
-    assert(lexists(opj(ds.path, 'with hole.txt')))
+    ds.config.reload()
+    eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
 
 
+# Skipping on Windows due to lack of MagicMime support:
+# https://github.com/datalad/datalad/pull/2770#issuecomment-415842284
+@known_failure_windows
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_create_text_no_annex(path):
     ds = create(path, text_no_annex=True)
     ok_clean_git(path)
@@ -321,3 +350,20 @@ def test_create_text_no_annex(path):
     ds.add(['t', 'b'])
     ok_file_under_git(path, 't', annexed=False)
     ok_file_under_git(path, 'b', annexed=True)
+
+
+@with_tempfile(mkdir=True)
+def test_create_fake_dates(path):
+    ds = create(path, fake_dates=True)
+
+    ok_(ds.config.getbool("datalad", "fake-dates"))
+    ok_(ds.repo.fake_dates_enabled)
+
+    # Another instance detects the fake date configuration.
+    ok_(Dataset(path).repo.fake_dates_enabled)
+
+    first_commit = ds.repo.repo.commit(
+        ds.repo.repo.git.rev_list("--reverse", "--all").split()[0])
+
+    eq_(ds.config.obtain("datalad.fake-dates-start") + 1,
+        first_commit.committed_date)

@@ -50,7 +50,6 @@ from datalad.support.network import is_ssh
 from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
-from datalad.utils import not_supported_on_windows
 from datalad.utils import _path_
 from datalad.utils import slash_join
 from datalad.utils import assure_list
@@ -416,11 +415,6 @@ class CreateSibling(Interface):
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit=False,
                  since=None):
-
-        # there is no point in doing anything further
-        not_supported_on_windows(
-            "Support for SSH connections is not yet implemented in Windows")
-
         #
         # nothing without a base dataset
         #

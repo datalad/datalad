@@ -41,6 +41,7 @@ from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
 from ..utils import assure_tuple_or_list
+from ..utils import get_dataset_root
 
 from datalad.customremotes.base import init_datalad_remote
 
@@ -62,7 +63,7 @@ _KEY_OPT_NOTE = "Note that it will be of no effect if %s is given" % _KEY_OPT
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
 
-    This results in the files within archive (which should be under annex
+    This results in the files within archive (which must be already under annex
     control itself) added under annex referencing original archive via
     custom special remotes mechanism
 
@@ -227,7 +228,16 @@ class AddArchiveContent(Interface):
         annex_path = annex.path
 
         # _rpath below should depict paths relative to the top of the annex
-        archive_rpath = relpath(archive_path, annex_path)
+        archive_rpath = relpath(
+            archive_path,
+            # Use `get_dataset_root` to avoid resolving the leading path. If no
+            # repo is found, downstream code will raise FileNotInRepositoryError.
+            get_dataset_root(archive_path) or ".")
+
+        if archive in annex.untracked_files:
+            raise RuntimeError(
+                "The archive is not under annex yet. You should run 'datalad "
+                "add {}' first".format(archive))
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if not allow_dirty and annex.dirty:
@@ -301,7 +311,9 @@ class AddArchiveContent(Interface):
         delete_after_rpath = None
         try:
             old_always_commit = annex.always_commit
-            annex.always_commit = False
+            # When faking dates, batch mode is disabled, so we want to always
+            # commit.
+            annex.always_commit = annex.fake_dates_enabled
 
             if annex_options:
                 if isinstance(annex_options, string_types):
@@ -502,7 +514,7 @@ class AddArchiveContent(Interface):
                 if annex.is_dirty(untracked_files=False):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
-                        (origin, archive, commit_stats.as_str(mode='full')),
+                        (origin, archive_rpath, commit_stats.as_str(mode='full')),
                         _datalad_msg=True
                     )
                     commit_stats.reset()

@@ -10,10 +10,13 @@
 """
 
 
-from datalad.tests.utils import known_failure_v6
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import (
+    get_datasets_topdir,
+    integration,
+    slow
+)
 
-
+import os
 from os.path import join as opj
 from os.path import isdir
 from os.path import exists
@@ -21,7 +24,6 @@ from os.path import basename
 from os.path import dirname
 from os import mkdir
 from os import chmod
-from os import geteuid
 
 from mock import patch
 
@@ -29,7 +31,7 @@ from datalad.api import create
 from datalad.api import clone
 from datalad.utils import chpwd
 from datalad.utils import _path_
-from datalad.utils import rmtree
+from datalad.utils import on_windows
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -54,7 +56,6 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_if
 
 from ..dataset import Dataset
@@ -78,6 +79,7 @@ def test_invalid_args(path, otherpath, alienpath):
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
 
+@integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
@@ -95,6 +97,7 @@ def test_clone_crcns(tdir, ds_path):
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
+@integration
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
@@ -102,7 +105,7 @@ def test_clone_datasets_root(tdir):
     with chpwd(tdir):
         ds = clone("///", result_xfm='datasets', return_type='item-or-list')
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, 'datasets.datalad.org'))
+        eq_(ds.path, opj(tdir, get_datasets_topdir()))
 
         # do it a second time:
         res = clone("///", on_failure='ignore')
@@ -122,7 +125,6 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_clone_simple_local(src, path):
@@ -165,7 +167,6 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
-@known_failure_v6  #FIXME
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -192,7 +193,7 @@ def test_clone_dataladri(src, topurl, path):
     gr.commit('demo')
     Runner(cwd=gr.path)(['git', 'update-server-info'])
     # now install it somewhere else
-    with patch('datalad.support.network.DATASETS_TOPURL', topurl):
+    with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     ok_clean_git(path, annex=False)
@@ -213,6 +214,8 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
+
+@slow  # 23.1478s
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
 # TODO: Somehow annex gets confused while initializing installed ds, whose
@@ -263,7 +266,8 @@ def test_notclone_known_subdataset(src, path):
     # clone is not meaningful
     res = ds.clone('subm 1', on_failure='ignore')
     assert_status('error', res)
-    assert_message('Failed to clone data from any candidate source URL: %s',
+    assert_message('Failed to clone from any candidate source URL. '
+                   'Encountered errors per each url were: %s',
                    res)
     # get does the job
     res = ds.get(path='subm 1', get_data=False)
@@ -281,10 +285,11 @@ def test_notclone_known_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_failed_clone(dspath):
     ds = create(dspath)
-    res = ds.clone("http://nonexistingreallyanything.somewhere/bla", "sub",
+    res = ds.clone("http://nonexistingreallyanything.datalad.org/bla", "sub",
                    on_failure='ignore')
     assert_status('error', res)
-    assert_message('Failed to clone data from any candidate source URL: %s',
+    assert_message('Failed to clone from any candidate source URL. '
+                   'Encountered errors per each url were: %s',
                    res)
 
 
@@ -324,8 +329,7 @@ def test_clone_isnt_a_smartass(origin_path, path):
     eq_(cloned.subdatasets(), [])
 
 
-@skip_if_on_windows
-@skip_if(not geteuid(), "Will fail under super-user")
+@skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
     pdir = _path_(tdir, 'protected')
@@ -337,4 +341,6 @@ def test_clone_report_permission_issue(tdir):
         assert_status('error', res)
         assert_result_count(
             res, 1, status='error',
-            message="could not create work tree dir '%s/datasets.datalad.org': Permission denied" % pdir)
+            message="could not create work tree dir '%s/%s': Permission denied"
+                    % (pdir, get_datasets_topdir())
+        )

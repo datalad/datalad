@@ -29,7 +29,6 @@ Dataset operations
    api.create_sibling
    api.create_sibling_github
    api.drop
-   api.plugin
    api.get
    api.install
    api.publish
@@ -39,15 +38,30 @@ Dataset operations
    api.uninstall
    api.unlock
 
-Meta data handling
-------------------
+Metadata handling
+-----------------
 
 .. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
    api.search
+   api.metadata
    api.aggregate_metadata
+   api.extract_metadata
+
+
+Reproducible execution
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.run
+   api.rerun
+   api.run_procedure
+
 
 Plumbing commands
 -----------------
@@ -75,8 +89,6 @@ Miscellaneous commands
    :toctree: generated
 
    api.add_archive_content
-   api.crawl
-   api.crawl_init
    api.test
 
 Plugins
@@ -90,7 +102,10 @@ with DataLad.
    :toctree: generated
 
    add_readme
-   export_tarball
+   addurls
+   check_dates
+   export_archive
+   export_to_figshare
    no_annex
    wtf
 
@@ -123,16 +138,6 @@ Configuration management
    :toctree: generated
 
    config
-
-Crawler
-=======
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   crawler.base
-   crawler.pipeline
 
 Test infrastructure
 ===================

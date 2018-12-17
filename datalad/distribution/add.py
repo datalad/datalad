@@ -13,12 +13,14 @@
 import logging
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 from os.path import normpath
 from os.path import pardir
 from os.path import relpath
 
+from datalad.utils import assure_unicode
 from datalad.utils import unique
 from datalad.utils import get_dataset_root
 from datalad.interface.base import Interface
@@ -28,6 +30,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import message_file_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
@@ -40,11 +43,13 @@ from datalad.interface.utils import discover_dataset_trace_to_targets
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.save import Save
-from datalad.distribution.utils import _fixup_submodule_dotgit_setup
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import CommandError
@@ -70,7 +75,7 @@ def _discover_subdatasets_recursively(
         return
     if not isdir(top):
         return
-    if GitRepo.is_valid_repo(top):
+    if not op.islink(top) and GitRepo.is_valid_repo(top):
         if top in discovered:
             # this was found already, assume everything beneath it too
             return
@@ -113,7 +118,7 @@ class Add(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git annex add`, or
+      Power-user info: This command uses :command:`git annex add` or
       :command:`git add` to incorporate new dataset content.
     """
 
@@ -129,8 +134,7 @@ class Add(Interface):
             args=("path",),
             metavar='PATH',
             doc="""path/name of the component to be added. The component
-            must either exist on the filesystem already, or a `source`
-            has to be provided.""",
+            must exist on the filesystem already.""",
             nargs="+",
             constraints=EnsureStr() | EnsureNone()),
         to_git=Parameter(
@@ -165,6 +169,7 @@ class Add(Interface):
             their respective datasets, regardless of this setting."""),
         save=nosave_opt,
         message=save_message_opt,
+        message_file=message_file_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts,
@@ -181,6 +186,7 @@ class Add(Interface):
             to_git=None,
             save=True,
             message=None,
+            message_file=None,
             recursive=False,
             recursion_limit=None,
             ds2super=False,
@@ -194,6 +200,13 @@ class Add(Interface):
                 "insufficient information for adding: requires at least a path")
         refds_path = Interface.get_refds_path(dataset)
         common_report = dict(action='add', logger=lgr, refds=refds_path)
+
+        if message and message_file:
+            raise ValueError("Both a message and message file were specified")
+
+        if message_file:
+            with open(message_file, "rb") as mfh:
+                message = assure_unicode(mfh.read())
 
         to_add = []
         subds_to_add = {}
@@ -236,7 +249,7 @@ class Add(Interface):
                 ap['type'] = 'dataset'
             if recursive and \
                     (ap.get('raw_input', False) or
-                     ap.get('state', None) in ('modified', 'untracked')) and \
+                     ap.get('state', None) in ('added', 'modified', 'untracked')) and \
                     (ap.get('parentds', None) or ap.get('type', None) == 'dataset'):
                 # this was an actually requested input path, or a path that was found
                 # modified by path annotation, based on an input argument
@@ -256,10 +269,6 @@ class Add(Interface):
             if not ap['path'] in ds_to_annotate_from_recursion:
                 # if it was somehow already discovered
                 to_add.append(ap)
-            # TODO check if next isn't covered by discover_dataset_trace_to_targets already??
-            if dataset and ap.get('type', None) == 'dataset':
-                # duplicates not possible, annotated_paths returns unique paths
-                subds_to_add[ap['path']] = ap
         if got_nothing:
             # path annotation yielded nothing, most likely cause is that nothing
             # was found modified, we need to say something about the reference
@@ -323,8 +332,7 @@ class Add(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 annotated_paths,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         if not content_by_ds:
@@ -360,24 +368,11 @@ class Add(Interface):
                         **dict(common_report, **ap))
                     continue
                 subds = Dataset(ap['path'])
-                # check that the subds has a commit, and refuse
-                # to operate on it otherwise, or we would get a bastard
-                # submodule that cripples git operations
-                if not subds.repo.get_hexsha():
-                    yield get_status_dict(
-                        ds=subds, status='impossible',
-                        message='cannot add subdataset with no commits',
-                        **dict(common_report, **ap))
-                    continue
                 subds_relpath = relpath(ap['path'], ds_path)
-                # make an attempt to configure a submodule source URL based on the
-                # discovered remote configuration
-                remote, branch = subds.repo.get_tracking_branch()
-                subds_url = subds.repo.get_remote_url(remote) if remote else None
                 # Register the repository in the repo tree as a submodule
                 try:
-                    ds.repo.add_submodule(subds_relpath, url=subds_url, name=None)
-                except CommandError as e:
+                    ds.repo.add_submodule(subds_relpath, url=None, name=None)
+                except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         ds=subds, status='error', message=e.stderr,
                         **dict(common_report, **ap))
@@ -395,7 +390,6 @@ class Add(Interface):
                 # slow down
                 #ap['staged'] = True
                 to_save.append(ap)
-                _fixup_submodule_dotgit_setup(ds, subds_relpath)
                 # report added subdatasets -- `annex add` below won't do it
                 yield get_status_dict(
                     ds=subds,
@@ -415,10 +409,13 @@ class Add(Interface):
             # XXX? should content_by_ds become OrderedDict so that possible
             # super here gets processed last?
             lgr.debug('Adding content to repo %s: %s', ds.repo, torepoadd)
-            added = ds.repo.add(
+            is_annex = isinstance(ds.repo, AnnexRepo)
+            add_kw = {'jobs': jobs} if is_annex and jobs else {}
+            added = ds.repo.add_(
                 list(torepoadd.keys()),
-                git=to_git if isinstance(ds.repo, AnnexRepo) else True,
-                commit=False)
+                git=to_git if is_annex else True,
+                **add_kw
+            )
             for a in added:
                 res = annexjson2result(a, ds, type='file', **common_report)
                 success = success_status_map[res['status']]

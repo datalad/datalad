@@ -19,6 +19,7 @@ from os.path import exists
 from os.path import relpath
 from os.path import pardir
 from os.path import join as opj
+from datalad.utils import rmdir
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -51,20 +52,15 @@ lgr = logging.getLogger('datalad.distribution.remove')
 class Remove(Interface):
     """Remove components from datasets
 
-    This command can remove any components (subdatasets, and (directories with)
-    files) from datasets. Removing a component implies any present content to
-    be dropped, and any associated subdatasets to be uninstalled. Subsequently,
-    the component is "unregistered" from the respective dataset. This means
-    that the respective component is no longer present on the file system.
+    This command can remove subdatasets and paths, including non-empty
+    directories, from datasets. Removing a component implies dropping present
+    content and uninstalling associated subdatasets. Subsequently, the
+    component is "unregistered" from the respective dataset. This means that
+    the component is no longer present on the file system.
 
-    By default, the availability of at least one remote copy is verified, by
-    default, before file content is dropped. As these checks could lead to slow
-    operation (network latencies, etc), they can be disabled.
-
-    Any number of paths to process can be given as input. Recursion into
-    subdatasets needs to be explicitly enabled, while recursion in
-    subdirectories within a dataset as always done automatically. An optional
-    recursion limit is applied relative to each given input path.
+    By default, the availability of at least one remote copy is verified before
+    file content is dropped. As these checks could lead to slow operation
+    (network latencies, etc), they can be disabled.
 
     Examples:
 
@@ -160,8 +156,7 @@ class Remove(Interface):
         content_by_ds, ds_props, completed, nondataset_paths = \
             annotated2content_by_ds(
                 to_process,
-                refds_path=refds_path,
-                path_only=False)
+                refds_path=refds_path)
         assert(not completed)
 
         # iterate over all datasets, starting at the bottom
@@ -173,11 +168,11 @@ class Remove(Interface):
         for ds_path in sorted(content_by_ds, reverse=True):
             ds = Dataset(ds_path)
             paths = content_by_ds[ds_path]
-            to_reporemove = []
+            to_reporemove = dict()
             # PLAN any dataset that was not raw_input, uninstall (passing recursive flag)
             # if dataset itself is in paths, skip any nondataset
             # sort reverse so we get subdatasets first
-            for ap in sorted(paths, key=lambda x: x ['path'], reverse=True):
+            for ap in sorted(paths, key=lambda x: x['path'], reverse=True):
                 if ap.get('type', None) == 'dataset':
                     # entire dataset needs to go, uninstall if present, pass recursive!
                     uninstall_failed = False
@@ -255,23 +250,39 @@ class Remove(Interface):
                     if not uninstall_failed and exists(ap['path']):
                         # could be an empty dir in case an already uninstalled subdataset
                         # got removed
-                        os.rmdir(ap['path'])
+                        rmdir(ap['path'])
                 else:
                     # anything that is not a dataset can simply be passed on
-                    to_reporemove.append(ap['path'])
+                    to_reporemove[ap['path']] = ap
             # avoid unnecessary git calls when there is nothing to do
             if to_reporemove:
                 if check and hasattr(ds.repo, 'drop'):
-                    for r in _drop_files(ds, to_reporemove, check=True):
+                    for r in _drop_files(ds, list(to_reporemove),
+                                         check=True):
+                        if r['status'] == 'error':
+                            # if drop errored on that path, we can't remove it
+                            to_reporemove.pop(r['path'], 'avoidKeyError')
                         yield r
-                for r in ds.repo.remove(to_reporemove, r=True):
-                    # these were removed, but we still need to save the removal
-                    ap['unavailable_path_status'] = ''
-                    to_save.append(ap)
-                    yield get_status_dict(
-                        status='ok',
-                        path=r,
-                        **res_kwargs)
+
+                if to_reporemove:
+                    for r in ds.repo.remove(list(to_reporemove), r=True):
+                        # these were removed, but we still need to save the
+                        # removal
+
+                        r_abs = opj(ds.path, r)
+                        if r_abs in to_reporemove:
+                            ap = to_reporemove[r_abs]
+                        else:
+                            ap = {'path': r_abs,
+                                  'parentds': ds.path,
+                                  'refds': refds_path
+                                  }
+                        ap['unavailable_path_status'] = ''
+                        to_save.append(ap)
+                        yield get_status_dict(
+                            status='ok',
+                            path=r,
+                            **res_kwargs)
 
         if not to_save:
             # nothing left to do, potentially all errored before

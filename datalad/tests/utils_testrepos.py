@@ -166,8 +166,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
             '', ['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'add', annex.url, '2'], **kw)
-        self.repo._git_custom_command(
-            '', ['git', 'commit', '-m', 'Added subm 1 and 2.'], **kw)
+        self.repo.commit('Added subm 1 and 2.')
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
@@ -188,12 +187,8 @@ class NestedDataset(BasicAnnexTestRepo):
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
             cwd=opj(self.path, 'sub dataset1'), **kw)
-        self.repo._git_custom_command(
-            '', ['git', 'commit', '-m', 'Added sub dataset.'],
-            cwd=opj(self.path, 'sub dataset1'), **kw)
-        self.repo._git_custom_command(
-            '', ['git', 'commit', '-a', '-m', 'Added subdatasets.'],
-            cwd=self.path, **kw)
+        GitRepo(opj(self.path, 'sub dataset1')).commit('Added sub dataset.')
+        self.repo.commit('Added subdatasets.', options=["-a"])
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'],
             cwd=self.path, **kw)
