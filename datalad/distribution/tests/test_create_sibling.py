@@ -505,7 +505,9 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds = Dataset(src_path).create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
-    ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
+    # for the test of setting a group, will just smoke test while using current
+    # user's group
+    ds.create_sibling(target_url, name=remote, shared='group', group=os.getgid())  # not doing recursively
     if standardgroup:
         ds.repo.set_preferred_content('wanted', 'standard', remote)
         ds.repo.set_preferred_content('group', standardgroup, remote)
