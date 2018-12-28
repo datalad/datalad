@@ -286,9 +286,9 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     # TODO -- more and more specific
 
 
-@skip_if_no_network
 @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
+    skip_if_no_network()
     yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
@@ -305,8 +305,8 @@ def test_authenticate_external_portals():
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
-@skip_if_no_network
 def test_download_ftp():
+    skip_if_no_network()
     try:
         import requests_ftp
     except ImportError:

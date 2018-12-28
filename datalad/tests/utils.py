@@ -822,11 +822,19 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
+def check_not_generatorfunction(func):
+    """Internal helper to verify that we are not decorating generator tests"""
+    if inspect.isgeneratorfunction(func):
+        raise RuntimeError("{}: must not be decorated, is a generator test"
+                           .format(func.__name__))
+
+
 def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
 
     If not used as a decorator, and just a function, could be used at the module level
     """
+    check_not_generatorfunction(func)
 
     def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
@@ -844,16 +852,24 @@ def skip_if_no_network(func=None):
         check_and_raise()
 
 
-def skip_if_on_windows(func):
+def skip_if_on_windows(func=None):
     """Skip test completely under Windows
     """
-    @wraps(func)
-    @attr('skip_if_on_windows')
-    def newfunc(*args, **kwargs):
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
         if on_windows:
             raise SkipTest("Skipping on Windows")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_on_windows')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
 
 
 @optional_args
@@ -873,6 +889,9 @@ def skip_if(func, cond=True, msg=None, method='raise'):
       in a test with method='pass' in order to not skip the entire test, but
       just that assertion.
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
@@ -889,6 +908,9 @@ def skip_ssh(func):
     """Skips SSH tests if on windows or if environment variable
     DATALAD_TESTS_SSH was not set
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
     @attr('skip_ssh')
     def newfunc(*args, **kwargs):

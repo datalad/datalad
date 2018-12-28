@@ -222,8 +222,8 @@ def check_runner_heavy_output(log_online):
         assert not ret[0], "all messages went into `logged`"
 
 
-@skip_if_on_windows  # much too slow to finish in any reaosnable time on windows
 def test_runner_heavy_output():
+    skip_if_on_windows()
     for log_online in [False, True]:
         yield check_runner_heavy_output, log_online
 

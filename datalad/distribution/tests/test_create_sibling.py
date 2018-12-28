@@ -554,8 +554,8 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
 def test_target_ssh_inherit():
+    skip_if_on_windows()  # create_sibling incompatible with win servers
     # TODO: waits for resolution on
     #   https://github.com/datalad/datalad/issues/1274
     #yield _test_target_ssh_inherit, None      # no wanted etc
