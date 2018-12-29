@@ -389,8 +389,9 @@ class CreateSibling(Interface):
         group=Parameter(
             args=("--group",),
             metavar="GROUP",
-            doc="""Filesystem group for the repository. Important in particular
-            when --shared=group""",
+            doc="""Filesystem group for the repository. Specifying the group is
+            particularly important when [CMD: --shared=group CMD][PY:
+            shared="group" PY]""",
             constraints=EnsureStr() | EnsureNone()
         ),
         ui=Parameter(
