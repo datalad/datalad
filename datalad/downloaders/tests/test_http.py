@@ -315,6 +315,7 @@ def test_download_ftp():
           "ftp://ftp.gnu.org/README", \
           None, \
           "This is ftp.gnu.org"
+test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
