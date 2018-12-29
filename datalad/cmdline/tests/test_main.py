@@ -268,7 +268,7 @@ def test_fail_with_short_help():
     assert_equal(out.getvalue(),
                  "error: Failed badly\n"
                  "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
-                 "Did you mean one of these?\n"
+                 "Did you mean any of these?\n"
                  "        mutter\n"
                  "        mother\n"
                  "        father\n"
