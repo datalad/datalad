@@ -207,7 +207,7 @@ def _create_dataset_sibling(
         # Either repository existed before or a new directory was created for it,
         # set its group to a desired one if was provided with the same chgrp
         ssh("chgrp -R {} {}".format(
-            sh_quote(group),
+            sh_quote(text_type(group)),
             sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
