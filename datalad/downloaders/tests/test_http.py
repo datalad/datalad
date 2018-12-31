@@ -311,10 +311,16 @@ def test_download_ftp():
         import requests_ftp
     except ImportError:
         raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
-    yield check_download_external_url, \
-          "ftp://ftp.gnu.org/README", \
-          None, \
-          "This is ftp.gnu.org"
+    # Started to throw 504 when on travis
+    try:
+        yield check_download_external_url, \
+              "ftp://ftp.gnu.org/README", \
+              None, \
+              "This is ftp.gnu.org"
+    except AccessFailedError as exc:
+        if 'status code 503' in str(exc):
+            raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
+        raise
 test_download_ftp.tags = ['network']
 
 
