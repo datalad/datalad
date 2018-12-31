@@ -305,23 +305,22 @@ def test_authenticate_external_portals():
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
+@skip_if_no_network
 def test_download_ftp():
-    skip_if_no_network()
     try:
         import requests_ftp
     except ImportError:
         raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
-    # Started to throw 504 when on travis
     try:
-        yield check_download_external_url, \
-              "ftp://ftp.gnu.org/README", \
-              None, \
-              "This is ftp.gnu.org"
+        check_download_external_url(
+                  "ftp://ftp.gnu.org/README",
+                  None,
+                  "This is ftp.gnu.org"
+        )
     except AccessFailedError as exc:
         if 'status code 503' in str(exc):
             raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
         raise
-test_download_ftp.tags = ['network']
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
