@@ -204,10 +204,10 @@ def _create_dataset_sibling(
             delayed_super, name, ssh)
 
     if group:
-        # Either it existed before or a new directory for a repo, set its
-        # group to a desired one if was provided
+        # Either repository existed before or a new directory was created for it,
+        # set its group to a desired one if was provided with the same chgrp
         ssh("chgrp -R {} {}".format(
-            group,
+            sh_quote(group),
             sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
