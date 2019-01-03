@@ -14,6 +14,7 @@ YODA: YODA's Organigram on Data Analysis [poster]
 Go FAIR with DataLad [talk]
    - On DataLad's capabilities to create and maintain Findable, Accessible, Interoperable, and Re-Usable (FAIR)
      resources.
-   - Michael Hanke
+   - Michael Hanke, Yaroslav O. Halchenko
    - Bernstein Conference 2018 workshop: Practical approaches to research data management and reproducibility
      (`slides <https://rawgit.com/psychoinformatics-de/talk-datalad-gofair/master/index.html>`__)
+   - OpenNeuro kick-off meeting, 2018, Stanford (`slide sources <https://github.com/datalad/talk-openneuro-2018>`__)
