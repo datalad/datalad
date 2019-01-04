@@ -1303,7 +1303,9 @@ class GitRepo(RepoInterface):
 
         try:
             self._git_custom_command(files, cmd,
-                                     expect_stderr=True, expect_fail=True,
+                                     log_stdout=not options or not '--edit' in options,
+                                     expect_stderr=True,
+                                     expect_fail=True,
                                      check_fake_dates=True,
                                      index_file=index_file)
         except CommandError as e:
