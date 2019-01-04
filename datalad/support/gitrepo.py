@@ -52,6 +52,7 @@ from datalad.cmd import GitRunner
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
+from datalad.ui import ui
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -1265,16 +1266,39 @@ class GitRepo(RepoInterface):
         self.precommit()
 
         if _datalad_msg:
+            # will not just prefix, but also return just the prefix
+            # as the sole message -- may or may not be a good thing
             msg = self._get_prefixed_commit_msg(msg)
 
         options = options or []
 
-        if not msg:
-            if options:
-                if "--allow-empty-message" not in options:
-                        options.append("--allow-empty-message")
-            else:
-                options = ["--allow-empty-message"]
+        # if _datalad_msg was set, there is always a message at this
+        # point, so internal calls setting this flag, because they have no
+        # better clue what is happening are safe now
+        # for any other call, not supplying a message can be meaningful
+        # depending on the options given to `commit`, e.g.
+        # --amend will re-use a message, only if none if supplied
+        # --template will insert a template, only if no message is given
+        # of course not supplying a message could also be a mistake
+        # look for --no-edit as an explicit flag to let empty messages
+        # through
+        # if not message was supplied, but the session is non-interactive
+        # there is no way to acquire a message, hence also enable
+        # pass-through, as we don't want to fail for procedural issues
+        # that deep in the stack -- better fix this stuff in the caller
+        if (not ui.is_interactive or '--no-edit' in options) \
+                and "--allow-empty-message" not in options:
+            allow_interactive = False
+            options.append("--allow-empty-message")
+        else:
+            allow_interactive = True
+
+        # likewise, if edit was specifically requested, do not force-pass
+        # an empty message
+        if msg:
+            options.extend(('-m', msg))
+        elif '--edit' not in options:
+            options.extend(('-m', ''))
 
         if date:
             options += ["--date", date]
@@ -1296,14 +1320,14 @@ class GitRepo(RepoInterface):
         # Therefore, for now always use direct call.
         # TODO: Figure out, what exactly is going on with gitpython here
 
-        cmd = ['git', 'commit'] + (["-m", msg if msg else ""])
+        cmd = ['git', 'commit']
         if options:
             cmd.extend(options)
         lgr.debug("Committing via direct call of git: %s" % cmd)
 
         try:
             self._git_custom_command(files, cmd,
-                                     log_stdout=not options or not '--edit' in options,
+                                     log_stdout=not allow_interactive,
                                      expect_stderr=True,
                                      expect_fail=True,
                                      check_fake_dates=True,
