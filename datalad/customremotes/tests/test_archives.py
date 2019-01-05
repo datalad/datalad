@@ -9,6 +9,13 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 from mock import patch
+import os
+import os.path as op
+import sys
+import re
+import logging
+import glob
+from time import sleep
 
 from datalad.tests.utils import known_failure_direct_mode
 
@@ -20,14 +27,39 @@ from ..archives import (
 from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
-from ...tests.utils import *
+from .test_base import (
+    BASE_INTERACTION_SCENARIOS,
+    check_interaction_scenario,
+)
+from ...tests.utils import (
+    abspath,
+    chpwd,
+    get_most_obscure_supported_name,
+    with_direct,
+    with_tempfile,
+    with_tree,
+    eq_,
+    ok_,
+    assert_false,
+    assert_true,
+    assert_is_instance,
+    assert_not_in,
+    assert_equal,
+    in_,
+    ok_file_has_content,
+    swallow_outputs,
+    swallow_logs,
+    serve_path_via_http,
+)
 from ...cmd import Runner, GitRunner
 from ...utils import (
     _path_,
     unlink,
+    on_linux,
+    on_osx,
 )
-
 from . import _get_custom_runner
+
 
 # both files will have the same content
 # fn_inarchive_obscure = 'test.dat'
@@ -38,6 +70,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
 #import line_profiler
 #prof = line_profiler.LineProfiler()
+
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
@@ -81,7 +114,7 @@ def test_basic_scenario(direct, d, d2):
 
     file_url = annexcr.get_file_url(
         archive_file=fn_archive,
-        file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
+        file=fn_archive.replace('.tar.gz', '') + '/d/' + fn_inarchive_obscure)
 
     annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
     annex.drop(fn_extracted)
@@ -141,9 +174,9 @@ def test_annex_get_from_subdir(topdir):
     annex.add('a.tar.gz')
     annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
-    fpath = opj(topdir, 'a', 'd', fn_inarchive_obscure)
+    fpath = op.join(topdir, 'a', 'd', fn_inarchive_obscure)
 
-    with chpwd(opj(topdir, 'a', 'd')):
+    with chpwd(op.join(topdir, 'a', 'd')):
         runner = Runner()
         runner(['git', 'annex', 'drop', '--', fn_inarchive_obscure])  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
@@ -174,14 +207,16 @@ def test_no_rdflib_loaded():
     from ...cmd import Runner
     runner = Runner()
     with swallow_outputs() as cmo:
-        runner.run([sys.executable, '-c', 'import datalad.customremotes.archives, sys; print([k for k in sys.modules if k.startswith("rdflib")])'],
-               log_stdout=False, log_stderr=False)
+        runner.run(
+            [sys.executable,
+             '-c',
+             'import datalad.customremotes.archives, sys; '
+             'print([k for k in sys.modules if k.startswith("rdflib")])'],
+            log_stdout=False,
+            log_stderr=False)
         # print cmo.out
         assert_not_in("rdflib", cmo.out)
         assert_not_in("rdflib", cmo.err)
-
-
-from .test_base import BASE_INTERACTION_SCENARIOS, check_interaction_scenario
 
 
 @with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
@@ -223,16 +258,15 @@ def test_interactions(tdir):
         check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
 
 
-from datalad.tests.utils import serve_path_via_http
 @with_tree(tree=
     {'1.tar.gz':
          {
-             'bu.dat': '52055957098986598349795121365535'*10000,
-             'bu3.dat': '8236397048205454767887168342849275422'*10000
+             'bu.dat': '52055957098986598349795121365535' * 10000,
+             'bu3.dat': '8236397048205454767887168342849275422' * 10000
           },
     '2.tar.gz':
          {
-             'bu2.dat': '17470674346319559612580175475351973007892815102'*10000
+             'bu2.dat': '17470674346319559612580175475351973007892815102' * 10000
           },
     }
 )
@@ -241,14 +275,14 @@ from datalad.tests.utils import serve_path_via_http
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import create, download_url, add_archive_content
+    from datalad.api import create, add_archive_content
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):
             ds.repo.add_url_to_file(f, topurl + f)
             ds.add(f)
             add_archive_content(f, delete=True, drop_after=True)
-    files = glob.glob(opj(outdir, '*'))
+    files = glob.glob(op.join(outdir, '*'))
     ds.drop(files) # will not drop tarballs
     ds.repo.drop([], options=['--all', '--fast'])
     ds.get(files)
@@ -257,7 +291,7 @@ def check_observe_tqdm(topdir, topurl, outdir):
     print(outdir)
     # import pdb; pdb.set_trace()
     while True:
-       sleep(0.1)
+        sleep(0.1)
 
 
 @with_tempfile
