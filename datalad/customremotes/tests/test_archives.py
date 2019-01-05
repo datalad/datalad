@@ -8,16 +8,24 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
+from mock import patch
+
 from datalad.tests.utils import known_failure_direct_mode
 
 
-from ..archives import ArchiveAnnexCustomRemote
+from ..archives import (
+    ArchiveAnnexCustomRemote,
+    link_file_load,
+)
 from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
 from ...cmd import Runner, GitRunner
-from ...utils import _path_
+from ...utils import (
+    _path_,
+    unlink,
+)
 
 from . import _get_custom_runner
 
@@ -250,3 +258,55 @@ def check_observe_tqdm(topdir, topurl, outdir):
     # import pdb; pdb.set_trace()
     while True:
        sleep(0.1)
+
+
+@with_tempfile
+def test_link_file_load(tempfile):
+    tempfile2 = tempfile + '_'
+
+    with open(tempfile, 'w') as f:
+        f.write("LOAD")
+
+    link_file_load(tempfile, tempfile2)  # this should work in general
+
+    ok_(os.path.exists(tempfile2))
+
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+
+    def inode(fname):
+        with open(fname) as fd:
+            return os.fstat(fd.fileno()).st_ino
+
+    def stats(fname, times=True):
+        """Return stats on the file which should have been preserved"""
+        with open(fname) as fd:
+            st = os.fstat(fd.fileno())
+            stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
+            if times:
+                return stats + (st.st_atime, st.st_mtime)
+            else:
+                return stats
+            # despite copystat mtime is not copied. TODO
+            #        st.st_mtime)
+
+    if on_linux or on_osx:
+        # above call should result in the hardlink
+        assert_equal(inode(tempfile), inode(tempfile2))
+        assert_equal(stats(tempfile), stats(tempfile2))
+
+        # and if we mock absence of .link
+        def raise_AttributeError(*args):
+            raise AttributeError("TEST")
+
+        with patch('os.link', raise_AttributeError):
+            with swallow_logs(logging.WARNING) as cm:
+                link_file_load(tempfile, tempfile2)  # should still work
+                ok_("failed (TEST), copying file" in cm.out)
+
+    # should be a copy (either originally for windows, or after mocked call)
+    ok_(inode(tempfile) != inode(tempfile2))
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+    assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
+    unlink(tempfile2)  # TODO: next two with_tempfile

@@ -9,7 +9,6 @@
 """Test command call wrapper
 """
 
-from mock import patch
 import os
 from os.path import dirname, join as opj
 import sys
@@ -19,7 +18,7 @@ import shlex
 from .utils import ok_, eq_, assert_is, assert_equal, assert_false, \
     assert_true, assert_greater, assert_raises, assert_in, SkipTest, unlink
 
-from ..cmd import Runner, link_file_load
+from ..cmd import Runner
 from ..cmd import GitRunner
 from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
@@ -226,58 +225,6 @@ def test_runner_heavy_output():
     skip_if_on_windows()
     for log_online in [False, True]:
         yield check_runner_heavy_output, log_online
-
-
-@with_tempfile
-def test_link_file_load(tempfile):
-    tempfile2 = tempfile + '_'
-
-    with open(tempfile, 'w') as f:
-        f.write("LOAD")
-
-    link_file_load(tempfile, tempfile2)  # this should work in general
-
-    ok_(os.path.exists(tempfile2))
-
-    with open(tempfile2, 'r') as f:
-        assert_equal(f.read(), "LOAD")
-
-    def inode(fname):
-        with open(fname) as fd:
-            return os.fstat(fd.fileno()).st_ino
-
-    def stats(fname, times=True):
-        """Return stats on the file which should have been preserved"""
-        with open(fname) as fd:
-            st = os.fstat(fd.fileno())
-            stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
-            if times:
-                return stats + (st.st_atime, st.st_mtime)
-            else:
-                return stats
-            # despite copystat mtime is not copied. TODO
-            #        st.st_mtime)
-
-    if on_linux or on_osx:
-        # above call should result in the hardlink
-        assert_equal(inode(tempfile), inode(tempfile2))
-        assert_equal(stats(tempfile), stats(tempfile2))
-
-        # and if we mock absence of .link
-        def raise_AttributeError(*args):
-            raise AttributeError("TEST")
-
-        with patch('os.link', raise_AttributeError):
-            with swallow_logs(logging.WARNING) as cm:
-                link_file_load(tempfile, tempfile2)  # should still work
-                ok_("failed (TEST), copying file" in cm.out)
-
-    # should be a copy (either originally for windows, or after mocked call)
-    ok_(inode(tempfile) != inode(tempfile2))
-    with open(tempfile2, 'r') as f:
-        assert_equal(f.read(), "LOAD")
-    assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
-    unlink(tempfile2)  # TODO: next two with_tempfile
 
 
 @with_tempfile(mkdir=True)
