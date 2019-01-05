@@ -702,13 +702,3 @@ def link_file_load(src, dst, dry_run=False):
         shutil.copystat(src_realpath, dst)
     else:
         lgr.log(2, "Hardlinking finished")
-
-
-def get_runner(*args, **kwargs):
-    # needs local import, because the ConfigManager itself needs the runner
-    from . import cfg
-    # TODO:  this is all crawl specific -- should be moved away
-    if cfg.obtain('datalad.crawl.dryrun', default=False):
-        kwargs = kwargs.copy()
-        kwargs['protocol'] = DryRunProtocol()
-    return Runner(*args, **kwargs)
