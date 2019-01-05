@@ -10,26 +10,38 @@
 """
 
 import os
-from os.path import dirname, join as opj
+import os.path as op
 import sys
 import logging
 import shlex
 
-from .utils import ok_, eq_, assert_is, assert_equal, assert_false, \
-    assert_true, assert_greater, assert_raises, assert_in, SkipTest, unlink
+from .utils import (
+    ok_,
+    eq_,
+    assert_is,
+    assert_equal,
+    assert_false,
+    assert_true,
+    assert_greater,
+    assert_raises,
+    assert_in,
+    SkipTest,
+    skip_if_on_windows,
+    with_tempfile,
+    assert_cwd_unchanged,
+    ignore_nose_capturing_stdout,
+    swallow_outputs,
+    swallow_logs,
+    on_windows,
+    lgr,
+)
 
-from ..cmd import Runner
-from ..cmd import GitRunner
+from ..cmd import (
+    Runner,
+    GitRunner,
+)
 from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
-from .utils import with_tempfile, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
-    on_linux, on_osx, on_windows, with_testrepos
-from .utils import lgr
-from ..utils import assure_unicode
-
-from .utils import local_testrepo_flavors
-from datalad.tests.utils import skip_if_on_windows
 
 
 @ignore_nose_capturing_stdout
@@ -180,7 +192,7 @@ def check_runner_heavy_output(log_online):
     # stucked yet.
 
     runner = Runner()
-    cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
+    cmd = '%s %s' % (sys.executable, op.join(op.dirname(__file__), "heavyoutput.py"))
 
     with swallow_outputs() as cm, swallow_logs():
         ret = runner.run(cmd,
@@ -260,10 +272,10 @@ def test_git_path(dir_):
 @with_tempfile(mkdir=True)
 def test_runner_stdin(path):
     runner = Runner()
-    with open(opj(path, "test_input.txt"), "w") as f:
+    with open(op.join(path, "test_input.txt"), "w") as f:
         f.write("whatever")
 
-    with swallow_outputs() as cmo, open(opj(path, "test_input.txt"), "r") as fake_input:
+    with swallow_outputs() as cmo, open(op.join(path, "test_input.txt"), "r") as fake_input:
         runner.run(['cat'], log_stdout=False, stdin=fake_input)
         assert_in("whatever", cmo.out)
 
