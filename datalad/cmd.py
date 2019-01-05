@@ -22,17 +22,27 @@ import functools
 import tempfile
 
 from collections import OrderedDict
-from six import PY3, PY2
-from six import string_types, binary_type, text_type
+from six import (
+    PY3,
+    PY2,
+    string_types,
+    binary_type,
+    text_type,
+)
 from .support import path as op
-
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol, \
-    ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
+from .support.protocol import (
+    NullProtocol,
+    ExecutionTimeProtocol,
+    ExecutionTimeExternalsProtocol,
+)
 from .utils import (
-    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    on_windows,
+    get_tempfile_kwargs,
+    assure_unicode,
+    assure_bytes,
     unlink,
 )
 from .dochelpers import borrowdoc
