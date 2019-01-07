@@ -9,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
+import logging
 from shutil import copy
 from mock import patch
 from os import makedirs
@@ -16,8 +17,11 @@ from os.path import join as opj
 from os.path import dirname
 from datalad.api import Dataset, install
 from nose.tools import assert_equal, assert_raises
-from datalad.utils import chpwd
-from datalad.utils import swallow_outputs
+from datalad.utils import (
+    chpwd,
+    swallow_logs,
+    swallow_outputs,
+)
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
@@ -319,6 +323,14 @@ type
         for matched_key, matched_val in matched.items():
             assert_in(matched_key, res[-1]['query_matched'])
             assert_equal(res[-1]['query_matched'][matched_key], matched_val)
+
+    # test a suggestion msg being logged if no hits and key is a bit off
+    with swallow_logs(new_level=logging.INFO) as cml:
+        res = ds.search('audio.formats:mp3 audio.bitsrate:1', mode='egrep')
+        assert not res
+        assert_in('Did you mean any of', cml.out)
+        assert_in('audio.format', cml.out)
+        assert_in('audio.bitrate', cml.out)
 
 
 def test_listdict2dictlist():

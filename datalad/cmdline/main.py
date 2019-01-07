@@ -31,9 +31,13 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
-from ..utils import setup_exceptionhook, chpwd
-from ..utils import assure_unicode
-from ..utils import on_msys_tainted_paths
+from ..utils import (
+    assure_unicode,
+    chpwd,
+    get_suggestions_msg,
+    on_msys_tainted_paths,
+    setup_exceptionhook,
+)
 from ..dochelpers import exc_str
 
 
@@ -355,12 +359,7 @@ def fail_with_short_help(parser=None,
             "datalad: Unknown %s %r.  See 'datalad --help'.\n\n"
             % (what, provided,))
         if provided not in known:
-            import difflib
-            suggestions = difflib.get_close_matches(provided, known)
-            if suggestions:
-                out.write(
-                    "Did you mean one of these?\n        %s\n"
-                    % "\n        ".join(suggestions))
+            out.write(get_suggestions_msg(provided, known))
         # Too noisy
         # sys.stderr.write(" All known %ss: %s\n"
         #                   % (what, ", ".join(sorted(known))))

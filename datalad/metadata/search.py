@@ -23,8 +23,11 @@ from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
-from six import reraise
-from six import iteritems
+from six import (
+    reraise,
+    iteritems,
+    PY2,
+)
 from time import time
 
 from datalad import cfg
@@ -40,8 +43,12 @@ from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
-from datalad.utils import assure_unicode
+from datalad.utils import (
+    assure_list, assure_iter, unicode_srctypes, as_unicode,
+    assure_unicode,
+    get_suggestions_msg,
+    unique,
+)
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
@@ -254,7 +261,18 @@ class _Search(object):
         raise NotImplementedError(args)
 
     def get_query(self, query):
+        """Prepare query structure specific for a search backend.
+
+        It can also memorize within instance some parameters of the last query
+        which could be used to assist output formatting/structuring later on
+        """
         raise NotImplementedError
+
+    def get_nohits_msg(self):
+        """Given what it knows, provide recommendation in the case of no hits"""
+        return "No search hits, wrong query? " \
+               "See 'datalad search --show-keys name' for known keys " \
+               "and 'datalad search --help' on how to prepare your query."
 
 
 class _WhooshSearch(_Search):
@@ -666,6 +684,10 @@ class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
+    def __init__(self, ds, **kwargs):
+        super(_EGrepCSSearch, self).__init__(ds, **kwargs)
+        self._queried_keys = None  # to be memoized by get_query
+
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
@@ -739,54 +761,14 @@ class _EGrepCSSearch(_Search):
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
 
-        class key_stat:
-            def __init__(self):
-                self.ndatasets = 0  # how many datasets have this field
-                self.uvals = set()
-
-        from collections import defaultdict
-        keys = defaultdict(key_stat)
-
-        for res in query_aggregated_metadata(
-                # XXX TODO After #2156 datasets may not necessarily carry all
-                # keys in the "unique" summary
-                reporton='datasets',
-                ds=self.ds,
-                aps=[dict(path=self.ds.path, type='dataset')],
-                recursive=True):
-            meta = res.get('metadata', {})
-            # inject a few basic properties into the dict
-            # analog to what the other modes do in their index
-            meta.update({
-                k: res.get(k, None) for k in ('@id', 'type', 'path', 'parentds')
-                # parentds is tricky all files will have it, but the dataset
-                # queried above might not (single dataset), let's force it in
-                if k == 'parentds' or k in res})
-
-            # no stringification of values for speed
-            idxd = _meta2autofield_dict(meta, val2str=False)
-
-            for k, kvals in iteritems(idxd):
-                # TODO deal with conflicting definitions when available
-                keys[k].ndatasets += 1
-                if mode == 'name':
-                    continue
-                try:
-                    kvals_set = assure_iter(kvals, set)
-                except TypeError:
-                    # TODO: may be do show hashable ones???
-                    nunhashable = sum(
-                        isinstance(x, collections.Hashable) for x in kvals
-                    )
-                    kvals_set = {
-                        'unhashable %d out of %d entries'
-                        % (nunhashable, len(kvals))
-                    }
-                keys[k].uvals |= kvals_set
+        keys = self._get_keys(mode)
 
         for k in sorted(keys):
             if mode == 'name':
-                print(k)
+                from datalad.utils import assure_bytes
+                # without assure_bytes UnicodeEncodeError in PY2 when
+                # output is piped into e.g. grep
+                print(assure_bytes(k) if PY2 else k)
                 continue
 
             # do a bit more
@@ -824,31 +806,124 @@ class _EGrepCSSearch(_Search):
         # keys in the "unique" summary
         lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
 
+
+    def _get_keys(self, mode=None):
+        """Return keys and their statistics if mode != 'name'."""
+        class key_stat:
+            def __init__(self):
+                self.ndatasets = 0  # how many datasets have this field
+                self.uvals = set()
+
+        from collections import defaultdict
+        keys = defaultdict(key_stat)
+        for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
+                reporton='datasets',
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                recursive=True):
+            meta = res.get('metadata', {})
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            meta.update({
+                k: res.get(k, None) for k in ('@id', 'type', 'path', 'parentds')
+                # parentds is tricky all files will have it, but the dataset
+                # queried above might not (single dataset), let's force it in
+                if k == 'parentds' or k in res})
+
+            # no stringification of values for speed
+            idxd = _meta2autofield_dict(meta, val2str=False)
+
+            for k, kvals in iteritems(idxd):
+                # TODO deal with conflicting definitions when available
+                keys[k].ndatasets += 1
+                if mode == 'name':
+                    continue
+                try:
+                    kvals_set = assure_iter(kvals, set)
+                except TypeError:
+                    # TODO: may be do show hashable ones???
+                    nunhashable = sum(
+                        isinstance(x, collections.Hashable) for x in kvals
+                    )
+                    kvals_set = {
+                        'unhashable %d out of %d entries'
+                        % (nunhashable, len(kvals))
+                    }
+                keys[k].uvals |= kvals_set
+        return keys
+
     def get_query(self, query):
         query = assure_list(query)
         simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
         quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
-        query = [
+        query_rec_matches = [
             simple_fieldspec.match(q) or
             quoted_fieldspec.match(q) or
             q
             for q in query]
+        query_group_dicts_only = [
+            q.groupdict() for q in query_rec_matches if hasattr(q, 'groupdict')
+        ]
+        self._queried_keys = [
+            qgd['field']
+            for qgd in query_group_dicts_only
+            if ('field' in qgd and qgd['field'])
+        ]
+        if len(query_group_dicts_only) != len(query_rec_matches):
+            # we had a query element without field specification add
+            # None as an indicator of that
+            self._queried_keys.append(None)
         # expand matches, compile expressions
         query = [
             {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
             if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
-            for q in query]
+            for q in query_rec_matches
+        ]
 
         # turn "empty" field specs into simple queries
         # this is used to forcibly disable field-based search
         # e.g. when searching for a value
-        query = [q['query'] if isinstance(q, dict) and q['field'].pattern == '' else q
+        query = [q['query']
+                 if isinstance(q, dict) and q['field'].pattern == '' else q
                  for q in query]
         return query
 
     def _xfm_query(self, q):
-        # implement potential transformations of regex before they get compiles
+        # implement potential transformations of regex before they get compiled
         return q
+
+    def get_nohits_msg(self):
+        """Given the query and performed search, provide recommendation
+
+        Quite often a key in the query is mistyped or I simply query for something
+        which is not actually known.  It requires --show-keys  run first, doing
+        visual search etc to mitigate.  Here we can analyze either all queried
+        keys are actually known, and if not known -- what would be the ones available.
+
+        Returns
+        -------
+        str
+          A sentence or a paragraph to be logged/output
+        """
+        #
+        queried_keys = self._queried_keys[:]
+        if queried_keys and None in queried_keys:
+            queried_keys.pop(queried_keys.index(None))
+        if not queried_keys:
+            return  # No keys were queried, we are of no use here
+        known_keys = self._get_keys(mode='name')
+        unknown_keys = sorted(list(set(queried_keys).difference(known_keys)))
+        if not unknown_keys:
+            return  # again we are of no help here
+        msg = super(_EGrepCSSearch, self).get_nohits_msg()
+        msg += " Following keys were not found in available metadata: %s. " \
+              % ", ".join(unknown_keys)
+        suggestions_msg = get_suggestions_msg(unknown_keys, known_keys)
+        if suggestions_msg:
+            msg += ' ' + suggestions_msg
+        return msg
 
 
 class _EGrepSearch(_EGrepCSSearch):
@@ -1177,8 +1252,12 @@ class Search(Interface):
             print(repr(searcher.get_query(query)))
             return
 
+        nhits = 0
         for r in searcher(
                 query,
                 max_nresults=max_nresults,
                 full_record=full_record):
+            nhits += 1
             yield r
+        if not nhits:
+            lgr.info(searcher.get_nohits_msg() or '')
