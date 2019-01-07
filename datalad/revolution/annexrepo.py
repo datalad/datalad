@@ -70,7 +70,7 @@ class RevolutionAnnexRepo(AnnexRepo, RevolutionGitRepo):
 
     def get_content_annexinfo(
             self, paths=None, init='git', ref=None, eval_availability=False,
-            **kwargs):
+            key_prefix='', **kwargs):
         """
         Parameters
         ----------
@@ -122,17 +122,26 @@ class RevolutionAnnexRepo(AnnexRepo, RevolutionGitRepo):
                 paths=paths, ref=ref, **kwargs)
         else:
             info = init
+        # use this funny-looking option with both find and findref
+        # it takes care of git-annex reporting on any known key, regardless
+        # of whether or not it actually (did) exist in the local annex
+        opts = ['--copies', '0']
         if ref:
             cmd = 'findref'
-            opts = [ref]
+            opts.append(ref)
         else:
             cmd = 'find'
             # stringify any pathobjs
-            opts = [str(p) for p in paths] if paths else ['--include', '*']
+            opts.extend([str(p) for p in paths]
+                        if paths else ['--include', '*'])
         for j in self._run_annex_command_json(cmd, opts=opts):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
-            rec = info.get(path, {})
-            rec.update({k: j[k] for k in j if k != 'file'})
+            rec = info.get(path, None)
+            if init is not None and rec is None:
+                # init constraint knows nothing about this path -> skip
+                continue
+            rec.update({'{}{}'.format(key_prefix, k): j[k]
+                       for k in j if k != 'file'})
             info[path] = rec
             # TODO make annex availability checks optional and move in here
             if not eval_availability:
@@ -148,13 +157,13 @@ class RevolutionAnnexRepo(AnnexRepo, RevolutionGitRepo):
             init=self.get_content_annexinfo(
                 paths=paths,
                 ref='HEAD',
-                eval_availability=False))
+                eval_availability=False,
+                init=self.status(
+                    paths=paths,
+                    ignore_submodules='other')
+            )
+        )
         self._mark_content_availability(info)
-        for f, r in iteritems(self.status(paths=paths)):
-            inf = info.get(f, {})
-            inf.update(r)
-            info[f] = inf
-
         return info
 
     def _save_add(self, files, git=None, git_opts=None):

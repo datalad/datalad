@@ -41,7 +41,7 @@ def test_get_content_info(path):
     assert_equal(ds.pathobj, ut.Path(path))
 
     # verify general rules on fused info records that are incrementally
-    # assembled: for git content info, ammended with annex info on 'HEAD'
+    # assembled: for git content info, amended with annex info on 'HEAD'
     # (to get the last commited stage and with it possibly vanished
     # content), and lastly annex info wrt to the present worktree, to
     # also get info on added/staged content
@@ -72,12 +72,6 @@ def test_get_content_info(path):
             assert_in('bytesize', r, f)
             # no duplication with path
             assert_not_in('file', r, f)
-
-    # query a single absolute path
-    res = ds.repo.get_content_info(
-        [op.join(ds.path, 'subdir', 'file_clean')])
-    assert_equal(len(res), 1)
-    assert_in(repopath.joinpath('subdir', 'file_clean'), res)
 
     # query full untracked report
     res = ds.repo.get_content_info()
@@ -150,13 +144,59 @@ def test_subds_path(path):
     # a dataset with a subdataset with a file, all neatly tracked
     ds = Dataset(path).rev_create()
     subds = ds.rev_create('sub')
+    assert_repo_status(path)
     with (subds.pathobj / 'some.txt').open('w') as f:
         f.write(u'test')
     ds.rev_save(recursive=True)
     assert_repo_status(path)
 
     # querying the toplevel dataset repo for a subdspath should
-    # be quiet (like `git status` would do), and definitely not report the
-    # subdataset as deleted
+    # report the subdataset record in the dataset
+    # (unlike `git status`, which is silent for subdataset paths),
+    # but definitely not report the subdataset as deleted
     # https://github.com/datalad/datalad-revolution/issues/17
-    assert_dict_equal({}, ds.repo.status(paths=[op.join('sub', 'some.txt')]))
+    stat = ds.repo.status(paths=[op.join('sub', 'some.txt')])
+    assert_equal(list(stat.keys()), [subds.repo.pathobj])
+    assert_equal(stat[subds.repo.pathobj]['state'], 'clean')
+
+
+@with_tempfile
+def test_report_absent_keys(path):
+    ds = Dataset(path).rev_create()
+    # create an annexed file
+    testfile = ds.pathobj / 'dummy'
+    testfile.write_text(u'nothing')
+    ds.rev_save()
+    # present in a full report and in a partial report
+    # based on worktree of HEAD ref
+    for ai in (
+            ds.repo.get_content_annexinfo(eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                paths=['dummy'],
+                eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                ref='HEAD',
+                eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                ref='HEAD',
+                paths=['dummy'],
+                eval_availability=True)):
+        assert_in(testfile, ai)
+        assert_equal(ai[testfile]['has_content'], True)
+    # drop the key, not available anywhere else
+    ds.drop('dummy', check=False)
+    # does not change a thing, except the key is gone
+    for ai in (
+            ds.repo.get_content_annexinfo(eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                paths=['dummy'],
+                eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                ref='HEAD',
+                eval_availability=True),
+            ds.repo.get_content_annexinfo(
+                ref='HEAD',
+                paths=['dummy'],
+                eval_availability=True)):
+        assert_in(testfile, ai)
+        assert_equal(ai[testfile]['has_content'], False)

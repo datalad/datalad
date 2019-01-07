@@ -175,6 +175,14 @@ def resolve_path(path, ds=None):
     considered relative to the location of the dataset. If no dataset is
     provided, the current working directory is used.
 
+    Note however, that this function is not able to resolve arbitrarily
+    obfuscated path specifications. All operations are purely lexical, and no
+    actual path resolution against the filesystem content is performed.
+    Consequently, common relative path arguments like '../something' (relative
+    to PWD) can be handled properly, but things like 'down/../under' cannot, as
+    resolving this path properly depends on the actual target of any
+    (potential) symlink leading up to '..'.
+
     Parameters
     ----------
     path : str or PathLike
@@ -186,6 +194,8 @@ def resolve_path(path, ds=None):
     -------
     `pathlib.Path` object
     """
+    if ds is not None and not isinstance(ds, _Dataset):
+        ds = require_dataset(ds, check_installed=False, purpose='path resolution')
     if ds is None:
         # CWD is the reference
         path = ut.Path(path)
@@ -204,8 +214,37 @@ def resolve_path(path, ds=None):
     # make sure we return an absolute path, but without actually
     # resolving anything
     if not path.is_absolute():
-        # not using ut.Path.cwd(), because it is symlinks resolved!!
-        path = ut.Path(getpwd()) / path
+        # in general it is almost impossible to use resolve() when
+        # we can have symlinks in the root path of a dataset
+        # (that we don't want to resolve here), symlinks to annex'ed
+        # files (that we never want to resolve), and other within-repo
+        # symlinks that we (sometimes) want to resolve (i.e. symlinked
+        # paths for addressing content vs adding content)
+        # CONCEPT: do the minimal thing to catch most real-world inputs
+        # ASSUMPTION: the only sane relative path input that needs
+        # handling and can be handled are upward references like
+        # '../../some/that', wherease stuff like 'down/../someotherdown'
+        # are intellectual excercises
+        # ALGORITHM: match any number of leading '..' path components
+        # and shorten the PWD by that number
+        # NOT using ut.Path.cwd(), because it has symlinks resolved!!
+        pwd_parts = ut.Path(getpwd()).parts
+        path_parts = path.parts
+        leading_parents = 0
+        for p in path.parts:
+            if p == op.pardir:
+                leading_parents += 1
+                path_parts = path_parts[1:]
+            elif p == op.curdir:
+                # we want to discard that, but without stripping
+                # a corresponding parent
+                path_parts = path_parts[1:]
+            else:
+                break
+        path = ut.Path(
+            op.join(
+                *(pwd_parts[:-leading_parents if leading_parents else None]
+                  + path_parts)))
     # note that we will not "normpath()" the result, check the
     # pathlib docs for why this is the only sane choice in the
     # face of the possibility of symlinks in the path
