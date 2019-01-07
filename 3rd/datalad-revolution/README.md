@@ -20,6 +20,7 @@ always use this mode by running:
 Commands provided by this extension
 
 - `rev-status` -- like `git status`, but simpler and working with dataset hierarchies
+- `rev-diff` -- sibling of `rev-status` for any state comparison, now also on Windows
 - `rev-save` -- a 2-in-1 replacement for `save` and `add`
 - `rev-create` -- a ~30% faster `create`
 
