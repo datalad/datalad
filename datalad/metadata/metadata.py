@@ -106,13 +106,6 @@ def get_metadata_type(ds):
     return []
 
 
-class MetadataDict(dict):
-    """Metadata dict helper class"""
-    # TODO no longer needed ATM, but keeping for now, avoiding the
-    # big diff
-    pass
-
-
 def _load_json_object(fpath, cache=None):
     if cache is None:
         cache = {}
@@ -367,7 +360,7 @@ def _query_aggregated_metadata_singlepath(
                   if rparentpath == op.curdir or
                   path_startswith(f, rparentpath)]:
         # we might be onto something here, prepare result
-        metadata = MetadataDict(contentmeta.get(fpath, {}))
+        metadata = contentmeta.get(fpath, {})
 
         # we have to pull out the context for each extractor from the dataset
         # metadata
@@ -441,8 +434,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     types : list
     """
     errored = False
-    dsmeta = MetadataDict()
-    # each item in here will be a MetadataDict, but not the whole thing
+    dsmeta = dict()
     contentmeta = {}
 
     if global_meta is not None and content_meta is not None and \
@@ -597,7 +589,6 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             #elif not meta:
             #    continue
 
-            meta = MetadataDict(meta)
             # apply filters
             meta = _filter_metadata_fields(
                 meta,
