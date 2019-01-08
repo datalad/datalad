@@ -21,13 +21,6 @@ from six.moves import (
 from os import makedirs
 from os import listdir
 import os.path as op
-from os.path import join as opj
-from os.path import dirname
-from os.path import relpath
-from os.path import isabs
-from os.path import exists
-from os.path import lexists
-from os.path import curdir
 
 from hashlib import md5
 import shutil
@@ -42,43 +35,54 @@ import datalad
 from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
-from datalad.interface.utils import discover_dataset_trace_to_targets
+from datalad.interface.utils import (
+    eval_results,
+    discover_dataset_trace_to_targets,
+)
 from datalad.interface.save import Save
 from datalad.interface.base import build_doc
-from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.interface.common_opts import nosave_opt
+from datalad.interface.common_opts import (
+    recursion_limit,
+    recursion_flag,
+    nosave_opt,
+)
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.metadata import (
     get_ds_aggregate_db_locations,
     load_ds_aggregate_db,
 )
-from datalad.metadata.metadata import exclude_from_metadata
-from datalad.metadata.metadata import get_metadata_type
-from datalad.metadata.metadata import _load_json_object
-from datalad.metadata.metadata import _get_metadata
-from datalad.metadata.metadata import _get_metadatarelevant_paths
-from datalad.metadata.metadata import _get_containingds_from_agginfo
-from datalad.distribution.dataset import datasetmethod, EnsureDataset, require_dataset
+from datalad.metadata.metadata import (
+    exclude_from_metadata,
+    get_metadata_type,
+    _get_metadata,
+    _get_metadatarelevant_paths,
+    _get_containingds_from_agginfo,
+    location_keys,
+)
+from datalad.distribution.dataset import (
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureNone,
+    EnsureBool,
+)
 from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support import json_py
 from datalad.support.path import split_ext
-
-from datalad.utils import path_is_subpath, all_same
-from datalad.utils import assure_list
-
+from datalad.utils import (
+    path_is_subpath,
+    all_same,
+    assure_list,
+)
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
-
-# TODO filepath_info is obsolete
-location_keys = ('dataset_info', 'content_info', 'filepath_info')
 
 
 def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
@@ -157,7 +161,7 @@ def _the_same_across_datasets(relpath, *dss):
     # The simplest check first -- exist in both and content is the same.
     # Even if content is just a symlink file on windows, the same content
     # condition would be correct
-    if all(map(exists, paths)) and all_same(map(md5sum, paths)):
+    if all(map(op.exists, paths)) and all_same(map(md5sum, paths)):
         return True
 
     # We first need to find problematic ones which are annexed and
@@ -257,9 +261,9 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     objid = refcommit if refcommit else ''
     # 2, our own dataset-global metadata and the dataset config
     for tfile in (
-            opj(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json'),
-            opj(aggfrom_ds.path, '.datalad', 'config')):
-        if exists(tfile):
+            op.join(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json'),
+            op.join(aggfrom_ds.path, '.datalad', 'config')):
+        if op.exists(tfile):
             objid += md5(open(tfile, 'r').read().encode()).hexdigest()
     # 3. potential annex-based metadata
     # XXX TODO shouldn't this be the annex extractor?
@@ -415,10 +419,10 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # actually copy dump files
         for objrelpath in objrelpaths.values():
             objpath = op.join(agginto_ds.path, objrelpath)
-            objdir = dirname(objpath)
-            if not exists(objdir):
+            objdir = op.dirname(objpath)
+            if not op.exists(objdir):
                 makedirs(objdir)
-            if lexists(objpath):
+            if op.lexists(objpath):
                 os.unlink(objpath)  # remove previous version first
                 # was a wild thought as a workaround for 
                 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec1
@@ -486,12 +490,12 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
         # only write to disk if there is something
         objrelpath = _get_obj_location(objid, label, props['dumper'])
         # place metadata object into the source dataset
-        objpath = opj(dest.path, agg_base_path, objrelpath)
+        objpath = op.join(dest.path, agg_base_path, objrelpath)
 
         # write obj files
-        if exists(objpath):
+        if op.exists(objpath):
             dest.unlock(objpath)
-        elif lexists(objpath):
+        elif op.lexists(objpath):
             # if it gets here, we have a symlink that is pointing nowhere
             # kill it, to be replaced with the newly aggregated content
             dest.repo.remove(objpath)
@@ -551,12 +555,12 @@ def _get_latest_refcommit(ds, subds_relpaths):
 
     def _filterpaths(basepath, paths, exclude):
         final_paths = []
-        for rp in [opj(basepath, p) if basepath else p for p in paths]:
+        for rp in [op.join(basepath, p) if basepath else p for p in paths]:
             if rp in exclude:
                 continue
             elif any(path_is_subpath(ep, rp) for ep in exclude):
                 final_paths.extend(
-                    _filterpaths(rp, listdir(opj(ds.path, rp)), exclude))
+                    _filterpaths(rp, listdir(op.join(ds.path, rp)), exclude))
                 pass
             else:
                 final_paths.append(rp)
@@ -578,7 +582,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
 
 
 def _get_obj_location(hash_str, ref_type, dumper):
-    objrelpath = opj(
+    objrelpath = op.join(
         'objects',
         hash_str[:2],
         '{}-{}'.format(
@@ -634,10 +638,10 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     for dpath in procds_paths:
         ds_dbinfo = agginfo_db.get(dpath, {}).copy()
         # relative path of the currect dataset within the dataset we are updating
-        drelpath = relpath(dpath, start=ds.path)
+        drelpath = op.relpath(dpath, start=ds.path)
         for loclabel in location_keys:
             # TODO filepath_info is obsolete
-            if loclabel == 'filepath_info' and drelpath == curdir:
+            if loclabel == 'filepath_info' and drelpath == op.curdir:
                 # do not write a file list into the dataset it is from
                 if 'filepath_info' in ds_dbinfo:
                     del ds_dbinfo['filepath_info']
@@ -654,7 +658,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
             objs2copy.append((
                 # this needs to turn into an absolute path
                 # `dpath` will be relative to the reference dataset
-                #op.normpath(op.join(ds.path, dpath, dirname(agginfo_relpath), objloc)),
+                #op.normpath(op.join(ds.path, dpath, op.dirname(agginfo_relpath), objloc)),
                 objloc,
                 target_objpath))
             # now build needed local relpath
@@ -682,7 +686,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     #      mattered (hopefully not that reflog is used somehow)
     objs2remove = []
     for obj in objlocs_was.difference(objlocs_is):
-        if lexists(obj):
+        if op.lexists(obj):
             objs2remove.append(obj)
         else:
             # not really a warning, we don't need it anymore, it is already gone
@@ -721,12 +725,12 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     for copy_from, copy_to in objs2copy:
         copy_from = op.join(agg_base_path, copy_from)
         copy_to = op.join(agg_base_path, copy_to)
-        target_dir = dirname(copy_to)
-        if not exists(target_dir):
+        target_dir = op.dirname(copy_to)
+        if not op.exists(target_dir):
             makedirs(target_dir)
         # TODO we could be more clever (later) and maybe `addurl` (or similar)
         # the file from another dataset
-        if lexists(copy_to):
+        if op.lexists(copy_to):
             # no need to unlock, just wipe out and replace
             os.remove(copy_to)
         shutil.copy(copy_from, copy_to)
@@ -736,11 +740,11 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     if objs2add:
         # they are added standard way, depending on the repo type
         ds.add(
-            [opj(agg_base_path, p) for p in objs2add],
+            [op.join(agg_base_path, p) for p in objs2add],
             save=False, result_renderer=None, return_type=list)
         # queue for save, and mark as staged
         to_save.extend(
-            [dict(path=opj(agg_base_path, p), type='file', staged=True)
+            [dict(path=op.join(agg_base_path, p), type='file', staged=True)
              for p in objs2add])
     # write aggregate info file
     if not ds_agginfos:
