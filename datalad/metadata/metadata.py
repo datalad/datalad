@@ -134,22 +134,26 @@ def _get_metadatarelevant_paths(ds, subds_relpaths):
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
-# TODO must work with abspath or relpath, no reason not to have that -> test
 def _get_containingds_from_agginfo(info, rpath):
-    """Return the relative path of a dataset that contains a relative query path
+    """Return the path of a dataset that contains a query path
+
+    If a query path matches a dataset path directly, the matching dataset path
+    is return -- not the parent dataset!
 
     Parameters
     ----------
     info : dict
-      Content of aggregate.json (dict with relative subdataset paths as keys)
+      Content of aggregate.json (dict with (relative) subdataset paths as keys)
     rpath : str
-      Relative query path
+      Query path can be absolute or relative, but must match the convention
+      used in the info dict.
 
     Returns
     -------
     str or None
-      None is returned if the is no match, the relative path of the closest
-      containing subdataset otherwise.
+      None is returned if there is no match, the path of the closest
+      containing subdataset otherwise (in the convention used in the
+      info dict).
     """
     if rpath in info:
         dspath = rpath

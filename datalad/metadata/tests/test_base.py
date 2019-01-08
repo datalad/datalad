@@ -14,13 +14,18 @@ import os
 
 from os.path import join as opj
 from os.path import relpath
+import os.path as op
 
 from datalad.api import Dataset
 from datalad.api import aggregate_metadata
 from datalad.api import install
 from datalad.api import search
 from datalad.api import metadata
-from datalad.metadata.metadata import get_metadata_type, query_aggregated_metadata
+from datalad.metadata.metadata import (
+    get_metadata_type,
+    query_aggregated_metadata,
+    _get_containingds_from_agginfo,
+)
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.tests.utils import with_tree, with_tempfile
@@ -248,3 +253,22 @@ def test_bf2458(src, dst):
     clone.metadata('.', on_failure='ignore')
     # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+
+
+def test_get_containingds_from_agginfo():
+    eq_(None, _get_containingds_from_agginfo({}, 'any'))
+    # direct hit returns itself
+    eq_('match', _get_containingds_from_agginfo({'match': {}, 'other': {}}, 'match'))
+    # matches
+    down = op.join('match', 'down')
+    eq_('match', _get_containingds_from_agginfo({'match': {}}, down))
+    # closest match
+    down_under = op.join(down, 'under')
+    eq_(down, _get_containingds_from_agginfo({'match': {}, down: {}}, down_under))
+    # absolute works too
+    eq_(op.abspath(down),
+        _get_containingds_from_agginfo(
+            {op.abspath('match'): {}, op.abspath(down): {}}, op.abspath(down_under)))
+    # will not tollerate mix'n'match
+    assert_raises(ValueError, _get_containingds_from_agginfo, {'match': {}}, op.abspath(down))
+    assert_raises(ValueError, _get_containingds_from_agginfo, {op.abspath('match'): {}}, down)
