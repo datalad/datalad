@@ -99,33 +99,23 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     Returns
     -------
     str or list
-      A string is an error message, a list contains all absolute paths for
-      all datasets on which info was put into the DB.
+      A string/tuple is an error message, a list contains all absolute paths
+      for all datasets on which info was put into the DB.
     """
     # TODO cache these
-    agginfos, info_basepath = load_ds_aggregate_db(Dataset(ds_path))
+    agginfos = load_ds_aggregate_db(Dataset(ds_path), abspath=True)
 
-    # TODO kill this functionality, and replace with load_ds_aggregate_db(abspath=True)
-    def _ensure_abs_obj_location(rec):
-        # object location in the DB must be absolute so we can copy easily
-        # to all relevant datasets
-        for key in location_keys:
-            if key in rec and not isabs(rec[key]):
-                rec[key] = opj(info_basepath, rec[key])
-        return rec
-
-    rpath = relpath(path, start=ds_path)
-    seed_ds = _get_containingds_from_agginfo(agginfos, rpath)
+    seed_ds = _get_containingds_from_agginfo(agginfos, path)
     if seed_ds is None:
         # nothing found
         # this will be the message in the result for the query path
         # and could be a tuple
-        return ("No matching aggregated metadata for path '%s' in Dataset at %s", rpath, ds_path)
+        return ("No matching aggregated metadata for path '%s' in Dataset at %s",
+                op.relpath(path, start=ds_path), ds_path)
 
     # easy peasy
-    seed_abs = opj(ds_path, seed_ds)
-    db[seed_abs] = _ensure_abs_obj_location(agginfos[seed_ds])
-    hits = [seed_abs]
+    db[seed_ds] = agginfos[seed_ds]
+    hits = [seed_ds]
 
     if not recursive:
         return hits
@@ -134,9 +124,8 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # records and pick the ones that are underneath the seed
     for agginfo_path in agginfos:
         if path_is_subpath(agginfo_path, seed_ds):
-            absp = opj(ds_path, agginfo_path)
-            db[absp] = _ensure_abs_obj_location(agginfos[agginfo_path])
-            hits.append(absp)
+            db[agginfo_path] = agginfos[agginfo_path]
+            hits.append(agginfo_path)
     # TODO we must keep the info on these recursively discovered datasets
     # somewhere, because we cannot rediscover them on the filesystem
     # when updating the datasets later on
