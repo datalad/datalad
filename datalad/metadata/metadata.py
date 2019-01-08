@@ -15,6 +15,7 @@ import glob
 import logging
 import re
 import os
+import os.path as op
 from os.path import dirname
 from os.path import relpath
 from os.path import normpath
@@ -61,15 +62,13 @@ from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.metadata')
 
 aggregate_layout_version = 1
-agginfo_relpath_template = opj(
-    '.datalad',
-    'metadata',
-    'aggregate_v{}.json')
-agginfo_relpath = agginfo_relpath_template.format(aggregate_layout_version)
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them
 exclude_from_metadata = ('.datalad', '.git', '.gitmodules', '.gitattributes')
+
+# TODO filepath_info is obsolete
+location_keys = ('dataset_info', 'content_info', 'filepath_info')
 
 
 def get_metadata_type(ds):
@@ -132,6 +131,7 @@ def _get_metadatarelevant_paths(ds, subds_relpaths):
                        for ex in list(exclude_from_metadata) + subds_relpaths))
 
 
+# TODO must work with abspath or relpath, no reason not to have that -> test
 def _get_containingds_from_agginfo(info, rpath):
     """Return the relative path of a dataset that contains a relative query path
 
@@ -197,30 +197,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     """
     from datalad.coreapi import get
     # look for and load the aggregation info for the base dataset
-    info_fpath = opj(ds.path, agginfo_relpath)
-    agg_base_path = dirname(info_fpath)
-    agginfos = _load_json_object(info_fpath)
-    if not agginfos and not exists(info_fpath):
-        # This dataset does not have aggregated metadata.  Does it have any
-        # other version?
-        info_glob = agginfo_relpath_template.format('*')
-        info_files = glob.glob(info_glob)
-        msg = "Found no aggregated metadata info file %s." \
-              % info_fpath
-        old_metadata_file = opj(ds.path, METADATA_DIR, METADATA_FILENAME)
-        if exists(old_metadata_file):
-            msg += " Found metadata generated with pre-0.10 version of " \
-                   "DataLad, but it will not be used."
-        upgrade_msg = ""
-        if info_files:
-            msg += " Found following info files, which might have been " \
-                   "generated with newer version(s) of datalad: %s." \
-                   % (', '.join(info_files))
-            upgrade_msg = ", upgrade datalad"
-        msg += " You will likely need to either update the dataset from its " \
-               "original location%s or reaggregate metadata locally." \
-               % upgrade_msg
-        lgr.warning(msg)
+    agginfos, agg_base_path = load_ds_aggregate_db(ds)
 
     # cache once loaded metadata objects for additional lookups
     # TODO possibly supply this cache from outside, if objects could
@@ -777,6 +754,100 @@ class ReadOnlyDict(Mapping):
         return self._hash
 
 
+def get_ds_aggregate_db_locations(ds, version='default'):
+    """Returns the location of a dataset's aggregate metadata DB
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to query
+    version : str
+      DataLad aggregate metadata layout version. At the moment only a single
+      version exists. 'default' will return the locations for the current default
+      layout version.
+
+    Returns
+    -------
+    db_location, db_object_base_path
+      Absolute paths to the DB itself, and to the basepath to resolve relative
+      object references in the database. Either path may not exist in the
+      queried dataset.
+    """
+    layout_version = aggregate_layout_version \
+        if version == 'default' else version
+
+    agginfo_relpath_template = opj(
+        '.datalad',
+        'metadata',
+        'aggregate_v{}.json')
+    agginfo_relpath = agginfo_relpath_template.format(layout_version)
+    info_fpath = opj(ds.path, agginfo_relpath)
+    agg_base_path = dirname(info_fpath)
+    # not sure if this is the right place with these check, better move then to a higher level
+    if not exists(info_fpath):
+        if version == 'default':
+            # caller had no specific idea what metadata version is needed/available
+            # This dataset does not have aggregated metadata.  Does it have any
+            # other version?
+            info_glob = agginfo_relpath_template.format('*')
+            info_files = glob.glob(info_glob)
+            msg = "Found no aggregated metadata info file %s." \
+                  % info_fpath
+            old_metadata_file = opj(ds.path, METADATA_DIR, METADATA_FILENAME)
+            if exists(old_metadata_file):
+                msg += " Found metadata generated with pre-0.10 version of " \
+                       "DataLad, but it will not be used."
+            upgrade_msg = ""
+            if info_files:
+                msg += " Found following info files, which might have been " \
+                       "generated with newer version(s) of datalad: %s." \
+                       % (', '.join(info_files))
+                upgrade_msg = ", upgrade datalad"
+            msg += " You will likely need to either update the dataset from its " \
+                   "original location%s or reaggregate metadata locally." \
+                   % upgrade_msg
+            lgr.warning(msg)
+    return info_fpath, agg_base_path
+
+
+def load_ds_aggregate_db(ds, version='default', abspath=False):
+    """Load a dataset's aggregate metadata database
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to query
+    version : str
+      DataLad aggregate metadata layout version. At the moment only a single
+      version exists. 'default' will return the content of the current default
+      aggregate database version.
+
+    Returns
+    -------
+    dict [, str]
+      A dictionary with the database content is return. If abspath is True,
+      all paths in the dictionary (datasets, metadata object archives) are
+      absolute. If abspath is False, all paths are relative, and the metadata
+      object base path is return as a second value.
+    """
+    info_fpath, agg_base_path = get_ds_aggregate_db_locations(ds, version)
+
+    # save to call even with a non-existing location
+    agginfos = _load_json_object(info_fpath)
+
+    if abspath:
+        return {
+            # paths in DB on disk are always relative
+            # make absolute to ease processing during aggregation
+            op.normpath(op.join(ds.path, p)):
+            {k: op.normpath(op.join(agg_base_path, v)) if k in location_keys else v
+             for k, v in props.items()}
+            for p, props in agginfos.items()
+        }
+    else:
+        return agginfos, agg_base_path
+
+
 @build_doc
 class Metadata(Interface):
     """Metadata reporting for files and entire datasets
@@ -871,8 +942,12 @@ class Metadata(Interface):
                 refds_path,
                 check_installed=True,
                 purpose='aggregate metadata query')
-            info_fpath = opj(ds.path, agginfo_relpath)
-            if not exists(info_fpath):
+            agginfos = load_ds_aggregate_db(
+                ds,
+                version=str(aggregate_layout_version),
+                abspath=True
+            )
+            if not agginfos:
                 # if there has ever been an aggregation run, this file would
                 # exist, hence there has not been and we need to tell this
                 # to people
@@ -883,11 +958,9 @@ class Metadata(Interface):
                     logger=lgr,
                     message='metadata aggregation has never been performed in this dataset')
                 return
-            agginfos = _load_json_object(info_fpath)
             parentds = []
-            for sd in sorted(agginfos):
-                info = agginfos[sd]
-                dspath = normpath(opj(ds.path, sd))
+            for dspath in sorted(agginfos):
+                info = agginfos[dspath]
                 if parentds and not path_is_subpath(dspath, parentds[-1]):
                     parentds.pop()
                 info.update(
@@ -895,7 +968,7 @@ class Metadata(Interface):
                     type='dataset',
                     status='ok',
                 )
-                if sd == curdir:
+                if dspath == ds.path:
                     info['layout_version'] = aggregate_layout_version
                 if parentds:
                     info['parentds'] = parentds[-1]

@@ -50,7 +50,10 @@ from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.results import get_status_dict
 from datalad.distribution.dataset import Dataset
-from datalad.metadata.metadata import agginfo_relpath
+from datalad.metadata.metadata import (
+    get_ds_aggregate_db_locations,
+    load_ds_aggregate_db,
+)
 from datalad.metadata.metadata import exclude_from_metadata
 from datalad.metadata.metadata import get_metadata_type
 from datalad.metadata.metadata import _load_json_object
@@ -99,11 +102,10 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
       A string is an error message, a list contains all absolute paths for
       all datasets on which info was put into the DB.
     """
-    info_fpath = opj(ds_path, agginfo_relpath)
-    info_basepath = dirname(info_fpath)
     # TODO cache these
-    agginfos = _load_json_object(info_fpath)
+    agginfos, info_basepath = load_ds_aggregate_db(Dataset(ds_path))
 
+    # TODO kill this functionality, and replace with load_ds_aggregate_db(abspath=True)
     def _ensure_abs_obj_location(rec):
         # object location in the DB must be absolute so we can copy easily
         # to all relevant datasets
@@ -139,6 +141,7 @@ def _get_dsinfo_from_aggmetadata(ds_path, path, recursive, db):
     # somewhere, because we cannot rediscover them on the filesystem
     # when updating the datasets later on
     return hits
+
 
 def _the_same_across_datasets(relpath, *dss):
     """Check if the file (present content or not) is identical across two datasets
@@ -246,7 +249,7 @@ def _the_same_across_datasets(relpath, *dss):
     return False
 
 
-def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extraction):
+def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extraction, agg_base_path):
     """Dump metadata from a dataset into object in the metadata store of another
 
     Info on the metadata objects is placed into a DB dict under the
@@ -346,7 +349,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     #       when I guess we just need to skip it?
     if not force_extraction:
         for s, sprop in metasources.items():
-            objloc = op.join(dirname(agginfo_relpath),
+            objloc = op.join(agg_base_path,
                              _get_obj_location(objid, s, sprop['dumper']))
             smetafound = [
                 # important to test for lexists() as we do not need to
@@ -390,7 +393,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
             objid,
             metasources,
             refcommit,
-            subds_relpaths)
+            subds_relpaths,
+            agg_base_path)
 
     # we did not actually run an extraction, so we need to
     # assemble an aggregation record from the existing pieces
@@ -444,11 +448,12 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
 
         # lastly get 'self' aggregation record from source dataset and
         # use in target dataset
-        db[aggfrom_ds.path] = _load_agginfo_db(aggfrom_ds.path)[aggfrom_ds.path]
+        db[aggfrom_ds.path] = load_ds_aggregate_db(aggfrom_ds, abspath=True)[aggfrom_ds.path]
         return False
 
 
-def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, refcommit, subds_relpaths):
+def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
+                      refcommit, subds_relpaths, agg_base_path):
     lgr.debug('Performing metadata extraction from %s', aggfrom_ds)
     # we will replace any conflicting info on this dataset with fresh stuff
     agginfo = db.get(aggfrom_ds.path, {})
@@ -484,7 +489,6 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, r
     coremeta['refcommit'] = refcommit
     dsmeta['datalad_core'] = coremeta
 
-
     # for both types of metadata
     for label, props in metasources.items():
         dest = props['targetds']
@@ -493,7 +497,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources, r
         # only write to disk if there is something
         objrelpath = _get_obj_location(objid, label, props['dumper'])
         # place metadata object into the source dataset
-        objpath = opj(dest.path, dirname(agginfo_relpath), objrelpath)
+        objpath = opj(dest.path, agg_base_path, objrelpath)
 
         # write obj files
         if exists(objpath):
@@ -624,15 +628,11 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
       necessary.
     """
     ds = Dataset(ds_path)
-    # location info of aggregate metadata
-    # aggregate.json
-    agginfo_fpath = opj(ds_path, agginfo_relpath)
-    # base path in which aggregate.json and objects is located
-    agg_base_path = dirname(agginfo_fpath)
     # load existing aggregate info dict
     # makes sure all file/dataset paths become absolute
     # TODO take from cache, once used in _get_dsinfo_from_aggmetadata()
-    ds_agginfos = _load_agginfo_db(ds_path)
+    agginfo_fpath, agg_base_path = get_ds_aggregate_db_locations(ds)
+    ds_agginfos = load_ds_aggregate_db(ds, abspath=True)
     # object locations referenced initially
     objlocs_was = set(ai[k]
                       for ai in ds_agginfos.values()
@@ -757,7 +757,7 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     if not ds_agginfos:
         return
 
-    _store_agginfo_db(ds_path, ds_agginfos)
+    _store_agginfo_db(ds, ds_agginfos)
     ds.add(agginfo_fpath, save=False, to_git=True,
            result_renderer=None, return_type=list)
     # queue for save, and mark as staged
@@ -767,29 +767,18 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
     # FIXME look for empty object dirs and remove them
 
 
-def _load_agginfo_db(ds_path):
-    return {
-        # paths in DB on disk are always relative
-        # make absolute to ease processing during aggregation
-        op.normpath(op.join(ds_path, p)):
-        {k: op.normpath(op.join(ds_path, op.dirname(agginfo_relpath), v)) if k in location_keys else v
-         for k, v in props.items()}
-        for p, props in _load_json_object(opj(ds_path, agginfo_relpath)).items()
-    }
-
-
-def _store_agginfo_db(ds_path, db):
+def _store_agginfo_db(ds, db):
     # base path in which aggregate.json and objects is located
-    agg_base_path = dirname(op.join(ds_path, agginfo_relpath))
+    agginfo_path, agg_base_path = get_ds_aggregate_db_locations(ds)
     # make DB paths on disk always relative
     json_py.dump(
         {
-            op.relpath(p, start=ds_path):
+            op.relpath(p, start=ds.path):
             {k: op.relpath(v, start=agg_base_path) if k in location_keys else v
              for k, v in props.items()}
             for p, props in db.items()
         },
-        op.join(ds_path, agginfo_relpath)
+        agginfo_path
     )
 
 
@@ -950,7 +939,8 @@ class AggregateMetaData(Interface):
             # also recurse current even if paths are given
             path.append(ds.path)
 
-        agginfo_db = _load_agginfo_db(ds.path)
+        agginfo_db_location, agg_base_path = get_ds_aggregate_db_locations(ds)
+        agginfo_db = load_ds_aggregate_db(ds, abspath=True)
 
         to_save = []
         to_aggregate = set()
@@ -1026,7 +1016,8 @@ class AggregateMetaData(Interface):
                     Dataset(aggsrc),
                     agginfo_db,
                     to_save,
-                    force_extraction)
+                    force_extraction,
+                    agg_base_path)
                 if errored:
                     yield get_status_dict(
                         status='error',
