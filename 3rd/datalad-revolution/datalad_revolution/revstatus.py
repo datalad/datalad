@@ -42,7 +42,7 @@ from .dataset import (
 )
 from . import utils as ut
 
-from datalad_revolution.revdiff import (
+from .revdiff import (
     RevDiff,
     _common_diffstatus_params,
 )
