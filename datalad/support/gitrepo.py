@@ -2599,8 +2599,8 @@ class GitRepo(RepoInterface):
     def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
 
-        By default appends additional lines to .gitattributes. Note, that later
-        lines in .gitattributes overrule earlier ones, which may or may not be
+        By default appends additional lines to `attrfile`. Note, that later
+        lines in `attrfile` overrule earlier ones, which may or may not be
         what you want. Set `mode` to 'w' to replace the entire file by
         what you provided in `attrs`.
 
