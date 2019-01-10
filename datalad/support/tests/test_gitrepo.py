@@ -1244,6 +1244,10 @@ def test_gitattributes(path):
             'sec.key': 'val',
         })
 
+    # mode='w' should replace the entire file:
+    gr.set_gitattributes([('**', {'some': 'nonsense'})], mode='w')
+    eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense'})
+
 
 @with_tempfile(mkdir=True)
 def test_get_hexsha_tag(path):
