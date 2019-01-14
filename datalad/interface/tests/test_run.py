@@ -22,12 +22,14 @@ from os.path import relpath
 from os import mkdir, remove
 import sys
 
+from six import PY2
 from six.moves import StringIO
 from mock import patch
 
 from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 
+from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
@@ -36,6 +38,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
+from datalad.interface.run import format_command
 from datalad.interface.run import run_command
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
@@ -1066,3 +1069,58 @@ def test_rerun_commit_message_check():
     eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
+
+
+@with_tempfile(mkdir=True)
+def test_format_command_strip_leading_dashes(path):
+    ds = Dataset(path).create()
+    eq_(format_command(ds, ["--", "cmd", "--opt"]), "cmd --opt")
+    eq_(format_command(ds, ["--"]), "")
+    # Can repeat to escape.
+    eq_(format_command(ds, ["--", "--", "ok"]), "-- ok")
+    # String stays as is.
+    eq_(format_command(ds, "--"), "--")
+
+
+@with_tempfile(mkdir=True)
+def test_run_cmdline_disambiguation(path):
+    Dataset(path).create()
+    with chpwd(path):
+        # Without a positional argument starting a command, any option is
+        # treated as an option to 'datalad run'.
+        with swallow_outputs() as cmo:
+            with patch("datalad.interface.run._execute_command") as exec_cmd:
+                with assert_raises(SystemExit):
+                    main(["datalad", "run", "--message"])
+                exec_cmd.assert_not_called()
+            assert_in("message: expected one", cmo.err)
+        # If we want to pass an option as the first value of a command (e.g.,
+        # because we are using a runscript with containers-run), we can do this
+        # with "--".
+        with patch("datalad.interface.run._execute_command") as exec_cmd:
+            with assert_raises(SystemExit):
+                main(["datalad", "run", "--", "--message"])
+            exec_cmd.assert_called_once_with(
+                "--message", path, expected_exit=None)
+
+        # And a twist on above: Our parser mishandles --version (gh-3067),
+        # treating 'datalad run CMD --version' as 'datalad --version'.
+        version_stream = "err" if PY2 else "out"
+        with swallow_outputs() as cmo:
+            with assert_raises(SystemExit) as cm:
+                main(["datalad", "run", "echo", "--version"])
+            eq_(cm.exception.code, 0)
+            out = getattr(cmo, version_stream)
+        with swallow_outputs() as cmo:
+            with assert_raises(SystemExit):
+                main(["datalad", "--version"])
+            version_out = getattr(cmo, version_stream)
+        ok_(version_out)
+        eq_(version_out, out)
+        # We can work around that (i.e., make "--version" get passed as
+        # command) with "--".
+        with patch("datalad.interface.run._execute_command") as exec_cmd:
+            with assert_raises(SystemExit):
+                main(["datalad", "run", "--", "echo", "--version"])
+            exec_cmd.assert_called_once_with(
+                "echo --version", path, expected_exit=None)
