@@ -16,24 +16,33 @@ import subprocess
 import sys
 import logging
 import os
-import shutil
 import shlex
 import atexit
 import functools
 import tempfile
 
 from collections import OrderedDict
-from six import PY3, PY2
-from six import string_types, binary_type, text_type
+from six import (
+    PY3,
+    PY2,
+    string_types,
+    binary_type,
+    text_type,
+)
 from .support import path as op
-
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol, DryRunProtocol, \
-    ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
+from .support.protocol import (
+    NullProtocol,
+    ExecutionTimeProtocol,
+    ExecutionTimeExternalsProtocol,
+)
 from .utils import (
-    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    on_windows,
+    get_tempfile_kwargs,
+    assure_unicode,
+    assure_bytes,
     unlink,
 )
 from .dochelpers import borrowdoc
@@ -674,41 +683,3 @@ class GitRunner(Runner):
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
-
-
-# ####
-# Preserve from previous version
-# TODO: document intention
-# ####
-# this one might get under Runner for better output/control
-def link_file_load(src, dst, dry_run=False):
-    """Just a little helper to hardlink files's load
-    """
-    dst_dir = op.dirname(dst)
-    if not op.exists(dst_dir):
-        os.makedirs(dst_dir)
-    if op.lexists(dst):
-        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
-        # TODO: how would it interact with git/git-annex
-        unlink(dst)
-    lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
-    src_realpath = op.realpath(src)
-
-    try:
-        os.link(src_realpath, dst)
-    except AttributeError as e:
-        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
-        shutil.copyfile(src_realpath, dst)
-        shutil.copystat(src_realpath, dst)
-    else:
-        lgr.log(2, "Hardlinking finished")
-
-
-def get_runner(*args, **kwargs):
-    # needs local import, because the ConfigManager itself needs the runner
-    from . import cfg
-    # TODO:  this is all crawl specific -- should be moved away
-    if cfg.obtain('datalad.crawl.dryrun', default=False):
-        kwargs = kwargs.copy()
-        kwargs['protocol'] = DryRunProtocol()
-    return Runner(*args, **kwargs)

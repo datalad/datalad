@@ -81,9 +81,9 @@ def _describe_datalad():
 
 
 def _describe_annex():
-    from datalad.cmd import get_runner
+    from datalad.cmd import GitRunner
 
-    runner = get_runner()
+    runner = GitRunner()
     try:
         out, err = runner.run(['git', 'annex', 'version'])
     except CommandError as e:
