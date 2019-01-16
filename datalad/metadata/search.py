@@ -321,9 +321,10 @@ class _WhooshSearch(_Search):
         `meta2doc` - must return dict for index document from result input
         """
         from whoosh import index as widx
-        from .metadata import agginfo_relpath
+        from .metadata import get_ds_aggregate_db_locations
+        dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
         # what is the lastest state of aggregated metadata
-        metadata_state = self.ds.repo.get_last_commit_hash(agginfo_relpath)
+        metadata_state = self.ds.repo.get_last_commit_hash(relpath(dbloc, start=self.ds.path))
         # use location common to all index types, they would all invalidate
         # simultaneously
         stamp_fname = opj(self.index_dir, 'datalad_metadata_state')
