@@ -142,9 +142,9 @@ class RevDiff(Interface):
     @datasetmethod(name='rev_diff')
     @eval_results
     def __call__(
+            path=None,
             fr='HEAD',
             to=None,
-            path=None,
             dataset=None,
             annex=None,
             untracked='normal',
