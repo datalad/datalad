@@ -2596,8 +2596,13 @@ class GitRepo(RepoInterface):
             attr = []
         return attributes
 
-    def set_gitattributes(self, attrs, attrfile='.gitattributes'):
+    def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
+
+        By default appends additional lines to `attrfile`. Note, that later
+        lines in `attrfile` overrule earlier ones, which may or may not be
+        what you want. Set `mode` to 'w' to replace the entire file by
+        what you provided in `attrs`.
 
         Parameters
         ----------
@@ -2611,12 +2616,15 @@ class GitRepo(RepoInterface):
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
+        mode: str
+          'a' to append .gitattributes, 'w' to replace it
         """
+
         git_attributes_file = op.join(self.path, attrfile)
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        with open(git_attributes_file, 'a') as f:
+        with open(git_attributes_file, mode) as f:
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(

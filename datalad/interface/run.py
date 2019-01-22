@@ -127,7 +127,9 @@ class Run(Interface):
             args=("cmd",),
             nargs=REMAINDER,
             metavar='COMMAND',
-            doc="command for execution"),
+            doc="""command for execution. A leading '--' can be used to
+            disambiguate this command from the preceding options to
+            DataLad."""),
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc="""specify the dataset to record the command results in.
@@ -315,7 +317,7 @@ def normalize_command(command):
     """
     if isinstance(command, list):
         command = list(map(assure_unicode, command))
-        if len(command) == 1:
+        if len(command) == 1 and command[0] != "--":
             # This is either a quoted compound shell command or a simple
             # one-item command. Pass it as is.
             #
@@ -327,6 +329,10 @@ def normalize_command(command):
             # (discussed in gh-2986), update this.
             command = command[0]
         else:
+            if command and command[0] == "--":
+                # Strip disambiguation marker. Note: "running from Python API"
+                # FIXME from below applies to this too.
+                command = command[1:]
             command = " ".join(shlex_quote(c) for c in command)
     else:
         command = assure_unicode(command)

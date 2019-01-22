@@ -12,15 +12,16 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj
+import os.path as op
 from collections import OrderedDict
 from operator import itemgetter
+import shutil
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 lgr.log(5, "Importing datalad.customremotes.archive")
 
 from ..dochelpers import exc_str
-from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..support.locking import lock_if_check_fails
@@ -28,8 +29,37 @@ from ..support.path import exists
 from ..utils import getpwd
 from ..utils import unique
 from ..utils import assure_bytes
+from ..utils import unlink
 from .base import AnnexCustomRemote
 from .main import main as super_main
+
+
+# ####
+# Preserve from previous version
+# TODO: document intention
+# ####
+# this one might get under Runner for better output/control
+def link_file_load(src, dst, dry_run=False):
+    """Just a little helper to hardlink files's load
+    """
+    dst_dir = op.dirname(dst)
+    if not op.exists(dst_dir):
+        os.makedirs(dst_dir)
+    if op.lexists(dst):
+        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
+        # TODO: how would it interact with git/git-annex
+        unlink(dst)
+    lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
+    src_realpath = op.realpath(src)
+
+    try:
+        os.link(src_realpath, dst)
+    except AttributeError as e:
+        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        shutil.copyfile(src_realpath, dst)
+        shutil.copystat(src_realpath, dst)
+    else:
+        lgr.log(2, "Hardlinking finished")
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
