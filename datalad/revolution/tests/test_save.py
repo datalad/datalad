@@ -35,6 +35,7 @@ from datalad.tests.utils import (
 )
 from datalad.distribution.tests.test_add import tree_arg
 
+from .. import utils as ut
 from ..dataset import RevolutionDataset as Dataset
 from ..annexrepo import RevolutionAnnexRepo as AnnexRepo
 from datalad.api import (
@@ -336,7 +337,8 @@ def test_add_files(path):
             result = ds.rev_save(arg[0], to_git=arg[1])
             for a in assure_list(arg[0]):
                 assert_result_count(result, 1, path=str(ds.pathobj / a))
-            status = ds.repo.get_content_annexinfo(assure_list(arg[0]))
+            status = ds.repo.get_content_annexinfo(
+                ut.Path(p) for p in assure_list(arg[0]))
         for f, p in iteritems(status):
             if arg[1]:
                 assert p.get('key', None) is None, f
@@ -456,7 +458,7 @@ def test_gh1597_simpler(path):
     # no annex key, not in annex
     assert_not_in(
         'key',
-        ds.repo.get_content_annexinfo([attrfile]).popitem()[1])
+        ds.repo.get_content_annexinfo([ut.Path(attrfile)]).popitem()[1])
 
 
 @with_tempfile(mkdir=True)
@@ -574,3 +576,13 @@ def test_partial_unlocked(path):
         ('*', {'annex.largefiles': 'nothing'})])
     ds.rev_save()
     assert_repo_status(ds.path)
+
+
+@with_tempfile()
+def test_path_arg_call(path):
+    ds = create(path)
+    for testfile in (
+            ds.pathobj / 'abs.txt',
+            ds.pathobj / 'rel.txt'):
+        testfile.write_text(u'123')
+        save(dataset=ds.path, path=[testfile.name], to_git=True)

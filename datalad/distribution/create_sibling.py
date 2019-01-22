@@ -70,6 +70,7 @@ def _create_dataset_sibling(
         target_pushurl,
         existing,
         shared,
+        group,
         publish_depends,
         publish_by_default,
         as_common_datasrc,
@@ -202,6 +203,12 @@ def _create_dataset_sibling(
         shared = CreateSibling._get_ds_remote_shared_setting(
             delayed_super, name, ssh)
 
+    if group:
+        # Either repository existed before or a new directory was created for it,
+        # set its group to a desired one if was provided with the same chgrp
+        ssh("chgrp -R {} {}".format(
+            sh_quote(text_type(group)),
+            sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
@@ -379,6 +386,14 @@ class CreateSibling(Interface):
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
             constraints=EnsureStr() | EnsureBool() | EnsureNone()),
+        group=Parameter(
+            args=("--group",),
+            metavar="GROUP",
+            doc="""Filesystem group for the repository. Specifying the group is
+            particularly important when [CMD: --shared=group CMD][PY:
+            shared="group" PY]""",
+            constraints=EnsureStr() | EnsureNone()
+        ),
         ui=Parameter(
             args=("--ui",),
             metavar='false|true|html_filename',
@@ -408,7 +423,10 @@ class CreateSibling(Interface):
                  dataset=None,
                  recursive=False,
                  recursion_limit=None,
-                 existing='error', shared=None, ui=False,
+                 existing='error',
+                 shared=None,
+                 group=None,
+                 ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
                  publish_depends=None,
@@ -587,6 +605,7 @@ class CreateSibling(Interface):
                 target_pushurl,
                 existing,
                 shared,
+                group,
                 publish_depends,
                 publish_by_default,
                 as_common_datasrc,

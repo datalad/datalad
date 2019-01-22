@@ -19,8 +19,6 @@ from six import (
 )
 from collections import OrderedDict
 
-import datalad.support.ansi_colors as ac
-
 from datalad.utils import (
     assure_list,
 )
@@ -29,14 +27,13 @@ from datalad.interface.base import (
     build_doc,
 )
 from datalad.interface.utils import eval_results
-from datalad.interface.common_opts import (
-    recursion_limit,
-    recursion_flag,
+from datalad.support.param import Parameter
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
 )
-
 from .dataset import (
     RevolutionDataset as Dataset,
-    EnsureDataset,
     datasetmethod,
     require_dataset,
     resolve_path,
@@ -45,19 +42,13 @@ from .dataset import (
 )
 from . import utils as ut
 
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.param import Parameter
+from .revdiff import (
+    RevDiff,
+    _common_diffstatus_params,
+)
+from datalad.dochelpers import single_or_plural
 
 lgr = logging.getLogger('datalad.revolution.status')
-
-
-state_color_map = {
-    'untracked': ac.RED,
-    'modified': ac.RED,
-    'added': ac.GREEN,
-}
 
 
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cache):
@@ -180,45 +171,15 @@ class RevStatus(Interface):
     result_renderer = 'tailored'
 
     _params_ = dict(
-        dataset=Parameter(
-            args=("-d", "--dataset"),
-            doc="""specify the dataset to query.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory""",
-            constraints=EnsureDataset() | EnsureNone()),
+        _common_diffstatus_params,
         path=Parameter(
             args=("path",),
             metavar="PATH",
             doc="""path to be evaluated""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        annex=Parameter(
-            args=('--annex',),
-            metavar='MODE',
-            constraints=EnsureChoice(None, 'basic', 'availability', 'all'),
-            doc="""Switch whether to include information on the annex
-            content of individual files in the status report, such as
-            recorded file size. By default no annex information is reported
-            (faster). Three report modes are available: basic information
-            like file size and key name ('basic'); additionally test whether
-            file content is present in the local annex ('availability';
-            requires one or two additional file system stat calls, but does
-            not call git-annex), this will add the result properties
-            'has_content' (boolean flag) and 'objloc' (absolute path to an
-            existing annex object file); or 'all' which will report all
-            available information (presently identical to 'availability').
-            """),
-        untracked=Parameter(
-            args=('--untracked',),
-            metavar='MODE',
-            constraints=EnsureChoice('no', 'normal', 'all'),
-            doc="""If and how untracked content is reported when comparing
-            a revision to the state of the work tree. 'no': no untracked
-            content is reported; 'normal': untracked files and entire
-            untracked directories are reported as such; 'all': report
-            individual files even in fully untracked directories."""),
-        recursive=recursion_flag,
-        recursion_limit=recursion_limit)
+        )
+
 
     @staticmethod
     @datasetmethod(name='rev_status')
@@ -230,6 +191,18 @@ class RevStatus(Interface):
             untracked='normal',
             recursive=False,
             recursion_limit=None):
+        # To the next white knight that comes in to re-implement `status` as a
+        # special case of `diff`. There is one fundamental difference between
+        # the two commands: `status` can always use the worktree as evident on
+        # disk as a contraint (e.g. to figure out which subdataset a path is in)
+        # `diff` cannot do that (everything need to be handled based on a
+        # "virtual" representation of a dataset hierarchy).
+        # MIH concludes that while `status` can be implemented as a special case
+        # of `diff` doing so would complicate and slow down both `diff` and
+        # `status`. So while the apparent almost code-duplication between the
+        # two commands feels wrong, the benefit is speed. Any future RF should
+        # come with evidence that speed does not suffer, and complexity stays
+        # on a manageable level
         ds = require_dataset(
             dataset, check_installed=True, purpose='status reporting')
 
@@ -301,6 +274,7 @@ class RevStatus(Interface):
                         "dataset containing given paths is not underneath "
                         "the reference dataset %s: %s",
                         ds, qpaths),
+                    logger=lgr,
                 )
                 continue
             elif qds_inrefds != qdspath:
@@ -332,39 +306,25 @@ class RevStatus(Interface):
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: no cover
-        if not res['status'] == 'ok' or res.get('state', None) == 'clean':
-            # logging reported already
-            return
-        from datalad.ui import ui
-        path=res['path']
-        #path = res['path'].relative_to(res['refds']) \
-        #    if res.get('refds', None) else res['path']
-        type_ = res.get('type', res.get('type_src', ''))
-        max_len = len('untracked(directory)')
-        ui.message('{fill}{state}: {path}{type_}'.format(
-            fill=' ' * max(0, max_len - len(res['state'])),
-            state=ac.color_word(
-                res['state'],
-                state_color_map.get(res['state'], ac.WHITE)),
-            path=path,
-            type_=' ({})'.format(
-                ac.color_word(type_, ac.MAGENTA) if type_ else '')))
+        RevDiff.custom_result_renderer(res, **kwargs)
 
     @staticmethod
     def custom_result_summary_renderer(results):  # pragma: no cover
         # fish out sizes of annexed files. those will only be present
         # with --annex ...
         annexed = [
-            int(r['bytesize']) for r in results
-            if r.get('action', None) == 'status'
+            (int(r['bytesize']), r.get('has_content', False))
+            for r in results
+            if r.get('action', None) == 'status' \
             and 'key' in r and 'bytesize' in r]
         if annexed:
             from datalad.ui import ui
             ui.message(
-                "Worktree has {} annex'ed files, "
-                "total size of tracked content: {}".format(
+                "{} annex'd {} ({}/{} present/total size)".format(
                     len(annexed),
-                    bytes2human(sum(annexed))))
+                    single_or_plural('file', 'files', len(annexed)),
+                    bytes2human(sum(a[0] for a in annexed if a[1])),
+                    bytes2human(sum(a[0] for a in annexed))))
 
 
 # TODO move to datalad.utils eventually

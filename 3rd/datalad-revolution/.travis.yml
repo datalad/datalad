@@ -73,6 +73,11 @@ script:
       --with-cov --cover-package datalad_revolution
       --logging-level=INFO
       $TESTS_TO_PERFORM
+  # Imports should be relative
+  - if grep -r -e '\(from\|import\)\s\s*datalad_revolution' datalad_revolution; then
+      echo Convert absolute imports to relative;
+      exit 1;
+    fi
   #- if [ ! "${DATALAD_LOG_LEVEL:-}" = 2 ]; then
   #      PYTHONPATH=$PWD $NOSE_WRAPPER make -C docs html doctest;
   #  fi

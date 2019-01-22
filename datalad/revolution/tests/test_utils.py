@@ -55,7 +55,7 @@ def test_resolve_path(path):
             eq_(str(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
                 op.join(d, 'bu'))
             eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
-                op.join(d, os.pardir, 'bu'))
+                op.join(ds_global.path, 'bu'))
 
         # resolve against a dataset
         eq_(str(resolve_path('bu', ds=ds_local)), op.join(d, 'bu'))
@@ -64,4 +64,29 @@ def test_resolve_path(path):
         eq_(str(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
             op.join(getpwd(), 'bu'))
         eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
-            op.join(getpwd(), os.pardir, 'bu'))
+            op.normpath(op.join(getpwd(), os.pardir, 'bu')))
+
+
+# little brother of the test above, but actually (must) run
+# under any circumstances
+@with_tempfile(mkdir=True)
+def test_resolve_path_symlink_edition(path):
+    deepest = ut.Path(path) / 'one' / 'two' / 'three'
+    deepest_str = str(deepest)
+    os.makedirs(deepest_str)
+    with chpwd(deepest_str):
+        # direct absolute
+        eq_(deepest, resolve_path(deepest))
+        eq_(deepest, resolve_path(deepest_str))
+        # explicit direct relative
+        eq_(deepest, resolve_path('.'))
+        eq_(deepest, resolve_path(op.join('.', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', 'two', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', '..',
+                                          'one', 'two', 'three')))
+        # weird ones
+        eq_(deepest, resolve_path(op.join('..', '.', 'three')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('.', '..', 'three')))

@@ -186,7 +186,6 @@ For merge commits to have more informative description, add to your
 `.git/config` or `~/.gitconfig` following section:
 
     [merge]
-    summary = true
     log = true
 
 and if conflicts occur, provide short summary on how they were resolved

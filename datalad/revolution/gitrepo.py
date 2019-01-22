@@ -80,11 +80,18 @@ class RevolutionGitRepo(GitRepo):
 
         This is simplified front-end for `git ls-files/tree`.
 
+        Both commands differ in their behavior when queried about subdataset
+        paths. ls-files will not report anything, ls-tree will report on the
+        subdataset record. This function uniformly follows the behavior of
+        ls-tree (report on the respective subdataset mount).
+
         Parameters
         ----------
-        paths : list
-          Specific paths to query info for. In none are given, info is
-          reported for all content.
+        paths : list(patlib.PurePath)
+          Specific paths, relative to the (resolved repository root, to query
+          info for. Paths must be normed to match the reporting done by Git,
+          i.e. no parent dir components (ala "some/../this").
+          If none are given, info is reported for all content.
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
@@ -131,6 +138,12 @@ class RevolutionGitRepo(GitRepo):
             '120000': 'symlink',
             '160000': 'dataset',
         }
+        if paths:
+            # path matching will happen against what Git reports
+            # and Git always reports POSIX paths
+            # any incoming path has to be relative already, so we can simply
+            # convert unconditionally
+            paths = [ut.PurePosixPath(p) for p in paths]
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -157,7 +170,11 @@ class RevolutionGitRepo(GitRepo):
 
         try:
             stdout, stderr = self._git_custom_command(
-                [str(f) for f in paths] if paths else [],
+                # specifically always ask for a full report and
+                # filter out matching path later on to
+                # homogenize wrt subdataset content paths across
+                # ls-files and ls-tree
+                None,
                 cmd,
                 log_stderr=True,
                 log_stdout=True,
@@ -207,6 +224,22 @@ class RevolutionGitRepo(GitRepo):
                     # on the particular mode annex is in
                     inf['type'] = 'file'
 
+            # the function assumes that any `path` is a relative path lib
+            # instance if there were path constraints given, we need to reject
+            # paths now
+            # reject anything that is:
+            # - not a direct match with a constraint
+            # - has no constraint as a parent
+            #   (relevant to find matches of regular files in a repository)
+            # - is not a parent of a constraint
+            #   (relevant for finding the matching subds entry for
+            #    subds-content paths)
+            if paths \
+                and not any(
+                    path == c or path in c.parents or c in path.parents
+                    for c in paths):
+                continue
+
             # join item path with repo path to get a universally useful
             # path representation with auto-conversion and tons of other
             # stuff
@@ -217,16 +250,6 @@ class RevolutionGitRepo(GitRepo):
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
 
-        # final loop to filter out reports on paths (that where given)
-        # that do not belong to this repo (which status() would turn into
-        if paths is not None and ref is not None:
-            # dedicated paths were queried, but ls-tree would respond with
-            # an entry for each path that is actually contained in a
-            # submodule with a report on the respective subdataset path
-            # -> only report on paths that were actually queried
-            paths = {self.pathobj / p for p in paths}
-            info = {k: v for k, v in iteritems(info)
-                    if k in paths or v.get('type', None) != 'dataset'}
         return info
 
     def status(self, paths=None, untracked='all', ignore_submodules='no'):
@@ -236,7 +259,9 @@ class RevolutionGitRepo(GitRepo):
         ----------
         paths : list or None
           If given, limits the query to the specified paths. To query all
-          paths specify `None`, not an empty list.
+          paths specify `None`, not an empty list. If a query path points
+          into a subdataset, a report is made on the subdataset record
+          within the queried dataset only (no recursion).
         untracked : {'no', 'normal', 'all'}
           If and how untracked content is reported when no `ref` was given:
           'no': no untracked files are reported; 'normal': untracked files
@@ -312,6 +337,16 @@ class RevolutionGitRepo(GitRepo):
 
         if _cache is None:
             _cache = {}
+
+        if paths:
+            # at this point we must normalize paths to the form that
+            # Git would report them, to easy matching later on
+            paths = [ut.Path(p) for p in paths]
+            paths = [
+                p.relative_to(self.pathobj) if p.is_absolute() else p
+                for p in paths
+            ]
+
         # TODO report more info from get_content_info() calls in return
         # value, those are cheap and possibly useful to a consumer
         status = OrderedDict()
@@ -381,8 +416,6 @@ class RevolutionGitRepo(GitRepo):
             else:
                 # change in git record, or on disk
                 props = dict(
-                    # TODO is 'modified' enough, should be report typechange?
-                    # often this will be a pointless detail, though...
                     # TODO we could have a new file that is already staged
                     # but had subsequent modifications done to it that are
                     # unstaged. Such file would presently show up as 'added'
@@ -393,8 +426,10 @@ class RevolutionGitRepo(GitRepo):
                     # cases
                     type=to_state_r['type'],
                 )
-            if props['state'] in ('clean', 'added'):
+            if props['state'] in ('clean', 'added', 'modified'):
                 props['gitshasum'] = to_state_r['gitshasum']
+            if props['state'] in ('clean', 'modified', 'deleted'):
+                props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props
 
         for f, from_state_r in iteritems(from_state):
@@ -610,7 +645,7 @@ class RevolutionGitRepo(GitRepo):
         to_add_submodules = [sm for sm, sm_props in iteritems(
             self.get_content_info(
                 # get content info for any untracked directory
-                [f for f, props in iteritems(status)
+                [f.relative_to(self.pathobj) for f, props in iteritems(status)
                  if props.get('state', None) == 'untracked' and
                  props.get('type', None) == 'directory'],
                 ref=None,
