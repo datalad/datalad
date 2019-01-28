@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 
+from datalad.utils import chpwd
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -34,12 +35,18 @@ from datalad.api import clean
 from datalad import cfg
 
 
-def test_invalid_call():
-    # needs spec or discover
-    assert_raises(InsufficientArgumentsError, run_procedure)
-    res = run_procedure('unknown', on_failure='ignore')
-    assert_true(len(res) == 1)
-    assert_in_results(res, status="impossible")
+@with_tempfile(mkdir=True)
+def test_invalid_call(path):
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+
+        # needs spec or discover
+        assert_raises(InsufficientArgumentsError, run_procedure)
+        res = run_procedure('unknown', on_failure='ignore')
+        assert_true(len(res) == 1)
+        assert_in_results(res, status="impossible")
 
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
@@ -112,16 +119,20 @@ add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
-    ps = run_procedure(discover=True)
-    # there are a few procedures coming with datalad, needs to find them
-    assert_true(len(ps) > 2)
-    # we get three essential properties
-    eq_(
-        sum(['procedure_type' in p and
-             'procedure_callfmt' in p and
-             'path' in p
-             for p in ps]),
-        len(ps))
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+        ps = run_procedure(discover=True)
+        # there are a few procedures coming with datalad, needs to find them
+        assert_true(len(ps) > 2)
+        # we get three essential properties
+        eq_(
+            sum(['procedure_type' in p and
+                 'procedure_callfmt' in p and
+                 'path' in p
+                 for p in ps]),
+            len(ps))
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
