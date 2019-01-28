@@ -683,3 +683,14 @@ class GitRunner(Runner):
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
+
+
+# TODO: remove some time after datalad-crawler > 0.2 and datalad > 0.11.1 are out
+# left for compatibility with released datalad-crawler (0.2)
+def get_runner(*args, **kwargs):
+    # needs local import, because the ConfigManager itself needs the runner
+    from . import cfg
+    if cfg.obtain('datalad.crawl.dryrun', default=False):
+        kwargs = kwargs.copy()
+        kwargs['protocol'] = DryRunProtocol()
+    return Runner(*args, **kwargs)
