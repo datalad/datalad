@@ -25,6 +25,9 @@ from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.metadata.metadata import _get_metadata
 from datalad.metadata.metadata import _get_metadatarelevant_paths
 
+# API commands needed
+from datalad.distribution.subdatasets import Subdatasets
+
 
 @build_doc
 class ExtractMetadata(Interface):
