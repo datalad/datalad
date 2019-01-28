@@ -113,13 +113,18 @@ assert_create_sshwebserver = (
 
 @with_tempfile(mkdir=True)
 def test_invalid_call(path):
-    # needs a SSH URL
-    assert_raises(InsufficientArgumentsError, create_sibling, '')
-    assert_raises(ValueError, create_sibling, 'http://ignore.me')
-    # needs an actual dataset
-    assert_raises(
-        ValueError,
-        create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+
+        # needs a SSH URL
+        assert_raises(InsufficientArgumentsError, create_sibling, '')
+        assert_raises(ValueError, create_sibling, 'http://ignore.me')
+        # needs an actual dataset
+        assert_raises(
+            ValueError,
+            create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
     # pre-configure a bogus remote
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
