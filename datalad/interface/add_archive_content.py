@@ -239,7 +239,6 @@ class AddArchiveContent(Interface):
                 "The archive is not under annex yet. You should run 'datalad "
                 "add {}' first".format(archive))
 
-        # TODO: somewhat too cruel -- may be an option or smth...
         if not allow_dirty and annex.dirty:
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
