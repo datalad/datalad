@@ -2552,6 +2552,20 @@ class GitRepo(RepoInterface):
         return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
+        """Query gitattributes which apply to top level directory
+
+        It is a thin compatibility/shortcut wrapper around more versatile
+        get_gitattributes which operates on a list of paths and returns
+        a dictionary per each path
+
+        Returns
+        -------
+        dict:
+          a dictionary with attribute name and value items relevant for the
+          top ('.') directory of the repository, and thus most likely the
+          default ones (if not overwritten with more rules) for all files within
+          repo.
+        """
         return self.get_gitattributes('.')['.']
 
 
