@@ -66,7 +66,6 @@ xml_content = """\
 @with_tree(tree={'elsewhere': {'meta.datacite.xml': xml_content}})
 def test_get_metadata(path1, path2):
     for p in (path1, path2):
-        print('PATH')
         ds = create(p, force=True)
         ds.add('.')
         meta = MetadataExtractor(
