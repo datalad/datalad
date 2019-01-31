@@ -34,7 +34,7 @@ testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data',
 def test_error(path):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
-        assert_raises(ValueError, extract_metadata, sources=['bogus__'], files=[testpath])
+        assert_raises(ValueError, extract_metadata, sources=['bogus__'], path=[testpath])
 
 
 @with_tempfile(mkdir=True)
@@ -54,7 +54,7 @@ def test_ds_extraction(path):
         sources=['xmp'],
         dataset=ds,
         # artificially disable extraction from any file in the dataset
-        files=[])
+        path=[])
     assert_result_count(
         res, 1,
         type='dataset', status='ok', action='metadata', path=path, refds=ds.path)
@@ -88,6 +88,6 @@ def test_file_extraction(path):
     with chpwd(path):
         res = extract_metadata(
             sources=['xmp'],
-            files=[testpath])
+            path=[testpath])
         assert_result_count(res, 1, type='file', status='ok', action='metadata', path=testpath)
         assert_in('xmp', res[0]['metadata'])

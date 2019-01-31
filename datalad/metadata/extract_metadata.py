@@ -24,6 +24,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone, EnsureStr
 from datalad.metadata.metadata import _get_metadata
 from datalad.metadata.metadata import _get_metadatarelevant_paths
+from datalad.utils import assure_list
 
 # API commands needed
 from datalad.distribution.subdatasets import Subdatasets
@@ -57,15 +58,15 @@ class ExtractMetadata(Interface):
             required=True,
             doc="""Name of a metadata extractor to be executed.
             [CMD: This option can be given more than once CMD]"""),
-        files=Parameter(
-            args=("files",),
+        path=Parameter(
+            args=("path",),
             metavar="FILE",
             nargs="*",
             doc="Path of a file to extract metadata from.",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""Dataset to extract metadata from. If no `file` is given,
+            doc=""""Dataset to extract metadata from. If no path is given,
             metadata is extracted from all files of the dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
     )
@@ -73,21 +74,23 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(sources, files=None, dataset=None):
+    def __call__(sources, path=None, dataset=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
-                                  check_installed=not files)
-        if not files:
+                                  check_installed=not path)
+        if not path:
             ds = require_dataset(dataset, check_installed=True)
             subds = ds.subdatasets(recursive=False, result_xfm='relpaths')
-            files = list(_get_metadatarelevant_paths(ds, subds))
+            paths = list(_get_metadatarelevant_paths(ds, subds))
+        else:
+            paths = assure_list(path)
 
         dsmeta, contentmeta, error = _get_metadata(
             dataset,
             sources,
             global_meta=True,
-            content_meta=bool(files),
-            paths=files)
+            content_meta=bool(paths),
+            paths=paths)
 
         if dataset is not None and dataset.is_installed():
             res = get_status_dict(
