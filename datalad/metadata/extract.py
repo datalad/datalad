@@ -84,7 +84,7 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(sources=None, path=None, dataset=None):
+    def __call__(dataset=None, path=None, sources=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
                                   check_installed=not path)
