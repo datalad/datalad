@@ -58,8 +58,6 @@ from datalad.metadata.metadata import (
 )
 from datalad.metadata.metadata import (
     exclude_from_metadata,
-    get_metadata_type,
-    _get_metadata,
     _get_metadatarelevant_paths,
     _get_containingds_from_agginfo,
     location_keys,
