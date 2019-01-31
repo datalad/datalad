@@ -30,6 +30,7 @@ from datalad.support.constraints import (
 from datalad.metadata.metadata import (
     _get_metadata,
     _get_metadatarelevant_paths,
+    get_metadata_type,
 )
 from datalad.utils import assure_list
 
@@ -62,8 +63,10 @@ class ExtractMetadata(Interface):
             dest="sources",
             metavar=("NAME"),
             action='append',
-            required=True,
             doc="""Name of a metadata extractor to be executed.
+            If none is given, a set of default configured extractors,
+            plus any extractors enabled in a dataset's configuration
+            and invoked.
             [CMD: This option can be given more than once CMD]"""),
         path=Parameter(
             args=("path",),
@@ -81,10 +84,15 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(sources, path=None, dataset=None):
+    def __call__(sources=None, path=None, dataset=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
                                   check_installed=not path)
+
+        if not sources:
+            sources = ['datalad_core', 'annex'] \
+                + assure_list(get_metadata_type(dataset))
+
         if not path:
             ds = require_dataset(dataset, check_installed=True)
             subds = ds.subdatasets(recursive=False, result_xfm='relpaths')

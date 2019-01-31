@@ -452,9 +452,11 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     agginfo = db.get(aggfrom_ds.path, {})
     # paths to extract from
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
+    # TODO RF: remove when _get_metadata() is no longer used below
     # get extractors to engage from source dataset
     nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
     # store esssential extraction config in dataset record
+    # TODO instead of reporting what was enabled, report what was actually retrieved
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
 
