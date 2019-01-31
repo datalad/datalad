@@ -34,7 +34,7 @@ testpath = opj(dirname(dirname(dirname(__file__))), 'metadata', 'tests', 'data',
 def test_error(path):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
-        assert_raises(ValueError, extract_metadata, types=['bogus__'], files=[testpath])
+        assert_raises(ValueError, extract_metadata, sources=['bogus__'], files=[testpath])
 
 
 @with_tempfile(mkdir=True)
@@ -51,7 +51,7 @@ def test_ds_extraction(path):
     ok_clean_git(ds.path)
 
     res = extract_metadata(
-        types=['xmp'],
+        sources=['xmp'],
         dataset=ds,
         # artificially disable extraction from any file in the dataset
         files=[])
@@ -62,7 +62,7 @@ def test_ds_extraction(path):
 
     # now the more useful case: getting everthing for xmp from a dataset
     res = extract_metadata(
-        types=['xmp'],
+        sources=['xmp'],
         dataset=ds)
     assert_result_count(res, 2)
     assert_result_count(
@@ -87,7 +87,7 @@ def test_file_extraction(path):
     # go into virgin dir to avoid detection of any dataset
     with chpwd(path):
         res = extract_metadata(
-            types=['xmp'],
+            sources=['xmp'],
             files=[testpath])
         assert_result_count(res, 1, type='file', status='ok', action='metadata', path=testpath)
         assert_in('xmp', res[0]['metadata'])

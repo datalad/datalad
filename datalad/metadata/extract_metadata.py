@@ -41,17 +41,17 @@ class ExtractMetadata(Interface):
       Extract metadata with two extractors from a dataset in the current directory
       and also from all its files::
 
-        $ datalad extract-metadata -d . --type frictionless_datapackage --type datalad_core
+        $ datalad extract-metadata -d . --source frictionless_datapackage --source datalad_core
 
       Extract XMP metadata from a single PDF that is not part of any dataset::
 
-        $ datalad extract-metadata --type xmp Downloads/freshfromtheweb.pdf
+        $ datalad extract-metadata --source xmp Downloads/freshfromtheweb.pdf
     """
 
     _params_ = dict(
-        types=Parameter(
-            args=("--type",),
-            dest="types",
+        sources=Parameter(
+            args=("--source",),
+            dest="sources",
             metavar=("NAME"),
             action='append',
             required=True,
@@ -73,7 +73,7 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(types, files=None, dataset=None):
+    def __call__(sources, files=None, dataset=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
                                   check_installed=not files)
@@ -84,7 +84,7 @@ class ExtractMetadata(Interface):
 
         dsmeta, contentmeta, error = _get_metadata(
             dataset,
-            types,
+            sources,
             global_meta=True,
             content_meta=bool(files),
             paths=files)
