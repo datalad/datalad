@@ -30,6 +30,7 @@ from datalad.distribution.get import Get
 from datalad.distribution.remove import Remove
 from datalad.distribution.subdatasets import Subdatasets
 from datalad.interface.unlock import Unlock
+from datalad.metadata.extract import ExtractMetadata
 
 import datalad
 from datalad.dochelpers import exc_str
@@ -46,7 +47,10 @@ from datalad.interface.common_opts import (
     recursion_flag,
     nosave_opt,
 )
-from datalad.interface.results import get_status_dict
+from datalad.interface.results import (
+    get_status_dict,
+    success_status_map,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.metadata import (
     get_ds_aggregate_db_locations,
@@ -452,37 +456,67 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     agginfo = db.get(aggfrom_ds.path, {})
     # paths to extract from
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
-    # TODO RF: remove when _get_metadata() is no longer used below
-    # get extractors to engage from source dataset
-    nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
-    # store esssential extraction config in dataset record
-    # TODO instead of reporting what was enabled, report what was actually retrieved
-    agginfo['extractors'] = nativetypes
-    agginfo['datalad_version'] = datalad.__version__
-
-    # perform the actual extraction
-    dsmeta, contentmeta, errored = _get_metadata(
-        aggfrom_ds,
-        nativetypes,
-        # None indicates to honor a datasets per-extractor configuration and to be
-        # on by default
-        global_meta=None,
-        content_meta=None,
-        paths=relevant_paths)
 
     meta = {
-        'ds': dsmeta,
-        'cn': (dict(contentmeta[k], path=k) for k in sorted(contentmeta))
+        'ds': None,
+        'cn': [],
     }
 
+    extracted_metadata_sources = set()
+    # TODO get rid of this anacronism
+    errored = False
+    # perform the actual extraction
+    for res in aggfrom_ds.extract_metadata(
+            path=relevant_paths,
+            # None indicates to honor a datasets per-extractor configuration and to be
+            # on by default
+            reporton=None):
+        # TODO proper error condition handling
+        if success_status_map.get(res['status'], False) != 'success':
+            lgr.warn(
+                'Unsuccessful metadata extraction from %s, ignored',
+                aggfrom_ds)
+            errored = True
+            continue
+        restype = res.get('type', None)
+        extracted_metadata_sources = extracted_metadata_sources.union(
+            # assumes that any non-JSONLD-internal key is a metadata
+            # extractor, which should be valid
+            (k for k in res.get('metadata', {}) if not k.startswith('@')))
+        if restype == 'dataset':
+            if meta['ds'] is not None:
+                lgr.warn(
+                    'Metadata extraction from %s yielded second dataset '
+                    'metadata set, ignored',
+                    aggfrom_ds)
+                continue
+            meta['ds'] = res['metadata']
+        elif restype == 'file':
+            meta['cn'].append(
+                dict(
+                    res['metadata'],
+                    path=op.relpath(res['path'], start=aggfrom_ds.path)
+                )
+            )
+            pass
+        else:
+            lgr.warn(
+                'Metadata extraction from %s yielded unexpected '
+                'result type (%s), ignored record',
+                aggfrom_ds, restype)
+
+    # store esssential extraction config in dataset record
+    agginfo['datalad_version'] = datalad.__version__
+    # instead of reporting what was enabled, report what was actually retrieved
+    agginfo['extractors'] = list(extracted_metadata_sources)
     # inject the info which commmit we are describing into the core metadata
     # this is done here in order to avoid feeding it all the way down
-    coremeta = dsmeta.get('datalad_core', {})
+    coremeta = meta['ds'].get('datalad_core', {})
     version = aggfrom_ds.repo.describe(commitish=refcommit)
     if version:
         coremeta['version'] = version
     coremeta['refcommit'] = refcommit
-    dsmeta['datalad_core'] = coremeta
+    meta['ds']['datalad_core'] = coremeta
 
     # for both types of metadata
     for label, props in metasources.items():
