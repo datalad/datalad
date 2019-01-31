@@ -26,6 +26,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
+    EnsureChoice,
 )
 from datalad.metadata.metadata import (
     _get_metadata,
@@ -68,6 +69,13 @@ class ExtractMetadata(Interface):
             plus any extractors enabled in a dataset's configuration
             and invoked.
             [CMD: This option can be given more than once CMD]"""),
+        reporton=Parameter(
+            args=("--reporton",),
+            doc="""dataset component type to report metadata on. If 'all',
+            metadata will be reported for the entire dataset and its content.
+            If not specified, the dataset's configuration will determine
+            the selection, and will default to 'all'.""",
+            constraints=EnsureChoice(None, 'all', 'dataset', 'content')),
         path=Parameter(
             args=("path",),
             metavar="FILE",
@@ -84,7 +92,7 @@ class ExtractMetadata(Interface):
     @staticmethod
     @datasetmethod(name='extract_metadata')
     @eval_results
-    def __call__(dataset=None, path=None, sources=None):
+    def __call__(dataset=None, path=None, sources=None, reporton=None):
         dataset = require_dataset(dataset or curdir,
                                   purpose="extract metadata",
                                   check_installed=not path)
