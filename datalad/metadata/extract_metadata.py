@@ -11,19 +11,26 @@
 __docformat__ = 'restructuredtext'
 
 from os import curdir
-from os.path import join as opj
+import os.path as op
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
-from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import (
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureNone, EnsureStr
-from datalad.metadata.metadata import _get_metadata
-from datalad.metadata.metadata import _get_metadatarelevant_paths
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+)
+from datalad.metadata.metadata import (
+    _get_metadata,
+    _get_metadatarelevant_paths,
+)
 from datalad.utils import assure_list
 
 # API commands needed
@@ -104,7 +111,7 @@ class ExtractMetadata(Interface):
         for p in contentmeta:
             res = get_status_dict(
                 action='metadata',
-                path=opj(dataset.path, p) if dataset else p,
+                path=op.join(dataset.path, p) if dataset else p,
                 refds=dataset.path,
                 metadata=contentmeta[p],
                 type='file',
