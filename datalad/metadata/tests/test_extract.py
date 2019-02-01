@@ -87,8 +87,6 @@ def test_ds_extraction(path):
         res[0]['metadata']["datalad_unique_content_properties"]['xmp']["dc:description"],
         ["dlsubject"]
     )
-    # but we can blacklist fields
-
     # and lastly, if we disable extraction via config, we get nothing
     ds.config.add('datalad.metadata.extract-dataset-xmp', 'no', where='dataset')
     ds.config.add('datalad.metadata.extract-content-xmp', 'no', where='dataset')
