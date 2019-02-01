@@ -34,12 +34,12 @@ from datalad.interface.common_opts import (
 
 from .dataset import (
     RevolutionDataset as Dataset,
-    EnsureDataset,
-    datasetmethod,
-    require_dataset,
-    resolve_path,
-    path_under_dataset,
-    get_dataset_root,
+    EnsureRevDataset,
+    rev_datasetmethod,
+    require_rev_dataset,
+    rev_resolve_path,
+    path_under_rev_dataset,
+    rev_get_dataset_root,
 )
 from . import utils as ut
 
@@ -60,7 +60,7 @@ _common_diffstatus_params = dict(
         doc="""specify the dataset to query.  If
         no dataset is given, an attempt is made to identify the dataset
         based on the current working directory""",
-        constraints=EnsureDataset() | EnsureNone()),
+        constraints=EnsureRevDataset() | EnsureNone()),
     annex=Parameter(
         args=('--annex',),
         metavar='MODE',
@@ -139,7 +139,7 @@ class RevDiff(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_diff')
+    @rev_datasetmethod(name='rev_diff')
     @eval_results
     def __call__(
             fr='HEAD',
@@ -150,7 +150,7 @@ class RevDiff(Interface):
             untracked='normal',
             recursive=False,
             recursion_limit=None):
-        ds = require_dataset(
+        ds = require_rev_dataset(
             dataset, check_installed=True, purpose='difference reporting')
 
         # convert cmdline args into plain labels
@@ -229,12 +229,12 @@ def _diff_cmd(
             # special case is the root dataset, always report its content
             # changes
             orig_path = str(p)
-            resolved_path = resolve_path(p, dataset)
+            resolved_path = rev_resolve_path(p, dataset)
             p = \
                 resolved_path, \
                 orig_path.endswith(op.sep) or resolved_path == ds.pathobj
             str_path = text_type(p[0])
-            root = get_dataset_root(str_path)
+            root = rev_get_dataset_root(str_path)
             if root is None:
                 # no root, not possibly underneath the refds
                 yield dict(
@@ -245,7 +245,7 @@ def _diff_cmd(
                     message='path not underneath this dataset',
                     logger=lgr)
                 continue
-            if path_under_dataset(ds, str_path) is None:
+            if path_under_rev_dataset(ds, str_path) is None:
                 # nothing we support handling any further
                 # there is only a single refds
                 yield dict(

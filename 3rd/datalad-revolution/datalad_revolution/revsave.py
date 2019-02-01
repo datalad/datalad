@@ -42,9 +42,9 @@ from . import utils as ut
 
 from .dataset import (
     RevolutionDataset as Dataset,
-    EnsureDataset,
-    datasetmethod,
-    require_dataset,
+    EnsureRevDataset,
+    rev_datasetmethod,
+    require_rev_dataset,
 )
 from .revstatus import (
     RevStatus as Status,
@@ -84,7 +84,7 @@ class RevSave(Interface):
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc=""""specify the dataset to save""",
-            constraints=EnsureDataset() | EnsureNone()),
+            constraints=EnsureRevDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -125,7 +125,7 @@ class RevSave(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_save')
+    @rev_datasetmethod(name='rev_save')
     @eval_results
     def __call__(path=None, message=None, dataset=None,
                  version_tag=None,
@@ -174,7 +174,7 @@ class RevSave(Interface):
         #   This avoids complex annotation loops and hierarchy tracking.
         # - any modification upwards from the root dataset
 
-        ds = require_dataset(dataset, check_installed=True, purpose='saving')
+        ds = require_rev_dataset(dataset, check_installed=True, purpose='saving')
 
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}

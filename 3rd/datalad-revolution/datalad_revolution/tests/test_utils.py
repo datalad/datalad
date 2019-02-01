@@ -15,7 +15,7 @@ from datalad.tests.utils import (
 
 from ..dataset import (
     RevolutionDataset as Dataset,
-    resolve_path,
+    rev_resolve_path as resolve_path,
 )
 
 from .. import utils as ut

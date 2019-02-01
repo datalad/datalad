@@ -39,12 +39,12 @@ from datalad.utils import getpwd
 
 from .dataset import (
     RevolutionDataset as Dataset,
-    datasetmethod,
-    EnsureDataset,
-    get_dataset_root,
-    resolve_path,
-    path_under_dataset,
-    require_dataset,
+    rev_datasetmethod,
+    EnsureRevDataset,
+    rev_get_dataset_root,
+    rev_resolve_path,
+    path_under_rev_dataset,
+    require_rev_dataset,
 )
 # for bound dataset method
 from .revsave import RevSave
@@ -138,7 +138,7 @@ class RevCreate(Interface):
             command will error if the target directory is not empty.
             Use `force` to create a dataset in a non-empty directory.""",
             # put dataset 2nd to avoid useless conversion
-            constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
+            constraints=EnsureStr() | EnsureRevDataset() | EnsureNone()),
         initopts=Parameter(
             args=("initopts",),
             metavar='INIT OPTIONS',
@@ -155,7 +155,7 @@ class RevCreate(Interface):
             metavar='DATASET',
             doc="""specify the dataset to perform the create operation on. If
             a dataset is given, a new subdataset will be created in it.""",
-            constraints=EnsureDataset() | EnsureNone()),
+            constraints=EnsureRevDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
             doc="""enforce creation of a dataset in a non-empty directory""",
@@ -177,7 +177,7 @@ class RevCreate(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_create')
+    @rev_datasetmethod(name='rev_create')
     @eval_results
     def __call__(
             path=None,
@@ -204,7 +204,7 @@ class RevCreate(Interface):
                                  "no annex repo.")
 
         if path:
-            path = resolve_path(path, dataset)
+            path = rev_resolve_path(path, dataset)
 
         path = path if path \
             else getpwd() if dataset is None \
@@ -219,11 +219,11 @@ class RevCreate(Interface):
 
         refds = None
         if refds_path and refds_path != path:
-            refds = require_dataset(
+            refds = require_rev_dataset(
                 refds_path, check_installed=True,
                 purpose='creating a subdataset')
 
-            path_inrefds = path_under_dataset(refds, path)
+            path_inrefds = path_under_rev_dataset(refds, path)
             if path_inrefds is None:
                 yield dict(
                     res,
@@ -241,7 +241,7 @@ class RevCreate(Interface):
         # a potentially absent/uninstalled subdataset of the parent
         # in this location
         # it will cost some filesystem traversal though...
-        parentds_path = get_dataset_root(
+        parentds_path = rev_get_dataset_root(
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)

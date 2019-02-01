@@ -97,7 +97,7 @@ setattr(RevolutionDataset, 'get_subdatasets', ut.nothere)
 
 
 @optional_args
-def datasetmethod(f, name=None, dataset_argname='dataset'):
+def rev_datasetmethod(f, name=None, dataset_argname='dataset'):
     """Decorator to bind functions to Dataset class.
 
     The decorated function is still directly callable and additionally serves
@@ -151,21 +151,20 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
 
 # minimal wrapper to ensure a revolution dataset is coming out
-class EnsureDataset(_EnsureDataset):
+class EnsureRevDataset(_EnsureDataset):
     def __call__(self, value):
         return RevolutionDataset(
-            super(EnsureDataset, self).__call__(value).path)
+            super(_EnsureDataset, self).__call__(value).path)
 
 
 # minimal wrapper to ensure a revolution dataset is coming out
-def require_dataset(dataset, check_installed=True, purpose=None):
+def require_rev_dataset(dataset, check_installed=True, purpose=None):
     return RevolutionDataset(_require_dataset(
         dataset,
         check_installed,
         purpose).path)
 
-
-def resolve_path(path, ds=None):
+def rev_resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
     Any explicit path (absolute or relative) is returned as an absolute path.
@@ -195,7 +194,7 @@ def resolve_path(path, ds=None):
     `pathlib.Path` object
     """
     if ds is not None and not isinstance(ds, _Dataset):
-        ds = require_dataset(ds, check_installed=False, purpose='path resolution')
+        ds = require_rev_dataset(ds, check_installed=False, purpose='path resolution')
     if ds is None:
         # CWD is the reference
         path = ut.Path(path)
@@ -251,7 +250,7 @@ def resolve_path(path, ds=None):
     return path
 
 
-def path_under_dataset(ds, path):
+def path_under_rev_dataset(ds, path):
     ds_path = ds.pathobj
     try:
         rpath = text_type(ut.Path(path).relative_to(ds_path))
@@ -262,14 +261,14 @@ def path_under_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = get_dataset_root(text_type(path))
+    root = rev_get_dataset_root(text_type(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
         # to jump in the the next directory up, but we have
         # to use ./.. and get_dataset_root() will handle
         # the rest just fine
-        root = get_dataset_root(op.join(root, op.pardir))
+        root = rev_get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
     return ds_path / op.relpath(text_type(path), root)
@@ -277,7 +276,7 @@ def path_under_dataset(ds, path):
 
 # XXX this is a copy of the change proposed in
 # https://github.com/datalad/datalad/pull/2944
-def get_dataset_root(path):
+def rev_get_dataset_root(path):
     """Return the root of an existent dataset containing a given path
 
     The root path is returned in the same absolute or relative form
@@ -310,3 +309,15 @@ def get_dataset_root(path):
         return altered
 
     return None
+
+
+# this is here to make it easier for extensions that use this already
+# TODO remove when merged into datalad-core, but keep in extension code
+datasetmethod = rev_datasetmethod
+require_dataset = require_rev_dataset
+path_under_dataset = path_under_rev_dataset
+resolve_path = rev_resolve_path
+get_dataset_root = rev_get_dataset_root
+EnsureDataset = EnsureRevDataset
+
+

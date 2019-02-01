@@ -53,5 +53,8 @@ setup(
         'datalad.tests': [
             'revolution=datalad_revolution',
         ],
+        'datalad.metadata.extractors': [
+            'custom=datalad_revolution.metadata.extractors.custom:MetadataExtractor',
+        ],
     },
 )
