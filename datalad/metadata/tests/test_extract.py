@@ -23,6 +23,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import eq_
 
 from datalad.support.exceptions import IncompleteResultsError
 
@@ -50,6 +51,13 @@ def test_ds_extraction(path):
     ds.add('.')
     ok_clean_git(ds.path)
 
+    # by default we get core and annex reports
+    res = extract_metadata(dataset=ds)
+    assert_result_count(res, 2)
+    for k in ('datalad_core', 'annex'):
+        assert(all(k in r['metadata'] for r in res))
+
+    # now for specific extractor request
     res = extract_metadata(
         sources=['xmp'],
         dataset=ds,
@@ -74,6 +82,17 @@ def test_ds_extraction(path):
         parentds=ds.path)
     for r in res:
         assert_in('xmp', r['metadata'])
+    # we have a unique value report
+    eq_(
+        res[0]['metadata']["datalad_unique_content_properties"]['xmp']["dc:description"],
+        ["dlsubject"]
+    )
+    # but we can blacklist fields
+
+    # and lastly, if we disable extraction via config, we get nothing
+    ds.config.add('datalad.metadata.extract-dataset-xmp', 'no', where='dataset')
+    ds.config.add('datalad.metadata.extract-content-xmp', 'no', where='dataset')
+    assert_result_count(extract_metadata(sources=['xmp'], dataset=ds), 0)
 
 
 @with_tempfile(mkdir=True)

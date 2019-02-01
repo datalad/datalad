@@ -172,6 +172,8 @@ class ExtractMetadata(Interface):
                 )
 
         # pull out potential metadata field blacklist config settings
+        # TODO this is pointless, as the blacklisting is not per extractor
+        # there will be no magic field name congruence...
         blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
             'datalad.metadata.aggregate-ignore-fields',
             default=[]))]
@@ -198,16 +200,11 @@ class ExtractMetadata(Interface):
             # load the extractor class, no instantiation yet
             try:
                 extractor_cls = extractors[msrc].load()
-            except Exception as e:
-                log_progress(
-                    lgr.error,
-                    'metadataextractors',
-                    'Failed %s metadata extraction from %s', msrc, dataset,
-                )
-                raise ValueError(
-                    "Failed to load metadata extractor for '%s', "
-                    "broken dataset configuration (%s)?: %s",
-                    msrc, dataset, exc_str(e))
+            except Exception as e:  # pragma: no cover
+                msg = ('Failed %s metadata extraction from %s: %s',
+                       msrc, dataset, exc_str)
+                log_progress(lgr.error, 'metadataextractors', *msg)
+                raise ValueError(msg[0] % msg[1])
 
             # desired setup for generation of unique metadata values
             want_unique = ds.config.obtain(
@@ -225,7 +222,14 @@ class ExtractMetadata(Interface):
                     dataset,
                     paths if extractor_cls.NEEDS_CONTENT else fullpathlist,
                     reporton):
-                if success_status_map.get(res['status'], False) == 'success':
+                # the following two conditionals are untested, as a test would require
+                # a metadata extractor to yield broken metadata, and in order to have
+                # such one, we need a mechanism to have the test inject one on the fly
+                # MIH thinks that the code neeeded to do that is more chances to be broken
+                # then the code it would test
+                # TODO verify that is has worked once by manually breaking an extractor
+                if success_status_map.get(res['status'], False) == 'success':  # pragma: no cover
+
                     # if the extractor was happy check the result
                     if not _ok_metadata(res, msrc, ds, None):
                         res.update(
@@ -234,7 +238,8 @@ class ExtractMetadata(Interface):
                             # TODO have _ok_metadata report the real error
                             message=('Invalid metadata (%s)', msrc),
                         )
-                if success_status_map.get(res['status'], False) != 'success':
+                if success_status_map.get(res['status'], False) != 'success':  # pragma: no cover
+
                     res.update(
                         path=op.join(dataset.path, res['path'])
                         if 'path' in res else dataset.path,
@@ -289,12 +294,13 @@ class ExtractMetadata(Interface):
             'Finished metadata extraction from %s', ds,
         )
 
-        # always identify the effective vocabulary - JSON-LD style
-        dsmeta['@context'] = {
-            '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
-                vocabulary_version)}
+        if dsmeta:
+            # always identify the effective vocabulary - JSON-LD style
+            dsmeta['@context'] = {
+                '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
+                    vocabulary_version)}
 
-        if dataset is not None and dataset.is_installed():
+        if dsmeta and dataset is not None and dataset.is_installed():
             yield get_status_dict(
                 ds=dataset,
                 metadata=dsmeta,
@@ -320,13 +326,13 @@ class ExtractMetadata(Interface):
 def _run_extractor(extractor_cls, name, ds, paths, reporton):
         want_dataset_meta = reporton in ('all', 'dataset') if reporton else \
             ds.config.obtain(
-                'datalad.metadata.aggregate-dataset-{}'.format(
+                'datalad.metadata.extract-dataset-{}'.format(
                     name.replace('_', '-')),
                 default=True,
                 valtype=EnsureBool())
         want_content_meta = reporton in ('all', 'content') if reporton else \
             ds.config.obtain(
-                'datalad.metadata.aggregate-content-{}'.format(
+                'datalad.metadata.extract-content-{}'.format(
                     name.replace('_', '-')),
                 default=True,
                 valtype=EnsureBool())
@@ -342,7 +348,7 @@ def _run_extractor(extractor_cls, name, ds, paths, reporton):
 
         try:
             extractor = extractor_cls(ds, paths)
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             log_progress(
                 lgr.error,
                 'metadataextractors',
@@ -374,7 +380,7 @@ def _run_extractor(extractor_cls, name, ds, paths, reporton):
                 type='dataset',
                 metadata=dsmeta_t,
             )
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             if cfg.get('datalad.runtime.raiseonerror'):
                 log_progress(
                     lgr.error,
@@ -413,6 +419,9 @@ def _update_unique_cm(unique_cm, msrc_key, dsmeta, cnmeta, exclude_keys):
     # and values into `dsmeta`
     for k, v in iteritems(cnmeta):
         if k in dsmeta.get(msrc_key, {}):
+            # XXX untested, needs a provoked conflict of content and dsmeta
+            # relatively hard to fake in a test
+            #
             # if the dataset already has a dedicated idea
             # about a key, we skip it from the unique list
             # the point of the list is to make missing info about
@@ -423,6 +432,9 @@ def _update_unique_cm(unique_cm, msrc_key, dsmeta, cnmeta, exclude_keys):
             # aggregated list of a hopefully-kinda-ok structure
             continue
         elif k in exclude_keys:
+            # XXX this is untested ATM and waiting for
+            # https://github.com/datalad/datalad/issues/3135
+            #
             # the extractor thinks this key is worthless for the purpose
             # of discovering whole datasets
             # we keep the key (so we know that some file is providing this key),
@@ -461,6 +473,7 @@ def _finalize_unique_cm(unique_cm, msrc_key, dsmeta):
     # was a list, os opposed to a list of unique values
 
     def _ensure_serializable(val):
+        # XXX special cases are untested, need more convoluted metadata
         if isinstance(val, ReadOnlyDict):
             return {k: _ensure_serializable(v) for k, v in iteritems(val)}
         if isinstance(val, (tuple, list)):
@@ -490,6 +503,7 @@ def _val2hashable(val):
     avoiding conversions that would result in a change of representation
     in a subsequent JSON string.
     """
+    # XXX special cases are untested, need more convoluted metadata
     if isinstance(val, dict):
         return ReadOnlyDict(val)
     elif isinstance(val, list):
@@ -501,6 +515,8 @@ def _val2hashable(val):
 def _unique_value_key(x):
     """Small helper for sorting unique content metadata values"""
     if isinstance(x, ReadOnlyDict):
+        # XXX special case untested, needs more convoluted metadata
+        #
         # turn into an item tuple with keys sorted and values plain
         # or as a hash if *dicts
         x = [(k,
@@ -535,6 +551,7 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
 def _ok_metadata(res, msrc, ds, loc):
     restype = res.get('type', None)
     if restype not in ('dataset', 'file'):
+        # XXX untested, needs broken extractor
         lgr.error(
             'metadata report for something other than a file or dataset: %s',
             restype
@@ -545,6 +562,7 @@ def _ok_metadata(res, msrc, ds, loc):
     if meta is None or isinstance(meta, dict):
         return True
 
+    # XXX untested, needs broken extractord
     msg = (
         "Metadata extractor '%s' yielded something other than a dictionary "
         "for dataset %s%s -- this is likely a bug, please consider "
@@ -564,6 +582,9 @@ def _ok_metadata(res, msrc, ds, loc):
 class ReadOnlyDict(Mapping):
     # Taken from https://github.com/slezica/python-frozendict
     # License: MIT
+
+    # XXX entire class is untested
+
     """
     An immutable wrapper around dictionaries that implements the complete
     :py:class:`collections.Mapping` interface. It can be used as a drop-in
