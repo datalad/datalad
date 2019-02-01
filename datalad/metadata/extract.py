@@ -113,14 +113,26 @@ class ExtractMetadata(Interface):
     @datasetmethod(name='extract_metadata')
     @eval_results
     def __call__(dataset=None, path=None, sources=None, reporton=None):
+        # TODO verify that we need this ds vs dataset distinction
         ds = dataset = require_dataset(
             dataset or curdir,
             purpose="extract metadata",
             check_installed=not path)
 
+        # check what extractors we want as sources, and whether they are
+        # available
         if not sources:
             sources = ['datalad_core', 'annex'] \
                 + assure_list(get_metadata_type(dataset))
+        # keep local, who knows what some extractors might pull in
+        from pkg_resources import iter_entry_points  # delayed heavy import
+        extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
+        for msrc in sources:
+            if msrc not in extractors:
+                # we said that we want to fail, rather then just moan about less metadata
+                raise ValueError(
+                    'Enabled metadata extractor %s not available'.format(msrc),
+                )
 
         if not path:
             ds = require_dataset(dataset, check_installed=True)
@@ -161,9 +173,6 @@ class ExtractMetadata(Interface):
             default=[]))]
         # enforce size limits
         max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-        # keep local, who knows what some extractors might pull in
-        from pkg_resources import iter_entry_points  # delayed heavy import
-        extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
 
         log_progress(
             lgr.info,
@@ -207,16 +216,6 @@ class ExtractMetadata(Interface):
                     msrc_key, ds,
                 )
                 continue
-            if msrc_key not in extractors:
-                # we said that we want to fail, rather then just moan about less metadata
-                log_progress(
-                    lgr.error,
-                    'metadataextractors',
-                    'Failed %s metadata extraction from %s', msrc_key, ds,
-                )
-                raise ValueError(
-                    'Enabled metadata extractor %s is not available in this installation',
-                    msrc_key)
             try:
                 extractor_cls = extractors[msrc_key].load()
                 extractor = extractor_cls(
@@ -338,32 +337,16 @@ class ExtractMetadata(Interface):
                 loc_dict[msrc_key] = meta
                 contentmeta[loc] = loc_dict
 
-                # TODO yield content meta here
-
                 if want_unique:
                     # go through content metadata and inject report of unique keys
-                    # and values into `dsmeta`
-                    for k, v in iteritems(meta):
-                        if k in dsmeta.get(msrc_key, {}):
-                            # if the dataset already has a dedicated idea
-                            # about a key, we skip it from the unique list
-                            # the point of the list is to make missing info about
-                            # content known in the dataset, not to blindly
-                            # duplicate metadata. Example: list of samples data
-                            # were recorded from. If the dataset has such under
-                            # a 'sample' key, we should prefer that, over an
-                            # aggregated list of a hopefully-kinda-ok structure
-                            continue
-                        elif k in extractor_unique_exclude:
-                            # the extractor thinks this key is worthless for the purpose
-                            # of discovering whole datasets
-                            # we keep the key (so we know that some file is providing this key),
-                            # but ignore any value it came with
-                            unique_cm[k] = None
-                            continue
-                        vset = unique_cm.get(k, set())
-                        vset.add(_val2hashable(v))
-                        unique_cm[k] = vset
+                    # and values into `unique_cm`
+                    _update_unique_cm(
+                        unique_cm,
+                        msrc_key,
+                        dsmeta,
+                        meta,
+                        extractor_unique_exclude,
+                    )
 
             # log_progress(
             #     lgr.debug,
@@ -371,39 +354,8 @@ class ExtractMetadata(Interface):
             #     'Finished metadata extraction across locations for %s', msrc)
 
             if unique_cm:
-                # per source storage here too
-                ucp = dsmeta.get('datalad_unique_content_properties', {})
-                # important: we want to have a stable order regarding
-                # the unique values (a list). we cannot guarantee the
-                # same order of discovery, hence even when not using a
-                # set above we would still need sorting. the callenge
-                # is that any value can be an arbitrarily complex nested
-                # beast
-                # we also want to have each unique value set always come
-                # in a top-level list, so we known if some unique value
-                # was a list, os opposed to a list of unique values
-
-                def _ensure_serializable(val):
-                    if isinstance(val, ReadOnlyDict):
-                        return {k: _ensure_serializable(v) for k, v in iteritems(val)}
-                    if isinstance(val, (tuple, list)):
-                        return [_ensure_serializable(v) for v in val]
-                    else:
-                        return val
-
-                ucp[msrc_key] = {
-                    k: [_ensure_serializable(i)
-                        for i in sorted(
-                            v,
-                            key=_unique_value_key)] if v is not None else None
-                    for k, v in iteritems(unique_cm)
-                    # v == None (disable unique, but there was a value at some point)
-                    # otherwise we only want actual values, and also no single-item-lists
-                    # of a non-value
-                    # those contribute no information, but bloat the operation
-                    # (inflated number of keys, inflated storage, inflated search index, ...)
-                    if v is None or (v and not v == {''})}
-                dsmeta['datalad_unique_content_properties'] = ucp
+                # produce final unique record in dsmeta for this extractor
+                _finalize_unique_cm(unique_cm, msrc_key, dsmeta)
 
         log_progress(
             lgr.info,
@@ -437,6 +389,98 @@ class ExtractMetadata(Interface):
             if dataset:
                 res['parentds'] = dataset.path
             yield res
+
+
+def _update_unique_cm(unique_cm, msrc_key, dsmeta, cnmeta, exclude_keys):
+    """Sift through a new content metadata set and update the unique value
+    record
+
+    Parameters
+    ----------
+    unique_cm : dict
+      unique value records for an individual extractor, modified
+      in place
+    msrc_key : str
+      key of the extractor currently processed
+    dsmeta : dict
+      dataset metadata record. To lookup conflicting field.
+    cnmeta : dict
+      Metadata to sift through.
+    exclude_keys : iterable
+      Keys of fields to exclude from processing.
+    """
+    # go through content metadata and inject report of unique keys
+    # and values into `dsmeta`
+    for k, v in iteritems(cnmeta):
+        if k in dsmeta.get(msrc_key, {}):
+            # if the dataset already has a dedicated idea
+            # about a key, we skip it from the unique list
+            # the point of the list is to make missing info about
+            # content known in the dataset, not to blindly
+            # duplicate metadata. Example: list of samples data
+            # were recorded from. If the dataset has such under
+            # a 'sample' key, we should prefer that, over an
+            # aggregated list of a hopefully-kinda-ok structure
+            continue
+        elif k in exclude_keys:
+            # the extractor thinks this key is worthless for the purpose
+            # of discovering whole datasets
+            # we keep the key (so we know that some file is providing this key),
+            # but ignore any value it came with
+            unique_cm[k] = None
+            continue
+        vset = unique_cm.get(k, set())
+        vset.add(_val2hashable(v))
+        unique_cm[k] = vset
+
+
+def _finalize_unique_cm(unique_cm, msrc_key, dsmeta):
+    """Convert harvested unique values in a serializable, ordered
+    representation, and inject it into the dataset metadata
+
+    Parameters
+    ----------
+    unique_cm : dict
+      unique value records for an individual extractor
+    msrc_key : str
+      key of the extractor currently processed
+    dsmeta : dict
+      dataset metadata record to inject unique value report into,
+      modified in place
+    """
+    # per source storage here too
+    ucp = dsmeta.get('datalad_unique_content_properties', {})
+    # important: we want to have a stable order regarding
+    # the unique values (a list). we cannot guarantee the
+    # same order of discovery, hence even when not using a
+    # set above we would still need sorting. the callenge
+    # is that any value can be an arbitrarily complex nested
+    # beast
+    # we also want to have each unique value set always come
+    # in a top-level list, so we known if some unique value
+    # was a list, os opposed to a list of unique values
+
+    def _ensure_serializable(val):
+        if isinstance(val, ReadOnlyDict):
+            return {k: _ensure_serializable(v) for k, v in iteritems(val)}
+        if isinstance(val, (tuple, list)):
+            return [_ensure_serializable(v) for v in val]
+        else:
+            return val
+
+    ucp[msrc_key] = {
+        k: [_ensure_serializable(i)
+            for i in sorted(
+                v,
+                key=_unique_value_key)] if v is not None else None
+        for k, v in iteritems(unique_cm)
+        # v == None (disable unique, but there was a value at some point)
+        # otherwise we only want actual values, and also no single-item-lists
+        # of a non-value
+        # those contribute no information, but bloat the operation
+        # (inflated number of keys, inflated storage, inflated search index, ...)
+        if v is None or (v and not v == {''})}
+    dsmeta['datalad_unique_content_properties'] = ucp
 
 
 def _val2hashable(val):
