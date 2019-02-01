@@ -26,7 +26,10 @@ from collections import (
 from datalad import cfg
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.interface.results import get_status_dict
+from datalad.interface.results import (
+    get_status_dict,
+    success_status_map,
+)
 from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import (
     datasetmethod,
@@ -151,6 +154,7 @@ class ExtractMetadata(Interface):
         dsmeta = dict()
         contentmeta = {}
 
+        # TODO this whole path vs fullpathlist is awkward and probably broken
         fullpathlist = paths
         if paths and isinstance(ds.repo, AnnexRepo):
             # Ugly? Jep: #2055
@@ -190,169 +194,91 @@ class ExtractMetadata(Interface):
                 'Engage %s metadata extractor', msrc_key,
                 update=1,
                 increment=True)
-            want_dataset_meta = reporton in ('all', 'dataset') if reporton else \
-                ds.config.obtain(
-                    'datalad.metadata.aggregate-dataset-{}'.format(
-                        msrc.replace('_', '-')),
-                    default=True,
-                    valtype=EnsureBool())
-            want_content_meta = reporton in ('all', 'content') if reporton else \
-                ds.config.obtain(
-                    'datalad.metadata.aggregate-content-{}'.format(
-                        msrc.replace('_', '-')),
-                    default=True,
-                    valtype=EnsureBool())
+
+            # load the extractor class, no instantiation yet
+            try:
+                extractor_cls = extractors[msrc].load()
+            except Exception as e:
+                log_progress(
+                    lgr.error,
+                    'metadataextractors',
+                    'Failed %s metadata extraction from %s', msrc, dataset,
+                )
+                raise ValueError(
+                    "Failed to load metadata extractor for '%s', "
+                    "broken dataset configuration (%s)?: %s",
+                    msrc, dataset, exc_str(e))
+
+            # desired setup for generation of unique metadata values
             want_unique = ds.config.obtain(
                 'datalad.metadata.generate-unique-{}'.format(
                     msrc_key.replace('_', '-')),
                 default=True,
                 valtype=EnsureBool())
-
-            if not (want_dataset_meta or want_content_meta):
-                log_progress(
-                    lgr.info,
-                    'metadataextractors',
-                    'Skipping %s metadata extraction from %s, disabled by configuration',
-                    msrc_key, ds,
-                )
-                continue
-            try:
-                extractor_cls = extractors[msrc_key].load()
-                extractor = extractor_cls(
-                    ds,
-                    paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
-            except Exception as e:
-                log_progress(
-                    lgr.error,
-                    'metadataextractors',
-                    'Failed %s metadata extraction from %s', msrc_key, ds,
-                )
-                raise ValueError(
-                    "Failed to load metadata extractor for '%s', "
-                    "broken dataset configuration (%s)?: %s",
-                    msrc, ds, exc_str(e))
-                continue
-            try:
-                dsmeta_t, contentmeta_t = extractor.get_metadata(
-                    dataset=want_dataset_meta,
-                    content=want_content_meta,
-                )
-            except Exception as e:
-                if cfg.get('datalad.runtime.raiseonerror'):
-                    log_progress(
-                        lgr.error,
-                        'metadataextractors',
-                        'Failed %s metadata extraction from %s', msrc_key, ds,
-                    )
-                    raise
-                yield get_status_dict(
-                    ds=dataset,
-                    # any errors will have been reported before
-                    status='error',
-                    message=('Failed to get %s metadata (%s): %s',
-                             dataset, msrc, exc_str(e)),
-                    **res_props
-                )
-                continue
-
-            if dsmeta_t:
-                if _ok_metadata(dsmeta_t, msrc, ds, None):
-                    dsmeta_t = _filter_metadata_fields(
-                        dsmeta_t,
-                        maxsize=max_fieldsize,
-                        blacklist=blacklist)
-                    dsmeta[msrc_key] = dsmeta_t
-                else:
-                    # TODO make _ok_metadata report the actual error and relay it
-                    yield get_status_dict(
-                        ds=dataset,
-                        status='error',
-                        message=('Invalid dataset metadata (%s): %s',
-                                 msrc, dataset),
-                        **res_props
-                    )
-
             unique_cm = {}
             extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
-            # TODO: ATM neuroimaging extractors all provide their own internal
-            #  log_progress but if they are all generators, we could provide generic
-            #  handling of the progress here.  Note also that log message is actually
-            #  seems to be ignored and not used, only the label ;-)
-            # log_progress(
-            #     lgr.debug,
-            #     'metadataextractors_loc',
-            #     'Metadata extraction per location for %s', msrc,
-            #     # contentmeta_t is a generator... so no cound is known
-            #     # total=len(contentmeta_t or []),
-            #     label='Metadata extraction per location',
-            #     unit=' locations',
-            # )
-            for loc, meta in contentmeta_t or {}:
-                absloc = op.join(dataset.path, loc)
-                lgr.log(5, "Analyzing metadata for %s", absloc)
-                # log_progress(
-                #     lgr.debug,
-                #     'metadataextractors_loc',
-                #     'ignoredatm',
-                #     label=loc,
-                #     update=1,
-                #     increment=True)
-                if not _ok_metadata(meta, msrc, ds, loc):
-                    yield get_status_dict(
-                        path=absloc,
-                        type='file',
-                        # any errors will have been reported before
-                        status='error',
-                        message=('Invalid content metadata (%s): %s',
-                                 msrc, absloc),
+
+            # actual pull the metadata records out of the extractor
+            for res in _run_extractor(
+                    extractor_cls,
+                    msrc,
+                    dataset,
+                    paths if extractor_cls.NEEDS_CONTENT else fullpathlist,
+                    reporton):
+                if success_status_map.get(res['status'], False) == 'success':
+                    # if the extractor was happy check the result
+                    if not _ok_metadata(res, msrc, ds, None):
+                        res.update(
+                            # this will prevent further processing a few lines down
+                            status='error',
+                            # TODO have _ok_metadata report the real error
+                            message=('Invalid metadata (%s)', msrc),
+                        )
+                if success_status_map.get(res['status'], False) != 'success':
+                    res.update(
+                        path=op.join(dataset.path, res['path'])
+                        if 'path' in res else dataset.path,
                         **res_props
                     )
-                    # log_progress(
-                    #     lgr.debug,
-                    #     'metadataextractors_loc',
-                    #     'ignoredatm',
-                    #     label='Failed for %s' % loc,
-                    # )
+                    yield res
+                    # no further processing of broken stuff
                     continue
+
+                # strip by applying size and type filters
+                res['metadata'] = _filter_metadata_fields(
+                    res['metadata'],
+                    maxsize=max_fieldsize,
+                    blacklist=blacklist)
+
                 # we also want to store info that there was no metadata(e.g. to get a list of
                 # files that have no metadata)
                 # if there is an issue that a extractor needlessly produces empty records, the
                 # extractor should be fixed and not a general switch. For example the datalad_core
                 # issues empty records to document the presence of a file
-                #elif not meta:
+                #if not res['metadata']:
+                #    # after checks and filters nothing is left, nothing to report
                 #    continue
 
-                # apply filters
-                meta = _filter_metadata_fields(
-                    meta,
-                    maxsize=max_fieldsize,
-                    blacklist=blacklist)
-
-                if not meta:
-                    continue
-
-                # assign
-                # only ask each metadata extractor once, hence no conflict possible
-                loc_dict = contentmeta.get(loc, {})
-                loc_dict[msrc_key] = meta
-                contentmeta[loc] = loc_dict
-
-                if want_unique:
-                    # go through content metadata and inject report of unique keys
-                    # and values into `unique_cm`
-                    _update_unique_cm(
-                        unique_cm,
-                        msrc_key,
-                        dsmeta,
-                        meta,
-                        extractor_unique_exclude,
-                    )
-
-            # log_progress(
-            #     lgr.debug,
-            #     'metadataextractors_loc',
-            #     'Finished metadata extraction across locations for %s', msrc)
-
+                if res['type'] == 'dataset':
+                    # TODO warn if two dataset records are generated by the same extractor
+                    dsmeta[msrc_key] = res['metadata']
+                else:
+                    # this is file metadata, _ok_metadata() checks unknown types
+                    # assign
+                    # only ask each metadata extractor once, hence no conflict possible
+                    loc_dict = contentmeta.get(res['path'], {})
+                    loc_dict[msrc_key] = res['metadata']
+                    contentmeta[res['path']] = loc_dict
+                    if want_unique:
+                        # go through content metadata and inject report of unique keys
+                        # and values into `unique_cm`
+                        _update_unique_cm(
+                            unique_cm,
+                            msrc_key,
+                            dsmeta,
+                            res['metadata'],
+                            extractor_unique_exclude,
+                        )
             if unique_cm:
                 # produce final unique record in dsmeta for this extractor
                 _finalize_unique_cm(unique_cm, msrc_key, dsmeta)
@@ -389,6 +315,80 @@ class ExtractMetadata(Interface):
             if dataset:
                 res['parentds'] = dataset.path
             yield res
+
+
+def _run_extractor(extractor_cls, name, ds, paths, reporton):
+        want_dataset_meta = reporton in ('all', 'dataset') if reporton else \
+            ds.config.obtain(
+                'datalad.metadata.aggregate-dataset-{}'.format(
+                    name.replace('_', '-')),
+                default=True,
+                valtype=EnsureBool())
+        want_content_meta = reporton in ('all', 'content') if reporton else \
+            ds.config.obtain(
+                'datalad.metadata.aggregate-content-{}'.format(
+                    name.replace('_', '-')),
+                default=True,
+                valtype=EnsureBool())
+
+        if not (want_dataset_meta or want_content_meta):
+            log_progress(
+                lgr.info,
+                'metadataextractors',
+                'Skipping %s metadata extraction from %s, disabled by configuration',
+                name, ds,
+            )
+            return
+
+        try:
+            extractor = extractor_cls(ds, paths)
+        except Exception as e:
+            log_progress(
+                lgr.error,
+                'metadataextractors',
+                'Failed %s metadata extraction from %s', name, ds,
+            )
+            raise ValueError(
+                "Failed to load metadata extractor for '%s', "
+                "broken dataset configuration (%s)?: %s",
+                name, ds, exc_str(e))
+        try:
+            # this is the old way of extractor operation
+            dsmeta_t, contentmeta_t = extractor.get_metadata(
+                dataset=want_dataset_meta,
+                content=want_content_meta,
+            )
+            # fake the new way of reporting results directly
+            # extractors had no way to report errors, hence
+            # everything is unconditionally 'ok'
+            for loc, meta in contentmeta_t:
+                yield dict(
+                    status='ok',
+                    path=loc,
+                    type='file',
+                    metadata=meta,
+                )
+            yield dict(
+                status='ok',
+                path=ds.path,
+                type='dataset',
+                metadata=dsmeta_t,
+            )
+        except Exception as e:
+            if cfg.get('datalad.runtime.raiseonerror'):
+                log_progress(
+                    lgr.error,
+                    'metadataextractors',
+                    'Failed %s metadata extraction from %s', name, ds,
+                )
+                raise
+            yield get_status_dict(
+                ds=ds,
+                # any errors will have been reported before
+                status='error',
+                message=('Failed to get %s metadata (%s): %s',
+                         ds, name, exc_str(e)),
+            )
 
 
 def _update_unique_cm(unique_cm, msrc_key, dsmeta, cnmeta, exclude_keys):
@@ -532,7 +532,16 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
     return d
 
 
-def _ok_metadata(meta, msrc, ds, loc):
+def _ok_metadata(res, msrc, ds, loc):
+    restype = res.get('type', None)
+    if restype not in ('dataset', 'file'):
+        lgr.error(
+            'metadata report for something other than a file or dataset: %s',
+            restype
+        )
+        return False
+
+    meta = res.get('metadata', None)
     if meta is None or isinstance(meta, dict):
         return True
 
