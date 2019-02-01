@@ -406,7 +406,7 @@ def get_open_files(path, log_open=False):
                 # note: could be done more efficiently so we do not
                 # renormalize path over and over again etc
                 if path_startswith(p, path):
-                    files[p] = proc.pid
+                    files[p] = proc
         # Catch a race condition where a process ends
         # before we can examine its files
         except psutil.NoSuchProcess:

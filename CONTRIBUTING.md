@@ -537,7 +537,7 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 - *DATALAD_ASSERT_NO_OPEN_FILES*:
-  Instructs internal tests for no open files under paths to be removed. If set to anything, it would log at ERROR level, and if set to "assert", it would raise AssertionError if any is
+  Instructs test helpers to check for open files at the end of a test. If set, remaining open files are logged at ERROR level. Alternative modes are: "assert" (raise AssertionError if any open file is found), "pdb"/"epdb" (drop into debugger when open files are found, info on files is provided in a "files" dictionary, mapping filenames to psutil process objects).
 
 # Changelog section
 
