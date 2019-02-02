@@ -151,176 +151,194 @@ class ExtractMetadata(Interface):
             refds=dataset.path,
         )
 
-        dsmeta = dict()
-        contentmeta = {}
-
-        # TODO this whole path vs fullpathlist is awkward and probably broken
-        fullpathlist = paths
-        if paths and isinstance(ds.repo, AnnexRepo):
-            # Ugly? Jep: #2055
-            content_info = zip(paths, ds.repo.file_has_content(paths), ds.repo.is_under_annex(paths))
-            paths = [p for p, c, a in content_info if not a or c]
-            nocontent = len(fullpathlist) - len(paths)
-            if nocontent:
-                # TODO better fail, or support incremental and label this file as no present
-                lgr.warn(
-                    '{} files have no content present, '
-                    'some extractors will not operate on {}'.format(
-                        nocontent,
-                        'them' if nocontent > 10
-                               else [p for p, c, a in content_info if not c and a])
-                )
-
-        # pull out potential metadata field blacklist config settings
-        # TODO this is pointless, as the blacklisting is not per extractor
-        # there will be no magic field name congruence...
-        blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
-            'datalad.metadata.aggregate-ignore-fields',
-            default=[]))]
-        # enforce size limits
-        max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
-
-        log_progress(
-            lgr.info,
-            'metadataextractors',
-            'Start metadata extraction from %s', ds,
-            total=len(sources),
-            label='Metadata extraction',
-            unit=' extractors',
-        )
-        for msrc in sources:
-            msrc_key = msrc
-            log_progress(
-                lgr.info,
-                'metadataextractors',
-                'Engage %s metadata extractor', msrc_key,
-                update=1,
-                increment=True)
-
-            # load the extractor class, no instantiation yet
-            try:
-                extractor_cls = extractors[msrc].load()
-            except Exception as e:  # pragma: no cover
-                msg = ('Failed %s metadata extraction from %s: %s',
-                       msrc, dataset, exc_str)
-                log_progress(lgr.error, 'metadataextractors', *msg)
-                raise ValueError(msg[0] % msg[1])
-
-            # desired setup for generation of unique metadata values
-            want_unique = ds.config.obtain(
-                'datalad.metadata.generate-unique-{}'.format(
-                    msrc_key.replace('_', '-')),
-                default=True,
-                valtype=EnsureBool())
-            unique_cm = {}
-            extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
-
-            # actual pull the metadata records out of the extractor
-            for res in _run_extractor(
-                    extractor_cls,
-                    msrc,
-                    dataset,
-                    paths if extractor_cls.NEEDS_CONTENT else fullpathlist,
+        try:
+            for res in _proc(
+                    ds,
+                    sources,
+                    paths,
+                    extractors,
                     reporton):
-                # the following two conditionals are untested, as a test would require
-                # a metadata extractor to yield broken metadata, and in order to have
-                # such one, we need a mechanism to have the test inject one on the fly
-                # MIH thinks that the code neeeded to do that is more chances to be broken
-                # then the code it would test
-                # TODO verify that is has worked once by manually breaking an extractor
-                if success_status_map.get(res['status'], False) == 'success':  # pragma: no cover
+                res.update(**res_props)
+                yield res
+        finally:
+            # extractors can come from any source with no guarantee for
+            # proper implementation. Let's make sure that we bring the
+            # dataset back into a sane state (e.g. no batch processes
+            # hanging around). We should do this here, as it is not
+            # clear whether extraction results will be saved to the
+            # dataset(which would have a similar sanitization effect)
+            if ds.repo:
+                ds.repo.precommit()
 
-                    # if the extractor was happy check the result
-                    if not _ok_metadata(res, msrc, ds, None):
-                        res.update(
-                            # this will prevent further processing a few lines down
-                            status='error',
-                            # TODO have _ok_metadata report the real error
-                            message=('Invalid metadata (%s)', msrc),
-                        )
-                if success_status_map.get(res['status'], False) != 'success':  # pragma: no cover
 
-                    res.update(
-                        path=op.join(dataset.path, res['path'])
-                        if 'path' in res else dataset.path,
-                        **res_props
-                    )
-                    yield res
-                    # no further processing of broken stuff
-                    continue
+def _proc(ds, sources, paths, extractors, reporton):
+    dsmeta = dict()
+    contentmeta = {}
 
-                # strip by applying size and type filters
-                res['metadata'] = _filter_metadata_fields(
-                    res['metadata'],
-                    maxsize=max_fieldsize,
-                    blacklist=blacklist)
+    # TODO this whole path vs fullpathlist is awkward and probably broken
+    fullpathlist = paths
+    if paths and isinstance(ds.repo, AnnexRepo):
+        # Ugly? Jep: #2055
+        content_info = zip(paths, ds.repo.file_has_content(paths), ds.repo.is_under_annex(paths))
+        paths = [p for p, c, a in content_info if not a or c]
+        nocontent = len(fullpathlist) - len(paths)
+        if nocontent:
+            # TODO better fail, or support incremental and label this file as no present
+            lgr.warn(
+                '{} files have no content present, '
+                'some extractors will not operate on {}'.format(
+                    nocontent,
+                    'them' if nocontent > 10
+                           else [p for p, c, a in content_info if not c and a])
+            )
 
-                # we also want to store info that there was no metadata(e.g. to get a list of
-                # files that have no metadata)
-                # if there is an issue that a extractor needlessly produces empty records, the
-                # extractor should be fixed and not a general switch. For example the datalad_core
-                # issues empty records to document the presence of a file
-                #if not res['metadata']:
-                #    # after checks and filters nothing is left, nothing to report
-                #    continue
+    # pull out potential metadata field blacklist config settings
+    # TODO this is pointless, as the blacklisting is not per extractor
+    # there will be no magic field name congruence...
+    blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
+        'datalad.metadata.aggregate-ignore-fields',
+        default=[]))]
+    # enforce size limits
+    max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
 
-                if res['type'] == 'dataset':
-                    # TODO warn if two dataset records are generated by the same extractor
-                    dsmeta[msrc_key] = res['metadata']
-                else:
-                    # this is file metadata, _ok_metadata() checks unknown types
-                    # assign
-                    # only ask each metadata extractor once, hence no conflict possible
-                    loc_dict = contentmeta.get(res['path'], {})
-                    loc_dict[msrc_key] = res['metadata']
-                    contentmeta[res['path']] = loc_dict
-                    if want_unique:
-                        # go through content metadata and inject report of unique keys
-                        # and values into `unique_cm`
-                        _update_unique_cm(
-                            unique_cm,
-                            msrc_key,
-                            dsmeta,
-                            res['metadata'],
-                            extractor_unique_exclude,
-                        )
-            if unique_cm:
-                # produce final unique record in dsmeta for this extractor
-                _finalize_unique_cm(unique_cm, msrc_key, dsmeta)
-
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Start metadata extraction from %s', ds,
+        total=len(sources),
+        label='Metadata extraction',
+        unit=' extractors',
+    )
+    for msrc in sources:
+        msrc_key = msrc
         log_progress(
             lgr.info,
             'metadataextractors',
-            'Finished metadata extraction from %s', ds,
+            'Engage %s metadata extractor', msrc_key,
+            update=1,
+            increment=True)
+
+        # load the extractor class, no instantiation yet
+        try:
+            extractor_cls = extractors[msrc].load()
+        except Exception as e:  # pragma: no cover
+            msg = ('Failed %s metadata extraction from %s: %s',
+                   msrc, ds, exc_str)
+            log_progress(lgr.error, 'metadataextractors', *msg)
+            raise ValueError(msg[0] % msg[1])
+
+        # desired setup for generation of unique metadata values
+        want_unique = ds.config.obtain(
+            'datalad.metadata.generate-unique-{}'.format(
+                msrc_key.replace('_', '-')),
+            default=True,
+            valtype=EnsureBool())
+        unique_cm = {}
+        extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
+
+        # actual pull the metadata records out of the extractor
+        for res in _run_extractor(
+                extractor_cls,
+                msrc,
+                ds,
+                paths if extractor_cls.NEEDS_CONTENT else fullpathlist,
+                reporton):
+            # the following two conditionals are untested, as a test would require
+            # a metadata extractor to yield broken metadata, and in order to have
+            # such one, we need a mechanism to have the test inject one on the fly
+            # MIH thinks that the code neeeded to do that is more chances to be broken
+            # then the code it would test
+            # TODO verify that is has worked once by manually breaking an extractor
+            if success_status_map.get(res['status'], False) == 'success':  # pragma: no cover
+
+                # if the extractor was happy check the result
+                if not _ok_metadata(res, msrc, ds, None):
+                    res.update(
+                        # this will prevent further processing a few lines down
+                        status='error',
+                        # TODO have _ok_metadata report the real error
+                        message=('Invalid metadata (%s)', msrc),
+                    )
+            if success_status_map.get(res['status'], False) != 'success':  # pragma: no cover
+
+                res.update(
+                    path=op.join(ds.path, res['path'])
+                    if 'path' in res else ds.path,
+                )
+                yield res
+                # no further processing of broken stuff
+                continue
+
+            # strip by applying size and type filters
+            res['metadata'] = _filter_metadata_fields(
+                res['metadata'],
+                maxsize=max_fieldsize,
+                blacklist=blacklist)
+
+            # we also want to store info that there was no metadata(e.g. to get a list of
+            # files that have no metadata)
+            # if there is an issue that a extractor needlessly produces empty records, the
+            # extractor should be fixed and not a general switch. For example the datalad_core
+            # issues empty records to document the presence of a file
+            #if not res['metadata']:
+            #    # after checks and filters nothing is left, nothing to report
+            #    continue
+
+            if res['type'] == 'dataset':
+                # TODO warn if two dataset records are generated by the same extractor
+                dsmeta[msrc_key] = res['metadata']
+            else:
+                # this is file metadata, _ok_metadata() checks unknown types
+                # assign
+                # only ask each metadata extractor once, hence no conflict possible
+                loc_dict = contentmeta.get(res['path'], {})
+                loc_dict[msrc_key] = res['metadata']
+                contentmeta[res['path']] = loc_dict
+                if want_unique:
+                    # go through content metadata and inject report of unique keys
+                    # and values into `unique_cm`
+                    _update_unique_cm(
+                        unique_cm,
+                        msrc_key,
+                        dsmeta,
+                        res['metadata'],
+                        extractor_unique_exclude,
+                    )
+        if unique_cm:
+            # produce final unique record in dsmeta for this extractor
+            _finalize_unique_cm(unique_cm, msrc_key, dsmeta)
+
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Finished metadata extraction from %s', ds,
+    )
+
+    if dsmeta:
+        # always identify the effective vocabulary - JSON-LD style
+        dsmeta['@context'] = {
+            '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
+                vocabulary_version)}
+
+    if dsmeta and ds is not None and ds.is_installed():
+        yield get_status_dict(
+            ds=ds,
+            metadata=dsmeta,
+            # any errors will have been reported before
+            status='ok',
         )
 
-        if dsmeta:
-            # always identify the effective vocabulary - JSON-LD style
-            dsmeta['@context'] = {
-                '@vocab': 'http://docs.datalad.org/schema_v{}.json'.format(
-                    vocabulary_version)}
-
-        if dsmeta and dataset is not None and dataset.is_installed():
-            yield get_status_dict(
-                ds=dataset,
-                metadata=dsmeta,
-                # any errors will have been reported before
-                status='ok',
-                **res_props
-            )
-
-        for p in contentmeta:
-            res = get_status_dict(
-                path=op.join(dataset.path, p) if dataset else p,
-                metadata=contentmeta[p],
-                type='file',
-                # any errors will have been reported before
-                status='ok',
-                **res_props
-            )
-            if dataset:
-                res['parentds'] = dataset.path
-            yield res
+    for p in contentmeta:
+        res = get_status_dict(
+            path=op.join(ds.path, p) if ds else p,
+            metadata=contentmeta[p],
+            type='file',
+            # any errors will have been reported before
+            status='ok',
+        )
+        if ds:
+            res['parentds'] = ds.path
+        yield res
 
 
 def _run_extractor(extractor_cls, name, ds, paths, reporton):
