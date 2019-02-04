@@ -374,7 +374,8 @@ class Add(Interface):
                     ds.repo.add_submodule(subds_relpath, url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
-                        ds=subds, status='error', message=e.stderr,
+                        ds=subds, status='error',
+                        message=getattr(e, 'stderr', None) or str(e),
                         **dict(common_report, **ap))
                     continue
                 # queue for saving using the updated annotated path
