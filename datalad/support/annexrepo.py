@@ -2362,46 +2362,47 @@ class AnnexRepo(GitRepo, RepoInterface):
           Whether to request/handle --json-progress
         """
         progress_indicators = None
+        if expected_entries:
+            progress_indicators = ProcessAnnexProgressIndicators(
+                expected=expected_entries
+            )
+            kwargs = kwargs.copy()
+            kwargs.update(dict(
+                log_stdout=progress_indicators,
+                log_stderr='offline',  # False, # to avoid lock down
+                log_online=True
+            ))
+        # TODO: refactor to account for possible --batch ones
+        annex_options = ['--json']
+        if progress:
+            annex_options += ['--json-progress']
+
+        if jobs == 'auto':
+            jobs = N_AUTO_JOBS
+        if jobs and jobs != 1:
+            annex_options += ['-J%d' % jobs]
+        if opts:
+            # opts might be the '--key' which should go last
+            annex_options += opts
+
+        # TODO: RF to use --batch where possible instead of splitting
+        # into multiple invocations
+        if not files:
+            file_chunks = [[]]
+        else:
+            files = assure_list(files)
+            maxl = max(map(len, files))
+            chunk_size = max(
+                1,  # should at least be 1. If blows then - not our fault
+                (CMD_MAX_ARG
+                 - len(command)
+                 - sum((len(x) + 3) for x in annex_options)
+                 - 4   # for '--' below
+                 ) // (maxl + 3)  # +3 for possible quotes and a space
+            )
+            file_chunks = generate_chunks(files, chunk_size)
+
         try:
-            if expected_entries:
-                progress_indicators = ProcessAnnexProgressIndicators(
-                    expected=expected_entries
-                )
-                kwargs = kwargs.copy()
-                kwargs.update(dict(
-                    log_stdout=progress_indicators,
-                    log_stderr='offline',  # False, # to avoid lock down
-                    log_online=True
-                ))
-            # TODO: refactor to account for possible --batch ones
-            annex_options = ['--json']
-            if progress:
-                annex_options += ['--json-progress']
-
-            if jobs == 'auto':
-                jobs = N_AUTO_JOBS
-            if jobs and jobs != 1:
-                annex_options += ['-J%d' % jobs]
-            if opts:
-                # opts might be the '--key' which should go last
-                annex_options += opts
-
-            # TODO: RF to use --batch where possible instead of splitting
-            # into multiple invocations
-            if not files:
-                file_chunks = [[]]
-            else:
-                files = assure_list(files)
-                maxl = max(map(len, files))
-                chunk_size = max(
-                    1,  # should at least be 1. If blows then - not our fault
-                    (CMD_MAX_ARG
-                     - len(command)
-                     - sum((len(x) + 3) for x in annex_options)
-                     - 4   # for '--' below
-                     ) // (maxl + 3)  # +3 for possible quotes and a space
-                )
-                file_chunks = generate_chunks(files, chunk_size)
             out, err = "", ""
             for file_chunk in file_chunks:
                 out_, err_ = self._run_annex_command(
