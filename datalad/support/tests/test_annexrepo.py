@@ -2552,7 +2552,7 @@ def check_files_split(cls, topdir):
     dl.add(dirs)
 
 
-@slow  # ???s  well --if errors - only 3 sec
+@slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
         yield check_files_split, cls
