@@ -66,6 +66,7 @@ from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -1713,19 +1714,12 @@ class GitRepo(RepoInterface):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, string_types):
-            if files and not cmd_str.strip().endswith(" --"):
-                cmd_str += " --"
-            cmd_str = shlex.split(cmd_str, posix=not on_windows)
+            cmd = shlex.split(cmd_str, posix=not on_windows)
         else:
-            if files and cmd_str[-1] != '--':
-                cmd_str.append('--')
-
-        cmd = cmd_str + files
+            cmd = cmd_str[:]  # we will modify in-place
 
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-
-        from .exceptions import GitIgnoreError
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
@@ -1733,6 +1727,12 @@ class GitRepo(RepoInterface):
         if index_file:
             env = (env if env is not None else os.environ).copy()
             env['GIT_INDEX_FILE'] = index_file
+
+        # Files handling
+        if files and cmd[-1] != '--':
+            cmd.append('--')
+
+        cmd += files
 
         try:
             out, err = self.cmd_call_wrapper.run(
