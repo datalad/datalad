@@ -82,6 +82,7 @@ from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
+from datalad.tests.utils import slow
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -2496,3 +2497,56 @@ def check_commit_annex_commit_changed(unlock, path):
 def test_commit_annex_commit_changed():
     for unlock in True, False:
         yield check_commit_annex_commit_changed, unlock
+
+
+@with_tempfile(mkdir=True)
+def check_files_split_exc(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    # absent files -- should not crash with "too long" but some other more
+    # meaningful exception
+    with assert_raises(Exception) as ecm:
+        r.add(["f" * 100 + "%04d" % f for f in range(100000)])
+    assert_not_in('too long', str(ecm.exception))
+    assert_not_in('too many', str(ecm.exception))
+
+
+def test_files_split_exc():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split_exc, cls
+
+
+_HEAVY_TREE = {
+    # might already run into 'filename too long' on windows probably
+    "d" * 98 + '%03d' % d: {
+        'f' * 98 + '%03d' % f: ''
+        for f in range(100)
+    }
+    for d in range(100)
+}
+
+
+@with_tree(tree=_HEAVY_TREE)
+def check_files_split(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    dirs = glob(op.join(topdir, '*'))
+    files = glob(op.join(topdir, '*', '*'))
+
+    r.add(files)
+    r.commit(files=files)
+
+    # Let's modify and do dl.add for even a heavier test
+    # Now do for real on some heavy directory
+    import datalad.api as dl
+    for f in files:
+        os.unlink(f)
+        with open(f, 'w') as f:
+            f.write('1')
+    dl.add(dirs)
+
+
+@slow  # ???s  well --if errors - only 3 sec
+def test_files_split():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split, cls
