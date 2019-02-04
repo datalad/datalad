@@ -20,6 +20,8 @@ from os.path import normpath
 from os.path import pardir
 from os.path import relpath
 
+from six import text_type
+
 from datalad.utils import assure_unicode
 from datalad.utils import unique
 from datalad.utils import get_dataset_root
@@ -374,7 +376,8 @@ class Add(Interface):
                     ds.repo.add_submodule(subds_relpath, url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
-                        ds=subds, status='error', message=e.stderr,
+                        ds=subds, status='error',
+                        message=getattr(e, 'stderr', None) or text_type(e),
                         **dict(common_report, **ap))
                     continue
                 # queue for saving using the updated annotated path
