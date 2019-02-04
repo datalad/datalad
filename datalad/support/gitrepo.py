@@ -1797,8 +1797,11 @@ class GitRepo(RepoInterface):
             out_, err_ = func(
                 cmd + (['--'] if file_chunk else []) + file_chunk,
                 *args, **kwargs)
-            out += out_
-            err += err_
+            # out_, err_ could be None, and probably no need to append empty strings
+            if out_:
+                out += out_
+            if err_:
+                err += err_
         return out, err
 
 
