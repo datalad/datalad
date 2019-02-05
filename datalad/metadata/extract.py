@@ -176,6 +176,7 @@ def _proc(ds, sources, paths, extractors, reporton):
     contentmeta = {}
 
     # TODO this whole path vs fullpathlist is awkward and probably broken
+    # TODO possibly delay all this and move into the pre2019 code adapter
     fullpathlist = paths
     if paths and isinstance(ds.repo, AnnexRepo):
         # Ugly? Jep: #2055
@@ -342,77 +343,100 @@ def _proc(ds, sources, paths, extractors, reporton):
 
 
 def _run_extractor(extractor_cls, name, ds, paths, reporton):
-        want_dataset_meta = reporton in ('all', 'dataset') if reporton else \
-            ds.config.obtain(
-                'datalad.metadata.extract-dataset-{}'.format(
-                    name.replace('_', '-')),
-                default=True,
-                valtype=EnsureBool())
-        want_content_meta = reporton in ('all', 'content') if reporton else \
-            ds.config.obtain(
-                'datalad.metadata.extract-content-{}'.format(
-                    name.replace('_', '-')),
-                default=True,
-                valtype=EnsureBool())
+    """Helper to control extractor using the right API
 
-        if not (want_dataset_meta or want_content_meta):
-            log_progress(
-                lgr.info,
-                'metadataextractors',
-                'Skipping %s metadata extraction from %s, disabled by configuration',
-                name, ds,
-            )
-            return
-
-        try:
-            extractor = extractor_cls(ds, paths)
-        except Exception as e:  # pragma: no cover
+    Central switch to deal with alternative/future APIs is inside
+    """
+    try:
+        # detect supported API and interface as needed
+        if hasattr(extractor_cls, 'get_metadata'):
+            for res in _yield_res_from_pre2019_extractor(
+                    ds,
+                    name,
+                    extractor_cls,
+                    reporton,
+                    paths):
+                yield res
+        else:
+            raise RuntimeError(
+                '{} does not have a recognised extractor API'.format(
+                    extractor_cls))
+    except Exception as e:  # pragma: no cover
+        if cfg.get('datalad.runtime.raiseonerror'):
             log_progress(
                 lgr.error,
                 'metadataextractors',
                 'Failed %s metadata extraction from %s', name, ds,
             )
-            raise ValueError(
-                "Failed to load metadata extractor for '%s', "
-                "broken dataset configuration (%s)?: %s",
-                name, ds, exc_str(e))
-        try:
-            # this is the old way of extractor operation
-            dsmeta_t, contentmeta_t = extractor.get_metadata(
-                dataset=want_dataset_meta,
-                content=want_content_meta,
-            )
-            # fake the new way of reporting results directly
-            # extractors had no way to report errors, hence
-            # everything is unconditionally 'ok'
-            for loc, meta in contentmeta_t:
-                yield dict(
-                    status='ok',
-                    path=loc,
-                    type='file',
-                    metadata=meta,
-                )
-            yield dict(
-                status='ok',
-                path=ds.path,
-                type='dataset',
-                metadata=dsmeta_t,
-            )
-        except Exception as e:  # pragma: no cover
-            if cfg.get('datalad.runtime.raiseonerror'):
-                log_progress(
-                    lgr.error,
-                    'metadataextractors',
-                    'Failed %s metadata extraction from %s', name, ds,
-                )
-                raise
-            yield get_status_dict(
-                ds=ds,
-                # any errors will have been reported before
-                status='error',
-                message=('Failed to get %s metadata (%s): %s',
-                         ds, name, exc_str(e)),
-            )
+            raise
+        yield get_status_dict(
+            ds=ds,
+            # any errors will have been reported before
+            status='error',
+            message=('Failed to get %s metadata (%s): %s',
+                     ds, name, exc_str(e)),
+        )
+
+
+def _yield_res_from_pre2019_extractor(ds, name, extractor_cls, reporton, paths):
+    """This implements dealing with our first extractor class concept"""
+
+    want_dataset_meta = reporton in ('all', 'dataset') if reporton else \
+        ds.config.obtain(
+            'datalad.metadata.extract-dataset-{}'.format(
+                name.replace('_', '-')),
+            default=True,
+            valtype=EnsureBool())
+    want_content_meta = reporton in ('all', 'content') if reporton else \
+        ds.config.obtain(
+            'datalad.metadata.extract-content-{}'.format(
+                name.replace('_', '-')),
+            default=True,
+            valtype=EnsureBool())
+
+    if not (want_dataset_meta or want_content_meta):
+        log_progress(
+            lgr.info,
+            'metadataextractors',
+            'Skipping %s metadata extraction from %s, disabled by configuration',
+            name, ds,
+        )
+        return
+
+    try:
+        extractor = extractor_cls(ds, paths)
+    except Exception as e:  # pragma: no cover
+        log_progress(
+            lgr.error,
+            'metadataextractors',
+            'Failed %s metadata extraction from %s', name, ds,
+        )
+        raise ValueError(
+            "Failed to load metadata extractor for '%s', "
+            "broken dataset configuration (%s)?: %s",
+            name, ds, exc_str(e))
+
+    # this is the old way of extractor operation
+    dsmeta_t, contentmeta_t = extractor.get_metadata(
+        dataset=want_dataset_meta,
+        content=want_content_meta,
+    )
+    # fake the new way of reporting results directly
+    # extractors had no way to report errors, hence
+    # everything is unconditionally 'ok'
+    for loc, meta in contentmeta_t:
+        yield dict(
+            status='ok',
+            path=loc,
+            type='file',
+            metadata=meta,
+        )
+    yield dict(
+        status='ok',
+        path=ds.path,
+        type='dataset',
+        metadata=dsmeta_t,
+    )
 
 
 def _update_unique_cm(unique_cm, msrc_key, dsmeta, cnmeta, exclude_keys):
