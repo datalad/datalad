@@ -16,74 +16,74 @@ A variety of bugfixes and enhancements
 ### Major refactoring and deprecations
 
 - All extracted metadata is now placed under git-annex by default.
-  Previously files smaller than 20 kb were store in git. (#3109)
+  Previously files smaller than 20 kb were store in git. ([#3109])
 - TODO: get_runner #3104 and pending #3131
 
 ### Fixes
 
 - Improved handling of long commands:
   - The code that inspected `SC_ARG_MAX` didn't check that the
-    reported value was a sensible, positive number. (#3025)
+    reported value was a sensible, positive number. ([#3025])
   - More commands that invoke `git` and `git-annex` with file
     arguments learned to split up the command calls when it is likely
     that the command would fail due to exceeding the maximum supported
-    length. (#3138)
+    length. ([#3138])
 - The `setup_yoda_dataset` procedure created a malformed
-  .gitattributes line. (#3057)
+  .gitattributes line. ([#3057])
 - [download-url] unnecessarily tried to infer the dataset when
-  `--no-save` was given. (#3029)
+  `--no-save` was given. ([#3029])
 - [rerun] aborted too late and with a confusing message when a ref
-  specified via `--onto` didn't exist. (#3019)
+  specified via `--onto` didn't exist. ([#3019])
 - [run]:
   - `run` didn't preserve the current directory prefix ("./") on
      inputs and outputs, which is problematic if the caller relies on
-     this representation when formatting the command. (#3037)
-  - Fixed a number of unicode py2-compatibility issues. (#3035) (#3046)
+     this representation when formatting the command. ([#3037])
+  - Fixed a number of unicode py2-compatibility issues. ([#3035]) ([#3046])
   - To proceed with a failed command, the user was confusingly
     instructed to use `save` instead of `add` even though `run` uses
-    `add` underneath. (#3080)
+    `add` underneath. ([#3080])
 - Fixed a case where the helper class for checking external modules
-  incorrectly reported a module as unknown. (#3051)
+  incorrectly reported a module as unknown. ([#3051])
 - [add-archive-content] mishandled the archive path when the leading
-  path contained a symlink. (#3058)
+  path contained a symlink. ([#3058])
 - Following denied access, the credential code failed to consider a
   scenario, leading to a type error rather than an appropriate error
-  message. (#3091)
+  message. ([#3091])
 - Some test failed when executed from a `git worktree` checkout of the
-  source repository. (#3129)
+  source repository. ([#3129])
 - During metadata extraction, batched annex processes weren't properly
-  terminated, leading to issues on Windows. (#3137)
+  terminated, leading to issues on Windows. ([#3137])
 - [add] incorrectly handled an "invalid repository" exception when
-  trying to add a submodule. (#3141)
+  trying to add a submodule. ([#3141])
 
 ### Enhancements and new features
 
 - [search] learned to suggest closely matching keys if there are now
-  hits. (#3089)
+  hits. ([#3089])
 - [create-sibling] gained a `--group` option so that the caller can
-  specify the file system group for the repository. (#3098)
+  specify the file system group for the repository. ([#3098])
 - Interface classes now override the default renderer for summarizing
-  results. (#3061)
+  results. ([#3061])
 - [run]:
   - `--input` and `--output` can now be shortened to `-i` and `-o`.
-    (#3066)
+    ([#3066])
   - Placeholders such as "{inputs}" are now expanded in the command
-    that is shown in the commit message subject. (#3065)
+    that is shown in the commit message subject. ([#3065])
   - `interface.run.run_command` gained an `extra_inputs` argument so
     that wrappers like [datalad-container] can specify additional inputs
-    that aren't considered when formatting the command string. (#3038)
+    that aren't considered when formatting the command string. ([#3038])
   - "--" can now be used to separate options for `run` and those for
-    the command in ambiguous cases. (#3119)
+    the command in ambiguous cases. ([#3119])
 - The utilities `create_tree` and `ok_file_has_content` now support
-  ".gz" files. (#3049)
+  ".gz" files. ([#3049])
 - The Singularity container for 0.11.1 now uses [nd_freeze] to make
   its builds reproducible.
-- A [publications] page has been added to the documentation. (#3099)
+- A [publications] page has been added to the documentation. ([#3099])
 - `GitRepo.set_gitattributes` now accepts a `mode` argument that
   controls whether the .gitattributes file is appended to (default) or
-  overwritten. (#3115)
+  overwritten. ([#3115])
 - `datalad --help` now avoids using `man` so that the list of
-  subcommands is shown.  (#3124)
+  subcommands is shown.  ([#3124])
 
 ## 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
 
@@ -1080,3 +1080,29 @@ publishing
 [#3002]: https://github.com/datalad/datalad/issues/3002
 [#3007]: https://github.com/datalad/datalad/issues/3007
 [#3009]: https://github.com/datalad/datalad/issues/3009
+[#3019]: https://github.com/datalad/datalad/issues/3019
+[#3025]: https://github.com/datalad/datalad/issues/3025
+[#3029]: https://github.com/datalad/datalad/issues/3029
+[#3037]: https://github.com/datalad/datalad/issues/3037
+[#3038]: https://github.com/datalad/datalad/issues/3038
+[#3046]: https://github.com/datalad/datalad/issues/3046
+[#3049]: https://github.com/datalad/datalad/issues/3049
+[#3051]: https://github.com/datalad/datalad/issues/3051
+[#3057]: https://github.com/datalad/datalad/issues/3057
+[#3058]: https://github.com/datalad/datalad/issues/3058
+[#3061]: https://github.com/datalad/datalad/issues/3061
+[#3065]: https://github.com/datalad/datalad/issues/3065
+[#3066]: https://github.com/datalad/datalad/issues/3066
+[#3080]: https://github.com/datalad/datalad/issues/3080
+[#3089]: https://github.com/datalad/datalad/issues/3089
+[#3091]: https://github.com/datalad/datalad/issues/3091
+[#3098]: https://github.com/datalad/datalad/issues/3098
+[#3099]: https://github.com/datalad/datalad/issues/3099
+[#3109]: https://github.com/datalad/datalad/issues/3109
+[#3115]: https://github.com/datalad/datalad/issues/3115
+[#3119]: https://github.com/datalad/datalad/issues/3119
+[#3124]: https://github.com/datalad/datalad/issues/3124
+[#3129]: https://github.com/datalad/datalad/issues/3129
+[#3137]: https://github.com/datalad/datalad/issues/3137
+[#3138]: https://github.com/datalad/datalad/issues/3138
+[#3141]: https://github.com/datalad/datalad/issues/3141
