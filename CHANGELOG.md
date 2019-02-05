@@ -15,15 +15,75 @@ A variety of bugfixes and enhancements
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- All extracted metadata is now placed under git-annex by default.
+  Previously files smaller than 20 kb were store in git. (#3109)
+- TODO: get_runner #3104 and pending #3131
 
 ### Fixes
 
-?
+- Improved handling of long commands:
+  - The code that inspected `SC_ARG_MAX` didn't check that the
+    reported value was a sensible, positive number. (#3025)
+  - More commands that invoke `git` and `git-annex` with file
+    arguments learned to split up the command calls when it is likely
+    that the command would fail due to exceeding the maximum supported
+    length. (#3138)
+- The `setup_yoda_dataset` procedure created a malformed
+  .gitattributes line. (#3057)
+- [download-url] unnecessarily tried to infer the dataset when
+  `--no-save` was given. (#3029)
+- [rerun] aborted too late and with a confusing message when a ref
+  specified via `--onto` didn't exist. (#3019)
+- [run]:
+  - `run` didn't preserve the current directory prefix ("./") on
+     inputs and outputs, which is problematic if the caller relies on
+     this representation when formatting the command. (#3037)
+  - Fixed a number of unicode py2-compatibility issues. (#3035) (#3046)
+  - To proceed with a failed command, the user was confusingly
+    instructed to use `save` instead of `add` even though `run` uses
+    `add` underneath. (#3080)
+- Fixed a case where the helper class for checking external modules
+  incorrectly reported a module as unknown. (#3051)
+- [add-archive-content] mishandled the archive path when the leading
+  path contained a symlink. (#3058)
+- Following denied access, the credential code failed to consider a
+  scenario, leading to a type error rather than an appropriate error
+  message. (#3091)
+- Some test failed when executed from a `git worktree` checkout of the
+  source repository. (#3129)
+- During metadata extraction, batched annex processes weren't properly
+  terminated, leading to issues on Windows. (#3137)
+- [add] incorrectly handled an "invalid repository" exception when
+  trying to add a submodule. (#3141)
 
 ### Enhancements and new features
 
-?
+- [search] learned to suggest closely matching keys if there are now
+  hits. (#3089)
+- [create-sibling] gained a `--group` option so that the caller can
+  specify the file system group for the repository. (#3098)
+- Interface classes now override the default renderer for summarizing
+  results. (#3061)
+- [run]:
+  - `--input` and `--output` can now be shortened to `-i` and `-o`.
+    (#3066)
+  - Placeholders such as "{inputs}" are now expanded in the command
+    that is shown in the commit message subject. (#3065)
+  - `interface.run.run_command` gained an `extra_inputs` argument so
+    that wrappers like [datalad-container] can specify additional inputs
+    that aren't considered when formatting the command string. (#3038)
+  - "--" can now be used to separate options for `run` and those for
+    the command in ambiguous cases. (#3119)
+- The utilities `create_tree` and `ok_file_has_content` now support
+  ".gz" files. (#3049)
+- The Singularity container for 0.11.1 now uses [nd_freeze] to make
+  its builds reproducible.
+- A [publications] page has been added to the documentation. (#3099)
+- `GitRepo.set_gitattributes` now accepts a `mode` argument that
+  controls whether the .gitattributes file is appended to (default) or
+  overwritten. (#3115)
+- `datalad --help` now avoids using `man` so that the list of
+  subcommands is shown.  (#3124)
 
 ## 0.11.1 (Nov 26, 2018) -- v7-better-than-v6
 
@@ -912,6 +972,7 @@ publishing
 [meta-data support and management]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 [meta-data]: http://docs.datalad.org/en/latest/cmdline.html#meta-data-handling
 
+[add-archive-content]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-add-archive-content.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
 [add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
@@ -922,6 +983,7 @@ publishing
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
+[datalad-container]: https://github.com/datalad/datalad-container
 [datalad-revolution]: http://github.com/datalad/datalad-revolution
 [download-url]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-download-url.html
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
@@ -931,9 +993,12 @@ publishing
 [install]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html
 [ls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-ls.html
 [metadata]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html
+[nd_freeze]: https://github.com/neurodebian/neurodebian/blob/master/tools/nd_freeze
 [plugin]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-plugin.html
+[publications]: https://datalad.readthedocs.io/en/latest/publications.html
 [publish]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html
 [remove]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-remove.html
+[rerun]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-rerun.html
 [run]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html
 [run-procedure]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-run-procedure.html
 [save]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html
