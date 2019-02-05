@@ -59,6 +59,8 @@ from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
+from datalad.utils import CMD_MAX_ARG
+from datalad.utils import generate_chunks
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -66,6 +68,7 @@ from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -1713,19 +1716,12 @@ class GitRepo(RepoInterface):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, string_types):
-            if files and not cmd_str.strip().endswith(" --"):
-                cmd_str += " --"
-            cmd_str = shlex.split(cmd_str, posix=not on_windows)
+            cmd = shlex.split(cmd_str, posix=not on_windows)
         else:
-            if files and cmd_str[-1] != '--':
-                cmd_str.append('--')
-
-        cmd = cmd_str + files
+            cmd = cmd_str[:]  # we will modify in-place
 
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-
-        from .exceptions import GitIgnoreError
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
@@ -1734,9 +1730,13 @@ class GitRepo(RepoInterface):
             env = (env if env is not None else os.environ).copy()
             env['GIT_INDEX_FILE'] = index_file
 
+        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
+        #  handling????
         try:
-            out, err = self.cmd_call_wrapper.run(
+            out, err = self._run_command_files_split(
+                self.cmd_call_wrapper.run,
                 cmd,
+                files,
                 log_stderr=log_stderr,
                 log_stdout=log_stdout,
                 log_online=log_online,
@@ -1759,6 +1759,51 @@ class GitRepo(RepoInterface):
             self.config.reload()
 
         return out, err
+
+    # TODO: could be static or class method even
+    def _run_command_files_split(
+            self,
+            func,
+            cmd,
+            files,
+            *args, **kwargs
+        ):
+        """
+        Run `func(cmd + files, ...)` possibly multiple times if `files` is too long
+        """
+        assert isinstance(cmd, list)
+        if not files:
+            file_chunks = [[]]
+        else:
+            files = assure_list(files)
+
+            maxl = max(map(len, files))
+            chunk_size = max(
+                1,  # should at least be 1. If blows then - not our fault
+                (CMD_MAX_ARG
+                 - sum((len(x) + 3) for x in cmd)
+                 - 4   # for '--' below
+                 ) // (maxl + 3)  # +3 for possible quotes and a space
+            )
+            # TODO: additional treatment for "too many arguments"? although
+            # as https://github.com/datalad/datalad/issues/1883#issuecomment-436272758
+            # shows there seems to be no hardcoded limit on # of arguments,
+            # but may be we decide to go for smth like follow to be on safe side
+            # chunk_size = min(10240 - len(cmd), chunk_size)
+            file_chunks = generate_chunks(files, chunk_size)
+
+        out, err = "", ""
+        for file_chunk in file_chunks:
+            out_, err_ = func(
+                cmd + (['--'] if file_chunk else []) + file_chunk,
+                *args, **kwargs)
+            # out_, err_ could be None, and probably no need to append empty strings
+            if out_:
+                out += out_
+            if err_:
+                err += err_
+        return out, err
+
 
 # TODO: --------------------------------------------------------------------
 
