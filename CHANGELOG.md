@@ -16,7 +16,7 @@ A variety of bugfixes and enhancements
 ### Major refactoring and deprecations
 
 - All extracted metadata is now placed under git-annex by default.
-  Previously files smaller than 20 kb were store in git. ([#3109])
+  Previously files smaller than 20 kb were stored in git. ([#3109])
 - TODO: get_runner #3104 and pending #3131
 
 ### Fixes
@@ -49,7 +49,7 @@ A variety of bugfixes and enhancements
 - Following denied access, the credential code failed to consider a
   scenario, leading to a type error rather than an appropriate error
   message. ([#3091])
-- Some test failed when executed from a `git worktree` checkout of the
+- Some tests failed when executed from a `git worktree` checkout of the
   source repository. ([#3129])
 - During metadata extraction, batched annex processes weren't properly
   terminated, leading to issues on Windows. ([#3137])
@@ -58,12 +58,12 @@ A variety of bugfixes and enhancements
 
 ### Enhancements and new features
 
-- [search] learned to suggest closely matching keys if there are now
+- [search] learned to suggest closely matching keys if there are no
   hits. ([#3089])
 - [create-sibling] gained a `--group` option so that the caller can
   specify the file system group for the repository. ([#3098])
-- Interface classes now override the default renderer for summarizing
-  results. ([#3061])
+- Interface classes can now override the default renderer for
+  summarizing results. ([#3061])
 - [run]:
   - `--input` and `--output` can now be shortened to `-i` and `-o`.
     ([#3066])
