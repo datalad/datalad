@@ -923,6 +923,7 @@ publishing
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
 [datalad-revolution]: http://github.com/datalad/datalad-revolution
+[download-url]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-download-url.html
 [drop]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-drop.html
 [export]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-export.html
 [export_tarball]: http://docs.datalad.org/en/latest/generated/datalad.plugin.export_tarball.html
