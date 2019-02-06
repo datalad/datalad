@@ -105,8 +105,10 @@ class RevolutionGitRepo(GitRepo):
         Returns
         -------
         dict
-          Each content item has an entry under its relative path within
-          the repository. Each value is a dictionary with properties:
+          Each content item has an entry under a pathlib `Path` object instance
+          pointing to its absolute path inside the repository (this path is
+          guaranteed to be underneath `Repo.path`).
+          Each value is a dictionary with properties:
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
@@ -272,8 +274,10 @@ class RevolutionGitRepo(GitRepo):
         Returns
         -------
         dict
-          Each content item has an entry under its relative path within
-          the repository. Each value is a dictionary with properties:
+          Each content item has an entry under a pathlib `Path` object instance
+          pointing to its absolute path inside the repository (this path is
+          guaranteed to be underneath `Repo.path`).
+          Each value is a dictionary with properties:
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'
@@ -314,8 +318,10 @@ class RevolutionGitRepo(GitRepo):
         Returns
         -------
         dict
-          Each content item has an entry under its relative path within
-          the repository. Each value is a dictionary with properties:
+          Each content item has an entry under a pathlib `Path` object instance
+          pointing to its absolute path inside the repository (this path is
+          guaranteed to be underneath `Repo.path`).
+          Each value is a dictionary with properties:
 
           `type`
             Can be 'file', 'symlink', 'dataset', 'directory'

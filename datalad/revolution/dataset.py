@@ -23,6 +23,10 @@ from datalad.support.gitrepo import (
     NoSuchPathError,
 )
 
+from datalad.support.exceptions import (
+    InvalidAnnexRepositoryError
+)
+
 from datalad.utils import (
     optional_args,
     getpwd,
@@ -50,39 +54,88 @@ class RevolutionDataset(_Dataset):
     @property
     def repo(self):
         """Get an instance of the version control system/repo for this dataset,
-        or None if there is none yet.
+        or None if there is none yet (or none anymore).
 
-        If creating an instance of GitRepo is guaranteed to be really cheap
-        this could also serve as a test whether a repo is present.
+        If testing the validity of an instance of GitRepo is guaranteed to be
+        really cheap this could also serve as a test whether a repo is present.
+
+        Note, that this property is evaluated every time it is used. If used
+        multiple times within a function it's probably a good idea to store its
+        value in a local variable and use this variable instead.
 
         Returns
         -------
-        GitRepo
+        GitRepo or AnnexRepo
         """
 
-        # Note: lazy loading was disabled, since this is provided by the
-        # flyweight pattern already and a possible invalidation of an existing
-        # instance has to be done therein.
-        # TODO: Still this is somewhat problematic. We can't invalidate strong
-        # references
+        # NOTE: This is a copy from datalad.distribution.Dataset
+        # See github https://github.com/datalad/datalad-revolution/issues/79
+        # for why this is needed.
 
+        # If we already got a *Repo instance, check whether it's still valid;
+        # Note, that this basically does part of the testing that would
+        # (implicitly) be done in the loop below again. So, there's still
+        # potential to speed up when we actually need to get a new instance
+        # (or none). But it's still faster for the vast majority of cases.
+        #
+        # TODO: Dig deeper into it and melt with new instance guessing. This
+        # should also involve to reduce redundancy of testing such things from
+        # within Flyweight.__call__, AnnexRepo.__init__ and GitRepo.__init__!
+        #
+        # Also note, that this could be forged into a single big condition, but
+        # that is hard to read and we should be well aware of the actual
+        # criteria here:
+        if self._repo is not None and op.realpath(self.path) == self._repo.path:
+            # we got a repo and path references still match
+            if isinstance(self._repo, RevolutionAnnexRepo):
+                # it's supposed to be an annex
+                if self._repo is RevolutionAnnexRepo._unique_instances.get(
+                        self._repo.path, None) and \
+                        RevolutionAnnexRepo.is_valid_repo(self._repo.path,
+                                                allow_noninitialized=True):
+                    # it's still the object registered as flyweight and it's a
+                    # valid annex repo
+                    return self._repo
+            elif isinstance(self._repo, RevolutionGitRepo):
+                # it's supposed to be a plain git
+                if self._repo is RevolutionGitRepo._unique_instances.get(
+                        self._repo.path, None) and \
+                        RevolutionGitRepo.is_valid_repo(self._repo.path) and not \
+                        self._repo.is_with_annex():
+                    # it's still the object registered as flyweight, it's a
+                    # valid git repo and it hasn't turned into an annex
+                    return self._repo
+
+        # Note: Although it looks like the "self._repo = None" assignments
+        # could be used instead of variable "valid", that's a big difference!
+        # The *Repo instances are flyweights, not singletons. self._repo might
+        # be the last reference, which would lead to those objects being
+        # destroyed and therefore the constructor call would result in an
+        # actually new instance. This is unnecessarily costly.
+        valid = False
         for cls, ckw, kw in (
                 # TODO: Do we really want to allow_noninitialized=True here?
                 # And if so, leave a proper comment!
-                (RevolutionAnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                (RevolutionAnnexRepo,
+                 {'allow_noninitialized': True},
+                 {'init': False}),
                 (RevolutionGitRepo, {}, {})
         ):
             if cls.is_valid_repo(self._path, **ckw):
                 try:
                     lgr.log(5, "Detected %s at %s", cls, self._path)
                     self._repo = cls(self._path, create=False, **kw)
+                    valid = True
                     break
-                except (InvalidGitRepositoryError, NoSuchPathError) as exc:
+                except (InvalidGitRepositoryError, NoSuchPathError,
+                        InvalidAnnexRepositoryError) as exc:
                     lgr.log(5,
                             "Oops -- guess on repo type was wrong?: %s",
                             exc_str(exc))
-                    pass
-                # version problems come as RuntimeError: DO NOT CATCH!
+
+        if not valid:
+            self._repo = None
+
         if self._repo is None:
             # Often .repo is requested to 'sense' if anything is installed
             # under, and if so -- to proceed forward. Thus log here only
@@ -97,7 +150,7 @@ setattr(RevolutionDataset, 'get_subdatasets', ut.nothere)
 
 
 @optional_args
-def datasetmethod(f, name=None, dataset_argname='dataset'):
+def rev_datasetmethod(f, name=None, dataset_argname='dataset'):
     """Decorator to bind functions to Dataset class.
 
     The decorated function is still directly callable and additionally serves
@@ -151,21 +204,20 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
 
 # minimal wrapper to ensure a revolution dataset is coming out
-class EnsureDataset(_EnsureDataset):
+class EnsureRevDataset(_EnsureDataset):
     def __call__(self, value):
         return RevolutionDataset(
-            super(EnsureDataset, self).__call__(value).path)
+            super(EnsureRevDataset, self).__call__(value).path)
 
 
 # minimal wrapper to ensure a revolution dataset is coming out
-def require_dataset(dataset, check_installed=True, purpose=None):
+def require_rev_dataset(dataset, check_installed=True, purpose=None):
     return RevolutionDataset(_require_dataset(
         dataset,
         check_installed,
         purpose).path)
 
-
-def resolve_path(path, ds=None):
+def rev_resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
     Any explicit path (absolute or relative) is returned as an absolute path.
@@ -195,7 +247,7 @@ def resolve_path(path, ds=None):
     `pathlib.Path` object
     """
     if ds is not None and not isinstance(ds, _Dataset):
-        ds = require_dataset(ds, check_installed=False, purpose='path resolution')
+        ds = require_rev_dataset(ds, check_installed=False, purpose='path resolution')
     if ds is None:
         # CWD is the reference
         path = ut.Path(path)
@@ -251,7 +303,7 @@ def resolve_path(path, ds=None):
     return path
 
 
-def path_under_dataset(ds, path):
+def path_under_rev_dataset(ds, path):
     ds_path = ds.pathobj
     try:
         rpath = text_type(ut.Path(path).relative_to(ds_path))
@@ -262,14 +314,14 @@ def path_under_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = get_dataset_root(text_type(path))
+    root = rev_get_dataset_root(text_type(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
         # to jump in the the next directory up, but we have
         # to use ./.. and get_dataset_root() will handle
         # the rest just fine
-        root = get_dataset_root(op.join(root, op.pardir))
+        root = rev_get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
     return ds_path / op.relpath(text_type(path), root)
@@ -277,7 +329,7 @@ def path_under_dataset(ds, path):
 
 # XXX this is a copy of the change proposed in
 # https://github.com/datalad/datalad/pull/2944
-def get_dataset_root(path):
+def rev_get_dataset_root(path):
     """Return the root of an existent dataset containing a given path
 
     The root path is returned in the same absolute or relative form
@@ -310,3 +362,15 @@ def get_dataset_root(path):
         return altered
 
     return None
+
+
+# this is here to make it easier for extensions that use this already
+# TODO remove when merged into datalad-core, but keep in extension code
+datasetmethod = rev_datasetmethod
+require_dataset = require_rev_dataset
+path_under_dataset = path_under_rev_dataset
+resolve_path = rev_resolve_path
+get_dataset_root = rev_get_dataset_root
+EnsureDataset = EnsureRevDataset
+
+

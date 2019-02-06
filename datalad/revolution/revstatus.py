@@ -34,11 +34,11 @@ from datalad.support.constraints import (
 )
 from .dataset import (
     RevolutionDataset as Dataset,
-    datasetmethod,
-    require_dataset,
-    resolve_path,
-    path_under_dataset,
-    get_dataset_root,
+    rev_datasetmethod,
+    require_rev_dataset,
+    rev_resolve_path,
+    path_under_rev_dataset,
+    rev_get_dataset_root,
 )
 from . import utils as ut
 
@@ -182,7 +182,7 @@ class RevStatus(Interface):
 
 
     @staticmethod
-    @datasetmethod(name='rev_status')
+    @rev_datasetmethod(name='rev_status')
     @eval_results
     def __call__(
             path=None,
@@ -203,7 +203,7 @@ class RevStatus(Interface):
         # two commands feels wrong, the benefit is speed. Any future RF should
         # come with evidence that speed does not suffer, and complexity stays
         # on a manageable level
-        ds = require_dataset(
+        ds = require_rev_dataset(
             dataset, check_installed=True, purpose='status reporting')
 
         paths_by_ds = OrderedDict()
@@ -214,8 +214,8 @@ class RevStatus(Interface):
                 # given path argument, before any normalization happens
                 # for further decision logic below
                 orig_path = str(p)
-                p = resolve_path(p, dataset)
-                root = get_dataset_root(str(p))
+                p = rev_resolve_path(p, dataset)
+                root = rev_get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
@@ -233,7 +233,7 @@ class RevStatus(Interface):
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
                         # content (e.g. 'ds/')
-                        super_root = get_dataset_root(op.dirname(root))
+                        super_root = rev_get_dataset_root(op.dirname(root))
                         if super_root:
                             # the dataset identified by the path argument
                             # is contained in a superdataset, and no
@@ -261,7 +261,7 @@ class RevStatus(Interface):
             # dataset
             # the path that it might have been located by could
             # have been a resolved path or another funky thing
-            qds_inrefds = path_under_dataset(ds, qdspath)
+            qds_inrefds = path_under_rev_dataset(ds, qdspath)
             if qds_inrefds is None:
                 # nothing we support handling any further
                 # there is only a single refds

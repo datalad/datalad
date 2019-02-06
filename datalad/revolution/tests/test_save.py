@@ -586,3 +586,41 @@ def test_path_arg_call(path):
             ds.pathobj / 'rel.txt'):
         testfile.write_text(u'123')
         save(dataset=ds.path, path=[testfile.name], to_git=True)
+
+
+@with_tree(tree={
+    'file.txt': 'some text',
+    'd1': {
+        'subrepo': {
+            'subfile': 'more repo text',
+        },
+    },
+    'd2': {
+        'subds': {
+            'subfile': 'more ds text',
+        },
+    },
+})
+def test_surprise_subds(path):
+    # https://github.com/datalad/datalad/issues/3139
+    ds = create(path, force=True)
+    # a lonely repo without any commit
+    somerepo = AnnexRepo(path=op.join(path, 'd1', 'subrepo'), create=True)
+    # a proper subdataset
+    subds = create(op.join(path, 'd2', 'subds'), force=True)
+    # save non-recursive
+    ds.rev_save(recursive=False)
+    # the content of both subds and subrepo are not added to their
+    # respective parent as no --recursive was given
+    assert_repo_status(subds.path, untracked=['subfile'])
+    assert_repo_status(somerepo.path, untracked=['subfile'])
+    # however, while the subdataset is added (and reported as modified
+    # because it content is still untracked) the subrepo
+    # cannot be added (it has no commit)
+    # worse: its untracked file add been added to the superdataset
+    assert_repo_status(ds.path, modified=['d2/subds'])
+    assert_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
+              ds.repo.get_content_info())
+    # with proper subdatasets, all evil is gone
+    assert_not_in(ds.repo.pathobj / 'd2' / 'subds' / 'subfile',
+                  ds.repo.get_content_info())

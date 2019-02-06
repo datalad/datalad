@@ -21,7 +21,7 @@ from datalad.interface.run import (
 )
 from .dataset import (
     RevolutionDataset as Dataset,
-    datasetmethod,
+    rev_datasetmethod,
 )
 from .revsave import RevSave
 
@@ -44,7 +44,7 @@ class RevRun(Run):
     __doc__ = Run.__doc__
 
     @staticmethod
-    @datasetmethod(name='rev_run')
+    @rev_datasetmethod(name='rev_run')
     @eval_results
     def __call__(
             cmd=None,

@@ -42,9 +42,9 @@ from . import utils as ut
 
 from .dataset import (
     RevolutionDataset as Dataset,
-    EnsureDataset,
-    datasetmethod,
-    require_dataset,
+    EnsureRevDataset,
+    rev_datasetmethod,
+    require_rev_dataset,
 )
 from .revstatus import (
     RevStatus as Status,
@@ -78,13 +78,21 @@ class RevSave(Interface):
       Tag the most recent saved state of a dataset::
 
         % dataset save -d <path_to_dataset> --version-tag bestyet
+
+    .. note::
+      For performance reasons, any Git repository without an initial commit
+      located inside a Dataset is ignored, and content underneath it will be
+      saved to the respective superdataset. DataLad datasets always have an
+      initial commit, hence are not affected by this behavior.
     """
+    # note above documents that out behavior is like that of `git add`, but
+    # does not explicitly mention the connection to keep it simple.
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
             doc=""""specify the dataset to save""",
-            constraints=EnsureDataset() | EnsureNone()),
+            constraints=EnsureRevDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -125,7 +133,7 @@ class RevSave(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_save')
+    @rev_datasetmethod(name='rev_save')
     @eval_results
     def __call__(path=None, message=None, dataset=None,
                  version_tag=None,
@@ -174,7 +182,7 @@ class RevSave(Interface):
         #   This avoids complex annotation loops and hierarchy tracking.
         # - any modification upwards from the root dataset
 
-        ds = require_dataset(dataset, check_installed=True, purpose='saving')
+        ds = require_rev_dataset(dataset, check_installed=True, purpose='saving')
 
         # use status() to do all discovery and annotation of paths
         paths_by_ds = {}
