@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_in,
     assert_not_in,
+    known_failure,
 )
 from ....tests.utils import (
     assert_repo_status,
@@ -88,6 +89,9 @@ testmeta = {
 }
 
 
+# TODO(revolution): Would need to adjust for integration with core (setup.py
+# entry_points and perhaps more).
+@known_failure
 @with_tree(
     tree={
         '.datalad': {
