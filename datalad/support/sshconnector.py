@@ -265,9 +265,10 @@ class SSHConnection(object):
         str
           stdout, stderr of the copy operation.
         """
-
+        # Convert ssh's port flag (-p) to scp's (-P).
+        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options = self._ctrl_options + ["-r"] if recursive else self._ctrl_options
+        scp_options += ["-r"] if recursive else []
         scp_options += ["-p"] if preserve_attrs else []
         scp_cmd = ["scp"] + scp_options
 
