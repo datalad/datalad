@@ -157,7 +157,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         create_sibling(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost",
+            sshurl="ssh://localhost:22",
             target_dir=target_path,
             ui=True)
         assert_not_in('enableremote local_target failed', cml.out)

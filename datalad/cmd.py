@@ -674,6 +674,7 @@ class GitRunner(Runner):
 
         if 'GIT_SSH_COMMAND' not in git_env:
             git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+            git_env['GIT_SSH_VARIANT'] = 'ssh'
 
         return git_env
 

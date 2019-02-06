@@ -543,7 +543,8 @@ class GitRepo(RepoInterface):
     """
 
     # We use our sshrun helper
-    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
+    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
+                   'GIT_SSH_VARIANT': 'ssh'}
 
     # We must check git config to have name and email set, but
     # should do it once
