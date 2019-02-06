@@ -78,7 +78,15 @@ class RevSave(Interface):
       Tag the most recent saved state of a dataset::
 
         % dataset save -d <path_to_dataset> --version-tag bestyet
+
+    .. note::
+      For performance reasons, any Git repository without an initial commit
+      located inside a Dataset is ignored, and content underneath it will be
+      saved to the respective superdataset. DataLad datasets always have an
+      initial commit, hence are not affected by this behavior.
     """
+    # note above documents that out behavior is like that of `git add`, but
+    # does not explicitly mention the connection to keep it simple.
 
     _params_ = dict(
         dataset=Parameter(
