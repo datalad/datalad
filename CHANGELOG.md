@@ -17,7 +17,7 @@ A variety of bugfixes and enhancements
 
 - All extracted metadata is now placed under git-annex by default.
   Previously files smaller than 20 kb were stored in git. ([#3109])
-- The function `datalad.cmd.get_runner` has been removed. (#3104)
+- The function `datalad.cmd.get_runner` has been removed. ([#3104])
 
 ### Fixes
 
@@ -65,7 +65,7 @@ A variety of bugfixes and enhancements
     system group for the repository. ([#3098])
   - now understands SSH URLs that have a port in them (i.e. the
     "ssh://[user@]host.xz[:port]/path/to/repo.git/" syntax mentioned
-    in `man git-fetch`). (#3146)
+    in `man git-fetch`). ([#3146])
 - Interface classes can now override the default renderer for
   summarizing results. ([#3061])
 - [run]:
@@ -1102,6 +1102,7 @@ publishing
 [#3091]: https://github.com/datalad/datalad/issues/3091
 [#3098]: https://github.com/datalad/datalad/issues/3098
 [#3099]: https://github.com/datalad/datalad/issues/3099
+[#3104]: https://github.com/datalad/datalad/issues/3104
 [#3109]: https://github.com/datalad/datalad/issues/3109
 [#3115]: https://github.com/datalad/datalad/issues/3115
 [#3119]: https://github.com/datalad/datalad/issues/3119
@@ -1110,3 +1111,4 @@ publishing
 [#3137]: https://github.com/datalad/datalad/issues/3137
 [#3138]: https://github.com/datalad/datalad/issues/3138
 [#3141]: https://github.com/datalad/datalad/issues/3141
+[#3146]: https://github.com/datalad/datalad/issues/3146
