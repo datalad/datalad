@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.11.2 (??? ??, 2019) -- TODO
+## 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
 
 A variety of bugfixes and enhancements
 
@@ -55,6 +55,8 @@ A variety of bugfixes and enhancements
   terminated, leading to issues on Windows. ([#3137])
 - [add] incorrectly handled an "invalid repository" exception when
   trying to add a submodule. ([#3141])
+- Pass `GIT_SSH_VARIANT=ssh` to git processes to be able to specify
+  alternative ports in SSH urls
 
 ### Enhancements and new features
 
