@@ -33,8 +33,15 @@ lgr = getLogger('datalad.cmdline')
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if is_interactive() and option_string == '--help':
-            # lets use the manpage on mature systems ...
+        # Lets use the manpage on mature systems but only for subcommands --
+        # --help should behave similar to how git does it:
+        # regular --help for "git" but man pages for specific commands.
+        # It is important since we do discover all subcommands from entry
+        # points at run time and thus any static manpage would like be out of
+        # date
+        if is_interactive() \
+                and option_string == '--help' \
+                and ' ' in parser.prog:  # subcommand
             try:
                 import subprocess
                 # get the datalad manpage to use

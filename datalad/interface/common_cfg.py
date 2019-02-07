@@ -271,7 +271,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Limit configuration annexing aggregated metadata in new dataset',
                'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
-        'default': 'largerthan=20kb',
+        'default': 'anything',
     },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {

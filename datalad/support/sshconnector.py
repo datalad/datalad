@@ -22,12 +22,7 @@ from os.path import join as opj
 from subprocess import Popen
 # importing the quote function here so it can always be imported from this
 # module
-try:
-    # from Python 3.3 onwards
-    from shlex import quote as sh_quote
-except ImportError:
-    # deprecated since Python 2.7
-    from pipes import quote as sh_quote
+from six.moves import shlex_quote as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -270,9 +265,10 @@ class SSHConnection(object):
         str
           stdout, stderr of the copy operation.
         """
-
+        # Convert ssh's port flag (-p) to scp's (-P).
+        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options = self._ctrl_options + ["-r"] if recursive else self._ctrl_options
+        scp_options += ["-r"] if recursive else []
         scp_options += ["-p"] if preserve_attrs else []
         scp_cmd = ["scp"] + scp_options
 

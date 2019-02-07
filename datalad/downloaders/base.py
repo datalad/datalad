@@ -284,7 +284,7 @@ class BaseDownloader(object):
         else:
             action_msg = "enter other credentials in case they were updated?"
 
-            if ui.yesno(
+            if self.credential and ui.yesno(
                     title=title,
                     text="Do you want to %s" % action_msg):
                 self.credential.enter_new()

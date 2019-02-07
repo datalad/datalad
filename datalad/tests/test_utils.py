@@ -62,9 +62,18 @@ from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
 from ..utils import map_items
 from ..utils import unlink
+from ..utils import CMD_MAX_ARG
+from ..utils import create_tree
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_true,
+    eq_,
+    ok_,
+)
 from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
@@ -83,7 +92,8 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode, skip_if
+    known_failure_direct_mode, skip_if,
+    ok_file_has_content
 )
 
 
@@ -1134,7 +1144,8 @@ def test_get_open_files(p):
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
         # all before comparison
-        eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+        eq_(get_open_files(p, log_open=40)[op.realpath(f1)].pid,
+            os.getpid())
 
     assert not get_open_files(subd)
     # if we start a process within that directory, should get informed
@@ -1149,8 +1160,8 @@ def test_get_open_files(p):
     # Assure that it started and we read the OK
     eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
-    eq_(get_open_files(p), {op.realpath(subd): proc.pid})
-    eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
+    eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
+    eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)
     proc.terminate()
     assert not get_open_files(subd)
 
@@ -1172,3 +1183,28 @@ def test_map_items():
     c_mapped = map_items(add10, c)
     assert type(c) is type(c_mapped)
     eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
+
+
+def test_CMD_MAX_ARG():
+    # 100 is arbitrarily large small integer ;)
+    # if fails -- we are unlikely to be able to work on this system
+    # and something went really wrong!
+    assert_greater(CMD_MAX_ARG, 100)
+
+
+@with_tempfile(mkdir=True)
+def test_create_tree(path):
+    content = u"мама мыла раму"
+    create_tree(path, OrderedDict([
+        ('1', content),
+        ('sd', OrderedDict(
+            [
+            # right away an obscure case where we have both 1 and 1.gz
+                ('1', content*2),
+                ('1.gz', content*3),
+            ]
+        )),
+    ]))
+    ok_file_has_content(op.join(path, '1'), content)
+    ok_file_has_content(op.join(path, 'sd', '1'), content*2)
+    ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)

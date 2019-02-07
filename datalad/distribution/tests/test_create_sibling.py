@@ -113,13 +113,18 @@ assert_create_sshwebserver = (
 
 @with_tempfile(mkdir=True)
 def test_invalid_call(path):
-    # needs a SSH URL
-    assert_raises(InsufficientArgumentsError, create_sibling, '')
-    assert_raises(ValueError, create_sibling, 'http://ignore.me')
-    # needs an actual dataset
-    assert_raises(
-        ValueError,
-        create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+
+        # needs a SSH URL
+        assert_raises(InsufficientArgumentsError, create_sibling, '')
+        assert_raises(ValueError, create_sibling, 'http://ignore.me')
+        # needs an actual dataset
+        assert_raises(
+            ValueError,
+            create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
     # pre-configure a bogus remote
     ds = Dataset(path).create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
@@ -152,7 +157,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         create_sibling(
             dataset=source,
             name="local_target",
-            sshurl="ssh://localhost",
+            sshurl="ssh://localhost:22",
             target_dir=target_path,
             ui=True)
         assert_not_in('enableremote local_target failed', cml.out)
@@ -497,6 +502,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     eq_(len(logs_post), len(logs_prior) + 1)
 
 
+@known_failure_direct_mode  #FIXME
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
@@ -505,7 +511,9 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds = Dataset(src_path).create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
-    ds.create_sibling(target_url, name=remote, shared='group')  # not doing recursively
+    # for the test of setting a group, will just smoke test while using current
+    # user's group
+    ds.create_sibling(target_url, name=remote, shared='group', group=os.getgid())  # not doing recursively
     if standardgroup:
         ds.repo.set_preferred_content('wanted', 'standard', remote)
         ds.repo.set_preferred_content('group', standardgroup, remote)
@@ -552,10 +560,11 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
-@skip_if_on_windows  # create_sibling incompatible with win servers
 def test_target_ssh_inherit():
-    # TODO: waits for resolution on
+    skip_if_on_windows()  # create_sibling incompatible with win servers
+    # TODO: was waiting for resolution on
     #   https://github.com/datalad/datalad/issues/1274
-    #yield _test_target_ssh_inherit, None      # no wanted etc
-    #yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield known_failure_direct_mode(_test_target_ssh_inherit), 'backup'  # backup -- all data files  #FIXME
+    # which is now closed but this one is failing ATM, thus leaving as TODO
+    # yield _test_target_ssh_inherit, None      # no wanted etc
+    yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
+    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files

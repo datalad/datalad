@@ -20,6 +20,9 @@ from os.path import normpath
 from os.path import pardir
 from os.path import relpath
 
+from six import text_type
+
+from datalad.utils import assure_unicode
 from datalad.utils import unique
 from datalad.utils import get_dataset_root
 from datalad.interface.base import Interface
@@ -29,6 +32,7 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 from datalad.interface.common_opts import nosave_opt
 from datalad.interface.common_opts import save_message_opt
+from datalad.interface.common_opts import message_file_opt
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
 from datalad.interface.common_opts import annex_add_opts
@@ -167,6 +171,7 @@ class Add(Interface):
             their respective datasets, regardless of this setting."""),
         save=nosave_opt,
         message=save_message_opt,
+        message_file=message_file_opt,
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_add_opts=annex_add_opts,
@@ -183,6 +188,7 @@ class Add(Interface):
             to_git=None,
             save=True,
             message=None,
+            message_file=None,
             recursive=False,
             recursion_limit=None,
             ds2super=False,
@@ -196,6 +202,13 @@ class Add(Interface):
                 "insufficient information for adding: requires at least a path")
         refds_path = Interface.get_refds_path(dataset)
         common_report = dict(action='add', logger=lgr, refds=refds_path)
+
+        if message and message_file:
+            raise ValueError("Both a message and message file were specified")
+
+        if message_file:
+            with open(message_file, "rb") as mfh:
+                message = assure_unicode(mfh.read())
 
         to_add = []
         subds_to_add = {}
@@ -363,7 +376,8 @@ class Add(Interface):
                     ds.repo.add_submodule(subds_relpath, url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
-                        ds=subds, status='error', message=e.stderr,
+                        ds=subds, status='error',
+                        message=getattr(e, 'stderr', None) or text_type(e),
                         **dict(common_report, **ap))
                     continue
                 # queue for saving using the updated annotated path

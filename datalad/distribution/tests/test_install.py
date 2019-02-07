@@ -34,6 +34,7 @@ from datalad import consts
 from datalad.utils import chpwd
 from datalad.utils import on_windows
 from datalad.support import path as op
+from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
 from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -71,6 +72,7 @@ from datalad.tests.utils import integration
 from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
+from datalad.tests.utils import SkipTest
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -931,6 +933,12 @@ def check_datasets_datalad_org(suffix, tdir):
     # Windows we get two records due to a duplicate attempt (as res[1]) to get it
     # again, which is reported as "notneeded".  For the purpose of this test
     # it doesn't make a difference.
+    # git-annex version is not "real" - but that is about when fix was introduced
+    from datalad import cfg
+    if on_windows \
+        and cfg.obtain("datalad.repo.version") < 6 \
+        and external_versions['cmd:annex'] <= '7.20181203':
+        raise SkipTest("Known to fail, needs fixed git-annex")
     assert_result_count(
         ds.get(op.join('001-anat-scout_ses-{date}', '000001.dcm')),
         1,

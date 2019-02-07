@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import gzip
 import string
 import wrapt
 
@@ -86,14 +87,17 @@ except:  # pragma: no cover
 # The last one would be the most conservative/Windows
 CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
-    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX') or CMD_MAX_ARG_HARDCODED
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
+    assert CMD_MAX_ARG > 0
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
-    # so exception would be thrown e.g. on Windows.
+    # so exception would be thrown e.g. on Windows, or
+    # somehow during Debian build for nd14.04 it is coming up with -1:
+    # https://github.com/datalad/datalad/issues/3015
     CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
     lgr.debug(
-        "Failed to query SC_ARG_MAX sysconf, will use hardcoded value: %s",
-        exc)
+        "Failed to query or got useless SC_ARG_MAX sysconf, "
+        "will use hardcoded value: %s", exc)
 # Even with all careful computations we do, due to necessity to account for
 # environment and what not, we still could not figure out "exact" way to
 # estimate it, but it was shown that 300k safety margin on linux was sufficient.
@@ -402,7 +406,7 @@ def get_open_files(path, log_open=False):
                 # note: could be done more efficiently so we do not
                 # renormalize path over and over again etc
                 if path_startswith(p, path):
-                    files[p] = proc.pid
+                    files[p] = proc
         # Catch a race condition where a process ends
         # before we can examine its files
         except psutil.NoSuchProcess:
@@ -2129,17 +2133,33 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
                     archives_leading_dir=archives_leading_dir,
                     remove_existing=remove_existing)
         else:
-            if PY2:
-                open_kwargs = {'mode': "w"}
-                if isinstance(load, text_type):
-                    load = load.encode('utf-8')
-            else:
-                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
-
-            with open(full_name, **open_kwargs) as f:
-                f.write(load)
+            open_func = open
+            if full_name.endswith('.gz'):
+                open_func = gzip.open
+            with open_func(full_name, "wb") as f:
+                f.write(assure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+def get_suggestions_msg(values, known, sep="\n        "):
+    """Return a formatted string with suggestions for values given the known ones
+    """
+    import difflib
+    suggestions = []
+    for value in assure_list(values):  # might not want to do it if we change presentation below
+        suggestions += difflib.get_close_matches(value, known)
+    suggestions = unique(suggestions)
+    msg = "Did you mean any of these?"
+    if suggestions:
+        if '\n' in sep:
+            # if separator includes new line - we add entire separator right away
+            msg += sep
+        else:
+            msg += ' '
+        return msg + "%s\n" % sep.join(suggestions)
+    return ''
+
 
 
 lgr.log(5, "Done importing datalad.utils")

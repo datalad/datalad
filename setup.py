@@ -134,6 +134,7 @@ requires.update({
         'asv',
         'nose-timer',
         'psutil',
+        'coverage',
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome

@@ -165,7 +165,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
 @with_tempfile(content="two")
 def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://localhost:22'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     ssh.open()

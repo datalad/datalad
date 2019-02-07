@@ -53,7 +53,6 @@ from datalad.utils import on_windows
 from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import _path_
-from datalad.utils import generate_chunks
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
 from datalad.utils import make_tempfile
@@ -988,7 +987,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Keys are special remore UUIDs, values are dicts with arguments
+          Keys are special remote UUIDs, values are dicts with arguments
           for `git-annex enableremote`. This includes at least the 'type'
           and 'name' of a special remote. Each type of special remote
           may require addition arguments that will be available in the
@@ -1043,7 +1042,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             This may change.
         jobs : int
         files: list, optional
-            If command passes list of files
+            If command passes list of files. If list is too long
+            (by number of files or overall size) it will be split, and multiple
+            command invocations will follow
         **kwargs
             these are passed as additional kwargs to datalad.cmd.Runner.run()
 
@@ -1076,10 +1077,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         if self.fake_dates_enabled:
             env = self.add_fake_dates(env)
 
-        if files:
-            cmd_list += ['--'] + files
         try:
-            return self.cmd_call_wrapper.run(cmd_list, env=env, **kwargs)
+            # TODO: RF to use --batch where possible instead of splitting
+            # into multiple invocations
+            return self._run_command_files_split(
+                self.cmd_call_wrapper.run,
+                cmd_list,
+                files,
+                env=env, **kwargs)
         except CommandError as e:
             if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
@@ -1087,7 +1092,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                                " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
             else:
-                raise e
+                raise
 
     def _run_simple_annex_command(self, *args, **kwargs):
         """Run an annex command and return its output, of which expect 1 line
@@ -2362,54 +2367,35 @@ class AnnexRepo(GitRepo, RepoInterface):
           Whether to request/handle --json-progress
         """
         progress_indicators = None
+        if expected_entries:
+            progress_indicators = ProcessAnnexProgressIndicators(
+                expected=expected_entries
+            )
+            kwargs = kwargs.copy()
+            kwargs.update(dict(
+                log_stdout=progress_indicators,
+                log_stderr='offline',  # False, # to avoid lock down
+                log_online=True
+            ))
+        # TODO: refactor to account for possible --batch ones
+        annex_options = ['--json']
+        if progress:
+            annex_options += ['--json-progress']
+
+        if jobs == 'auto':
+            jobs = N_AUTO_JOBS
+        if jobs and jobs != 1:
+            annex_options += ['-J%d' % jobs]
+        if opts:
+            # opts might be the '--key' which should go last
+            annex_options += opts
+
         try:
-            if expected_entries:
-                progress_indicators = ProcessAnnexProgressIndicators(
-                    expected=expected_entries
-                )
-                kwargs = kwargs.copy()
-                kwargs.update(dict(
-                    log_stdout=progress_indicators,
-                    log_stderr='offline',  # False, # to avoid lock down
-                    log_online=True
-                ))
-            # TODO: refactor to account for possible --batch ones
-            annex_options = ['--json']
-            if progress:
-                annex_options += ['--json-progress']
-
-            if jobs == 'auto':
-                jobs = N_AUTO_JOBS
-            if jobs and jobs != 1:
-                annex_options += ['-J%d' % jobs]
-            if opts:
-                # opts might be the '--key' which should go last
-                annex_options += opts
-
-            # TODO: RF to use --batch where possible instead of splitting
-            # into multiple invocations
-            if not files:
-                file_chunks = [[]]
-            else:
-                files = assure_list(files)
-                maxl = max(map(len, files))
-                chunk_size = max(
-                    1,  # should at least be 1. If blows then - not our fault
-                    (CMD_MAX_ARG
-                     - len(command)
-                     - sum((len(x) + 3) for x in annex_options)
-                     - 4   # for '--' below
-                     ) // (maxl + 3)  # +3 for possible quotes and a space
-                )
-                file_chunks = generate_chunks(files, chunk_size)
-            out, err = "", ""
-            for file_chunk in file_chunks:
-                out_, err_ = self._run_annex_command(
+            out, err = self._run_annex_command(
                     command,
-                    annex_options=annex_options + ['--'] + file_chunk,
+                    files=files,
+                    annex_options=annex_options,
                     **kwargs)
-                out += out_
-                err += err_
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2896,7 +2882,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 direct_mode = self.is_direct_mode()
                 # we might need to avoid explicit paths
                 files_to_commit = None if direct_mode else files
-                if files and self.config.getint("annex", "version") < 6:
+                if files:
                     # In direct mode, if we commit file(s) they would get
                     # committed directly into git ignoring possibly being
                     # staged by annex.  So, if not all files are committed, and

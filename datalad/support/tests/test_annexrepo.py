@@ -82,6 +82,7 @@ from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
+from datalad.tests.utils import slow
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -1331,14 +1332,17 @@ def test_annex_copy_to(origin, clone):
     def ok_copy(command, **kwargs):
         # Check that we do pass to annex call only the list of files which we
         #  asked to be copied
-        assert_in('copied1', kwargs['annex_options'])
-        assert_in('copied2', kwargs['annex_options'])
-        assert_in('existed', kwargs['annex_options'])
+        assert_in('copied1', kwargs['files'])
+        assert_in('copied2', kwargs['files'])
+        assert_in('existed', kwargs['files'])
         return """
 {"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
 {"command":"copy","note":"checking target ...", "success":true, "key":"akey3", "file":"existed"}
 """, ""
+    # Note that we patch _run_annex_command, which is also invoked by _run_annex_command_json
+    # which is in turn invoked first by copy_to for "find" operation.
+    # TODO: provide a dedicated handling within above ok_copy for 'find' command
     with patch.object(repo, '_run_annex_command', ok_copy):
         eq_(repo.copy_to(["copied2", "copied1", "existed"], "target"),
             ["copied1", "copied2"])
@@ -2493,3 +2497,62 @@ def check_commit_annex_commit_changed(unlock, path):
 def test_commit_annex_commit_changed():
     for unlock in True, False:
         yield check_commit_annex_commit_changed, unlock
+
+
+@with_tempfile(mkdir=True)
+def check_files_split_exc(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    # absent files -- should not crash with "too long" but some other more
+    # meaningful exception
+    files = ["f" * 100 + "%04d" % f for f in range(100000)]
+    if isinstance(r, AnnexRepo):
+        # Annex'es add first checks for what is being added and does not fail
+        # for non existing files either ATM :-/  TODO: make consistent etc
+        r.add(files)
+    else:
+        with assert_raises(Exception) as ecm:
+            r.add(files)
+        assert_not_in('too long', str(ecm.exception))
+        assert_not_in('too many', str(ecm.exception))
+
+
+def test_files_split_exc():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split_exc, cls
+
+
+_HEAVY_TREE = {
+    # might already run into 'filename too long' on windows probably
+    "d" * 98 + '%03d' % d: {
+        'f' * 98 + '%03d' % f: ''
+        for f in range(100)
+    }
+    for d in range(100)
+}
+
+
+@with_tree(tree=_HEAVY_TREE)
+def check_files_split(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    dirs = glob(op.join(topdir, '*'))
+    files = glob(op.join(topdir, '*', '*'))
+
+    r.add(files)
+    r.commit(files=files)
+
+    # Let's modify and do dl.add for even a heavier test
+    # Now do for real on some heavy directory
+    import datalad.api as dl
+    for f in files:
+        os.unlink(f)
+        with open(f, 'w') as f:
+            f.write('1')
+    dl.add(dirs)
+
+
+@slow  # 313s  well -- if errors out - only 3 sec
+def test_files_split():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split, cls

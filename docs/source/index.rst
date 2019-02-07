@@ -7,6 +7,7 @@ DataLad |---| data management and publication multitool: Documentation
    gettingstarted
    changelog
    acknowledgements
+   publications
 
 Concepts and technologies
 =========================

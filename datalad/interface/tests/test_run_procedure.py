@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os.path as op
 
+from datalad.utils import chpwd
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -21,6 +22,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_true
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
@@ -33,12 +35,18 @@ from datalad.api import clean
 from datalad import cfg
 
 
-def test_invalid_call():
-    # needs spec or discover
-    assert_raises(InsufficientArgumentsError, run_procedure)
-    res = run_procedure('unknown', on_failure='ignore')
-    assert_true(len(res) == 1)
-    assert_in_results(res, status="impossible")
+@with_tempfile(mkdir=True)
+def test_invalid_call(path):
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+
+        # needs spec or discover
+        assert_raises(InsufficientArgumentsError, run_procedure)
+        res = run_procedure('unknown', on_failure='ignore')
+        assert_true(len(res) == 1)
+        assert_in_results(res, status="impossible")
 
 
 # FIXME: For some reason fails to commit correctly if on windows and in direct
@@ -60,6 +68,7 @@ def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
+    assert_false(ds.repo.is_under_annex("README.md"))
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -110,16 +119,20 @@ add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
-    ps = run_procedure(discover=True)
-    # there are a few procedures coming with datalad, needs to find them
-    assert_true(len(ps) > 2)
-    # we get three essential properties
-    eq_(
-        sum(['procedure_type' in p and
-             'procedure_callfmt' in p and
-             'path' in p
-             for p in ps]),
-        len(ps))
+    with chpwd(path):
+        # ^ Change directory so that we don't fail with an
+        # InvalidGitRepositoryError if the test is executed from a git
+        # worktree.
+        ps = run_procedure(discover=True)
+        # there are a few procedures coming with datalad, needs to find them
+        assert_true(len(ps) > 2)
+        # we get three essential properties
+        eq_(
+            sum(['procedure_type' in p and
+                 'procedure_callfmt' in p and
+                 'path' in p
+                 for p in ps]),
+            len(ps))
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)

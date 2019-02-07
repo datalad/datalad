@@ -6,7 +6,10 @@
 # Changelog
 # ---------
 # 0.11.1
-#  - Update to get a fresh build, also with fixed up git-annex
+#  - Update to get a fresh build, also with fixed up git-annex.
+#    Starting from this build, we would freeze APT repos, to make
+#    build reproducible.  The state of APT repos might be after the release
+#    to absorb fixes in other packages such as git-annex-standalone.
 # 0.10.2
 #  - Update after initial "burn-in" time for 0.10 series
 # 0.10.rc5
@@ -19,6 +22,7 @@ Bootstrap:docker
 From:neurodebian:latest
 
 %post
+    nd_freeze 20181209
     echo "Configuring the environment"
     apt-get -y update
 
@@ -31,17 +35,13 @@ From:neurodebian:latest
     locale-gen
 
     # bare essentials to pull everything else in
-    eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip
+    eatmydata apt-get -y install --no-install-recommends git git-annex-standalone python3-pip datalad python-datalad python3-datalad
 
     eatmydata apt-get -y install --no-install-recommends python3-setuptools python3-wheel less rsync git-remote-gcrypt aria2 libexempi3
 
     # just for scrapy
     eatmydata apt-get -y install --no-install-recommends python3-twisted
 
-    # little dance because pip cannot handle this url plus [full] in one go
-    wget https://github.com/datalad/datalad/archive/master.zip
-    pip3 install --system master.zip[full]
-    rm -f master.zip
 
     # clean up
     apt-get clean

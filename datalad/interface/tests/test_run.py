@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -22,21 +22,23 @@ from os.path import relpath
 from os import mkdir, remove
 import sys
 
+from six import PY2
 from six.moves import StringIO
 from mock import patch
 
 from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 
+from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.gitrepo import GitCommandError, GitRepo
+from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import ok_, assert_false, neq_
 from datalad.api import install
 from datalad.api import run
-from datalad.interface.run import GlobbedPaths
+from datalad.interface.run import format_command
 from datalad.interface.run import run_command
 from datalad.interface.rerun import get_run_info
 from datalad.interface.rerun import diff_revision, new_or_modified
@@ -131,6 +133,32 @@ def test_basics(path, nodspath):
         with swallow_logs(new_level=logging.WARN) as cml:
             ds.run()
             assert_in("No command given", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def test_py2_unicode_command(path):
+    # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+    ds = Dataset(path).create()
+    touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
+    cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+                                        touch_cmd,
+                                        u"bβ0.dat")
+    ds.run(cmd_str)
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ0.dat"))
+
+    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u"bβ1.dat"))
+
+    # Send in a list of byte-strings to mimic a py2 command-line invocation.
+    ds.run([s.encode("utf-8")
+            for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
+    ok_clean_git(ds.path)
+    ok_exists(op.join(path, u" β1 "))
+
+    with assert_raises(CommandError), swallow_outputs():
+        ds.run(u"bβ2.dat")
 
 
 @known_failure_windows
@@ -312,6 +340,13 @@ def test_rerun_onto(path):
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
+    # We abort when an explicitly specified `onto` doesn't exist.
+    ds.repo.checkout("master")
+    assert_result_count(
+        ds.rerun(since="", onto="doesnotexist", branch="from-base",
+                 on_failure="ignore"),
+        1, status="error", action="run")
+
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
@@ -391,26 +426,27 @@ def test_rerun_just_one_commit(path):
 
 @ignore_nose_capturing_stdout
 @known_failure_windows
+@known_failure_direct_mode
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
+    subds = ds.create("sub")
 
     hexsha_initial = ds.repo.get_hexsha()
 
     with assert_raises(CommandError):
-        ds.run("echo x$(cat grows) > grows && false")
+        ds.run("echo x$(cat sub/grows) > sub/grows && false")
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
     msgfile = opj(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
-    ds.add(".", save=False)
-    ds.save(message_file=msgfile)
+    ds.add(".", recursive=True, message_file=msgfile)
     ok_clean_git(ds.path)
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
-    outfile = opj(ds.path, "grows")
+    outfile = opj(subds.path, "grows")
     eq_('x\n', open(outfile).read())
 
     # There is no CommandError on rerun if the non-zero error matches the
@@ -667,7 +703,8 @@ def test_rerun_script(path):
 @slow  # ~10s
 @ignore_nose_capturing_stdout
 @known_failure_windows
-@with_tree(tree={"test-annex.dat": "content",
+@with_tree(tree={"input.dat": "input",
+                 "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
                                         "b.txt": "b"}},
                         "s1_1": {"s2": {"c.dat": "c",
@@ -688,22 +725,31 @@ def test_run_inputs_outputs(src, path):
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
 
-    # If we specify test-annex.dat as an input, it will be retrieved before the
-    # run.
-    ds.run("cat test-annex.dat test-annex.dat >doubled.dat",
-           inputs=["test-annex.dat"])
+    # The specified inputs and extra inputs will be retrieved before the run.
+    # (Use run_command() to access the extra_inputs argument.)
+    list(run_command("cat {inputs} {inputs} >doubled.dat",
+                     dataset=ds,
+                     inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
 
     ok_clean_git(ds.path)
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
     ok_(ds.repo.file_has_content("doubled.dat"))
+    with open(opj(path, "doubled.dat")) as fh:
+        content = fh.read()
+        assert_in("input", content)
+        assert_not_in("extra-input", content)
 
     # Rerunning the commit will also get the input file.
-    ds.repo.drop("test-annex.dat", options=["--force"])
-    assert_false(ds.repo.file_has_content("test-annex.dat"))
+    ds.repo.drop(["input.dat", "extra-input.dat"], options=["--force"])
+    assert_false(ds.repo.file_has_content("input.dat"))
+    assert_false(ds.repo.file_has_content("extra-input.dat"))
     ds.rerun()
-    ok_(ds.repo.file_has_content("test-annex.dat"))
+    ok_(ds.repo.file_has_content("input.dat"))
+    ok_(ds.repo.file_has_content("extra-input.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.run("touch dummy", inputs=["not-there"])
@@ -951,7 +997,7 @@ def test_inputs_quotes_needed(path):
     # spaces ...
     cmd_str = "{} -c \"{}\" {{inputs}} {{outputs[0]}}".format(
         sys.executable, cmd)
-    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"])
+    ds.run(cmd_str, inputs=["*.t*"], outputs=["out0"], expand="inputs")
     expected = u"!".join(
         list(sorted([OBSCURE_FILENAME + u".t", "bar.txt", "foo blah.txt"])) +
         ["out0"])
@@ -978,73 +1024,6 @@ def test_inject(path):
     msg = ds.repo.format_commit("%B")
     assert_in("custom_key", msg)
     assert_in("nonsense command", msg)
-
-
-def test_globbedpaths_get_sub_patterns():
-    gp = GlobbedPaths([], "doesn't matter")
-    for pat, expected in [
-            # If there are no patterns in the directory component, we get no
-            # sub-patterns.
-            ("", []),
-            ("nodir", []),
-            (op.join("nomagic", "path"), []),
-            (op.join("nomagic", "path*"), []),
-            # Create sub-patterns from leading path, successively dropping the
-            # right-most component.
-            (op.join("s*", "path"), ["s*" + op.sep]),
-            (op.join("s", "ss*", "path"), [op.join("s", "ss*") + op.sep]),
-            (op.join("s", "ss*", "path*"), [op.join("s", "ss*") + op.sep]),
-            (op.join("s", "ss*" + op.sep), []),
-            (op.join("s*", "ss", "path*"),
-             [op.join("s*", "ss") + op.sep,
-              "s*" + op.sep]),
-            (op.join("s?", "ss", "sss*", "path*"),
-             [op.join("s?", "ss", "sss*") + op.sep,
-              op.join("s?", "ss") + op.sep,
-              "s?" + op.sep])]:
-        eq_(gp._get_sub_patterns(pat), expected)
-
-
-@with_tree(tree={"1.txt": "",
-                 "2.dat": "",
-                 "3.txt": ""})
-def test_globbedpaths(path):
-    for patterns, expected in [
-            (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
-            (["*.txt", "*.dat"], {"1.txt", "2.dat", "3.txt"}),
-            (["*.txt"], {"1.txt", "3.txt"})]:
-        gp = GlobbedPaths(patterns, pwd=path)
-        eq_(set(gp.expand()), expected)
-        eq_(set(gp.expand(full=True)),
-            {opj(path, p) for p in expected})
-
-    # Full patterns still get returned as relative to pwd.
-    gp = GlobbedPaths([opj(path, "*.dat")], pwd=path)
-    eq_(gp.expand(), ["2.dat"])
-
-    # "." gets special treatment.
-    gp = GlobbedPaths([".", "*.dat"], pwd=path)
-    eq_(set(gp.expand()), {"2.dat", "."})
-    eq_(gp.expand(dot=False), ["2.dat"])
-    gp = GlobbedPaths(["."], pwd=path, expand=False)
-    eq_(gp.expand(), ["."])
-    eq_(gp.paths, ["."])
-
-    # We can the glob outputs.
-    glob_results = {"z": "z",
-                    "a": ["x", "d", "b"]}
-    with patch('glob.glob', glob_results.get):
-        gp = GlobbedPaths(["z", "a"])
-        eq_(gp.expand(), ["z", "b", "d", "x"])
-
-    # glob expansion for paths property is determined by expand argument.
-    for expand, expected in [(True, ["2.dat"]), (False, ["*.dat"])]:
-        gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
-        eq_(gp.paths, expected)
-
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        GlobbedPaths(["not here"], pwd=path).expand()
-        assert_in("No matching files found for 'not here'", cml.out)
 
 
 def test_rerun_commit_message_check():
@@ -1090,3 +1069,58 @@ def test_rerun_commit_message_check():
     eq_(subject, "fine")
     assert_dict_equal(info,
                       {"pwd": ".", "cmd": "echo ok >okfile", "exit": 0})
+
+
+@with_tempfile(mkdir=True)
+def test_format_command_strip_leading_dashes(path):
+    ds = Dataset(path).create()
+    eq_(format_command(ds, ["--", "cmd", "--opt"]), "cmd --opt")
+    eq_(format_command(ds, ["--"]), "")
+    # Can repeat to escape.
+    eq_(format_command(ds, ["--", "--", "ok"]), "-- ok")
+    # String stays as is.
+    eq_(format_command(ds, "--"), "--")
+
+
+@with_tempfile(mkdir=True)
+def test_run_cmdline_disambiguation(path):
+    Dataset(path).create()
+    with chpwd(path):
+        # Without a positional argument starting a command, any option is
+        # treated as an option to 'datalad run'.
+        with swallow_outputs() as cmo:
+            with patch("datalad.interface.run._execute_command") as exec_cmd:
+                with assert_raises(SystemExit):
+                    main(["datalad", "run", "--message"])
+                exec_cmd.assert_not_called()
+            assert_in("message: expected one", cmo.err)
+        # If we want to pass an option as the first value of a command (e.g.,
+        # because we are using a runscript with containers-run), we can do this
+        # with "--".
+        with patch("datalad.interface.run._execute_command") as exec_cmd:
+            with assert_raises(SystemExit):
+                main(["datalad", "run", "--", "--message"])
+            exec_cmd.assert_called_once_with(
+                "--message", path, expected_exit=None)
+
+        # And a twist on above: Our parser mishandles --version (gh-3067),
+        # treating 'datalad run CMD --version' as 'datalad --version'.
+        version_stream = "err" if PY2 else "out"
+        with swallow_outputs() as cmo:
+            with assert_raises(SystemExit) as cm:
+                main(["datalad", "run", "echo", "--version"])
+            eq_(cm.exception.code, 0)
+            out = getattr(cmo, version_stream)
+        with swallow_outputs() as cmo:
+            with assert_raises(SystemExit):
+                main(["datalad", "--version"])
+            version_out = getattr(cmo, version_stream)
+        ok_(version_out)
+        eq_(version_out, out)
+        # We can work around that (i.e., make "--version" get passed as
+        # command) with "--".
+        with patch("datalad.interface.run._execute_command") as exec_cmd:
+            with assert_raises(SystemExit):
+                main(["datalad", "run", "--", "echo", "--version"])
+            exec_cmd.assert_called_once_with(
+                "echo --version", path, expected_exit=None)
