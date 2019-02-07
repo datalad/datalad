@@ -11,7 +11,11 @@
 
 import logging
 import os
+import os.path as op
 from os.path import exists, isdir, getmtime, join as opj
+from mock import patch
+
+from nose import SkipTest
 
 from datalad.support.external_versions import external_versions
 
@@ -212,6 +216,28 @@ def test_ssh_compound_cmds():
     out, err = ssh('[ 1 = 2 ] && echo no || echo success')
     eq_(out.strip(), 'success')
     ssh.close()  # so we get rid of the possibly lingering connections
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_custom_identity_file():
+    ifile = "/tmp/dl-test-ssh-id"  # Travis
+    if not op.exists(ifile):
+        raise SkipTest("Travis-specific '{}' identity file does not exist"
+                       .format(ifile))
+
+    with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            manager = SSHManager()
+            ssh = manager.get_connection('ssh://localhost')
+            cmd_out, _ = ssh("echo blah")
+            expected_socket = op.join(
+                manager.socket_dir,
+                get_connection_hash("localhost", identity_file=ifile))
+            ok_(exists(expected_socket))
+            manager.close()
+            assert_in("-i", cml.out)
+            assert_in(ifile, cml.out)
 
 
 @skip_if_on_windows  # our test setup has no SSH server running

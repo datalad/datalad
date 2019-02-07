@@ -349,6 +349,10 @@ class SSHConnection(object):
 class SSHManager(object):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
+
+    Note: If a connection should use a custom identity file via
+    `datalad.ssh.identityfile`, that value should be set before this class is
+    initialized.
     """
 
     def __init__(self):
@@ -358,6 +362,7 @@ class SSHManager(object):
         # handling of socket_dir, so we do not define them here explicitly
         # to an empty list to fail if logic is violated
         self._prev_connections = None
+        self._identity_file = None
         # and no explicit initialization in the constructor
         # self.assure_initialized()
 
@@ -379,6 +384,7 @@ class SSHManager(object):
         cfg = ConfigManager()
         self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
                                'sockets')
+        self._identity_file = cfg.get('datalad.ssh.identityfile')
         assure_dir(self._socket_dir)
         try:
             chmod(self._socket_dir, 0o700)
@@ -437,9 +443,13 @@ class SSHManager(object):
             raise ValueError("Unsupported SSH URL: '{0}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
+        # Ensure self._identityfile has been set, if configured.
+        self.assure_initialized()
+
         conhash = get_connection_hash(
             sshri.hostname,
             port=sshri.port,
+            identity_file=self._identity_file or "",
             username=sshri.username)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
@@ -448,7 +458,8 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri)
+            c = SSHConnection(ctrl_path, sshri,
+                              identity_file=self._identity_file)
             self._connections[ctrl_path] = c
             return c
 
