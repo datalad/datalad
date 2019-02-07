@@ -12,7 +12,7 @@ Last-Update: 2018-06-05
 
 --- a/datalad/tests/test_cmd.py
 +++ b/datalad/tests/test_cmd.py
-@@ -42,7 +42,7 @@ def test_runner_dry(tempfile):
+@@ -53,7 +53,7 @@ def test_runner_dry(tempfile):
      runner = Runner(protocol=dry)
  
      # test dry command call
@@ -21,7 +21,7 @@ Last-Update: 2018-06-05
      with swallow_logs(new_level=9) as cml:
          ret = runner.run(cmd)
          cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
-@@ -66,7 +66,7 @@ def test_runner(tempfile):
+@@ -77,7 +77,7 @@ def test_runner(tempfile):
  
      # test non-dry command call
      runner = Runner()
@@ -30,7 +30,7 @@ Last-Update: 2018-06-05
      ret = runner.run(cmd)
      assert_true(os.path.exists(tempfile),
                  "Run of: %s resulted with non-existing file %s" %
-@@ -149,7 +149,7 @@ def test_runner_log_stdout():
+@@ -160,7 +160,7 @@ def test_runner_log_stdout():
      # assertion yet.
  
      runner = Runner(log_outputs=True)
@@ -39,7 +39,7 @@ Last-Update: 2018-06-05
      for cmd in [cmd_, ' '.join(cmd_)]:
          # should be identical runs, either as a string or as a list
          kw = {}
-@@ -162,16 +162,16 @@ def test_runner_log_stdout():
+@@ -173,16 +173,16 @@ def test_runner_log_stdout():
              if not on_windows:
                  # we can just count on sanity
                  cm.assert_logged("stdout| stdout-"

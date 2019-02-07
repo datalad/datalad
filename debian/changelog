@@ -1,3 +1,9 @@
+datalad (0.11.2-1) unstable; urgency=medium
+
+  * Fresh upstream bugfix/minor release
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 06 Feb 2019 23:20:28 -0500
+
 datalad (0.11.1-1) unstable; urgency=medium
 
   * Fresh upstream bugfix/minor release
