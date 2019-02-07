@@ -10,8 +10,10 @@ Problems go away if UTF-8 locale is configured and set (instead of C or POSIX)
 
 Last-Update: 2018-06-05
 
---- a/datalad/tests/test_cmd.py
-+++ b/datalad/tests/test_cmd.py
+Index: datalad-0.11.2/datalad/tests/test_cmd.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/tests/test_cmd.py
++++ datalad-0.11.2/datalad/tests/test_cmd.py
 @@ -53,7 +53,7 @@ def test_runner_dry(tempfile):
      runner = Runner(protocol=dry)
  
@@ -60,8 +62,19 @@ Last-Update: 2018-06-05
              eq_(cml.out, "")
  
  
---- a/datalad/tests/test_config.py
-+++ b/datalad/tests/test_config.py
+@@ -258,7 +258,7 @@ def test_runner_failure_unicode(path):
+     # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
+     runner = Runner()
+     with assert_raises(CommandError), swallow_logs():
+-        runner.run(u"β-command-doesnt-exist", cwd=path)
++        runner.run(u"B-command-doesnt-exist", cwd=path)
+ 
+ 
+ @with_tempfile(mkdir=True)
+Index: datalad-0.11.2/datalad/tests/test_config.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/tests/test_config.py
++++ datalad-0.11.2/datalad/tests/test_config.py
 @@ -39,7 +39,7 @@ user = name=Jane Doe
  user = email=jd@example.com
  myint = 3
@@ -111,3 +124,123 @@ Last-Update: 2018-06-05
      # sections are added on demand
      cfg.add('unheard.of', 'fame')
      assert_true(cfg.has_section('unheard.of'))
+Index: datalad-0.11.2/datalad/distribution/tests/test_add.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/distribution/tests/test_add.py
++++ datalad-0.11.2/datalad/distribution/tests/test_add.py
+@@ -70,10 +70,10 @@ def test_add_message_file(path):
+         ds.add("blah", message="me", message_file="and me")
+ 
+     create_tree(path, {"foo": "x",
+-                       "msg": u"add β"})
++                       "msg": u"add X"})
+     ds.add("foo", message_file=opj(ds.path, "msg"))
+     assert_equal(ds.repo.format_commit("%s"),
+-                 u"add β")
++                 u"add X")
+ 
+ 
+ tree_arg = dict(tree={'test.txt': 'some',
+Index: datalad-0.11.2/datalad/interface/tests/test_run.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/interface/tests/test_run.py
++++ datalad-0.11.2/datalad/interface/tests/test_run.py
+@@ -142,23 +142,23 @@ def test_py2_unicode_command(path):
+     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
+     cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
+                                         touch_cmd,
+-                                        u"bβ0.dat")
++                                        u"bB0.dat")
+     ds.run(cmd_str)
+     ok_clean_git(ds.path)
+-    ok_exists(op.join(path, u"bβ0.dat"))
++    ok_exists(op.join(path, u"bB0.dat"))
+ 
+-    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
++    ds.run([sys.executable, "-c", touch_cmd, u"bB1.dat"])
+     ok_clean_git(ds.path)
+-    ok_exists(op.join(path, u"bβ1.dat"))
++    ok_exists(op.join(path, u"bB1.dat"))
+ 
+     # Send in a list of byte-strings to mimic a py2 command-line invocation.
+     ds.run([s.encode("utf-8")
+-            for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
++            for s in [sys.executable, "-c", touch_cmd, u" B1 "]])
+     ok_clean_git(ds.path)
+-    ok_exists(op.join(path, u" β1 "))
++    ok_exists(op.join(path, u" B1 "))
+ 
+     with assert_raises(CommandError), swallow_outputs():
+-        ds.run(u"bβ2.dat")
++        ds.run(u"bB2.dat")
+ 
+ 
+ @known_failure_windows
+Index: datalad-0.11.2/datalad/interface/tests/test_save.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/interface/tests/test_save.py
++++ datalad-0.11.2/datalad/interface/tests/test_save.py
+@@ -274,11 +274,11 @@ def test_save_message_file(path):
+         ds.save("blah", message="me", message_file="and me")
+ 
+     create_tree(path, {"foo": "x",
+-                       "msg": u"add β"})
++                       "msg": u"add B"})
+     ds.add("foo", save=False)
+     ds.save(message_file=opj(ds.path, "msg"))
+     assert_equal(ds.repo.format_commit("%s"),
+-                 u"add β")
++                 u"add B")
+ 
+ 
+ def test_renamed_file():
+Index: datalad-0.11.2/datalad/support/tests/test_globbedpaths.py
+===================================================================
+--- datalad-0.11.2.orig/datalad/support/tests/test_globbedpaths.py
++++ datalad-0.11.2/datalad/support/tests/test_globbedpaths.py
+@@ -51,7 +51,7 @@ def test_globbedpaths_get_sub_patterns()
+                  "2.dat": "",
+                  "3.txt": "",
+                  # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
+-                 u"bβ.dat": "",
++                 u"bB.dat": "",
+                  "subdir": {"1.txt": "", "2.txt": ""}})
+ def test_globbedpaths(path):
+     dotdir = op.curdir + op.sep
+@@ -59,9 +59,9 @@ def test_globbedpaths(path):
+     for patterns, expected in [
+             (["1.txt", "2.dat"], {"1.txt", "2.dat"}),
+             ([dotdir + "1.txt", "2.dat"], {dotdir + "1.txt", "2.dat"}),
+-            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bβ.dat", "3.txt"}),
++            (["*.txt", "*.dat"], {"1.txt", "2.dat", u"bB.dat", "3.txt"}),
+             ([dotdir + "*.txt", "*.dat"],
+-             {dotdir + "1.txt", "2.dat", u"bβ.dat", dotdir + "3.txt"}),
++             {dotdir + "1.txt", "2.dat", u"bB.dat", dotdir + "3.txt"}),
+             (["subdir/*.txt"], {"subdir/1.txt", "subdir/2.txt"}),
+             ([dotdir + "subdir/*.txt"],
+              {dotdir + p for p in ["subdir/1.txt", "subdir/2.txt"]}),
+@@ -87,12 +87,12 @@ def test_globbedpaths(path):
+ 
+     # Full patterns still get returned as relative to pwd.
+     gp = GlobbedPaths([op.join(path, "*.dat")], pwd=path)
+-    eq_(gp.expand(), ["2.dat", u"bβ.dat"])
++    eq_(gp.expand(), ["2.dat", u"bB.dat"])
+ 
+     # "." gets special treatment.
+     gp = GlobbedPaths([".", "*.dat"], pwd=path)
+-    eq_(set(gp.expand()), {"2.dat", u"bβ.dat", "."})
+-    eq_(gp.expand(dot=False), ["2.dat", u"bβ.dat"])
++    eq_(set(gp.expand()), {"2.dat", u"bB.dat", "."})
++    eq_(gp.expand(dot=False), ["2.dat", u"bB.dat"])
+     gp = GlobbedPaths(["."], pwd=path, expand=False)
+     eq_(gp.expand(), ["."])
+     eq_(gp.paths, ["."])
+@@ -105,7 +105,7 @@ def test_globbedpaths(path):
+         eq_(gp.expand(), ["z", "b", "d", "x"])
+ 
+     # glob expansion for paths property is determined by expand argument.
+-    for expand, expected in [(True, ["2.dat", u"bβ.dat"]),
++    for expand, expected in [(True, ["2.dat", u"bB.dat"]),
+                              (False, ["*.dat"])]:
+         gp = GlobbedPaths(["*.dat"], pwd=path, expand=expand)
+         eq_(gp.paths, expected)
