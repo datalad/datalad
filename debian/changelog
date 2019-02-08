@@ -1,3 +1,10 @@
+datalad (0.11.2-2) unstable; urgency=medium
+
+  * Drop B-Depends on python-libxmp - optional dependency and currently
+    causes possible removal of datalad from buster
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 08 Feb 2019 14:32:00 -0500
+
 datalad (0.11.2-1) unstable; urgency=medium
 
   * Fresh upstream bugfix/minor release
