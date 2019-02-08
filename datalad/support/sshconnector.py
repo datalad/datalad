@@ -68,7 +68,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri):
+    def __init__(self, ctrl_path, sshri, identity_file=None):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -80,6 +80,8 @@ class SSHConnection(object):
         sshri: SSHRI
           SSH resource identifier (contains all connection-relevant info),
           or another resource identifier that can be converted into an SSHRI.
+        identity_file : str or None
+          Value to pass to ssh's -i option.
         """
         self._runner = None
 
@@ -94,6 +96,8 @@ class SSHConnection(object):
         self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+
+        self._identity_file = identity_file
 
         # essential properties of the remote system
         self._remote_props = {}
@@ -211,6 +215,8 @@ class SSHConnection(object):
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self._ctrl_options
+        if self._identity_file:
+            ctrl_options.extend(["-i", self._identity_file])
         # create ssh control master command
         cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
 
