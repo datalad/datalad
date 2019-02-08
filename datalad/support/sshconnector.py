@@ -37,13 +37,16 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username=''):
+def get_connection_hash(hostname, port='', username='', identity_file=''):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
     to a connection from and to a particular machine (with
     port and login username). The hash also contains the local
     host name.
+
+    Identity file corresponds to a file that will be passed via ssh's -i
+    option.
     """
     # returning only first 8 characters to minimize our chance
     # of hitting a limit on the max path length for the Unix socket.
@@ -52,10 +55,11 @@ def get_connection_hash(hostname, port='', username=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
+            identity_file=identity_file,
             username=username).encode('utf-8')).hexdigest()[:8]
 
 
