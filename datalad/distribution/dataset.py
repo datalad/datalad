@@ -179,12 +179,12 @@ class Dataset(object):
         # provided to @datasetmethod and what is defined in interfaces
         if not attr.startswith('_'):  # do not even consider those
             from datalad.interface.base import (
-                get_interface_groups, get_interface_name
+                get_interface_groups, get_api_name
             )
             for _, _, interfaces in get_interface_groups():
                 for intfspec in interfaces:
                     # lgr.log(5, "Considering interface %s", intfspec)
-                    name = get_interface_name(intfspec, 'python')
+                    name = get_api_name(intfspec)
                     if attr == name:
                         from importlib import import_module
                         # turn the interface spec into an instance
