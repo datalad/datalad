@@ -60,10 +60,7 @@ class AddReadme(Interface):
         import logging
         lgr = logging.getLogger('datalad.plugin.add_readme')
 
-        from datalad.distribution.add import Add
         from datalad.distribution.dataset import require_dataset
-        from datalad.interface.unlock import Unlock
-        from datalad.metadata.metadata import Metadata
         from datalad.utils import assure_list
 
         dataset = require_dataset(dataset, check_installed=True,
