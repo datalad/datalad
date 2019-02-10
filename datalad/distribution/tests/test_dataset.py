@@ -435,15 +435,3 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
     assert_is_not(ds_link.config, ar3.config)
     assert_false(ds_link._cfg_bound)
     assert_is_none(ds_link.id)
-
-
-@with_tempfile(mkdir=True)
-def test_datasetmethod_bound(path):
-    ds = Dataset(path)
-    # should be automagically imported/picked up if not bound already
-    assert ds.add  # simplest, intfspec only 2 entries
-    assert ds.download_url  # 3 entries, with dash
-    assert ds.create_sibling_github # 3 entries, 2 dashes
-    # if we ask for some really not known API - kaboom
-    with assert_raises(AttributeError):
-        ds.kaboommethod()
