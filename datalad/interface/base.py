@@ -100,6 +100,22 @@ def get_interface_groups(include_plugins=False):
     return grps
 
 
+def get_interface_name(intfspec, domain='python'):
+    """Given interface spec, return the func/method name"""
+    assert domain == 'python', "no other ATM supported for this function"
+
+    if len(intfspec) >= 4:
+        name = intfspec[3]
+    else:
+        # there might be just 2 entries - module, class
+        if len(intfspec) <= 2:
+            name = intfspec[1].lower()
+        else:
+            name = intfspec[2]
+        name = name.replace('-', '_')
+    return name
+
+
 def get_cmd_summaries(descriptions, groups, width=79):
     """Return summaries for the commands in `groups`.
 
