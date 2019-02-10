@@ -10,7 +10,6 @@
 """Test metadata """
 
 import logging
-import os
 
 from os.path import join as opj
 from os.path import relpath
@@ -19,7 +18,6 @@ import os.path as op
 from datalad.api import Dataset
 from datalad.api import aggregate_metadata
 from datalad.api import install
-from datalad.api import search
 from datalad.api import metadata
 from datalad.metadata.metadata import (
     get_metadata_type,
