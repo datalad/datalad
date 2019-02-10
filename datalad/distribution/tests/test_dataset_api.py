@@ -25,7 +25,15 @@ def test_datasetmethod_bound(path):
     # should be automagically imported/picked up if not bound already
     assert ds.add  # simplest, intfspec only 2 entries
     assert ds.download_url  # 3 entries, with dash
-    assert ds.create_sibling_github # 3 entries, 2 dashes
+    assert ds.create_sibling_github  # 3 entries, 2 dashes
+    assert ds.aggregate_metadata  # module name is called "aggregate"
+    assert ds.drop  # some fancy parametrization
+    assert ds.get  # some fancy parametrization
+    # plugins - unfortunately they are too special ATM,
+    # we would need to import from the full filename path, etc
+    # postpoined that part
+    # assert ds.addurls
+    # assert ds.wtf
     # if we ask for some really not known API - kaboom
     with assert_raises(AttributeError):
         ds.kaboommethod()
