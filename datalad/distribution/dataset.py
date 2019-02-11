@@ -180,42 +180,24 @@ class Dataset(object):
         meth = None
         if not attr.startswith('_'):  # do not even consider those
             from datalad.interface.base import (
-                get_interface_groups, get_api_name
+                get_interface_groups, get_api_name, load_interface
             )
-            from datalad.plugin import _load_plugin
             groups = get_interface_groups(True)
-            plugins = groups.pop()  # the last one
-            assert plugins[0].lower() == 'plugins'
             for group, _, interfaces in groups:
                 for intfspec in interfaces:
                     # lgr.log(5, "Considering interface %s", intfspec)
-                    meth_ = None
                     name = get_api_name(intfspec)
                     if attr == name:
-                        from importlib import import_module
-                        # turn the interface spec into an instance
-                        import_module(intfspec[0], package='datalad')
-                        # Now it must be bound but let's stay cautious
-                        meth = getattr(self, attr, None)
-                        if meth:
-                            # break the loop
-                            break
-            # Plugins come last and could potentially overload
-            # previously loaded name
-            for name, plugin_spec in plugins[2]:
-                assert isinstance(plugin_spec, dict)
-                if attr == name:
-                    # allow it to fail to import (will be logged)
-                    meth_ = _load_plugin(plugin_spec['file'], fail=False)
-                    if meth_:
-                        lgr.debug("Found matching interface %s for %s",
-                                  intfspec, name)
-                        if meth:
-                            lgr.debug(
-                                "New match possibly overloaded previous one"
-                            )
-                        meth = meth_
-                        break
+                        meth_ = load_interface(intfspec)
+                        if meth_:
+                            lgr.debug("Found matching interface %s for %s",
+                                      intfspec, name)
+                            if meth:
+                                lgr.debug(
+                                    "New match %s possibly overloaded previous one %s",
+                                    meth_, meth
+                                )
+                            meth = meth_
             if not meth:
                 lgr.debug("Found no match among known interfaces for %r", attr)
         return super(Dataset, self).__getattribute__(attr)
