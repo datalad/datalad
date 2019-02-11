@@ -286,7 +286,10 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     # TODO -- more and more specific
 
 
-@use_cassette('test_authenticate_external_portals', record_mode='once')
+# TODO: @use_cassette is not playing nice with generators, causing
+# troubles when trying to cause test skip if no network. So disabling for now
+# https://github.com/datalad/datalad/issues/3158
+# @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     skip_if_no_network()
     yield check_download_external_url, \
