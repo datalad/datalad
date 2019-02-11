@@ -108,8 +108,10 @@ def test_ssh_manager_close():
     manager = SSHManager()
 
     # check for previously existing sockets:
-    existed_before_1 = exists(opj(manager.socket_dir, 'localhost'))
-    existed_before_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+    existed_before_1 = exists(opj(manager.socket_dir,
+                                  get_connection_hash('localhost')))
+    existed_before_2 = exists(opj(manager.socket_dir,
+                                  get_connection_hash('datalad-test')))
 
     manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
@@ -125,8 +127,10 @@ def test_ssh_manager_close():
 
     manager.close()
 
-    still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
-    still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+    still_exists_1 = exists(opj(manager.socket_dir,
+                                get_connection_hash('localhost')))
+    still_exists_2 = exists(opj(manager.socket_dir,
+                                get_connection_hash('datalad-test')))
 
     eq_(existed_before_1, still_exists_1)
     eq_(existed_before_2, still_exists_2)
