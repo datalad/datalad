@@ -29,11 +29,9 @@ def test_datasetmethod_bound(path):
     assert ds.aggregate_metadata  # module name is called "aggregate"
     assert ds.drop  # some fancy parametrization
     assert ds.get  # some fancy parametrization
-    # plugins - unfortunately they are too special ATM,
-    # we would need to import from the full filename path, etc
-    # postpoined that part
-    # assert ds.addurls
-    # assert ds.wtf
+    # plugins
+    assert ds.addurls
+    assert ds.wtf
     # if we ask for some really not known API - kaboom
     with assert_raises(AttributeError):
         ds.kaboommethod()
