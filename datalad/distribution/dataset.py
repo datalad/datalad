@@ -183,40 +183,41 @@ class Dataset(object):
                 get_interface_groups, get_api_name
             )
             from datalad.plugin import _load_plugin
-            for group, _, interfaces in get_interface_groups(True):
+            groups = get_interface_groups(True)
+            plugins = groups.pop()  # the last one
+            assert plugins[0].lower() == 'plugins'
+            for group, _, interfaces in groups:
                 for intfspec in interfaces:
                     # lgr.log(5, "Considering interface %s", intfspec)
                     meth_ = None
-                    # Plugins come last and could potentially overload
-                    # previously found name
-                    if group.lower() != 'plugins':
-                        name = get_api_name(intfspec)
-                        if attr == name:
-                            from importlib import import_module
-                            # turn the interface spec into an instance
-                            import_module(intfspec[0], package='datalad')
-                            # Now it must be bound
-                            meth_ = getattr(self, attr, None)
-                    else:
-                        # plugin
-                        assert len(intfspec) >= 2
-                        assert isinstance(intfspec[1], dict)
-                        name = intfspec[0]
-                        if attr == name:
-                            # allow it to fail to import (will be logged)
-                            meth_ = _load_plugin(intfspec[1]['file'], fail=False)
-
+                    name = get_api_name(intfspec)
+                    if attr == name:
+                        from importlib import import_module
+                        # turn the interface spec into an instance
+                        import_module(intfspec[0], package='datalad')
+                        # Now it must be bound but let's stay cautious
+                        meth = getattr(self, attr, None)
+                        if meth:
+                            # break the loop
+                            break
+            # Plugins come last and could potentially overload
+            # previously loaded name
+            for name, plugin_spec in plugins[2]:
+                assert isinstance(plugin_spec, dict)
+                if attr == name:
+                    # allow it to fail to import (will be logged)
+                    meth_ = _load_plugin(plugin_spec['file'], fail=False)
                     if meth_:
-                        lgr.debug(
-                            "Found matching interface %s for %s",
-                            intfspec, name)
-                        if meth is not None:
+                        lgr.debug("Found matching interface %s for %s",
+                                  intfspec, name)
+                        if meth:
                             lgr.debug(
                                 "New match possibly overloaded previous one"
                             )
                         meth = meth_
-
-            lgr.debug("Found no match among known interfaces for %r", attr)
+                        break
+            if not meth:
+                lgr.debug("Found no match among known interfaces for %r", attr)
         return super(Dataset, self).__getattribute__(attr)
 
     def close(self):
