@@ -26,8 +26,6 @@ from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
-# needed below as bound dataset method
-from datalad.api import add
 
 from datalad.cmd import Runner
 

@@ -37,9 +37,7 @@ from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
 
-# bound dataset methods
 from datalad.interface.run import Run
-from datalad.distribution.subdatasets import Subdatasets
 
 lgr = logging.getLogger('datalad.interface.run_procedures')
 

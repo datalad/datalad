@@ -16,7 +16,6 @@ from os.path import join as opj, abspath, normpath, relpath, exists
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad import cfg
 from datalad.api import create
-from datalad.api import install
 from datalad.api import get
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_

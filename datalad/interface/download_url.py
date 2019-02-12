@@ -21,7 +21,6 @@ from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
 from ..utils import get_dataset_pwds
-from ..distribution.add import Add
 from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
 from ..distribution.dataset import require_dataset
