@@ -2655,8 +2655,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
+        # note - shouldn't use merge_annex_branches=False because updated
+        # info/description about remote UUIDs might be needed
         json_records = list(self._run_annex_command_json(
-            'info', opts=options, merge_annex_branches=False))
+            'info', opts=options))
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields
