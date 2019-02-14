@@ -1023,6 +1023,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                            git_options=None, annex_options=None,
                            backend=None, jobs=None,
                            files=None,
+                           merge_annex_branches=True,
                            **kwargs):
         """Helper to run actual git-annex calls
 
@@ -1045,6 +1046,10 @@ class AnnexRepo(GitRepo, RepoInterface):
             If command passes list of files. If list is too long
             (by number of files or overall size) it will be split, and multiple
             command invocations will follow
+        merge_annex_branches: bool, optional
+            If False, annex.merge-annex-branches=false config will be set for
+            git-annex call.  Useful for operations which are not intended to
+            benefit from updating information about remote git-annexes
         **kwargs
             these are passed as additional kwargs to datalad.cmd.Runner.run()
 
@@ -1063,6 +1068,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not self.always_commit:
             git_options += ['-c', 'annex.alwayscommit=false']
+
+        if not merge_annex_branches:
+            git_options += ['-c', 'annex.merge-annex-branches=false']
 
         if git_options:
             cmd_list = ['git'] + git_options + ['annex']
@@ -1354,7 +1362,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not key:
             expected_downloads, fetch_files = self._get_expected_files(
-                files, ['--not', '--in', 'here'])
+                files, ['--not', '--in', 'here'],
+                merge_annex_branches=False  # interested only in local info
+            )
         else:
             fetch_files = files
             assert len(files) == 1, "When key=True only a single file be provided"
@@ -1389,7 +1399,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # and vomit an exception of incomplete download????
         return results_list
 
-    def _get_expected_files(self, files, expr):
+    def _get_expected_files(self, files, expr, merge_annex_branches=True):
         """Given a list of files, figure out what to be downloaded
 
         Parameters
@@ -1413,7 +1423,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         unknown_sizes = []  # unused atm
         # for now just record total size, and
         for j in self._run_annex_command_json(
-                'find', opts=expr, files=files
+                'find', opts=expr, files=files,
+                merge_annex_branches=merge_annex_branches
         ):
             # TODO: some files might not even be here.  So in current fancy
             # output reporting scheme we should then theoretically handle
@@ -1839,7 +1850,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         # Ignore batch=True if any path is a directory because `git annex find
         # --batch` always returns an empty string for directories.
         if batch and not any(isdir(opj(self.path, f)) for f in files):
-            find = self._batched.get('find', json=True, path=self.path)
+            find = self._batched.get(
+                'find', json=True, path=self.path,
+                # Since we are just interested in local information
+                git_options=['-c', 'annex.merge-annex-branches=false']
+            )
             objects = {f: json_out.get("file", "")
                        for f, json_out in zip(files, find(files))}
         else:
@@ -1848,7 +1863,8 @@ class AnnexRepo(GitRepo, RepoInterface):
                     obj, er = self._run_annex_command(
                         'find', files=[f],
                         annex_options=["--print0"],
-                        expect_fail=True
+                        expect_fail=True,
+                        merge_annex_branches=False
                     )
                     items = obj.rstrip("\0").split("\0")
                     objects[f] = items[0] if len(items) == 1 else items
@@ -2365,6 +2381,8 @@ class AnnexRepo(GitRepo, RepoInterface):
           ProcessAnnexProgressIndicators to display progress
         progress: bool, optional
           Whether to request/handle --json-progress
+        **kwargs
+          Passed to ._run_annex_command
         """
         progress_indicators = None
         if expected_entries:
@@ -2600,11 +2618,12 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not batch:
             json_objects = self._run_annex_command_json(
-                'info', opts=options, files=files)
+                'info', opts=options, files=files, merge_annex_branches=False)
         else:
             json_objects = self._batched.get(
                 'info',
-                annex_options=options, json=True, path=self.path
+                annex_options=options, json=True, path=self.path,
+                git_options=['-c', 'annex.merge-annex-branches=false']
             )(files)
 
         # Some aggressive checks. ATM info can be requested only per file
@@ -2636,7 +2655,8 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
-        json_records = list(self._run_annex_command_json('info', opts=options))
+        json_records = list(self._run_annex_command_json(
+            'info', opts=options, merge_annex_branches=False))
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields
@@ -2683,7 +2703,9 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             if with_content_only:
                 args.extend(['--in', 'here'])
-        out, err = self._run_annex_command('find', annex_options=args)
+        out, err = self._run_annex_command(
+            'find', annex_options=args, merge_annex_branches=False
+        )
         # TODO: JSON
         return out.splitlines()
 
