@@ -26,12 +26,13 @@ class CommandError(RuntimeError):
         self.stderr = stderr
 
     def __str__(self):
+        from datalad.utils import assure_unicode
         to_str = "%s: " % self.__class__.__name__
         if self.cmd:
             to_str += "command '%s'" % (self.cmd,)
         if self.code:
             to_str += " failed with exitcode %d" % self.code
-        to_str += "\n%s" % self.msg
+        to_str += "\n%s" % assure_unicode(self.msg)
         return to_str
 
 
