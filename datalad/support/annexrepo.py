@@ -2644,21 +2644,23 @@ class AnnexRepo(GitRepo, RepoInterface):
             out[f] = j
         return out
 
-    def repo_info(self, fast=False):
+    def repo_info(self, fast=False, merge_annex_branches=True):
         """Provide annex info for the entire repository.
 
         Returns
         -------
         dict
           Info for the repository, with keys matching the ones returned by annex
+        merge_annex_branches: bool, optional
+          Either to allow git-annex if needed to merge annex branches, e.g. to
+          make sure up to date descriptions for git annex remotes
         """
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
 
-        # note - shouldn't use merge_annex_branches=False because updated
-        # info/description about remote UUIDs might be needed
         json_records = list(self._run_annex_command_json(
-            'info', opts=options))
+            'info', opts=options, merge_annex_branches=merge_annex_branches)
+        )
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields
