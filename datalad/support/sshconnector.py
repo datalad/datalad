@@ -37,13 +37,16 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username=''):
+def get_connection_hash(hostname, port='', username='', identity_file=''):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
     to a connection from and to a particular machine (with
     port and login username). The hash also contains the local
     host name.
+
+    Identity file corresponds to a file that will be passed via ssh's -i
+    option.
     """
     # returning only first 8 characters to minimize our chance
     # of hitting a limit on the max path length for the Unix socket.
@@ -52,10 +55,11 @@ def get_connection_hash(hostname, port='', username=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
+            identity_file=identity_file,
             username=username).encode('utf-8')).hexdigest()[:8]
 
 
@@ -64,7 +68,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri):
+    def __init__(self, ctrl_path, sshri, identity_file=None):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -76,6 +80,8 @@ class SSHConnection(object):
         sshri: SSHRI
           SSH resource identifier (contains all connection-relevant info),
           or another resource identifier that can be converted into an SSHRI.
+        identity_file : str or None
+          Value to pass to ssh's -i option.
         """
         self._runner = None
 
@@ -90,6 +96,8 @@ class SSHConnection(object):
         self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+
+        self._identity_file = identity_file
 
         # essential properties of the remote system
         self._remote_props = {}
@@ -207,6 +215,8 @@ class SSHConnection(object):
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self._ctrl_options
+        if self._identity_file:
+            ctrl_options.extend(["-i", self._identity_file])
         # create ssh control master command
         cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
 
@@ -339,6 +349,10 @@ class SSHConnection(object):
 class SSHManager(object):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
+
+    Note: If a connection should use a custom identity file via
+    `datalad.ssh.identityfile`, that value should be set before this class is
+    initialized.
     """
 
     def __init__(self):
@@ -348,6 +362,7 @@ class SSHManager(object):
         # handling of socket_dir, so we do not define them here explicitly
         # to an empty list to fail if logic is violated
         self._prev_connections = None
+        self._identity_file = None
         # and no explicit initialization in the constructor
         # self.assure_initialized()
 
@@ -369,6 +384,7 @@ class SSHManager(object):
         cfg = ConfigManager()
         self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
                                'sockets')
+        self._identity_file = cfg.get('datalad.ssh.identityfile')
         assure_dir(self._socket_dir)
         try:
             chmod(self._socket_dir, 0o700)
@@ -427,9 +443,13 @@ class SSHManager(object):
             raise ValueError("Unsupported SSH URL: '{0}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
+        # Ensure self._identityfile has been set, if configured.
+        self.assure_initialized()
+
         conhash = get_connection_hash(
             sshri.hostname,
             port=sshri.port,
+            identity_file=self._identity_file or "",
             username=sshri.username)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
@@ -438,7 +458,8 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri)
+            c = SSHConnection(ctrl_path, sshri,
+                              identity_file=self._identity_file)
             self._connections[ctrl_path] = c
             return c
 
