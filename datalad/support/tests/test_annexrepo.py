@@ -2618,5 +2618,4 @@ def test_ro_operations(path):
         sudochown(['-R', str(os.geteuid()), repo2.path])
 
     # just check that all is good again
-    repo2.pull()
-    repo2.get('file2')
+    repo2.repo_info()
