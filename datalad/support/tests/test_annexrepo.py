@@ -80,6 +80,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
@@ -2556,3 +2557,65 @@ def check_files_split(cls, topdir):
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
         yield check_files_split, cls
+
+
+@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
+@with_tree({
+    'repo': {
+        'file1': 'file1',
+        'file2': 'file2'
+    }
+})
+def test_ro_operations(path):
+    # This test would function only if there is a way to run sudo
+    # non-interactively, e.g. on Travis or on your local (watchout!) system
+    # after you ran sudo command recently.
+
+    from datalad.cmd import Runner
+    run = Runner().run
+    sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
+
+    # Verify that there is non-interactive sudo
+    try:
+        sudochown(["--help"])
+    except CommandError:
+        raise SkipTest("Cannot run sudo chown or chmod non-interactively")
+
+    repo = AnnexRepo(op.join(path, 'repo'), init=True)
+    repo.add('file1')
+    repo.commit()
+
+    # make a clone
+    repo2 = repo.clone(repo.path, op.join(path, 'clone'))
+    repo2.get('file1')
+
+    # progress forward original repo and fetch (but nothing else) it into repo2
+    repo.add('file2')
+    repo.commit()
+    repo2.fetch('origin')
+
+    # Assure that regardless of umask everyone could read it all
+    run(['chmod', '-R', 'a+rX', repo2.path])
+    try:
+        # To assure that git/git-annex really cannot acquire a lock and do
+        # any changes (e.g. merge git-annex branch), we make this repo owned by root
+        sudochown(['-R', 'root', repo2.path])
+        assert not repo2.get('file1')  # should work since file is here already
+        repo2.get_status()  # should be Ok as well
+        # and we should get info on the file just fine
+        assert repo2.info('file1')
+        # The tricky part is the repo_info which might need to update
+        # remotes UUID -- by default it should fail!
+        with assert_raises(CommandError):
+            repo2.repo_info()
+        # but should succeed if we disallow merges
+        repo2.repo_info(merge_annex_branches=False)
+        # and ultimately the ls which uses it
+        from datalad.interface.ls import Ls
+        Ls.__call__(repo2.path, all_=True, long_=True)
+    finally:
+        sudochown(['-R', str(os.geteuid()), repo2.path])
+
+    # just check that all is good again
+    repo2.pull()
+    repo2.get('file2')
