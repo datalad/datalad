@@ -2575,12 +2575,6 @@ def test_ro_operations(path):
     run = Runner().run
     sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
 
-    # Verify that there is non-interactive sudo
-    try:
-        sudochown(["--help"])
-    except CommandError:
-        raise SkipTest("Cannot run sudo chown or chmod non-interactively")
-
     repo = AnnexRepo(op.join(path, 'repo'), init=True)
     repo.add('file1')
     repo.commit()
@@ -2600,6 +2594,10 @@ def test_ro_operations(path):
         # To assure that git/git-annex really cannot acquire a lock and do
         # any changes (e.g. merge git-annex branch), we make this repo owned by root
         sudochown(['-R', 'root', repo2.path])
+    except CommandError as exc:
+        raise SkipTest("Cannot run sudo chown non-interactively")
+
+    try:
         assert not repo2.get('file1')  # should work since file is here already
         repo2.get_status()  # should be Ok as well
         # and we should get info on the file just fine
