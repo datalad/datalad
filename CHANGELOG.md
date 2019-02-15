@@ -11,20 +11,31 @@ We would recommend to consult log of the
 
 ## 0.11.3 (??? ??, 2019) -- will be better than ever
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+TODO
 
 ### Fixes
 
-?
+- The logic for setting the maximum command line length now works
+  around Python 3.4 returning an unreasonably high value for
+  `SC_ARG_MAX` on Debian systems (#3165).
+
+- DataLad commands that are conceptually "read-only", such as
+  `datalad ls -L`, can fail when the caller lacks write permissions
+  because git-annex tries merging remote git-annex branches to update
+  information about availability. DataLad now disables
+  `annex.merge-annex-branches` in some common "read-only" scenarios to
+  avoid these failures. (#3164)
 
 ### Enhancements and new features
 
-?
+- Accessing an "unbound" dataset method now automatically imports the
+  necessary module rather than requiring an explicit import from the
+  Python caller. For example, calling `Dataset.add` no longer needs to
+  be preceded by `from datalad.distribution.add import Add` or an
+  import of `datalad.api`. (#3156)
 
+- Configuring the new variable `datalad.ssh.identityfile` instructs
+  DataLad to pass a value to the `-i` option of `ssh`. (#3149)
 
 ## 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
 
