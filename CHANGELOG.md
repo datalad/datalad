@@ -17,14 +17,14 @@ TODO
 
 - The logic for setting the maximum command line length now works
   around Python 3.4 returning an unreasonably high value for
-  `SC_ARG_MAX` on Debian systems (#3165).
+  `SC_ARG_MAX` on Debian systems ([#3165]).
 
 - DataLad commands that are conceptually "read-only", such as
   `datalad ls -L`, can fail when the caller lacks write permissions
   because git-annex tries merging remote git-annex branches to update
   information about availability. DataLad now disables
   `annex.merge-annex-branches` in some common "read-only" scenarios to
-  avoid these failures. (#3164)
+  avoid these failures. ([#3164])
 
 ### Enhancements and new features
 
@@ -32,10 +32,10 @@ TODO
   necessary module rather than requiring an explicit import from the
   Python caller. For example, calling `Dataset.add` no longer needs to
   be preceded by `from datalad.distribution.add import Add` or an
-  import of `datalad.api`. (#3156)
+  import of `datalad.api`. ([#3156])
 
 - Configuring the new variable `datalad.ssh.identityfile` instructs
-  DataLad to pass a value to the `-i` option of `ssh`. (#3149)
+  DataLad to pass a value to the `-i` option of `ssh`. ([#3149])
 
 ## 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
 
@@ -1142,3 +1142,7 @@ publishing
 [#3138]: https://github.com/datalad/datalad/issues/3138
 [#3141]: https://github.com/datalad/datalad/issues/3141
 [#3146]: https://github.com/datalad/datalad/issues/3146
+[#3149]: https://github.com/datalad/datalad/issues/3149
+[#3156]: https://github.com/datalad/datalad/issues/3156
+[#3164]: https://github.com/datalad/datalad/issues/3164
+[#3165]: https://github.com/datalad/datalad/issues/3165
