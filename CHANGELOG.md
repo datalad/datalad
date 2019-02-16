@@ -36,6 +36,7 @@ TODO
 
 - Configuring the new variable `datalad.ssh.identityfile` instructs
   DataLad to pass a value to the `-i` option of `ssh`. ([#3149])
+  (#3168)
 
 ## 0.11.2 (Feb 07, 2019) -- live-long-and-prosper
 
