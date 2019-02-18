@@ -31,7 +31,6 @@ from datalad.tests.utils import known_failure_direct_mode
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.api import run_procedure
-from datalad.api import clean
 from datalad import cfg
 
 

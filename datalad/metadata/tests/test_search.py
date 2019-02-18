@@ -15,7 +15,7 @@ from mock import patch
 from os import makedirs
 from os.path import join as opj
 from os.path import dirname
-from datalad.api import Dataset, install
+from datalad.api import Dataset
 from nose.tools import assert_equal, assert_raises
 from datalad.utils import (
     chpwd,
@@ -36,7 +36,6 @@ from datalad.tests.utils import eq_
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
-from datalad.metadata import search as search_mod
 
 from ..search import _listdict2dictlist
 from ..search import _meta2autofield_dict

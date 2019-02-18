@@ -39,14 +39,9 @@ from datalad.support.globbedpaths import GlobbedPaths
 from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
 
-from datalad.distribution.add import Add
-from datalad.distribution.get import Get
-from datalad.distribution.install import Install
-from datalad.distribution.remove import Remove
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.interface.unlock import Unlock
 
 from datalad.utils import assure_bytes
 from datalad.utils import assure_unicode

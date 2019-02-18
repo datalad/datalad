@@ -14,7 +14,6 @@ import os.path as op
 from os.path import join as opj
 
 from datalad.api import metadata
-from datalad.api import install
 from datalad.distribution.dataset import Dataset
 
 

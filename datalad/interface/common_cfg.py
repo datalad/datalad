@@ -220,6 +220,12 @@ definitions = {
         'ui': ('question', {
                'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
     },
+    'datalad.ssh.identityfile': {
+        'ui': ('question', {
+               'title': "If set, pass this file as ssh's -i option."}),
+        'destination': 'global',
+        'default': None,
+    },
     'datalad.repo.direct': {
         'ui': ('yesno', {
                'title': 'Direct Mode for git-annex repositories',

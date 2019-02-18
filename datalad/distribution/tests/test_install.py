@@ -9,7 +9,10 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import (
+    known_failure_direct_mode,
+    known_failure_windows,
+)
 
 
 import logging
@@ -28,7 +31,6 @@ from datalad.utils import getpwd
 
 from datalad.api import create
 from datalad.api import install
-from datalad.api import remove
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd
@@ -921,6 +923,7 @@ def test_install_subds_from_another_remote(topdir):
 
 # Takes > 2 sec
 # Do not use cassette
+@known_failure_windows
 @skip_if_no_network
 @with_tempfile
 def check_datasets_datalad_org(suffix, tdir):
