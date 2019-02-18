@@ -2559,7 +2559,7 @@ def test_files_split():
         yield check_files_split, cls
 
 
-@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
+@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
 @with_tree({
     'repo': {
         'file1': 'file1',
@@ -2594,8 +2594,9 @@ def test_ro_operations(path):
         # To assure that git/git-annex really cannot acquire a lock and do
         # any changes (e.g. merge git-annex branch), we make this repo owned by root
         sudochown(['-R', 'root', repo2.path])
-    except CommandError as exc:
-        raise SkipTest("Cannot run sudo chown non-interactively")
+    except Exception as exc:
+        # Exception could be CommandError or IOError when there is no sudo
+        raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
 
     try:
         assert not repo2.get('file1')  # should work since file is here already
