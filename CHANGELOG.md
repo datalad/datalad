@@ -9,15 +9,15 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.11.3 (??? ??, 2019) -- will be better than ever
+## 0.11.3 (Feb 19, 2019) -- read-me-gently
 
-TODO
+Just a few of important fixes and minor enhancements.
 
 ### Fixes
 
 - The logic for setting the maximum command line length now works
   around Python 3.4 returning an unreasonably high value for
-  `SC_ARG_MAX` on Debian systems ([#3165]).
+  `SC_ARG_MAX` on Debian systems. ([#3165])
 
 - DataLad commands that are conceptually "read-only", such as
   `datalad ls -L`, can fail when the caller lacks write permissions
