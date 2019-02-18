@@ -1,3 +1,10 @@
+datalad (0.11.3-1) experimental; urgency=medium
+
+  * Fresh upstream bugfix release. Since bundles some new features, upload to
+    experimental
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 18 Feb 2019 10:38:23 -0500
+
 datalad (0.11.2-2) unstable; urgency=medium
 
   * Drop B-Depends on python-libxmp - optional dependency and currently
