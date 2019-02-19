@@ -7,7 +7,7 @@ datalad (0.11.3-1) experimental; urgency=medium
       Otherwise nose fails to run tests on e.g. jessie.
       Ref: https://github.com/datalad/datalad/issues/3170
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 18 Feb 2019 10:38:23 -0500
+ -- Yaroslav Halchenko <debian@onerussian.com>  Tue, 19 Feb 2019 12:06:41 -0500
 
 datalad (0.11.2-2) unstable; urgency=medium
 
