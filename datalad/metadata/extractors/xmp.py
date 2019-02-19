@@ -17,7 +17,9 @@ import logging
 lgr = logging.getLogger('datalad.metadata.extractors.xmp')
 from datalad.log import log_progress
 
-from libxmp.utils import file_to_dict
+# Do not import libxmp at top level since causes troubles for nose
+# when libxmp is not available
+#from libxmp.utils import file_to_dict
 from datalad.metadata.definitions import vocabulary_id
 from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.utils import assure_unicode
@@ -28,6 +30,7 @@ xmp_field_re = re.compile('^([^\[\]]+)(\[\d+\]|)(/?.*|)')
 
 class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
+        from libxmp.utils import file_to_dict
         if not content:
             return {}, []
         context = {}
