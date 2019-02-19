@@ -50,16 +50,26 @@ def test_dont_trip_over_missing_subds(path):
     assert_false(subds2.is_installed())
     # see if it wants to talk to github (and fail), or if it trips over something
     # before
-    assert_raises(gh.BadCredentialsException, ds1.create_sibling_github, 'bogus', recursive=True, github_login='disabledloginfortesting')
+    assert_raises(gh.BadCredentialsException,
+        ds1.create_sibling_github, 'bogus', recursive=True,
+        github_login='disabledloginfortesting')
     # inject remote config prior run
     assert_not_in('github', ds1.repo.get_remotes())
     # fail on existing
     ds1.repo.add_remote('github', 'http://nothere')
-    assert_raises(ValueError, ds1.create_sibling_github, 'bogus', recursive=True, github_login='disabledloginfortesting')
+    assert_raises(ValueError,
+        ds1.create_sibling_github, 'bogus', recursive=True,
+        github_login='disabledloginfortesting')
     # talk to github when existing is OK
-    assert_raises(gh.BadCredentialsException, ds1.create_sibling_github, 'bogus', recursive=True, github_login='disabledloginfortesting', existing='reconfigure')
+    assert_raises(gh.BadCredentialsException,
+        ds1.create_sibling_github, 'bogus', recursive=True,
+        github_login='disabledloginfortesting', existing='reconfigure')
     # return happy emptiness when all is skipped
-    assert_equal(ds1.create_sibling_github('bogus', recursive=True, github_login='disabledloginfortesting', existing='skip'), [])
+    assert_equal(
+        ds1.create_sibling_github(
+            'bogus', recursive=True,
+            github_login='disabledloginfortesting', existing='skip'),
+        [])
 
 
 def test_get_repo_url():
