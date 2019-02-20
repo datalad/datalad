@@ -588,6 +588,7 @@ def test_path_arg_call(path):
         save(dataset=ds.path, path=[testfile.name], to_git=True)
 
 
+@known_failure_windows  # See revolution's gh-85.
 @with_tree(tree={
     'file.txt': 'some text',
     'd1': {
