@@ -22,8 +22,6 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.diff import Diff
-from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
 from datalad.interface.run import format_command
@@ -510,7 +508,6 @@ def get_run_info(dset, message):
             default=op.join('.datalad', 'runinfo'))
         record_path = op.join(dset.path, record_dir, runinfo)
         if not op.lexists(record_path):
-            # too harsh IMHO, but same harshness as few lines further down
             raise ValueError("Run record sidecar file not found: {}".format(record_path))
         # TODO `get` the file
         recs = load_stream(record_path, compressed=True)

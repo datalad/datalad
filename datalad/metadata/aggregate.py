@@ -25,12 +25,6 @@ import os.path as op
 from hashlib import md5
 import shutil
 
-# API commands we need
-from datalad.distribution.get import Get
-from datalad.distribution.remove import Remove
-from datalad.distribution.subdatasets import Subdatasets
-from datalad.interface.unlock import Unlock
-
 import datalad
 from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths

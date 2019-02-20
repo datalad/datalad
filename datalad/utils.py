@@ -89,6 +89,10 @@ CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
 try:
     CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
     assert CMD_MAX_ARG > 0
+    if sys.version_info[:2] == (3, 4):
+        # workaround for some kind of a bug which comes up with python 3.4
+        # see https://github.com/datalad/datalad/issues/3150
+        CMD_MAX_ARG = min(CMD_MAX_ARG, CMD_MAX_ARG_HARDCODED)
 except Exception as exc:
     # ATM (20181005) SC_ARG_MAX available only on POSIX systems
     # so exception would be thrown e.g. on Windows, or
@@ -406,7 +410,7 @@ def get_open_files(path, log_open=False):
                 # note: could be done more efficiently so we do not
                 # renormalize path over and over again etc
                 if path_startswith(p, path):
-                    files[p] = proc.pid
+                    files[p] = proc
         # Catch a race condition where a process ends
         # before we can examine its files
         except psutil.NoSuchProcess:

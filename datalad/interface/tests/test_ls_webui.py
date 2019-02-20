@@ -25,8 +25,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
-# needed below as bound dataset method
-from datalad.api import add
 
 from datalad.cmd import Runner
 

@@ -21,6 +21,7 @@ from datalad.utils import unlink
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import InvalidGitRepositoryError
 
 
 lgr = logging.getLogger('datalad.plugin.wtf')
@@ -314,7 +315,10 @@ class WTF(Interface):
         infos['metadata_extractors'] = _describe_metadata_extractors()
         infos['dependencies'] = _describe_dependencies()
         if ds:
-            infos['dataset'] = _describe_dataset(ds, sensitive)
+            try:
+                infos['dataset'] = _describe_dataset(ds, sensitive)
+            except InvalidGitRepositoryError as e:
+                infos['dataset'] = {"invalid": exc_str(e)}
 
         if clipboard:
             external_versions.check(

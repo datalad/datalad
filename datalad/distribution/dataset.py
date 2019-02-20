@@ -172,6 +172,36 @@ class Dataset(object):
             return False
         return realpath(self.path) == realpath(other.path)
 
+    def __getattr__(self, attr):
+        # Assure that we are not just missing some late binding
+        # @datasetmethod . We will use interface definitions.
+        # The gotcha could be the mismatch between explicit name
+        # provided to @datasetmethod and what is defined in interfaces
+        meth = None
+        if not attr.startswith('_'):  # do not even consider those
+            from datalad.interface.base import (
+                get_interface_groups, get_api_name, load_interface
+            )
+            groups = get_interface_groups(True)
+            for group, _, interfaces in groups:
+                for intfspec in interfaces:
+                    # lgr.log(5, "Considering interface %s", intfspec)
+                    name = get_api_name(intfspec)
+                    if attr == name:
+                        meth_ = load_interface(intfspec)
+                        if meth_:
+                            lgr.debug("Found matching interface %s for %s",
+                                      intfspec, name)
+                            if meth:
+                                lgr.debug(
+                                    "New match %s possibly overloaded previous one %s",
+                                    meth_, meth
+                                )
+                            meth = meth_
+            if not meth:
+                lgr.debug("Found no match among known interfaces for %r", attr)
+        return super(Dataset, self).__getattribute__(attr)
+
     def close(self):
         """Perform operations which would close any possible process using this Dataset
         """

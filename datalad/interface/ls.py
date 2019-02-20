@@ -34,8 +34,6 @@ from ..support import ansi_colors
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
 
-from datalad.distribution.subdatasets import Subdatasets
-
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.annexrepo import GitRepo
 from datalad.utils import is_interactive
@@ -270,7 +268,10 @@ class AnnexModel(GitModel):
     @property
     def info(self):
         if self._info is None and self.type == 'annex':
-            self._info = self.repo.repo_info()
+            # we do not care about descriptions - just about sizes etc,
+            # so to allow RO mode operation - disallow git-annex branch
+            # merges
+            self._info = self.repo.repo_info(merge_annex_branches=False)
         return self._info
 
     @property

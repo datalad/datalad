@@ -8,9 +8,6 @@ import os.path as op
 
 from datalad.distribution.dataset import require_dataset
 
-# bound dataset methods
-import datalad.interface.save
-
 ds = require_dataset(
     sys.argv[1],
     check_installed=True,
