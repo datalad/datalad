@@ -54,7 +54,7 @@ from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_batch_direct
+from datalad.tests.utils import with_parametric_batch
 from datalad.tests.utils import assert_dict_equal as deq_
 from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_false
@@ -200,50 +200,6 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos('.*annex.*')
-@with_tempfile
-def test_AnnexRepo_set_direct_mode(src, dst):
-
-    ar = AnnexRepo.clone(src, dst)
-
-    if ar.supports_unlocked_pointers:
-        # there's no direct mode available:
-        assert_raises(CommandError, ar.set_direct_mode, True)
-        raise SkipTest("Test not applicable in repository version >= 6")
-
-    ar.set_direct_mode(True)
-    ok_(ar.is_direct_mode(), "Switching to direct mode failed.")
-    if ar.is_crippled_fs():
-        assert_raises(CommandNotAvailableError, ar.set_direct_mode, False)
-        ok_(
-            ar.is_direct_mode(),
-            "Indirect mode on crippled fs detected. Shouldn't be possible.")
-    else:
-        ar.set_direct_mode(False)
-        assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_AnnexRepo_annex_proxy(src, annex_path):
-    ar = AnnexRepo.clone(src, annex_path)
-    if ar.supports_unlocked_pointers:
-        # there's no direct mode available and therefore no 'annex proxy':
-        assert_raises(CommandError, ar.proxy, ['git', 'status'])
-        raise SkipTest("Test not applicable in repository version >= 6")
-    ar.set_direct_mode(True)
-
-    # annex proxy raises in indirect mode:
-    try:
-        ar.set_direct_mode(False)
-        assert_raises(CommandNotAvailableError, ar.proxy, ['git', 'status'])
-    except CommandNotAvailableError:
-        # we can't switch to indirect
-        pass
-
-
-@assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
@@ -312,11 +268,11 @@ def test_AnnexRepo_get_remote_na(path):
 
 
 # 1 is enough to test file_has_content
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
-    ar = AnnexRepo.clone(src, annex_path, direct=direct)
+def test_AnnexRepo_file_has_content(batch, src, annex_path):
+    ar = AnnexRepo.clone(src, annex_path)
     testfiles = ["test-annex.dat", "test.dat"]
 
     eq_(ar.file_has_content(testfiles), [False, False])
@@ -331,22 +287,21 @@ def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
     assert_false(ar.file_has_content("bogus.txt", batch=batch))
     ok_(ar.file_has_content("test-annex.dat", batch=batch))
 
-    if not direct:  # There's no unlock in direct mode.
-        ar.unlock(["test-annex.dat"])
-        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-            [ar.supports_unlocked_pointers])
-        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
-            ofh.write("more")
-        eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
-            [False])
+    ar.unlock(["test-annex.dat"])
+    eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+        [ar.supports_unlocked_pointers])
+    with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+        ofh.write("more")
+    eq_(ar.file_has_content(["test-annex.dat"], batch=batch),
+        [False])
 
 
 # 1 is enough to test
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
-    ar = AnnexRepo.clone(src, annex_path, direct=direct)
+def test_AnnexRepo_is_under_annex(batch, src, annex_path):
+    ar = AnnexRepo.clone(src, annex_path)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
         f.write("aaa")
@@ -367,14 +322,13 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     ok_(ar.is_under_annex("test-annex.dat", batch=batch))
 
-    if not direct:  # There's no unlock in direct mode.
-        ar.unlock(["test-annex.dat"])
-        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-            [ar.supports_unlocked_pointers])
-        with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
-            ofh.write("more")
-        eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
-            [False])
+    ar.unlock(["test-annex.dat"])
+    eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+        [ar.supports_unlocked_pointers])
+    with open(opj(annex_path, "test-annex.dat"), "a") as ofh:
+        ofh.write("more")
+    eq_(ar.is_under_annex(["test-annex.dat"], batch=batch),
+        [False])
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
@@ -600,18 +554,13 @@ def test_AnnexRepo_migrating_backends(src, dst):
     # migrating will only do, if file is present
     ok_annex_get(ar, 'test-annex.dat')
 
-    if ar.is_direct_mode():
-        # No migration in direct mode
-        assert_raises(CommandNotAvailableError, ar.migrate_backend,
-                      'test-annex.dat')
-    else:
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
-        ar.migrate_backend('test-annex.dat')
-        eq_(ar.get_file_backend('test-annex.dat'), 'MD5')
+    eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+    ar.migrate_backend('test-annex.dat')
+    eq_(ar.get_file_backend('test-annex.dat'), 'MD5')
 
-        ar.migrate_backend('', backend='SHA1')
-        eq_(ar.get_file_backend(filename), 'SHA1')
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
+    ar.migrate_backend('', backend='SHA1')
+    eq_(ar.get_file_backend(filename), 'SHA1')
+    eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
 tree1args = dict(
@@ -641,11 +590,11 @@ def __test_get_md5s(path):
     print({f: annex.get_file_key(f) for f in files})
 
 
-@with_batch_direct
+@with_parametric_batch
 @with_tree(**tree1args)
-def test_dropkey(batch, direct, path):
+def test_dropkey(batch, path):
     kw = {'batch': batch}
-    annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
+    annex = AnnexRepo(path, init=True, backend='MD5E')
     files = list(tree1_md5e_keys)
     annex.add(files)
     annex.commit()
@@ -695,14 +644,10 @@ def test_AnnexRepo_get_file_backend(src, dst):
     ar = AnnexRepo.clone(src, dst)
 
     eq_(ar.get_file_backend('test-annex.dat'), 'SHA256E')
-    if not ar.is_direct_mode():
-        # no migration in direct mode
-        ok_annex_get(ar, 'test-annex.dat', network=False)
-        ar.migrate_backend('test-annex.dat', backend='SHA1')
-        eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
-    else:
-        assert_raises(CommandNotAvailableError, ar.migrate_backend,
-                      'test-annex.dat', backend='SHA1')
+    # no migration
+    ok_annex_get(ar, 'test-annex.dat', network=False)
+    ar.migrate_backend('test-annex.dat', backend='SHA1')
+    eq_(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
 @with_tempfile
@@ -832,12 +777,8 @@ def test_AnnexRepo_add_to_annex(path):
 
     out_json = repo.add(filename)
     # file is known to annex:
-    if not repo.is_direct_mode():
-        assert_true(os.path.islink(filename_abs),
-                    "Annexed file is not a link.")
-    else:
-        assert_false(os.path.islink(filename_abs),
-                     "Annexed file is link in direct mode.")
+    assert_true(os.path.islink(filename_abs),
+                "Annexed file is not a link.")
     assert_in('key', out_json)
     key = repo.get_file_key(filename)
     assert_false(key == '')
@@ -845,11 +786,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # uncommitted:
-    # but not in direct mode branch
-    if repo.is_direct_mode():
-        ok_(not repo.is_dirty(submodules=False))
-    else:
-        ok_(repo.is_dirty(submodules=False))
+    ok_(repo.is_dirty(submodules=False))
 
     repo.commit("Added file to annex.")
     ok_clean_git(repo, annex=True, ignore_submodules=True)
@@ -904,30 +841,6 @@ def test_AnnexRepo_add_to_git(path):
 
     # and committed:
     ok_clean_git(repo, annex=True, ignore_submodules=True)
-
-
-@with_testrepos('submodule_annex', flavors=['clone'])
-def test_AnnexRepo_add_unexpected_direct_mode(path):
-    # tests a special case where a submodule is in direct mode, while it's
-    # superproject is not.
-    # There is no point in this test, if direct mode was enforced in the
-    # superproject already (either by test run configuration or FS) or if the
-    # repositories are in V6+ by default (where there is no direct mode)
-
-    top = AnnexRepo(path)
-
-    if top.is_direct_mode() or top.supports_unlocked_pointers:
-        raise SkipTest("Nothing to test for")
-
-    top.update_submodule('subm 1', init=True)
-    sub = AnnexRepo(opj(path, 'subm 1'))
-    sub.set_direct_mode(True)
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        top.add('.')
-        cml.assert_logged(msg="Known bug in direct mode.",
-                          level="WARNING",
-                          regex=False)
-
 
 
 @ignore_nose_capturing_stdout
@@ -1051,11 +964,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     eq_(info['size'], 14)
     assert(info['key'])
     # not even added to index yet since we this repo is with default batch_size
-    # but: in direct mode it is added!
-    if ar.is_direct_mode():
-        assert_in(ar.WEB_UUID, ar.whereis(testfile))
-    else:
-        assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
+    assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -1101,9 +1010,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))
 
-    if not ar.is_direct_mode():
-        # in direct mode there's nothing to commit
-        ar.commit("actually committing new files")
+    ar.commit("actually committing new files")
     assert_in(filename, ar.get_files())
     assert_in(ar.WEB_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
@@ -1251,37 +1158,36 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     ok_(exists(socket_2))
     ssh_manager.close(ctrl_path=[socket_1, socket_2])
 
+
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_annex_remove(path1, path2):
-    ar1 = AnnexRepo(path1, create=False)
-    ar2 = AnnexRepo.clone(path1, path2, create=True, direct=True)
+    repo = AnnexRepo(path1, create=False)
 
-    for repo in (ar1, ar2):
-        file_list = repo.get_annexed_files()
-        assert len(file_list) >= 1
-        # remove a single file
-        out = repo.remove(file_list[0])
-        assert_not_in(file_list[0], repo.get_annexed_files())
-        eq_(out[0], file_list[0])
+    file_list = repo.get_annexed_files()
+    assert len(file_list) >= 1
+    # remove a single file
+    out = repo.remove(file_list[0])
+    assert_not_in(file_list[0], repo.get_annexed_files())
+    eq_(out[0], file_list[0])
 
-        with open(opj(repo.path, "rm-test.dat"), "w") as f:
-            f.write("whatever")
+    with open(opj(repo.path, "rm-test.dat"), "w") as f:
+        f.write("whatever")
 
-        # add it
-        repo.add("rm-test.dat")
+    # add it
+    repo.add("rm-test.dat")
 
-        # remove without '--force' should fail, due to staged changes:
-        if repo.is_direct_mode():
-            assert_raises(CommandError, repo.remove, "rm-test.dat")
-        else:
-            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
-        assert_in("rm-test.dat", repo.get_annexed_files())
+    # remove without '--force' should fail, due to staged changes:
+    if repo.is_direct_mode():
+        assert_raises(CommandError, repo.remove, "rm-test.dat")
+    else:
+        assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+    assert_in("rm-test.dat", repo.get_annexed_files())
 
-        # now force:
-        out = repo.remove("rm-test.dat", force=True)
-        assert_not_in("rm-test.dat", repo.get_annexed_files())
-        eq_(out[0], "rm-test.dat")
+    # now force:
+    out = repo.remove("rm-test.dat", force=True)
+    assert_not_in("rm-test.dat", repo.get_annexed_files())
+    eq_(out[0], "rm-test.dat")
 
 
 @with_tempfile
@@ -1479,9 +1385,9 @@ def test_annex_remove(path):
     eq_(out[0], "rm-test.dat")
 
 
-@with_batch_direct
+@with_parametric_batch
 @with_testrepos('basic_annex', flavors=['clone'], count=1)
-def test_is_available(batch, direct, p):
+def test_is_available(batch, p):
     annex = AnnexRepo(p)
 
     # bkw = {'batch': batch}
@@ -1829,11 +1735,9 @@ def test_AnnexRepo_dirty(path):
     ok_(repo.dirty)
     # annexed file
     repo.add('file2.txt', git=False)
-    if not repo.is_direct_mode():
-        # in direct mode 'annex add' results in a clean repo
-        ok_(repo.dirty)
-        # commit
-        repo.commit("file2.txt annexed")
+    ok_(repo.dirty)
+    # commit
+    repo.commit("file2.txt annexed")
     ok_(not repo.dirty)
 
     # TODO: unlock/modify
@@ -1903,9 +1807,7 @@ def _test_status(ar):
     ar.add('second')
     sync_wrapper()
     stat['untracked'].remove('second')
-    if not ar.is_direct_mode():
-        # in direct mode annex-status doesn't report an added file 'added'
-        stat['added'].append('second')
+    stat['added'].append('second')
     eq_(stat, ar.get_status())
 
     # commit to be clean again:
@@ -1922,14 +1824,7 @@ def _test_status(ar):
 
     ar.add('fifth')
     sync_wrapper()
-    # TODO:
-    # Note: For some reason this seems to be the only place, where we actually
-    # need to call commit via annex-proxy. If called via '-c core.bare=False'
-    # and/or '--work-tree=.' the file ends up in git instead of annex.
-    # Note 2: This is only if we explicitly pass a path. Otherwise it works
-    # without annex-proxy.
-    ar.commit(msg="fifth to be unannexed", files='fifth',
-              proxy=ar.is_direct_mode())
+    ar.commit(msg="fifth to be unannexed", files='fifth')
     eq_(stat, ar.get_status())
 
     ar.unannex('fifth')
@@ -1945,18 +1840,16 @@ def _test_status(ar):
     eq_(stat, ar.get_status())
 
     # modify an annexed file:
-    if not ar.is_direct_mode():
-        # actually: if 'second' isn't locked, which is the case in direct mode
-        ar.unlock('second')
-        if not ar.get_active_branch().endswith('(unlocked)'):
-            stat['type_changed'].append('second')
-        eq_(stat, ar.get_status())
+    ar.unlock('second')
+    if not ar.get_active_branch().endswith('(unlocked)'):
+        stat['type_changed'].append('second')
+    eq_(stat, ar.get_status())
+
     with open(opj(ar.path, 'second'), 'w') as f:
         f.write("Needed to unlock first. Sad!")
-    if not ar.is_direct_mode():
-        ar.add('second')  # => modified
-        if not ar.get_active_branch().endswith('(unlocked)'):
-            stat['type_changed'].remove('second')
+    ar.add('second')  # => modified
+    if not ar.get_active_branch().endswith('(unlocked)'):
+        stat['type_changed'].remove('second')
     stat['modified'].append('second')
     sync_wrapper()
     eq_(stat, ar.get_status())
@@ -2038,15 +1931,6 @@ def _test_status(ar):
     eq_(stat, ar.get_status(submodules=False))
 
     # commit the submodule
-    # in direct mode, commit of a removed submodule fails with:
-    #  error: unable to index file submod
-    #  fatal: updating files failed
-    #
-    # - this happens, when commit is called with -c core.bare=False
-    # - it works when called via annex proxy
-    # - if we add a submodule instead of removing one, it's vice versa with
-    #   the very same error message
-
     ar.commit(msg="submodule added", files=['.gitmodules', 'submod'])
 
     stat['added'].remove('.gitmodules')
@@ -2126,9 +2010,6 @@ def _test_status(ar):
     stat['modified'].append('.gitmodules')
     eq_(stat, ar.get_status())
 
-    # Note: Here again we need to use annex-proxy; This contradicts the addition
-    # of the very same submodule, which we needed to commit via
-    # -c core.bare=False instead. Otherwise the very same failure happens.
     # Just vice versa. See above where 'submod' is added.
     ar.commit("submod removed", files=['submod', '.gitmodules'])
     stat['modified'].remove('.gitmodules')
@@ -2312,9 +2193,7 @@ def test_AnnexRepo_get_corresponding_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we should be on master or a corresponding branch like annex/direct/master
-    # respectively if ran in direct mode build.
-    # We want to get 'master' in any case
+    # we should be on master.
     eq_('master', ar.get_corresponding_branch())
 
     # special case v6 adjusted branch is not provided by a dedicated build:
@@ -2331,8 +2210,7 @@ def test_AnnexRepo_get_tracking_branch(path):
 
     ar = AnnexRepo(path)
 
-    # we want the relation to original branch, especially in direct mode
-    # or even in v6 adjusted branch
+    # we want the relation to original branch, e.g. in v6+ adjusted branch
     eq_(('origin', 'refs/heads/master'), ar.get_tracking_branch())
 
 
@@ -2341,13 +2219,11 @@ def test_AnnexRepo_is_managed_branch(path):
 
     ar = AnnexRepo(path)
 
-    if ar.is_direct_mode():
-        ok_(ar.is_managed_branch())
-    else:
-        # ATM only direct mode and v6+ adjusted branches should return True.
-        # Adjusted branch requires a call of git-annex-adjust and shouldn't
-        # be the state of a fresh clone
-        ok_(not ar.is_managed_branch())
+    # ATM only v6+ adjusted branches should return True.
+    # Adjusted branch requires a call of git-annex-adjust and shouldn't
+    # be the state of a fresh clone
+    ok_(not ar.is_managed_branch())
+
     if ar.supports_unlocked_pointers:
         ar.adjust()
         ok_(ar.is_managed_branch())
@@ -2491,8 +2367,7 @@ def check_commit_annex_commit_changed(unlock, path):
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'tobechanged-git', annexed=False)
-    # TODO: direct mode gotcha!!!
-    ok_file_under_git(path, 'tobechanged-annex', annexed=not ar.is_direct_mode())
+    ok_file_under_git(path, 'tobechanged-annex', annexed=True)
 
 
 def test_commit_annex_commit_changed():

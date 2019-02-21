@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 from os.path import join as opj
@@ -146,7 +145,6 @@ def test_diff(path, norepo):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_diff_recursive(path):
     ds = Dataset(path).create()
     sub = ds.create('sub')
@@ -203,7 +201,6 @@ def test_diff_recursive(path):
     'modified': 'original_content',
     'untracked': 'dirt',
 })
-@known_failure_direct_mode  #FIXME
 def test_diff_helper(path):
     # make test dataset components of interesting states
     ds = Dataset.create(path, force=True)

@@ -267,6 +267,21 @@ class InvalidAnnexRepositoryError(RuntimeError):
     without init=True"""
 
 
+class DirectModeNoLongerSupportedError(NotImplementedError):
+    """direct mode is no longer supported"""
+
+    def __init__(self, repo, msg=None):
+        super(DirectModeNoLongerSupportedError, self).__init__(
+            ((" " + msg + ", but ") if msg else '')
+            +
+             "direct mode of operation is being deprecated in git-annex and "
+             "no longer supported by DataLad. "
+             "Please use 'git annex upgrade' under %s to upgrade your direct "
+             "mode repository to annex v6 (or later)." % repo.path
+            )
+        self.repo = repo  # might come handy
+
+
 class IncompleteResultsError(RuntimeError):
     """Exception to be raised whenever results are incomplete.
 

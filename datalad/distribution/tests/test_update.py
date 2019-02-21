@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
@@ -38,13 +37,13 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import slow
+from datalad.tests.utils import known_failure_windows
 
 
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -151,7 +150,6 @@ def test_update_git_smoke(src_path, dst_path):
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_fetch_all(src, remote_1, remote_2):
     rmt1 = AnnexRepo.clone(src, remote_1)
     rmt2 = AnnexRepo.clone(src, remote_2)
@@ -210,9 +208,9 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_newthings_coming_down(originpath, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
@@ -267,10 +265,10 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
@@ -348,9 +346,9 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_clean_git(ds.path)
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_reobtain_data(originpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
@@ -392,7 +390,6 @@ def test_reobtain_data(originpath, destpath):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  # use of bare repos in the test
 def test_multiway_merge(path):
     # prepare ds with two siblings, but no tracking branch
     ds = Dataset(op.join(path, 'ds_orig')).create()

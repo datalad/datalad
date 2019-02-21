@@ -9,9 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
-
-
 import logging
 import os
 
@@ -72,6 +69,7 @@ from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -424,11 +422,6 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
-# @known_failure_direct_mode  #FIXME:
-# If we use all testrepos, we get a mixed hierarchy. Therefore ok_clean_git
-# fails if we are in direct mode and run into a plain git beneath an annex, due
-# to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
-
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -442,10 +435,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
-    if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
-        ok_(exists(opj(subds.path, '.git')))
-    else:
-        ok_(isdir(opj(subds.path, '.git')))
+    ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
     # sub is clean:
@@ -473,11 +463,11 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+@known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
 
@@ -535,7 +525,6 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_implicit_install(src, dst):
 
     origin_top = create(src)
@@ -792,12 +781,12 @@ def test_install_source_relpath(src, dest):
         ds2 = install(dest, source=src_)
 
 
+@known_failure_windows  #FIXME
 @integration  # 41.2043s
 @with_tempfile
 @with_tempfile
 @with_tempfile
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_install_consistent_state(src, dest, dest2, dest3):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
