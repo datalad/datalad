@@ -11,12 +11,16 @@ import os
 from os.path import join as opj, exists
 
 from mock import patch
-from .utils import assert_true, assert_false, eq_, \
-    with_tree, with_tempfile, swallow_outputs, on_windows
+from .utils import (
+    assert_true, assert_false, eq_,
+    with_tree, with_tempfile, swallow_outputs, on_windows,
+    ok_file_has_content,
+)
 from .utils import assert_equal
 
 from ..support.archives import decompress_file, compress_files, unixify_path
 from ..support.archives import ExtractedArchive, ArchivesCache
+from ..support import path as op
 
 from .utils import OBSCURE_FILENAME, assert_raises
 from .utils import assert_in
@@ -83,7 +87,7 @@ def test_decompress_file():
                     ),),
             ))))
 @with_tempfile()
-def check_compress_file(ext, path, name):
+def check_compress_dir(ext, path, name):
     archive = name + ext
     compress_files([os.path.basename(path)], archive,
                    path=os.path.dirname(path))
@@ -94,10 +98,26 @@ def check_compress_file(ext, path, name):
     assert_true(exists(opj(name_extracted, 'd1', 'd2', 'f1')))
 
 
+def test_compress_dir():
+    yield check_compress_dir, '.tar.gz'
+    yield check_compress_dir, '.tar'
+    yield check_compress_dir, '.zip'
+
+
+# space in the filename to test for correct quotations etc
+@with_tree((('fi le.dat', 'content'),))
+@with_tempfile()
+def check_compress_file(ext, path, name):
+    archive = name + ext
+    compress_files(['fi le.dat'], archive,
+                   path=path)
+    assert_true(exists(archive))
+    name_extracted = name + "_extracted"
+    decompress_file(archive, name_extracted)
+    ok_file_has_content(op.join(path, 'fi le.dat'), 'content')
+
+
 def test_compress_file():
-    yield check_compress_file, '.tar.gz'
-    yield check_compress_file, '.tar'
-    yield check_compress_file, '.zip'
     yield check_compress_file, '.gz'
 
 
