@@ -32,6 +32,7 @@ from .utils import (
     ignore_nose_capturing_stdout,
     swallow_outputs,
     swallow_logs,
+    ok_file_has_content,
     on_windows,
     lgr,
 )
@@ -77,11 +78,34 @@ def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    cmd = 'echo Testing äöü東 real run > %r' % tempfile
+    content = 'Testing äöü東 real run'
+    cmd = 'echo %s > %r' % (content, tempfile)
     ret = runner.run(cmd)
-    assert_true(os.path.exists(tempfile),
-                "Run of: %s resulted with non-existing file %s" %
-                (cmd, tempfile))
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Run with shell
+    ret = runner.run(cmd, shell=True)
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Pass as a list and with shell - "not exactly what we expect"
+    # Initial suspicion came from incorrect behavior of Runner as a runner
+    # for patool.  Apparently (docs for 2.7):
+    #   If args is a sequence, the first item specifies the command string,
+    #   and any additional items will be treated as additional arguments to
+    #   the shell itself.
+    # which is what it ruins it for us!  So, for now we are not testing/using
+    # this form
+    # ret = runner.run(shlex.split(cmd, posix=not on_windows), shell=True)
+    # # ?! for some reason there is an empty line in stdout
+    # # TODO: figure out.  It shouldn't though be of critical effect
+    # ret = (ret[0].rstrip(), ret[1])
+    # assert_equal(ret, ('', ''))  # no out or err
+    # # And here we get kaboom ATM!
+    # ok_file_has_content(tempfile, content, strip=True)
 
     # test non-dry python function call
     output = runner.call(os.path.join, 'foo', 'bar')
