@@ -81,7 +81,19 @@ def _patool_run(cmd, verbosity=0, **kwargs):
     # use our runner
     try:
         # kwargs_ = kwargs[:];         kwargs_['shell'] = True
-        _runner.run(cmd, **kwargs)
+        # Any debug/progress output could be spit out to stderr so let's
+        # "expect" it.
+        #
+        if isinstance(cmd, (list, tuple)) and kwargs.get('shell'):
+            # patool (as far as I see it) takes care about quoting args
+            cmd = ' '.join(cmd)
+        out, err = _runner.run(cmd,
+                    #log_stdout='offline',
+                    #log_stderr='offline',
+                    #expect_stderr=True,
+                    #stdin=open('/dev/null'),
+                    **kwargs)
+        lgr.debug("Finished running for patool. stdout=%s, stderr=%s", out, err)
         return 0
     except CommandError as e:
         return e.code
