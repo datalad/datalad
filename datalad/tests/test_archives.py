@@ -105,20 +105,37 @@ def test_compress_dir():
 
 
 # space in the filename to test for correct quotations etc
-@with_tree((('fi le.dat', 'content'),))
+_filename = 'fi le.dat'
+
+
+@with_tree(((_filename, 'content'),))
 @with_tempfile()
-def check_compress_file(ext, path, name):
+def check_compress_file(ext, annex, path, name):
     archive = name + ext
-    compress_files(['fi le.dat'], archive,
+    compress_files([_filename], archive,
                    path=path)
     assert_true(exists(archive))
-    name_extracted = name + "_extracted"
-    decompress_file(archive, name_extracted)
-    ok_file_has_content(op.join(path, 'fi le.dat'), 'content')
+    if annex:
+        # It should work even when file is annexed and is a symlink to the
+        # key
+        from datalad.support.annexrepo import AnnexRepo
+        repo = AnnexRepo(path, init=True)
+        repo.add(_filename)
+        repo.commit(files=[_filename], msg="commit")
+
+    dir_extracted = name + "_extracted"
+    decompress_file(archive, dir_extracted)
+    _filepath = op.join(dir_extracted, _filename)
+
+    import glob
+    print(dir_extracted)
+    print(glob.glob(dir_extracted + '/*'))
+    ok_file_has_content(_filepath, 'content')
 
 
 def test_compress_file():
-    yield check_compress_file, '.gz'
+    for annex in True, False:
+        yield check_compress_file, '.gz', annex
 
 
 @with_tree(**tree_simplearchive)
