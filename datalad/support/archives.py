@@ -18,9 +18,14 @@ assert(external_versions["patoolib"] >= "1.7")
 
 import os
 import tempfile
-from .path import join as opj, exists, abspath, isabs, normpath, relpath, pardir, isdir
-from .path import sep as opsep
-from .path import realpath
+from .exceptions import MissingExternalDependency
+from .path import (
+    basename,
+    join as opj,
+    exists, abspath, isabs, normpath, relpath, pardir, isdir,
+    realpath,
+    sep as opsep,
+)
 from six import next, PY2
 from six.moves.urllib.parse import unquote as urlunquote
 
@@ -161,6 +166,26 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             # should be supplied in PY3 to avoid b''
             outdir = assure_unicode(outdir)
             archive = assure_unicode(archive)
+
+        format_compression = patoolib.get_archive_format(archive)
+        if format_compression == ('gzip', None):
+            # Yarik fell into the trap of being lazy and not providing proper
+            # support for .gz .xz etc "stream archivers" formats in handling
+            # of archives. ATM out support for .gz relies on behavior of 7z while
+            # extracting them and respecting possibly present .gz filename
+            # header field.
+            # See more https://github.com/datalad/datalad/pull/3176#issuecomment-466819861
+            # TODO: provide proper handling of all those archives without
+            # relying on any filename been stored in the header
+            program = patoolib.find_archive_program(
+                format_compression[0], 'extract')
+            if basename(program) != '7z':
+                raise MissingExternalDependency(
+                    "cmd:7z",
+                    msg="(Not) Funny enough but ATM we need p7zip installation "
+                        "to handle .gz files extraction 'correctly'"
+                )
+
         patoolib._extract_archive(unixify_path(archive),
                                   outdir=outdir,
                                   verbosity=100)

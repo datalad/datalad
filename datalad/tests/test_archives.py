@@ -18,13 +18,24 @@ from .utils import (
 )
 from .utils import assert_equal
 
-from ..support.archives import decompress_file, compress_files, unixify_path
-from ..support.archives import ExtractedArchive, ArchivesCache
+from ..dochelpers import exc_str
+from ..support.archives import (
+    ArchivesCache,
+    compress_files,
+    decompress_file,
+    ExtractedArchive,
+    unixify_path,
+)
+from ..support.exceptions import MissingExternalDependency
 from ..support import path as op
 
-from .utils import OBSCURE_FILENAME, assert_raises
-from .utils import assert_in
-from .utils import ok_generator
+from .utils import (
+    assert_in,
+    assert_raises,
+    OBSCURE_FILENAME,
+    ok_generator,
+    SkipTest,
+)
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
@@ -124,7 +135,10 @@ def check_compress_file(ext, annex, path, name):
         repo.commit(files=[_filename], msg="commit")
 
     dir_extracted = name + "_extracted"
-    decompress_file(archive, dir_extracted)
+    try:
+        decompress_file(archive, dir_extracted)
+    except MissingExternalDependency as exc:
+        raise SkipTest(exc_str(exc))
     _filepath = op.join(dir_extracted, _filename)
 
     import glob
