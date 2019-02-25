@@ -599,15 +599,25 @@ def test_make_tempfile():
 
 def test_unique():
     eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique(range(3), reverse=True), [0, 1, 2])
     eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1), reverse=True), [3, 2, 0, 1])
     eq_(unique([]), [])
+    eq_(unique([], reverse=True), [])
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], reverse=True),
+        [(1,), (1, 2), (0, 3)])
 
     # with a key now
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)],
                key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)],
+               key=itemgetter(0), reverse=True), [(1, 2), (0, 3)])
+
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
                key=itemgetter(1)), [(1, 2), (1, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
+               key=itemgetter(1), reverse=True), [(1, 2), (0, 3)])
 
 
 def test_all_same():
