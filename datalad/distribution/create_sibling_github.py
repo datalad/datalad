@@ -201,12 +201,19 @@ def _gen_github_ses(gh,
                     choices=["global", "local", ""]
                 )
                 if where_to_store:
-                    cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
-                            where=where_to_store)
-                    lgr.info("Stored %s=%s in %s config.",
-                             CONFIG_HUB_TOKEN_FIELD, _token_str(token),
-                             where_to_store)
-                yield gh.Github("token"), cred
+                    try:
+                        cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
+                                where=where_to_store)
+                        lgr.info("Stored %s=%s in %s config.",
+                                 CONFIG_HUB_TOKEN_FIELD, _token_str(token),
+                                 where_to_store)
+                    except Exception as exc:
+                        lgr.debug("Failed to store token: %s", exc_str(exc))
+                        ui.error(
+                            "Failed to store the token (%s), please store manually as %s"
+                            % (token, CONFIG_HUB_TOKEN_FIELD)
+                        )
+                yield gh.Github(token), None  # None for cred so does not get killed
 
         # if we are getting here, it means we are asked for more and thus
         # aforementioned one didn't work out :-/
