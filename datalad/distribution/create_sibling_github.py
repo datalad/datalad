@@ -19,6 +19,8 @@ from os.path import join as opj
 from os.path import relpath
 from datalad import cfg
 
+from ..ui import ui
+
 from datalad.interface.common_opts import recursion_flag, recursion_limit
 from datalad.interface.common_opts import publish_depends
 from datalad.downloaders.credentials import UserPassword
@@ -31,7 +33,10 @@ from datalad.support.param import Parameter
 from datalad.support.network import URL
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.constraints import EnsureChoice
-from datalad.support.exceptions import MissingExternalDependency
+from datalad.support.exceptions import (
+    MissingExternalDependency,
+    AccessDeniedError,
+)
 from ..interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
@@ -39,6 +44,8 @@ from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
 from datalad.distribution.siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
+
+CONFIG_HUB_TOKEN_FIELD = 'hub.oauthtoken'
 
 
 def get_repo_url(repo, access_protocol, github_login):
@@ -58,105 +65,257 @@ def get_repo_url(repo, access_protocol, github_login):
     return prop
 
 
-def _get_github_entity(gh, cred, github_login, github_passwd, github_organization):
+def _token_str(token):
+    """Shorten token so we do not leak sensitive info into the logs"""
+    return token[:3] + '...' + token[-3:]
+
+
+def _get_tokens_for_login(gh, login, tokens):
+    selected_tokens = []
+    for t in tokens:
+        try:
+            g = gh.Github(t)
+            gu = g.get_user()
+            if gu.login == login:
+                selected_tokens.append(t)
+        except gh.BadCredentialsException as exc:
+            lgr.debug(
+                "Token %s caused %s while trying to check token's use"
+                " login name. Skipping", _token_str(t), exc_str(exc))
+    lgr.debug(
+        "Selected %d tokens out of %d for the login %s",
+        len(selected_tokens), len(tokens), login
+    )
+    return selected_tokens
+
+
+def _gen_github_ses(gh,
+                    github_login, github_passwd,
+                    ):
+    """Generate viable Github sessions
+
+    The idea is that we keep trying "new" ways to authenticate until we either
+    exhaust or external loop stops asking for more
+
+    Parameters
+    ----------
+    gh:
+    github_login:
+    github_passwd:
+
+    Yields
+    -------
+    Github, credential
+      credential might be None if there is no credential associated as when
+      we consider tokens from the config (instead of credentials store)
+
+    """
     if github_login == 'disabledloginfortesting':
         raise gh.BadCredentialsException(403, 'no login specified')
+
+    # see if we have tokens - might be many. Doesn't cost us much so get at once
+    all_tokens = tokens = unique(
+        assure_list(cfg.get(CONFIG_HUB_TOKEN_FIELD, None)),
+        reverse=True
+    )
+
     if not (github_login and github_passwd):
         # we don't have both
-        # check if there is an oauth token from
+        # Check the tokens.  If login is provided, only the token(s) for the
+        # login are considered. We consider oauth tokens as stored/used by
         # https://github.com/sociomantic/git-hub
-        token = False
-        if not cred.is_known:
-            if not github_login:
-                # try find a token as login
-                github_login = cfg.get('hub.oauthtoken', None)
-                if github_login and isinstance(github_login, (list, tuple)):
-                    unique_tokens = unique(github_login)
-                    if len(unique_tokens) > 1:
-                        github_login = github_login[-1]
-                        lgr.warning(
-                            "Got %d unique tokens for github. Will use the last one %s...%s",
-                            len(unique_tokens), github_login[:3], github_login[-3:]
-                        )
-                token = True
-            if not (github_login and (github_passwd or token)):
-                # still at least one missing, utilize the credential store
-                # to get auth info, pass potential passwd value along
-                cred.enter_new(
-                    user=github_login,
-                    password=github_passwd)
-        # now we should really have it
-        creds = cred()
-        github_login = creds['user']
-        github_passwd = creds['password']
 
-    if not github_login:
-        raise gh.BadCredentialsException(403, 'no login specified')
+        if github_login and tokens:
+            # Take only the tokens which are Ok and correspond to that login
+            tokens = _get_tokens_for_login(gh, github_login, tokens)
 
-    # this will always succeed, but it might later throw an exception
-    # if the credentials were wrong
-    # and this case, known credentials are wiped out again below
-    authed_gh = gh.Github(
-        github_login,
-        password=github_passwd)
-
-    try:
-        if github_organization:
+        for token in tokens:
             try:
-                entity = authed_gh.get_organization(github_organization)
-            except gh.UnknownObjectException as e:
-                raise ValueError('unknown organization "{}" [{}]'.format(
-                                 github_organization,
-                                 exc_str(e)))
-        else:
-            entity = authed_gh.get_user()
-    except gh.BadCredentialsException as e:
-        # things blew up, wipe out cred store, if anything is in it
-        if cred.is_known:
-            cred.delete()
-        raise e
+                yield(gh.Github(token), None)
+            except gh.BadCredentialsException as exc:
+                lgr.debug("Failed to obtain Github session for token %s",
+                          _token_str(token))
 
-    return entity
+    # We got here so time to try credentials
+
+    # make it per user if github_login was provided. People might want to use
+    # different credentials etc
+    cred_identity = "%s@github" % github_login if github_login else "github"
+
+    # TODO: if login and passwd were provided - try that one first
+    try_provided_creds = github_login and github_passwd
+
+    while True:
+        cred = UserPassword(cred_identity, 'https://github.com/login')
+        if cred.is_known:
+            creds = cred()
+            user_name = creds['user']
+            ses = gh.Github(user_name, password=creds['password'])
+            # Get user and list its authorizations to verify that we do
+            # not need 2FA
+            user = ses.get_user()
+            try:
+                user_name_ = user.name  # should trigger need for 2FA
+                # authorizations = list(user.get_authorizations())
+                yield ses, cred
+            except gh.TwoFactorException as exc:
+                # 2FA - we need to interact!
+                if not ui.is_interactive:
+                    # Or should we just allow to pass
+                    raise RuntimeError(
+                        "Cannot proceed with 2FA for Github - UI is not interactive. "
+                        "Please 'manually' establish token based authentication "
+                        "with Github and specify it in  %s  config"
+                        % CONFIG_HUB_TOKEN_FIELD
+                    )
+                # if all_tokens:
+                #     # yoh not sure if we can just add one more value if there is
+                #     # one at a given level (global/local) so - warn
+                #     lgr.warning("There are already known tokens for Github but "
+                #                 "either they were not tried or didn't work.  "
+                #                 "ATM we will might not be able to store a new token "
+                #                 "if we generate it")
+                if not ui.yesno(
+                    title="GitHub credentials - 2FA",
+                    text="%s account uses 2FA, we will need to establish "
+                         "token based authentication to proceed.  If you already "
+                         "have a token for the account, just specify it in "
+                         "config (%s) and for now say 'no' here, otherwise say 'yes' "
+                        % (user_name, CONFIG_HUB_TOKEN_FIELD)
+                    ):
+                    return
+
+                one_time_password = ui.question("2FA one time password", hidden=True)
+                # TODO: can fail if already exists -- handle!?
+                # in principle there is .authorization.delete()
+                auth = user.create_authorization(
+                    scopes=['user', 'repo'],  # TODO: Configurable??
+                    note='DataLad',  # TODO: Configurable??
+                    onetime_password=one_time_password)
+                token = auth.token
+                where_to_store = ui.question(
+                    title="Where to store token %s?" % _token_str(token),
+                    text="Empty string would result in the token not being "
+                         "stored for future reuse, so you will have to adjust "
+                         "configuration manually",
+                    choices=["global", "local", ""]
+                )
+                if where_to_store:
+                    cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
+                            where=where_to_store)
+                    lgr.info("Stored %s=%s in %s config.",
+                             CONFIG_HUB_TOKEN_FIELD, _token_str(token),
+                             where_to_store)
+                yield gh.Github("token"), cred
+
+        # if we are getting here, it means we are asked for more and thus
+        # aforementioned one didn't work out :-/
+        if ui.is_interactive:
+            if ui.yesno(
+                title="GitHub credentials",
+                text="Do you want to (re)enter GitHub credentials to be used?"
+            ):
+                cred.enter_new()
+            else:
+                break
+        else:
+            # Nothing we could do
+            lgr.debug(
+                "UI is not interactive - we cannot query for more credentials"
+                " for GitHub")
+            break
+
+
+def _gen_github_entity(
+    gh,
+    github_login, github_passwd,
+    github_organization
+):
+    nattempts = 0
+    for ses, cred in _gen_github_ses(gh, github_login, github_passwd):
+        nattempts += 1
+        try:
+            if github_organization:
+                try:
+                    yield ses.get_organization(github_organization), cred
+                except gh.UnknownObjectException as e:
+                    # yoh thinks it might be due to insufficient credentials?
+                    raise ValueError('unknown organization "{}" [{}]'.format(
+                                     github_organization,
+                                     exc_str(e)))
+            else:
+                yield ses.get_user(), cred
+        except gh.BadCredentialsException as e:
+            # Not sure if should be wiped here! TODO
+            # things blew up, wipe out cred store, if anything is in it
+            if cred and cred.is_known:
+                cred.delete()
+            raise e
+
+    # External loop should stop querying for the next possible way when it succeeds,
+    # so we should never get here if everything worked out
+    if nattempts:
+        raise AccessDeniedError(
+            "Tried %d times to get authenticated access to GitHub but kept failing"
+            % nattempts
+        )
+    else:
+        raise RuntimeError(
+            "Should have tried at least one way to authenticate! Not sure how got there"
+        )
 
 
 def _make_github_repos(
         gh, github_login, github_passwd, github_organization, rinfo, existing,
         access_protocol, dryrun):
-    # make it per user if github_login was provided. People might want to use
-    # different credentials etc
-    cred_identity = "%s@github" % github_login if github_login else "github"
-    cred = UserPassword(cred_identity, 'https://github.com/login')
-
-    # determine the entity under which to create the repos
-    entity = _get_github_entity(
-        gh,
-        cred,
-        github_login,
-        github_passwd,
-        github_organization)
 
     res = []
-    for ds, reponame in rinfo:
-        try:
-            access_url, existed = _make_github_repo(
-                gh,
-                github_login,
-                entity,
-                reponame,
-                existing,
-                access_protocol,
-                dryrun)
-            res.append((ds, access_url, existed))
-        except gh.BadCredentialsException as e:
-            # things blew up, wipe out cred store, if anything is in it
-            if cred.is_known:
-                # to avoid surprises "who ate my creds?", warn the user
-                lgr.warning(
-                    "Authentication failed, deleting stored credential %s",
-                    cred_identity
-                )
-                cred.delete()
-            raise e
+    if not rinfo:
+        return res  # no need to even try!
+
+    # determine the entity under which to create the repos.  It might be that
+    # we would need to check a few credentials
+    for entity, cred in _gen_github_entity(
+            gh,  # TODO: also avoid passing the entire module around
+            # cred,
+            github_login,
+            github_passwd,
+            github_organization):
+        for ds, reponame in rinfo:
+            try:
+                access_url, existed = _make_github_repo(
+                    gh,
+                    github_login,
+                    entity,
+                    reponame,
+                    existing,
+                    access_protocol,
+                    dryrun)
+                res.append((ds, access_url, existed))
+            except gh.BadCredentialsException as e:
+                if res:
+                    # so we have succeeded with at least one repo already -
+                    # we should not try any other credential.
+                    # TODO: may be it would make sense to have/use different
+                    # credentials for different datasets e.g. if somehow spread
+                    # across different organizations? but it is not the case here
+                    # IMHO (-- yoh)
+                    raise e
+                # things blew up, wipe out cred store, if anything is in it
+                if cred:  # if was not just a config token
+                    if cred.is_known:
+                        # to avoid surprises "who ate my creds?", warn the user
+                        lgr.warning(
+                            "Authentication failed, deleting stored credential %s",
+                            cred.name
+                        )
+                        cred.delete()
+                else:
+                    lgr.warning(
+                        "Authentication failed using a token. Trying next way"
+                    )
+                break  # go to the next attempt to authenticate
+        break  # we got here - means that we completed the ds loop wo error
     return res
 
 
@@ -198,7 +357,7 @@ def _make_github_repo(gh, github_login, entity, reponame, existing, access_proto
                 auto_init=False)
         except gh.GithubException as e:
             msg = "Github {}: {}".format(
-                e.data.get('message', 'unknown'),
+                e.data.get('message', str(e) or 'unknown'),
                 ', '.join([err.get('message')
                            for err in e.data.get('errors', [])
                            if 'message' in err]))
