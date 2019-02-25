@@ -23,7 +23,10 @@ from datalad.interface.common_opts import recursion_flag, recursion_limit
 from datalad.interface.common_opts import publish_depends
 from datalad.downloaders.credentials import UserPassword
 from datalad.dochelpers import exc_str
-from datalad.utils import assure_list
+from datalad.utils import (
+    assure_list,
+    unique,
+)
 from datalad.support.param import Parameter
 from datalad.support.network import URL
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -67,6 +70,14 @@ def _get_github_entity(gh, cred, github_login, github_passwd, github_organizatio
             if not github_login:
                 # try find a token as login
                 github_login = cfg.get('hub.oauthtoken', None)
+                if github_login and isinstance(github_login, (list, tuple)):
+                    unique_tokens = unique(github_login)
+                    if len(unique_tokens) > 1:
+                        github_login = github_login[-1]
+                        lgr.warning(
+                            "Got %d unique tokens for github. Will use the last one %s...%s",
+                            len(unique_tokens), github_login[:3], github_login[-3:]
+                        )
                 token = True
             if not (github_login and (github_passwd or token)):
                 # still at least one missing, utilize the credential store
@@ -230,7 +241,7 @@ class CreateSiblingGithub(Interface):
     configuration under variable *hub.oauthtoken* will be used automatically.
     Such a token can be obtained, for example, using the commandline Github
     interface (https://github.com/sociomantic/git-hub) by running:
-    :kbd:`git hub setup`.
+    :kbd:`git hub setup` (if no 2FA is used).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
