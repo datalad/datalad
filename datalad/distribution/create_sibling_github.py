@@ -238,38 +238,17 @@ def _gen_github_entity(
     github_login, github_passwd,
     github_organization
 ):
-    nattempts = 0
     for ses, cred in _gen_github_ses(gh, github_login, github_passwd):
-        nattempts += 1
-        try:
-            if github_organization:
-                try:
-                    yield ses.get_organization(github_organization), cred
-                except gh.UnknownObjectException as e:
-                    # yoh thinks it might be due to insufficient credentials?
-                    raise ValueError('unknown organization "{}" [{}]'.format(
-                                     github_organization,
-                                     exc_str(e)))
-            else:
-                yield ses.get_user(), cred
-        except gh.BadCredentialsException as e:
-            # Not sure if should be wiped here! TODO
-            # things blew up, wipe out cred store, if anything is in it
-            if cred and cred.is_known:
-                cred.delete()
-            raise e
-
-    # External loop should stop querying for the next possible way when it succeeds,
-    # so we should never get here if everything worked out
-    if nattempts:
-        raise AccessDeniedError(
-            "Tried %d times to get authenticated access to GitHub but kept failing"
-            % nattempts
-        )
-    else:
-        raise RuntimeError(
-            "Should have tried at least one way to authenticate! Not sure how got there"
-        )
+        if github_organization:
+            try:
+                yield ses.get_organization(github_organization), cred
+            except gh.UnknownObjectException as e:
+                # yoh thinks it might be due to insufficient credentials?
+                raise ValueError('unknown organization "{}" [{}]'.format(
+                                 github_organization,
+                                 exc_str(e)))
+        else:
+            yield ses.get_user(), cred
 
 
 def _make_github_repos(
@@ -280,6 +259,7 @@ def _make_github_repos(
     if not rinfo:
         return res  # no need to even try!
 
+    ncredattempts = 0
     # determine the entity under which to create the repos.  It might be that
     # we would need to check a few credentials
     for entity, cred in _gen_github_entity(
@@ -288,6 +268,7 @@ def _make_github_repos(
             github_login,
             github_passwd,
             github_organization):
+        ncredattempts += 1
         for ds, reponame in rinfo:
             try:
                 access_url, existed = _make_github_repo(
@@ -309,21 +290,22 @@ def _make_github_repos(
                     # IMHO (-- yoh)
                     raise e
                 # things blew up, wipe out cred store, if anything is in it
-                if cred:  # if was not just a config token
-                    if cred.is_known:
-                        # to avoid surprises "who ate my creds?", warn the user
-                        lgr.warning(
-                            "Authentication failed, deleting stored credential %s",
-                            cred.name
-                        )
-                        cred.delete()
+                if cred:
+                    lgr.warning("Authentication failed using %s.", cred.name)
                 else:
-                    lgr.warning(
-                        "Authentication failed using a token. Trying next way"
-                    )
+                    lgr.warning("Authentication failed using a token.")
                 break  # go to the next attempt to authenticate
-        break  # we got here - means that we completed the ds loop wo error
-    return res
+        return res
+
+    # External loop should stop querying for the next possible way when it succeeds,
+    # so we should never get here if everything worked out
+    if ncredattempts:
+        raise AccessDeniedError(
+            "Tried %d times to get authenticated access to GitHub but kept failing"
+            % ncredattempts
+        )
+    else:
+        raise RuntimeError("Did not even try to create a repo on github")
 
 
 def _make_github_repo(gh, github_login, entity, reponame, existing, access_protocol, dryrun):
