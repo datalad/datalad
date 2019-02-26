@@ -70,7 +70,8 @@ def _token_str(token):
     return token[:3] + '...' + token[-3:]
 
 
-def _get_tokens_for_login(gh, login, tokens):
+def _get_tokens_for_login(login, tokens):
+    import github as gh
     selected_tokens = []
     for t in tokens:
         try:
@@ -89,9 +90,7 @@ def _get_tokens_for_login(gh, login, tokens):
     return selected_tokens
 
 
-def _gen_github_ses(gh,
-                    github_login, github_passwd,
-                    ):
+def _gen_github_ses(github_login, github_passwd):
     """Generate viable Github sessions
 
     The idea is that we keep trying "new" ways to authenticate until we either
@@ -99,7 +98,6 @@ def _gen_github_ses(gh,
 
     Parameters
     ----------
-    gh:
     github_login:
     github_passwd:
 
@@ -110,6 +108,7 @@ def _gen_github_ses(gh,
       we consider tokens from the config (instead of credentials store)
 
     """
+    import github as gh
     if github_login == 'disabledloginfortesting':
         raise gh.BadCredentialsException(403, 'no login specified')
 
@@ -127,7 +126,7 @@ def _gen_github_ses(gh,
 
         if github_login and tokens:
             # Take only the tokens which are Ok and correspond to that login
-            tokens = _get_tokens_for_login(gh, github_login, tokens)
+            tokens = _get_tokens_for_login(github_login, tokens)
 
         for token in tokens:
             try:
@@ -142,103 +141,127 @@ def _gen_github_ses(gh,
     # different credentials etc
     cred_identity = "%s@github" % github_login if github_login else "github"
 
-    # TODO: if login and passwd were provided - try that one first
-    try_provided_creds = github_login and github_passwd
+    # if login and passwd were provided - try that one first
+    try_creds = github_login and github_passwd
 
     while True:
-        cred = UserPassword(cred_identity, 'https://github.com/login')
-        if cred.is_known:
+        if try_creds:
+            # So we do not store them into cred store and thus do not need to
+            # remove
+            cred = None
+            ses = gh.Github(github_login, password=github_passwd)
+            user_name = github_login
+            try_creds = None
+        else:
+            cred = UserPassword(cred_identity, 'https://github.com/login')
+            if not cred.is_known:
+                cred.enter_new()
             creds = cred()
             user_name = creds['user']
             ses = gh.Github(user_name, password=creds['password'])
-            # Get user and list its authorizations to verify that we do
-            # not need 2FA
-            user = ses.get_user()
-            try:
-                user_name_ = user.name  # should trigger need for 2FA
-                # authorizations = list(user.get_authorizations())
-                yield ses, cred
-            except gh.TwoFactorException as exc:
-                # 2FA - we need to interact!
-                if not ui.is_interactive:
-                    # Or should we just allow to pass
-                    raise RuntimeError(
-                        "Cannot proceed with 2FA for Github - UI is not interactive. "
-                        "Please 'manually' establish token based authentication "
-                        "with Github and specify it in  %s  config"
-                        % CONFIG_HUB_TOKEN_FIELD
-                    )
-                # if all_tokens:
-                #     # yoh not sure if we can just add one more value if there is
-                #     # one at a given level (global/local) so - warn
-                #     lgr.warning("There are already known tokens for Github but "
-                #                 "either they were not tried or didn't work.  "
-                #                 "ATM we will might not be able to store a new token "
-                #                 "if we generate it")
-                if not ui.yesno(
-                    title="GitHub credentials - 2FA",
-                    text="%s account uses 2FA, we will need to establish "
-                         "token based authentication to proceed.  If you already "
-                         "have a token for the account, just specify it in "
-                         "config (%s) and for now say 'no' here, otherwise say 'yes' "
-                        % (user_name, CONFIG_HUB_TOKEN_FIELD)
-                    ):
-                    return
-
-                one_time_password = ui.question("2FA one time password", hidden=True)
-                # TODO: can fail if already exists -- handle!?
-                # in principle there is .authorization.delete()
-                auth = user.create_authorization(
-                    scopes=['user', 'repo'],  # TODO: Configurable??
-                    note='DataLad',  # TODO: Configurable??
-                    onetime_password=one_time_password)
-                token = auth.token
-                where_to_store = ui.question(
-                    title="Where to store token %s?" % _token_str(token),
-                    text="Empty string would result in the token not being "
-                         "stored for future reuse, so you will have to adjust "
-                         "configuration manually",
-                    choices=["global", "local", ""]
+        # Get user and list its authorizations to verify that we do
+        # not need 2FA
+        user = ses.get_user()
+        try:
+            user_name_ = user.name  # should trigger need for 2FA
+            # authorizations = list(user.get_authorizations())
+            yield ses, cred
+        except gh.BadCredentialsException as exc:
+            lgr.error("Bad Github credentials")
+        except gh.TwoFactorException as exc:
+            # 2FA - we need to interact!
+            if not ui.is_interactive:
+                # Or should we just allow to pass
+                raise RuntimeError(
+                    "Cannot proceed with 2FA for Github - UI is not interactive. "
+                    "Please 'manually' establish token based authentication "
+                    "with Github and specify it in  %s  config"
+                    % CONFIG_HUB_TOKEN_FIELD
                 )
-                if where_to_store:
-                    try:
-                        cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
-                                where=where_to_store)
-                        lgr.info("Stored %s=%s in %s config.",
-                                 CONFIG_HUB_TOKEN_FIELD, _token_str(token),
-                                 where_to_store)
-                    except Exception as exc:
-                        lgr.debug("Failed to store token: %s", exc_str(exc))
-                        ui.error(
-                            "Failed to store the token (%s), please store manually as %s"
-                            % (token, CONFIG_HUB_TOKEN_FIELD)
-                        )
-                yield gh.Github(token), None  # None for cred so does not get killed
+            if not ui.yesno(
+                title="GitHub credentials - %s uses 2FA" % user_name,
+                text="Generate a GitHub token to proceed? "
+                     "If you already have a token for the account, "
+                     "just say 'no' now and specify it in config (%s), "
+                     "otherwise say 'yes' "
+                    % (CONFIG_HUB_TOKEN_FIELD,)
+                ):
+                return
+
+            token = _get_2fa_token(user)
+            yield gh.Github(token), None  # None for cred so does not get killed
 
         # if we are getting here, it means we are asked for more and thus
         # aforementioned one didn't work out :-/
         if ui.is_interactive:
-            if ui.yesno(
-                title="GitHub credentials",
-                text="Do you want to (re)enter GitHub credentials to be used?"
-            ):
-                cred.enter_new()
-            else:
-                break
+            if cred is not None:
+                if ui.yesno(
+                    title="GitHub credentials",
+                    text="Do you want to try (re)entering GitHub credentials?"
+                ):
+                    cred.enter_new()
+                else:
+                    break
         else:
             # Nothing we could do
             lgr.debug(
                 "UI is not interactive - we cannot query for more credentials"
-                " for GitHub")
+            )
             break
 
 
+def _get_2fa_token(user):
+    import github as gh
+    one_time_password = ui.question(
+        "2FA one time password", hidden=True, repeat=False
+    )
+    try:
+        # TODO: can fail if already exists -- handle!?
+        # in principle there is .authorization.delete()
+        token_note = 'DataLad'
+        auth = user.create_authorization(
+            scopes=['user', 'repo'],  # TODO: Configurable??
+            note=token_note,  # TODO: Configurable??
+            onetime_password=one_time_password)
+    except gh.GithubException as exc:
+        if (exc.status == 422  # "Unprocessable Entity"
+            and exc.data.get('errors', [{}])[0].get('code') == 'already_exists'
+        ):
+            raise ValueError(
+                "Token with a note %r already exists. If you specified " 
+                "password -- don't, and specify token in configuration as %s"
+                % (token_note, CONFIG_HUB_TOKEN_FIELD)
+            )
+        raise
+    token = auth.token
+    where_to_store = ui.question(
+        title="Where to store token %s?" % _token_str(token),
+        text="Empty string would result in the token not being "
+             "stored for future reuse, so you will have to adjust "
+             "configuration manually",
+        choices=["global", "local", ""]
+    )
+    if where_to_store:
+        try:
+            cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
+                    where=where_to_store)
+            lgr.info("Stored %s=%s in %s config.",
+                     CONFIG_HUB_TOKEN_FIELD, _token_str(token),
+                     where_to_store)
+        except Exception as exc:
+            lgr.debug("Failed to store token: %s", exc_str(exc))
+            ui.error(
+                "Failed to store the token (%s), please store manually as %s"
+                % (token, CONFIG_HUB_TOKEN_FIELD)
+            )
+    return token
+
+
 def _gen_github_entity(
-    gh,
     github_login, github_passwd,
     github_organization
 ):
-    for ses, cred in _gen_github_ses(gh, github_login, github_passwd):
+    for ses, cred in _gen_github_ses(github_login, github_passwd):
         if github_organization:
             try:
                 yield ses.get_organization(github_organization), cred
@@ -252,9 +275,9 @@ def _gen_github_entity(
 
 
 def _make_github_repos(
-        gh, github_login, github_passwd, github_organization, rinfo, existing,
+        github_login, github_passwd, github_organization, rinfo, existing,
         access_protocol, dryrun):
-
+    import github as gh
     res = []
     if not rinfo:
         return res  # no need to even try!
@@ -263,8 +286,6 @@ def _make_github_repos(
     # determine the entity under which to create the repos.  It might be that
     # we would need to check a few credentials
     for entity, cred in _gen_github_entity(
-            gh,  # TODO: also avoid passing the entire module around
-            # cred,
             github_login,
             github_passwd,
             github_organization):
@@ -272,7 +293,6 @@ def _make_github_repos(
         for ds, reponame in rinfo:
             try:
                 access_url, existed = _make_github_repo(
-                    gh,
                     github_login,
                     entity,
                     reponame,
@@ -308,7 +328,8 @@ def _make_github_repos(
         raise RuntimeError("Did not even try to create a repo on github")
 
 
-def _make_github_repo(gh, github_login, entity, reponame, existing, access_protocol, dryrun):
+def _make_github_repo(github_login, entity, reponame, existing, access_protocol, dryrun):
+    import github as gh
     repo = None
     try:
         repo = entity.get_repo(reponame)
@@ -520,7 +541,7 @@ class CreateSiblingGithub(Interface):
 
         # actually make it happen on Github
         rinfo = _make_github_repos(
-            gh, github_login, github_passwd, github_organization, filtered,
+            github_login, github_passwd, github_organization, filtered,
             existing, access_protocol, dryrun)
 
         # lastly configure the local datasets
