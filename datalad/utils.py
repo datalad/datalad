@@ -308,6 +308,20 @@ def is_explicit_path(path):
         or path.startswith(os.pardir + os.sep)
 
 
+# handle this dance once, and import pathlib from here
+# in all other places
+if PY2:
+    from pathlib2 import (
+        Path,
+        PurePosixPath,
+    )
+else:
+    from pathlib import (
+        Path,
+        PurePosixPath,
+    )
+
+
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
 
