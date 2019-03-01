@@ -104,9 +104,7 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        # was added in https://github.com/datalad/datalad/pull/1995 without
-        # due investigation, should not be needed until we add duecredit support
-        # 'duecredit',
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
         'simplejson',
         'whoosh',
     ] + req_lzma,
