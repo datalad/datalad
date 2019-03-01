@@ -612,7 +612,7 @@ class GitRepo(RepoInterface):
     @due.dcite(Doi("10.5281/zenodo.808846"),
                # override path since there is no need ATM for such details
                path="datalad",
-               description="Data management and distribution platform")
+               description="DataLad - Data management and distribution platform")
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, repo=None, fake_dates=False, **kwargs):
         """Creates representation of git repository at `path`.
