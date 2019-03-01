@@ -952,6 +952,30 @@ def line_profile(func):
             prof.print_stats()
     return newfunc
 
+
+# Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
+def never_fail(f):
+    """Assure that function never fails -- all exceptions are caught
+
+    Returns `None` if function fails internally.
+    """
+    @wraps(f)
+    def wrapped_func(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            lgr.warning(
+                "DataLad internal failure while running %s: %r. "
+                "Please report at https://github.com/datalad/datalad/issues"
+                % (f, e)
+            )
+
+    if os.environ.get('DATALAD_ALLOW_FAIL', False):
+        return f
+    else:
+        return wrapped_func
+
+
 #
 # Context Managers
 #
