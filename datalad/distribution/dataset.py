@@ -28,7 +28,9 @@ from datalad.config import ConfigManager
 from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
-from datalad.support.due import due, Doi
+# DueCredit
+from datalad.support.due import due
+from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
@@ -297,80 +299,14 @@ class Dataset(object):
         if not valid:
             self._repo = None
 
-        from datalad.support.due import due, Doi, Url, Text
         if self._repo is None:
             # Often .repo is requested to 'sense' if anything is installed
             # under, and if so -- to proceed forward. Thus log here only
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
-        elif external_versions['duecredit'] and getattr(due, 'active', None):
-            # TODO: extend duecredit's stub with .active
-            res = self.metadata(
-                reporton='datasets',  # Interested only in the dataset record
-                result_renderer=None,  # No need
-                return_type='item-or-list'  # Expecting a single record
-            )
-            # We have a couple of candidates for looking up references.
-            # In the future (TODO) extractors should provide API to provide
-            # reference(s). Order of extractors from config should be preserved
-            # and define precedence
-            if not isinstance(res, dict):
-                lgr.debug("Got record which is not a dict, no duecredit for now")
-            metadata = res.get('metadata', {})
-
-            # Descend following the dots -- isn't there a helper already? TODO
-            def get_field(struct, field):
-                if not field:
-                    return None
-                value = struct
-                for subfield in field.split('.'):
-                    value = value.get(subfield, None)
-                    if not value:
-                        return None
-                return value
-
-            for cite_field, desc_field, cite_type in [
-                ('bids.DatasetDOI', 'bids.name', Doi), #  our best guess I guess
-                ('bids.HowToAcknowledge', 'bids.name', Text),
-                # ('bids.citation', Text), # non-standard!
-                # ('bids.ReferencesAndLinks', list) #  freeform but we could detect
-                #                                   #  URLs, DOIs, and for the rest use Text
-                # ('datacite.?'  # ?
-                # ('frictionless_datapackage.?'  # ?
-                # ('frictionless_datapackage.homepage'  # ?
-                (None, None, None)  # Catch all so we leave no one behind
-            ]:
-                cite_rec = get_field(metadata, cite_field)
-                if cite_field is not None:
-                    if not cite_rec:
-                        continue
-                    # we found it! ;)
-                else:
-                    # Catch all
-                    cite_rec = "DataLad dataset at %s" % self.path
-
-                desc = None
-                if desc_field:
-                    desc = get_field(metadata, desc_field)
-                desc = desc or "DataLad dataset %s" % self.id
-
-                # DueCredit's path defines groupping of entries, so with
-                # "datalad." we bring them all under datalad's roof!
-                # And as for unique suffix, there is no better one but the ID,
-                # but that one is too long so let's take the first part of UUID
-                path = "datalad:%s" % (self.id.split('-', 1)[0])
-
-                try:
-                    due.cite(
-                        (cite_type or FreeTextEntry)(cite_rec),
-                        path=path,
-                        version=self.repo.describe(),
-                        description=desc
-                    )
-                    break  # we are done. TODO: should we continue? ;)
-                except Exception as exc:
-                    # who knows what could go wrong with DueCredit!?
-                    lgr.debug("DueCredit .cite caused %s", exc_str(exc))
+        elif due.active:
+            # Makes sense only on installed dataset
+            duecredit_dataset(self)
 
         return self._repo
 
