@@ -722,10 +722,6 @@ class GitRepo(RepoInterface):
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
 
-        # the sole purpose of this init is to add a pathlib
-        # native path object to the instance
-        # XXX this relies on the assumption that self.path as managed
-        # by the base class is always a native path
         self.pathobj = ut.Path(self.path)
 
     def _create_empty_repo(self, path, **kwargs):
