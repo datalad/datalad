@@ -16,17 +16,19 @@ lgr = logging.getLogger('datalad.duecredit')
 # In the future (TODO) extractors should provide API to provide
 # reference(s). Order of extractors from config should be preserved
 # and define precedence.
-# Field for citation, Field for Description, DueCredit Entry.
+# Citation Field(s), Description Field(s), Version Field(s), DueCredit Entry.
 CITATION_CANDIDATES = [
-    ('bids.DatasetDOI', 'bids.name', Doi),  # our best guess I guess
-    ('bids.HowToAcknowledge', 'bids.name', Text),
+    ('bids.DatasetDOI', 'bids.name', None, Doi),  # our best guess I guess
+    ('bids.HowToAcknowledge', 'bids.name', None, Text),
     # ('bids.citation', Text), # non-standard!
     # ('bids.ReferencesAndLinks', list) #  freeform but we could detect
     #                                   #  URLs, DOIs, and for the rest use Text
-    # ('datacite.?'  # ?
+    # CRCNS style datacite
+    ('datacite.sameas', ('datacite.shortdescription', 'datacite.description'),
+     'datacite.version', Doi),
     # ('frictionless_datapackage.?'  # ?
     # ('frictionless_datapackage.homepage'  # ?
-    (None, None, None)  # Catch all so we leave no one behind
+    (None, None, None, None)  # Catch all so we leave no one behind
 ]
 
 
@@ -43,11 +45,18 @@ def duecredit_dataset(dataset):
     support of extraction of relevant information by each extractor.
     """
 
-    res = dataset.metadata(
-        reporton='datasets',  # Interested only in the dataset record
-        result_renderer=None,  # No need
-        return_type='item-or-list'  # Expecting a single record
-    )
+    try:
+        res = dataset.metadata(
+            reporton='datasets',  # Interested only in the dataset record
+            result_renderer=None,  # No need
+            return_type='item-or-list'  # Expecting a single record
+        )
+    except Exception as exc:
+        lgr.warning(
+            "Failed to obtain metadata for %s. Will not provide duecredit entry",
+            dataset
+        )
+        return
 
     if not isinstance(res, dict):
         lgr.debug("Got record which is not a dict, no duecredit for now")
@@ -55,6 +64,9 @@ def duecredit_dataset(dataset):
 
     # Descend following the dots -- isn't there a helper already - TODO?
     def get_field(struct, field):
+        if isinstance(field, (tuple, list)):
+            first = lambda values: (el for el in values if el)
+            return next(first(get_field(struct, f) for f in field), None)
         if not field:
             return None
         value = struct
@@ -64,7 +76,7 @@ def duecredit_dataset(dataset):
                 return None
         return value
 
-    for cite_field, desc_field, cite_type in CITATION_CANDIDATES:
+    for cite_field, desc_field, version_field, cite_type in CITATION_CANDIDATES:
         cite_rec = get_field(metadata, cite_field)
         if cite_field is not None:
             if not cite_rec:
@@ -74,9 +86,7 @@ def duecredit_dataset(dataset):
             # Catch all
             cite_rec = "DataLad dataset at %s" % dataset.path
 
-        desc = None
-        if desc_field:
-            desc = get_field(metadata, desc_field)
+        desc = get_field(metadata, desc_field) if desc_field else None
         desc = desc or "DataLad dataset %s" % dataset.id
 
         # DueCredit's path defines groupping of entries, so with
@@ -85,11 +95,14 @@ def duecredit_dataset(dataset):
         # but that one is too long so let's take the first part of UUID
         path = "datalad:%s" % (dataset.id.split('-', 1)[0])
 
+        version = get_field(metadata, version_field) if version_field else None
+        version = version or dataset.repo.describe()
+
         try:
             due.cite(
                 (cite_type or Text)(cite_rec),
                 path=path,
-                version=dataset.repo.describe(),
+                version=version,
                 description=desc
             )
             break  # we are done. TODO: should we continue? ;)
