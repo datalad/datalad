@@ -60,6 +60,8 @@ def duecredit_dataset(dataset):
 
     if not isinstance(res, dict):
         lgr.debug("Got record which is not a dict, no duecredit for now")
+        return
+    
     metadata = res.get('metadata', {})
 
     # Descend following the dots -- isn't there a helper already - TODO?
