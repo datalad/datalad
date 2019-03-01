@@ -39,7 +39,8 @@ class InactiveDueCreditCollector(object):
             return func
         return nondecorating_decorator
 
-    cite = load = add = _donothing
+    active = False
+    activate = add = cite = dump = load = _donothing
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -58,7 +59,7 @@ try:
 except Exception as e:
     if type(e).__name__ != 'ImportError':
         import logging
-        logging.getLogger("datalad.support.due").error(
+        logging.getLogger("datalad.duecredit").error(
             "Failed to import duecredit due to %s" % str(e))
     # Initiate due stub
     due = InactiveDueCreditCollector()
