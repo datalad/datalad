@@ -6,6 +6,7 @@ Support functionality for using DueCredit
 
 # Note Text was added/exposed only since DueCredit 0.6.5
 from .due import due, Doi, Url, Text
+from ..utils import never_fail
 
 import logging
 lgr = logging.getLogger('datalad.duecredit')
@@ -35,6 +36,7 @@ CITATION_CANDIDATES = [
 # Not worth being a @datasetmethod at least in this shape.
 # Could in principle provide rendering of the citation(s) etc
 # using duecredit
+@never_fail  # For paranoid Yarik
 def duecredit_dataset(dataset):
     """Duecredit cite a dataset if Duecredit is active
 
@@ -100,14 +102,10 @@ def duecredit_dataset(dataset):
         version = get_field(metadata, version_field) if version_field else None
         version = version or dataset.repo.describe()
 
-        try:
-            due.cite(
-                (cite_type or Text)(cite_rec),
-                path=path,
-                version=version,
-                description=desc
-            )
-            break  # we are done. TODO: should we continue? ;)
-        except Exception as exc:
-            # who knows what could go wrong with DueCredit!?
-            lgr.debug("DueCredit .cite caused %s", exc_str(exc))
+        due.cite(
+            (cite_type or Text)(cite_rec),
+            path=path,
+            version=version,
+            description=desc
+        )
+        return  # we are done. TODO: should we continue? ;)

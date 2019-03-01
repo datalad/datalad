@@ -305,7 +305,7 @@ class Dataset(object):
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
         elif due.active:
-            # Makes sense only on installed dataset
+            # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
 
         return self._repo
