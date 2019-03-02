@@ -2582,7 +2582,10 @@ class AnnexRepo(GitRepo, RepoInterface):
                 staged_not_to_commit = changed_files_staged.difference(files_set)
                 if staged_not_to_commit or files_changed_notstaged:
                     # Need an alternative index_file
-                    with make_tempfile() as index_file:
+                    with make_tempfile(dir=opj(self.path,
+                                               GitRepo.get_git_dir(self)),
+                                       prefix="datalad-",
+                                       suffix=".index") as index_file:
                         # First add those which were changed but not staged yet
                         if files_changed_notstaged:
                             self.add(files=list(files_changed_notstaged))

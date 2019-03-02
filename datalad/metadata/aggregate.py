@@ -756,7 +756,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
 
 def _store_agginfo_db(ds, db):
     # base path in which aggregate.json and objects is located
-    agginfo_path, agg_base_path = get_ds_aggregate_db_locations(ds)
+    agginfo_path, agg_base_path = get_ds_aggregate_db_locations(
+        ds, warn_absent=False)
     # make DB paths on disk always relative
     json_py.dump(
         {
@@ -926,7 +927,10 @@ class AggregateMetaData(Interface):
             # also recurse current even if paths are given
             path.append(ds.path)
 
-        agginfo_db_location, agg_base_path = get_ds_aggregate_db_locations(ds)
+        agginfo_db_location, agg_base_path = get_ds_aggregate_db_locations(
+            ds,
+            # do not warn here, next call triggers the same warning
+            warn_absent=False)
         agginfo_db = load_ds_aggregate_db(ds, abspath=True)
 
         to_save = []
