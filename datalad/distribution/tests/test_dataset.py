@@ -509,3 +509,22 @@ def test_rev_resolve_path_symlink_edition(path):
         eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
         eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
         eq_(deepest, rev_resolve_path(op.join('.', '..', 'three')))
+
+
+@with_tempfile(mkdir=True)
+def test_hashable(path):
+    path = ut.Path(path)
+    tryme = set()
+    # is it considered hashable at all
+    tryme.add(Dataset(path / 'one'))
+    eq_(len(tryme), 1)
+    # do another one, same class different path
+    tryme.add(Dataset(path / 'two'))
+    eq_(len(tryme), 2)
+    # test whether two different types of repo instances pointing
+    # to the same repo on disk are considered different
+    Dataset(path).create()
+    tryme.add(GitRepo(path))
+    eq_(len(tryme), 3)
+    tryme.add(AnnexRepo(path))
+    eq_(len(tryme), 4)
