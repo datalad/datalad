@@ -608,6 +608,11 @@ class GitRepo(RepoInterface):
 
     # End Flyweight
 
+    def __hash__(self):
+        # the flyweight key is already determining unique instances
+        # add the class name to distinguish from strings of a path
+        return hash((self.__class__.__name__, self.__weakref__.key))
+
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, repo=None, fake_dates=False, **kwargs):
         """Creates representation of git repository at `path`.
