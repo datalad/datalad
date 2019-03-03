@@ -38,6 +38,7 @@ from weakref import WeakValueDictionary
 
 
 from six import string_types
+from six import text_type
 from six import add_metaclass
 from six import iteritems
 from six import PY2
@@ -576,6 +577,10 @@ class GitRepo(RepoInterface):
 
         if path is None:
             raise AttributeError
+
+        # mirror what is happening in __init__
+        if isinstance(path, ut.PurePath):
+            path = text_type(path)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or

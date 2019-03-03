@@ -126,6 +126,10 @@ class Dataset(object):
         if path is None:
             raise AttributeError
 
+        # mirror what is happening in __init__
+        if isinstance(path, ut.PurePath):
+            path = text_type(path)
+
         # Custom handling for few special abbreviations
         path_ = path
         if path == '^':
@@ -163,10 +167,12 @@ class Dataset(object):
         """
         Parameters
         ----------
-        path : str
+        path : str or Path
           Path to the dataset location. This location may or may not exist
           yet.
         """
+        if isinstance(path, ut.PurePath):
+            path = text_type(path)
         self._path = path
         self._repo = None
         self._id = None

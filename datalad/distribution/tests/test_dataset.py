@@ -516,15 +516,15 @@ def test_hashable(path):
     path = ut.Path(path)
     tryme = set()
     # is it considered hashable at all
-    tryme.add(Dataset(str(path / 'one')))
+    tryme.add(Dataset(path / 'one'))
     eq_(len(tryme), 1)
     # do another one, same class different path
-    tryme.add(Dataset(str(path / 'two')))
+    tryme.add(Dataset(path / 'two'))
     eq_(len(tryme), 2)
     # test whether two different types of repo instances pointing
     # to the same repo on disk are considered different
-    Dataset(str(path)).create()
-    tryme.add(GitRepo(str(path)))
+    Dataset(path).create()
+    tryme.add(GitRepo(path))
     eq_(len(tryme), 3)
-    tryme.add(AnnexRepo(str(path)))
+    tryme.add(AnnexRepo(path))
     eq_(len(tryme), 4)

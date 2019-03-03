@@ -313,11 +313,13 @@ def is_explicit_path(path):
 if PY2:
     from pathlib2 import (
         Path,
+        PurePath,
         PurePosixPath,
     )
 else:
     from pathlib import (
         Path,
+        PurePath,
         PurePosixPath,
     )
 
