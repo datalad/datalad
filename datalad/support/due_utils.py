@@ -73,8 +73,12 @@ def duecredit_dataset(dataset):
             return next(first(get_field(struct, f) for f in field), None)
         if not field:
             return None
+        # I think it is better to be case insensitive
+        field = field.lower()
         value = struct
         for subfield in field.split('.'):
+            # lower case all the keys
+            value = {k.lower(): v for k, v in value.items()}
             value = value.get(subfield, None)
             if not value:
                 return None
