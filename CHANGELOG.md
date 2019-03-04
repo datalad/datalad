@@ -10,21 +10,24 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.11.4 (??? ??, 2019) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
+## 0.12.0rc1 (Mar 03, 2019) -- to boldly go ...
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- Discontinued support for git-annex direct-mode (also no longer
+  supported upstream).
 
 ### Fixes
 
-?
+- Create temporary index files under .git/ to stay on the same filesystem.
 
 ### Enhancements and new features
 
-?
+- Dataset and Repo object instances are now hashable, and can be
+  created based on pathlib Path object instances
+
+- Imported various additional methods for the Repo classes to query
+  information and save changes.
 
 
 ## 0.11.3 (Feb 19, 2019) -- read-me-gently
