@@ -225,21 +225,24 @@ def _get_2fa_token(user):
     one_time_password = ui.question(
         "2FA one time password", hidden=True, repeat=False
     )
+    token_note = cfg.obtain('datalad.github.token-note')
     try:
         # TODO: can fail if already exists -- handle!?
         # in principle there is .authorization.delete()
-        token_note = 'DataLad'
         auth = user.create_authorization(
             scopes=['user', 'repo'],  # TODO: Configurable??
             note=token_note,  # TODO: Configurable??
             onetime_password=one_time_password)
     except gh.GithubException as exc:
         if (exc.status == 422  # "Unprocessable Entity"
-            and exc.data.get('errors', [{}])[0].get('code') == 'already_exists'
+                and exc.data.get('errors', [{}])[0].get('code') == 'already_exists'
         ):
             raise ValueError(
-                "Token with a note %r already exists. If you specified " 
-                "password -- don't, and specify token in configuration as %s"
+                "Token %r already exists. If you specified "
+                "password -- don't, and specify token in configuration as %s. "
+                "If token already exists and you want to generate a new one "
+                "anyways - specify a new one via 'datalad.github.token-note' "
+                "configuration variable"
                 % (token_note, CONFIG_HUB_TOKEN_FIELD)
             )
         raise

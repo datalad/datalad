@@ -106,6 +106,12 @@ definitions = {
         'type': EnsureInt(),
         'default': 1112911993,
     },
+    'datalad.github.token-note': {
+        'ui': ('question', {
+            'title': 'Github token note',
+            'text': 'Description for a Personal access token to generate.'}),
+        'default': 'DataLad',
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
