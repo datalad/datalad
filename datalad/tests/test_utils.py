@@ -1144,7 +1144,8 @@ def test_get_open_files(p):
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
         # all before comparison
-        eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+        eq_(get_open_files(p, log_open=40)[op.realpath(f1)].pid,
+            os.getpid())
 
     assert not get_open_files(subd)
     # if we start a process within that directory, should get informed
@@ -1159,8 +1160,8 @@ def test_get_open_files(p):
     # Assure that it started and we read the OK
     eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
-    eq_(get_open_files(p), {op.realpath(subd): proc.pid})
-    eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
+    eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
+    eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)
     proc.terminate()
     assert not get_open_files(subd)
 

@@ -65,6 +65,9 @@ class MetadataExtractor(BaseMetadataExtractor):
             if key:
                 meta['key'] = key
             yield (file, meta)
+        # we need to make sure that batch processes are terminated
+        # otherwise they might cause trouble on windows
+        repo.precommit()
         log_progress(
             lgr.info,
             'extractorannex',

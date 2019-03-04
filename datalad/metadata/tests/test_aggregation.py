@@ -10,10 +10,10 @@
 """Test metadata aggregation"""
 
 
+import os.path as op
 from os.path import join as opj
 
 from datalad.api import metadata
-from datalad.api import install
 from datalad.distribution.dataset import Dataset
 
 
@@ -258,9 +258,9 @@ def _get_contained_objs(ds):
 
 
 def _get_referenced_objs(ds):
-    return set([opj('.datalad', 'metadata', r[f])
-               for r in ds.metadata(get_aggregates=True)
-               for f in ('content_info', 'dataset_info')])
+    return set([op.relpath(r[f], start=ds.path)
+                for r in ds.metadata(get_aggregates=True)
+                for f in ('content_info', 'dataset_info')])
 
 
 @with_tree(tree=_dataset_hierarchy_template)
@@ -383,7 +383,7 @@ def test_partial_aggregation(path):
     # now let's do partial aggregation from just one subdataset
     # we should not loose information on the other datasets
     # as this would be a problem any time anything in a dataset
-    # subtree is missing: no installed, too expensive to reaggregate, ...
+    # subtree is missing: not installed, too expensive to reaggregate, ...
     ds.aggregate_metadata(path='sub1', incremental=True)
     res = ds.metadata(get_aggregates=True)
     assert_result_count(res, 3)

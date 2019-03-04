@@ -65,6 +65,7 @@ from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change
 
 
@@ -1244,6 +1245,10 @@ def test_gitattributes(path):
             'sec.key': 'val',
         })
 
+    # mode='w' should replace the entire file:
+    gr.set_gitattributes([('**', {'some': 'nonsense'})], mode='w')
+    eq_(gr.get_gitattributes('.')['.'], {'some': 'nonsense'})
+
 
 @with_tempfile(mkdir=True)
 def test_get_hexsha_tag(path):
@@ -1367,3 +1372,18 @@ def test_guard_BadName():
     v = Vulnerable()
     eq_(v(1, y=3), 4)
     eq_(calls, [1, 'precommit'])
+
+
+@with_tree(tree={"foo": "foo content"})
+def test_custom_runner_protocol(path):
+    # Check that a runner with a non-default protocol gets wired up correctly.
+    prot = ExecutionTimeProtocol()
+    gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
+    eq_(len(prot), 1)
+    ok_(prot[0]['duration'] >= 0)
+    gr.add("foo")
+    eq_(len(prot), 2)
+    assert_in("add", prot[1]["command"])
+    gr.commit("commit foo")
+    eq_(len(prot), 3)
+    assert_in("commit", prot[2]["command"])

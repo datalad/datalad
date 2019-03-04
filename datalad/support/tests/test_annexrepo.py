@@ -80,8 +80,10 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
+from datalad.tests.utils import slow
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -1331,9 +1333,9 @@ def test_annex_copy_to(origin, clone):
     def ok_copy(command, **kwargs):
         # Check that we do pass to annex call only the list of files which we
         #  asked to be copied
-        assert_in('copied1', kwargs['annex_options'])
-        assert_in('copied2', kwargs['annex_options'])
-        assert_in('existed', kwargs['annex_options'])
+        assert_in('copied1', kwargs['files'])
+        assert_in('copied2', kwargs['files'])
+        assert_in('existed', kwargs['files'])
         return """
 {"command":"copy","note":"to target ...", "success":true, "key":"akey1", "file":"copied1"}
 {"command":"copy","note":"to target ...", "success":true, "key":"akey2", "file":"copied2"}
@@ -2496,3 +2498,123 @@ def check_commit_annex_commit_changed(unlock, path):
 def test_commit_annex_commit_changed():
     for unlock in True, False:
         yield check_commit_annex_commit_changed, unlock
+
+
+@with_tempfile(mkdir=True)
+def check_files_split_exc(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    # absent files -- should not crash with "too long" but some other more
+    # meaningful exception
+    files = ["f" * 100 + "%04d" % f for f in range(100000)]
+    if isinstance(r, AnnexRepo):
+        # Annex'es add first checks for what is being added and does not fail
+        # for non existing files either ATM :-/  TODO: make consistent etc
+        r.add(files)
+    else:
+        with assert_raises(Exception) as ecm:
+            r.add(files)
+        assert_not_in('too long', str(ecm.exception))
+        assert_not_in('too many', str(ecm.exception))
+
+
+def test_files_split_exc():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split_exc, cls
+
+
+_HEAVY_TREE = {
+    # might already run into 'filename too long' on windows probably
+    "d" * 98 + '%03d' % d: {
+        'f' * 98 + '%03d' % f: ''
+        for f in range(100)
+    }
+    for d in range(100)
+}
+
+
+@with_tree(tree=_HEAVY_TREE)
+def check_files_split(cls, topdir):
+    from glob import glob
+    r = cls(topdir)
+    dirs = glob(op.join(topdir, '*'))
+    files = glob(op.join(topdir, '*', '*'))
+
+    r.add(files)
+    r.commit(files=files)
+
+    # Let's modify and do dl.add for even a heavier test
+    # Now do for real on some heavy directory
+    import datalad.api as dl
+    for f in files:
+        os.unlink(f)
+        with open(f, 'w') as f:
+            f.write('1')
+    dl.add(dirs)
+
+
+@slow  # 313s  well -- if errors out - only 3 sec
+def test_files_split():
+    for cls in GitRepo, AnnexRepo:
+        yield check_files_split, cls
+
+
+@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
+@with_tree({
+    'repo': {
+        'file1': 'file1',
+        'file2': 'file2'
+    }
+})
+def test_ro_operations(path):
+    # This test would function only if there is a way to run sudo
+    # non-interactively, e.g. on Travis or on your local (watchout!) system
+    # after you ran sudo command recently.
+
+    from datalad.cmd import Runner
+    run = Runner().run
+    sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
+
+    repo = AnnexRepo(op.join(path, 'repo'), init=True)
+    repo.add('file1')
+    repo.commit()
+
+    # make a clone
+    repo2 = repo.clone(repo.path, op.join(path, 'clone'))
+    repo2.get('file1')
+
+    # progress forward original repo and fetch (but nothing else) it into repo2
+    repo.add('file2')
+    repo.commit()
+    repo2.fetch('origin')
+
+    # Assure that regardless of umask everyone could read it all
+    run(['chmod', '-R', 'a+rX', repo2.path])
+    try:
+        # To assure that git/git-annex really cannot acquire a lock and do
+        # any changes (e.g. merge git-annex branch), we make this repo owned by root
+        sudochown(['-R', 'root', repo2.path])
+    except Exception as exc:
+        # Exception could be CommandError or IOError when there is no sudo
+        raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
+
+    try:
+        assert not repo2.get('file1')  # should work since file is here already
+        repo2.get_status()  # should be Ok as well
+        # and we should get info on the file just fine
+        assert repo2.info('file1')
+        # The tricky part is the repo_info which might need to update
+        # remotes UUID -- by default it should fail!
+        # Oh well -- not raised on travis... whatever for now
+        #with assert_raises(CommandError):
+        #    repo2.repo_info()
+        # but should succeed if we disallow merges
+        repo2.repo_info(merge_annex_branches=False)
+        # and ultimately the ls which uses it
+        from datalad.interface.ls import Ls
+        Ls.__call__(repo2.path, all_=True, long_=True)
+    finally:
+        sudochown(['-R', str(os.geteuid()), repo2.path])
+
+    # just check that all is good again
+    repo2.repo_info()

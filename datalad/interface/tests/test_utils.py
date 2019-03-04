@@ -40,7 +40,6 @@ from ..utils import eval_results
 from ..utils import discover_dataset_trace_to_targets
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
-from datalad.api import create
 
 
 __docformat__ = 'restructuredtext'

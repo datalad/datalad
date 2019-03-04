@@ -186,7 +186,6 @@ For merge commits to have more informative description, add to your
 `.git/config` or `~/.gitconfig` following section:
 
     [merge]
-    summary = true
     log = true
 
 and if conflicts occur, provide short summary on how they were resolved
@@ -538,13 +537,13 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 - *DATALAD_ASSERT_NO_OPEN_FILES*:
-  Instructs internal tests for no open files under paths to be removed. If set to anything, it would log at ERROR level, and if set to "assert", it would raise AssertionError if any is
+  Instructs test helpers to check for open files at the end of a test. If set, remaining open files are logged at ERROR level. Alternative modes are: "assert" (raise AssertionError if any open file is found), "pdb"/"epdb" (drop into debugger when open files are found, info on files is provided in a "files" dictionary, mapping filenames to psutil process objects).
 
 # Changelog section
 
 For the upcoming release use this template
 
-## 0.11.3 (??? ??, 2018) -- will be better than ever
+## 0.11.5 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

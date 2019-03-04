@@ -55,8 +55,6 @@ def _uninstall_dataset(ds, check, has_super, **kwargs):
             # error reporting already happened, we can just stop here
             return
 
-    # we want to use the bound dataset method
-    from datalad.distribution.subdatasets import Subdatasets
     # TODO: uninstall of a subdataset that has a local URL
     #       (e.g. ./anything) implies cannot be undone, decide how, and
     #       if to check for that

@@ -28,7 +28,6 @@ from datalad.utils import getpwd
 
 from datalad.api import create
 from datalad.api import install
-from datalad.api import remove
 from datalad.api import get
 from datalad import consts
 from datalad.utils import chpwd

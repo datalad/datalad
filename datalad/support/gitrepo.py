@@ -59,6 +59,8 @@ from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
+from datalad.utils import CMD_MAX_ARG
+from datalad.utils import generate_chunks
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -66,6 +68,7 @@ from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
+from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -540,7 +543,8 @@ class GitRepo(RepoInterface):
     """
 
     # We use our sshrun helper
-    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND}
+    GIT_SSH_ENV = {'GIT_SSH_COMMAND': GIT_SSH_COMMAND,
+                   'GIT_SSH_VARIANT': 'ssh'}
 
     # We must check git config to have name and email set, but
     # should do it once
@@ -1713,19 +1717,12 @@ class GitRepo(RepoInterface):
 
         # ensure cmd_str becomes a well-formed list:
         if isinstance(cmd_str, string_types):
-            if files and not cmd_str.strip().endswith(" --"):
-                cmd_str += " --"
-            cmd_str = shlex.split(cmd_str, posix=not on_windows)
+            cmd = shlex.split(cmd_str, posix=not on_windows)
         else:
-            if files and cmd_str[-1] != '--':
-                cmd_str.append('--')
-
-        cmd = cmd_str + files
+            cmd = cmd_str[:]  # we will modify in-place
 
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
-
-        from .exceptions import GitIgnoreError
 
         if check_fake_dates and self.fake_dates_enabled:
             env = self.add_fake_dates(env)
@@ -1734,9 +1731,13 @@ class GitRepo(RepoInterface):
             env = (env if env is not None else os.environ).copy()
             env['GIT_INDEX_FILE'] = index_file
 
+        # TODO?: wouldn't splitting interfer with above GIT_INDEX_FILE
+        #  handling????
         try:
-            out, err = self.cmd_call_wrapper.run(
+            out, err = self._run_command_files_split(
+                self.cmd_call_wrapper.run,
                 cmd,
+                files,
                 log_stderr=log_stderr,
                 log_stdout=log_stdout,
                 log_online=log_online,
@@ -1759,6 +1760,51 @@ class GitRepo(RepoInterface):
             self.config.reload()
 
         return out, err
+
+    # TODO: could be static or class method even
+    def _run_command_files_split(
+            self,
+            func,
+            cmd,
+            files,
+            *args, **kwargs
+        ):
+        """
+        Run `func(cmd + files, ...)` possibly multiple times if `files` is too long
+        """
+        assert isinstance(cmd, list)
+        if not files:
+            file_chunks = [[]]
+        else:
+            files = assure_list(files)
+
+            maxl = max(map(len, files))
+            chunk_size = max(
+                1,  # should at least be 1. If blows then - not our fault
+                (CMD_MAX_ARG
+                 - sum((len(x) + 3) for x in cmd)
+                 - 4   # for '--' below
+                 ) // (maxl + 3)  # +3 for possible quotes and a space
+            )
+            # TODO: additional treatment for "too many arguments"? although
+            # as https://github.com/datalad/datalad/issues/1883#issuecomment-436272758
+            # shows there seems to be no hardcoded limit on # of arguments,
+            # but may be we decide to go for smth like follow to be on safe side
+            # chunk_size = min(10240 - len(cmd), chunk_size)
+            file_chunks = generate_chunks(files, chunk_size)
+
+        out, err = "", ""
+        for file_chunk in file_chunks:
+            out_, err_ = func(
+                cmd + (['--'] if file_chunk else []) + file_chunk,
+                *args, **kwargs)
+            # out_, err_ could be None, and probably no need to append empty strings
+            if out_:
+                out += out_
+            if err_:
+                err += err_
+        return out, err
+
 
 # TODO: --------------------------------------------------------------------
 
@@ -2552,6 +2598,20 @@ class GitRepo(RepoInterface):
         return self.get_changed_files(staged=True, diff_filter='D')
 
     def get_git_attributes(self):
+        """Query gitattributes which apply to top level directory
+
+        It is a thin compatibility/shortcut wrapper around more versatile
+        get_gitattributes which operates on a list of paths and returns
+        a dictionary per each path
+
+        Returns
+        -------
+        dict:
+          a dictionary with attribute name and value items relevant for the
+          top ('.') directory of the repository, and thus most likely the
+          default ones (if not overwritten with more rules) for all files within
+          repo.
+        """
         return self.get_gitattributes('.')['.']
 
 
@@ -2596,8 +2656,13 @@ class GitRepo(RepoInterface):
             attr = []
         return attributes
 
-    def set_gitattributes(self, attrs, attrfile='.gitattributes'):
+    def set_gitattributes(self, attrs, attrfile='.gitattributes', mode='a'):
         """Set gitattributes
+
+        By default appends additional lines to `attrfile`. Note, that later
+        lines in `attrfile` overrule earlier ones, which may or may not be
+        what you want. Set `mode` to 'w' to replace the entire file by
+        what you provided in `attrs`.
 
         Parameters
         ----------
@@ -2611,12 +2676,15 @@ class GitRepo(RepoInterface):
         attrfile: path
           Path relative to the repository root of the .gitattributes file the
           attributes shall be set in.
+        mode: str
+          'a' to append .gitattributes, 'w' to replace it
         """
+
         git_attributes_file = op.join(self.path, attrfile)
         attrdir = op.dirname(git_attributes_file)
         if not op.exists(attrdir):
             os.makedirs(attrdir)
-        with open(git_attributes_file, 'a') as f:
+        with open(git_attributes_file, mode) as f:
             for pattern, attr in sorted(attrs, key=lambda x: x[0]):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
