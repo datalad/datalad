@@ -168,7 +168,17 @@ def _gen_github_ses(github_login, github_passwd):
             yield ses, cred
         except gh.BadCredentialsException as exc:
             lgr.error("Bad Github credentials")
-        except gh.TwoFactorException as exc:
+        except (gh.TwoFactorException, gh.GithubException) as exc:
+            # With github 1.43.5, in comparison to 1.40 we get a "regular"
+            # GithubException for some reason, yet to check/report upstream
+            # so we will just check for the expected in such cases messages
+            if not (
+                isinstance(exc, gh.GithubException) and
+                getattr(exc, 'data', {}).get('message', '').startswith(
+                    'Must specify two-factor authentication OTP code')
+            ):
+                raise
+
             # 2FA - we need to interact!
             if not ui.is_interactive:
                 # Or should we just allow to pass
