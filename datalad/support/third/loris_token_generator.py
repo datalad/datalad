@@ -13,6 +13,7 @@ from six.moves.urllib.request import Request, urlopen
 from six.moves.urllib.error import HTTPError
 
 from datalad.downloaders.base import AccessDeniedError, AccessFailedError
+from datalad.utils import assure_unicode
 
 
 class LORISTokenGenerator(object):
@@ -39,7 +40,7 @@ class LORISTokenGenerator(object):
         except HTTPError:
             raise AccessDeniedError("Could not authenticate into LORIS")
 
-        str_response = response.read().decode('utf-8')
+        str_response = assure_unicode(response.read())
         data = json.loads(str_response)
         return data["token"]
 
