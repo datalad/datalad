@@ -222,8 +222,10 @@ def get_ipython_shell():
 
 
 def md5sum(filename):
-    with open(filename, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
+    """Compute an MD5 sum for the given file
+    """
+    from datalad.support.digests import Digester
+    return Digester(digests=['md5'])(filename)['md5']
 
 
 def sorted_files(dout):
