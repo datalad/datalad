@@ -37,7 +37,7 @@ install:
   - echo. >> %SYSTEMROOT%\System32\drivers\etc\hosts
   - echo.127.0.0.1  datalad-test >> %SYSTEMROOT%\System32\drivers\etc\hosts
   # OpenSSH server setup
-  - appveyor DownloadFile https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.6.1.0p1-Beta/OpenSSH-Win32.zip -FileName resources\openssh.zip
+  - appveyor DownloadFile https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.9.0.0p1-Beta/OpenSSH-Win32.zip -FileName resources\openssh.zip
   - 7z x -o"resources" resources\openssh.zip
   # install
   - powershell.exe -ExecutionPolicy Bypass -File resources\OpenSSH-Win32\install-sshd.ps1
