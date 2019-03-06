@@ -796,6 +796,13 @@ def test_GitRepo_dirty(path):
     repo.commit("file1.txt modified")
     ok_(not repo.dirty)
 
+    # An empty directory doesn't count as dirty.
+    os.mkdir(op.join(path, "empty"))
+    ok_(not repo.dirty)
+    # Neither does an empty directory with an otherwise empty directory.
+    os.mkdir(op.join(path, "empty", "empty-again"))
+    ok_(not repo.dirty)
+
     # TODO: submodules
 
 
