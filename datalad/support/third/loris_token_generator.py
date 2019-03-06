@@ -39,6 +39,7 @@ class LORISTokenGenerator(object):
         except HTTPError:
             raise AccessDeniedError("Could not authenticate into LORIS")
 
-        data = json.load(response)
+        str_response = response.read().decode('utf-8')
+        data = json.loads(str_response)
         return data["token"]
 
