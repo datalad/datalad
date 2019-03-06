@@ -50,21 +50,28 @@ from ..log import lgr
 from ..dochelpers import exc_str
 
 
-def dump(obj, fname):
+def dump(obj, fname, compressed=False):
+
+    _open = LZMAFile if compressed else io.open
+
     indir = dirname(fname)
     if not exists(indir):
         makedirs(indir)
     if lexists(fname):
         os.unlink(fname)
-    with io.open(fname, 'wb') as f:
-        return dump2fileobj(obj, f)
+    with _open(fname, 'wb') as f:
+        return dump2fileobj(
+            obj,
+            f,
+            **(compressed_json_dump_kwargs if compressed else json_dump_kwargs)
+        )
 
 
-def dump2fileobj(obj, fileobj):
+def dump2fileobj(obj, fileobj, **kwargs):
     return jsondump(
         obj,
         codecs.getwriter('utf-8')(fileobj),
-        **json_dump_kwargs)
+        **kwargs)
 
 
 def LZMAFile(*args, **kwargs):
