@@ -2276,7 +2276,7 @@ class GitRepo(RepoInterface):
     def dirty(self):
         return len([
             p for p, props in iteritems(self.status(
-                untracked='normal', ignore_submodules='other'))
+                untracked='all', ignore_submodules='other'))
             if props.get('state', None) != 'clean' and
             # -core ignores empty untracked directories, so shall we
             not (p.is_dir() and len(list(p.iterdir())) == 0)]) > 0
