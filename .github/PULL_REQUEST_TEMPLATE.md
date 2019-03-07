@@ -6,9 +6,11 @@ Please go through the following checklist before submitting the PR:
 
 - [ ] Include `Fixes #NNN` or `Closes #NNN` somewhere in the description if this PR addresses an existing issue.
 
-- [ ] If this PR is not complete, add the "WiP" label or select "Create Draft Pull Request" in the pull request button's menu.
+- [ ] If this PR is not complete, select "Create Draft Pull Request" in the pull request button's menu.
 
   Consider using a task list (e.g., `- [ ] add tests ...`) to indicate remaining to-do items.
+
+  The Travis tests aren't triggered for draft PRs.  If the PR is in a state where running the tests would be useful, instead submit a regular PR marked with the "WiP" label.
 
 - [ ] If you would like to list yourself as a DataLad contributor and your name is not mentioned please modify .zenodo.json file.
 
