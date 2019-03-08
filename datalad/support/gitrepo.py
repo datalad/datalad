@@ -719,6 +719,24 @@ class GitRepo(RepoInterface):
         self._fake_dates_enabled = None
 
     def _create_empty_repo(self, path, **kwargs):
+        if op.lexists(path):
+            # Verify that we are not trying to initialize a new git repository
+            # under a directory some files of which are already tracked by git
+            # use case: https://github.com/datalad/datalad/issues/3068
+            try:
+                stdout, _ = self._git_custom_command(
+                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                )
+                if stdout:
+                    raise RuntimeError(
+                        "Failing to initialize new repository under %s where "
+                        "following files are known to a repository above: %s"
+                        % (path, stdout)
+                    )
+            except CommandError:
+                # assume that all is good -- we are not under any repo
+                pass
+
         try:
             lgr.debug(
                 "Initialize empty Git repository at '%s'%s",

@@ -143,6 +143,26 @@ def test_GitRepo_init_options(path):
     ok_(cfg.get_value(section="core", option="bare"))
 
 
+@with_tree(
+    tree={
+        'subds': {
+            'file_name': ''
+        }
+    }
+)
+def test_init_fail_under_known_subdir(path):
+    repo = GitRepo(path, create=True)
+    repo.add(op.join('subds', 'file_name'))
+    # Should fail even if we do not commit but only add to index:
+    with assert_raises(RuntimeError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
+    assert_in("file_name", str(cme.exception))  # we provide a list of offenders
+    # and after we commit - the same story
+    repo.commit("added file")
+    with assert_raises(RuntimeError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
+
+
 @with_tempfile
 @with_tempfile
 def test_GitRepo_equals(path1, path2):
