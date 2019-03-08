@@ -87,8 +87,6 @@ def test_resolve_path(somedir):
 # TODO: test remember/recall more extensive?
 
 
-# TODO: There's something wrong with the nested testrepo!
-# Fear mongering detected!
 @with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
 def test_is_installed(src, path):
@@ -101,7 +99,13 @@ def test_is_installed(src, path):
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    subds.create()
+    # We must not be able to create a new repository under a known
+    # subdataset path.
+    # Note: Unfortunately we would still be able to generate it under
+    # subdirectory within submodule, e.g. `subm 1/subdir` but that is
+    # not checked here
+    with assert_raises(Exception):
+        subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
