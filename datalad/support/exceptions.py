@@ -173,6 +173,12 @@ class PathOutsideRepositoryError(Exception):
         return "path {0} not within repository {1}".format(self.file_, self.repo)
 
 
+class PathKnownToRepositoryError(Exception):
+    """Thrown if file/path is under Git control, and attempted operation
+    must not be ran"""
+    pass
+
+
 class MissingBranchError(Exception):
     """Thrown if accessing a repository's branch, that is not available"""
 

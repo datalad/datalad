@@ -35,7 +35,7 @@ from datalad.tests.utils import assert_is
 from datalad.tests.utils import assert_not_equal
 
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.exceptions import PathKnownToRepositoryError
 
 
 def test_EnsureDataset():
@@ -107,7 +107,7 @@ def test_is_installed(src, path):
     # when create/rev-create merge.
     # Unfortunately such protection does not work in direct mode
     if not ds.repo.is_direct_mode():
-        with assert_raises(Exception):
+        with assert_raises(PathKnownToRepositoryError):
             subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is

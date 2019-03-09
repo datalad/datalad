@@ -70,6 +70,7 @@ from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
+from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
 from .repo import Flyweight
@@ -738,7 +739,7 @@ class GitRepo(RepoInterface):
                         op.lexists(op.join(path, f))
                         for f in stdout.split(os.linesep)
                     ):
-                    raise RuntimeError(
+                    raise PathKnownToRepositoryError(
                         "Failing to initialize new repository under %s where "
                         "following files are known to a repository above: %s"
                         % (path, stdout)
