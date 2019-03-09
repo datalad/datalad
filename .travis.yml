@@ -111,7 +111,9 @@ matrix:
     # By default no logs will be output. This one is to test with log output at INFO level
     env:
     - _DL_UPSTREAM_GITPYTHON=1
-    - _DL_UPSTREAM_GITANNEX=1
+    # It is not usable without setting locales env vars ATM
+    # see https://github.com/datalad/datalad/issues/3159
+    # - _DL_UPSTREAM_GITANNEX=1
     # Just so we test if we did not screw up running under nose without -s as well
     - NOSE_OPTS=
     - _DL_CRON=1
