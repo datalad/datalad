@@ -487,7 +487,7 @@ class BaseDownloader(object):
             atexit.register(self._cache.close)
         return self._cache
 
-    def _fetch(self, url, cache=None, size=None, allow_redirects=True):
+    def _fetch(self, url, cache=None, size=None, allow_redirects=True, decode=True):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management and decodes
@@ -541,7 +541,7 @@ class BaseDownloader(object):
             downloaded_size = len(content)
 
             # now that we know size based on encoded content, let's decode into string type
-            if PY3 and isinstance(content, binary_type):
+            if PY3 and isinstance(content, binary_type) and decode:
                 content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
@@ -615,7 +615,7 @@ class BaseDownloader(object):
             and self.authenticator.failure_re \
             else 0
 
-        _, headers = self._fetch(url, cache=False, size=download_size)
+        _, headers = self._fetch(url, cache=False, size=download_size, decode=False)
 
         # extract from headers information to depict the status of the url
         status = self.get_status_from_headers(headers)
