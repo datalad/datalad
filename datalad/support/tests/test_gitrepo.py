@@ -65,6 +65,7 @@ from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.exceptions import PathKnownToRepositoryError
 from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change
 
@@ -141,6 +142,26 @@ def test_GitRepo_init_options(path):
 
     cfg = gr.repo.config_reader()
     ok_(cfg.get_value(section="core", option="bare"))
+
+
+@with_tree(
+    tree={
+        'subds': {
+            'file_name': ''
+        }
+    }
+)
+def test_init_fail_under_known_subdir(path):
+    repo = GitRepo(path, create=True)
+    repo.add(op.join('subds', 'file_name'))
+    # Should fail even if we do not commit but only add to index:
+    with assert_raises(PathKnownToRepositoryError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
+    assert_in("file_name", str(cme.exception))  # we provide a list of offenders
+    # and after we commit - the same story
+    repo.commit("added file")
+    with assert_raises(PathKnownToRepositoryError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
 
 
 @with_tempfile
@@ -1379,11 +1400,14 @@ def test_custom_runner_protocol(path):
     # Check that a runner with a non-default protocol gets wired up correctly.
     prot = ExecutionTimeProtocol()
     gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-    eq_(len(prot), 1)
-    ok_(prot[0]['duration'] >= 0)
-    gr.add("foo")
+    # now we run two commands
+    #  1. to check if no known to possible git upstairs files in current path
+    #  2. actually call git init
     eq_(len(prot), 2)
-    assert_in("add", prot[1]["command"])
-    gr.commit("commit foo")
+    gr.add("foo")
     eq_(len(prot), 3)
-    assert_in("commit", prot[2]["command"])
+    assert_in("add", prot[2]["command"])
+    gr.commit("commit foo")
+    eq_(len(prot), 4)
+    assert_in("commit", prot[3]["command"])
+    ok_(all(p['duration'] >= 0 for p in prot))
