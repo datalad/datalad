@@ -291,7 +291,11 @@ def test_runner_fix_PWD(path):
     env = os.environ.copy()
     env['PWD'] = orig_cwd = os.getcwd()
     runner = Runner(cwd=path, env=env)
-    out, err = runner.run(u"echo $PWD", cwd=path)
+    out, err = runner.run(
+        [sys.executable, '-c', 'import os; print(os.environ["PWD"])'],
+        cwd=path,
+        shell=False
+    )
     eq_(err, '')
     eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
     eq_(env['PWD'], orig_cwd)  # no side-effect
