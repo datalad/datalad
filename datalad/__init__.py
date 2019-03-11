@@ -171,6 +171,7 @@ def setup_package():
 
     class StringIO(OrigStringIO):
         fileno = lambda self: 1
+        encoding = None
 
     from nose.ext import dtcompat
     from nose.plugins import capture, multiprocess, plugintest
