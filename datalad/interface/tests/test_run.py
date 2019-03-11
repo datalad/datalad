@@ -60,7 +60,6 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import OBSCURE_FILENAME
@@ -77,7 +76,6 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -186,7 +184,6 @@ def test_sidecar(path):
 
 
 @slow  # 17.1880s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -275,7 +272,6 @@ def test_rerun_empty_branch(path):
     assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -348,7 +344,6 @@ def test_rerun_onto(path):
         1, status="error", action="run")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_chain(path):
@@ -370,7 +365,6 @@ def test_rerun_chain(path):
     assert info["chain"] == commits[:1]
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_old_flag_compatibility(path):
@@ -387,7 +381,6 @@ def test_rerun_old_flag_compatibility(path):
         eq_("xxx\n", open(opj(path, "grows")).read())
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
@@ -424,7 +417,6 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @known_failure_direct_mode
 @with_tempfile(mkdir=True)
@@ -468,7 +460,6 @@ def test_run_failure(path):
     assert_false(op.exists(msgfile))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -521,7 +512,6 @@ def test_rerun_branch(path):
                   ds.rerun, since="prerun", branch="rerun2")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
@@ -539,7 +529,6 @@ def test_rerun_cherry_pick(path):
         assert_in_results(results, status='ok', rerun_action=action)
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
@@ -558,7 +547,6 @@ def test_rerun_outofdate_tree(path):
     assert_raises(CommandError, ds.rerun, revision="HEAD~")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
@@ -571,7 +559,6 @@ def test_rerun_ambiguous_revision_file(path):
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
 
-@ignore_nose_capturing_stdout
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -661,7 +648,6 @@ def test_new_or_modified(path):
         {"to_modify", "d/to_modify"})
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
@@ -701,7 +687,6 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
@@ -858,7 +843,6 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
@@ -870,7 +854,6 @@ def test_run_inputs_no_annex_repo(path):
 
 
 @slow  # ~10s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
@@ -923,7 +906,6 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(opj("subdir", "foo")))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
@@ -984,7 +966,6 @@ def test_placeholders(path):
         assert_in("gpl3", cmout.getvalue())
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
@@ -1011,7 +992,6 @@ def test_inputs_quotes_needed(path):
     ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"foo": "f", "bar": "b"})
 def test_inject(path):
