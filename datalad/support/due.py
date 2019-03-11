@@ -57,7 +57,7 @@ try:
         raise RuntimeError(
             "Imported due lacks .cite. DueCredit is now disabled")
 except Exception as e:
-    if type(e).__name__ != 'ImportError':
+    if type(e).__name__ not in ('ImportError', 'ModuleNotFoundError'):
         import logging
         logging.getLogger("datalad.duecredit").error(
             "Failed to import duecredit due to %s" % str(e))
