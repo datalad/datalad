@@ -1405,6 +1405,11 @@ def test_duecredit(path):
 
     # Test with duecredit not enabled for sure
     env.pop('DUECREDIT_ENABLE', None)
+    # Alternative workaround for what to be fixed by
+    # https://github.com/datalad/datalad/pull/3215
+    # where underlying datalad process might issue a warning since our temp
+    # cwd is not matching possibly present PWD env variable
+    env.pop('PWD', None)
 
     out, err = run(cmd, env=env, expect_stderr=True)
     outs = out + err  # Let's not depend on where duecredit decides to spit out
