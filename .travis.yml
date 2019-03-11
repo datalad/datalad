@@ -263,7 +263,7 @@ before_install:
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo eatmydata apt-get install zip pandoc
+  - travis_retry sudo eatmydata apt-get install zip pandoc p7zip-full
   - travis_retry sudo eatmydata apt-get install shunit2
   # for metadata support
   - travis_retry sudo eatmydata apt-get install exempi
