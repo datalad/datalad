@@ -108,10 +108,8 @@ def test_is_installed(src, path):
     # subdirectory within submodule, e.g. `subm 1/subdir` but that is
     # not checked here. `rev-create` will provide that protection
     # when create/rev-create merge.
-    # Unfortunately such protection does not work in direct mode
-    if not ds.repo.is_direct_mode():
-        with assert_raises(PathKnownToRepositoryError):
-            subds.create()
+    with assert_raises(PathKnownToRepositoryError):
+        subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
