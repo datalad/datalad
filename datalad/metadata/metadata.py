@@ -759,7 +759,7 @@ class ReadOnlyDict(Mapping):
         return self._hash
 
 
-def get_ds_aggregate_db_locations(ds, version='default'):
+def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
     """Returns the location of a dataset's aggregate metadata DB
 
     Parameters
@@ -770,6 +770,10 @@ def get_ds_aggregate_db_locations(ds, version='default'):
       DataLad aggregate metadata layout version. At the moment only a single
       version exists. 'default' will return the locations for the current default
       layout version.
+    warn_absent : bool
+      If True, warn if the desired DB version is not present and give hints on
+      what else is available. This is useful when using this function from
+      a user-facing command.
 
     Returns
     -------
@@ -789,7 +793,7 @@ def get_ds_aggregate_db_locations(ds, version='default'):
     info_fpath = op.join(ds.path, agginfo_relpath)
     agg_base_path = op.dirname(info_fpath)
     # not sure if this is the right place with these check, better move then to a higher level
-    if not op.exists(info_fpath):
+    if warn_absent and not op.exists(info_fpath):
         if version == 'default':
             # caller had no specific idea what metadata version is needed/available
             # This dataset does not have aggregated metadata.  Does it have any
@@ -815,7 +819,7 @@ def get_ds_aggregate_db_locations(ds, version='default'):
     return info_fpath, agg_base_path
 
 
-def load_ds_aggregate_db(ds, version='default', abspath=False):
+def load_ds_aggregate_db(ds, version='default', abspath=False, warn_absent=True):
     """Load a dataset's aggregate metadata database
 
     Parameters
@@ -826,6 +830,10 @@ def load_ds_aggregate_db(ds, version='default', abspath=False):
       DataLad aggregate metadata layout version. At the moment only a single
       version exists. 'default' will return the content of the current default
       aggregate database version.
+    warn_absent : bool
+      If True, warn if the desired DB version is not present and give hints on
+      what else is available. This is useful when using this function from
+      a user-facing command.
 
     Returns
     -------
@@ -835,7 +843,7 @@ def load_ds_aggregate_db(ds, version='default', abspath=False):
       absolute. If abspath is False, all paths are relative, and the metadata
       object base path is return as a second value.
     """
-    info_fpath, agg_base_path = get_ds_aggregate_db_locations(ds, version)
+    info_fpath, agg_base_path = get_ds_aggregate_db_locations(ds, version, warn_absent)
 
     # save to call even with a non-existing location
     agginfos = _load_json_object(info_fpath)
