@@ -165,6 +165,20 @@ def setup_package():
     # obtain() since that one consults for the default value
     ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
+    # Monkey patch nose so it does not ERROR out whenever code asks for fileno
+    # of the output. See https://github.com/nose-devs/nose/issues/6
+    from six.moves import StringIO as OrigStringIO
+
+    class StringIO(OrigStringIO):
+        fileno = lambda self: 1
+
+    from nose.ext import dtcompat
+    from nose.plugins import capture, multiprocess, plugintest
+    dtcompat.StringIO = StringIO
+    capture.StringIO = StringIO
+    multiprocess.StringIO = StringIO
+    plugintest.StringIO = StringIO
+
 
 def teardown_package():
     import os

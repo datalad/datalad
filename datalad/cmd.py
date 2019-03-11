@@ -100,7 +100,8 @@ def _get_output_stream(log_std, false_value):
 
 
 def _cleanup_output(stream, std):
-    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+    if isinstance(stream, file_class) and \
+        _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
         if not stream.closed:
             stream.close()
         if op.exists(stream.name):
@@ -332,8 +333,8 @@ class Runner(object):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
         out = binary_type()
-        if isinstance(stream,
-                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+        if isinstance(stream, file_class) and \
+                _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
             if not stream.closed:
                 stream.close()
