@@ -281,7 +281,7 @@ install:
 
 script:
   # Test installation system-wide
-  - sudo pip install .
+  - pip install .
   - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
