@@ -163,6 +163,9 @@ def test_init_fail_under_known_subdir(path):
     with assert_raises(PathKnownToRepositoryError) as cme:
         GitRepo(op.join(path, 'subds'), create=True)
 
+    # But it would succeed if we disable the checks
+    GitRepo(op.join(path, 'subds'), create=True, create_sanity_checks=False)
+
 
 @with_tempfile
 @with_tempfile
