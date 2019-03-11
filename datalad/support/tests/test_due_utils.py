@@ -3,7 +3,12 @@ from ...distribution.dataset import Dataset
 from .. import due_utils
 from ..due_utils import duecredit_dataset
 
-from ..due import due
+from ..due import (
+    Doi,
+    due,
+    Text,
+)
+
 
 from ...tests.utils import (
     assert_raises,
@@ -20,9 +25,7 @@ from mock import patch
 
 
 @with_tempfile(mkdir=True)
-@patch.object(due_utils, 'Doi')
-@patch.object(due_utils, 'Text')
-def test_duecredit_dataset(path, Text, Doi):
+def test_duecredit_dataset(path):
     dataset = Dataset(path)
 
     # Verify that we do not call duecredit_dataset if due is not enabled
@@ -54,6 +57,24 @@ def test_duecredit_dataset(path, Text, Doi):
             )
         mcite.assert_not_called()
 
+    # Below we will rely on duecredit Entries being comparable, so if
+    # duecredit is available and does not provide __cmp__ we make it for now
+    # Whenever https://github.com/duecredit/duecredit/pull/148 is merged, and
+    # probably 0.7.1 released - we will eventually remove this monkey patching
+    try:
+        from duecredit.entries import DueCreditEntry
+        if not hasattr(DueCreditEntry, '__eq__'):
+            def _entry_eq(self, other):
+                return (
+                        (self._rawentry == other._rawentry) and
+                        (self._key == other._key)
+                )
+            DueCreditEntry.__eq__ = _entry_eq
+    except:
+        # assume that not present so donothing stubs would be used, and
+        # we will just compare Nones
+        pass
+
     # Let's provide some, but no relevant, metadata
     with patch.object(due, 'cite') as mcite, \
         patch.object(dataset, 'metadata') as mmetadata:
@@ -62,7 +83,7 @@ def test_duecredit_dataset(path, Text, Doi):
         # We resort to catch all
         mcite.assert_called_once_with(
             # TODO: make a proper class for Text/Doi not just magical mock
-            Text("CONTENT ISN'T CHECKED"), # ""DataLad dataset at %s" % dataset.path),
+            Text("DataLad dataset at %s" % dataset.path),
             description='DataLad dataset %s' % dataset.id,
             path='datalad:%s' % dataset.id[:8],
             version=None
@@ -80,13 +101,10 @@ def test_duecredit_dataset(path, Text, Doi):
                     'name': "ds name",
             }}}
         duecredit_dataset(dataset)
-        # TODO: somehow if worked for Text() - doesn't work for Doi
-        #       Claims that we didn't specify doi for Doi() in expected
-        # mcite.assert_called_once_with(
-        #     # TODO: make a proper class for Text/Doi not just magical mock
-        #     Doi(doi), # ""DataLad dataset at %s" % dataset.path),
-        #     description='ds name',
-        #     path='datalad:%s' % dataset.id[:8],
-        #     version=None
-        # )
+        mcite.assert_called_once_with(
+            Doi(doi), # ""DataLad dataset at %s" % dataset.path),
+            description='ds name',
+            path='datalad:%s' % dataset.id[:8],
+            version=None
+        )
 
