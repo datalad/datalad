@@ -75,6 +75,7 @@ from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
+from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
 from .repo import Flyweight
@@ -735,6 +736,36 @@ class GitRepo(RepoInterface):
         self.pathobj = ut.Path(self.path)
 
     def _create_empty_repo(self, path, **kwargs):
+        if op.lexists(path):
+            # Verify that we are not trying to initialize a new git repository
+            # under a directory some files of which are already tracked by git
+            # use case: https://github.com/datalad/datalad/issues/3068
+            try:
+                stdout, _ = self._git_custom_command(
+                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                )
+                # The 2nd check to verify that the files exctually exist is for
+                # the cases of direct-mode:  there ls-files just lists files
+                # in the top tree of the repository instead of the current
+                # directory.  all() check should be removed whenever this
+                # is to be merged into master, where there is no direct mode
+                # support
+                if stdout and \
+                    all(
+                        op.lexists(op.join(path, f))
+                        for f in stdout.split(os.linesep)
+                    ):
+                    raise PathKnownToRepositoryError(
+                        "Failing to initialize new repository under %s where "
+                        "following files are known to a repository above: %s"
+                        % (path, stdout)
+                    )
+            except CommandError:
+                # assume that all is good -- we are not under any repo
+                pass
+        else:
+            os.makedirs(path)
+
         cmd = ['git', 'init']
         cmd.extend(kwargs.pop('_from_cmdline_', []))
         cmd.extend(to_options(**kwargs))
@@ -742,8 +773,7 @@ class GitRepo(RepoInterface):
             "Initialize empty Git repository at '%s'%s",
             path,
             ' %s' % cmd[2:] if cmd[2:] else '')
-        if not op.exists(path):
-            os.makedirs(path)
+
         try:
             stdout, stderr = self._git_custom_command(
                 None,
