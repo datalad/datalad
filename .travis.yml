@@ -188,17 +188,15 @@ matrix:
     - NOSE_SELECTION_OP=not
     - NOSE_SELECTION=
 
-# Requires current master (0.12.x) so cannot be tested against 0.11.x
-#
-#  - python: 3.5
-#    # test with extension datalad-revolution
-#    env:
-#    - BUILD_DATALAD_EXTENSION=datalad-revolution
-#    - DATALAD_REPO_VERSION=6
-#    - TESTS_TO_PERFORM=datalad_revolution
-#    # Use a selector that will always be true.
-#    - NOSE_SELECTION_OP=not
-#    - NOSE_SELECTION=
+  - python: 3.5
+    # test with extension datalad-revolution
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-revolution
+    - DATALAD_REPO_VERSION=6
+    - TESTS_TO_PERFORM=datalad_revolution
+    # Use a selector that will always be true.
+    - NOSE_SELECTION_OP=not
+    - NOSE_SELECTION=
 
   allow_failures:
   # Test under NFS mount  (full, only in master)
