@@ -450,7 +450,7 @@ class Runner(object):
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
 
-        if popen_cwd and popen_env and 'PWD' in popen_env and not shell:
+        if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must
             # adjust it
             popen_env = popen_env.copy()  # to avoid side-effects
