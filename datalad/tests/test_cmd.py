@@ -285,6 +285,18 @@ def test_runner_failure_unicode(path):
         runner.run(u"β-command-doesnt-exist", cwd=path)
 
 
+@skip_if_on_windows  # likely would fail
+@with_tempfile(mkdir=True)
+def test_runner_fix_PWD(path):
+    env = os.environ.copy()
+    env['PWD'] = orig_cwd = os.getcwd()
+    runner = Runner(cwd=path, env=env)
+    out, err = runner.run(u"echo $PWD", cwd=path)
+    eq_(err, '')
+    eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
+    eq_(env['PWD'], orig_cwd)  # no side-effect
+
+
 @with_tempfile(mkdir=True)
 def test_git_path(dir_):
     from ..support.gitrepo import GitRepo
