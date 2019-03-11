@@ -133,7 +133,7 @@ def loads(s, *args, **kwargs):
         raise
 
 
-def load(fname, fixup=True, **kw):
+def load(fname, fixup=True, compressed=None, **kw):
     """Load JSON from a file, possibly fixing it up if initial load attempt fails
 
     Parameters
@@ -141,12 +141,21 @@ def load(fname, fixup=True, **kw):
     fixup : bool
       In case of failed load, apply a set of fixups with hope to resolve issues
       in JSON
+    compressed : bool or None
+      Flag whether to treat the file as XZ compressed. If None, this decision
+      is made automatically based on the presence of a '.xz' extension in the
+      filename
     **kw
       Passed into the load (and loads after fixups) function
     """
-    with io.open(fname, 'r', encoding='utf-8') as f:
+    _open = LZMAFile \
+        if compressed or compressed is None and fname.endswith('.xz') \
+        else io.open
+
+    with _open(fname, 'rb') as f:
         try:
-            return jsonload(f, **kw)
+            jreader = codecs.getreader('utf-8')(f)
+            return jsonload(jreader, **kw)
         except JSONDecodeError as exc:
             if not fixup:
                 raise
@@ -155,8 +164,8 @@ def load(fname, fixup=True, **kw):
             # Load entire content and replace common "abusers" which break JSON
             # comprehension but in general
             # are Ok
-            with io.open(fname, 'r', encoding='utf-8') as f:
-                s_orig = s = f.read()
+            with _open(fname,'rb') as f:
+                s_orig = s = codecs.getreader('utf-8')(f).read()
 
             for o, r in {
                 u"\xa0": " ",  # non-breaking space
