@@ -744,17 +744,7 @@ class GitRepo(RepoInterface):
                 stdout, _ = self._git_custom_command(
                     None, ['git', 'ls-files'], cwd=path, expect_fail=True
                 )
-                # The 2nd check to verify that the files exctually exist is for
-                # the cases of direct-mode:  there ls-files just lists files
-                # in the top tree of the repository instead of the current
-                # directory.  all() check should be removed whenever this
-                # is to be merged into master, where there is no direct mode
-                # support
-                if stdout and \
-                    all(
-                        op.lexists(op.join(path, f))
-                        for f in stdout.split(os.linesep)
-                    ):
+                if stdout:
                     raise PathKnownToRepositoryError(
                         "Failing to initialize new repository under %s where "
                         "following files are known to a repository above: %s"
