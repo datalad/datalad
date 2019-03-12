@@ -620,7 +620,9 @@ class GitRepo(RepoInterface):
         return hash((self.__class__.__name__, self.__weakref__.key))
 
     def __init__(self, path, url=None, runner=None, create=True,
-                 git_opts=None, repo=None, fake_dates=False, **kwargs):
+                 git_opts=None, repo=None, fake_dates=False,
+                 create_sanity_checks=True,
+                 **kwargs):
         """Creates representation of git repository at `path`.
 
         Can also be used to create a git repository at `path`.
@@ -642,6 +644,11 @@ class GitRepo(RepoInterface):
           or doesn't contain a git repository.
         repo: git.Repo, optional
           GitPython's Repo instance to (re)use if provided
+        create_sanity_checks: bool, optional
+          Whether to perform sanity checks during initialization (when
+          `create=True` and target path is not a valid repo already), such as
+          that new repository is not created in the directory where git already
+          tracks some files.
         kwargs:
           keyword arguments serving as additional options to the git-init
           command. Therefore, it makes sense only if called with `create`.
@@ -702,7 +709,7 @@ class GitRepo(RepoInterface):
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-            self._repo = self._create_empty_repo(path, **git_opts)
+            self._repo = self._create_empty_repo(path, create_sanity_checks, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -735,10 +742,10 @@ class GitRepo(RepoInterface):
 
         self.pathobj = ut.Path(self.path)
 
-    def _create_empty_repo(self, path, **kwargs):
+    def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
-        else:
+        elif sanity_checks:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
