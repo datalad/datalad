@@ -3337,7 +3337,16 @@ class GitRepo(RepoInterface):
                     # we would always see individual files
                     recursive=False):
                 # TODO normalize result
-                yield r
+                yield get_status_dict(
+                    action='delete',
+                    refds=self.pathobj,
+                    # TODO make remove() report the type
+                    # for now it claims to report on files only
+                    type='file',
+                    path=(self.pathobj / ut.PurePosixPath(r)),
+                    # make remove() report on failures too
+                    status='ok',
+                    logger=lgr)
 
         # TODO this additonal query should not be, base on status as given
         # if anyhow possible, however, when paths are given, status may
