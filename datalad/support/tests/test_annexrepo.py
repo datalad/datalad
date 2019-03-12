@@ -48,7 +48,6 @@ from datalad.utils import rmtree
 from datalad.utils import linux_distribution_name
 from datalad.utils import unlink
 
-from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
@@ -109,7 +108,6 @@ from datalad.support.annexrepo import (
 from .utils import check_repo_deals_with_inode_change
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
 @with_tempfile
@@ -127,7 +125,6 @@ def test_AnnexRepo_instance_from_clone(src, dst):
             assert("already exists" in cm.out)
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_instance_from_existing(path):
@@ -137,7 +134,6 @@ def test_AnnexRepo_instance_from_existing(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
@@ -843,7 +839,6 @@ def test_AnnexRepo_add_to_git(path):
     ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
-@ignore_nose_capturing_stdout
 @with_testrepos('.*annex.*', flavors=['local'])
 # TODO: flavor 'network' has wrong content for test-annex.dat!
 @with_tempfile

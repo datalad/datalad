@@ -59,7 +59,6 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import ignore_nose_capturing_stdout
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import OBSCURE_FILENAME
@@ -76,7 +75,6 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -179,7 +177,6 @@ def test_sidecar(path):
 
 
 @slow  # 17.1880s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -247,7 +244,9 @@ def test_rerun(path, nodspath):
 
     # If a file is dropped, we remove it instead of unlocking it.
     ds.drop(probe_path, check=False)
-    ds.rerun()
+    with swallow_outputs():
+        ds.rerun()
+
     eq_('x\n', open(probe_path).read())
     # If the history to rerun has a merge commit, we abort.
     ds.repo.checkout("HEAD~3", options=["-b", "topic"])
@@ -267,7 +266,6 @@ def test_rerun_empty_branch(path):
     assert_status("impossible", ds.rerun(on_failure="ignore"))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
@@ -283,7 +281,8 @@ def test_rerun_onto(path):
 
     ds.run('echo static-content > static')
     ds.repo.tag("static")
-    ds.run('echo x$(cat grows) > grows')
+    with swallow_outputs():
+        ds.run('echo x$(cat grows) > grows')
     ds.rerun()
     eq_('xx\n', open(grow_file).read())
 
@@ -297,7 +296,8 @@ def test_rerun_onto(path):
     # If we run the "static" change from the same "base", we end up
     # with a new commit.
     ds.repo.checkout("master")
-    ds.rerun(revision="static", onto="static^")
+    with swallow_outputs():
+        ds.rerun(revision="static", onto="static^")
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.get_hexsha(),
          ds.repo.get_hexsha("static"))
@@ -316,7 +316,8 @@ def test_rerun_onto(path):
 
     # An empty `onto` means use the parent of the first revision.
     ds.repo.checkout("master")
-    ds.rerun(since="static^", onto="")
+    with swallow_outputs():
+        ds.rerun(since="static^", onto="")
     ok_(ds.repo.get_active_branch() is None)
     for revrange in ["..master", "master.."]:
         assert_result_count(
@@ -325,7 +326,8 @@ def test_rerun_onto(path):
     # An empty `onto` means use the parent of the first revision that
     # has a run command.
     ds.repo.checkout("master")
-    ds.rerun(since="", onto="", branch="from-base")
+    with swallow_outputs():
+        ds.rerun(since="", onto="", branch="from-base")
     eq_(ds.repo.get_active_branch(), "from-base")
     assert_result_count(ds.diff(revision="master..from-base"), 0)
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
@@ -339,7 +341,6 @@ def test_rerun_onto(path):
         1, status="error", action="run")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_chain(path):
@@ -347,7 +348,8 @@ def test_rerun_chain(path):
     commits = []
 
     grow_file = opj(path, "grows")
-    ds.run('echo x$(cat grows) > grows')
+    with swallow_outputs():
+        ds.run('echo x$(cat grows) > grows')
     ds.repo.tag("first-run")
 
     for _ in range(3):
@@ -361,12 +363,12 @@ def test_rerun_chain(path):
     assert info["chain"] == commits[:1]
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_old_flag_compatibility(path):
     ds = Dataset(path).create()
-    ds.run("echo x$(cat grows) > grows")
+    with swallow_outputs():
+        ds.run("echo x$(cat grows) > grows")
     # Deprecated `datalad --rerun` still runs the last commit's
     # command.
     ds.run(rerun=True)
@@ -378,7 +380,6 @@ def test_rerun_old_flag_compatibility(path):
         eq_("xxx\n", open(opj(path, "grows")).read())
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
@@ -415,7 +416,6 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
@@ -424,8 +424,9 @@ def test_run_failure(path):
 
     hexsha_initial = ds.repo.get_hexsha()
 
-    with assert_raises(CommandError):
-        ds.run("echo x$(cat sub/grows) > sub/grows && false")
+    with swallow_outputs():
+        with assert_raises(CommandError):
+            ds.run("echo x$(cat sub/grows) > sub/grows && false")
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -458,7 +459,6 @@ def test_run_failure(path):
     assert_false(op.exists(msgfile))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path):
@@ -468,7 +468,8 @@ def test_rerun_branch(path):
 
     outfile = opj(path, "run-file")
 
-    ds.run('echo x$(cat run-file) > run-file')
+    with swallow_outputs():
+        ds.run('echo x$(cat run-file) > run-file')
     ds.rerun()
     eq_('xx\n', open(outfile).read())
 
@@ -478,7 +479,8 @@ def test_rerun_branch(path):
 
     # Rerun the commands on a new branch that starts at the parent
     # commit of the first run.
-    ds.rerun(since="prerun", onto="prerun", branch="rerun")
+    with swallow_outputs():
+        ds.rerun(since="prerun", onto="prerun", branch="rerun")
 
     eq_(ds.repo.get_active_branch(), "rerun")
     eq_('xx\n', open(outfile).read())
@@ -510,7 +512,6 @@ def test_rerun_branch(path):
                   ds.rerun, since="prerun", branch="rerun2")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_cherry_pick(path):
@@ -527,7 +528,6 @@ def test_rerun_cherry_pick(path):
         assert_in_results(results, status='ok', rerun_action=action)
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
@@ -543,10 +543,10 @@ def test_rerun_outofdate_tree(path):
     # Change tree so that it is no longer compatible.
     ds.remove("foo")
     # Now rerunning should fail because foo no longer exists.
-    assert_raises(CommandError, ds.rerun, revision="HEAD~")
+    with swallow_outputs():
+        assert_raises(CommandError, ds.rerun, revision="HEAD~")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
@@ -559,7 +559,6 @@ def test_rerun_ambiguous_revision_file(path):
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
 
-@ignore_nose_capturing_stdout
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
@@ -649,7 +648,6 @@ def test_new_or_modified(path):
         {"to_modify", "d/to_modify"})
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
@@ -689,7 +687,6 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
@@ -810,7 +807,8 @@ def test_run_inputs_outputs(src, path):
         eq_(fh.read(), "a.dat appended\n")
 
     with swallow_logs(new_level=logging.DEBUG) as cml:
-        ds.run("echo blah", outputs=["not-there"])
+        with swallow_outputs():
+            ds.run("echo blah", outputs=["not-there"])
         assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.create('sub')
@@ -845,7 +843,6 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
@@ -857,7 +854,6 @@ def test_run_inputs_no_annex_repo(path):
 
 
 @slow  # ~10s
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
@@ -889,7 +885,8 @@ def test_run_explicit(path):
 
     # If an input doesn't exist, we just show the standard warning.
     with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("ls", inputs=["not-there"], explicit=True)
+        with swallow_outputs():
+            ds.run("ls", inputs=["not-there"], explicit=True)
         assert_in("Input does not exist: ", cml.out)
 
     remove(opj(path, "doubled.dat"))
@@ -910,7 +907,6 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(opj("subdir", "foo")))
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
@@ -971,7 +967,6 @@ def test_placeholders(path):
         assert_in("gpl3", cmout.getvalue())
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
@@ -998,7 +993,6 @@ def test_inputs_quotes_needed(path):
     ok_file_has_content(opj(path, "out0"), "bar.txt foo!blah.txt!out0")
 
 
-@ignore_nose_capturing_stdout
 @known_failure_windows
 @with_tree(tree={"foo": "f", "bar": "b"})
 def test_inject(path):
