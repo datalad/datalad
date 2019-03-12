@@ -736,7 +736,9 @@ class GitRepo(RepoInterface):
         self.pathobj = ut.Path(self.path)
 
     def _create_empty_repo(self, path, **kwargs):
-        if op.lexists(path):
+        if not op.lexists(path):
+            os.makedirs(path)
+        else:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
@@ -753,8 +755,6 @@ class GitRepo(RepoInterface):
             except CommandError:
                 # assume that all is good -- we are not under any repo
                 pass
-        else:
-            os.makedirs(path)
 
         cmd = ['git', 'init']
         cmd.extend(kwargs.pop('_from_cmdline_', []))
