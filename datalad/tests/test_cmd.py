@@ -29,7 +29,6 @@ from .utils import (
     skip_if_on_windows,
     with_tempfile,
     assert_cwd_unchanged,
-    ignore_nose_capturing_stdout,
     swallow_outputs,
     swallow_logs,
     ok_file_has_content,
@@ -45,7 +44,6 @@ from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -71,7 +69,6 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
@@ -113,7 +110,6 @@ def test_runner(tempfile):
                  "Call of: os.path.join, 'foo', 'bar' returned %s" % output)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_dry():
 
     cmd_ = ['echo', 'Testing', '__call__', 'with', 'string']
@@ -138,7 +134,6 @@ def test_runner_instance_callable_dry():
                  "Buffer: %s" % dry)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_wet():
 
     runner = Runner()
@@ -152,7 +147,6 @@ def test_runner_instance_callable_wet():
     eq_(ret, os.path.join('foo', 'bar'))
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stderr():
 
     runner = Runner(log_outputs=True)
@@ -178,7 +172,6 @@ def test_runner_log_stderr():
                           "stderr| stderr-Message should not be logged")
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
     # assertion yet.
@@ -210,7 +203,6 @@ def test_runner_log_stdout():
             eq_(cml.out, "")
 
 
-@ignore_nose_capturing_stdout
 def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being
     # stucked yet.
@@ -283,6 +275,22 @@ def test_runner_failure_unicode(path):
     runner = Runner()
     with assert_raises(CommandError), swallow_logs():
         runner.run(u"β-command-doesnt-exist", cwd=path)
+
+
+@skip_if_on_windows  # likely would fail
+@with_tempfile(mkdir=True)
+def test_runner_fix_PWD(path):
+    env = os.environ.copy()
+    env['PWD'] = orig_cwd = os.getcwd()
+    runner = Runner(cwd=path, env=env)
+    out, err = runner.run(
+        [sys.executable, '-c', 'import os; print(os.environ["PWD"])'],
+        cwd=path,
+        shell=False
+    )
+    eq_(err, '')
+    eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
+    eq_(env['PWD'], orig_cwd)  # no side-effect
 
 
 @with_tempfile(mkdir=True)

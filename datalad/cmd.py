@@ -100,7 +100,8 @@ def _get_output_stream(log_std, false_value):
 
 
 def _cleanup_output(stream, std):
-    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+    if isinstance(stream, file_class) and \
+        _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
         if not stream.closed:
             stream.close()
         if op.exists(stream.name):
@@ -332,8 +333,8 @@ class Runner(object):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
         out = binary_type()
-        if isinstance(stream,
-                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+        if isinstance(stream, file_class) and \
+                _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
             if not stream.closed:
                 stream.close()
@@ -448,6 +449,13 @@ class Runner(object):
         errstream = _get_output_stream(log_stderr, sys.stderr)
 
         popen_env = env or self.env
+        popen_cwd = cwd or self.cwd
+
+        if popen_cwd and popen_env and 'PWD' in popen_env:
+            # we must have inherited PWD, but cwd was provided, so we must
+            # adjust it
+            popen_env = popen_env.copy()  # to avoid side-effects
+            popen_env['PWD'] = popen_cwd
 
         # TODO: if outputstream is sys.stdout and that one is set to StringIO
         #       we have to "shim" it with something providing fileno().
@@ -461,7 +469,7 @@ class Runner(object):
         log_args = [cmd]
         if self.log_cwd:
             log_msgs += ['cwd=%r']
-            log_args += [cwd or self.cwd]
+            log_args += [popen_cwd]
         if self.log_stdin:
             log_msgs += ['stdin=%r']
             log_args += [stdin]
@@ -491,7 +499,7 @@ class Runner(object):
                                         stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
-                                        cwd=cwd or self.cwd,
+                                        cwd=popen_cwd,
                                         env=popen_env,
                                         stdin=stdin)
 
@@ -535,7 +543,7 @@ class Runner(object):
 
                 if status not in [0, None]:
                     msg = "Failed to run %r%s. Exit code=%d.%s%s" \
-                        % (cmd, " under %r" % (cwd or self.cwd), status,
+                        % (cmd, " under %r" % (popen_cwd), status,
                            "" if log_online else " out=%s" % out[0],
                            "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
