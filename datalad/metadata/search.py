@@ -1261,4 +1261,4 @@ class Search(Interface):
             nhits += 1
             yield r
         if not nhits:
-            lgr.info(searcher.get_nohits_msg() or '')
+            lgr.info(searcher.get_nohits_msg() or 'no hits')
