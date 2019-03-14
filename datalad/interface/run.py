@@ -526,11 +526,12 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         exc = None
 
     try:
-        cmd_expanded = format_command(ds, cmd,
-                                      pwd=pwd,
-                                      dspath=ds.path,
-                                      inputs=inputs,
-                                      outputs=outputs)
+        cmd_expanded = format_command(
+            ds, cmd,
+            pwd=pwd,
+            dspath=ds.path,
+            inputs=inputs,
+            outputs=outputs)
     except KeyError as exc:
         yield get_status_dict(
             'run',
