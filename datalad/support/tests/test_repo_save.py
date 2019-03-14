@@ -42,7 +42,12 @@ def _test_save_all(path, repocls):
     ds = get_convoluted_situation(path, GitRepo)
     orig_status = ds.repo.status(untracked='all', ignore_submodules='no')
     # TODO test the results when the are crafted
-    ds.repo.save()
+    res = ds.repo.save()
+    # make sure we get a 'delete' result for each deleted file
+    eq_(
+        set(r['path'] for r in res if r['action'] == 'delete'),
+        {k for k, v in iteritems(orig_status) if k.name == 'file_deleted'}
+    )
     saved_status = ds.repo.status(untracked='all', ignore_submodules='no')
     # we still have an entry for everything that did not get deleted
     # intentionally
