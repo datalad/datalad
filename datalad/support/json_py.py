@@ -51,6 +51,17 @@ from ..dochelpers import exc_str
 
 
 def dump(obj, fname, compressed=False):
+    """Dump a JSON-serializable objects into a file
+
+    Parameters
+    ----------
+    obj : object
+      Structure to serialize.
+    fname : str
+      Name of the file to dump into.
+    compressed : bool
+      Flag whether to use LZMA compression for file content.
+    """
 
     _open = LZMAFile if compressed else io.open
 
@@ -68,6 +79,17 @@ def dump(obj, fname, compressed=False):
 
 
 def dump2fileobj(obj, fileobj, **kwargs):
+    """Dump a JSON-serializable objects into a file-like
+
+    Parameters
+    ----------
+    obj : object
+      Structure to serialize.
+    fileobj : file
+      Writeable file-like object to dump into.
+    **kwargs
+      Keyword arguments to be passed on to simplejson.dump()
+    """
     return jsondump(
         obj,
         codecs.getwriter('utf-8')(fileobj),
