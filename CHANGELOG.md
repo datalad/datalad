@@ -10,9 +10,14 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.11.4 (??? ??, 2019) -- will be better than ever
+## 0.11.4 (Mar 18, 2019) -- get-ready
 
-bet we will fix some bugs and make a world even a better place.
+Largely a bug fix release with a few enhancements
+
+### Important
+
+- 0.11.x series will be the last one with support for direct mode of [git-annex]
+  which is used on crippled (no symlinks and no locking) filesystems
 
 ### Major refactoring and deprecations
 
