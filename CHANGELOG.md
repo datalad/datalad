@@ -23,38 +23,38 @@ Largely a bug fix release with a few enhancements
 ### Fixes
 
 - Extraction of .gz files is broken without p7zip installed.  We now
-  abort with an informative error in this situation.  (#3176)
+  abort with an informative error in this situation.  ([#3176])
 
 - Committing failed in some cases because we didn't ensure that the
   path passed to `git read-tree --index-output=...` resided on the
-  same filesystem as the repository.  (#3181)
+  same filesystem as the repository.  ([#3181])
 
 - Some pointless warnings during metadata aggregation have been
-  eliminated.  (#3186)
+  eliminated.  ([#3186])
 
 - With Python 3 the LORIS token authenticator did not properly decode
-  a response (#3205).
+  a response ([#3205]).
 
 - With Python 3 downloaders unnecessarily decoded the response when
-  getting the status, leading to an encoding error.  (#3210)
+  getting the status, leading to an encoding error.  ([#3210])
 
 - In some cases, our internal command Runner did not adjust the
   environment's `PWD` to match the current working directory specified
-  with the `cwd` parameter.  (#3215)
+  with the `cwd` parameter.  ([#3215])
 
-- The specification of the pyliblzma dependency was broken.  (#3220)
+- The specification of the pyliblzma dependency was broken.  ([#3220])
 
 - [search] displayed an uninformative blank log message in some
-  cases.  (#3222)
+  cases.  ([#3222])
 
 ### Enhancements and new features
 
 - Creating a new repository now aborts if any of the files in the
   directory are tracked by a repository in a parent directory.
-  (#3211)
+  ([#3211])
 
 - [run] learned to replace the `{tmpdir}` placeholder in commands with
-  a temporary directory.  (#3223)
+  a temporary directory.  ([#3223])
 
 ## 0.11.3 (Feb 19, 2019) -- read-me-gently
 
@@ -1195,3 +1195,13 @@ publishing
 [#3164]: https://github.com/datalad/datalad/issues/3164
 [#3165]: https://github.com/datalad/datalad/issues/3165
 [#3168]: https://github.com/datalad/datalad/issues/3168
+[#3176]: https://github.com/datalad/datalad/issues/3176
+[#3181]: https://github.com/datalad/datalad/issues/3181
+[#3186]: https://github.com/datalad/datalad/issues/3186
+[#3205]: https://github.com/datalad/datalad/issues/3205
+[#3210]: https://github.com/datalad/datalad/issues/3210
+[#3211]: https://github.com/datalad/datalad/issues/3211
+[#3215]: https://github.com/datalad/datalad/issues/3215
+[#3220]: https://github.com/datalad/datalad/issues/3220
+[#3222]: https://github.com/datalad/datalad/issues/3222
+[#3223]: https://github.com/datalad/datalad/issues/3223
