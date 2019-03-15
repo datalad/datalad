@@ -1682,24 +1682,24 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
 
 def get_deeply_nested_structure(path):
     """ Here is what this does (assuming UNIX, locked):
-    .
-    ├── directory_untracked
-    │   └── link2dir -> ../subdir
-    ├── file_modified
-    ├── link2dir -> subdir
-    ├── link2subdsdir -> subds_modified/subdir
-    ├── link2subdsroot -> subds_modified
-    ├── subdir
-    │   ├── annexed_file.txt -> ../.git/annex/objects/...
-    │   ├── file_modified
-    │   ├── git_file.txt
-    │   └── link2annex_files.txt -> annexed_file.txt
-    └── subds_modified
-        ├── link2superdsdir -> ../subdir
-        ├── subdir
-        │   └── annexed_file.txt -> ../.git/annex/objects/...
-        └── subds_lvl1_modified
-            └── directory_untracked
+    |  .
+    |  ├── directory_untracked
+    |  │   └── link2dir -> ../subdir
+    |  ├── file_modified
+    |  ├── link2dir -> subdir
+    |  ├── link2subdsdir -> subds_modified/subdir
+    |  ├── link2subdsroot -> subds_modified
+    |  ├── subdir
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  └── subds_modified
+    |      ├── link2superdsdir -> ../subdir
+    |      ├── subdir
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      └── subds_lvl1_modified
+    |          └── directory_untracked
     """
     ds = Dataset(path).rev_create()
     (ds.pathobj / 'subdir').mkdir()
