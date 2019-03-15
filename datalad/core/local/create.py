@@ -287,6 +287,7 @@ class Create(Interface):
                 tbds.path,
                 url=None,
                 create=True,
+                create_sanity_checks=False,
                 git_opts=initopts,
                 fake_dates=fake_dates)
             # place a .noannex file to indicate annex to leave this repo alone
@@ -302,6 +303,7 @@ class Create(Interface):
                 tbds.path,
                 url=None,
                 create=True,
+                create_sanity_checks=False,
                 # do not set backend here, to avoid a dedicated commit
                 backend=None,
                 # None causes version to be taken from config
