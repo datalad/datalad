@@ -96,7 +96,6 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
         # lzma is included in python since 3.3
         # We now support backports.lzma as well (besides AutomagicIO), but since
         # there is not way to define an alternative here (AFAIK, yoh), we will
@@ -115,7 +114,10 @@ requires = {
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
-    ]
+    ],
+    'duecredit': [
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+    ],
 }
 
 requires['full'] = sum(list(requires.values()), [])
