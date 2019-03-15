@@ -17,20 +17,44 @@ Largely a bug fix release with a few enhancements
 ### Important
 
 - 0.11.x series will be the last one with support for direct mode of [git-annex]
-  which is used on crippled (no symlinks and no locking) filesystems
-
-### Major refactoring and deprecations
-
-- hopefully none
+  which is used on crippled (no symlinks and no locking) filesystems.
+  v7 repositories should be used instead.
 
 ### Fixes
 
-?
+- Extraction of .gz files is broken without p7zip installed.  We now
+  abort with an informative error in this situation.  (#3176)
+
+- Committing failed in some cases because we didn't ensure that the
+  path passed to `git read-tree --index-output=...` resided on the
+  same filesystem as the repository.  (#3181)
+
+- Some pointless warnings during metadata aggregation have been
+  eliminated.  (#3186)
+
+- With Python 3 the LORIS token authenticator did not properly decode
+  a response (#3205).
+
+- With Python 3 downloaders unnecessarily decoded the response when
+  getting the status, leading to an encoding error.  (#3210)
+
+- In some cases, our internal command Runner did not adjust the
+  environment's `PWD` to match the current working directory specified
+  with the `cwd` parameter.  (#3215)
+
+- The specification of the pyliblzma dependency was broken.  (#3220)
+
+- [search] displayed an uninformative blank log message in some
+  cases.  (#3222)
 
 ### Enhancements and new features
 
-?
+- Creating a new repository now aborts if any of the files in the
+  directory are tracked by a repository in a parent directory.
+  (#3211)
 
+- [run] learned to replace the `{tmpdir}` placeholder in commands with
+  a temporary directory.  (#3223)
 
 ## 0.11.3 (Feb 19, 2019) -- read-me-gently
 
