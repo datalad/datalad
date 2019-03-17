@@ -131,7 +131,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     _ALLOW_LOCAL_URLS = False
 
     def __init__(self, path, url=None, runner=None,
-                 backend=None, always_commit=True, create=True,
+                 backend=None, always_commit=True,
+                 create=True, create_sanity_checks=True,
                  init=False, batch_size=None, version=None, description=None,
                  git_opts=None, annex_opts=None, annex_init_opts=None,
                  repo=None, fake_dates=False):
@@ -161,6 +162,8 @@ class AnnexRepo(GitRepo, RepoInterface):
           Create and initialize an annex repository at path, in case
           there is none. If set to False, and this repository is not an annex
           repository (initialized or not), an exception is raised.
+        create_sanity_checks: bool, optional
+          Passed to GitRepo.
         init: bool, optional
           Initialize git-annex repository (run "git annex init") if path is an
           annex repository which just was not yet initialized by annex (e.g. a
@@ -191,10 +194,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         fix_it = False
         try:
-            super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create, repo=repo,
-                                            git_opts=git_opts,
-                                            fake_dates=fake_dates)
+            super(AnnexRepo, self).__init__(
+                path, url, runner=runner,
+                create=create, create_sanity_checks=create_sanity_checks,
+                repo=repo, git_opts=git_opts, fake_dates=fake_dates)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
