@@ -349,7 +349,6 @@ def test_rerun_chain(path):
     ds = Dataset(path).create()
     commits = []
 
-    grow_file = op.join(path, "grows")
     with swallow_outputs():
         ds.run('echo x$(cat grows) > grows')
     ds.repo.tag("first-run")
