@@ -29,6 +29,8 @@ from datalad.utils import assure_unicode
 from datalad.utils import chpwd
 from datalad.utils import on_windows
 
+from datalad.tests.utils import assert_repo_status
+
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
@@ -46,7 +48,6 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import ok_exists
 from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import ok_file_has_content
@@ -93,7 +94,7 @@ def test_basics(path, nodspath):
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
         res = ds.run('touch empty', message='TEST')
-        ok_clean_git(ds.path)
+        assert_repo_status(ds.path)
         assert_result_count(res, 2)
         # TODO 'state' is still untracked!!!
         assert_result_count(res, 1, action='add', path=opj(ds.path, 'empty'), type='file')
@@ -136,17 +137,17 @@ def test_py2_unicode_command(path):
                                         touch_cmd,
                                         u"bβ0.dat")
     ds.run(cmd_str)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
     ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ1.dat"))
 
     # Send in a list of byte-strings to mimic a py2 command-line invocation.
     ds.run([s.encode("utf-8")
             for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_exists(op.join(path, u" β1 "))
 
     with assert_raises(CommandError), swallow_outputs():
@@ -190,7 +191,7 @@ def test_rerun(path, nodspath):
             swallow_outputs():
         ds.run('echo x$(cat sub/sequence) > sub/sequence')
     # command ran once, all clean
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     eq_('x\n', open(probe_path).read())
     # now, for a rerun we can be anywhere, PWD and all are recorded
     # moreover, rerun must figure out which bits to unlock, even in
@@ -198,7 +199,7 @@ def test_rerun(path, nodspath):
     with chpwd(nodspath), \
             swallow_outputs():
         ds.rerun()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     # ran twice now
     eq_('xx\n', open(probe_path).read())
 
@@ -216,7 +217,7 @@ def test_rerun(path, nodspath):
         fh.write("")
     assert_status('impossible', ds.rerun(on_failure="ignore"))
     remove(dirt)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # Make a non-run commit.
     with open(opj(path, "nonrun-file"), "w") as f:
@@ -256,7 +257,7 @@ def test_rerun(path, nodspath):
     ds.add("topic-file")
     ds.repo.checkout("master")
     ds.repo.merge("topic")
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     assert_raises(IncompleteResultsError, ds.rerun)
 
 
@@ -418,7 +419,7 @@ def test_run_failure(path):
     ok_exists(msgfile)
 
     ds.add(".", recursive=True, message_file=msgfile)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     outfile = opj(subds.path, "grows")
@@ -432,7 +433,7 @@ def test_run_failure(path):
     # On the other hand, we fail if we rerun a command and there is a non-zero
     # error that doesn't match.
     ds.run("[ ! -e bar ] && echo c >bar")
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     with assert_raises(CommandError):
         ds.rerun()
 
@@ -448,7 +449,7 @@ def test_run_save_deletion(path):
     ds = Dataset(path).create(force=True)
     ds.rev_save()
     ds.run("{} to_remove".format("del" if on_windows else "rm"))
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
 
 @known_failure_windows
@@ -560,7 +561,7 @@ def test_rerun_subdir(path):
     subdir = opj(path, 'subdir')
     with chpwd(subdir):
         run("touch test.dat")
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     # FIXME: A plain ok_file_under_git call doesn't properly resolve the file
     # in the TMPDIR="/var/tmp/sym link" test case. Temporarily call realpath.
@@ -574,7 +575,7 @@ def test_rerun_subdir(path):
     # now, rerun within root of the dataset
     with chpwd(ds.path):
         ds.rerun()
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_file_under_git_kludge(subdir, "test.dat")
     # and not on top
     assert_raises(AssertionError, ok_file_under_git, opj(ds.path, "test.dat"), annexed=True)
@@ -582,7 +583,7 @@ def test_rerun_subdir(path):
     # but if we run ds.run -- runs within top of the dataset
     with chpwd(subdir):
         ds.run("touch test2.dat")
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_file_under_git_kludge(ds.path, "test2.dat")
     rec_msg, runinfo = get_run_info(ds, ds.repo.format_commit("%B"))
     eq_(runinfo['pwd'], '.')
@@ -710,7 +711,7 @@ def test_run_inputs_outputs(src, path):
                      dataset=ds,
                      inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
 
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
     ok_(ds.repo.file_has_content("input.dat"))
     ok_(ds.repo.file_has_content("extra-input.dat"))
     ok_(ds.repo.file_has_content("doubled.dat"))
