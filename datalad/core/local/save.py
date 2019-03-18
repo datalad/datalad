@@ -73,7 +73,7 @@ class Save(Interface):
       Save any modification of known dataset content, but leave untracked
       files (e.g. temporary files) untouched::
 
-        % dataset rev-save -d <path_to_dataset>
+        % dataset rev-save -u -d <path_to_dataset>
 
       Tag the most recent saved state of a dataset::
 
