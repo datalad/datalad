@@ -10,21 +10,28 @@ We would recommend to consult log of the
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
 
-## 0.12.0rc2 (??? ??, 2019) -- will be better than ever
-
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+## 0.12.0rc2 (Mar 18, 2019) -- revolution!
 
 ### Fixes
 
-?
+- `GitRepo.dirty` does not report on nested empty directories ([#3196]).
+
+- LORIS token authenticator now works with Python 3.
+
+- Introduce an explicit switch to enable decoding of fetched content
+  in `BaseDownloader`
+
+- `GitRepo.save()` reports results on deleted files.
 
 ### Enhancements and new features
 
-?
+- Absorb a new set of core commands from the datalad-revolution extension:
+  - `rev-status`: like `git status`, but simpler and working with dataset
+     hierarchies
+  - `rev-save`: a 2-in-1 replacement for save and add
+  - `rev-create`: a ~30% faster create
+
+- JSON support tools can now read and write compressed files.
 
 
 ## 0.12.0rc1 (Mar 03, 2019) -- to boldly go ...
