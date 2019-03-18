@@ -246,11 +246,12 @@ def test_nested_create(path):
     with open(op.join(lvl2path, 'file'), 'w') as f:
         f.write('some')
     ok_(ds.rev_save())
-    assert_repo_status(ds.path, untracked=['lvl1/empty'])
+    # Empty directories are filtered out.
+    assert_repo_status(ds.path, untracked=[])
     # later create subdataset in a fresh dir
     # WINDOWS FAILURE IS NEXT LINE
     subds1 = ds.rev_create(op.join('lvl1', 'subds'))
-    assert_repo_status(ds.path, untracked=['lvl1/empty'])
+    assert_repo_status(ds.path, untracked=[])
     eq_(ds.subdatasets(result_xfm='relpaths'), [op.join('lvl1', 'subds')])
     # later create subdataset in an existing empty dir
     subds2 = ds.rev_create(op.join('lvl1', 'empty'))

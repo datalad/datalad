@@ -1555,10 +1555,14 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     create_tree(
         ds.path,
         {
+            '.gitignore': '*.ignored',
             'subdir': {
                 'file_clean': 'file_clean',
                 'file_deleted': 'file_deleted',
                 'file_modified': 'file_clean',
+            },
+            'subdir-only-ignored': {
+                '1.ignored': '',
             },
             'file_clean': 'file_clean',
             'file_deleted': 'file_deleted',
