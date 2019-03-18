@@ -23,6 +23,8 @@ from os.path import relpath
 from six.moves import map
 from six.moves import shlex_quote
 
+from datalad.core.local.save import Save
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -389,8 +391,9 @@ def _execute_command(command, pwd, expected_exit=None):
 
 def _save_outputs(ds, to_save, msg):
     """Helper to save results after command execution is completed"""
-    return ds.add(
+    return Save.__call__(
         to_save,
+        dataset=ds.path,
         recursive=True,
         message=msg,
         return_type='generator')
@@ -595,7 +598,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
-                     "'datalad add -d . -r -F %s .'",
+                     "'datalad rev-save -d . -r -F %s'",
                      msg_path)
         raise exc
     elif outputs_to_save:

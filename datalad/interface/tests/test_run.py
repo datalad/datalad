@@ -27,6 +27,7 @@ from mock import patch
 
 from datalad.utils import assure_unicode
 from datalad.utils import chpwd
+from datalad.utils import on_windows
 
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
@@ -104,12 +105,12 @@ def test_basics(path, nodspath):
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
         res = ds.run('touch empty', message='NOOP_TEST')
-        assert_result_count(res, 1, action='add', status='notneeded')
+        assert_result_count(res, 1, action='save', status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
         res = ds.run(['touch empty'], message='NOOP_TEST')
-        assert_result_count(res, 1, action='add', status='notneeded')
+        assert_result_count(res, 1, action='save', status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
@@ -440,6 +441,14 @@ def test_run_failure(path):
     with assert_raises(CommandError):
         ds.run("false", explicit=True, outputs=None)
     assert_false(op.exists(msgfile))
+
+
+@with_tree(tree={"to_remove": "abc"})
+def test_run_save_deletion(path):
+    ds = Dataset(path).create(force=True)
+    ds.rev_save()
+    ds.run("{} to_remove".format("del" if on_windows else "rm"))
+    ok_clean_git(ds.path)
 
 
 @known_failure_windows
