@@ -70,7 +70,7 @@ def test_invalid_call(path):
         # no dataset, no luck
         assert_raises(NoDatasetArgumentFound, run, 'doesntmatter')
         # dirty dataset
-        ds = Dataset(path).create()
+        ds = Dataset(path).rev_create()
         create_tree(ds.path, {'this': 'dirty'})
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
@@ -79,7 +79,7 @@ def test_invalid_call(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     last_state = ds.repo.get_hexsha()
     # run inside the dataset
     with chpwd(path), \
@@ -131,7 +131,7 @@ def test_basics(path, nodspath):
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     touch_cmd = "import sys; open(sys.argv[1], 'w').write('')"
     cmd_str = u"{} -c \"{}\" {}".format(sys.executable,
                                         touch_cmd,
@@ -157,7 +157,7 @@ def test_py2_unicode_command(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     # Simple sidecar message checks.
     ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
@@ -183,8 +183,8 @@ def test_sidecar(path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_rerun(path, nodspath):
-    ds = Dataset(path).create()
-    sub = ds.create('sub')
+    ds = Dataset(path).rev_create()
+    sub = ds.rev_create('sub')
     probe_path = op.join(sub.path, 'sequence')
     # run inside the dataset
     with chpwd(path), \
@@ -271,7 +271,10 @@ def test_rerun_empty_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_onto(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
+    # Make sure we have more than one commit. The one commit case is checked
+    # elsewhere.
+    ds.repo.commit(msg="noop commit", options=["--allow-empty"])
 
     grow_file = op.join(path, "grows")
 
@@ -346,7 +349,7 @@ def test_rerun_onto(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_chain(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     commits = []
 
     with swallow_outputs():
@@ -367,7 +370,7 @@ def test_rerun_chain(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
 
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
@@ -403,8 +406,8 @@ def test_rerun_just_one_commit(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
-    ds = Dataset(path).create()
-    subds = ds.create("sub")
+    ds = Dataset(path).rev_create()
+    subds = ds.rev_create("sub")
 
     hexsha_initial = ds.repo.get_hexsha()
 
@@ -445,7 +448,7 @@ def test_run_failure(path):
 
 @with_tree(tree={"to_remove": "abc"})
 def test_run_save_deletion(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.rev_save()
     ds.run("{} to_remove".format("del" if on_windows else "rm"))
     assert_repo_status(ds.path)
@@ -454,7 +457,7 @@ def test_run_save_deletion(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_branch(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
 
     ds.repo.tag("prerun")
 
@@ -507,7 +510,7 @@ def test_rerun_branch(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_cherry_pick(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
 
     ds.repo.tag("prerun")
     ds.run('echo abc > runfile')
@@ -523,7 +526,7 @@ def test_rerun_cherry_pick(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_outofdate_tree(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     input_file = op.join(path, "foo")
     output_file = op.join(path, "out")
     with open(input_file, "w") as f:
@@ -542,7 +545,7 @@ def test_rerun_outofdate_tree(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_ambiguous_revision_file(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     ds.run('echo ambig > ambig')
     ds.repo.tag("ambig")
     # Don't fail when "ambig" refers to both a file and revision.
@@ -556,7 +559,7 @@ def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
     # calls realpath on the path, which masks a failure in the
     # TMPDIR="/var/tmp/sym link" test case
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     subdir = op.join(path, 'subdir')
     with chpwd(subdir):
         run("touch test.dat")
@@ -601,7 +604,7 @@ def test_new_or_modified(path):
         return [op.relpath(ap["path"], path)
                 for ap in new_or_modified(diff_revision(*args, **kwargs))]
 
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).rev_create(force=True, no_annex=True)
 
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
@@ -644,7 +647,7 @@ def test_new_or_modified(path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_rerun_script(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     ds.run("echo a >foo")
     ds.run(["touch", "bar"], message='BAR', sidecar=True)
     # a run record sidecar file was added with the last commit
@@ -696,8 +699,8 @@ def test_run_inputs_outputs(src, path):
                   ("s0", "s1_1"),
                   ("s0", "ss"),
                   ("s0",)]:
-        Dataset(op.join(*((src,) + subds))).create(force=True)
-    src_ds = Dataset(src).create(force=True)
+        Dataset(op.join(*((src,) + subds))).rev_create(force=True)
+    src_ds = Dataset(src).rev_create(force=True)
     src_ds.add(".", recursive=True)
 
     ds = install(path, source=src,
@@ -805,7 +808,7 @@ def test_run_inputs_outputs(src, path):
             ds.run("echo blah", outputs=["not-there"])
         assert_in("Filtered out non-existing path: ", cml.out)
 
-    ds.create('sub')
+    ds.rev_create('sub')
     ds.run("echo sub_orig >sub/subfile")
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
     ds.drop("sub/subfile", check=False)
@@ -840,7 +843,7 @@ def test_run_inputs_outputs(src, path):
 @known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
-    ds = Dataset(path).create(no_annex=True)
+    ds = Dataset(path).rev_create(no_annex=True)
     # Running --input in a plain Git repo doesn't fail.
     ds.run("touch dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
@@ -905,7 +908,7 @@ def test_run_explicit(path):
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.add(".")
     ds.run("echo {inputs} >{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
     ok_file_has_content(op.join(path, "c.out"), "a.in b.in\n")
@@ -967,7 +970,7 @@ def test_placeholders(path):
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
 def test_inputs_quotes_needed(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.add(".")
     cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
     # The string form of a command works fine when the inputs/outputs have
@@ -991,7 +994,7 @@ def test_inputs_quotes_needed(path):
 @known_failure_windows
 @with_tree(tree={"foo": "f", "bar": "b"})
 def test_inject(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ok_(ds.repo.is_dirty())
     list(run_command("nonsense command",
                      dataset=ds,
@@ -1049,7 +1052,7 @@ def test_rerun_commit_message_check():
 
 @with_tempfile(mkdir=True)
 def test_format_command_strip_leading_dashes(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     eq_(format_command(ds, ["--", "cmd", "--opt"]), "cmd --opt")
     eq_(format_command(ds, ["--"]), "")
     # Can repeat to escape.
@@ -1060,7 +1063,7 @@ def test_format_command_strip_leading_dashes(path):
 
 @with_tempfile(mkdir=True)
 def test_run_cmdline_disambiguation(path):
-    Dataset(path).create()
+    Dataset(path).rev_create()
     with chpwd(path):
         # Without a positional argument starting a command, any option is
         # treated as an option to 'datalad run'.
