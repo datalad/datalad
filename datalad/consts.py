@@ -21,6 +21,10 @@ HANDLE_META_DIR = ".datalad"
 OLDMETADATA_DIR = join(HANDLE_META_DIR, 'meta')
 OLDMETADATA_FILENAME = 'meta.json'
 
+METADATA_DIR = join(HANDLE_META_DIR, 'metadata')
+DATASET_METADATA_FILE = join(METADATA_DIR, 'dataset.json')
+DATASET_CONFIG_FILE = join(HANDLE_META_DIR, 'config')
+
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 DATALAD_GIT_DIR = join('.git', 'datalad')
