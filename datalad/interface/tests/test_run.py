@@ -158,15 +158,17 @@ def test_py2_unicode_command(path):
     assert_repo_status(ds.path)
     ok_exists(op.join(path, u"bβ0.dat"))
 
-    ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
-    assert_repo_status(ds.path)
-    ok_exists(op.join(path, u"bβ1.dat"))
+    if not on_windows:  # FIXME
+        ds.run([sys.executable, "-c", touch_cmd, u"bβ1.dat"])
+        assert_repo_status(ds.path)
+        ok_exists(op.join(path, u"bβ1.dat"))
 
-    # Send in a list of byte-strings to mimic a py2 command-line invocation.
-    ds.run([s.encode("utf-8")
-            for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
-    assert_repo_status(ds.path)
-    ok_exists(op.join(path, u" β1 "))
+        # Send in a list of byte-strings to mimic a py2 command-line
+        # invocation.
+        ds.run([s.encode("utf-8")
+                for s in [sys.executable, "-c", touch_cmd, u" β1 "]])
+        assert_repo_status(ds.path)
+        ok_exists(op.join(path, u" β1 "))
 
     with assert_raises(CommandError), swallow_outputs():
         ds.run(u"bβ2.dat")
