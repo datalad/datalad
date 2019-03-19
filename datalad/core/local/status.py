@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-import os.path as op
 from six import (
     iteritems,
     text_type,
@@ -44,9 +43,8 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
-    rev_resolve_path,
     path_under_rev_dataset,
-    rev_get_dataset_root,
+    sort_paths_by_datasets,
 )
 
 import datalad.utils as ut
@@ -256,43 +254,14 @@ class Status(Interface):
         paths_by_ds = OrderedDict()
         if path:
             # sort any path argument into the respective subdatasets
-            for p in sorted(assure_list(path)):
-                # it is important to capture the exact form of the
-                # given path argument, before any normalization happens
-                # for further decision logic below
-                orig_path = str(p)
-                p = rev_resolve_path(p, dataset)
-                root = rev_get_dataset_root(str(p))
-                if root is None:
-                    # no root, not possibly underneath the refds
-                    yield dict(
-                        action='status',
-                        path=p,
-                        refds=ds.path,
-                        status='error',
-                        message='path not underneath this dataset',
-                        logger=lgr)
-                    continue
-                else:
-                    if dataset and root == str(p) and \
-                            not orig_path.endswith(op.sep):
-                        # the given path is pointing to a dataset
-                        # distinguish rsync-link syntax to identify
-                        # the dataset as whole (e.g. 'ds') vs its
-                        # content (e.g. 'ds/')
-                        super_root = rev_get_dataset_root(op.dirname(root))
-                        if super_root:
-                            # the dataset identified by the path argument
-                            # is contained in a superdataset, and no
-                            # trailing path separator was found in the
-                            # argument -> user wants to address the dataset
-                            # as a whole (in the superdataset)
-                            root = super_root
-
-                root = ut.Path(root)
-                ps = paths_by_ds.get(root, [])
-                ps.append(p)
-                paths_by_ds[root] = ps
+            paths_by_ds, errors = sort_paths_by_datasets(
+                dataset, assure_list(path))
+            for e in errors:
+                e.update(
+                    logger=lgr,
+                    refds=ds.path,
+                )
+                yield e
         else:
             paths_by_ds[ds.pathobj] = None
 
