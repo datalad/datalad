@@ -9,6 +9,21 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.12.0rc3 (??? ??, 2019) -- will be better than ever
+￼
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
 
 ## 0.12.0rc2 (Mar 18, 2019) -- revolution!
 
