@@ -14,54 +14,72 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-
+import os
 import os.path as op
-from os import mkdir, remove
+from os import (
+    mkdir,
+    remove,
+)
 import sys
 
 from six import PY2
 from six.moves import StringIO
 from mock import patch
 
-from datalad.utils import assure_unicode
-from datalad.utils import chpwd
-from datalad.utils import on_windows
-
-from datalad.tests.utils import assert_repo_status
+from datalad.utils import (
+    assure_unicode,
+    chpwd,
+    on_windows,
+)
 
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import ok_, assert_false, neq_
-from datalad.api import install
-from datalad.api import run
-from datalad.interface.run import format_command
-from datalad.interface.run import run_command
-from datalad.interface.rerun import get_run_info
-from datalad.interface.rerun import diff_revision, new_or_modified
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_dict_equal
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import ok_exists
-from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import eq_
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import known_failure_windows
-from datalad.tests.utils import slow
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import OBSCURE_FILENAME
+from datalad.support.exceptions import (
+    NoDatasetArgumentFound,
+    CommandError,
+    IncompleteResultsError,
+)
+from datalad.api import (
+    install,
+    rev_run as run,
+)
+from datalad.interface.run import (
+    format_command,
+    run_command,
+)
+from datalad.interface.rerun import (
+    get_run_info,
+    diff_revision,
+    new_or_modified,
+)
+from datalad.tests.utils import (
+    assert_raises,
+    assert_false,
+    assert_dict_equal,
+    assert_in_results,
+    assert_repo_status,
+    with_tempfile,
+    with_tree,
+    ok_,
+    ok_exists,
+    ok_file_has_content,
+    ok_file_under_git,
+    create_tree,
+    eq_,
+    neq_,
+    assert_status,
+    assert_result_count,
+    assert_in,
+    assert_not_in,
+    swallow_logs,
+    swallow_outputs,
+    known_failure_windows,
+    slow,
+    with_testrepos,
+    OBSCURE_FILENAME,
+    SkipTest,
+)
 
 
 @with_tempfile(mkdir=True)
@@ -75,7 +93,6 @@ def test_invalid_call(path):
         assert_status('impossible', run('doesntmatter', on_failure='ignore'))
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_basics(path, nodspath):
@@ -91,7 +108,7 @@ def test_basics(path, nodspath):
             ok_(cme.code > 0)
         eq_(last_state, ds.repo.get_hexsha())
         # now one that must work
-        res = ds.run('touch empty', message='TEST')
+        res = ds.run('cd .> empty', message='TEST')
         assert_repo_status(ds.path)
         assert_result_count(res, 2)
         # TODO 'state' is still untracked!!!
@@ -104,18 +121,19 @@ def test_basics(path, nodspath):
         assert_in('"pwd": "."', commit_msg)
         last_state = ds.repo.get_hexsha()
         # now run a command that will not alter the dataset
-        res = ds.run('touch empty', message='NOOP_TEST')
+        noop_cmd = ':'
+        res = ds.run(noop_cmd, message='NOOP_TEST')
         assert_result_count(res, 1, action='save', status='notneeded')
         eq_(last_state, ds.repo.get_hexsha())
         # We can also run the command via a single-item list because this is
         # what the CLI interface passes in for quoted commands.
-        res = ds.run(['touch empty'], message='NOOP_TEST')
+        res = ds.run([noop_cmd], message='NOOP_TEST')
         assert_result_count(res, 1, action='save', status='notneeded')
 
     # run outside the dataset, should still work but with limitations
     with chpwd(nodspath), \
             swallow_outputs():
-        res = ds.run(['touch', 'empty2'], message='TEST')
+        res = ds.run('cd . > empty2', message='TEST')
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty2'),
                             type='file', status='ok')
@@ -154,27 +172,26 @@ def test_py2_unicode_command(path):
         ds.run(u"bβ2.dat")
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_sidecar(path):
     ds = Dataset(path).rev_create()
     # Simple sidecar message checks.
-    ds.run(["touch", "dummy0"], message="sidecar arg", sidecar=True)
+    ds.run("cd .> dummy0", message="sidecar arg", sidecar=True)
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
     ds.config.set("datalad.run.record-sidecar", "false", where="local")
-    ds.run(["touch", "dummy1"], message="sidecar config")
+    ds.run("cd .> dummy1", message="sidecar config")
     assert_in('"cmd":', ds.repo.format_commit("%B"))
 
     ds.config.set("datalad.run.record-sidecar", "true", where="local")
-    ds.run(["touch", "dummy1"], message="sidecar config")
+    ds.run("cd .> dummy2", message="sidecar config")
     assert_not_in('"cmd":', ds.repo.format_commit("%B"))
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
     ds.config.add("datalad.run.record-sidecar", "false", where="local")
-    ds.run(["touch", "dummy2"], message="sidecar config")
+    ds.run("cd .> dummy3", message="sidecar config")
     assert_in('"cmd":', ds.repo.format_commit("%B"))
 
 
@@ -411,9 +428,14 @@ def test_run_failure(path):
 
     hexsha_initial = ds.repo.get_hexsha()
 
-    with swallow_outputs():
-        with assert_raises(CommandError):
-            ds.run("echo x$(cat sub/grows) > sub/grows && false")
+    with assert_raises(CommandError):
+        if on_windows:
+            # this does not do exactly the same as the cmd on other systems
+            # but is close enough to make running the test worthwhile
+            ds.run("echo x>{} & false".format(op.join("sub", "grows")))
+        else:
+            ds.run("echo x$(cat {0}) > {0} && false"
+                   .format(op.join("sub", "grows")))
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -425,7 +447,7 @@ def test_run_failure(path):
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     outfile = op.join(subds.path, "grows")
-    eq_('x\n', open(outfile).read())
+    eq_('x \n' if on_windows else 'x\n', open(outfile).read())
 
     # There is no CommandError on rerun if the non-zero error matches the
     # original code.
@@ -635,13 +657,13 @@ def test_new_or_modified(path):
     ds.rev_save(["to_modify", "d/to_modify"])
 
     eq_(set(get_new_or_modified(ds, "HEAD")),
-        {"to_modify", "d/to_modify"})
+        {"to_modify", op.join("d", "to_modify")})
 
     # Non-HEAD revisions work.
     ds.repo.commit("empty", options=["--allow-empty"])
     assert_false(get_new_or_modified(ds, "HEAD"))
     eq_(set(get_new_or_modified(ds, "HEAD~")),
-        {"to_modify", "d/to_modify"})
+        {"to_modify", op.join("d", "to_modify")})
 
 
 @known_failure_windows
@@ -683,7 +705,6 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
-@known_failure_windows
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
@@ -693,6 +714,12 @@ def test_rerun_script(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 def test_run_inputs_outputs(src, path):
+    if 'APPVEYOR' in os.environ:
+        # issue only happens on appveyor, Python itself implodes
+        # cannot be reproduced on a real win7 box
+        raise SkipTest(
+            'test causes appveyor (only) to crash, reason unknown')
+
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
                   ("s0", "s1_0"),
@@ -710,7 +737,8 @@ def test_run_inputs_outputs(src, path):
 
     # The specified inputs and extra inputs will be retrieved before the run.
     # (Use run_command() to access the extra_inputs argument.)
-    list(run_command("cat {inputs} {inputs} >doubled.dat",
+    list(run_command("{} {{inputs}} {{inputs}} >doubled.dat"
+                     .format('type' if on_windows else 'cat'),
                      dataset=ds,
                      inputs=["input.dat"], extra_inputs=["extra-input.dat"]))
 
@@ -732,7 +760,7 @@ def test_run_inputs_outputs(src, path):
     ok_(ds.repo.file_has_content("extra-input.dat"))
 
     with swallow_logs(new_level=logging.WARN) as cml:
-        ds.run("touch dummy", inputs=["not-there"])
+        ds.run("cd .> dummy", inputs=["not-there"])
         assert_in("Input does not exist: ", cml.out)
 
     # Test different combinations of globs and explicit files.
@@ -750,7 +778,7 @@ def test_run_inputs_outputs(src, path):
     for idx, (inputs_arg, expected_present) in enumerate(test_cases):
         assert_false(any(ds.repo.file_has_content(i) for i in inputs))
 
-        ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+        ds.run("cd .> dummy{}".format(idx), inputs=inputs_arg)
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
         assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
@@ -762,18 +790,17 @@ def test_run_inputs_outputs(src, path):
     ds.rev_save("subdir")
     ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
     ds.repo.drop("subdir", options=["--force"])
-    ds.run("touch subdir-dummy", inputs=[op.join(ds.path, "subdir")])
-    ok_(all(ds.repo.file_has_content(op.join("subdir", f))
-            for f in ["a", "b"]))
+    ds.run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
+    ok_(all(ds.repo.file_has_content(op.join("subdir", f)) for f in ["a", "b"]))
 
     # Inputs are specified relative to a dataset's subdirectory.
     ds.repo.drop(op.join("subdir", "a"), options=["--force"])
     with chpwd(op.join(path, "subdir")):
-        run("touch subdir-dummy1", inputs=["a"])
+        run("cd .> subdir-dummy1", inputs=["a"])
     ok_(ds.repo.file_has_content(op.join("subdir", "a")))
 
     # --input=. runs "datalad get ."
-    ds.run("touch dot-dummy", inputs=["."])
+    ds.run("cd .> dot-dummy", inputs=["."])
     eq_(ds.repo.get_annexed_files(),
         ds.repo.get_annexed_files(with_content_only=True))
     # On rerun, we get all files, even those that weren't in the tree at the
@@ -789,24 +816,30 @@ def test_run_inputs_outputs(src, path):
     ds.repo.get("a.dat")
     ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
     with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), "a.dat appended\n")
+        eq_(fh.read(), "a.dat' appended' \n" if on_windows else "a.dat appended\n" )
 
     # --output will remove files that are not present.
     ds.repo.drop(["a.dat", "d.txt"], options=["--force"])
     ds.run("echo ' appended' >>a.dat", outputs=["a.dat"])
-    with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), " appended\n")
+    if not on_windows:
+        # MIH doesn't yet understand how to port this
+        with open(op.join(path, "a.dat")) as fh:
+            eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
     ds.repo.repo.git.reset("--hard", "HEAD~2")
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
-    with open(op.join(path, "a.dat")) as fh:
-        eq_(fh.read(), "a.dat appended\n")
+    if not on_windows:
+        # MIH doesn't yet understand how to port this
+        with open(op.join(path, "a.dat")) as fh:
+            eq_(fh.read(), "a.dat appended\n")
 
-    with swallow_logs(new_level=logging.DEBUG) as cml:
-        with swallow_outputs():
-            ds.run("echo blah", outputs=["not-there"])
-        assert_in("Filtered out non-existing path: ", cml.out)
+    if not on_windows:
+        # see datalad#2606
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            with swallow_outputs():
+                ds.run("echo blah", outputs=["not-there"])
+                assert_in("Filtered out non-existing path: ", cml.out)
 
     ds.rev_create('sub')
     ds.run("echo sub_orig >sub/subfile")
@@ -815,7 +848,7 @@ def test_run_inputs_outputs(src, path):
     ds.run("echo sub_overwrite >sub/subfile", outputs=["sub/subfile"])
 
     # --input/--output globs can be stored in expanded form.
-    ds.run("touch expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
+    ds.run("cd .> expand-dummy", inputs=["a.*"], outputs=["b.*"], expand="both")
     assert_in("a.dat", ds.repo.format_commit("%B"))
     assert_in("b.dat", ds.repo.format_commit("%B"))
 
@@ -827,9 +860,11 @@ def test_run_inputs_outputs(src, path):
     ds.uninstall("s0")
     assert_false(Dataset(op.join(path, "s0")).is_installed())
     ds.run("echo {inputs} >globbed-subds", inputs=["s0/s1_*/s2/*.dat"])
-    ok_file_has_content(op.join(ds.path, "globbed-subds"),
-                        "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
-                        strip=True)
+    ok_file_has_content(
+        op.join(ds.path, "globbed-subds"),
+        "'s0\\s1_0\\s2\\a.dat' 's0\\s1_1\\s2\\c.dat'" if on_windows
+        else "s0/s1_0/s2/a.dat s0/s1_1/s2/c.dat",
+        strip=True)
 
     ds_ss = Dataset(op.join(path, "s0", "ss"))
     assert_false(ds_ss.is_installed())
@@ -840,18 +875,17 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).rev_create(no_annex=True)
     # Running --input in a plain Git repo doesn't fail.
-    ds.run("touch dummy", inputs=["*"])
+    ds.run("cd .> dummy", inputs=["*"])
     ok_exists(op.join(ds.path, "dummy"))
     ds.rerun()
 
 
 @slow  # ~10s
-@known_failure_windows
+# use of testrepos is broken on Windows and causes this test to be skipped there
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)
@@ -893,7 +927,7 @@ def test_run_explicit(path):
            inputs=["test-annex.dat"], outputs=["doubled.dat"],
            explicit=True)
     ok_(ds.repo.file_has_content("doubled.dat"))
-    ok_(ds.repo.is_dirty(path="dirt_modified"))
+    assert_repo_status(ds.path, modified=["dirt_modified"], untracked=['dirt_untracked'])
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
     # Saving explicit outputs works from subdirectories.
@@ -904,20 +938,22 @@ def test_run_explicit(path):
     ok_(ds.repo.file_has_content(op.join("subdir", "foo")))
 
 
-@known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):
     ds = Dataset(path).rev_create(force=True)
     ds.rev_save()
-    ds.run("echo {inputs} >{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
+    assert_repo_status(ds.path, untracked=['subdir'])
+    # ATTN windows is sensitive to spaces before redirect symbol
+    ds.run("echo {inputs}>{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
     ok_file_has_content(op.join(path, "c.out"), "a.in b.in\n")
 
     hexsha_before = ds.repo.get_hexsha()
     ds.rerun()
     eq_(hexsha_before, ds.repo.get_hexsha())
 
-    ds.run("echo {inputs[0]} >getitem", inputs=["*.in"])
+    # ATTN windows is sensitive to spaces before redirect symbol
+    ds.run("echo {inputs[0]}>getitem", inputs=["*.in"])
     ok_file_has_content(op.join(path, "getitem"), "a.in\n")
 
     ds.run("echo {pwd} >expanded-pwd")
@@ -937,14 +973,14 @@ def test_placeholders(path):
         "subdir")
 
     # Double brackets can be used to escape placeholders.
-    ds.run("touch {{inputs}}", inputs=["*.in"])
+    ds.run("cd .> {{inputs}}", inputs=["*.in"])
     ok_exists(op.join(path, "{inputs}"))
 
     # rerun --script expands the placeholders.
     with patch("sys.stdout", new_callable=StringIO) as cmout:
         ds.rerun(script="-", since="")
         script_out = cmout.getvalue()
-        assert_in("echo a.in b.in >c.out", script_out)
+        assert_in("echo a.in b.in>c.out", script_out)
         assert_in("echo {} >expanded-pwd".format(subdir_path),
                   script_out)
         assert_in("echo {} >expanded-dspath".format(ds.path),
@@ -965,7 +1001,7 @@ def test_placeholders(path):
         assert_in("gpl3", cmout.getvalue())
 
 
-@known_failure_windows
+@known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",
                  "bar.txt": "b",
                  "foo blah.txt": "f"})
@@ -991,11 +1027,10 @@ def test_inputs_quotes_needed(path):
     ok_file_has_content(op.join(path, "out0"), "bar.txt foo!blah.txt!out0")
 
 
-@known_failure_windows
 @with_tree(tree={"foo": "f", "bar": "b"})
 def test_inject(path):
     ds = Dataset(path).rev_create(force=True)
-    ok_(ds.repo.is_dirty())
+    assert_repo_status(ds.path, untracked=['foo', 'bar'])
     list(run_command("nonsense command",
                      dataset=ds,
                      inject=True,
