@@ -579,6 +579,7 @@ def test_rerun_ambiguous_revision_file(path):
         len(ds.repo.repo.git.rev_list("ambig", "--").split()))
 
 
+@known_failure_windows
 @with_tree(tree={"subdir": {}})
 def test_rerun_subdir(path):
     # Note: Using with_tree rather than with_tempfile is matters. The latter
