@@ -1021,16 +1021,49 @@ class Metadata(Interface):
                 continue
             if ap.get('type', None) == 'dataset' and GitRepo.is_valid_repo(ap['path']):
                 ap['process_content'] = True
-            to_query = None
-            if ap.get('state', None) == 'absent' or \
-                    ap.get('type', 'dataset') != 'dataset':
-                # this is a lonely absent dataset/file or content in a present dataset
+
+            to_query = ap['path']
+            query_parentds = False
+            # Why not to add more fields to the unregulated record?
+            #  By default assume the state of the dataset
+            ap['metadata-state'] = ap.get('state', None)
+            # Check if is installed dataset caries metadata
+            if ap.get('type', None) == 'dataset':
+                if not ap.get('parentds', None):
+                    # TEMP fix, for use case where we do know that it is a
+                    # dataset and there might be its parent above, but we
+                    # were not called with -d, so no parents were marked
+                    # by annotation
+                    from datalad.utils import get_dataset_root
+                    # for now we will not even check if it is a known
+                    # subdataset, query would just fail if not known.
+                    # If None - all good as well
+                    ap['parentds'] = get_dataset_root(op.dirname(ap['path']))
+                if ap.get('state', None) == 'absent':
+                    query_parentds = "Dataset %(path)s is not installed"
+                else:
+                    ap_agginfo_path, _ = get_ds_aggregate_db_locations(
+                        Dataset(ap['path']),
+                        version=str(aggregate_layout_version),
+                        warn_absent=False)
+                    if not op.lexists(ap_agginfo_path):
+                        query_parentds = \
+                            "Dataset %(path)s is installed, but lacks aggregated " \
+                            "metadata"
+                        ap['metadata-state'] = 'absent'
+            else: # file
+                # this is a lonely absent file or content in a present dataset
                 # -> query through parent
                 # there must be a parent, otherwise this would be a non-dataset path
                 # and would have errored during annotation
+                # if known absent file - do not complain
+                if ap.get('state', None) == 'absent':
+                    query_parentds = "Path %(path)s is not known to an installed dataset"
+
+            if query_parentds:
+                lgr.warning(query_parentds + ". Querying superdataset", ap)
                 to_query = ap['parentds']
-            else:
-                to_query = ap['path']
+
             if to_query:
                 pcontent = content_by_ds.get(to_query, [])
                 pcontent.append(ap)
@@ -1041,7 +1074,7 @@ class Metadata(Interface):
             query_agg = [ap for ap in content_by_ds[ds_path]
                          # this is an available subdataset, will be processed in another
                          # iteration
-                         if ap.get('state', None) == 'absent' or
+                         if ap['metadata-state'] == 'absent' or
                          not(ap.get('type', None) == 'dataset' and ap['path'] != ds_path)]
             if not query_agg:
                 continue

@@ -270,3 +270,34 @@ def test_get_containingds_from_agginfo():
     # will not tollerate mix'n'match
     assert_raises(ValueError, _get_containingds_from_agginfo, {'match': {}}, op.abspath(down))
     assert_raises(ValueError, _get_containingds_from_agginfo, {op.abspath('match'): {}}, down)
+
+
+@with_tempfile(mkdir=True)
+def test_get_metadata_fromparentds_file(path):
+    # https://github.com/datalad/datalad/issues/3055
+    # Use-case test based on https://github.com/datalad/datalad/issues/3055#issuecomment-444516736
+    # by @mih himself (but without revolution)
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
+    from datalad.utils import create_tree
+    create_tree(sub.path, {'somefile': ''})
+    sub.add('somefile', message="added")
+    ds.aggregate_metadata(update_mode='target', recursive=True)
+    # common kwargs for metadata call
+    mkwargs = dict(reporton='datasets', return_type='item-or-list')
+    # will be ok since querying using `ds.`, i.e. `-d`
+    out1 = ds.metadata('sub', **mkwargs)
+    assert out1['refds'], "Should have got some metadata and refds recorded"
+    out1.pop('refds')  # but without ds., there would be no "refds"
+    from datalad.api import metadata
+    with chpwd(path):
+        # fails to access
+        out2 = metadata('sub', **mkwargs)
+    assert_dict_equal(out1, out2)
+    # remove subds in question
+    ds.uninstall('sub', check=False)  # no check since there is no original one
+    # works now
+    out2 = ds.metadata('sub', **mkwargs)
+    # again - refds will be here but not in out1 due to use of ds.
+    assert out2.pop('refds', None)
+    assert_dict_equal(out1, out2)
