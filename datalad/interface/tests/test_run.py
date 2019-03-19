@@ -420,7 +420,6 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
-@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).rev_create()
@@ -448,6 +447,10 @@ def test_run_failure(path):
 
     outfile = op.join(subds.path, "grows")
     eq_('x \n' if on_windows else 'x\n', open(outfile).read())
+
+    if on_windows:
+        # FIXME: Make the remaining code compatible with Windows.
+        return
 
     # There is no CommandError on rerun if the non-zero error matches the
     # original code.
