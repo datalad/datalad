@@ -64,8 +64,8 @@ from datalad.utils import (
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
 from datalad.consts import (
-    METADATA_DIR,
-    METADATA_FILENAME,
+    OLDMETADATA_DIR,
+    OLDMETADATA_FILENAME,
 )
 from datalad.log import log_progress
 
@@ -802,7 +802,7 @@ def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
             info_files = glob.glob(info_glob)
             msg = "Found no aggregated metadata info file %s." \
                   % info_fpath
-            old_metadata_file = op.join(ds.path, METADATA_DIR, METADATA_FILENAME)
+            old_metadata_file = op.join(ds.path, OLDMETADATA_DIR, OLDMETADATA_FILENAME)
             if op.exists(old_metadata_file):
                 msg += " Found metadata generated with pre-0.10 version of " \
                        "DataLad, but it will not be used."

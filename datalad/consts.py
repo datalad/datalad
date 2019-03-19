@@ -14,11 +14,12 @@ from os.path import join
 from os.path import expanduser
 
 # directory containing prepared metadata of a dataset repository:
+# Used at least in the crawler
 HANDLE_META_DIR = ".datalad"
 
 # Make use of those in datalad.metadata
-METADATA_DIR = join(HANDLE_META_DIR, 'meta')
-METADATA_FILENAME = 'meta.json'
+OLDMETADATA_DIR = join(HANDLE_META_DIR, 'meta')
+OLDMETADATA_FILENAME = 'meta.json'
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
