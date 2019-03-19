@@ -273,6 +273,37 @@ def test_get_containingds_from_agginfo():
 
 
 @with_tempfile(mkdir=True)
+def test_get_metadata_fromparentds_dataset(path):
+    # Original issue which lead to https://github.com/datalad/datalad/issues/3055
+    # which somewhat misrepresented the problem:
+    #  not being able to aggregate metadata from its superds, whenever subds is
+    #  installed but itself lacks metadata (e.g. openneuro/ds*)
+    ds = Dataset(path).create()
+    sub1 = ds.create('sub1')
+    sub2 = sub1.create('sub2')
+    from datalad.utils import create_tree
+    create_tree(sub2.path, {'somefile': ''})
+    sub2.add('somefile', message="added")
+    # aggregate within sub1
+    sub1.aggregate_metadata(update_mode='target', recursive=True)
+
+    # and then we would like to aggregate that information within ds
+    # without causing extraction again in sub1/sub2 which lacks metadata ATM
+    ds.aggregate_metadata(update_mode='target', recursive=True)
+
+    # common kwargs for metadata call
+    mkwargs = dict(return_type='item-or-list')
+    # will be ok since querying using `ds.`, i.e. `-d`
+    out_ds = ds.metadata('sub1/sub2', reporton='datasets', **mkwargs)
+    out_file = ds.metadata('sub1/sub2/somefile', **mkwargs)
+    # assert that no aggregation has happened
+    ok_(not op.exists(op.join(sub2.path, '.datalad', 'metadata')))
+
+    assert out_ds['metadata']  # We have metadata for the ds
+    assert out_file['metadata']['annex']['key']  # We have metadata for the file
+
+
+@with_tempfile(mkdir=True)
 def test_get_metadata_fromparentds_file(path):
     # https://github.com/datalad/datalad/issues/3055
     # Use-case test based on https://github.com/datalad/datalad/issues/3055#issuecomment-444516736
