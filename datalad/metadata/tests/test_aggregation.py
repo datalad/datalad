@@ -66,7 +66,7 @@ def test_basic_aggregate(path):
     # we will first aggregate the middle dataset on its own, this will
     # serve as a smoke test for the reuse of metadata objects later on
     sub.aggregate_metadata()
-    base.save()
+    base.rev_save()
     ok_clean_git(base.path)
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
@@ -390,7 +390,7 @@ def test_partial_aggregation(path):
     sub1.unlock('here')
     with open(opj(sub1.path, 'here'), 'w') as f:
         f.write('fresh')
-    ds.save(recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(path)
     # TODO for later
     # test --since with non-incremental

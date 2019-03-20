@@ -442,7 +442,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(subds.path, annex=None)
     # top is too:
     ok_clean_git(ds.path, annex=None)
-    ds.save('addsub')
+    ds.rev_save(message='addsub')
     # now it is:
     ok_clean_git(ds.path, annex=None)
 
@@ -539,7 +539,7 @@ def test_implicit_install(src, dst):
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
     origin_subsub.rev_save("file3.txt")
-    origin_top.save(recursive=True)
+    origin_top.rev_save(recursive=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -815,7 +815,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     # and progress subsub2 forward to stay really thorough
     put_file_under_git(subsub2.path, 'file.dat', content="data")
-    subsub2.save("added a file")  # above function does not commit
+    subsub2.rev_save(message="added a file")  # above function does not commit
 
     # just installing a submodule -- apparently different code/logic
     # but also the same story should hold - we should install the version pointed

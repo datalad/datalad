@@ -108,8 +108,7 @@ def test_get_invalid_call(path, file_outside):
     ds.create(no_annex=True)
     with open(opj(path, "some.txt"), "w") as f:
         f.write("whatever")
-    ds.rev_save("some.txt", to_git=True)
-    ds.save("Initial commit.")
+    ds.rev_save("some.txt", to_git=True, message="Initial commit.")
 
     # make it an annex:
     AnnexRepo(path, init=True, create=True)
@@ -168,8 +167,7 @@ def test_get_multiple_files(path, url, ds_dir):
 
     # prepare origin
     origin = Dataset(path).create(force=True)
-    origin.rev_save(file_list)
-    origin.save("initial")
+    origin.rev_save(file_list, message="initial")
 
     ds = install(
         ds_dir, source=path,
@@ -378,7 +376,7 @@ def test_get_mixed_hierarchy(src, path):
         f.write('content')
     origin.rev_save('file_in_git.txt', to_git=True)
     origin_sub.rev_save('file_in_annex.txt')
-    origin.save()
+    origin.rev_save()
 
     # now, install that thing:
     ds, subds = install(

@@ -107,7 +107,7 @@ def test_diff(path, norepo):
     assert_result_count(
         ds.diff(revision='HEAD'), 1,
         action='diff', path=opj(ds.path, 'new'), state='modified')
-    ds.save()
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     # untracked stuff

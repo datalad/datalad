@@ -93,7 +93,6 @@ def test_clean_subds_removal(path):
     assert(not exists(subds1.path))
     # and now again, but this time remove something that is not installed
     ds.create('three')
-    ds.save()
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['three', 'two'])
     ds.uninstall('two')
     ok_clean_git(ds.path)
@@ -309,7 +308,7 @@ def test_uninstall_recursive(path):
     assert_result_count(res, 1, action='add', status='ok', type='file')
     assert_result_count(res, 1, action='save', status='ok', type='dataset')
     # save all -> all clean
-    ds.save(recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(subds.path)
     ok_clean_git(ds.path)
     # now uninstall in subdataset through superdataset

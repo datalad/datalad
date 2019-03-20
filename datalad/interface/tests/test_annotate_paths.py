@@ -266,7 +266,7 @@ def test_get_modified_subpaths(path):
         type='dataset')
 
     # now save uptop, this will the new state of subb, but keep suba dirty
-    ds.save(subb.path, recursive=True)
+    ds.rev_save(subb.path, recursive=True)
     # now if we ask for what was last saved, we only get the new state of subb
     assert_result_count(
         get_modified_subpaths(

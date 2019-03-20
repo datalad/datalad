@@ -152,7 +152,7 @@ def test_save_hierarchy(path):
         ok_(d.repo.dirty)
     # need to give file specifically, otherwise it will simply just preserve
     # staged changes
-    ds_bb.save(path=opj(ds_bbaa.path, 'file_bbaa'))
+    ds_bb.rev_save(path=opj(ds_bbaa.path, 'file_bbaa'))
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -165,7 +165,7 @@ def test_save_hierarchy(path):
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
     # generator
-    d.save(recursive=True)
+    d.rev_save(recursive=True)
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)
@@ -183,17 +183,12 @@ def test_save_hierarchy(path):
     ca.repo.remove('file_ca')
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
-    ds.save(
+    ds.rev_save(
         # append trailing slashes to the path to indicate that we want to
         # have the staged content in the dataset saved, rather than only the
         # subdataset state in the respective superds.
-        # an alternative would have been to pass `save` annotated paths of
-        # type {'path': dspath, 'process_content': True} for each dataset
-        # in question, but here we want to test how this would most likely
-        # by used from cmdline
         path=[opj(p, '')
-               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
-        super_datasets=True)
+               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)])
 
 
 # Note: class name needs to match module's name

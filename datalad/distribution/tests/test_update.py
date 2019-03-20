@@ -73,8 +73,7 @@ def test_update_simple(origin, src_path, dst_path):
     # modify origin:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
-    source.rev_save(path="update.txt")
-    source.save("Added update.txt")
+    source.rev_save(path="update.txt", message="Added update.txt")
     ok_clean_git(src_path)
 
     # fail when asked to update a non-dataset

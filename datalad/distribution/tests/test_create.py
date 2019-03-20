@@ -185,7 +185,7 @@ def test_create_sub_nosave(path):
     ok_(ds.repo.dirty)
     ok_(sub_annex.repo.dirty)
     ok_exists(opj(ds.path, ".gitmodules"))
-    ds.save(recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
     ok_clean_git(sub_annex.path)
 
@@ -194,7 +194,7 @@ def test_create_sub_nosave(path):
     ok_(sub_noannex.repo.dirty)
     # Save has no effect because the non-annex subdataset wasn't registered as
     # a submodule.
-    ds.save(recursive=True)
+    ds.rev_save(recursive=True, updated=True)
     ok_(ds.repo.dirty)
     ok_(sub_noannex.repo.dirty)
 
@@ -219,7 +219,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
     ok_(ds.id != subds.id != subsubds.id)
-    ds.save(recursive=True)
+    ds.rev_save(recursive=True, updated=True)
     # 'file*' in each repo was untracked before and should remain as such
     # (we don't want a #1419 resurrection
     ok_(ds.repo.dirty)
@@ -266,10 +266,6 @@ def test_nested_create(path):
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
-    # nothing to save, git-annex commits the unannex itself
-    assert_status(
-        'ok' if ds.repo.supports_unlocked_pointers else 'notneeded',
-        ds.save())
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_in_results(

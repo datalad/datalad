@@ -377,7 +377,7 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
 
     # Let's save those present changes and publish while implying "since last
     # merge point"
-    source.save(message="Changes in subm2")
+    source.rev_save(message="Changes in subm2")
     # and test if it could deduce the remote/branch to push to
     source.config.set('branch.master.remote', 'target', where='local')
     with chpwd(source.path):
