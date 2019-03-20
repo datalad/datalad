@@ -949,7 +949,7 @@ def test_run_explicit(path):
 def test_placeholders(path):
     ds = Dataset(path).rev_create(force=True)
     ds.rev_save()
-    assert_repo_status(ds.path, untracked=['subdir'])
+    assert_repo_status(ds.path)
     # ATTN windows is sensitive to spaces before redirect symbol
     ds.run("echo {inputs}>{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
     ok_file_has_content(op.join(path, "c.out"), "a.in b.in\n")
