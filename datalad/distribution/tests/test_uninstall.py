@@ -225,11 +225,11 @@ def test_uninstall_subdataset(src, dst):
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).create(force=True, save=False)
     subds = ds.create('deep', force=True)
-    subds.add('.', recursive=True)
+    subds.rev_save(recursive=True)
     ok_clean_git(subds.path)
     # needs to be able to add a combination of staged files, modified submodule,
     # and untracked files
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
     # drop content of all 'kill' files
     topfile = 'kill'
@@ -273,7 +273,7 @@ def test_uninstall_dataset(path):
 @with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
-    ds.add(os.curdir)
+    ds.rev_save()
     ok_clean_git(ds.path)
     # make sure there is any key
     ok_(len(ds.repo.get_file_key('one')))
@@ -305,7 +305,7 @@ def test_uninstall_recursive(path):
     subds = ds.create('deep', force=True)
     # we add one file, but we get a response for the requested
     # directory too
-    res = subds.add('.')
+    res = subds.rev_save()
     assert_result_count(res, 1, action='add', status='ok', type='file')
     assert_result_count(res, 1, action='save', status='ok', type='dataset')
     # save all -> all clean
@@ -388,7 +388,7 @@ def test_kill(path):
     testfile = opj(ds.path, "file.dat")
     with open(testfile, 'w') as f:
         f.write("load")
-    ds.add("file.dat")
+    ds.rev_save("file.dat")
     subds = ds.create('deep1')
     eq_(sorted(ds.subdatasets(result_xfm='relpaths')), ['deep1'])
     ok_clean_git(ds.path)
@@ -471,7 +471,7 @@ def test_failon_nodrop(path):
     # of top-level datasets
     sub = ds.create('sub')
     create_tree(sub.path, {'test': 'content'})
-    ds.add(opj('sub', 'test'))
+    ds.rev_save(opj('sub', 'test'))
     ok_clean_git(ds.path)
     eq_(['test'], sub.repo.get_annexed_files(with_content_only=True))
     # we put one file into the dataset's annex, no redundant copies
@@ -527,7 +527,7 @@ def test_drop_nocrash_absent_subds(path):
 @with_tree({'one': 'one', 'two': 'two', 'three': 'three'})
 def test_remove_more_than_one(path):
     ds = Dataset(path).create(force=True)
-    ds.add('.')
+    ds.rev_save()
     ok_clean_git(path)
     # ensure #1912 stays resolved
     ds.remove(['one', 'two'], check=False)

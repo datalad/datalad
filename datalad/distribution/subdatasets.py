@@ -42,6 +42,9 @@ from datalad.utils import path_startswith
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 
+# API commands
+import datalad.core.local.save
+
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import resolve_path
@@ -318,7 +321,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     val)
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
-            Dataset(dspath).add(
+            Dataset(dspath).rev_save(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties')
             # let go of resources, locks, ...

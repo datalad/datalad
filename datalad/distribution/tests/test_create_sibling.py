@@ -461,7 +461,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     url = 'localhost:%s' % dst_relpath
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
-    ds.add('sub.dat')
+    ds.rev_save('sub.dat')
     ds.create_sibling(url)
     published = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
@@ -485,7 +485,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
-    ds.add('sub2.dat')
+    ds.rev_save('sub2.dat')
     published3 = ds.publish(to='localhost', transfer_data='none')  # we publish just git
     assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
     # now publish "with" data, which should also trigger the hook!
@@ -518,7 +518,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     # now a month later we created a new subdataset
     subds = ds.create('sub')  # so now we got a hierarchy!
     create_tree(subds.path, {'sub.dat': 'lots of data'})
-    subds.add('sub.dat')
+    subds.rev_save('sub.dat')
     ok_file_under_git(subds.path, 'sub.dat', annexed=True)
 
     target_sub = Dataset(opj(target_path, 'sub'))

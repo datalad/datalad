@@ -174,7 +174,7 @@ def test_subdatasets(path):
     eq_(ds.subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.add(path='test')
+    ds.rev_save(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
     # Assuming that tmp location was not under a super-dataset

@@ -29,7 +29,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
 from datalad.api import create
-from datalad.api import add
+from datalad.api import rev_save
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
@@ -402,15 +402,14 @@ def test_bf1886(path):
         opj(parent.path, 'subdir', 'subsubdir', 'upup3'))
     # need to use absolute paths
     with chpwd(opj(parent.path, 'subdir', 'subsubdir')):
-        add([opj(parent.path, 'sub3'),
-             opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
-    # here is where we need to disagree with the repo in #1886
-    # we would not expect that `add` registers sub3 as a subdataset
-    # of parent, because no reference dataset was given and the
-    # command cannot decide (with the current semantics) whether
-    # it should "add anything in sub3 to sub3" or "add sub3 to whatever
-    # sub3 is in"
-    ok_clean_git(parent.path, untracked=['sub3/'])
+        rev_save([opj(parent.path, 'sub3'),
+                  opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
+    # in contrast to `add` only operates on a single top-level dataset
+    # although it is not specified, it get's discovered based on the PWD
+    # the logic behind that feels a bit shaky
+    # consult discussion in https://github.com/datalad/datalad/issues/3230
+    # if this comes up as an issue at some point
+    ok_clean_git(parent.path)
 
 
 @with_tree({

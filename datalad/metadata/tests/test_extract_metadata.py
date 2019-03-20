@@ -47,7 +47,7 @@ def test_ds_extraction(path):
 
     ds = Dataset(path).create()
     copy(testpath, path)
-    ds.add('.')
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     res = extract_metadata(

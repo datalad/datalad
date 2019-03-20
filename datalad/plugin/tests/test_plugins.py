@@ -126,10 +126,10 @@ def test_no_annex(path):
             'notinannex': 'othercontent'},
          'README': 'please'})
     # add inannex pre configuration
-    ds.add(opj('code', 'inannex'))
+    ds.rev_save(opj('code', 'inannex'))
     no_annex(pattern=['code/**', 'README'], dataset=ds)
     # add inannex and README post configuration
-    ds.add([opj('code', 'notinannex'), 'README'])
+    ds.rev_save([opj('code', 'notinannex'), 'README'])
     ok_clean_git(ds.path)
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
@@ -159,7 +159,7 @@ _ds_template = {
 @with_tree(_ds_template)
 def test_add_readme(path):
     ds = Dataset(path).create(force=True)
-    ds.add('.')
+    ds.rev_save()
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     assert_status('ok', ds.add_readme())

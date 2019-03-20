@@ -145,7 +145,7 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+    source.rev_save(opj(src_path, 'test_mod_file'), to_git=True,
                message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
@@ -202,7 +202,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+    source.rev_save(opj(src_path, 'test_mod_file'), to_git=True,
                message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
@@ -334,12 +334,12 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # add to subdataset, does not alter super dataset!
     # MIH: use `to_git` because original test author used
     # and explicit `GitRepo.add` -- keeping this for now
-    Dataset(sub2.path).add('file.txt', to_git=True)
+    Dataset(sub2.path).rev_save('file.txt', to_git=True)
 
     # Let's now update one subm
     create_tree(sub2.path, {'file.dat': 'content'})
     # add to subdataset, without reflecting the change in its super(s)
-    Dataset(sub2.path).add('file.dat')
+    Dataset(sub2.path).rev_save('file.dat')
 
     # note: will publish to origin here since that is what it tracks
     res_ = publish(dataset=source, recursive=True, on_failure='ignore')
@@ -538,7 +538,7 @@ def test_publish_depends(
     ok_clean_git(src_path)
     # introduce change in source
     create_tree(src_path, {'probe1': 'probe1'})
-    source.add('probe1')
+    source.rev_save('probe1')
     ok_clean_git(src_path)
     # only the source has the probe
     ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
@@ -606,7 +606,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 
     # some content modification of the superdataset
     create_tree(src_path, {'probe1': 'probe1'})
-    source.add('probe1')
+    source.rev_save('probe1')
     ok_clean_git(src_path)
 
     # create the target(s):
@@ -632,7 +632,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
-    ds.add('1')
+    ds.rev_save('1')
     ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
@@ -659,7 +659,7 @@ def test_gh1763(src, target1, target2):
         publish_depends='target1')
     # a file to annex
     create_tree(src.path, {'probe1': 'probe1'})
-    src.add('probe1', to_git=False)
+    src.rev_save('probe1', to_git=False)
     # make sure the probe is annexed, not straight in Git
     assert_in('probe1', src.repo.get_annexed_files(with_content_only=True))
     # publish to target2, must handle dependency

@@ -226,7 +226,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(subds.repo.dirty)
     ok_(subsubds.repo.dirty)
     # if we add these three, we should get clean
-    ds.add(['file1', opj(subds.path, 'file2'), opj(subsubds.path, 'file3')])
+    ds.rev_save(['file1', opj(subds.path, 'file2'), opj(subsubds.path, 'file3')])
     ok_clean_git(ds.path)
     ok_(ds.id != subds.id != subsubds.id)
 
@@ -242,7 +242,7 @@ def test_nested_create(path):
     os.makedirs(opj(ds.path, 'lvl1', 'empty'))
     with open(opj(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.add('.'))
+    ok_(ds.rev_save())
     # later create subdataset in a fresh dir
     subds1 = ds.create(opj('lvl1', 'subds'))
     ok_clean_git(ds.path)
@@ -345,7 +345,7 @@ def test_create_text_no_annex(path):
                      # should we adjust the rule to consider only non empty files?
         }
     )
-    ds.add(['t', 'b'])
+    ds.rev_save(['t', 'b'])
     ok_file_under_git(path, 't', annexed=False)
     ok_file_under_git(path, 'b', annexed=True)
 

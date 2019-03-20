@@ -193,7 +193,7 @@ class Update(Interface):
             lgr.debug(
                 'Subdatasets where updated state may need to be '
                 'saved in the parent dataset: %s', save_paths)
-            for r in Dataset(refds_path).add(
+            for r in Dataset(refds_path).rev_save(
                     path=save_paths,
                     recursive=False,
                     message='[DATALAD] Save updated subdatasets'):

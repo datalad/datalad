@@ -16,7 +16,7 @@ import timeit
 
 from subprocess import call
 
-from datalad.api import add
+from datalad.api import rev-save
 from datalad.api import create
 from datalad.api import create_test_dataset
 from datalad.api import Dataset
@@ -106,7 +106,7 @@ class supers(SuprocBenchmarks):
 
     def time_createadd_to_dataset(self, tarfile_path):
         subds = create(opj(self.ds.path, 'newsubds'))
-        self.ds.add(subds.path)
+        self.ds.rev_save(subds.path)
 
     def time_ls(self, tarfile_path):
         ls(self.ds.path)

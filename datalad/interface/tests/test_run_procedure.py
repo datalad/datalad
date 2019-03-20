@@ -53,11 +53,11 @@ def test_invalid_call(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import rev_save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_basics(path, super_path):
@@ -71,7 +71,7 @@ def test_basics(path, super_path):
         'code',
         where='dataset')
     # commit this procedure config for later use in a clone:
-    ds.add(op.join('.datalad', 'config'))
+    ds.rev_save(op.join('.datalad', 'config'))
     # configure dataset to run the demo procedure prior to the clean command
     ds.config.add(
         'datalad.clean.proc-pre',
@@ -142,7 +142,7 @@ def test_procedure_discovery(path, super_path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
-    ds.add(op.join('.datalad', 'config'))
+    ds.rev_save(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
     ps = ds.run_procedure(discover=True)
@@ -204,11 +204,11 @@ def test_procedure_discovery(path, super_path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import rev_save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('{}\\n'.format(sys.argv[2]))
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 def test_configs(path):
 

@@ -69,7 +69,7 @@ def test_diff(path, norepo):
     assert len(ds.diff(revision='HEAD~1')) > 0
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
-    ds.add('.', to_git=True)
+    ds.rev_save(to_git=True)
     ok_clean_git(ds.path)
     res = ds.diff(revision='HEAD~1')
     assert_result_count(res, 1)
@@ -167,11 +167,11 @@ def test_diff_recursive(path):
     assert_result_count(res, 1, action='diff', state='modified', path=sub.path, type='dataset')
     assert_result_count(res, 1, action='diff', state='untracked', path=opj(sub.path, 'twofile'), type='file')
     # save sub
-    sub.add('.')
+    sub.rev_save()
     # save sub in parent
-    ds.save()
+    ds.rev_save(sub.path)
     # save addition in parent
-    ds.add('.')
+    ds.rev_save()
     ok_clean_git(ds.path)
     # look at the last change, only one file was added
     res = ds.diff(revision='HEAD~1..HEAD')
@@ -210,10 +210,10 @@ def test_diff_helper(path):
     sub_clean = ds.create('sub_clean', force=True)
     # proper submodule, but commited modifications not commited in parent
     sub_modified = ds.create('sub_modified', force=True)
-    sub_modified.add('modified')
+    sub_modified.rev_save('modified')
     # proper submodule with untracked changes
     sub_dirty = ds.create('sub_dirty', force=True)
-    ds.add(['clean', 'modified'])
+    ds.rev_save(['clean', 'modified'])
     ds.unlock('modified')
     with open(opj(ds.path, 'modified'), 'w') as f:
         f.write('modified_content')
