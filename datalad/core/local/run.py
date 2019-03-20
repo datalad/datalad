@@ -6,38 +6,20 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Thin wrapper around `run` from DataLad core"""
+"""Temporary rev-run -> run alias"""
 
 __docformat__ = 'restructuredtext'
 
-
-import logging
-
-# take everything from run, all we want to be is a thin variant
 from datalad.interface.run import (
     Run as _Run,
     run_command,
     build_doc,
     eval_results,
+    _save_outputs,
 )
 from datalad.distribution.dataset import (
-    Dataset,
     datasetmethod,
 )
-from .save import Save
-
-lgr = logging.getLogger('datalad.core.local.run')
-
-
-def _save_outputs(ds, to_save, msg):
-    """Helper to save results after command execution is completed"""
-    return Save.__call__(
-        to_save,
-        message=msg,
-        # need to convert any incoming dataset into a revolutionary one
-        dataset=Dataset(ds.path),
-        recursive=True,
-        return_type='generator')
 
 
 @build_doc
