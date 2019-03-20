@@ -1555,10 +1555,14 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
     create_tree(
         ds.path,
         {
+            '.gitignore': '*.ignored',
             'subdir': {
                 'file_clean': 'file_clean',
                 'file_deleted': 'file_deleted',
                 'file_modified': 'file_clean',
+            },
+            'subdir-only-ignored': {
+                '1.ignored': '',
             },
             'file_clean': 'file_clean',
             'file_deleted': 'file_deleted',
@@ -1700,6 +1704,7 @@ def get_deeply_nested_structure(path):
     |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
     |          └── directory_untracked
+    |              └── untracked_file
     """
     ds = Dataset(path).rev_create()
     (ds.pathobj / 'subdir').mkdir()
@@ -1710,10 +1715,7 @@ def get_deeply_nested_structure(path):
     # a subtree of datasets
     subds = ds.rev_create('subds_modified')
     # another dataset, plus an additional dir in it
-    (Dataset(
-        ds.create(
-            op.join('subds_modified', 'subds_lvl1_modified')
-        ).path).pathobj / 'directory_untracked').mkdir()
+    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
     create_tree(
         ds.path,
         {
@@ -1722,6 +1724,10 @@ def get_deeply_nested_structure(path):
             },
             'file_modified': 'file_modified',
         }
+    )
+    create_tree(
+        text_type(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
+        {'directory_untracked' : {"untraced_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
