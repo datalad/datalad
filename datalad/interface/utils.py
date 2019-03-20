@@ -331,6 +331,7 @@ def eval_results(func):
 
         # retrieve common options from kwargs, and fall back on the command
         # class attributes, or general defaults if needed
+        kwargs = kwargs.copy()  # we will pop, which might cause side-effect
         common_params = {
             p_name: kwargs.pop(
                 p_name,

@@ -1006,6 +1006,9 @@ def test_placeholders(path):
         ds.rerun(script="-")
         assert_in("gpl3", cmout.getvalue())
 
+    ds.run("echo {tmpdir} >tout")
+    ok_file_has_content(op.join(path, "tout"), ".*datalad-run.*", re_=True)
+
 
 @known_failure_windows  # due to use of obscure filename that breaks the runner on Win
 @with_tree(tree={OBSCURE_FILENAME + u".t": "obscure",

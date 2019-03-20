@@ -31,7 +31,11 @@ from datalad.config import ConfigManager
 from datalad.dochelpers import exc_str
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import Constraint
+# DueCredit
+from datalad.support.due import due
+from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.support.external_versions import external_versions
 from datalad.support.gitrepo import GitRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import NoSuchPathError
@@ -322,6 +326,9 @@ class Dataset(object):
             # under, and if so -- to proceed forward. Thus log here only
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
+        elif due.active:
+            # Makes sense only on installed dataset - @never_fail'ed
+            duecredit_dataset(self)
 
         return self._repo
 

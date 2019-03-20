@@ -51,6 +51,8 @@ from git.exc import NoSuchPathError
 from git.exc import InvalidGitRepositoryError
 from git.objects.blob import Blob
 
+from datalad.support.due import due, Doi
+
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
 from datalad.consts import GIT_SSH_COMMAND
@@ -619,6 +621,13 @@ class GitRepo(RepoInterface):
         # add the class name to distinguish from strings of a path
         return hash((self.__class__.__name__, self.__weakref__.key))
 
+    # This is the least common denominator to claim that a user
+    # used DataLad.
+    # For now citing Zenodo's all (i.e., latest) version
+    @due.dcite(Doi("10.5281/zenodo.808846"),
+               # override path since there is no need ATM for such details
+               path="datalad",
+               description="DataLad - Data management and distribution platform")
     def __init__(self, path, url=None, runner=None, create=True,
                  git_opts=None, repo=None, fake_dates=False,
                  create_sanity_checks=True,

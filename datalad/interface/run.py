@@ -19,6 +19,7 @@ import os.path as op
 from os.path import join as opj
 from os.path import normpath
 from os.path import relpath
+from tempfile import mkdtemp
 
 from six.moves import map
 from six.moves import shlex_quote
@@ -84,7 +85,8 @@ class Run(Interface):
     A few placeholders are supported in the command via Python format
     specification. "{pwd}" will be replaced with the full path of the current
     working directory. "{dspath}" will be replaced with the full path of the
-    dataset that run is invoked on. "{inputs}" and "{outputs}" represent the
+    dataset that run is invoked on. "{tmpdir}" will be replaced with the full
+    path of a temporary directory. "{inputs}" and "{outputs}" represent the
     values specified by [CMD: --input and --output CMD][PY: `inputs` and
     `outputs` PY]. If multiple values are specified, the values will be joined
     by a space. The order of the values will match that order from the command
@@ -512,11 +514,15 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         exc = None
 
     try:
-        cmd_expanded = format_command(ds, cmd,
-                                      pwd=pwd,
-                                      dspath=ds.path,
-                                      inputs=inputs,
-                                      outputs=outputs)
+        cmd_expanded = format_command(
+            ds, cmd,
+            pwd=pwd,
+            dspath=ds.path,
+            # Check if the command contains "{tmpdir}" to avoid creating an
+            # unnecessary temporary directory in most but not all cases.
+            tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
+            inputs=inputs,
+            outputs=outputs)
     except KeyError as exc:
         yield get_status_dict(
             'run',

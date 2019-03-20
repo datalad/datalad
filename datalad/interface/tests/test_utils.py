@@ -261,6 +261,11 @@ def test_eval_results_plus_build_doc():
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(len(list(result)), 3)
 
+    # test absent side-effect of popping eval_defaults
+    kwargs = dict(return_type='list')
+    TestUtils().__call__(2, **kwargs)
+    assert_equal(list(kwargs), ['return_type'])
+
     # test signature:
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])

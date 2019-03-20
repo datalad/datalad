@@ -18,6 +18,8 @@ import os
 from os import linesep
 import os.path as op
 
+import sys
+
 
 from datalad import get_encoding_info
 from datalad.cmd import Runner
@@ -66,6 +68,7 @@ from datalad.support.exceptions import DeprecatedError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.exceptions import PathKnownToRepositoryError
+from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change
 
@@ -1430,3 +1433,38 @@ def test_custom_runner_protocol(path):
     check(prev_len, prot, "commit")
 
     ok_(all(p['duration'] >= 0 for p in prot))
+
+
+@with_tempfile(mkdir=True)
+def test_duecredit(path):
+    # Just to check that no obvious side-effects
+    run = Runner(cwd=path).run
+    cmd = [
+        sys.executable, "-c",
+        "from datalad.support.gitrepo import GitRepo; GitRepo(%r, create=True)" % path
+    ]
+
+    env = os.environ.copy()
+
+    # Test with duecredit not enabled for sure
+    env.pop('DUECREDIT_ENABLE', None)
+    # Alternative workaround for what to be fixed by
+    # https://github.com/datalad/datalad/pull/3215
+    # where underlying datalad process might issue a warning since our temp
+    # cwd is not matching possibly present PWD env variable
+    env.pop('PWD', None)
+
+    out, err = run(cmd, env=env, expect_stderr=True)
+    outs = out + err  # Let's not depend on where duecredit decides to spit out
+    # All quiet
+    eq_(outs, '')
+
+    # and now enable DUECREDIT - output could come to stderr
+    env['DUECREDIT_ENABLE'] = '1'
+    out, err = run(cmd, env=env, expect_stderr=True)
+    outs = out + err
+
+    if external_versions['duecredit']:
+        assert_in('Data management and distribution platform', outs)
+    else:
+        eq_(outs, '')
