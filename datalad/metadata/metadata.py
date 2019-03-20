@@ -798,7 +798,7 @@ def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
             # caller had no specific idea what metadata version is needed/available
             # This dataset does not have aggregated metadata.  Does it have any
             # other version?
-            info_glob = agginfo_relpath_template.format('*')
+            info_glob = op.join(ds.path, agginfo_relpath_template).format('*')
             info_files = glob.glob(info_glob)
             msg = "Found no aggregated metadata info file %s." \
                   % info_fpath
