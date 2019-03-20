@@ -2854,7 +2854,7 @@ class GitRepo(RepoInterface):
             if untracked == 'all':
                 cmd.append('-o')
             elif untracked == 'normal':
-                cmd += ['-o', '--directory']
+                cmd += ['-o', '--directory', '--no-empty-directory']
             elif untracked == 'no':
                 pass
             else:
