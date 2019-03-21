@@ -128,7 +128,7 @@ def _describe_environment():
 def _describe_python():
     import platform
     return {
-        'python': platform.python_version(),
+        'version': platform.python_version(),
         'implementation': platform.python_implementation(),
     }
 
