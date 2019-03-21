@@ -73,9 +73,7 @@ def test_invalid_call(path):
 def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
-    # TODO RF the helper above to produce a proper hierarchy
-    # and then use rev_save()
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
 
     with chpwd(dspath):
@@ -324,15 +322,13 @@ def test_get_modified_subpaths(path):
 def test_recurseinto(dspath, dest):
     # make fresh dataset hierarchy
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
-    # TODO RF the helper above to produce a proper hierarchy, and then
-    # use rev_save()
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     # label intermediate dataset as 'norecurseinto'
     res = Dataset(opj(ds.path, 'b')).subdatasets(
         contains='bb',
         set_property=[('datalad-recursiveinstall', 'skip')])
     assert_result_count(res, 1, path=opj(ds.path, 'b', 'bb'))
-    ds.rev_save('b/', recursive=True)
+    ds.rev_save('b', recursive=True)
     ok_clean_git(ds.path)
 
     # recursive install, should skip the entire bb branch

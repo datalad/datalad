@@ -129,7 +129,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
     for node, items in tree.items():
         if isinstance(items, dict):
             node_path = opj(path, node)
-            nodeds = Dataset(node_path).create(force=True)
+            nodeds = parent.rev_create(node_path, force=True)
             make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
     return parent
 
@@ -139,9 +139,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    # TODO RF the helper above to produce a proper hierarchy
-    # and then use rev_save()
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
@@ -314,9 +312,7 @@ def test_discover_ds_trace(path, otherdir):
     # we have to check whether we get the correct hierarchy, as the test
     # subject is also involved in this
     assert_true(exists(opj(db, 'file_db')))
-    # TODO RF the helper above to produce a proper hierarchy
-    # and then use rev_save()
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
     # now two datasets which are not available locally, but we
     # know about them (e.g. from metadata)
