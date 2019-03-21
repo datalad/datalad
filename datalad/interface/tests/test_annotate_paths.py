@@ -34,6 +34,8 @@ from datalad.api import install
 from datalad.interface.annotate_paths import get_modified_subpaths
 from datalad.utils import chpwd
 
+from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
+
 
 __docformat__ = 'restructuredtext'
 
@@ -50,17 +52,6 @@ demo_hierarchy = {
                     'file_bbaa': 'file_bbaa'}},
             'file_bb': 'file_bb'}},
 }
-
-
-def make_demo_hierarchy_datasets(path, tree, parent=None):
-    if parent is None:
-        parent = Dataset(path).create(force=True)
-    for node, items in tree.items():
-        if isinstance(items, dict):
-            node_path = opj(path, node)
-            nodeds = Dataset(node_path).create(force=True)
-            make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
-    return parent
 
 
 @with_tempfile(mkdir=True)
