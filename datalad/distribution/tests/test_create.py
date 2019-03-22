@@ -266,6 +266,8 @@ def test_nested_create(path):
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
     ds.repo._run_annex_command('unannex', annex_options=[opj(lvl2relpath, 'file')])
+    # in v7 repos the unannex ends up with a staged deletion
+    ds.repo.commit(careless=True)
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_in_results(
