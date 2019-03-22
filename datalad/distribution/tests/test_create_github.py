@@ -31,15 +31,15 @@ except ImportError:
 def test_invalid_call(path):
     # no dataset
     assert_raises(ValueError, create_sibling_github, 'bogus', dataset=path)
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     # no user
     assert_raises(gh.BadCredentialsException, ds.create_sibling_github, 'bogus', github_login='disabledloginfortesting')
 
 
 @with_tempfile
 def test_dont_trip_over_missing_subds(path):
-    ds1 = Dataset(opj(path, 'ds1')).create()
-    ds2 = Dataset(opj(path, 'ds2')).create()
+    ds1 = Dataset(opj(path, 'ds1')).rev_create()
+    ds2 = Dataset(opj(path, 'ds2')).rev_create()
     subds2 = ds1.install(
         source=ds2.path, path='subds2',
         result_xfm='datasets', return_type='item-or-list')

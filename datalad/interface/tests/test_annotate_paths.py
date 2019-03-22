@@ -34,6 +34,8 @@ from datalad.api import install
 from datalad.interface.annotate_paths import get_modified_subpaths
 from datalad.utils import chpwd
 
+from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
+
 
 __docformat__ = 'restructuredtext'
 
@@ -50,17 +52,6 @@ demo_hierarchy = {
                     'file_bbaa': 'file_bbaa'}},
             'file_bb': 'file_bb'}},
 }
-
-
-def make_demo_hierarchy_datasets(path, tree, parent=None):
-    if parent is None:
-        parent = Dataset(path).create(force=True)
-    for node, items in tree.items():
-        if isinstance(items, dict):
-            node_path = opj(path, node)
-            nodeds = Dataset(node_path).create(force=True)
-            make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
-    return parent
 
 
 @with_tempfile(mkdir=True)
@@ -82,7 +73,7 @@ def test_invalid_call(path):
 def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
 
     with chpwd(dspath):
@@ -224,11 +215,11 @@ def test_annotate_paths(dspath, nodspath):
 @slow  # 11.0891s
 @with_tree(demo_hierarchy['b'])
 def test_get_modified_subpaths(path):
-    ds = Dataset(path).create(force=True)
-    suba = ds.create('ba', force=True)
-    subb = ds.create('bb', force=True)
-    subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
-    ds.add('.', recursive=True)
+    ds = Dataset(path).rev_create(force=True)
+    suba = ds.rev_create('ba', force=True)
+    subb = ds.rev_create('bb', force=True)
+    subsub = ds.rev_create(opj('bb', 'bba', 'bbaa'), force=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(path)
 
     orig_base_commit = ds.repo.repo.commit().hexsha
@@ -241,7 +232,7 @@ def test_get_modified_subpaths(path):
 
     # modify one subdataset
     create_tree(subsub.path, {'added': 'test'})
-    subsub.add('added')
+    subsub.rev_save('added')
 
     # it will replace the requested path with the path of the closest
     # submodule that is modified
@@ -264,7 +255,7 @@ def test_get_modified_subpaths(path):
         type='dataset')
 
     # now save uptop, this will the new state of subb, but keep suba dirty
-    ds.save(subb.path, recursive=True)
+    ds.rev_save(subb.path, recursive=True)
     # now if we ask for what was last saved, we only get the new state of subb
     assert_result_count(
         get_modified_subpaths(
@@ -283,7 +274,7 @@ def test_get_modified_subpaths(path):
         type='dataset', path=suba.path)
 
     # add/save everything, become clean
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(path)
     # nothing is reported as modified
     assert_result_count(
@@ -331,13 +322,13 @@ def test_get_modified_subpaths(path):
 def test_recurseinto(dspath, dest):
     # make fresh dataset hierarchy
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     # label intermediate dataset as 'norecurseinto'
     res = Dataset(opj(ds.path, 'b')).subdatasets(
         contains='bb',
         set_property=[('datalad-recursiveinstall', 'skip')])
     assert_result_count(res, 1, path=opj(ds.path, 'b', 'bb'))
-    ds.add('b/', recursive=True)
+    ds.rev_save('b', recursive=True)
     ok_clean_git(ds.path)
 
     # recursive install, should skip the entire bb branch

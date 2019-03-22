@@ -167,7 +167,7 @@ def test_add_recursive(path):
     # next one make the parent dirty
     subsub = sub2.create('subsub')
     ok_clean_git(parent.path, index_modified=['sub2'])
-    res = parent.save()
+    res = parent.rev_save()
     ok_clean_git(parent.path)
 
     # now add content deep in the hierarchy

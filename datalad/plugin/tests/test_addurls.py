@@ -288,7 +288,7 @@ def test_extract_wrong_input_type():
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).rev_create(force=True, no_annex=True)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
@@ -296,7 +296,7 @@ def test_addurls_nonannex_repo(path):
 
 @with_tempfile(mkdir=True)
 def test_addurls_dry_run(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
 
     with chpwd(path):
         json_file = "links.json"
@@ -306,7 +306,7 @@ def test_addurls_dry_run(path):
                        {"url": "URL/c.dat", "name": "c", "subdir": "foo"}],
                       jfh)
 
-        ds.add(".", message="setup")
+        ds.rev_save(message="setup")
 
         with swallow_logs(new_level=logging.INFO) as cml:
             ds.addurls(json_file,
@@ -405,7 +405,7 @@ class TestAddurls(object):
             ds.unlock("a")
             with open("a", "w") as ofh:
                 ofh.write("changed")
-            ds.add("a")
+            ds.rev_save("a")
 
             assert_raises(IncompleteResultsError,
                           ds.addurls,
@@ -439,7 +439,7 @@ class TestAddurls(object):
 
             # Now save the "--nosave" changes and check that we have
             # all the subdatasets.
-            ds.add(".")
+            ds.rev_save()
             eq_(set(subdatasets(ds, recursive=True,
                                 result_xfm="relpaths")),
                 {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})

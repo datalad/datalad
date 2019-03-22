@@ -21,8 +21,8 @@ from nose.tools import assert_equal
 
 @with_tree(tree={'file.dat': ''})
 def check_api(no_annex, path):
-    ds = Dataset(path).create(force=True, no_annex=no_annex)
-    ds.add('.')
+    ds = Dataset(path).rev_create(force=True, no_annex=no_annex)
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     processed_extractors, skipped_extractors = [], []

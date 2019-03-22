@@ -423,7 +423,7 @@ def test_gh1597(path):
         raise SkipTest(
             'this test causes appveyor to crash, reason unknown')
     ds = Dataset(path).rev_create()
-    sub = ds.create('sub')
+    sub = ds.rev_create('sub')
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # now modify .gitmodules with another command

@@ -125,7 +125,7 @@ def test_invalid_call(path):
             ValueError,
             create_sibling, 'localhost:/tmp/somewhere', dataset='/nothere')
     # pre-configure a bogus remote
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     ds.repo.add_remote('bogus', 'http://bogus.url.com')
     # fails to reconfigure by default with generated
     # and also when given an existing name
@@ -355,7 +355,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         # verify that we can create-sibling which was created later and possibly
         # first published in super-dataset as an empty directory
         sub3_name = 'subm 3-%s' % flat
-        sub3 = source.create(sub3_name)
+        sub3 = source.rev_create(sub3_name)
         # since is an empty value to force it to consider all changes since we published
         # already
         with chpwd(source.path):
@@ -388,7 +388,7 @@ def test_target_ssh_since(origin, src_path, target_path):
     source = install(src_path, source=origin, recursive=True)
     eq_(len(source.subdatasets()), 2)
     # get a new subdataset and make sure it is committed in the super
-    source.create('brandnew')
+    source.rev_create('brandnew')
     eq_(len(source.subdatasets()), 3)
     ok_clean_git(source.path)
 
@@ -407,9 +407,9 @@ def test_target_ssh_since(origin, src_path, target_path):
     eq_(['brandnew'], os.listdir(target_path))
 
     # now test functionality if we add a subdataset with a subdataset
-    brandnew2 = source.create('brandnew2')
-    brandnewsub = brandnew2.create('sub')
-    brandnewsubsub = brandnewsub.create('sub')
+    brandnew2 = source.rev_create('brandnew2')
+    brandnewsub = brandnew2.rev_create('sub')
+    brandnewsubsub = brandnewsub.rev_create('sub')
     # and now we create a sibling for the new subdataset only
     assert_create_sshwebserver(
         name='dominique_carrera',
@@ -427,7 +427,7 @@ def test_target_ssh_since(origin, src_path, target_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_failon_no_permissions(src_path, target_path):
-    ds = Dataset(src_path).create()
+    ds = Dataset(src_path).rev_create()
     # remove user write permissions from target path
     chmod(target_path, stat.S_IREAD | stat.S_IEXEC)
     assert_raises(
@@ -459,9 +459,9 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     remote_home = remote_home.rstrip('\n')
     dst_relpath = os.path.relpath(dst_path, remote_home)
     url = 'localhost:%s' % dst_relpath
-    ds = Dataset(src_path).create()
+    ds = Dataset(src_path).rev_create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
-    ds.add('sub.dat')
+    ds.rev_save('sub.dat')
     ds.create_sibling(url)
     published = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
@@ -485,7 +485,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     # and one more test since in above test it would not puke ATM but just
     # not even try to copy since it assumes that file is already there
     create_tree(ds.path, {'sub2.dat': 'more data'})
-    ds.add('sub2.dat')
+    ds.rev_save('sub2.dat')
     published3 = ds.publish(to='localhost', transfer_data='none')  # we publish just git
     assert_result_count(published3, 0, path=opj(ds.path, 'sub2.dat'))
     # now publish "with" data, which should also trigger the hook!
@@ -504,7 +504,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
 @with_tempfile(mkdir=True)
 @with_tempfile(suffix="target")
 def _test_target_ssh_inherit(standardgroup, src_path, target_path):
-    ds = Dataset(src_path).create()
+    ds = Dataset(src_path).rev_create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
     # for the test of setting a group, will just smoke test while using current
@@ -516,9 +516,9 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
     ds.publish(to=remote)
 
     # now a month later we created a new subdataset
-    subds = ds.create('sub')  # so now we got a hierarchy!
+    subds = ds.rev_create('sub')  # so now we got a hierarchy!
     create_tree(subds.path, {'sub.dat': 'lots of data'})
-    subds.add('sub.dat')
+    subds.rev_save('sub.dat')
     ok_file_under_git(subds.path, 'sub.dat', annexed=True)
 
     target_sub = Dataset(opj(target_path, 'sub'))

@@ -44,8 +44,8 @@ def test_failure(path):
 
 @with_tree(_dataset_template)
 def test_archive(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True)
-    ds.add('.')
+    ds = Dataset(opj(path, 'ds')).rev_create(force=True)
+    ds.rev_save()
     committed_date = ds.repo.get_commit_date()
     default_outname = opj(path, 'datalad_{}.tar.gz'.format(ds.id))
     with chpwd(path):
@@ -95,8 +95,8 @@ def test_archive(path):
 
 @with_tree(_dataset_template)
 def test_zip_archive(path):
-    ds = Dataset(opj(path, 'ds')).create(force=True, no_annex=True)
-    ds.add('.')
+    ds = Dataset(opj(path, 'ds')).rev_create(force=True, no_annex=True)
+    ds.rev_save()
     with chpwd(path):
         ds.export_archive(filename='my', archivetype='zip')
         assert_true(os.path.exists('my.zip'))

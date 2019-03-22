@@ -23,10 +23,7 @@ for nt in sys.argv[2:]:
         where='dataset',
         reload=False)
 
-ds.save(
-    path=[dict(
-        path=op.join(ds.path, '.datalad', 'config'),
-        type='file',
-        parentds=ds.path)],
+ds.rev_save(
+    path=op.join(ds.path, '.datalad', 'config'),
     message="Configure metadata type(s)",
 )

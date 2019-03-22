@@ -50,7 +50,7 @@ def test_magic_number():
 def test_diff(path, norepo):
     with chpwd(norepo):
         assert_status('impossible', diff(on_failure='ignore'))
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     ok_clean_git(ds.path)
     # reports stupid revision input
     assert_result_count(
@@ -64,12 +64,9 @@ def test_diff(path, norepo):
     assert_result_count(ds.diff(revision='HEAD'), 0)
     # bogus path makes no difference
     assert_result_count(ds.diff(path='THIS', revision='HEAD'), 0)
-    # comparing to a previous state we should get a diff in most cases
-    # for this test, let's not care what exactly it is -- will do later
-    assert len(ds.diff(revision='HEAD~1')) > 0
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
-    ds.add('.', to_git=True)
+    ds.rev_save(to_git=True)
     ok_clean_git(ds.path)
     res = ds.diff(revision='HEAD~1')
     assert_result_count(res, 1)
@@ -96,7 +93,7 @@ def test_diff(path, norepo):
         ds.diff('new'), 1,
         action='diff', path=opj(ds.path, 'new'), state='modified')
     # stage changes
-    ds.add('.', to_git=True, save=False)
+    ds.repo.add('.', git=True)
     # no diff, because we staged the modification
     assert_result_count(ds.diff(), 0)
     # but we can get at it
@@ -107,7 +104,7 @@ def test_diff(path, norepo):
     assert_result_count(
         ds.diff(revision='HEAD'), 1,
         action='diff', path=opj(ds.path, 'new'), state='modified')
-    ds.save()
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     # untracked stuff
@@ -131,7 +128,7 @@ def test_diff(path, norepo):
         ds.diff(path='deep'), 1,
         state='untracked', path=opj(ds.path, 'deep'))
     # now we stage on of the two files in deep
-    ds.add(opj('deep', 'down2'), to_git=True, save=False)
+    ds.repo.add(opj('deep', 'down2'), git=True)
     # without any reference it will ignore the staged stuff and report the remaining
     # untracked file
     assert_result_count(
@@ -146,8 +143,8 @@ def test_diff(path, norepo):
 
 @with_tempfile(mkdir=True)
 def test_diff_recursive(path):
-    ds = Dataset(path).create()
-    sub = ds.create('sub')
+    ds = Dataset(path).rev_create()
+    sub = ds.rev_create('sub')
     # look at the last change, and confirm a dataset was added
     res = ds.diff(revision='HEAD~1..HEAD')
     assert_result_count(res, 1, action='diff', state='added', path=sub.path, type='dataset')
@@ -167,11 +164,11 @@ def test_diff_recursive(path):
     assert_result_count(res, 1, action='diff', state='modified', path=sub.path, type='dataset')
     assert_result_count(res, 1, action='diff', state='untracked', path=opj(sub.path, 'twofile'), type='file')
     # save sub
-    sub.add('.')
+    sub.rev_save()
     # save sub in parent
-    ds.save()
+    ds.rev_save(sub.path)
     # save addition in parent
-    ds.add('.')
+    ds.rev_save()
     ok_clean_git(ds.path)
     # look at the last change, only one file was added
     res = ds.diff(revision='HEAD~1..HEAD')
@@ -203,17 +200,17 @@ def test_diff_recursive(path):
 })
 def test_diff_helper(path):
     # make test dataset components of interesting states
-    ds = Dataset.create(path, force=True)
+    ds = Dataset.rev_create(path, force=True)
     # detached dataset, not a submodule
-    nosub = Dataset.create(opj(path, 'nosub'))
+    nosub = Dataset.rev_create(opj(path, 'nosub'))
     # unmodified, proper submodule
-    sub_clean = ds.create('sub_clean', force=True)
+    sub_clean = ds.rev_create('sub_clean', force=True)
     # proper submodule, but commited modifications not commited in parent
-    sub_modified = ds.create('sub_modified', force=True)
-    sub_modified.add('modified')
+    sub_modified = ds.rev_create('sub_modified', force=True)
+    sub_modified.rev_save('modified')
     # proper submodule with untracked changes
-    sub_dirty = ds.create('sub_dirty', force=True)
-    ds.add(['clean', 'modified'])
+    sub_dirty = ds.rev_create('sub_dirty', force=True)
+    ds.rev_save(['clean', 'modified'])
     ds.unlock('modified')
     with open(opj(ds.path, 'modified'), 'w') as f:
         f.write('modified_content')
