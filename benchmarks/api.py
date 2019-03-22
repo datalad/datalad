@@ -16,8 +16,15 @@ import timeit
 
 from subprocess import call
 
-from datalad.api import rev_save
-from datalad.api import rev_create
+try:
+    from datalad.api import rev_save
+    from datalad.api import rev_create
+except ImportError:
+    # If it is a version without revolution - those will not be benchmarked
+    pass
+
+from datalad.api import add
+from datalad.api import create
 from datalad.api import create_test_dataset
 from datalad.api import Dataset
 from datalad.api import install
@@ -101,12 +108,19 @@ class supers(SuprocBenchmarks):
         # somewhat duplicating setup but lazy to do different one for now
         assert install(self.ds.path + '_', source=self.ds.path, recursive=True)
 
-    def time_createadd(self, tarfile_path):
+    def time_rev_createadd(self, tarfile_path):
         assert self.ds.rev_create('newsubds')
 
-    def time_createadd_to_dataset(self, tarfile_path):
+    def time_rev_createadd_to_dataset(self, tarfile_path):
         subds = rev_create(opj(self.ds.path, 'newsubds'))
         self.ds.rev_save(subds.path)
+
+    def time_createadd(self, tarfile_path):
+        assert self.ds.create('newsubds')
+
+    def time_createadd_to_dataset(self, tarfile_path):
+        subds = create(opj(self.ds.path, 'newsubds'))
+        self.ds.add(subds.path)
 
     def time_ls(self, tarfile_path):
         ls(self.ds.path)
