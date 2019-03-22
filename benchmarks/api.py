@@ -16,8 +16,8 @@ import timeit
 
 from subprocess import call
 
-from datalad.api import rev-save
-from datalad.api import create
+from datalad.api import rev_save
+from datalad.api import rev_create
 from datalad.api import create_test_dataset
 from datalad.api import Dataset
 from datalad.api import install
@@ -102,10 +102,10 @@ class supers(SuprocBenchmarks):
         assert install(self.ds.path + '_', source=self.ds.path, recursive=True)
 
     def time_createadd(self, tarfile_path):
-        assert self.ds.create('newsubds')
+        assert self.ds.rev_create('newsubds')
 
     def time_createadd_to_dataset(self, tarfile_path):
-        subds = create(opj(self.ds.path, 'newsubds'))
+        subds = rev_create(opj(self.ds.path, 'newsubds'))
         self.ds.rev_save(subds.path)
 
     def time_ls(self, tarfile_path):

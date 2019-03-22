@@ -19,7 +19,7 @@ from os.path import lexists
 from ..dataset import Dataset
 from datalad.api import publish, install
 from datalad.api import install
-from datalad.api import create
+from datalad.api import rev_create
 from datalad.dochelpers import exc_str
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -65,8 +65,8 @@ def test_invalid_call(origin, tdir):
     with chpwd(tdir):
         assert_raises(InsufficientArgumentsError, publish, since='HEAD')
     # new dataset, with unavailable subdataset
-    dummy = Dataset(tdir).create()
-    dummy_sub = dummy.create('sub')
+    dummy = Dataset(tdir).rev_create()
+    dummy_sub = dummy.rev_create('sub')
     dummy_sub.uninstall()
     assert_in('sub', dummy.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # now an explicit call to publish the unavailable subdataset
@@ -83,7 +83,7 @@ def test_invalid_call(origin, tdir):
 @with_tempfile
 @with_tempfile
 def test_smth_about_not_supported(p1, p2):
-    source = Dataset(p1).create()
+    source = Dataset(p1).rev_create()
     from datalad.support.network import PathRI
     source.create_sibling(
         'ssh://localhost' + PathRI(p2).posixpath,
@@ -570,7 +570,7 @@ def test_publish_depends(
 @with_tempfile(mkdir=True)
 def test_gh1426(origin_path, target_path):
     # set up a pair of repos, one the published copy of the other
-    origin = create(origin_path)
+    origin = rev_create(origin_path)
     target = AnnexRepo(target_path, create=True)
     target.config.set(
         'receive.denyCurrentBranch', 'updateInstead', where='local')
@@ -582,7 +582,7 @@ def test_gh1426(origin_path, target_path):
 
     # gist of #1426 is that a newly added subdataset does not cause the
     # superdataset to get published
-    origin.create('sub')
+    origin.rev_create('sub')
     ok_clean_git(origin.path)
     assert_not_equal(origin.repo.get_hexsha(), target.get_hexsha())
     # now push
@@ -631,7 +631,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 @serve_path_via_http
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
-    ds = Dataset(src).create(force=True)
+    ds = Dataset(src).rev_create(force=True)
     ds.rev_save('1')
     ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
                       name='target',
@@ -649,7 +649,7 @@ def test_publish_target_url(src, desttop, desturl):
 def test_gh1763(src, target1, target2):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763
-    src = Dataset(src).create(force=True)
+    src = Dataset(src).rev_create(force=True)
     src.create_sibling(
         'ssh://datalad-test' + target1,
         name='target1')

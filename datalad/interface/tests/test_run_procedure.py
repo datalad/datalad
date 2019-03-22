@@ -61,7 +61,7 @@ rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_basics(path, super_path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     assert_false(ds.repo.is_under_annex("README.md"))
@@ -84,7 +84,7 @@ def test_basics(path, super_path):
     ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
 
     # make a fresh dataset:
-    super = Dataset(super_path).create()
+    super = Dataset(super_path).rev_create()
     # configure dataset to run the demo procedure prior to the clean command
     super.config.add(
         'datalad.clean.proc-pre',
@@ -129,7 +129,7 @@ def test_procedure_discovery(path, super_path):
             len(ps))
 
     # set up dataset with registered procedure (c&p from test_basics):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
@@ -160,7 +160,7 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
 
     # make it a subdataset and try again:
-    super = Dataset(super_path).create()
+    super = Dataset(super_path).rev_create()
     super.install('sub', source=ds.path)
 
     ps = super.run_procedure(discover=True)
@@ -213,7 +213,7 @@ rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.run_procedure('setup_yoda_dataset')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder

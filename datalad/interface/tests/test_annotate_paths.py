@@ -215,10 +215,10 @@ def test_annotate_paths(dspath, nodspath):
 @slow  # 11.0891s
 @with_tree(demo_hierarchy['b'])
 def test_get_modified_subpaths(path):
-    ds = Dataset(path).create(force=True)
-    suba = ds.create('ba', force=True)
-    subb = ds.create('bb', force=True)
-    subsub = ds.create(opj('bb', 'bba', 'bbaa'), force=True)
+    ds = Dataset(path).rev_create(force=True)
+    suba = ds.rev_create('ba', force=True)
+    subb = ds.rev_create('bb', force=True)
+    subsub = ds.rev_create(opj('bb', 'bba', 'bbaa'), force=True)
     ds.rev_save(recursive=True)
     ok_clean_git(path)
 

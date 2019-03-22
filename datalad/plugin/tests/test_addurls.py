@@ -288,7 +288,7 @@ def test_extract_wrong_input_type():
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
-    ds = Dataset(path).create(force=True, no_annex=True)
+    ds = Dataset(path).rev_create(force=True, no_annex=True)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
@@ -296,7 +296,7 @@ def test_addurls_nonannex_repo(path):
 
 @with_tempfile(mkdir=True)
 def test_addurls_dry_run(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
 
     with chpwd(path):
         json_file = "links.json"

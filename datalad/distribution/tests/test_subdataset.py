@@ -170,8 +170,8 @@ def test_get_subdatasets(path):
 
 @with_tempfile
 def test_state(path):
-    ds = Dataset.create(path)
-    sub = ds.create('sub')
+    ds = Dataset.rev_create(path)
+    sub = ds.rev_create('sub')
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # by default we are not reporting any state info
@@ -194,9 +194,9 @@ def test_state(path):
 
 @with_tempfile
 def test_get_subdatasets_types(path):
-    from datalad.api import create
-    ds = create(path)
-    ds.create('1')
-    ds.create('true')
+    from datalad.api import rev_create
+    ds = rev_create(path)
+    ds.rev_create('1')
+    ds.rev_create('true')
     # no types casting should happen
     eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])

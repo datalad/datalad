@@ -23,7 +23,7 @@ from mock import patch
 
 from datalad.utils import getpwd
 
-from datalad.api import create
+from datalad.api import rev_create
 from datalad.api import install
 from datalad.api import get
 from datalad import consts
@@ -177,7 +177,7 @@ def test_invalid_args(path):
     # install to a remote location
     assert_raises(ValueError, install, 'ssh://mars/Zoidberg', source='Zoidberg')
     # make fake dataset
-    ds = create(path)
+    ds = rev_create(path)
     assert_raises(IncompleteResultsError, install, '/higherup.', 'Zoidberg', dataset=ds)
 
 
@@ -431,7 +431,7 @@ def test_install_recursive_with_data(src, path):
 @with_tempfile
 def test_install_into_dataset(source, top_path):
 
-    ds = create(top_path)
+    ds = rev_create(top_path)
     ok_clean_git(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
@@ -457,7 +457,7 @@ def test_install_into_dataset(source, top_path):
 
     # and we should achieve the same behavior if we create a dataset
     # and then decide to add it
-    create(_path_(top_path, 'sub3'))
+    rev_create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
     ds.rev_save('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
@@ -469,10 +469,10 @@ def test_install_into_dataset(source, top_path):
 @use_cassette('test_install_crcns')
 @with_tempfile
 def test_failed_install_multiple(top_path):
-    ds = create(top_path)
+    ds = rev_create(top_path)
 
-    create(_path_(top_path, 'ds1'))
-    create(_path_(top_path, 'ds3'))
+    rev_create(_path_(top_path, 'ds1'))
+    rev_create(_path_(top_path, 'ds3'))
     ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
 
     # specify install with multiple paths and one non-existing
@@ -527,9 +527,9 @@ def test_install_known_subdataset(src, path):
 @with_tempfile(mkdir=True)
 def test_implicit_install(src, dst):
 
-    origin_top = create(src)
-    origin_sub = origin_top.create("sub")
-    origin_subsub = origin_sub.create("subsub")
+    origin_top = rev_create(src)
+    origin_sub = origin_top.rev_create("sub")
+    origin_subsub = origin_sub.rev_create("subsub")
     with open(opj(origin_top.path, "file1.txt"), "w") as f:
         f.write("content1")
     origin_top.rev_save("file1.txt")
@@ -588,7 +588,7 @@ def test_implicit_install(src, dst):
 
 @with_tempfile(mkdir=True)
 def test_failed_install(dspath):
-    ds = create(dspath)
+    ds = rev_create(dspath)
     assert_raises(IncompleteResultsError,
                   ds.install,
                   "sub",
@@ -643,10 +643,10 @@ def test_reckless(path, top_path):
 @with_tempfile(mkdir=True)
 @skip_if_on_windows  # Due to "another process error" and buggy ok_clean_git
 def test_install_recursive_repeat(src, path):
-    top_src = Dataset(src).create(force=True)
-    sub1_src = top_src.create('sub 1', force=True)
-    sub2_src = top_src.create('sub 2', force=True)
-    subsub_src = sub1_src.create('subsub', force=True)
+    top_src = Dataset(src).rev_create(force=True)
+    sub1_src = top_src.rev_create('sub 1', force=True)
+    sub2_src = top_src.rev_create('sub 2', force=True)
+    subsub_src = sub1_src.rev_create('subsub', force=True)
     top_src.rev_save(recursive=True)
     ok_clean_git(top_src.path)
 
@@ -757,10 +757,10 @@ def test_install_skip_failed_recursive(src, path):
                  })
 @with_tempfile(mkdir=True)
 def test_install_noautoget_data(src, path):
-    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
-    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
-    sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
-    top_src = Dataset(src).create(force=True)
+    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).rev_create(force=True)
+    sub1_src = Dataset(opj(src, 'sub 1')).rev_create(force=True)
+    sub2_src = Dataset(opj(src, 'sub 2')).rev_create(force=True)
+    top_src = Dataset(src).rev_create(force=True)
     top_src.rev_save(recursive=True)
 
     # install top level:
@@ -775,7 +775,7 @@ def test_install_noautoget_data(src, path):
 @with_tempfile
 @with_tempfile
 def test_install_source_relpath(src, dest):
-    ds1 = create(src)
+    ds1 = rev_create(src)
     src_ = basename(src)
     with chpwd(dirname(src)):
         ds2 = install(dest, source=src_)
@@ -794,8 +794,8 @@ def test_install_consistent_state(src, dest, dest2, dest3):
     # position where previous location was pointing to.
     # It is indeed a mere heuristic which might not hold the assumption in some
     # cases, but it would work for most simple and thus mostly used ones
-    ds1 = create(src)
-    sub1 = ds1.create('sub1')
+    ds1 = rev_create(src)
+    sub1 = ds1.rev_create('sub1')
 
     def check_consistent_installation(ds):
         datasets = [ds] + list(
@@ -811,7 +811,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     dest_ds = install(dest, source=src)
     # now we progress sub1 by adding sub2
-    subsub2 = sub1.create('sub2')
+    subsub2 = sub1.rev_create('sub2')
 
     # and progress subsub2 forward to stay really thorough
     put_file_under_git(subsub2.path, 'file.dat', content="data")
@@ -849,8 +849,8 @@ from datalad.tests.utils import skip_ssh
 @with_tempfile
 @with_tempfile
 def test_install_subds_with_space(opath, tpath):
-    ds = create(opath)
-    ds.create('sub ds')
+    ds = rev_create(opath)
+    ds.rev_create('sub ds')
     # works even now, boring
     # install(tpath, source=opath, recursive=True)
     if on_windows:
@@ -867,8 +867,8 @@ def test_install_subds_with_space(opath, tpath):
 @with_tempfile
 @with_tempfile
 def test_install_from_tilda(opath, tpath):
-    ds = create(opath)
-    ds.create('sub ds')
+    ds = rev_create(opath)
+    ds.rev_create('sub ds')
     orelpath = os.path.join(
         '~',
         os.path.relpath(opath, os.path.expanduser('~'))
@@ -890,7 +890,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1_ = 'clone1'
         clone2_ = 'clone2'
 
-        origin = create(origin_, no_annex=True)
+        origin = rev_create(origin_, no_annex=True)
         clone1 = install(source=origin, path=clone1_)
         # print("Initial clone")
         clone1.create_sibling('ssh://localhost%s/%s' % (PathRI(getpwd()).posixpath, clone2_), name=clone2_)
@@ -899,7 +899,7 @@ def test_install_subds_from_another_remote(topdir):
         clone1.publish(to=clone2_)
         clone2 = Dataset(clone2_)
         # print("Initiating subdataset")
-        clone2.create('subds1')
+        clone2.rev_create('subds1')
 
         # print("Updating")
         clone1.update(merge=True, sibling=clone2_)

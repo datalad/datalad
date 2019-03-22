@@ -28,7 +28,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import save
-from datalad.api import create
+from datalad.api import rev_create
 from datalad.api import rev_save
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
@@ -93,7 +93,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
-    subds = ds.create('subds')
+    subds = ds.rev_create('subds')
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
     # modify subds
     with open(opj(subds.path, "some_file.tst"), "w") as f:
@@ -108,7 +108,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # now introduce a change downstairs
-    subds.create('someotherds')
+    subds.rev_create('someotherds')
     ok_clean_git(subds.path, annex=isinstance(subds.repo, AnnexRepo))
     ok_(ds.repo.dirty)
     # and save via subdataset path
@@ -118,13 +118,13 @@ def test_save(path):
 
 @with_tempfile()
 def test_recursive_save(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     # nothing to save
     assert_status('notneeded', ds.save())
-    subds = ds.create('sub')
+    subds = ds.rev_create('sub')
     # subdataset presence already saved
     ok_clean_git(ds.path)
-    subsubds = subds.create('subsub')
+    subsubds = subds.rev_create('subsub')
     assert_equal(
         ds.subdatasets(recursive=True, fulfilled=True, result_xfm='paths'),
         [subds.path, subsubds.path])
@@ -266,7 +266,7 @@ def test_recursive_save(path):
 
 @with_tempfile()
 def test_save_message_file(path):
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     with assert_raises(ValueError):
         ds.save("blah", message="me", message_file="and me")
 
@@ -281,7 +281,7 @@ def test_save_message_file(path):
 def test_renamed_file():
     @with_tempfile()
     def check_renamed_file(recursive, no_annex, path):
-        ds = Dataset(path).create(no_annex=no_annex)
+        ds = Dataset(path).rev_create(no_annex=no_annex)
         create_tree(path, {'old': ''})
         ds.add('old')
         ds.repo._git_custom_command(['old', 'new'], ['git', 'mv'])
@@ -295,8 +295,8 @@ def test_renamed_file():
 
 @with_tempfile(mkdir=True)
 def test_subdataset_save(path):
-    parent = Dataset(path).create()
-    sub = parent.create('sub')
+    parent = Dataset(path).rev_create()
+    sub = parent.rev_create('sub')
     ok_clean_git(parent.path)
     create_tree(parent.path, {
         "untracked": 'ignore',
@@ -342,7 +342,7 @@ def test_symlinked_relpath(path):
     os.makedirs(opj(path, "origin"))
     dspath = opj(path, "linked")
     os.symlink('origin', dspath)
-    ds = Dataset(dspath).create()
+    ds = Dataset(dspath).rev_create()
     create_tree(dspath, {
         "mike1": 'mike1',  # will be added from topdir
         "later": "later",  # later from within subdir
@@ -370,8 +370,8 @@ def test_symlinked_relpath(path):
 
 @with_tempfile(mkdir=True)
 def test_bf1886(path):
-    parent = Dataset(path).create()
-    sub = parent.create('sub')
+    parent = Dataset(path).rev_create()
+    sub = parent.rev_create('sub')
     ok_clean_git(parent.path)
     # create a symlink pointing down to the subdataset, and add it
     os.symlink('sub', opj(parent.path, 'down'))
@@ -388,7 +388,7 @@ def test_bf1886(path):
     ok_clean_git(parent.path)
     # simulatenously add a subds and a symlink pointing to it
     # create subds, but don't register it
-    sub2 = create(opj(parent.path, 'sub2'))
+    sub2 = rev_create(opj(parent.path, 'sub2'))
     os.symlink(
         opj(pardir, pardir, 'sub2'),
         opj(parent.path, 'subdir', 'subsubdir', 'upup2'))
@@ -396,7 +396,7 @@ def test_bf1886(path):
     ok_clean_git(parent.path)
     # full replication of #1886: the above but be in subdir of symlink
     # with no reference dataset
-    sub3 = create(opj(parent.path, 'sub3'))
+    sub3 = rev_create(opj(parent.path, 'sub3'))
     os.symlink(
         opj(pardir, pardir, 'sub3'),
         opj(parent.path, 'subdir', 'subsubdir', 'upup3'))
@@ -419,7 +419,7 @@ def test_bf1886(path):
 def test_gh2043p1(path):
     # this tests documents the interim agreement on what should happen
     # in the case documented in gh-2043
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.add('1')
     ok_clean_git(ds.path, untracked=['2', '3'])
     ds.unlock('1')
@@ -445,7 +445,7 @@ def test_gh2043p1(path):
     'staged': 'staged',
     'untracked': 'untracked'})
 def test_bf2043p2(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.add('staged', save=False)
     ok_clean_git(ds.path, head_modified=['staged'], untracked=['untracked'])
     # plain save does not commit untracked content

@@ -13,7 +13,7 @@
 
 from os.path import join as opj
 
-from datalad.coreapi import create
+from datalad.api import rev_create
 from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
 from datalad.api import wtf
@@ -72,7 +72,7 @@ def test_wtf(path):
             assert_not_in('## dataset', cmo.out)
             assert_in('## configuration', cmo.out)
     # now with a dataset
-    ds = create(path)
+    ds = rev_create(path)
     with swallow_outputs() as cmo:
         wtf(dataset=ds.path)
         assert_in('## configuration', cmo.out)
@@ -117,7 +117,7 @@ def test_wtf(path):
 
 @with_tempfile(mkdir=True)
 def test_no_annex(path):
-    ds = create(path)
+    ds = rev_create(path)
     ok_clean_git(ds.path)
     create_tree(
         ds.path,
@@ -158,7 +158,7 @@ _ds_template = {
 
 @with_tree(_ds_template)
 def test_add_readme(path):
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.rev_save()
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
