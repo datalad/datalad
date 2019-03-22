@@ -10,6 +10,8 @@
 
 import os.path as op
 
+import logging
+
 from mock import patch
 
 from ..providers import Provider
@@ -23,6 +25,7 @@ from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
 from ...tests.utils import ok_exists
+from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
 from ...tests.utils import with_testsui
@@ -226,3 +229,28 @@ def test_providers_multiple_matches(path):
     # When selecting a single one, the later one is given priority.
     the_chosen_one = providers.get_provider('https://foo.org/data')
     assert_equal(the_chosen_one.name, "foo1")
+
+@with_tree(tree={'providers.cfg': """\
+[provider:foo0]
+url_re = https?://[foo-a\.org]/.*
+authentication_type = none
+
+[provider:foo1]
+url_re = https?://foo\.org/.*
+authentication_type = none
+"""})
+def test_providers_badre(path):
+    """Test that a config with a bad regular expression doesn't crash
+
+    Ensure that when a provider config has a bad url_re, there is no
+	exception thrown and a valid warning is provided.
+    """
+
+    providers = Providers.from_config_files(
+        files=[op.join(path, "providers.cfg")], reload=True)
+
+
+    # When selecting a single one, the later one is given priority.
+    with swallow_logs(logging.WARNING) as msg:
+        the_chosen_one = providers.get_provider('https://foo.org/data')
+        assert_in("Invalid regex", msg.out)
