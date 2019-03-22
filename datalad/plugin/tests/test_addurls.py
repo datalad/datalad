@@ -12,6 +12,7 @@
 import json
 import logging
 import os
+import os.path as op
 import tempfile
 
 from mock import patch
@@ -431,8 +432,12 @@ class TestAddurls(object):
                            save=save)
                 hexsha_after = ds.repo.get_hexsha()
 
-                for fname in ["foo-{}/a", "bar-{}/b", "foo-{}/c"]:
-                    ok_exists(fname.format(label))
+                subdirs = ["{}-{}".format(d, label) for d in ["foo", "bar"]]
+                subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
+
+                for subds, fnames in subdir_files.items():
+                    for fname in fnames:
+                        ok_exists(op.join(subds, fname))
 
                 assert_true(save ^ (hexsha_before == hexsha_after))
                 assert_true(save ^ ds.repo.dirty)
@@ -469,16 +474,16 @@ class TestAddurls(object):
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
 
-            for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
-                ok_exists(fname)
+            for fname in ["a.dat", "b.dat", "c.dat"]:
+                ok_exists(op.join("udir", fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename(self, path):
         ds = Dataset(path).create(force=True)
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}")
-            for fname in ["udir/a.dat", "udir/b.dat", "udir/c.dat"]:
-                ok_exists(fname)
+            for fname in ["a.dat", "b.dat", "c.dat"]:
+                ok_exists(op.join("udir", fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename_fail(self, path):
