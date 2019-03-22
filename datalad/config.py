@@ -12,7 +12,7 @@
 import datalad
 from datalad.consts import (
     DATASET_CONFIG_FILE,
-    HANDLE_META_DIR,
+    DATALAD_DOTDIR,
 )
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
@@ -547,7 +547,7 @@ class ConfigManager(object):
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path,  HANDLE_META_DIR)
+            dscfg_dirname = opj(self._dataset_path,  DATALAD_DOTDIR)
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(self._dataset_cfgfname):

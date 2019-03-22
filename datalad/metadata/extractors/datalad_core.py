@@ -19,7 +19,7 @@ from os.path import exists
 
 from datalad.consts import (
     DATASET_METADATA_FILE,
-    HANDLE_META_DIR,
+    DATALAD_DOTDIR,
 )
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
@@ -106,7 +106,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         for file, whereis in self.ds.repo.whereis(
                 self.paths if self.paths and valid_paths is None else '.',
                 output='full').items():
-            if file.startswith(HANDLE_META_DIR) or valid_paths and file not in valid_paths:
+            if file.startswith(DATALAD_DOTDIR) or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
             log_progress(
