@@ -26,6 +26,7 @@ from datalad.tests.utils import chpwd, slow, swallow_logs
 from datalad.tests.utils import assert_false, assert_true, assert_raises
 from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
 from datalad.tests.utils import assert_dict_equal
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
 from datalad.utils import get_tempfile_kwargs, rmtemp
@@ -426,11 +427,9 @@ class TestAddurls(object):
         with chpwd(path):
             for save in True, False:
                 label = "save" if save else "nosave"
-                hexsha_before = ds.repo.get_hexsha()
                 ds.addurls(self.json_file, "{url}",
                            "{subdir}-" + label + "//{name}",
                            save=save)
-                hexsha_after = ds.repo.get_hexsha()
 
                 subdirs = ["{}-{}".format(d, label) for d in ["foo", "bar"]]
                 subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
@@ -439,8 +438,14 @@ class TestAddurls(object):
                     for fname in fnames:
                         ok_exists(op.join(subds, fname))
 
-                assert_true(save ^ (hexsha_before == hexsha_after))
-                assert_true(save ^ ds.repo.dirty)
+                if save:
+                    assert_repo_status(path)
+                else:
+                    # The datasets are create and saved ...
+                    assert_repo_status(path, modified=subdirs)
+                    # but the downloaded files aren't.
+                    for subds, fnames in subdir_files.items():
+                        assert_repo_status(subds, added=fnames)
 
             # Now save the "--nosave" changes and check that we have
             # all the subdatasets.
