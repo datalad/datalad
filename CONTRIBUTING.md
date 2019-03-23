@@ -406,6 +406,14 @@ Notes:
   [asv.conf.json](./asv.conf.json))
 
 
+#### Profile a benchmark and produce a nice graph visualization
+
+Example (replace with the benchmark of interest)
+
+    asv profile -v -o profile.gprof usecases.study_forrest.time_make_studyforrest_mockup
+    gprof2dot -f pstats profile.gprof | dot -Tpng -o profile.png \
+        && xdg-open profile.png
+
 #### Common options
 
 - `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`

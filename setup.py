@@ -133,7 +133,8 @@ requires.update({
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
-        'asv',
+        'asv',        # benchmarks
+        'gprof2dot',  # rendering cProfile output as a graph image
         'nose-timer',
         'psutil',
         'coverage',

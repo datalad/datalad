@@ -5,7 +5,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Benchmarks for DataLad"""
+"""Benchmarks of the datalad.api functionality"""
 
 import os
 import sys
