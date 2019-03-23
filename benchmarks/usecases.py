@@ -31,15 +31,11 @@ class study_forrest(SuprocBenchmarks):
     timeout = 180  # especially with profiling might take longer than default 60s
 
     def setup(self):
-        sys.stderr.write("IN SETUP!")
         self.path = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='bm_forrest'))
 
     def teardown(self):
-        sys.stderr.write("IN TEARDOWN!")
         if osp.exists(self.path):
-            sys.stderr.write("REMOVING")
             rmtree(self.path)
-            sys.stderr.write("REMOVED")
 
     def time_make_studyforrest_mockup(self):
         path = self.path
