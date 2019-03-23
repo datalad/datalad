@@ -750,8 +750,8 @@ class Addurls(Interface):
 
         if not dataset.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None, return_type='generator',
-                                    save=save):
+            for r in dataset.rev_create(result_xfm=None,
+                                        return_type='generator'):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -762,8 +762,8 @@ class Addurls(Interface):
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                for r in dataset.create(spath, result_xfm=None,
-                                        return_type='generator', save=save):
+                for r in dataset.rev_create(spath, result_xfm=None,
+                                            return_type='generator'):
                     yield r
 
         for row in rows:
