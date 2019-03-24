@@ -207,7 +207,11 @@ def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
     #
-    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+    return (
+        (not sys.stdin.closed and sys.stdin.isatty()) and
+        (not sys.stdout.closed and sys.stdout.isatty()) and
+        (not sys.stderr.closed and sys.stderr.isatty())
+    )
 
 
 def get_ipython_shell():
