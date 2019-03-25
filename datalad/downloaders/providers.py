@@ -331,10 +331,10 @@ class Providers(object):
                     if re.match(url_re, url):
                         lgr.debug("Returning provider %s for url %s", provider, url)
                         matching_providers.append(provider)
-                except Exception:
+                except re.error as ex:
                     lgr.warning(
-                        "Invalid regex %s in provider %s"
-                        % (url_re, provider.name)
+                        "Invalid regex %s in provider %s: %s"
+                        % (url_re, provider.name, ex.msg)
                     )
 
         if matching_providers:
