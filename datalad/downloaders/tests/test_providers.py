@@ -249,8 +249,9 @@ def test_providers_badre(path):
     providers = Providers.from_config_files(
         files=[op.join(path, "providers.cfg")], reload=True)
 
-
-    # When selecting a single one, the later one is given priority.
+    # Regexes are evaluated when get_provider is called,
+    # so we need to get a random provider, even though it
+    # doesn't match.
     with swallow_logs(logging.WARNING) as msg:
         the_chosen_one = providers.get_provider('https://foo.org/data')
         assert_in("Invalid regex", msg.out)
