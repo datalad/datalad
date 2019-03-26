@@ -175,9 +175,9 @@ Rushed out bugfix release to stay fully compatible with recent
 
 - [shub://datalad/datalad:git-annex-dev](https://singularity-hub.org/containers/5663/view)
   provides a Debian buster Singularity image with build environment for
-  [git-annex]. [tools/bisect-git-annex]() provides a helper for running
+  [git-annex]. `tools/bisect-git-annex` provides a helper for running
   `git bisect` on git-annex using that Singularity container ([#2995])
-- Added [.zenodo.json]() for better integration with Zenodo for citation
+- Added `.zenodo.json` for better integration with Zenodo for citation
 - [run-procedure] now provides names and help messages with a custom
   renderer for ([#2993])
 - Documentation: point to [datalad-revolution] extension (prototype of
