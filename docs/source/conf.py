@@ -17,6 +17,7 @@ import os
 import shlex
 from os.path import join as opj, exists
 from os import pardir
+from glob import glob
 
 
 def setup(sphinx):
@@ -41,6 +42,16 @@ for setup_py_path in (opj(pardir, 'setup.py'),  # travis
         except:
             # shut up and do your best
             pass
+
+# if docs are build for a development version of datalad installed with
+# `pip install -e`, add its location to the path
+if 'VIRTUAL_ENV' in os.environ:
+    site_packages_glob = os.sep.join([
+        os.environ['VIRTUAL_ENV'],
+        'lib', 'python*', 'site-packages', 'datalad.*'])
+    for site_package in glob(site_packages_glob):
+        if site_package.endswith('.egg-link'):
+            sys.path.insert(0, open(site_package).read().strip('\n.'))
 
 # -- General configuration ------------------------------------------------
 
