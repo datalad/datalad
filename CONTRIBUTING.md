@@ -10,11 +10,6 @@ Files organization
   with major submodules being:
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
-    - `crawler/` - functionality for crawling (online) resources and creating
-      or updating datasets and collections based on the scraped/downloaded data
-        - `nodes/` processing elements which are used in the pipeline
-        - `pipelines/` pipelines generators, to produce pipelines to be ran
-        - `pipeline.py` pipeline runner
     - `customremotes/` - custom special remotes for annex provided by datalad
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
