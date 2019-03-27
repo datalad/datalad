@@ -37,6 +37,7 @@ KNOWN_BACKENDS = {
     'annex': UnderAnnexUI,
     'tests': UnderTestsUI,
     'tests-noninteractive': SilentConsoleLog,
+    'no-progress': SilentConsoleLog,
 }
 
 
