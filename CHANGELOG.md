@@ -1066,8 +1066,9 @@ publishing
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 
-[#2752]: https://github.com/datalad/datalad/issues/2752
+[#2992]: https://github.com/datalad/datalad/issues/2992
 [#1350]: https://github.com/datalad/datalad/issues/1350
+[#1651]: https://github.com/datalad/datalad/issues/1651
 [#2692]: https://github.com/datalad/datalad/issues/2692
 [#2702]: https://github.com/datalad/datalad/issues/2702
 [#2703]: https://github.com/datalad/datalad/issues/2703
@@ -1087,6 +1088,7 @@ publishing
 [#2738]: https://github.com/datalad/datalad/issues/2738
 [#2741]: https://github.com/datalad/datalad/issues/2741
 [#2744]: https://github.com/datalad/datalad/issues/2744
+[#2752]: https://github.com/datalad/datalad/issues/2752
 [#2761]: https://github.com/datalad/datalad/issues/2761
 [#2770]: https://github.com/datalad/datalad/issues/2770
 [#2773]: https://github.com/datalad/datalad/issues/2773
@@ -1109,6 +1111,7 @@ publishing
 [#2881]: https://github.com/datalad/datalad/issues/2881
 [#2886]: https://github.com/datalad/datalad/issues/2886
 [#2891]: https://github.com/datalad/datalad/issues/2891
+[#2892]: https://github.com/datalad/datalad/issues/2892
 [#2893]: https://github.com/datalad/datalad/issues/2893
 [#2894]: https://github.com/datalad/datalad/issues/2894
 [#2900]: https://github.com/datalad/datalad/issues/2900
@@ -1117,7 +1120,7 @@ publishing
 [#2903]: https://github.com/datalad/datalad/issues/2903
 [#2904]: https://github.com/datalad/datalad/issues/2904
 [#2905]: https://github.com/datalad/datalad/issues/2905
-[#2909]: https://github.com/datalad/datalad/issues/2900
+[#2909]: https://github.com/datalad/datalad/issues/2909
 [#2912]: https://github.com/datalad/datalad/issues/2912
 [#2914]: https://github.com/datalad/datalad/issues/2914
 [#2917]: https://github.com/datalad/datalad/issues/2917
@@ -1130,11 +1133,12 @@ publishing
 [#2952]: https://github.com/datalad/datalad/issues/2952
 [#2954]: https://github.com/datalad/datalad/issues/2954
 [#2958]: https://github.com/datalad/datalad/issues/2958
+[#2960]: https://github.com/datalad/datalad/issues/2960
 [#2972]: https://github.com/datalad/datalad/issues/2972
+[#2974]: https://github.com/datalad/datalad/issues/2974
 [#2982]: https://github.com/datalad/datalad/issues/2982
 [#2984]: https://github.com/datalad/datalad/issues/2984
 [#2991]: https://github.com/datalad/datalad/issues/2991
-[#2992]: https://github.com/datalad/datalad/issues/2992
 [#2993]: https://github.com/datalad/datalad/issues/2993
 [#2995]: https://github.com/datalad/datalad/issues/2995
 [#3001]: https://github.com/datalad/datalad/issues/3001
@@ -1144,6 +1148,7 @@ publishing
 [#3019]: https://github.com/datalad/datalad/issues/3019
 [#3025]: https://github.com/datalad/datalad/issues/3025
 [#3029]: https://github.com/datalad/datalad/issues/3029
+[#3035]: https://github.com/datalad/datalad/issues/3035
 [#3037]: https://github.com/datalad/datalad/issues/3037
 [#3038]: https://github.com/datalad/datalad/issues/3038
 [#3046]: https://github.com/datalad/datalad/issues/3046
@@ -1174,3 +1179,4 @@ publishing
 [#3164]: https://github.com/datalad/datalad/issues/3164
 [#3165]: https://github.com/datalad/datalad/issues/3165
 [#3168]: https://github.com/datalad/datalad/issues/3168
+[#3196]: https://github.com/datalad/datalad/issues/3196
