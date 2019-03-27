@@ -88,7 +88,12 @@ class ArgumentParserDisableAbbrev(argparse.ArgumentParser):
 def setup_parser(
         cmdlineargs,
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        return_subparsers=False):
+        return_subparsers=False,
+        # prevent loading of extension entrypoints when --help is requested
+        # this is enabled when building docs to avoid pollution of generated
+        # manpages with extensions commands (that should appear in their own
+        # docs, but not in the core datalad package docs)
+        help_ignore_extensions=False):
     lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
@@ -236,7 +241,8 @@ def setup_parser(
     if need_single_subparser is not None \
             or unparsed_arg in ('--help', '--help-np', '-h'):
         need_single_subparser = False
-        add_entrypoints_to_interface_groups(interface_groups)
+        if not help_ignore_extensions:
+            add_entrypoints_to_interface_groups(interface_groups)
     elif unparsed_arg.startswith('-'):  # unknown option
         fail_with_short_help(parser,
                              msg="unrecognized argument %s" % unparsed_arg,
