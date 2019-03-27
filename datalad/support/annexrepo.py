@@ -178,9 +178,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
-        if self.git_annex_version is None:
-            self._check_git_annex_version()
-
         # initialize
         self._uuid = None
         self._annex_common_options = []
@@ -944,6 +941,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
+        if self.git_annex_version is None:
+            self._check_git_annex_version()
+
         debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
         backend = ['--backend=%s' % backend] if backend else []
 
