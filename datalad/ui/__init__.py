@@ -80,7 +80,7 @@ class _UI_Switcher(object):
                 else:
                     backend = 'dialog'
             else:
-                backend = 'console' if not is_interactive() else 'dialog'
+                backend = 'dialog' if is_interactive() else 'no-progress'
         self._ui = KNOWN_BACKENDS[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend
