@@ -57,14 +57,6 @@ on_windows = platform_system == 'windows'
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
 
-# lzma is included in python since 3.3
-# We now support backports.lzma as well (besides AutomagicIO), but since
-# there is not way to define an alternative here (AFAIK, yoh), we will
-# use pyliblzma as the default for now.  Patch were you would prefer
-# backports.lzma instead
-req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
-
-
 requires = {
     'core': [
         'appdirs',
@@ -105,19 +97,28 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        # lzma is included in python since 3.3
+        # We now support backports.lzma as well (besides AutomagicIO), but since
+        # there is not way to define an alternative here (AFAIK, yoh), we will
+        # use pyliblzma as the default for now.  Patch were you would prefer
+        # backports.lzma instead
+        'pyliblzma; python_version < "3.3"',
         # was added in https://github.com/datalad/datalad/pull/1995 without
         # due investigation, should not be needed until we add duecredit support
         # 'duecredit',
         'simplejson',
         'whoosh',
-    ] + req_lzma,
+    ],
     'metadata-extra': [
         'PyYAML',  # very optional
         'mutagen>=1.36',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
-    ]
+    ],
+    'duecredit': [
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+    ],
 }
 
 requires['full'] = sum(list(requires.values()), [])

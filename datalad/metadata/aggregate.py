@@ -26,6 +26,10 @@ from hashlib import md5
 import shutil
 
 import datalad
+from datalad.consts import (
+    DATASET_CONFIG_FILE,
+    DATASET_METADATA_FILE,
+)
 from datalad.dochelpers import exc_str
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
@@ -255,8 +259,8 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
     objid = refcommit if refcommit else ''
     # 2, our own dataset-global metadata and the dataset config
     for tfile in (
-            op.join(aggfrom_ds.path, '.datalad', 'metadata', 'dataset.json'),
-            op.join(aggfrom_ds.path, '.datalad', 'config')):
+            op.join(aggfrom_ds.path, DATASET_METADATA_FILE),
+            op.join(aggfrom_ds.path, DATASET_CONFIG_FILE)):
         if op.exists(tfile):
             objid += md5(open(tfile, 'r').read().encode()).hexdigest()
     # 3. potential annex-based metadata
@@ -756,7 +760,8 @@ def _update_ds_agginfo(refds_path, ds_path, subds_paths, incremental, agginfo_db
 
 def _store_agginfo_db(ds, db):
     # base path in which aggregate.json and objects is located
-    agginfo_path, agg_base_path = get_ds_aggregate_db_locations(ds)
+    agginfo_path, agg_base_path = get_ds_aggregate_db_locations(
+        ds, warn_absent=False)
     # make DB paths on disk always relative
     json_py.dump(
         {
@@ -926,7 +931,10 @@ class AggregateMetaData(Interface):
             # also recurse current even if paths are given
             path.append(ds.path)
 
-        agginfo_db_location, agg_base_path = get_ds_aggregate_db_locations(ds)
+        agginfo_db_location, agg_base_path = get_ds_aggregate_db_locations(
+            ds,
+            # do not warn here, next call triggers the same warning
+            warn_absent=False)
         agginfo_db = load_ds_aggregate_db(ds, abspath=True)
 
         to_save = []

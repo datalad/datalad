@@ -640,7 +640,7 @@ def test_ignore_nose_capturing_stdout():
     def raise_exc():
         raise AttributeError('nose causes a message which includes words '
                              'StringIO and fileno')
-    with assert_raises(SkipTest):
+    with assert_raises(AttributeError):
         ignore_nose_capturing_stdout(raise_exc)()
 
 

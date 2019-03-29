@@ -17,6 +17,10 @@ from datalad.log import log_progress
 from os.path import join as opj
 from os.path import exists
 
+from datalad.consts import (
+    DATASET_METADATA_FILE,
+    DATALAD_DOTDIR,
+)
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
 from datalad.coreapi import subdatasets
@@ -26,7 +30,6 @@ from datalad.metadata.definitions import version as vocabulary_version
 
 
 class MetadataExtractor(BaseMetadataExtractor):
-    _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
     _unique_exclude = {"url"}
 
     def _get_dataset_metadata(self):
@@ -36,7 +39,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         dict
           keys are homogenized datalad metadata keys, values are arbitrary
         """
-        fpath = opj(self.ds.path, self._dataset_metadata_filename)
+        fpath = opj(self.ds.path, DATASET_METADATA_FILE)
         obj = {}
         if exists(fpath):
             obj = jsonload(fpath, fixup=True)
@@ -103,7 +106,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         for file, whereis in self.ds.repo.whereis(
                 self.paths if self.paths and valid_paths is None else '.',
                 output='full').items():
-            if file.startswith('.datalad') or valid_paths and file not in valid_paths:
+            if file.startswith(DATALAD_DOTDIR) or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
             log_progress(

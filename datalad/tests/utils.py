@@ -1322,27 +1322,22 @@ def assert_result_values_cond(results, prop, cond):
 
 
 def ignore_nose_capturing_stdout(func):
-    """Decorator workaround for nose's behaviour with redirecting sys.stdout
+    """DEPRECATED and will be removed soon.  Does nothing!
 
-    Needed for tests involving the runner and nose redirecting stdout.
-    Counter-intuitively, that means it needed for nosetests without '-s'.
+    Originally was intended as a decorator workaround for nose's behaviour
+    with redirecting sys.stdout, but now we monkey patch nose now so no test
+    should no longer be skipped.
+
     See issue reported here:
     https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
-    """
 
-    @make_decorator(func)
-    def newfunc(*args, **kwargs):
-        import io
-        try:
-            func(*args, **kwargs)
-        except (AttributeError, io.UnsupportedOperation) as e:
-            # Use args instead of .message which is PY2 specific
-            message = e.args[0] if e.args else ""
-            if re.search('^(.*StringIO.*)?fileno', message):
-                raise SkipTest("Triggered nose defect in masking out real stdout")
-            else:
-                raise
-    return newfunc
+    """
+    lgr.warning(
+        "@ignore_nose_capturing_stdout no longer does anything - nose should "
+        "just be monkey patched in setup_package. {} still has it"
+        .format(func.__name__)
+    )
+    return func
 
 
 def skip_httpretty_on_problematic_pythons(func):
