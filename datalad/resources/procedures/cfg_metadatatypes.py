@@ -6,6 +6,9 @@ Additional arguments: <metadata type label> [...]
 import sys
 import os.path as op
 
+from datalad.consts import (
+    DATASET_CONFIG_FILE
+)
 from datalad.distribution.dataset import require_dataset
 
 ds = require_dataset(
@@ -24,6 +27,6 @@ for nt in sys.argv[2:]:
         reload=False)
 
 ds.rev_save(
-    path=op.join(ds.path, '.datalad', 'config'),
+    path=op.join(ds.path, DATASET_CONFIG_FILE),
     message="Configure metadata type(s)",
 )

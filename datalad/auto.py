@@ -30,7 +30,7 @@ from .utils import getpwd
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .cmdline.helpers import get_repo_instance
-from .consts import HANDLE_META_DIR
+from .consts import DATALAD_DOTDIR
 
 # To be used for a quick detection of path being under .git/
 _DOT_GIT_DIR = pathsep + '.git' + pathsep
@@ -245,7 +245,7 @@ class AutomagicIO(object):
             # level dataset for that
             try:
                 filedir = pathsep.join(
-                    filedir_parts[:filedir_parts.index(HANDLE_META_DIR)]
+                    filedir_parts[:filedir_parts.index(DATALAD_DOTDIR)]
                 )
             except ValueError:
                 # would happen if no .datalad
