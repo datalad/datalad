@@ -203,15 +203,22 @@ def auto_repr(cls):
     return cls
 
 
+def _is_stream_tty(stream):
+    try:
+        # TODO: check on windows if hasattr check would work correctly and
+        # add value:
+        return stream.isatty()
+    except ValueError as exc:
+        # Who knows why it is a ValueError, but let's try to be specific
+        # If there is a problem with I/O - non-interactive, otherwise reraise
+        if "I/O" in str(exc):
+            return False
+        raise
+
+
 def is_interactive():
     """Return True if all in/outs are tty"""
-    # TODO: check on windows if hasattr check would work correctly and add value:
-    #
-    return (
-        (not sys.stdin.closed and sys.stdin.isatty()) and
-        (not sys.stdout.closed and sys.stdout.isatty()) and
-        (not sys.stderr.closed and sys.stderr.isatty())
-    )
+    return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
 def get_ipython_shell():
