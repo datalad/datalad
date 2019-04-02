@@ -217,7 +217,13 @@ def _is_stream_tty(stream):
 
 
 def is_interactive():
-    """Return True if all in/outs are tty"""
+    """Return True if all in/outs are open and tty.
+
+    Note that in a somewhat abnormal case where e.g. stdin is explicitly
+    closed, and any operation on it would raise a
+    `ValueError("I/O operation on closed file")` exception, this function
+    would just return False, since the session cannot be used interactively.
+    """
     return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
