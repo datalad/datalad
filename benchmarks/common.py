@@ -51,7 +51,9 @@ class SuprocBenchmarks(object):
             # which caused our is_interactive to fail.  We need to provide
             # more robust version
             from datalad.support.external_versions import external_versions
-            if external_versions['datalad'] < '0.11.4':
+            # comparing to 0.12.1  since the returned version is "loose"
+            # so fails correctly identify rc as pre .0
+            if external_versions['datalad'] < '0.12.1':
                 from datalad import utils
                 from datalad.interface import ls
                 utils.is_interactive = is_interactive
