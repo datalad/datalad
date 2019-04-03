@@ -49,10 +49,10 @@ Largely a bug fix release with a few enhancements
 
 - The logic for finding the location of the aggregate metadata DB
   anchored the search path incorrectly, leading to a spurious warning.
-  (#3241)
+  ([#3241][])
 
 - Some progress bars were still displayed when stdout and stderr were
-  not attached to a tty.  (#3281)
+  not attached to a tty.  ([#3281][])
 
 ### Enhancements and new features
 
@@ -64,12 +64,12 @@ Largely a bug fix release with a few enhancements
   a temporary directory.  ([#3223][])
 
 - [duecredit][] support has been added for citing DataLad itself as
-  well as datasets that an analysis uses.  (#3184)
+  well as datasets that an analysis uses.  ([#3184][])
 
 - The `eval_results` interface helper unintentionally modified one of
-  its arguments.  (#3249)
+  its arguments.  ([#3249][])
 
-- A few DataLad constants have been added, changed, or renamed (#3250):
+- A few DataLad constants have been added, changed, or renamed ([#3250][]):
   - `HANDLE_META_DIR` is now `DATALAD_DOTDIR`.  The old name should be
      considered deprecated.
   - `METADATA_DIR` now refers to `DATALAD_DOTDIR/metadata` rather than
@@ -1235,6 +1235,7 @@ publishing
 [#3168]: https://github.com/datalad/datalad/issues/3168
 [#3176]: https://github.com/datalad/datalad/issues/3176
 [#3181]: https://github.com/datalad/datalad/issues/3181
+[#3184]: https://github.com/datalad/datalad/issues/3184
 [#3186]: https://github.com/datalad/datalad/issues/3186
 [#3205]: https://github.com/datalad/datalad/issues/3205
 [#3210]: https://github.com/datalad/datalad/issues/3210
@@ -1243,3 +1244,7 @@ publishing
 [#3220]: https://github.com/datalad/datalad/issues/3220
 [#3222]: https://github.com/datalad/datalad/issues/3222
 [#3223]: https://github.com/datalad/datalad/issues/3223
+[#3241]: https://github.com/datalad/datalad/issues/3241
+[#3249]: https://github.com/datalad/datalad/issues/3249
+[#3250]: https://github.com/datalad/datalad/issues/3250
+[#3281]: https://github.com/datalad/datalad/issues/3281
