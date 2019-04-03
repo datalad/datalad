@@ -3363,34 +3363,36 @@ class GitRepo(RepoInterface):
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
-        to_add_submodules = [sm for sm, sm_props in iteritems(
-            self.get_content_info(
-                # get content info for any untracked directory
-                [f.relative_to(self.pathobj) for f, props in iteritems(status)
-                 if props.get('state', None) == 'untracked' and
-                 props.get('type', None) == 'directory'],
-                ref=None,
-                # request exhaustive list, so that everything that is
-                # still reported as a directory must be its own repository
-                untracked='all'))
-            if sm_props.get('type', None) == 'directory']
         added_submodule = False
-        for cand_sm in to_add_submodules:
-            try:
-                self.add_submodule(
-                    str(cand_sm.relative_to(self.pathobj)),
-                    url=None, name=None)
-            except (CommandError, InvalidGitRepositoryError) as e:
-                yield get_status_dict(
-                    action='add_submodule',
-                    ds=self,
-                    path=self.pathobj / ut.PurePosixPath(cand_sm),
-                    status='error',
-                    message=e.stderr if hasattr(e, 'stderr')
-                    else ('not a Git repository: %s', exc_str(e)),
-                    logger=lgr)
-                continue
-            added_submodule = True
+        untracked_dirs = [f.relative_to(self.pathobj)
+                          for f, props in iteritems(status)
+                          if props.get('state', None) == 'untracked' and
+                          props.get('type', None) == 'directory']
+        if untracked_dirs:
+            to_add_submodules = [sm for sm, sm_props in iteritems(
+                self.get_content_info(
+                    untracked_dirs,
+                    ref=None,
+                    # request exhaustive list, so that everything that is
+                    # still reported as a directory must be its own repository
+                    untracked='all'))
+                if sm_props.get('type', None) == 'directory']
+            for cand_sm in to_add_submodules:
+                try:
+                    self.add_submodule(
+                        str(cand_sm.relative_to(self.pathobj)),
+                        url=None, name=None)
+                except (CommandError, InvalidGitRepositoryError) as e:
+                    yield get_status_dict(
+                        action='add_submodule',
+                        ds=self,
+                        path=self.pathobj / ut.PurePosixPath(cand_sm),
+                        status='error',
+                        message=e.stderr if hasattr(e, 'stderr')
+                        else ('not a Git repository: %s', exc_str(e)),
+                        logger=lgr)
+                    continue
+                added_submodule = True
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
