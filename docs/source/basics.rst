@@ -91,7 +91,7 @@ Benefiting from Git's support for workflows based on decentralized "clones" of
 a repository, DataLad's datasets can be (re-)published to a new location
 without loosing the connection between the "original" and the new "copy". This
 is extremely useful for collaborative work, but also in more mundane scenarios
-such as data backup, or temporary deployment fo a dataset on a compute cluster,
+such as data backup, or temporary deployment of a dataset on a compute cluster,
 or in the cloud.  Using git-annex, data can also get synchronized across
 different locations of a dataset (:term:`sibling`\s in DataLad terminology).
 Using metadata tags, it is even possible to configure different levels of
