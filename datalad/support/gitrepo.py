@@ -2792,7 +2792,7 @@ class GitRepo(RepoInterface):
         Parameters
         ----------
         paths : list(patlib.PurePath)
-          Specific paths, relative to the (resolved repository root, to query
+          Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
           If none are given, info is reported for all content.
@@ -2818,7 +2818,7 @@ class GitRepo(RepoInterface):
             Can be 'file', 'symlink', 'dataset', 'directory'
 
             Note that the reported type will not always match the type of
-            content commited to Git, rather it will reflect the nature
+            content committed to Git, rather it will reflect the nature
             of the content minus platform/mode-specifics. For example,
             a symlink to a locked annexed file on Unix will have a type
             'file', reported, while a symlink to a file in Git or directory
