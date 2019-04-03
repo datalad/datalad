@@ -16,7 +16,7 @@ Largely a bug fix release with a few enhancements
 
 ### Important
 
-- 0.11.x series will be the last one with support for direct mode of [git-annex]
+- 0.11.x series will be the last one with support for direct mode of [git-annex][]
   which is used on crippled (no symlinks and no locking) filesystems.
   v7 repositories should be used instead.
 
