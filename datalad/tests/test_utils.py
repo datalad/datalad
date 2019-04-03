@@ -64,6 +64,8 @@ from ..utils import map_items
 from ..utils import unlink
 from ..utils import CMD_MAX_ARG
 from ..utils import create_tree
+from ..utils import never_fail
+
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import (
@@ -1208,3 +1210,25 @@ def test_create_tree(path):
     ok_file_has_content(op.join(path, '1'), content)
     ok_file_has_content(op.join(path, 'sd', '1'), content*2)
     ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+
+
+def test_never_fail():
+
+    @never_fail
+    def iamok(arg):
+        return arg
+    eq_(iamok(1), 1)
+
+    @never_fail
+    def ifail(arg):
+        raise ValueError
+    eq_(ifail(1), None)
+
+    with patch.dict('os.environ', {'DATALAD_ALLOW_FAIL': '1'}):
+        # decision to create failing or not failing function
+        # is done at the time of decoration
+        @never_fail
+        def ifail2(arg):
+            raise ValueError
+
+        assert_raises(ValueError, ifail2, 1)

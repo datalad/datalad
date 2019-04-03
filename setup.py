@@ -114,7 +114,10 @@ requires = {
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
-    ]
+    ],
+    'duecredit': [
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+    ],
 }
 
 requires['full'] = sum(list(requires.values()), [])
