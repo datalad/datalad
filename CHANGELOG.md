@@ -47,6 +47,13 @@ Largely a bug fix release with a few enhancements
 - [search] displayed an uninformative blank log message in some
   cases.  ([#3222][])
 
+- The logic for finding the location of the aggregate metadata DB
+  anchored the search path incorrectly, leading to a spurious warning.
+  (#3241)
+
+- Some progress bars were still displayed when stdout and stderr were
+  not attached to a tty.  (#3281)
+
 ### Enhancements and new features
 
 - Creating a new repository now aborts if any of the files in the
@@ -55,6 +62,22 @@ Largely a bug fix release with a few enhancements
 
 - [run] learned to replace the `{tmpdir}` placeholder in commands with
   a temporary directory.  ([#3223][])
+
+- [duecredit][] support has been added for citing DataLad itself as
+  well as datasets that an analysis uses.  (#3184)
+
+- The `eval_results` interface helper unintentionally modified one of
+  its arguments.  (#3249)
+
+- A few DataLad constants have been added, changed, or renamed (#3250):
+  - `HANDLE_META_DIR` is now `DATALAD_DOTDIR`.  The old name should be
+     considered deprecated.
+  - `METADATA_DIR` now refers to `DATALAD_DOTDIR/metadata` rather than
+    `DATALAD_DOTDIR/meta` (which is still available as
+    `OLDMETADATA_DIR`).
+  - The new `DATASET_METADATA_FILE` refers to `METADATA_DIR/dataset.json`.
+  - The new `DATASET_CONFIG_FILE` refers to `DATALAD_DOTDIR/config`.
+  - `METADATA_FILENAME` has been renamed to `OLDMETADATA_FILENAME`.
 
 ## 0.11.3 (Feb 19, 2019) -- read-me-gently
 
@@ -1036,6 +1059,7 @@ Release primarily focusing on interface functionality including initial
 publishing
 
 [git-annex]: http://git-annex.branchable.com/
+[duecredit]: https://github.com/duecredit/duecredit
 
 [Kaggle]: https://www.kaggle.com
 [BALSA]: http://balsa.wustl.edu
