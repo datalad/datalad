@@ -130,11 +130,14 @@ def dump2xzstream(obj, fname):
     dump2stream(obj, fname, compressed=True)
 
 
-def load_stream(fname, compressed=False):
+def load_stream(fname, compressed=None):
+    _open = LZMAFile \
+        if compressed or compressed is None and fname.endswith('.xz') \
+        else io.open
 
-    _open = LZMAFile if compressed else open
-    with _open(fname, mode='r') as f:
-        for line in f:
+    with _open(fname, mode='rb') as f:
+        jreader = codecs.getreader('utf-8')(f)
+        for line in jreader:
             yield loads(line)
 
 
