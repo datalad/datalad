@@ -54,6 +54,9 @@ Largely a bug fix release with a few enhancements
 - Some progress bars were still displayed when stdout and stderr were
   not attached to a tty.  ([#3281][])
 
+- Check for stdin/out/err to not be closed before checking for `.isatty`.
+  ([#3268][])
+
 ### Enhancements and new features
 
 - Creating a new repository now aborts if any of the files in the
@@ -1247,4 +1250,5 @@ publishing
 [#3241]: https://github.com/datalad/datalad/issues/3241
 [#3249]: https://github.com/datalad/datalad/issues/3249
 [#3250]: https://github.com/datalad/datalad/issues/3250
+[#3268]: https://github.com/datalad/datalad/issues/3268
 [#3281]: https://github.com/datalad/datalad/issues/3281
