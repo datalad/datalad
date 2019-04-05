@@ -627,3 +627,16 @@ def test_surprise_subds(path):
     # with proper subdatasets, all evil is gone
     assert_not_in(ds.repo.pathobj / 'd2' / 'subds' / 'subfile',
                   ds.repo.get_content_info())
+
+
+@with_tree({"foo": ""})
+def test_bf3285(path):
+    ds = Dataset(path).rev_create(force=True)
+    # Note: Using repo.pathobj matters in the "TMPDIR=/var/tmp/sym\ link" case
+    # because assert_repo_status is based off of {Annex,Git}Repo.path, which is
+    # the realpath'd path (from the processing in _flyweight_id_from_args).
+    subds = create(ds.repo.pathobj.joinpath("subds"))
+    # Explicitly saving a path does not save an untracked, unspecified
+    # subdataset.
+    ds.rev_save("foo")
+    assert_repo_status(ds.path, untracked=[subds.path])
