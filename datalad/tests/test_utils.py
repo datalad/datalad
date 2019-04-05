@@ -34,6 +34,7 @@ from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import is_interactive
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -64,6 +65,8 @@ from ..utils import map_items
 from ..utils import unlink
 from ..utils import CMD_MAX_ARG
 from ..utils import create_tree
+from ..utils import never_fail
+
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import (
@@ -1208,3 +1211,59 @@ def test_create_tree(path):
     ok_file_has_content(op.join(path, '1'), content)
     ok_file_has_content(op.join(path, 'sd', '1'), content*2)
     ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+
+
+def test_never_fail():
+
+    @never_fail
+    def iamok(arg):
+        return arg
+    eq_(iamok(1), 1)
+
+    @never_fail
+    def ifail(arg):
+        raise ValueError
+    eq_(ifail(1), None)
+
+    with patch.dict('os.environ', {'DATALAD_ALLOW_FAIL': '1'}):
+        # decision to create failing or not failing function
+        # is done at the time of decoration
+        @never_fail
+        def ifail2(arg):
+            raise ValueError
+
+        assert_raises(ValueError, ifail2, 1)
+
+
+@with_tempfile
+def test_is_interactive(fout):
+    # must not fail if one of the streams is no longer open:
+    # https://github.com/datalad/datalad/issues/3267
+    from ..cmd import Runner
+
+    bools = ["False", "True"]
+
+    def get_interactive(py_pre="", **run_kwargs):
+        out, err = Runner().run(
+            [sys.executable,
+             "-c",
+             py_pre +
+             'from datalad.utils import is_interactive; '
+             'f = open(%r, "w"); '
+             'f.write(str(is_interactive())); '
+             'f.close()'
+             % fout
+             ],
+            **run_kwargs
+        )
+        with open(fout) as f:
+            out = f.read()
+        assert_in(out, bools)
+        return bool(bools.index(out))
+
+    # we never request for pty in our Runner, so can't be interactive
+    eq_(get_interactive(), False)
+    # and it must not crash if smth is closed
+    for o in ('stderr', 'stdin', 'stdout'):
+        eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
+

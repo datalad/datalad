@@ -538,12 +538,14 @@ Refer datalad/config.py for information on how to add these environment variable
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 - *DATALAD_ASSERT_NO_OPEN_FILES*:
   Instructs test helpers to check for open files at the end of a test. If set, remaining open files are logged at ERROR level. Alternative modes are: "assert" (raise AssertionError if any open file is found), "pdb"/"epdb" (drop into debugger when open files are found, info on files is provided in a "files" dictionary, mapping filenames to psutil process objects).
+- *DATALAD_ALLOW_FAIL*:
+  Instructs `@never_fail` decorator to allow to fail, e.g. to ease debugging.
 
 # Changelog section
 
 For the upcoming release use this template
 
-## 0.11.4 (??? ??, 2019) -- will be better than ever
+## 0.11.5 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

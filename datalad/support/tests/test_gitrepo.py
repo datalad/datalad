@@ -18,6 +18,8 @@ import os
 from os import linesep
 import os.path as op
 
+import sys
+
 
 from datalad import get_encoding_info
 from datalad.cmd import Runner
@@ -65,6 +67,8 @@ from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.support.exceptions import PathKnownToRepositoryError
+from datalad.support.external_versions import external_versions
 from datalad.support.protocol import ExecutionTimeProtocol
 from .utils import check_repo_deals_with_inode_change
 
@@ -141,6 +145,26 @@ def test_GitRepo_init_options(path):
 
     cfg = gr.repo.config_reader()
     ok_(cfg.get_value(section="core", option="bare"))
+
+
+@with_tree(
+    tree={
+        'subds': {
+            'file_name': ''
+        }
+    }
+)
+def test_init_fail_under_known_subdir(path):
+    repo = GitRepo(path, create=True)
+    repo.add(op.join('subds', 'file_name'))
+    # Should fail even if we do not commit but only add to index:
+    with assert_raises(PathKnownToRepositoryError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
+    assert_in("file_name", str(cme.exception))  # we provide a list of offenders
+    # and after we commit - the same story
+    repo.commit("added file")
+    with assert_raises(PathKnownToRepositoryError) as cme:
+        GitRepo(op.join(path, 'subds'), create=True)
 
 
 @with_tempfile
@@ -796,6 +820,13 @@ def test_GitRepo_dirty(path):
     repo.commit("file1.txt modified")
     ok_(not repo.dirty)
 
+    # An empty directory doesn't count as dirty.
+    os.mkdir(op.join(path, "empty"))
+    ok_(not repo.dirty)
+    # Neither does an empty directory with an otherwise empty directory.
+    os.mkdir(op.join(path, "empty", "empty-again"))
+    ok_(not repo.dirty)
+
     # TODO: submodules
 
 
@@ -1379,11 +1410,49 @@ def test_custom_runner_protocol(path):
     # Check that a runner with a non-default protocol gets wired up correctly.
     prot = ExecutionTimeProtocol()
     gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-    eq_(len(prot), 1)
-    ok_(prot[0]['duration'] >= 0)
-    gr.add("foo")
+    # now we run two commands
+    #  1. to check if no known to possible git upstairs files in current path
+    #  2. actually call git init
     eq_(len(prot), 2)
-    assert_in("add", prot[1]["command"])
-    gr.commit("commit foo")
+    gr.add("foo")
     eq_(len(prot), 3)
-    assert_in("commit", prot[2]["command"])
+    assert_in("add", prot[2]["command"])
+    gr.commit("commit foo")
+    eq_(len(prot), 4)
+    assert_in("commit", prot[3]["command"])
+    ok_(all(p['duration'] >= 0 for p in prot))
+
+
+@with_tempfile(mkdir=True)
+def test_duecredit(path):
+    # Just to check that no obvious side-effects
+    run = Runner(cwd=path).run
+    cmd = [
+        sys.executable, "-c",
+        "from datalad.support.gitrepo import GitRepo; GitRepo(%r, create=True)" % path
+    ]
+
+    env = os.environ.copy()
+
+    # Test with duecredit not enabled for sure
+    env.pop('DUECREDIT_ENABLE', None)
+    # Alternative workaround for what to be fixed by
+    # https://github.com/datalad/datalad/pull/3215
+    # where underlying datalad process might issue a warning since our temp
+    # cwd is not matching possibly present PWD env variable
+    env.pop('PWD', None)
+
+    out, err = run(cmd, env=env, expect_stderr=True)
+    outs = out + err  # Let's not depend on where duecredit decides to spit out
+    # All quiet
+    eq_(outs, '')
+
+    # and now enable DUECREDIT - output could come to stderr
+    env['DUECREDIT_ENABLE'] = '1'
+    out, err = run(cmd, env=env, expect_stderr=True)
+    outs = out + err
+
+    if external_versions['duecredit']:
+        assert_in('Data management and distribution platform', outs)
+    else:
+        eq_(outs, '')

@@ -11,16 +11,31 @@ import os
 from os.path import join as opj, exists
 
 from mock import patch
-from .utils import assert_true, assert_false, eq_, \
-    with_tree, with_tempfile, swallow_outputs, on_windows
+from .utils import (
+    assert_true, assert_false, eq_,
+    with_tree, with_tempfile, swallow_outputs, on_windows,
+    ok_file_has_content,
+)
 from .utils import assert_equal
 
-from ..support.archives import decompress_file, compress_files, unixify_path
-from ..support.archives import ExtractedArchive, ArchivesCache
+from ..dochelpers import exc_str
+from ..support.archives import (
+    ArchivesCache,
+    compress_files,
+    decompress_file,
+    ExtractedArchive,
+    unixify_path,
+)
+from ..support.exceptions import MissingExternalDependency
+from ..support import path as op
 
-from .utils import OBSCURE_FILENAME, assert_raises
-from .utils import assert_in
-from .utils import ok_generator
+from .utils import (
+    assert_in,
+    assert_raises,
+    OBSCURE_FILENAME,
+    ok_generator,
+    SkipTest,
+)
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
@@ -83,7 +98,7 @@ def test_decompress_file():
                     ),),
             ))))
 @with_tempfile()
-def check_compress_file(ext, path, name):
+def check_compress_dir(ext, path, name):
     archive = name + ext
     compress_files([os.path.basename(path)], archive,
                    path=os.path.dirname(path))
@@ -94,10 +109,47 @@ def check_compress_file(ext, path, name):
     assert_true(exists(opj(name_extracted, 'd1', 'd2', 'f1')))
 
 
+def test_compress_dir():
+    yield check_compress_dir, '.tar.gz'
+    yield check_compress_dir, '.tar'
+    yield check_compress_dir, '.zip'
+
+
+# space in the filename to test for correct quotations etc
+_filename = 'fi le.dat'
+
+
+@with_tree(((_filename, 'content'),))
+@with_tempfile()
+def check_compress_file(ext, annex, path, name):
+    archive = name + ext
+    compress_files([_filename], archive,
+                   path=path)
+    assert_true(exists(archive))
+    if annex:
+        # It should work even when file is annexed and is a symlink to the
+        # key
+        from datalad.support.annexrepo import AnnexRepo
+        repo = AnnexRepo(path, init=True)
+        repo.add(_filename)
+        repo.commit(files=[_filename], msg="commit")
+
+    dir_extracted = name + "_extracted"
+    try:
+        decompress_file(archive, dir_extracted)
+    except MissingExternalDependency as exc:
+        raise SkipTest(exc_str(exc))
+    _filepath = op.join(dir_extracted, _filename)
+
+    import glob
+    print(dir_extracted)
+    print(glob.glob(dir_extracted + '/*'))
+    ok_file_has_content(_filepath, 'content')
+
+
 def test_compress_file():
-    yield check_compress_file, '.tar.gz'
-    yield check_compress_file, '.tar'
-    yield check_compress_file, '.zip'
+    for annex in True, False:
+        yield check_compress_file, '.gz', annex
 
 
 @with_tree(**tree_simplearchive)

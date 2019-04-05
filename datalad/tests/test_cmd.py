@@ -29,9 +29,9 @@ from .utils import (
     skip_if_on_windows,
     with_tempfile,
     assert_cwd_unchanged,
-    ignore_nose_capturing_stdout,
     swallow_outputs,
     swallow_logs,
+    ok_file_has_content,
     on_windows,
     lgr,
 )
@@ -44,7 +44,6 @@ from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -70,18 +69,40 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    cmd = 'echo Testing äöü東 real run > %r' % tempfile
+    content = 'Testing äöü東 real run'
+    cmd = 'echo %s > %r' % (content, tempfile)
     ret = runner.run(cmd)
-    assert_true(os.path.exists(tempfile),
-                "Run of: %s resulted with non-existing file %s" %
-                (cmd, tempfile))
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Run with shell
+    ret = runner.run(cmd, shell=True)
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Pass as a list and with shell - "not exactly what we expect"
+    # Initial suspicion came from incorrect behavior of Runner as a runner
+    # for patool.  Apparently (docs for 2.7):
+    #   If args is a sequence, the first item specifies the command string,
+    #   and any additional items will be treated as additional arguments to
+    #   the shell itself.
+    # which is what it ruins it for us!  So, for now we are not testing/using
+    # this form
+    # ret = runner.run(shlex.split(cmd, posix=not on_windows), shell=True)
+    # # ?! for some reason there is an empty line in stdout
+    # # TODO: figure out.  It shouldn't though be of critical effect
+    # ret = (ret[0].rstrip(), ret[1])
+    # assert_equal(ret, ('', ''))  # no out or err
+    # # And here we get kaboom ATM!
+    # ok_file_has_content(tempfile, content, strip=True)
 
     # test non-dry python function call
     output = runner.call(os.path.join, 'foo', 'bar')
@@ -89,7 +110,6 @@ def test_runner(tempfile):
                  "Call of: os.path.join, 'foo', 'bar' returned %s" % output)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_dry():
 
     cmd_ = ['echo', 'Testing', '__call__', 'with', 'string']
@@ -114,7 +134,6 @@ def test_runner_instance_callable_dry():
                  "Buffer: %s" % dry)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_wet():
 
     runner = Runner()
@@ -128,7 +147,6 @@ def test_runner_instance_callable_wet():
     eq_(ret, os.path.join('foo', 'bar'))
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stderr():
 
     runner = Runner(log_outputs=True)
@@ -154,7 +172,6 @@ def test_runner_log_stderr():
                           "stderr| stderr-Message should not be logged")
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
     # assertion yet.
@@ -186,7 +203,6 @@ def test_runner_log_stdout():
             eq_(cml.out, "")
 
 
-@ignore_nose_capturing_stdout
 def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being
     # stucked yet.
@@ -259,6 +275,22 @@ def test_runner_failure_unicode(path):
     runner = Runner()
     with assert_raises(CommandError), swallow_logs():
         runner.run(u"β-command-doesnt-exist", cwd=path)
+
+
+@skip_if_on_windows  # likely would fail
+@with_tempfile(mkdir=True)
+def test_runner_fix_PWD(path):
+    env = os.environ.copy()
+    env['PWD'] = orig_cwd = os.getcwd()
+    runner = Runner(cwd=path, env=env)
+    out, err = runner.run(
+        [sys.executable, '-c', 'import os; print(os.environ["PWD"])'],
+        cwd=path,
+        shell=False
+    )
+    eq_(err, '')
+    eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
+    eq_(env['PWD'], orig_cwd)  # no side-effect
 
 
 @with_tempfile(mkdir=True)

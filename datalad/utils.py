@@ -203,11 +203,28 @@ def auto_repr(cls):
     return cls
 
 
+def _is_stream_tty(stream):
+    try:
+        # TODO: check on windows if hasattr check would work correctly and
+        # add value:
+        return stream.isatty()
+    except ValueError as exc:
+        # Who knows why it is a ValueError, but let's try to be specific
+        # If there is a problem with I/O - non-interactive, otherwise reraise
+        if "I/O" in str(exc):
+            return False
+        raise
+
+
 def is_interactive():
-    """Return True if all in/outs are tty"""
-    # TODO: check on windows if hasattr check would work correctly and add value:
-    #
-    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+    """Return True if all in/outs are open and tty.
+
+    Note that in a somewhat abnormal case where e.g. stdin is explicitly
+    closed, and any operation on it would raise a
+    `ValueError("I/O operation on closed file")` exception, this function
+    would just return False, since the session cannot be used interactively.
+    """
+    return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
 def get_ipython_shell():
@@ -222,8 +239,10 @@ def get_ipython_shell():
 
 
 def md5sum(filename):
-    with open(filename, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
+    """Compute an MD5 sum for the given file
+    """
+    from datalad.support.digests import Digester
+    return Digester(digests=['md5'])(filename)['md5']
 
 
 def sorted_files(dout):
@@ -951,6 +970,30 @@ def line_profile(func):
         finally:
             prof.print_stats()
     return newfunc
+
+
+# Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
+def never_fail(f):
+    """Assure that function never fails -- all exceptions are caught
+
+    Returns `None` if function fails internally.
+    """
+    @wraps(f)
+    def wrapped_func(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            lgr.warning(
+                "DataLad internal failure while running %s: %r. "
+                "Please report at https://github.com/datalad/datalad/issues"
+                % (f, e)
+            )
+
+    if os.environ.get('DATALAD_ALLOW_FAIL', False):
+        return f
+    else:
+        return wrapped_func
+
 
 #
 # Context Managers

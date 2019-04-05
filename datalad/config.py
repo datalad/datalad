@@ -10,6 +10,10 @@
 """
 
 import datalad
+from datalad.consts import (
+    DATASET_CONFIG_FILE,
+    DATALAD_DOTDIR,
+)
 from datalad.cmd import GitRunner
 from datalad.dochelpers import exc_str
 from distutils.version import LooseVersion
@@ -180,7 +184,7 @@ class ConfigManager(object):
             self._repo_cfgfname = None
         else:
             self._dataset_path = dataset.path
-            self._dataset_cfgfname = opj(self._dataset_path, '.datalad', 'config')
+            self._dataset_cfgfname = opj(self._dataset_path, DATASET_CONFIG_FILE)
             if not dataset_only:
                 self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
         self._dataset_only = dataset_only
@@ -543,7 +547,7 @@ class ConfigManager(object):
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path, '.datalad')
+            dscfg_dirname = opj(self._dataset_path,  DATALAD_DOTDIR)
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(self._dataset_cfgfname):

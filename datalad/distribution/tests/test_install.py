@@ -9,10 +9,7 @@
 
 """
 
-from datalad.tests.utils import (
-    known_failure_direct_mode,
-    known_failure_windows,
-)
+from datalad.tests.utils import known_failure_direct_mode
 
 
 import logging
@@ -923,7 +920,6 @@ def test_install_subds_from_another_remote(topdir):
 
 # Takes > 2 sec
 # Do not use cassette
-@known_failure_windows
 @skip_if_no_network
 @with_tempfile
 def check_datasets_datalad_org(suffix, tdir):
