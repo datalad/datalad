@@ -101,7 +101,7 @@ STATE_COLOR_MAP = {
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cache):
     # take the datase that went in first
     repo_path = ds.repo.pathobj
-    lgr.debug('query %s.status() for paths: %s', ds.repo, paths)
+    lgr.debug('query %s.diffstatus() for paths: %s', ds.repo, paths)
     status = ds.repo.diffstatus(
         fr='HEAD' if ds.repo.get_hexsha() else None,
         to=None,
@@ -114,6 +114,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
         ignore_submodules='other',
         _cache=cache)
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
+        lgr.debug('query %s.get_content_annexinfo() for paths: %s', ds.repo, paths)
         # this will ammend `status`
         ds.repo.get_content_annexinfo(
             paths=paths if paths else None,

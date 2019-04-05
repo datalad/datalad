@@ -223,7 +223,10 @@ class Create(Interface):
             # GitRepo.get_content_info(), as we need to detect
             # uninstalled/added subdatasets too
             check_path = ut.Path(path)
-            pstatus = prepo.status(untracked='no')
+            pstatus = prepo.status(
+                untracked='no',
+                # limit query to target path for a potentially massive speed-up
+                paths=[check_path.relative_to(parentds_path)])
             if any(
                     check_path == p or check_path in p.parents
                     for p in pstatus):

@@ -2835,6 +2835,7 @@ class GitRepo(RepoInterface):
           In case of an invalid Git reference (e.g. 'HEAD' in an empty
           repository)
         """
+        lgr.debug('%s.get_content_info(...)', self)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
