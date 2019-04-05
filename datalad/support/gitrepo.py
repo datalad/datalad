@@ -729,13 +729,17 @@ class GitRepo(RepoInterface):
         self._fake_dates_enabled = None
 
     def _create_empty_repo(self, path, **kwargs):
-        if op.lexists(path):
+        # We need to check from parent directory for elderly Git (e.g. 2.11.0)
+        # https://github.com/datalad/datalad/issues/3295
+        path = op.abspath(path)
+        parpath = op.dirname(path)
+        if op.lexists(path) and op.lexists(parpath) and parpath != path:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
             try:
                 stdout, _ = self._git_custom_command(
-                    None, ['git', 'ls-files'], cwd=path, expect_fail=True
+                    [path], ['git', 'ls-files'], cwd=parpath, expect_fail=True
                 )
                 # The 2nd check to verify that the files exctually exist is for
                 # the cases of direct-mode:  there ls-files just lists files
@@ -745,7 +749,7 @@ class GitRepo(RepoInterface):
                 # support
                 if stdout and \
                     all(
-                        op.lexists(op.join(path, f))
+                        op.lexists(op.join(parpath, f))
                         for f in stdout.split(os.linesep)
                     ):
                     raise PathKnownToRepositoryError(
