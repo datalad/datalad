@@ -10,9 +10,9 @@ Last-Update: 2016-05-20
 
 --- a/setup.py
 +++ b/setup.py
-@@ -65,6 +65,11 @@ if dist[0] == 'debian' and dist[1].split
- req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
- 
+@@ -57,6 +57,11 @@ on_windows = platform_system == 'windows
+ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
+     keyring_requires = ['keyring<8.0']
  
 +# Debian patch:  do not demand any specific version of keyring via setup
 +#  we will rely on debian/control specification specific for the distribution
