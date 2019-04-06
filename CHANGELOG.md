@@ -1179,9 +1179,6 @@ publishing
 [wtf]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-wtf.html
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
-
-[#2992]: https://github.com/datalad/datalad/issues/2992
-[#2992]: https://github.com/datalad/datalad/issues/2992
 [#1350]: https://github.com/datalad/datalad/issues/1350
 [#1651]: https://github.com/datalad/datalad/issues/1651
 [#2692]: https://github.com/datalad/datalad/issues/2692
