@@ -31,11 +31,6 @@ bet we will fix some bugs and make a world even a better place.
 
 - `GitRepo.dirty` does not report on nested empty directories ([#3196][]).
 
-- LORIS token authenticator now works with Python 3.
-
-- Introduce an explicit switch to enable decoding of fetched content
-  in `BaseDownloader`
-
 - `GitRepo.save()` reports results on deleted files.
 
 ### Enhancements and new features
