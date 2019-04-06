@@ -68,6 +68,77 @@ bet we will fix some bugs and make a world even a better place.
 - Imported various additional methods for the Repo classes to query
   information and save changes.
 
+## 0.11.4 (Mar 18, 2019) -- get-ready
+
+Largely a bug fix release with a few enhancements
+
+### Important
+
+- 0.11.x series will be the last one with support for direct mode of [git-annex][]
+  which is used on crippled (no symlinks and no locking) filesystems.
+  v7 repositories should be used instead.
+
+### Fixes
+
+- Extraction of .gz files is broken without p7zip installed.  We now
+  abort with an informative error in this situation.  ([#3176][])
+
+- Committing failed in some cases because we didn't ensure that the
+  path passed to `git read-tree --index-output=...` resided on the
+  same filesystem as the repository.  ([#3181][])
+
+- Some pointless warnings during metadata aggregation have been
+  eliminated.  ([#3186][])
+
+- With Python 3 the LORIS token authenticator did not properly decode
+  a response ([#3205][]).
+
+- With Python 3 downloaders unnecessarily decoded the response when
+  getting the status, leading to an encoding error.  ([#3210][])
+
+- In some cases, our internal command Runner did not adjust the
+  environment's `PWD` to match the current working directory specified
+  with the `cwd` parameter.  ([#3215][])
+
+- The specification of the pyliblzma dependency was broken.  ([#3220][])
+
+- [search] displayed an uninformative blank log message in some
+  cases.  ([#3222][])
+
+- The logic for finding the location of the aggregate metadata DB
+  anchored the search path incorrectly, leading to a spurious warning.
+  ([#3241][])
+
+- Some progress bars were still displayed when stdout and stderr were
+  not attached to a tty.  ([#3281][])
+
+- Check for stdin/out/err to not be closed before checking for `.isatty`.
+  ([#3268][])
+
+### Enhancements and new features
+
+- Creating a new repository now aborts if any of the files in the
+  directory are tracked by a repository in a parent directory.
+  ([#3211][])
+
+- [run] learned to replace the `{tmpdir}` placeholder in commands with
+  a temporary directory.  ([#3223][])
+ 
+- [duecredit][] support has been added for citing DataLad itself as
+  well as datasets that an analysis uses.  ([#3184][])
+
+- The `eval_results` interface helper unintentionally modified one of
+  its arguments.  ([#3249][])
+
+- A few DataLad constants have been added, changed, or renamed ([#3250][]):
+  - `HANDLE_META_DIR` is now `DATALAD_DOTDIR`.  The old name should be
+     considered deprecated.
+  - `METADATA_DIR` now refers to `DATALAD_DOTDIR/metadata` rather than
+    `DATALAD_DOTDIR/meta` (which is still available as
+    `OLDMETADATA_DIR`).
+  - The new `DATASET_METADATA_FILE` refers to `METADATA_DIR/dataset.json`.
+  - The new `DATASET_CONFIG_FILE` refers to `DATALAD_DOTDIR/config`.
+  - `METADATA_FILENAME` has been renamed to `OLDMETADATA_FILENAME`.
 
 ## 0.11.3 (Feb 19, 2019) -- read-me-gently
 
@@ -1049,6 +1120,7 @@ Release primarily focusing on interface functionality including initial
 publishing
 
 [git-annex]: http://git-annex.branchable.com/
+[duecredit]: https://github.com/duecredit/duecredit
 
 [Kaggle]: https://www.kaggle.com
 [BALSA]: http://balsa.wustl.edu
@@ -1108,6 +1180,7 @@ publishing
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 
+[#2992]: https://github.com/datalad/datalad/issues/2992
 [#2992]: https://github.com/datalad/datalad/issues/2992
 [#1350]: https://github.com/datalad/datalad/issues/1350
 [#1651]: https://github.com/datalad/datalad/issues/1651
@@ -1221,4 +1294,20 @@ publishing
 [#3164]: https://github.com/datalad/datalad/issues/3164
 [#3165]: https://github.com/datalad/datalad/issues/3165
 [#3168]: https://github.com/datalad/datalad/issues/3168
+[#3176]: https://github.com/datalad/datalad/issues/3176
+[#3181]: https://github.com/datalad/datalad/issues/3181
+[#3184]: https://github.com/datalad/datalad/issues/3184
+[#3186]: https://github.com/datalad/datalad/issues/3186
 [#3196]: https://github.com/datalad/datalad/issues/3196
+[#3205]: https://github.com/datalad/datalad/issues/3205
+[#3210]: https://github.com/datalad/datalad/issues/3210
+[#3211]: https://github.com/datalad/datalad/issues/3211
+[#3215]: https://github.com/datalad/datalad/issues/3215
+[#3220]: https://github.com/datalad/datalad/issues/3220
+[#3222]: https://github.com/datalad/datalad/issues/3222
+[#3223]: https://github.com/datalad/datalad/issues/3223
+[#3241]: https://github.com/datalad/datalad/issues/3241
+[#3249]: https://github.com/datalad/datalad/issues/3249
+[#3250]: https://github.com/datalad/datalad/issues/3250
+[#3268]: https://github.com/datalad/datalad/issues/3268
+[#3281]: https://github.com/datalad/datalad/issues/3281

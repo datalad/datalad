@@ -34,6 +34,7 @@ from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import is_interactive
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -1220,3 +1221,37 @@ def test_never_fail():
             raise ValueError
 
         assert_raises(ValueError, ifail2, 1)
+
+
+@with_tempfile
+def test_is_interactive(fout):
+    # must not fail if one of the streams is no longer open:
+    # https://github.com/datalad/datalad/issues/3267
+    from ..cmd import Runner
+
+    bools = ["False", "True"]
+
+    def get_interactive(py_pre="", **run_kwargs):
+        out, err = Runner().run(
+            [sys.executable,
+             "-c",
+             py_pre +
+             'from datalad.utils import is_interactive; '
+             'f = open(%r, "w"); '
+             'f.write(str(is_interactive())); '
+             'f.close()'
+             % fout
+             ],
+            **run_kwargs
+        )
+        with open(fout) as f:
+            out = f.read()
+        assert_in(out, bools)
+        return bool(bools.index(out))
+
+    # we never request for pty in our Runner, so can't be interactive
+    eq_(get_interactive(), False)
+    # and it must not crash if smth is closed
+    for o in ('stderr', 'stdin', 'stdout'):
+        eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
+
