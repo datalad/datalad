@@ -3084,9 +3084,17 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        generator
+        list
           JSON obj per modified file
         """
+        return list(self.set_metadata_(
+            files, reset=reset, add=add, init=init,
+            remove=remove, purge=purge, recursive=recursive))
+
+    def set_metadata_(
+            self, files, reset=None, add=None, init=None,
+            remove=None, purge=None, recursive=False):
+        """Like set_metadata() but returns a generator"""
 
         def _genspec(expr, d):
             return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]

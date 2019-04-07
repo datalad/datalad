@@ -201,8 +201,8 @@ def test_within_ds_file_search(path):
     ok_file_under_git(path, opj('stim', 'stim1.mp3'), annexed=True)
     # If it is not under annex, below addition of metadata silently does
     # not do anything
-    list(ds.repo.set_metadata(
-        opj('stim', 'stim1.mp3'), init={'importance': 'very'}))
+    ds.repo.set_metadata(
+        opj('stim', 'stim1.mp3'), init={'importance': 'very'})
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     # basic sanity check on the metadata structure of the dataset

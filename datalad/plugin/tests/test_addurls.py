@@ -505,7 +505,7 @@ class TestAddurls(object):
         ds = Dataset(path).rev_create(force=True)
 
         # Force failure by passing a non-existent file name to annex.
-        fn = ds.repo.set_metadata
+        fn = ds.repo.set_metadata_
 
         def set_meta(_, **kwargs):
             for i in fn("wreaking-havoc-and-such", **kwargs):

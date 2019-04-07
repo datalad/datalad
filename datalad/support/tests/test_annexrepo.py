@@ -2106,13 +2106,13 @@ def test_AnnexRepo_metadata(path):
     eq_([], list(ar.get_metadata([])))
     eq_({'up.dat': {}}, dict(ar.get_metadata('up.dat')))
     # basic invocation
-    eq_(1, len(list(ar.set_metadata(
+    eq_(1, len(ar.set_metadata(
         'up.dat',
         reset={'mike': 'awesome'},
         add={'tag': 'awesome'},
         remove={'tag': 'awesome'},  # cancels prev, just to use it
         init={'virgin': 'true'},
-        purge=['nothere']))))
+        purge=['nothere'])))
     # no timestamps by default
     md = dict(ar.get_metadata('up.dat'))
     deq_({'up.dat': {
@@ -2125,13 +2125,13 @@ def test_AnnexRepo_metadata(path):
         assert_in('{}-lastchanged'.format(k), md_ts['up.dat'])
     assert_in('lastchanged', md_ts['up.dat'])
     # recursive needs a flag
-    assert_raises(CommandError, list, ar.set_metadata('.', purge=['virgin']))
-    list(ar.set_metadata('.', purge=['virgin'], recursive=True))
+    assert_raises(CommandError, ar.set_metadata, '.', purge=['virgin'])
+    ar.set_metadata('.', purge=['virgin'], recursive=True)
     deq_({'up.dat': {
         'mike': ['awesome']}},
         dict(ar.get_metadata('up.dat')))
     # Use trickier tags (spaces, =)
-    list(ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True))
+    ar.set_metadata('.', reset={'tag': 'one and= '}, purge=['mike'], recursive=True)
     playfile = opj('d o"w n', 'd o w n.dat')
     target = {
         'up.dat': {
@@ -2140,21 +2140,21 @@ def test_AnnexRepo_metadata(path):
             'tag': ['one and= ']}}
     deq_(target, dict(ar.get_metadata('.')))
     # incremental work like a set
-    list(ar.set_metadata(playfile, add={'tag': 'one and= '}))
+    ar.set_metadata(playfile, add={'tag': 'one and= '})
     deq_(target, dict(ar.get_metadata('.')))
-    list(ar.set_metadata(playfile, add={'tag': ' two'}))
+    ar.set_metadata(playfile, add={'tag': ' two'})
     # returned values are sorted
     eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
     # init honor prior values
-    list(ar.set_metadata(playfile, init={'tag': 'three'}))
+    ar.set_metadata(playfile, init={'tag': 'three'})
     eq_([' two', 'one and= '], dict(ar.get_metadata(playfile))[playfile]['tag'])
-    list(ar.set_metadata(playfile, remove={'tag': ' two'}))
+    ar.set_metadata(playfile, remove={'tag': ' two'})
     deq_(target, dict(ar.get_metadata('.')))
     # remove non-existing doesn't error and doesn't change anything
-    list(ar.set_metadata(playfile, remove={'ether': 'best'}))
+    ar.set_metadata(playfile, remove={'ether': 'best'})
     deq_(target, dict(ar.get_metadata('.')))
     # add works without prior existence
-    list(ar.set_metadata(playfile, add={'novel': 'best'}))
+    ar.set_metadata(playfile, add={'novel': 'best'})
     eq_(['best'], dict(ar.get_metadata(playfile))[playfile]['novel'])
 
 
@@ -2165,7 +2165,7 @@ def test_AnnexRepo_addurl_batched_and_set_metadata(path, url, dest):
     ar = AnnexRepo(dest, create=True)
     fname = "file.txt"
     ar.add_url_to_file(fname, urljoin(url, fname), batch=True)
-    list(ar.set_metadata(fname, init={"number": "one"}))
+    ar.set_metadata(fname, init={"number": "one"})
     eq_(["one"], dict(ar.get_metadata(fname))[fname]["number"])
 
 
