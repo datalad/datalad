@@ -60,6 +60,7 @@ from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
+from datalad.utils import Path
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -2396,7 +2397,7 @@ class GitRepo(RepoInterface):
           as a tracking branch. If `None`, remote HEAD will be checked out.
         """
         if name is None:
-            name = path
+            name = Path(path).as_posix()
         # XXX the following should do it, but GitPython will refuse to add a submodule
         # unless you specify a URL that is configured as one of its remotes, or you
         # specify no URL, but the repo has at least one remote.
