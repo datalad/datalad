@@ -66,6 +66,7 @@ from ..utils import unlink
 from ..utils import CMD_MAX_ARG
 from ..utils import create_tree
 from ..utils import never_fail
+from ..utils import Path
 
 from ..support.annexrepo import AnnexRepo
 
@@ -729,6 +730,11 @@ def test_assure_unicode():
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
     assert assure_unicode(1) is 1
+
+
+def test_pathlib_unicode():
+    eq_(text_type(Path("a")), u"a")
+    eq_(text_type(Path(u"β")), u"β")
 
 
 def test_as_unicode():

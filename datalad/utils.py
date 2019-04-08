@@ -335,6 +335,11 @@ if PY2:
         PurePath,
         PurePosixPath,
     )
+
+    def _unicode_path(pathobj):
+        return assure_unicode(str(pathobj))
+
+    PurePath.__unicode__ = _unicode_path
 else:
     from pathlib import (
         Path,
