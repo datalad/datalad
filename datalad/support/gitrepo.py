@@ -993,10 +993,7 @@ class GitRepo(RepoInterface):
         if not op.exists(dot_git):
             raise RuntimeError("Missing .git in %s." % repo)
         elif op.islink(dot_git):
-            # readlink cannot be imported on windows, but there should also
-            # be no symlinks
-            from os import readlink
-            git_dir = readlink(dot_git)
+            git_dir = os.readlink(dot_git)
         elif op.isdir(dot_git):
             git_dir = ".git"
         elif op.isfile(dot_git):
