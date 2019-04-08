@@ -2872,10 +2872,12 @@ class GitRepo(RepoInterface):
             else:
                 raise ValueError(
                     'unknown value for `untracked`: %s', untracked)
-            props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
-            props_re = re.compile(r'([0-9]+) ([a-z]*) ([^ ]*) [\s]*([0-9-]+)\t(.*)$')
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
         try:
             stdout, stderr = self._git_custom_command(
@@ -2909,10 +2911,10 @@ class GitRepo(RepoInterface):
                 inf['gitshasum'] = None
             else:
                 # again Git reports always in POSIX
-                path = ut.PurePosixPath(props.group(4 if not ref else 5))
-                inf['gitshasum'] = props.group(2 if not ref else 3)
+                path = ut.PurePosixPath(props.group('fname'))
+                inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
-                    props.group(1), props.group(1))
+                    props.group('type'), props.group('type'))
                 if inf['type'] == 'symlink' and \
                         '.git/annex/objects' in \
                         ut.Path(
@@ -2933,7 +2935,7 @@ class GitRepo(RepoInterface):
                     # on the particular mode annex is in
                     inf['type'] = 'file'
                 if ref and inf['type'] == 'file':
-                    inf['bytesize'] = int(props.group(4))
+                    inf['bytesize'] = int(props.group('size'))
 
             # the function assumes that any `path` is a relative path lib
             # instance if there were path constraints given, we need to reject
