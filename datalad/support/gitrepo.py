@@ -2936,10 +2936,15 @@ class GitRepo(RepoInterface):
                 inf['type'] = mode_type_map.get(
                     props.group('type'), props.group('type'))
                 if inf['type'] == 'symlink' and \
-                        '.git/annex/objects' in \
-                        ut.Path(
+                        ((ref is None and '.git/annex/objects' in \
+                          ut.Path(
                             os.readlink(text_type(self.pathobj / path))
-                        ).as_posix():
+                          ).as_posix()) or \
+                         (ref and \
+                          '.git/annex/objects' in self._git_custom_command(
+                            '',
+                            ['git', 'cat-file', 'blob', '{}:{}'.format(
+                                ref, text_type(path))])[0])):
                     # report annex symlink pointers as file, their
                     # symlink-nature is a technicality that is dependent
                     # on the particular mode annex is in
