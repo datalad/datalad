@@ -796,7 +796,7 @@ class BatchedCommand(object):
             #       a number of restarts/resends, but it should be per command
             #       since for some we cannot just resend the same query. But if
             #       it is just a "get"er - we could resend it few times
-            # We are expecting a single line output
+            # The default output_proc expects a single line output.
             # TODO: timeouts etc
             stdout = assure_unicode(self.output_proc(process.stdout)) \
                 if not process.stdout.closed else None
