@@ -2916,7 +2916,16 @@ class GitRepo(RepoInterface):
                 output_proc=_read_symlink_target_from_catfile,
             )
         else:
-            _get_link_target = os.readlink
+            def try_readlink(path):
+                try:
+                    return os.readlink(path)
+                except OSError:
+                    # readlink will fail if the symlink reported by ls-files is
+                    # not in the working tree (it could be removed or
+                    # unlocked). Fall back to a slower method.
+                    return op.realpath(path)
+
+            _get_link_target = try_readlink
 
         for line in stdout.split('\0'):
             if not line:
