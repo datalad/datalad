@@ -2903,11 +2903,16 @@ class GitRepo(RepoInterface):
         if ref:
             def _read_symlink_target_from_catfile(lines):
                 # it is always the second line, all checks done upfront
-                lines.readline()
+                header = lines.readline()
+                if header.rstrip().endswith('missing'):
+                    # something we do not know about, should not happen
+                    # in real use, but guard against to avoid stalling
+                    return ''
                 return lines.readline().rstrip()
 
             _get_link_target = BatchedCommand(
                 ['git', 'cat-file', '--batch'],
+                path=self.path,
                 output_proc=_read_symlink_target_from_catfile,
             )
         else:
