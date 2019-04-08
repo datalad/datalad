@@ -2879,6 +2879,7 @@ class GitRepo(RepoInterface):
             props_re = re.compile(
                 r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
+        lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
                 # specifically always ask for a full report and
@@ -2899,6 +2900,7 @@ class GitRepo(RepoInterface):
             if "fatal: Not a valid object name" in str(exc):
                 raise ValueError("Git reference '{}' invalid".format(ref))
             raise
+        lgr.debug('Done query repo: %s', cmd)
 
         for line in stdout.split('\0'):
             if not line:
@@ -2963,6 +2965,7 @@ class GitRepo(RepoInterface):
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
 
+        lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
     def status(self, paths=None, untracked='all', ignore_submodules='no'):
