@@ -702,7 +702,7 @@ def readline_rstripped(stdout):
 
 @auto_repr
 class BatchedCommand(object):
-    """Container for an annex process which would allow for persistent communication
+    """Container for a process which would allow for persistent communication
     """
 
     def __init__(self, cmd, path=None, output_proc=None):
@@ -766,7 +766,7 @@ class BatchedCommand(object):
         Returns
         -------
         str or list
-          Output received from annex.  list in case if cmds was a list
+          Output received from process.  list in case if cmds was a list
         """
         # TODO: add checks -- may be process died off and needs to be reinitiated
         if not self._process:
