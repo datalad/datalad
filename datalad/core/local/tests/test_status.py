@@ -76,6 +76,7 @@ def test_status_basics(path, linkpath, otherdir):
         eq_(s['state'], 'clean')
         eq_(s['type'], 'file')
         assert_in('gitshasum', s)
+        assert_in('bytesize', s)
         eq_(s['refds'], ds.path)
 
 

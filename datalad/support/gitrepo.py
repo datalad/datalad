@@ -2799,7 +2799,9 @@ class GitRepo(RepoInterface):
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
-          present work tree (via ls-files).
+          present work tree (via ls-files). With a given reference, the
+          reported content properties also contain a 'bytesize' record,
+          stating the size of a file in bytes.
         untracked : {'no', 'normal', 'all'}
           If and how untracked content is reported when no `ref` was given:
           'no': no untracked files are reported; 'normal': untracked files
@@ -2870,10 +2872,12 @@ class GitRepo(RepoInterface):
             else:
                 raise ValueError(
                     'unknown value for `untracked`: %s', untracked)
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
         else:
-            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree']
-        # works for both modes
-        props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
+            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
         try:
             stdout, stderr = self._git_custom_command(
@@ -2907,10 +2911,10 @@ class GitRepo(RepoInterface):
                 inf['gitshasum'] = None
             else:
                 # again Git reports always in POSIX
-                path = ut.PurePosixPath(props.group(4))
-                inf['gitshasum'] = props.group(2 if not ref else 3)
+                path = ut.PurePosixPath(props.group('fname'))
+                inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
-                    props.group(1), props.group(1))
+                    props.group('type'), props.group('type'))
                 if inf['type'] == 'symlink' and \
                         '.git/annex/objects' in \
                         ut.Path(
@@ -2930,6 +2934,8 @@ class GitRepo(RepoInterface):
                     # symlink-nature is a technicality that is dependent
                     # on the particular mode annex is in
                     inf['type'] = 'file'
+                if ref and inf['type'] == 'file':
+                    inf['bytesize'] = int(props.group('size'))
 
             # the function assumes that any `path` is a relative path lib
             # instance if there were path constraints given, we need to reject
@@ -3139,6 +3145,12 @@ class GitRepo(RepoInterface):
                 )
             if props['state'] in ('clean', 'added', 'modified'):
                 props['gitshasum'] = to_state_r['gitshasum']
+                if 'bytesize' in to_state_r:
+                    # if we got this cheap, report it
+                    props['bytesize'] = to_state_r['bytesize']
+                elif props['state'] == 'clean' and 'bytesize' in from_state[f]:
+                    # no change, we can take this old size info
+                    props['bytesize'] = from_state[f]['bytesize']
             if props['state'] in ('clean', 'modified', 'deleted'):
                 props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props

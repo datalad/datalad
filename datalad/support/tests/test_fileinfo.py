@@ -7,6 +7,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test file info getters"""
 
+
+from six import iteritems
 import os.path as op
 import datalad.utils as ut
 
@@ -135,8 +137,14 @@ def test_compare_content_info(path):
     assert_repo_status(path)
 
     # for a clean repo HEAD and worktree query should yield identical results
+    # minus a 'bytesize' report that is readily available for HEAD, but would
+    # not a stat call per file for the worktree, and is not done ATM
     wt = ds.repo.get_content_info(ref=None)
-    assert_dict_equal(wt, ds.repo.get_content_info(ref='HEAD'))
+    assert_dict_equal(
+        wt,
+        {f: {k: v for k, v in iteritems(p) if k != 'bytesize'}
+         for f, p in iteritems(ds.repo.get_content_info(ref='HEAD'))}
+    )
 
 
 @with_tempfile
