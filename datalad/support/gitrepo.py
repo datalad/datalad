@@ -55,6 +55,7 @@ from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
+from datalad.cmd import BatchedCommand
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
@@ -2899,6 +2900,19 @@ class GitRepo(RepoInterface):
             raise
         lgr.debug('Done query repo: %s', cmd)
 
+        if ref:
+            def _read_symlink_target_from_catfile(lines):
+                # it is always the second line, all checks done upfront
+                lines.readline()
+                return lines.readline().rstrip()
+
+            _get_link_target = BatchedCommand(
+                ['git', 'cat-file', '--batch'],
+                output_proc=_read_symlink_target_from_catfile,
+            )
+        else:
+            _get_link_target = os.readlink
+
         for line in stdout.split('\0'):
             if not line:
                 continue
@@ -2938,13 +2952,13 @@ class GitRepo(RepoInterface):
                 if inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
                           ut.Path(
-                            os.readlink(text_type(self.pathobj / path))
+                            _get_link_target(text_type(self.pathobj / path))
                           ).as_posix()) or \
                          (ref and \
-                          '.git/annex/objects' in self._git_custom_command(
-                            '',
-                            ['git', 'cat-file', 'blob', '{}:{}'.format(
-                                ref, text_type(path))])[0])):
+                          '.git/annex/objects' in _get_link_target(
+                              '{}:{}'.format(
+                                  ref, text_type(path))))
+                        ):
                     # report annex symlink pointers as file, their
                     # symlink-nature is a technicality that is dependent
                     # on the particular mode annex is in
@@ -2962,6 +2976,10 @@ class GitRepo(RepoInterface):
                 inf['type'] = 'symlink' if path.is_symlink() \
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
+
+        if ref:
+            # cancel batch process
+            _get_link_target.close()
 
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
