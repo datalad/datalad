@@ -2911,20 +2911,8 @@ class GitRepo(RepoInterface):
             else:
                 # again Git reports always in POSIX
                 path = ut.PurePosixPath(props.group('fname'))
-                inf['gitshasum'] = props.group('sha')
-                inf['type'] = mode_type_map.get(
-                    props.group('type'), props.group('type'))
-                if inf['type'] == 'symlink' and \
-                        '.git/annex/objects' in \
-                        ut.Path(
-                            os.readlink(text_type(self.pathobj / path))
-                        ).as_posix():
-                    # report annex symlink pointers as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
-                if ref and inf['type'] == 'file':
-                    inf['bytesize'] = int(props.group('size'))
+
+            # rejects paths as early as possible
 
             # the function assumes that any `path` is a relative path lib
             # instance if there were path constraints given, we need to reject
@@ -2941,6 +2929,24 @@ class GitRepo(RepoInterface):
                     path == c or path in c.parents or c in path.parents
                     for c in paths):
                 continue
+
+            # revisit the file props after this path has not been rejected
+            if props:
+                inf['gitshasum'] = props.group('sha')
+                inf['type'] = mode_type_map.get(
+                    props.group('type'), props.group('type'))
+                if inf['type'] == 'symlink' and \
+                        '.git/annex/objects' in \
+                        ut.Path(
+                            os.readlink(text_type(self.pathobj / path))
+                        ).as_posix():
+                    # report annex symlink pointers as file, their
+                    # symlink-nature is a technicality that is dependent
+                    # on the particular mode annex is in
+                    inf['type'] = 'file'
+
+                if ref and inf['type'] == 'file':
+                    inf['bytesize'] = int(props.group('size'))
 
             # join item path with repo path to get a universally useful
             # path representation with auto-conversion and tons of other
