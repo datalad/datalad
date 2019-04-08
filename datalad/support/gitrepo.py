@@ -2961,7 +2961,7 @@ class GitRepo(RepoInterface):
                           ).as_posix()) or \
                          (ref and \
                           '.git/annex/objects' in _get_link_target(
-                              '{}:{}'.format(
+                              u'{}:{}'.format(
                                   ref, text_type(path))))
                         ):
                     # report annex symlink pointers as file, their
