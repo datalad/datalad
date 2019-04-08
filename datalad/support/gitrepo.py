@@ -2920,19 +2920,9 @@ class GitRepo(RepoInterface):
                 if inf['type'] == 'symlink' and \
                         '.git/annex/objects' in \
                         ut.Path(
-                            op.realpath(op.join(
-                                # this is unicode
-                                self.path,
-                                # this has to become unicode on older Pythons
-                                # it doesn't only look ugly, it is ugly
-                                # and probably wrong
-                                unicode(str(path), 'utf-8')
-                                if PY2 else str(path)))).as_posix():
-                    # ugly thing above could be just
-                    #  (self.pathobj / path).resolve().as_posix()
-                    # but PY3.5 does not support resolve(strict=False)
-
-                    # report locked annexed files as file, their
+                            os.readlink(text_type(self.pathobj / path))
+                        ).as_posix():
+                    # report annex symlink pointers as file, their
                     # symlink-nature is a technicality that is dependent
                     # on the particular mode annex is in
                     inf['type'] = 'file'
