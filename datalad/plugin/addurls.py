@@ -496,7 +496,7 @@ def add_meta(rows):
 
         with patch.object(ds.repo, "always_commit", False):
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
+            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
                 # Don't show all added metadata for the file because that
                 # could quickly flood the output.
