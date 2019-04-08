@@ -2432,6 +2432,15 @@ class GitRepo(RepoInterface):
                 url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # record dataset ID if possible for comprehesive metadata on
+        # dataset components within the dataset itself
+        subm_id = GitRepo(op.join(self.path, path)).config.get(
+            'datalad.dataset.id', None)
+        if subm_id:
+            self._git_custom_command(
+                '',
+                ['git', 'config', '--file', '.gitmodules', '--add',
+                 'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
         # TODO: return value
