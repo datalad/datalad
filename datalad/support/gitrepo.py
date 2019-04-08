@@ -2799,7 +2799,9 @@ class GitRepo(RepoInterface):
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
-          present work tree (via ls-files).
+          present work tree (via ls-files). With a given reference, the
+          reported content properties also contain a 'bytesize' record,
+          stating the size of a file in bytes.
         untracked : {'no', 'normal', 'all'}
           If and how untracked content is reported when no `ref` was given:
           'no': no untracked files are reported; 'normal': untracked files
