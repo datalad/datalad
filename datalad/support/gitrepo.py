@@ -2440,7 +2440,7 @@ class GitRepo(RepoInterface):
         if subm_id:
             self._git_custom_command(
                 '',
-                ['git', 'config', '--file', '.gitmodules', '--add',
+                ['git', 'config', '--file', '.gitmodules', '--replace-all',
                  'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
