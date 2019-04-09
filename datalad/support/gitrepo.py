@@ -3503,7 +3503,7 @@ class GitRepo(RepoInterface):
                 # https://github.com/datalad/datalad/issues/3306
                 for r in GitRepo._save_add(
                         self,
-                        {self.pathobj.joinpath('.gitmodules'): None}):
+                        {op.join(self.path, '.gitmodules'): None}):
                     yield get_status_dict(
                         action='add',
                         refds=self.pathobj,
