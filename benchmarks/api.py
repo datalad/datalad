@@ -25,6 +25,19 @@ from datalad.api import ls
 from datalad.api import remove
 from datalad.api import uninstall
 
+#
+# Following ones could be absent in older versions
+#
+try:
+    from datalad.api import diff
+except ImportError:
+    diff = None
+
+try:
+    from datalad.api import status
+except ImportError:
+    status = None
+
 from datalad.utils import (
     getpwd,
     get_tempfile_kwargs,
@@ -141,3 +154,15 @@ class supers(SuprocBenchmarks):
 
     def time_remove(self):
         remove(self.ds.path, recursive=True)
+
+    def time_diff(self):
+        diff(self.ds.path, revision="HEAD^")
+
+    def time_diff_recursive(self):
+        diff(self.ds.path, revision="HEAD^", recursive=True)
+
+    def time_status(self):
+        status(self.ds.path)
+
+    def time_status_recursive(self):
+        status(self.ds.path, recursive=True)
