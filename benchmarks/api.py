@@ -160,6 +160,9 @@ class supers(SuprocBenchmarks):
     def time_subdatasets_recursive(self):
         self.ds.subdatasets(recursive=True)
 
+    def time_subdatasets_recursive_first(self):
+        next(self.ds.subdatasets(recursive=True, return_type='generator'))
+
     def time_uninstall(self):
         for subm in self.ds.repo.get_submodules():
             self.ds.uninstall(subm.path, recursive=True, check=False)
