@@ -126,8 +126,9 @@ class supers(SampleSuperDatasetBenchmarks):
     def time_diff_recursive(self):
         diff(self.ds.path, revision="HEAD^", recursive=True)
 
+    # Status must be called with the dataset, unlike diff
     def time_status(self):
-        status(self.ds.path)
+        self.ds.status()
 
     def time_status_recursive(self):
-        status(self.ds.path, recursive=True)
+        self.ds.status(recursive=True)
