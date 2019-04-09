@@ -3494,6 +3494,23 @@ class GitRepo(RepoInterface):
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
+            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+                # we cannot simply hook into the coming add-call
+                # as this would go to annex, so make a dedicted git-add
+                # call to ensure .gitmodules is not annexed
+                # in any normal DataLad dataset .gitattributes will
+                # prevent this, but in a plain repo it won't
+                # https://github.com/datalad/datalad/issues/3306
+                for r in GitRepo._save_add(
+                        self,
+                        {self.pathobj.joinpath('.gitmodules'): None}):
+                    yield get_status_dict(
+                        action='add',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
+                        status='ok' if r.get('success', None) else 'error',
+                        logger=lgr)
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
