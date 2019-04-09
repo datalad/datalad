@@ -44,10 +44,14 @@ class testds(SuprocBenchmarks):
     """
 
     def time_create_test_dataset1(self):
-        create_test_dataset(spec='1', seed=0)
+        self.remove_paths.extend(
+            create_test_dataset(spec='1', seed=0)
+        )
 
     def time_create_test_dataset2x2(self):
-        create_test_dataset(spec='2/2', seed=0)
+        self.remove_paths.extend(
+            create_test_dataset(spec='2/2', seed=0)
+        )
 
 
 class supers(SuprocBenchmarks):
@@ -89,13 +93,8 @@ class supers(SuprocBenchmarks):
         os.rename(epath, epath_unique)
         self.__class__.ds_count += 1
         self.ds = Dataset(epath_unique)
+        self.remove_paths += [self.ds.path + '_', self.ds.path]
         print("Finished setup for %s" % tempdir)
-
-    def teardown(self, tarfile_path):
-        for path in [self.ds.path + '_', self.ds.path]:
-            print("Cleaning up %s" % path)
-            if osp.exists(path):
-                rmtree(path)
 
     def time_installr(self, tarfile_path):
         # somewhat duplicating setup but lazy to do different one for now

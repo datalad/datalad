@@ -9,6 +9,9 @@
 
 import sys
 import timeit
+import os.path as op
+
+from datalad.utils import rmtree
 
 ############
 # Monkey patches
@@ -59,4 +62,20 @@ class SuprocBenchmarks(object):
                 utils.is_interactive = is_interactive
                 ls.is_interactive = is_interactive
             SuprocBenchmarks._monkey_patched = True
+        self.remove_paths = []
 
+    def _cleanup(self):
+        while self.remove_paths:
+            path = self.remove_paths.pop()
+            if op.lexists(path):
+                rmtree(path)
+
+    def teardown(self):
+        self._cleanup()
+
+    def __del__(self):
+        # We will at least try
+        try:
+            self._cleanup()
+        except:
+            pass
