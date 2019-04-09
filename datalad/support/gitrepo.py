@@ -2839,12 +2839,6 @@ class GitRepo(RepoInterface):
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        mode_type_map = {
-            '100644': 'file',
-            '100755': 'file',
-            '120000': 'symlink',
-            '160000': 'dataset',
-        }
         if paths:
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
@@ -2927,7 +2921,32 @@ class GitRepo(RepoInterface):
 
             _get_link_target = try_readlink
 
-        for line in stdout.split('\0'):
+        try:
+            self._get_content_info_line_helper(
+                paths,
+                ref,
+                info,
+                stdout.split('\0'),
+                props_re,
+                _get_link_target)
+        finally:
+            if ref:
+                # cancel batch process
+                _get_link_target.close()
+
+        lgr.debug('Done %s.get_content_info(...)', self)
+        return info
+
+    def _get_content_info_line_helper(self, paths, ref, info, lines,
+                                      props_re, get_link_target):
+        """Internal helper of get_content_info() to parse Git output"""
+        mode_type_map = {
+            '100644': 'file',
+            '100755': 'file',
+            '120000': 'symlink',
+            '160000': 'dataset',
+        }
+        for line in lines:
             if not line:
                 continue
             inf = {}
@@ -2966,10 +2985,10 @@ class GitRepo(RepoInterface):
                 if inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
                           ut.Path(
-                            _get_link_target(text_type(self.pathobj / path))
+                            get_link_target(text_type(self.pathobj / path))
                           ).as_posix()) or \
                          (ref and \
-                          '.git/annex/objects' in _get_link_target(
+                          '.git/annex/objects' in get_link_target(
                               u'{}:{}'.format(
                                   ref, text_type(path))))
                         ):
@@ -2990,13 +3009,6 @@ class GitRepo(RepoInterface):
                 inf['type'] = 'symlink' if path.is_symlink() \
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
-
-        if ref:
-            # cancel batch process
-            _get_link_target.close()
-
-        lgr.debug('Done %s.get_content_info(...)', self)
-        return info
 
     def status(self, paths=None, untracked='all', ignore_submodules='no'):
         """Simplified `git status` equivalent.
