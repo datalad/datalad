@@ -148,9 +148,21 @@ class supers(SuprocBenchmarks):
     def time_ls_recursive_long_all(self):
         ls(self.ds.path, recursive=True, long_=True, all_=True)
 
-    # TODO: since doesn't really allow to uninstall top level ds... bleh ;)
-    #def time_uninstall(self, tarfile_path):
-    #    uninstall(self.ds.path, recursive=True)
+    def time_get_subdatasets(self):
+        self.ds.get_subdatasets()
+
+    def time_get_subdatasets_recursive(self):
+        self.ds.get_subdatasets(recursive=True)
+
+    def time_subdatasets(self):
+        self.ds.subdatasets()
+
+    def time_subdatasets_recursive(self):
+        self.ds.subdatasets(recursive=True)
+
+    def time_uninstall(self):
+        for subm in self.ds.repo.get_submodules():
+            self.ds.uninstall(subm.path, recursive=True, check=False)
 
     def time_remove(self):
         remove(self.ds.path, recursive=True)
