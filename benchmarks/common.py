@@ -65,6 +65,9 @@ class SuprocBenchmarks(object):
         self.remove_paths = []
 
     def _cleanup(self):
+        if not self.remove_paths:
+            return  # Nothing TODO
+        self.log("Cleaning up %d paths", len(self.remove_paths))
         while self.remove_paths:
             path = self.remove_paths.pop()
             if op.lexists(path):
@@ -79,3 +82,7 @@ class SuprocBenchmarks(object):
             self._cleanup()
         except:
             pass
+
+    def log(self, msg, *args):
+        """Consistent benchmarks logging"""
+        print("BM: "+ str(msg % tuple(args)))
