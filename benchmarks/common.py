@@ -155,4 +155,5 @@ class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
         os.rename(epath, epath_unique)
         self.__class__.ds_count += 1
         self.ds = Dataset(epath_unique)
+        self.repo = self.ds.repo
         self.log("Finished setup for %s", tempdir)
