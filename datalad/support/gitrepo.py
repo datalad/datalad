@@ -55,6 +55,7 @@ from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
+from datalad.cmd import BatchedCommand
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
@@ -993,10 +994,7 @@ class GitRepo(RepoInterface):
         if not op.exists(dot_git):
             raise RuntimeError("Missing .git in %s." % repo)
         elif op.islink(dot_git):
-            # readlink cannot be imported on windows, but there should also
-            # be no symlinks
-            from os import readlink
-            git_dir = readlink(dot_git)
+            git_dir = os.readlink(dot_git)
         elif op.isdir(dot_git):
             git_dir = ".git"
         elif op.isfile(dot_git):
@@ -2841,12 +2839,6 @@ class GitRepo(RepoInterface):
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        mode_type_map = {
-            '100644': 'file',
-            '100755': 'file',
-            '120000': 'symlink',
-            '160000': 'dataset',
-        }
         if paths:
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
@@ -2879,6 +2871,7 @@ class GitRepo(RepoInterface):
             props_re = re.compile(
                 r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
+        lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
                 # specifically always ask for a full report and
@@ -2899,8 +2892,61 @@ class GitRepo(RepoInterface):
             if "fatal: Not a valid object name" in str(exc):
                 raise ValueError("Git reference '{}' invalid".format(ref))
             raise
+        lgr.debug('Done query repo: %s', cmd)
 
-        for line in stdout.split('\0'):
+        if ref:
+            def _read_symlink_target_from_catfile(lines):
+                # it is always the second line, all checks done upfront
+                header = lines.readline()
+                if header.rstrip().endswith('missing'):
+                    # something we do not know about, should not happen
+                    # in real use, but guard against to avoid stalling
+                    return ''
+                return lines.readline().rstrip()
+
+            _get_link_target = BatchedCommand(
+                ['git', 'cat-file', '--batch'],
+                path=self.path,
+                output_proc=_read_symlink_target_from_catfile,
+            )
+        else:
+            def try_readlink(path):
+                try:
+                    return os.readlink(path)
+                except OSError:
+                    # readlink will fail if the symlink reported by ls-files is
+                    # not in the working tree (it could be removed or
+                    # unlocked). Fall back to a slower method.
+                    return op.realpath(path)
+
+            _get_link_target = try_readlink
+
+        try:
+            self._get_content_info_line_helper(
+                paths,
+                ref,
+                info,
+                stdout.split('\0'),
+                props_re,
+                _get_link_target)
+        finally:
+            if ref:
+                # cancel batch process
+                _get_link_target.close()
+
+        lgr.debug('Done %s.get_content_info(...)', self)
+        return info
+
+    def _get_content_info_line_helper(self, paths, ref, info, lines,
+                                      props_re, get_link_target):
+        """Internal helper of get_content_info() to parse Git output"""
+        mode_type_map = {
+            '100644': 'file',
+            '100755': 'file',
+            '120000': 'symlink',
+            '160000': 'dataset',
+        }
+        for line in lines:
             if not line:
                 continue
             inf = {}
@@ -2912,30 +2958,8 @@ class GitRepo(RepoInterface):
             else:
                 # again Git reports always in POSIX
                 path = ut.PurePosixPath(props.group('fname'))
-                inf['gitshasum'] = props.group('sha')
-                inf['type'] = mode_type_map.get(
-                    props.group('type'), props.group('type'))
-                if inf['type'] == 'symlink' and \
-                        '.git/annex/objects' in \
-                        ut.Path(
-                            op.realpath(op.join(
-                                # this is unicode
-                                self.path,
-                                # this has to become unicode on older Pythons
-                                # it doesn't only look ugly, it is ugly
-                                # and probably wrong
-                                unicode(str(path), 'utf-8')
-                                if PY2 else str(path)))).as_posix():
-                    # ugly thing above could be just
-                    #  (self.pathobj / path).resolve().as_posix()
-                    # but PY3.5 does not support resolve(strict=False)
 
-                    # report locked annexed files as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
-                if ref and inf['type'] == 'file':
-                    inf['bytesize'] = int(props.group('size'))
+            # rejects paths as early as possible
 
             # the function assumes that any `path` is a relative path lib
             # instance if there were path constraints given, we need to reject
@@ -2953,6 +2977,29 @@ class GitRepo(RepoInterface):
                     for c in paths):
                 continue
 
+            # revisit the file props after this path has not been rejected
+            if props:
+                inf['gitshasum'] = props.group('sha')
+                inf['type'] = mode_type_map.get(
+                    props.group('type'), props.group('type'))
+                if inf['type'] == 'symlink' and \
+                        ((ref is None and '.git/annex/objects' in \
+                          ut.Path(
+                            get_link_target(text_type(self.pathobj / path))
+                          ).as_posix()) or \
+                         (ref and \
+                          '.git/annex/objects' in get_link_target(
+                              u'{}:{}'.format(
+                                  ref, text_type(path))))
+                        ):
+                    # report annex symlink pointers as file, their
+                    # symlink-nature is a technicality that is dependent
+                    # on the particular mode annex is in
+                    inf['type'] = 'file'
+
+                if ref and inf['type'] == 'file':
+                    inf['bytesize'] = int(props.group('size'))
+
             # join item path with repo path to get a universally useful
             # path representation with auto-conversion and tons of other
             # stuff
@@ -2962,8 +3009,6 @@ class GitRepo(RepoInterface):
                 inf['type'] = 'symlink' if path.is_symlink() \
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
-
-        return info
 
     def status(self, paths=None, untracked='all', ignore_submodules='no'):
         """Simplified `git status` equivalent.
