@@ -11,12 +11,15 @@
 
 import os
 import shutil
+import os.path as op
 from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
+from ..dataset import rev_resolve_path
 from datalad import cfg
-from datalad.api import create
+from datalad.api import rev_create
 from datalad.api import get
+import datalad.utils as ut
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.utils import get_dataset_root
@@ -33,6 +36,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import assert_is
 from datalad.tests.utils import assert_not_equal
+from datalad.tests.utils import assert_result_count
 
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathKnownToRepositoryError
@@ -105,10 +109,16 @@ def test_is_installed(src, path):
     # subdirectory within submodule, e.g. `subm 1/subdir` but that is
     # not checked here. `rev-create` will provide that protection
     # when create/rev-create merge.
-    # Unfortunately such protection does not work in direct mode
-    if not ds.repo.is_direct_mode():
-        with assert_raises(PathKnownToRepositoryError):
-            subds.create()
+    res = subds.rev_create(on_failure='ignore',
+                           return_type='list',
+                           result_filter=None,
+                           result_xfm=None)
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1, status='error', path=subds.path,
+        message=(
+            'collision with content in parent dataset at %s: %s',
+            ds.path, [subds.path]))
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
@@ -168,14 +178,13 @@ def test_subdatasets(path):
     ds = Dataset(path)
     assert_false(ds.is_installed())
     eq_(ds.subdatasets(), [])
-    ds = ds.create()
+    ds = ds.rev_create()
     assert_true(ds.is_installed())
     eq_(ds.subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.add(path='test')
+    ds.rev_save(path='test', message="Hello!", version_tag=1)
     assert_true(ds.is_installed())
-    ds.save("Hello!", version_tag=1)
     # Assuming that tmp location was not under a super-dataset
     eq_(ds.get_superdataset(), None)
     eq_(ds.get_superdataset(topmost=True), ds)
@@ -192,7 +201,7 @@ def test_subdatasets(path):
     eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
     eq_(subdss, ds.subdatasets(recursive=True))
     eq_(subdss, ds.subdatasets(fulfilled=True))
-    ds.save("with subds", version_tag=2)
+    ds.rev_save(message="with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
     eq_(ds.subdatasets(), [])
@@ -232,7 +241,7 @@ def test_require_dataset(path):
             InsufficientArgumentsError,
             require_dataset,
             None)
-        create('.')
+        rev_create('.')
         # in this folder by default
         assert_equal(
             require_dataset(None).path,
@@ -252,7 +261,7 @@ def test_require_dataset(path):
 def test_dataset_id(path):
     ds = Dataset(path)
     assert_equal(ds.id, None)
-    ds.create()
+    ds.rev_create()
     dsorigid = ds.id
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
@@ -275,7 +284,7 @@ def test_dataset_id(path):
     # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
-    ds.create(no_annex=True, force=True)
+    ds.rev_create(no_annex=True, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
     #
@@ -285,7 +294,7 @@ def test_dataset_id(path):
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
     AnnexRepo._unique_instances.clear()
-    ds.create(force=True)
+    ds.rev_create(force=True)
     assert_equal(ds.id, dsorigid)
     # dataset ID and annex UUID have nothing to do with each other
     # if an ID was already generated
@@ -303,7 +312,7 @@ def test_dataset_id(path):
     assert_equal(ds.id, newds.id)
     # even if we generate a dataset from scratch with an annex UUID right away,
     # this is also not the ID
-    annexds = Dataset(opj(path, 'scratch')).create()
+    annexds = Dataset(opj(path, 'scratch')).rev_create()
     assert_true(annexds.id != annexds.repo.uuid)
 
 
@@ -348,7 +357,7 @@ def test_property_reevaluation(repo1):
     assert_false(ds._cfg_bound)
     assert_is_none(ds.id)
 
-    ds.create()
+    ds.rev_create()
     ok_clean_git(repo1)
     # after creation, we have `repo`, and `config` was reevaluated to point
     # to the repo's config:
@@ -372,7 +381,7 @@ def test_property_reevaluation(repo1):
     assert_is_not(second_config, third_config)
     assert_is_none(ds.id)
 
-    ds.create()
+    ds.rev_create()
     ok_clean_git(repo1)
     # after recreation everything is sane again:
     assert_is_not_none(ds.repo)
@@ -397,7 +406,7 @@ def test_property_reevaluation(repo1):
 @with_tempfile
 def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
-    ds = Dataset(repo1).create()
+    ds = Dataset(repo1).rev_create()
 
     # now, let ds be a symlink and change that symlink to point to different
     # things:
@@ -442,3 +451,93 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
     assert_is_not(ds_link.config, ar3.config)
     assert_false(ds_link._cfg_bound)
     assert_is_none(ds_link.id)
+
+
+@with_tempfile(mkdir=True)
+def test_rev_resolve_path(path):
+    if op.realpath(path) != path:
+        raise SkipTest("Test assumptions require non-symlinked parent paths")
+    # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
+    opath = op.join(path, "origin")
+    os.makedirs(opath)
+    if not on_windows:
+        lpath = op.join(path, "linked")
+        os.symlink('origin', lpath)
+
+    ds_global = Dataset(path)
+    # path resolution of absolute paths is not influenced by symlinks
+    # ignore the linked path on windows, it is not a symlink in the POSIX sense
+    for d in (opath,) if on_windows else (opath, lpath):
+        ds_local = Dataset(d)
+        # no symlink resolution
+        eq_(str(rev_resolve_path(d)), d)
+        with chpwd(d):
+            # be aware: knows about cwd, but this CWD has symlinks resolved
+            eq_(str(rev_resolve_path(d).cwd()), opath)
+            # using pathlib's `resolve()` will resolve any
+            # symlinks
+            # also resolve `opath`, as on old windows systems the path might
+            # come in crippled (e.g. C:\Users\MIKE~1/...)
+            # and comparison would fails unjustified
+            eq_(rev_resolve_path('.').resolve(), ut.Path(opath).resolve())
+            # no norming, but absolute paths, without resolving links
+            eq_(rev_resolve_path('.'), ut.Path(d))
+            eq_(str(rev_resolve_path('.')), d)
+
+            eq_(str(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
+                op.join(d, 'bu'))
+            eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+                op.join(ds_global.path, 'bu'))
+
+        # resolve against a dataset
+        eq_(str(rev_resolve_path('bu', ds=ds_local)), op.join(d, 'bu'))
+        eq_(str(rev_resolve_path('bu', ds=ds_global)), op.join(path, 'bu'))
+        # but paths outside the dataset are left untouched
+        eq_(str(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
+            op.join(getpwd(), 'bu'))
+        eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+            op.normpath(op.join(getpwd(), os.pardir, 'bu')))
+
+
+# little brother of the test above, but actually (must) run
+# under any circumstances
+@with_tempfile(mkdir=True)
+def test_rev_resolve_path_symlink_edition(path):
+    deepest = ut.Path(path) / 'one' / 'two' / 'three'
+    deepest_str = str(deepest)
+    os.makedirs(deepest_str)
+    with chpwd(deepest_str):
+        # direct absolute
+        eq_(deepest, rev_resolve_path(deepest))
+        eq_(deepest, rev_resolve_path(deepest_str))
+        # explicit direct relative
+        eq_(deepest, rev_resolve_path('.'))
+        eq_(deepest, rev_resolve_path(op.join('.', '.')))
+        eq_(deepest, rev_resolve_path(op.join('..', 'three')))
+        eq_(deepest, rev_resolve_path(op.join('..', '..', 'two', 'three')))
+        eq_(deepest, rev_resolve_path(op.join('..', '..', '..',
+                                              'one', 'two', 'three')))
+        # weird ones
+        eq_(deepest, rev_resolve_path(op.join('..', '.', 'three')))
+        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, rev_resolve_path(op.join('.', '..', 'three')))
+
+
+@with_tempfile(mkdir=True)
+def test_hashable(path):
+    path = ut.Path(path)
+    tryme = set()
+    # is it considered hashable at all
+    tryme.add(Dataset(path / 'one'))
+    eq_(len(tryme), 1)
+    # do another one, same class different path
+    tryme.add(Dataset(path / 'two'))
+    eq_(len(tryme), 2)
+    # test whether two different types of repo instances pointing
+    # to the same repo on disk are considered different
+    Dataset(path).rev_create()
+    tryme.add(GitRepo(path))
+    eq_(len(tryme), 3)
+    tryme.add(AnnexRepo(path))
+    eq_(len(tryme), 4)

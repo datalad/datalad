@@ -7,7 +7,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test subdataset command"""
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os
 from os.path import join as opj
@@ -25,10 +24,8 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
-from datalad.tests.utils import known_failure_direct_mode
 
 
-@known_failure_direct_mode  #FIXME
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
@@ -173,8 +170,8 @@ def test_get_subdatasets(path):
 
 @with_tempfile
 def test_state(path):
-    ds = Dataset.create(path)
-    sub = ds.create('sub')
+    ds = Dataset.rev_create(path)
+    sub = ds.rev_create('sub')
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # by default we are not reporting any state info
@@ -195,12 +192,11 @@ def test_state(path):
         ds.subdatasets(), 1, path=sub.path, state='absent')
 
 
-@known_failure_direct_mode  #FIXME same issue as gh-2113
 @with_tempfile
 def test_get_subdatasets_types(path):
-    from datalad.api import create
-    ds = create(path)
-    ds.create('1')
-    ds.create('true')
+    from datalad.api import rev_create
+    ds = rev_create(path)
+    ds.rev_create('1')
+    ds.rev_create('true')
     # no types casting should happen
     eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])

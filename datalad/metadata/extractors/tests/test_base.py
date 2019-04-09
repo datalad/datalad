@@ -14,7 +14,6 @@ from datalad.api import Dataset
 from datalad.utils import on_osx
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import known_failure_direct_mode
 
 from nose import SkipTest
 from nose.tools import assert_equal
@@ -22,8 +21,8 @@ from nose.tools import assert_equal
 
 @with_tree(tree={'file.dat': ''})
 def check_api(no_annex, path):
-    ds = Dataset(path).create(force=True, no_annex=no_annex)
-    ds.add('.')
+    ds = Dataset(path).rev_create(force=True, no_annex=no_annex)
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     processed_extractors, skipped_extractors = [], []

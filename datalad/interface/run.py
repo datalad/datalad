@@ -24,6 +24,8 @@ from tempfile import mkdtemp
 from six.moves import map
 from six.moves import shlex_quote
 
+from datalad.core.local.save import Save
+
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -179,13 +181,6 @@ class Run(Interface):
             '.datalad/runinfo' directory (customizable via the
             'datalad.run.record-directory' configuration variable).""",
             constraints=EnsureNone() | EnsureBool()),
-        rerun=Parameter(
-            args=('--rerun',),
-            action='store_true',
-            doc="""re-run the command recorded in the last saved change (if any).
-            Note: This option is deprecated since version 0.9.2 and
-            will be removed in a later release. Use `datalad rerun`
-            instead."""),
     )
 
     @staticmethod
@@ -199,24 +194,14 @@ class Run(Interface):
             expand=None,
             explicit=False,
             message=None,
-            sidecar=None,
-            rerun=False):
-        if rerun:
-            if cmd:
-                lgr.warning("Ignoring provided command in --rerun mode")
-            lgr.warning("The --rerun option is deprecated since version 0.9.2. "
-                        "Use `datalad rerun` instead.")
-            from datalad.interface.rerun import Rerun
-            for r in Rerun.__call__(dataset=dataset, message=message):
-                yield r
-        else:
-            for r in run_command(cmd, dataset=dataset,
-                                 inputs=inputs, outputs=outputs,
-                                 expand=expand,
-                                 explicit=explicit,
-                                 message=message,
-                                 sidecar=sidecar):
-                yield r
+            sidecar=None):
+        for r in run_command(cmd, dataset=dataset,
+                             inputs=inputs, outputs=outputs,
+                             expand=expand,
+                             explicit=explicit,
+                             message=message,
+                             sidecar=sidecar):
+            yield r
 
 
 def _install_and_reglob(dset, gpaths):
@@ -408,8 +393,9 @@ def _execute_command(command, pwd, expected_exit=None):
 
 def _save_outputs(ds, to_save, msg):
     """Helper to save results after command execution is completed"""
-    return ds.add(
+    return Save.__call__(
         to_save,
+        dataset=ds.path,
         recursive=True,
         message=msg,
         return_type='generator')
@@ -618,7 +604,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "
                      "If this is expected, you can save the changes with "
-                     "'datalad add -d . -r -F %s .'",
+                     "'datalad rev-save -d . -r -F %s'",
                      msg_path)
         raise exc
     elif outputs_to_save:

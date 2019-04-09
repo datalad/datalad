@@ -10,11 +10,6 @@ Files organization
   with major submodules being:
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
-    - `crawler/` - functionality for crawling (online) resources and creating
-      or updating datasets and collections based on the scraped/downloaded data
-        - `nodes/` processing elements which are used in the pipeline
-        - `pipelines/` pipelines generators, to produce pipelines to be ran
-        - `pipeline.py` pipeline runner
     - `customremotes/` - custom special remotes for annex provided by datalad
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
@@ -406,6 +401,14 @@ Notes:
   [asv.conf.json](./asv.conf.json))
 
 
+#### Profile a benchmark and produce a nice graph visualization
+
+Example (replace with the benchmark of interest)
+
+    asv profile -v -o profile.gprof usecases.study_forrest.time_make_studyforrest_mockup
+    gprof2dot -f pstats profile.gprof | dot -Tpng -o profile.png \
+        && xdg-open profile.png
+
 #### Common options
 
 - `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`
@@ -545,7 +548,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.11.5 (??? ??, 2019) -- will be better than ever
+## 0.12.0rc4 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

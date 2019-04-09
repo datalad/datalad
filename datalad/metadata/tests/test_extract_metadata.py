@@ -45,9 +45,9 @@ def test_ds_extraction(path):
     except ImportError:
         raise SkipTest
 
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     copy(testpath, path)
-    ds.add('.')
+    ds.rev_save()
     ok_clean_git(ds.path)
 
     res = extract_metadata(

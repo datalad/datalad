@@ -37,7 +37,7 @@ from datalad.interface.utils import (
     eval_results,
     discover_dataset_trace_to_targets,
 )
-from datalad.interface.save import Save
+from datalad.core.local.save import Save
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import (
     recursion_limit,
@@ -1076,7 +1076,8 @@ class AggregateMetaData(Interface):
             return
         lgr.info('Attempting to save %i files/datasets', len(to_save))
         for res in Save.__call__(
-                path=to_save,
+                # rev-save does not need any pre-annotated path hints
+                path=[r['path'] for r in to_save],
                 dataset=refds_path,
                 message='[DATALAD] Dataset aggregate metadata update',
                 return_type='generator',

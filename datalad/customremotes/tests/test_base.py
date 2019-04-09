@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the base of our custom remotes"""
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from os.path import isabs
 
@@ -19,7 +18,6 @@ from ..base import AnnexCustomRemote, DEFAULT_AVAILABILITY, DEFAULT_COST
 from datalad.tests.utils import eq_
 
 @with_tree(tree={'file.dat': ''})
-@known_failure_direct_mode  #FIXME
 def test_get_contentlocation(tdir):
     repo = AnnexRepo(tdir, create=True, init=True)
     repo.add('file.dat')

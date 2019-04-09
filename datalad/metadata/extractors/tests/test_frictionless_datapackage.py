@@ -40,7 +40,7 @@ from datalad.tests.utils import with_tree, with_tempfile
 """})
 def test_get_metadata(path):
 
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     p = MetadataExtractor(ds, [])
     meta = p._get_dataset_metadata()
     assert_equal(

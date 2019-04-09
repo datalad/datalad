@@ -166,6 +166,9 @@ def test_init_fail_under_known_subdir(path):
     with assert_raises(PathKnownToRepositoryError) as cme:
         GitRepo(op.join(path, 'subds'), create=True)
 
+    # But it would succeed if we disable the checks
+    GitRepo(op.join(path, 'subds'), create=True, create_sanity_checks=False)
+
 
 @with_tempfile
 @with_tempfile
@@ -1410,16 +1413,25 @@ def test_custom_runner_protocol(path):
     # Check that a runner with a non-default protocol gets wired up correctly.
     prot = ExecutionTimeProtocol()
     gr = GitRepo(path, runner=Runner(cwd=path, protocol=prot), create=True)
-    # now we run two commands
-    #  1. to check if no known to possible git upstairs files in current path
-    #  2. actually call git init
-    eq_(len(prot), 2)
+
+    ok_(len(prot) > 0)
+    ok_(prot[0]['duration'] >= 0)
+
+    def check(prev_len, prot, command):
+        # Check that the list grew and has the expected command without
+        # assuming that it gained _only_ a one command.
+        ok_(len(prot) > prev_len)
+        assert_in(command,
+                  sum([p["command"] for p in prot[prev_len:]], []))
+
+    prev_len = len(prot)
     gr.add("foo")
-    eq_(len(prot), 3)
-    assert_in("add", prot[2]["command"])
+    check(prev_len, prot, "add")
+
+    prev_len = len(prot)
     gr.commit("commit foo")
-    eq_(len(prot), 4)
-    assert_in("commit", prot[3]["command"])
+    check(prev_len, prot, "commit")
+
     ok_(all(p['duration'] >= 0 for p in prot))
 
 

@@ -69,6 +69,7 @@ requires = {
         'patool>=1.7',
         'six>=1.8.0',
         'wrapt',
+        'pathlib2; python_version < "3.0"',  # brought to you by revolution1
     ] +
     pbar_requires +
     (['colorama'] if on_windows else []),
@@ -132,7 +133,8 @@ requires.update({
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
-        'asv',
+        'asv',        # benchmarks
+        'gprof2dot',  # rendering cProfile output as a graph image
         'nose-timer',
         'psutil',
         'coverage',

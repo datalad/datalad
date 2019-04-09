@@ -137,7 +137,7 @@ class NoAnnex(Interface):
             attrfile=gitattr_file)
         yield dict(res_kwargs, status='ok')
 
-        for r in dataset.add(
+        for r in dataset.rev_save(
                 gitattr_file,
                 to_git=True,
                 message="[DATALAD] exclude paths from annex'ing",

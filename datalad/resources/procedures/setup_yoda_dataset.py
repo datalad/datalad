@@ -61,10 +61,6 @@ ds.repo.set_gitattributes(
 
 # leave clean
 # TODO only commit actually changed/added files
-ds.add(
-    path=[dict(
-        path=ds.path,
-        type='dataset',
-        parentds=ds.path)],
+ds.rev_save(
     message="Apply YODA dataset setup",
 )

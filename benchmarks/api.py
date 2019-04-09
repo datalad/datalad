@@ -5,7 +5,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Benchmarks for DataLad"""
+"""Benchmarks of the datalad.api functionality"""
 
 import os
 import sys
@@ -15,6 +15,13 @@ import tarfile
 import tempfile
 
 from subprocess import call
+
+try:
+    from datalad.api import rev_save
+    from datalad.api import rev_create
+except ImportError:
+    # If it is a version without revolution - those will not be benchmarked
+    pass
 
 from datalad.api import add
 from datalad.api import create
@@ -134,6 +141,13 @@ class supers(SuprocBenchmarks):
 
     def time_createadd(self):
         assert self.ds.create('newsubds')
+
+    def time_rev_createadd(self, tarfile_path):
+        assert self.ds.rev_create('newsubds')
+
+    def time_rev_createadd_to_dataset(self, tarfile_path):
+        subds = rev_create(opj(self.ds.path, 'newsubds'))
+        self.ds.rev_save(subds.path)
 
     def time_createadd_to_dataset(self):
         subds = create(opj(self.ds.path, 'newsubds'))

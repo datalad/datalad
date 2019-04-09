@@ -41,8 +41,8 @@ DOI: 10.5281/zenodo.48421
 """}})
 def test_get_metadata(path):
 
-    ds = Dataset(path).create(force=True)
-    ds.add('.')
+    ds = Dataset(path).rev_create(force=True)
+    ds.rev_save()
     meta = MetadataExtractor(ds, [])._get_dataset_metadata()
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),

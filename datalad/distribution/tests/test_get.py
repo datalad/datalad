@@ -10,13 +10,12 @@
 """
 
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from os import curdir
 from os.path import join as opj, basename
 from glob import glob
 
-from datalad.api import create
+from datalad.api import rev_create
 from datalad.api import get
 from datalad.api import install
 from datalad.interface.results import only_matching_paths
@@ -49,16 +48,16 @@ from ..dataset import Dataset
 
 
 def _make_dataset_hierarchy(path):
-    origin = Dataset(path).create()
-    origin_sub1 = origin.create('sub1')
-    origin_sub2 = origin_sub1.create('sub2')
+    origin = Dataset(path).rev_create()
+    origin_sub1 = origin.rev_create('sub1')
+    origin_sub2 = origin_sub1.rev_create('sub2')
     with open(opj(origin_sub2.path, 'file_in_annex.txt'), "w") as f:
         f.write('content2')
-    origin_sub3 = origin_sub2.create('sub3')
+    origin_sub3 = origin_sub2.rev_create('sub3')
     with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
         f.write('content3')
-    origin_sub4 = origin_sub3.create('sub4')
-    origin.add('.', recursive=True)
+    origin_sub4 = origin_sub3.rev_create('sub4')
+    origin.rev_save(recursive=True)
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
@@ -67,7 +66,7 @@ def _make_dataset_hierarchy(path):
 def test_get_flexible_source_candidates_for_submodule(t, t2):
     f = _get_flexible_source_candidates_for_submodule
     # for now without mocking -- let's just really build a dataset
-    ds = create(t)
+    ds = rev_create(t)
     clone = install(
         t2, source=t,
         result_xfm='datasets', return_type='item-or-list')
@@ -106,13 +105,14 @@ def test_get_invalid_call(path, file_outside):
 
     # have a plain git:
     ds = Dataset(path)
-    ds.create(no_annex=True)
+    ds.rev_create(no_annex=True)
     with open(opj(path, "some.txt"), "w") as f:
         f.write("whatever")
-    ds.add("some.txt", to_git=True)
-    ds.save("Initial commit.")
+    ds.rev_save("some.txt", to_git=True, message="Initial commit.")
 
-    # make it an annex:
+    # make it an annex (remove indicator file that rev_create has placed
+    # in the dataset to make it possible):
+    (ds.pathobj / '.noannex').unlink()
     AnnexRepo(path, init=True, create=True)
     # call get again on a file in git:
     result = ds.get("some.txt")
@@ -122,7 +122,7 @@ def test_get_invalid_call(path, file_outside):
     # yoh:  but now we would need to add it to annex since clever code first
     # checks what needs to be fetched at all
     create_tree(path, {'annexed.dat': 'some'})
-    ds.add("annexed.dat")
+    ds.rev_save("annexed.dat")
     ds.repo.drop("annexed.dat", options=['--force'])
     with assert_raises(RemoteNotAvailableError) as ce:
         ds.get("annexed.dat", source='MysteriousRemote')
@@ -168,9 +168,8 @@ def test_get_multiple_files(path, url, ds_dir):
     [RI(url + f) for f in file_list]
 
     # prepare origin
-    origin = Dataset(path).create(force=True)
-    origin.add(file_list)
-    origin.save("initial")
+    origin = Dataset(path).rev_create(force=True)
+    origin.rev_save(file_list, message="initial")
 
     ds = install(
         ds_dir, source=path,
@@ -208,8 +207,8 @@ def test_get_multiple_files(path, url, ds_dir):
 def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:
-    origin = Dataset(o_path).create(force=True)
-    origin.add('.')
+    origin = Dataset(o_path).rev_create(force=True)
+    origin.rev_save()
 
     ds = install(
         c_path, source=o_path,
@@ -344,7 +343,7 @@ def test_get_install_missing_subdataset(src, path):
     ds = install(
         path=path, source=src,
         result_xfm='datasets', return_type='item-or-list')
-    ds.create(force=True)  # force, to cause dataset initialization
+    ds.rev_create(force=True)  # force, to cause dataset initialization
     subs = ds.subdatasets(result_xfm='datasets')
     ok_(all([not sub.is_installed() for sub in subs]))
 
@@ -369,18 +368,17 @@ def test_get_install_missing_subdataset(src, path):
 #                  'subds': {'file_in_annex.txt': 'content'}})
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_get_mixed_hierarchy(src, path):
 
-    origin = Dataset(src).create(no_annex=True)
-    origin_sub = origin.create('subds')
+    origin = Dataset(src).rev_create(no_annex=True)
+    origin_sub = origin.rev_create('subds')
     with open(opj(origin.path, 'file_in_git.txt'), "w") as f:
         f.write('no idea')
     with open(opj(origin_sub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.add('file_in_git.txt', to_git=True)
-    origin_sub.add('file_in_annex.txt')
-    origin.save()
+    origin.rev_save('file_in_git.txt', to_git=True)
+    origin_sub.rev_save('file_in_annex.txt')
+    origin.rev_save()
 
     # now, install that thing:
     ds, subds = install(
@@ -419,12 +417,12 @@ def test_autoresolve_multiple_datasets(src, path):
 @with_tempfile(mkdir=True)
 def test_get_autoresolve_recurse_subdatasets(src, path):
 
-    origin = Dataset(src).create()
-    origin_sub = origin.create('sub')
-    origin_subsub = origin_sub.create('subsub')
+    origin = Dataset(src).rev_create()
+    origin_sub = origin.rev_create('sub')
+    origin_subsub = origin_sub.rev_create('subsub')
     with open(opj(origin_subsub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.add('.', recursive=True)
+    origin.rev_save(recursive=True)
 
     ds = install(
         path, source=src,

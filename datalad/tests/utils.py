@@ -22,6 +22,7 @@ import multiprocessing
 import logging
 import random
 import socket
+import warnings
 from six import PY2, text_type, iteritems
 from six import binary_type
 from six import string_types
@@ -49,6 +50,8 @@ from nose.tools import \
 from nose.tools import assert_set_equal
 from nose.tools import assert_is_instance
 from nose import SkipTest
+
+import datalad.utils as ut
 
 from ..cmd import Runner
 from .. import utils
@@ -120,6 +123,7 @@ import os
 from os.path import exists, join
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
+from datalad.distribution.dataset import Dataset
 from ..utils import chpwd, getpwd
 
 
@@ -185,39 +189,27 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     eq_(sorted(r.untracked_files), sorted(untracked))
 
-    if annex and r.is_direct_mode():
-        if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not supported "
-                        "for direct mode repositories!")
+    repo = r.repo
+
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
+
+        if not head_modified and not index_modified:
+            # get string representations of diffs with index to ease
+            # troubleshooting
+            head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+            index_diffs = [str(d) for d in repo.index.diff(None)]
+            eq_(head_diffs, [])
+            eq_(index_diffs, [])
         else:
-            test_untracked = not untracked
-            test_submodules = not ignore_submodules
-            ok_(not r.is_dirty(untracked_files=test_untracked,
-                               submodules=test_submodules),
-                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
-                    test_untracked, test_submodules))
-    else:
-        repo = r.repo
-
-        if repo.index.entries.keys():
-            ok_(repo.head.is_valid())
-
-            if not head_modified and not index_modified:
-                # get string representations of diffs with index to ease
-                # troubleshooting
-                head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-                index_diffs = [str(d) for d in repo.index.diff(None)]
-                eq_(head_diffs, [])
-                eq_(index_diffs, [])
-            else:
-                # TODO: These names are confusing/non-descriptive.  REDO
-                if head_modified:
-                    # we did ask for interrogating changes
-                    head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(sorted(head_modified_), sorted(head_modified))
-                if index_modified:
-                    index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(sorted(index_modified_), sorted(index_modified))
+            # TODO: These names are confusing/non-descriptive.  REDO
+            if head_modified:
+                # we did ask for interrogating changes
+                head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
+                eq_(sorted(head_modified_), sorted(head_modified))
+            if index_modified:
+                index_modified_ = [d.a_path for d in repo.index.diff(None)]
+                eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -1013,26 +1005,22 @@ known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
-    """Test decorator marking a test as known to fail in a direct mode test run
+    """DEPRECATED.  Stop using.  Does nothing
+
+    Test decorator marking a test as known to fail in a direct mode test run
 
     If datalad.repo.direct is set to True behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
     """
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct") or on_windows
-    if direct:
-
-        @known_failure
-        @wraps(func)
-        @attr('known_failure_direct_mode')
-        @attr('direct_mode')
-        def dm_func(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        return dm_func
-
+    # TODO: consider adopting   nibabel/deprecated.py  nibabel/deprecator.py
+    # mechanism to consistently deprecate functionality and ensure they are
+    # displayed.
+    # Since 2.7 Deprecation warnings aren't displayed by default
+    # and thus kinda pointless to issue a warning here, so we will just log
+    msg = "Direct mode support is deprecated, so no point in using " \
+          "@known_failure_direct_mode for %r since glorious future " \
+          "DataLad 0.12" % func.__name__
+    lgr.warning(msg)
     return func
 
 
@@ -1072,25 +1060,6 @@ def skip_v6_or_later(func, method='raise'):
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')
-    def newfunc(*args, **kwargs):
-        return func(*args, **kwargs)
-    return newfunc
-
-
-@optional_args
-def skip_direct_mode(func, method='raise'):
-    """Skips tests if datalad is configured to use direct mode
-    (set DATALAD_REPO_DIRECT)
-    """
-
-    from datalad import cfg
-
-    @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run",
-             method=method)
-    @wraps(func)
-    @attr('skip_direct_mode')
-    @attr('direct_mode')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1359,14 +1328,13 @@ def skip_httpretty_on_problematic_pythons(func):
 
 
 @optional_args
-def with_batch_direct(t):
+def with_parametric_batch(t):
     """Helper to run parametric test with possible combinations of batch and direct
     """
     @wraps(t)
     def newfunc():
         for batch in (False, True):
-            for direct in (False, True) if not on_windows else (True,):
-                yield t, batch, direct
+                yield t, batch
 
     return newfunc
 
@@ -1455,29 +1423,6 @@ def with_testsui(t, responses=None, interactive=True):
 with_testsui.__test__ = False
 
 
-@optional_args
-def with_direct(func):
-    """To test functions under both direct and indirect mode
-
-    Unlike fancy generators would just fail on the first failure
-    """
-    @wraps(func)
-    @attr('direct_mode')
-    def newfunc(*args, **kwargs):
-        if on_windows or on_travis:
-            # since on windows would become indirect anyways
-            # on travis -- we have a dedicated matrix run
-            # which would select one or another based on config
-            # if we specify None
-            directs = [None]
-        else:
-            # otherwise we assume that we have to test both modes
-            directs = [True, False]
-        for direct in directs:
-            func(*(args + (direct,)), **kwargs)
-    return newfunc
-
-
 def assert_no_errors_logged(func, skip_re=None):
     """Decorator around function to assert that no errors logged during its execution"""
     @wraps(func)
@@ -1518,6 +1463,322 @@ def get_datasets_topdir():
     """Delayed parsing so it could be monkey patched etc"""
     from datalad.consts import DATASETS_TOPURL
     return RI(DATASETS_TOPURL).hostname
+
+
+def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
+    """Compare a repo status against (optional) exceptions.
+
+    Anything file/directory that is not explicitly indicated must have
+    state 'clean', i.e. no modifications and recorded in Git.
+
+    This is an alternative to the traditional `ok_clean_git` helper.
+
+    Parameters
+    ----------
+    path: str or Repo
+      in case of a str: path to the repository's base dir;
+      Note, that passing a Repo instance prevents detecting annex. This might
+      be useful in case of a non-initialized annex, a GitRepo is pointing to.
+    annex: bool or None
+      explicitly set to True or False to indicate, that an annex is (not)
+      expected; set to None to autodetect, whether there is an annex.
+      Default: None.
+    untracked_mode: {'no', 'normal', 'all'}
+      If and how untracked content is reported. The specification of untracked
+      files that are OK to be found must match this mode. See `Repo.status()`
+    **kwargs
+      Files/directories that are OK to not be in 'clean' state. Each argument
+      must be one of 'added', 'untracked', 'deleted', 'modified' and each
+      value must be a list of filenames (relative to the root of the
+      repository, in POSIX convention).
+    """
+    r = None
+    if isinstance(path, AnnexRepo):
+        if annex is None:
+            annex = True
+        # if `annex` was set to False, but we find an annex => fail
+        assert_is(annex, True)
+        r = path
+    elif isinstance(path, GitRepo):
+        if annex is None:
+            annex = False
+        # explicitly given GitRepo instance doesn't make sense with
+        # 'annex' True
+        assert_is(annex, False)
+        r = path
+    else:
+        # 'path' is an actual path
+        try:
+            r = AnnexRepo(path, init=False, create=False)
+            if annex is None:
+                annex = True
+            # if `annex` was set to False, but we find an annex => fail
+            assert_is(annex, True)
+        except Exception:
+            # Instantiation failed => no annex
+            try:
+                r = GitRepo(path, init=False, create=False)
+            except Exception:
+                raise AssertionError("Couldn't find an annex or a git "
+                                     "repository at {}.".format(path))
+            if annex is None:
+                annex = False
+            # explicitly given GitRepo instance doesn't make sense with
+            # 'annex' True
+            assert_is(annex, False)
+
+    status = r.status(untracked=untracked_mode)
+    # for any file state that indicates some kind of change (all but 'clean)
+    for state in ('added', 'untracked', 'deleted', 'modified'):
+        oktobefound = sorted(r.pathobj.joinpath(ut.PurePosixPath(p))
+                             for p in kwargs.get(state, []))
+        state_files = sorted(k for k, v in iteritems(status)
+                             if v.get('state', None) == state)
+        eq_(state_files, oktobefound,
+            'unexpected content of state "%s": %r != %r'
+            % (state, state_files, oktobefound))
+
+
+def get_convoluted_situation(path, repocls=AnnexRepo):
+    from datalad.api import rev_create as create
+
+    if 'APPVEYOR' in os.environ:
+        # issue only happens on appveyor, Python itself implodes
+        # cannot be reproduced on a real windows box
+        raise SkipTest(
+            'get_convoluted_situation() causes appveyor to crash, '
+            'reason unknown')
+    repo = repocls(path, create=True)
+    # use create(force) to get an ID and config into the empty repo
+    ds = Dataset(path).rev_create(force=True)
+    # base content
+    create_tree(
+        ds.path,
+        {
+            '.gitignore': '*.ignored',
+            'subdir': {
+                'file_clean': 'file_clean',
+                'file_deleted': 'file_deleted',
+                'file_modified': 'file_clean',
+            },
+            'subdir-only-ignored': {
+                '1.ignored': '',
+            },
+            'file_clean': 'file_clean',
+            'file_deleted': 'file_deleted',
+            'file_staged_deleted': 'file_staged_deleted',
+            'file_modified': 'file_clean',
+        }
+    )
+    if isinstance(ds.repo, AnnexRepo):
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_dropped_clean': 'file_dropped_clean',
+                },
+                'file_dropped_clean': 'file_dropped_clean',
+            }
+        )
+    ds.rev_save()
+    if isinstance(ds.repo, AnnexRepo):
+        # some files straight in git
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_ingit_clean': 'file_ingit_clean',
+                    'file_ingit_modified': 'file_ingit_clean',
+                },
+                'file_ingit_clean': 'file_ingit_clean',
+                'file_ingit_modified': 'file_ingit_clean',
+            }
+        )
+        ds.rev_save(to_git=True)
+        ds.drop([
+            'file_dropped_clean',
+            op.join('subdir', 'file_dropped_clean')],
+            check=False)
+    # clean and proper subdatasets
+    ds.rev_create('subds_clean')
+    ds.rev_create(op.join('subdir', 'subds_clean'))
+    ds.rev_create('subds_unavailable_clean')
+    ds.rev_create(op.join('subdir', 'subds_unavailable_clean'))
+    # uninstall some subdatasets (still clean)
+    ds.uninstall([
+        'subds_unavailable_clean',
+        op.join('subdir', 'subds_unavailable_clean')],
+        check=False)
+    assert_repo_status(ds.path)
+    # make a dirty subdataset
+    ds.rev_create('subds_modified')
+    ds.rev_create(op.join('subds_modified', 'someds'))
+    ds.rev_create(op.join('subds_modified', 'someds', 'dirtyds'))
+    # make a subdataset with additional commits
+    ds.rev_create(op.join('subdir', 'subds_modified'))
+    pdspath = op.join(ds.path, 'subdir', 'subds_modified', 'progressedds')
+    ds.rev_create(pdspath)
+    create_tree(
+        pdspath,
+        {'file_clean': 'file_ingit_clean'}
+    )
+    Dataset(pdspath).rev_save()
+    assert_repo_status(pdspath)
+    # staged subds, and files
+    create(op.join(ds.path, 'subds_added'))
+    ds.repo.add_submodule('subds_added')
+    create(op.join(ds.path, 'subdir', 'subds_added'))
+    ds.repo.add_submodule(op.join('subdir', 'subds_added'))
+    # some more untracked files
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_untracked': 'file_untracked',
+                'file_added': 'file_added',
+            },
+            'file_untracked': 'file_untracked',
+            'file_added': 'file_added',
+            'dir_untracked': {
+                'file_untracked': 'file_untracked',
+            },
+            'subds_modified': {
+                'someds': {
+                    "dirtyds": {
+                        'file_untracked': 'file_untracked',
+                    },
+                },
+            },
+        }
+    )
+    ds.repo.add(['file_added', op.join('subdir', 'file_added')])
+    # untracked subdatasets
+    create(op.join(ds.path, 'subds_untracked'))
+    create(op.join(ds.path, 'subdir', 'subds_untracked'))
+    # deleted files
+    os.remove(op.join(ds.path, 'file_deleted'))
+    os.remove(op.join(ds.path, 'subdir', 'file_deleted'))
+    # staged deletion
+    ds.repo.remove('file_staged_deleted')
+    # modified files
+    if isinstance(ds.repo, AnnexRepo):
+        ds.repo.unlock(['file_modified', op.join('subdir', 'file_modified')])
+        create_tree(
+            ds.path,
+            {
+                'subdir': {
+                    'file_ingit_modified': 'file_ingit_modified',
+                },
+                'file_ingit_modified': 'file_ingit_modified',
+            }
+        )
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_modified': 'file_modified',
+            },
+            'file_modified': 'file_modified',
+        }
+    )
+    return ds
+
+
+def get_deeply_nested_structure(path):
+    """ Here is what this does (assuming UNIX, locked):
+    |  .
+    |  ├── directory_untracked
+    |  │   └── link2dir -> ../subdir
+    |  ├── file_modified
+    |  ├── link2dir -> subdir
+    |  ├── link2subdsdir -> subds_modified/subdir
+    |  ├── link2subdsroot -> subds_modified
+    |  ├── subdir
+    |  │   ├── annexed_file.txt -> ../.git/annex/objects/...
+    |  │   ├── file_modified
+    |  │   ├── git_file.txt
+    |  │   └── link2annex_files.txt -> annexed_file.txt
+    |  └── subds_modified
+    |      ├── link2superdsdir -> ../subdir
+    |      ├── subdir
+    |      │   └── annexed_file.txt -> ../.git/annex/objects/...
+    |      └── subds_lvl1_modified
+    |          └── directory_untracked
+    |              └── untracked_file
+    """
+    ds = Dataset(path).rev_create()
+    (ds.pathobj / 'subdir').mkdir()
+    (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    ds.rev_save()
+    (ds.pathobj / 'subdir' / 'git_file.txt').write_text(u'dummy')
+    ds.rev_save(to_git=True)
+    # a subtree of datasets
+    subds = ds.rev_create('subds_modified')
+    # another dataset, plus an additional dir in it
+    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
+    create_tree(
+        ds.path,
+        {
+            'subdir': {
+                'file_modified': 'file_modified',
+            },
+            'file_modified': 'file_modified',
+        }
+    )
+    create_tree(
+        text_type(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
+        {'directory_untracked' : {"untraced_file": ""}}
+    )
+    (ut.Path(subds.path) / 'subdir').mkdir()
+    (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
+    subds.rev_save()
+    (ds.pathobj / 'directory_untracked').mkdir()
+    # symlink farm #1
+    # symlink to annexed file
+    (ds.pathobj / 'subdir' / 'link2annex_files.txt').symlink_to(
+        'annexed_file.txt')
+    # symlink to directory within the dataset
+    (ds.pathobj / 'link2dir').symlink_to('subdir')
+    # upwards pointing symlink to directory within the same dataset
+    (ds.pathobj / 'directory_untracked' / 'link2dir').symlink_to(
+        op.join('..', 'subdir'))
+    # symlink pointing to a subdataset mount in the same dataset
+    (ds.pathobj / 'link2subdsroot').symlink_to('subds_modified')
+    # symlink to a dir in a subdataset (across dataset boundaries)
+    (ds.pathobj / 'link2subdsdir').symlink_to(
+        op.join('subds_modified', 'subdir'))
+    # symlink to a dir in a superdataset (across dataset boundaries)
+    (ut.Path(subds.path) / 'link2superdsdir').symlink_to(
+        op.join('..', 'subdir'))
+    return ds
+
+
+def has_symlink_capability():
+    try:
+        wdir = ut.Path(tempfile.mkdtemp())
+        (wdir / 'target').touch()
+        (wdir / 'link').symlink_to(wdir / 'target')
+        return True
+    except Exception:
+        return False
+    finally:
+        shutil.rmtree(str(wdir))
+
+
+def skip_wo_symlink_capability(func):
+    """Skip test when environment does not support symlinks
+
+    Perform a behavioral test instead of top-down logic, as on
+    windows this could be on or off on a case-by-case basis.
+    """
+    @wraps(func)
+    @attr('skip_wo_symlink_capability')
+    def newfunc(*args, **kwargs):
+        if not has_symlink_capability():
+            raise SkipTest("no symlink capabilities")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 #
 # Context Managers

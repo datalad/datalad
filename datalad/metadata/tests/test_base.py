@@ -34,8 +34,6 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import skip_direct_mode
-from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
 from datalad.tests.utils import swallow_logs
@@ -69,7 +67,7 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
-    Dataset(path).create()
+    Dataset(path).rev_create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(Dataset(path)), [])
     # got section, but no setting
@@ -97,27 +95,26 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
-@known_failure_direct_mode  #FIXME
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
-    ds = Dataset(opj(path, 'origin')).create(force=True)
+    ds = Dataset(opj(path, 'origin')).rev_create(force=True)
     # before anything aggregated we would get nothing and only a log warning
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
     assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                   where='dataset')
-    subds = ds.create('sub', force=True)
+    subds = ds.rev_create('sub', force=True)
     subds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                      where='dataset')
-    subsubds = subds.create('subsub', force=True)
+    subsubds = subds.rev_create('subsub', force=True)
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
-    ds.add('.', recursive=True)
+    ds.rev_save(recursive=True)
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
@@ -207,7 +204,7 @@ def test_ignore_nondatasets(path):
                     del m[k]
         return meta
 
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     meta = _kill_time(ds.metadata(reporton='datasets', on_failure='ignore'))
     n_subm = 0
     # placing another repo in the dataset has no effect on metadata
@@ -221,7 +218,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
-        ds.add(subpath)
+        ds.rev_save(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
@@ -231,7 +228,7 @@ def test_ignore_nondatasets(path):
 def test_get_aggregates_fails(path):
     with chpwd(path), assert_raises(NoDatasetArgumentFound):
         metadata(get_aggregates=True)
-    ds = Dataset(path).create()
+    ds = Dataset(path).rev_create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')
     assert_result_count(res, 1, path=ds.path, status='impossible')
 
@@ -239,17 +236,15 @@ def test_get_aggregates_fails(path):
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):
-    ds = Dataset(src).create(force=True)
-    ds.add('.', to_git=False)
+    ds = Dataset(src).rev_create(force=True)
+    ds.rev_save(to_git=False)
 
     # no clone (empty) into new dst
     clone = install(source=ds.path, path=dst)
-    # XXX whereis says nothing in direct mode
     # content is not here
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
     # check that plain metadata access does not `get` stuff
     clone.metadata('.', on_failure='ignore')
-    # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
 
 

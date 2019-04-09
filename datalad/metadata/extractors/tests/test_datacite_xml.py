@@ -68,7 +68,7 @@ def test_get_metadata(path1, path2):
     for p in (path1, path2):
         print('PATH')
         ds = create(p, force=True)
-        ds.add('.')
+        ds.rev_save()
         meta = MetadataExtractor(
                 ds,
                 _get_metadatarelevant_paths(ds, []))._get_dataset_metadata()

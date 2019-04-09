@@ -84,6 +84,16 @@ _group_plumbing = (
         ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
 
+# Avoid _group_revolution to prevent confusing interface commands.
+_group_future = (
+    'Commands of the future',
+    [
+        ('datalad.core.local.create', 'Create', 'rev-create', 'rev_create'),
+        ('datalad.core.local.run', 'Run', 'rev-run', 'rev_run'),
+        ('datalad.core.local.save', 'Save', 'rev-save', 'rev_save'),
+        ('datalad.core.local.status', 'Status', 'status'),
+    ])
+
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {
     'datalad-crawler': ('crawl', 'crawl-init'),

@@ -125,6 +125,12 @@ def _describe_environment():
     from datalad import get_envvars_info
     return get_envvars_info()
 
+def _describe_python():
+    import platform
+    return {
+        'version': platform.python_version(),
+        'implementation': platform.python_implementation(),
+    }
 
 def _describe_configuration(cfg, sensitive):
     if not cfg:
@@ -307,6 +313,7 @@ class WTF(Interface):
             infos=infos,
         )
         infos['datalad'] = _describe_datalad()
+        infos['python'] = _describe_python()
         infos['git-annex'] = _describe_annex()
         infos['system'] = _describe_system()
         infos['environment'] = _describe_environment()

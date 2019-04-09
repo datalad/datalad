@@ -34,6 +34,7 @@ from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import is_interactive
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -65,6 +66,7 @@ from ..utils import unlink
 from ..utils import CMD_MAX_ARG
 from ..utils import create_tree
 from ..utils import never_fail
+from ..utils import Path
 
 from ..support.annexrepo import AnnexRepo
 
@@ -94,7 +96,7 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode, skip_if,
+    skip_if,
     ok_file_has_content
 )
 
@@ -730,6 +732,11 @@ def test_assure_unicode():
     assert assure_unicode(1) is 1
 
 
+def test_pathlib_unicode():
+    eq_(text_type(Path("a")), u"a")
+    eq_(text_type(Path(u"β")), u"β")
+
+
 def test_as_unicode():
     eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     eq_(as_unicode(None), u"")
@@ -979,35 +986,23 @@ def test_known_failure_v6():
         assert_raises(AssertionError, failing)
 
 
-def test_known_failure_direct_mode():
-
-    @known_failure_direct_mode
-    def failing():
-        raise AssertionError("Failed")
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct")
-    skip = cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = cfg.obtain("datalad.tests.knownfailures.probe")
-
-    if direct:
-        if skip:
-            # skipping takes precedence over probing
-            failing()
-        elif probe:
-            # if we probe a known failure it's okay to fail:
-            failing()
-        else:
-            # not skipping and not probing results in the original failure:
-            assert_raises(AssertionError, failing)
-
-    else:
-        # behaves as if it wasn't decorated at all, no matter what
-        assert_raises(AssertionError, failing)
-
-
 from datalad.utils import read_csv_lines
+
+
+def test_known_failure_direct_mode():
+    # Decorator is deprecated now and that is what we check
+    from .utils import known_failure_direct_mode
+
+    x = []
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        @known_failure_direct_mode
+        def failing():
+            x.append('ok')
+            raise AssertionError("Failed")
+
+        assert_raises(AssertionError, failing)  # nothing is swallowed
+        eq_(x, ['ok'])  # everything runs
+        assert_in("Direct mode support is deprecated", cml.out)
 
 
 @with_tempfile(content="h1 h2\nv1 2\nv2 3")
@@ -1232,3 +1227,37 @@ def test_never_fail():
             raise ValueError
 
         assert_raises(ValueError, ifail2, 1)
+
+
+@with_tempfile
+def test_is_interactive(fout):
+    # must not fail if one of the streams is no longer open:
+    # https://github.com/datalad/datalad/issues/3267
+    from ..cmd import Runner
+
+    bools = ["False", "True"]
+
+    def get_interactive(py_pre="", **run_kwargs):
+        out, err = Runner().run(
+            [sys.executable,
+             "-c",
+             py_pre +
+             'from datalad.utils import is_interactive; '
+             'f = open(%r, "w"); '
+             'f.write(str(is_interactive())); '
+             'f.close()'
+             % fout
+             ],
+            **run_kwargs
+        )
+        with open(fout) as f:
+            out = f.read()
+        assert_in(out, bools)
+        return bool(bools.index(out))
+
+    # we never request for pty in our Runner, so can't be interactive
+    eq_(get_interactive(), False)
+    # and it must not crash if smth is closed
+    for o in ('stderr', 'stdin', 'stdout'):
+        eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
+

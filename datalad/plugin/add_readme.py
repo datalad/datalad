@@ -141,7 +141,7 @@ see the DataLad documentation at: http://docs.datalad.org
                 type='file',
                 action='add_readme')
 
-        for r in dataset.add(
+        for r in dataset.rev_save(
                 filename,
                 message='[DATALAD] added README',
                 result_filter=None,
