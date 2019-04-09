@@ -7,14 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Benchmarks of the datalad.api functionality"""
 
-import os
-import sys
-import os.path as osp
 from os.path import join as opj
-import tarfile
-import tempfile
-
-from subprocess import call
 
 try:
     from datalad.api import rev_save
@@ -23,10 +16,8 @@ except ImportError:
     # If it is a version without revolution - those will not be benchmarked
     pass
 
-from datalad.api import add
 from datalad.api import create
 from datalad.api import create_test_dataset
-from datalad.api import Dataset
 from datalad.api import install
 from datalad.api import ls
 from datalad.api import remove
@@ -45,11 +36,6 @@ try:
 except ImportError:
     status = None
 
-from datalad.utils import (
-    getpwd,
-    get_tempfile_kwargs,
-    rmtree,
-)
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -58,7 +44,10 @@ from datalad.utils import (
 #track_num_objects.unit = "objects"
 
 
-from .common import SuprocBenchmarks
+from .common import (
+    SampleSuperDatasetBenchmarks,
+    SuprocBenchmarks,
+)
 
 
 class testds(SuprocBenchmarks):
@@ -77,63 +66,10 @@ class testds(SuprocBenchmarks):
         )
 
 
-class supers(SuprocBenchmarks):
+class supers(SampleSuperDatasetBenchmarks):
     """
     Benchmarks on common operations on collections of datasets using datalad API
     """
-
-    timeout = 3600
-    # need to assure that we are working in a different repository now
-    # see https://github.com/datalad/datalad/issues/1512
-    # might not be sufficient due to side effects between tests and
-    # thus getting into the same situation
-    ds_count = 0
-
-    # Creating in CWD so things get removed when ASV is done
-    #  https://asv.readthedocs.io/en/stable/writing_benchmarks.html
-    # that is where it would be run and cleaned up after
-
-    dsname = 'testds1'
-    tarfile = 'testds1.tar'
-
-    def setup_cache(self):
-        ds_path = create_test_dataset(
-            self.dsname
-            , spec='2/-2/-2'
-            , seed=0
-        )[0]
-        self.log("Setup cache ds path %s. CWD: %s", ds_path, getpwd())
-        # Will store into a tarfile since otherwise install -r is way too slow
-        # to be invoked for every benchmark
-        # Store full path since apparently setup is not ran in that directory
-        self.tarfile = osp.realpath(supers.tarfile)
-        with tarfile.open(self.tarfile, "w") as tar:
-            # F.CK -- Python tarfile can't later extract those because key dirs are
-            # read-only.  For now just a workaround - make it all writeable
-            from datalad.utils import rotree
-            rotree(self.dsname, ro=False, chmod_files=False)
-            tar.add(self.dsname, recursive=True)
-        rmtree(self.dsname)
-
-    def setup(self):
-        import tarfile
-        from glob import glob
-        self.log("Setup ran in %s, existing paths: %s", getpwd(), glob('*'))
-
-        tempdir = tempfile.mkdtemp(
-            **get_tempfile_kwargs({}, prefix="bm")
-        )
-        self.remove_paths.append(tempdir)
-        with tarfile.open(self.tarfile) as tar:
-            tar.extractall(tempdir)
-
-        # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
-        epath = opj(tempdir, 'testds1')
-        epath_unique = epath + str(self.__class__.ds_count)
-        os.rename(epath, epath_unique)
-        self.__class__.ds_count += 1
-        self.ds = Dataset(epath_unique)
-        self.log("Finished setup for %s", tempdir)
 
     def time_installr(self):
         # somewhat duplicating setup but lazy to do different one for now
@@ -142,10 +78,10 @@ class supers(SuprocBenchmarks):
     def time_createadd(self):
         assert self.ds.create('newsubds')
 
-    def time_rev_createadd(self, tarfile_path):
+    def time_rev_createadd(self):
         assert self.ds.rev_create('newsubds')
 
-    def time_rev_createadd_to_dataset(self, tarfile_path):
+    def time_rev_createadd_to_dataset(self):
         subds = rev_create(opj(self.ds.path, 'newsubds'))
         self.ds.rev_save(subds.path)
 

@@ -7,11 +7,24 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Helpers for benchmarks of DataLad"""
 
+import os
 import sys
+import tarfile
+import tempfile
 import timeit
 import os.path as op
+from glob import glob
 
-from datalad.utils import rmtree
+from datalad.utils import (
+    getpwd,
+    get_tempfile_kwargs,
+    rmtree,
+)
+
+from datalad.api import (
+    Dataset,
+    create_test_dataset,
+)
 
 ############
 # Monkey patches
@@ -86,3 +99,60 @@ class SuprocBenchmarks(object):
     def log(self, msg, *args):
         """Consistent benchmarks logging"""
         print("BM: "+ str(msg % tuple(args)))
+
+
+class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
+    """
+    Setup a sample hierarchy of datasets to be used
+    """
+
+    timeout = 3600
+    # need to assure that we are working in a different repository now
+    # see https://github.com/datalad/datalad/issues/1512
+    # might not be sufficient due to side effects between tests and
+    # thus getting into the same situation
+    ds_count = 0
+
+    # Creating in CWD so things get removed when ASV is done
+    #  https://asv.readthedocs.io/en/stable/writing_benchmarks.html
+    # that is where it would be run and cleaned up after
+
+    dsname = 'testds1'
+    tarfile = 'testds1.tar'
+
+    def setup_cache(self):
+        ds_path = create_test_dataset(
+            self.dsname
+            , spec='2/-2/-2'
+            , seed=0
+        )[0]
+        self.log("Setup cache ds path %s. CWD: %s", ds_path, getpwd())
+        # Will store into a tarfile since otherwise install -r is way too slow
+        # to be invoked for every benchmark
+        # Store full path since apparently setup is not ran in that directory
+        self.tarfile = op.realpath(SampleSuperDatasetBenchmarks.tarfile)
+        with tarfile.open(self.tarfile, "w") as tar:
+            # F.CK -- Python tarfile can't later extract those because key dirs are
+            # read-only.  For now just a workaround - make it all writeable
+            from datalad.utils import rotree
+            rotree(self.dsname, ro=False, chmod_files=False)
+            tar.add(self.dsname, recursive=True)
+        rmtree(self.dsname)
+
+    def setup(self):
+        self.log("Setup ran in %s, existing paths: %s", getpwd(), glob('*'))
+
+        tempdir = tempfile.mkdtemp(
+            **get_tempfile_kwargs({}, prefix="bm")
+        )
+        self.remove_paths.append(tempdir)
+        with tarfile.open(self.tarfile) as tar:
+            tar.extractall(tempdir)
+
+        # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
+        epath = op.join(tempdir, 'testds1')
+        epath_unique = epath + str(self.__class__.ds_count)
+        os.rename(epath, epath_unique)
+        self.__class__.ds_count += 1
+        self.ds = Dataset(epath_unique)
+        self.log("Finished setup for %s", tempdir)
