@@ -164,10 +164,17 @@ def test_create_sub(path):
     ds.rev_create()
 
     # 1. create sub and add to super:
-    subds = ds.rev_create("some/what/deeper")
+    subds = ds.rev_create(op.join("some", "what", "deeper"))
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     assert_repo_status(subds.path, annex=True)
+    assert_in(
+        'submodule.some/what/deeper.datalad-id={}'.format(
+            subds.id),
+        ds.repo._git_custom_command(
+            '',
+            ['git', 'config', '--file', '.gitmodules', '--list'])[0]
+    )
 
     # subdataset is known to superdataset:
     assert_in(op.join("some", "what", "deeper"),

@@ -60,6 +60,7 @@ from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
+from datalad.utils import Path
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -2396,7 +2397,7 @@ class GitRepo(RepoInterface):
           as a tracking branch. If `None`, remote HEAD will be checked out.
         """
         if name is None:
-            name = path
+            name = Path(path).as_posix()
         # XXX the following should do it, but GitPython will refuse to add a submodule
         # unless you specify a URL that is configured as one of its remotes, or you
         # specify no URL, but the repo has at least one remote.
@@ -2432,6 +2433,15 @@ class GitRepo(RepoInterface):
                 url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # record dataset ID if possible for comprehesive metadata on
+        # dataset components within the dataset itself
+        subm_id = GitRepo(op.join(self.path, path)).config.get(
+            'datalad.dataset.id', None)
+        if subm_id:
+            self._git_custom_command(
+                '',
+                ['git', 'config', '--file', '.gitmodules', '--replace-all',
+                 'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
         # TODO: return value
@@ -3484,6 +3494,23 @@ class GitRepo(RepoInterface):
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
+            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+                # we cannot simply hook into the coming add-call
+                # as this would go to annex, so make a dedicted git-add
+                # call to ensure .gitmodules is not annexed
+                # in any normal DataLad dataset .gitattributes will
+                # prevent this, but in a plain repo it won't
+                # https://github.com/datalad/datalad/issues/3306
+                for r in GitRepo._save_add(
+                        self,
+                        {op.join(self.path, '.gitmodules'): None}):
+                    yield get_status_dict(
+                        action='add',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
+                        status='ok' if r.get('success', None) else 'error',
+                        logger=lgr)
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
