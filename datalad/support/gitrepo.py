@@ -3223,13 +3223,20 @@ class GitRepo(RepoInterface):
                     gitshasum=from_state_r['gitshasum'],
                 )
 
-        if ignore_submodules == 'all':
+        if ignore_submodules == 'all' or to is not None:
+            # if we have `to` we are specifically comparing against
+            # a recorded state, and this function only attempts
+            # to label the state of a subdataset, not investigate
+            # specifically what the changes in subdatasets are
+            # this is done by a high-level command like rev-diff
+            # so the comparison within this repo and the present
+            # `state` label are all we need, and they are done already
             return status
 
         # loop over all subdatasets and look for additional modifications
         for f, st in iteritems(status):
-            if not (st['type'] == 'dataset' and st['state'] == 'clean' and
-                    GitRepo.is_valid_repo(str(f))):
+            if not (st['type'] == 'dataset' and st['state'] == 'clean' \
+                    and GitRepo.is_valid_repo(str(f))):
                 # no business here
                 continue
             # we have to recurse into the dataset and get its status
