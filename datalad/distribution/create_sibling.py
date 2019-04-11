@@ -819,9 +819,6 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
   && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
-
-# Some submodules might have been added and thus we better init them
-( cd "$dsdir"; git submodule update --init || : ; ) >> "$logfile" 2>&1
 '''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:
