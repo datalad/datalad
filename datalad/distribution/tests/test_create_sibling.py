@@ -59,7 +59,8 @@ from datalad.utils import _path_
 import logging
 lgr = logging.getLogger('datalad.tests')
 
-def _test_correct_publish(target_path, rootds=False, flat=True):
+
+def assert_publish_with_ui(target_path, rootds=False, flat=True):
 
     paths = [_path_(".git/hooks/post-update")]     # hooks enabled in all datasets
     not_paths = []  # _path_(".git/datalad/metadata")]  # metadata only on publish
@@ -109,6 +110,28 @@ assert_create_sshwebserver = (
         lgr.getEffectiveLevel() > logging.DEBUG)
     else create_sibling
 )
+
+
+def assert_postupdate_hooks(path, installed=True, flat=False):
+    """
+    Verify that post-update hook was installed (or not, if installed=False)
+    """
+    from glob import glob
+    if flat:
+        # there is no top level dataset
+        datasets = glob(opj(path, '*'))
+    else:
+        ds = Dataset(path)
+        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True)
+    for ds_ in datasets:
+        ds_ = Dataset(ds_)
+        hook_path = opj(ds_.path, '.git', 'hooks', 'post-update')
+        if installed:
+            ok_(os.path.exists(hook_path),
+                msg="Missing %s" % hook_path)
+        else:
+            ok_(not os.path.exists(hook_path),
+                msg="%s exists when it shouldn't" % hook_path)
 
 
 @with_tempfile(mkdir=True)
@@ -207,7 +230,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             name="local_target",
             sshurl="ssh://localhost" + target_path,
             publish_by_default='master',
-            existing='replace')
+            existing='replace',
+            ui=True,
+        )
         eq_("ssh://localhost" + urlquote(target_path),
             source.repo.get_remote_url("local_target"))
         ok_(source.repo.get_remote_url("local_target", push=True) is None)
@@ -245,7 +270,7 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
-        _test_correct_publish(target_path)
+        assert_publish_with_ui(target_path)
 
         # now, push should work:
         publish(dataset=source, to="local_target")
@@ -346,7 +371,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
             # raise if git repos were not created
             GitRepo(target_dir, create=False)
 
-            _test_correct_publish(target_dir, rootds=not suffix, flat=flat)
+            assert_publish_with_ui(target_dir, rootds=not suffix, flat=flat)
 
         for repo in [source.repo, sub1.repo, sub2.repo]:
             assert_not_in("local_target", repo.get_remotes())
@@ -375,6 +400,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                 ui=True,
                 since=''
             )
+            assert_postupdate_hooks(target_path_, installed=True, flat=flat)
         # so it was created on remote correctly and wasn't just skipped
         assert(Dataset(_path_(target_path_, ('prefix-' if flat else '') + sub3_name)).is_installed())
         publish(dataset=source, to=remote_name, recursive=True, since='') # just a smoke test
@@ -424,6 +450,9 @@ def test_target_ssh_since(origin, src_path, target_path):
     ok_(Dataset(_path_(target_path, 'brandnew2/sub')).is_installed())
     ok_(Dataset(_path_(target_path, 'brandnew2/sub/sub')).is_installed())
 
+    # we installed without web ui - no hooks should be created/enabled
+    assert_postupdate_hooks(_path_(target_path, 'brandnew'), installed=False)
+
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
@@ -465,7 +494,7 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     ds = Dataset(src_path).create()
     create_tree(ds.path, {'sub.dat': 'lots of data'})
     ds.add('sub.dat')
-    ds.create_sibling(url)
+    ds.create_sibling(url, ui=True)
     published = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published, 1, path=opj(ds.path, 'sub.dat'))
     # verify that hook runs and there is nothing in stderr
@@ -481,7 +510,9 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     res = ds.create_sibling(url, on_failure='ignore')
     assert_status('error', res)
     assert_in('already configured', res[0]['message'][0])
-    ds.create_sibling(url, existing='replace')
+    # "Settings" such as UI do not persist, so we specify it again
+    # for the test below depending on it
+    ds.create_sibling(url, existing='replace', ui=True)
     published2 = ds.publish(to='localhost', transfer_data='all')
     assert_result_count(published2, 1, path=opj(ds.path, 'sub.dat'))
 
@@ -500,6 +531,8 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
     assert_result_count(published4, 1, path=opj(ds.path, 'sub2.dat'))
     logs_post = glob(_path_(dst_path, WEB_META_LOG, '*'))
     eq_(len(logs_post), len(logs_prior) + 1)
+
+    assert_postupdate_hooks(dst_path)
 
 
 @known_failure_direct_mode  #FIXME

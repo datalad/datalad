@@ -73,6 +73,7 @@ def _create_dataset_sibling(
         group,
         publish_depends,
         publish_by_default,
+        install_postupdate_hook,
         as_common_datasrc,
         annex_wanted,
         annex_group,
@@ -265,14 +266,15 @@ def _create_dataset_sibling(
                   " and run with --existing=reconfigure",
                   ssh.get_git_version())
 
-    # enable metadata refresh on dataset updates to publication server
-    lgr.info("Enabling git post-update hook ...")
-    try:
-        CreateSibling.create_postupdate_hook(
-            remoteds_path, ssh, ds)
-    except CommandError as e:
-        lgr.error("Failed to add json creation command to post update "
-                  "hook.\nError: %s" % exc_str(e))
+    if install_postupdate_hook:
+        # enable metadata refresh on dataset updates to publication server
+        lgr.info("Enabling git post-update hook ...")
+        try:
+            CreateSibling.create_postupdate_hook(
+                remoteds_path, ssh, ds)
+        except CommandError as e:
+            lgr.error("Failed to add json creation command to post update "
+                      "hook.\nError: %s" % exc_str(e))
 
     return remoteds_path
 
@@ -608,6 +610,7 @@ class CreateSibling(Interface):
                 group,
                 publish_depends,
                 publish_by_default,
+                ui,
                 as_common_datasrc,
                 annex_wanted,
                 annex_group,
@@ -643,10 +646,11 @@ class CreateSibling(Interface):
         # TODO: add progressbar
         for path, currentds_ap in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
-            lgr.debug("Running hook for %s", path)
+            lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
-                ssh("cd {} && hooks/post-update".format(
-                    sh_quote(_path_(path, ".git"))))
+                ssh("cd {} "
+                    "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                    "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
                 currentds_ap['message'] = (
