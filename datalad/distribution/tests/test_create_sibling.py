@@ -551,13 +551,25 @@ def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
         ds.repo.set_preferred_content('group', standardgroup, remote)
     ds.publish(to=remote)
 
-    # now a month later we created a new subdataset
-    subds = ds.create('sub')  # so now we got a hierarchy!
-    create_tree(subds.path, {'sub.dat': 'lots of data'})
-    subds.add('sub.dat')
-    ok_file_under_git(subds.path, 'sub.dat', annexed=True)
+    # now a month later we created a new subdataset... a few of the nested ones
+    # A known hiccup happened when there
+    # is also subsub ds added - we might incorrectly traverse and not prepare
+    # sub first for subsub to inherit etc
+    parent_ds = ds
+    subdss = []
+    nlevels = 2  # gets slow: 1 - 43 sec, 2 - 49 sec , 3 - 69 sec
+    for levels in range(nlevels):
+        subds = parent_ds.create('sub')
+        create_tree(subds.path, {'sub.dat': 'lots of data'})
+        subds.add('sub.dat', ds2super=True)
+        ok_file_under_git(subds.path, 'sub.dat', annexed=True)
+        parent_ds = subds
+        subdss.append(subds)
 
-    target_sub = Dataset(opj(target_path, 'sub'))
+    target_subdss = [
+        Dataset(opj(*([target_path] + ['sub'] * (i+1))))
+        for i in range(nlevels)
+    ]
     # since we do not have yet/thus have not used an option to record to publish
     # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
     # -- should fail
@@ -569,31 +581,38 @@ def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     assert_postupdate_hooks(target_path, installed=ui)
-    ok_(not target_sub.is_installed())  # still not there
+    for target_sub in target_subdss:
+        ok_(not target_sub.is_installed())  # still not there
     res = ds.publish(to=remote, recursive=True, on_failure='ignore')
-    assert_result_count(res, 2)
+    assert_result_count(res, 1 + len(subdss))
     assert_status(('error', 'notneeded'), res)
     assert_result_count(
-        res, 1,
+        res, len(subdss),
         status='error',
         message=("Unknown target sibling '%s' for publication", 'magical'))
+
+    # Finally publishing with inheritance
     ds.publish(to=remote, recursive=True, missing='inherit')
     assert_postupdate_hooks(target_path, installed=ui)
+
     # we added the remote and set all the
-    eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
-    eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
+    for subds in subdss:
+        eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
+        eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
 
-    ok_(target_sub.is_installed())  # it is there now
-    eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
-    # and we have transferred the content
-    if standardgroup and standardgroup == 'backup':
-        # only then content should be copied
-        ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
-    else:
-        # otherwise nothing is copied by default
-        assert_false(target_sub.repo.file_has_content('sub.dat'))
+    for target_sub in target_subdss:
+        ok_(target_sub.is_installed())  # it is there now
+        eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
+        # and we have transferred the content
+        if standardgroup and standardgroup == 'backup':
+            # only then content should be copied
+            ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
+        else:
+            # otherwise nothing is copied by default
+            assert_false(target_sub.repo.file_has_content('sub.dat'))
 
 
+@slow  # 49 sec
 def test_target_ssh_inherit():
     skip_if_on_windows()  # create_sibling incompatible with win servers
     # TODO: was waiting for resolution on
