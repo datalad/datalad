@@ -122,7 +122,7 @@ def assert_postupdate_hooks(path, installed=True, flat=False):
         datasets = glob(opj(path, '*'))
     else:
         ds = Dataset(path)
-        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True)
+        datasets = [ds.path] + ds.subdatasets(result_xfm='paths', recursive=True, fulfilled=True)
     for ds_ in datasets:
         ds_ = Dataset(ds_)
         hook_path = opj(ds_.path, '.git', 'hooks', 'post-update')
@@ -536,17 +536,16 @@ def test_replace_and_relative_sshpath(src_path, dst_path):
 
 
 @known_failure_direct_mode  #FIXME
-@skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(suffix="target")
-def _test_target_ssh_inherit(standardgroup, src_path, target_path):
+def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
     ds = Dataset(src_path).create()
     target_url = 'localhost:%s' % target_path
     remote = "magical"
     # for the test of setting a group, will just smoke test while using current
     # user's group
-    ds.create_sibling(target_url, name=remote, shared='group', group=os.getgid())  # not doing recursively
+    ds.create_sibling(target_url, name=remote, shared='group', group=os.getgid(), ui=ui)  # not doing recursively
     if standardgroup:
         ds.repo.set_preferred_content('wanted', 'standard', remote)
         ds.repo.set_preferred_content('group', standardgroup, remote)
@@ -569,6 +568,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         message='No target sibling configured for default publication, please specific via --to')
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
+    assert_postupdate_hooks(target_path, installed=ui)
     ok_(not target_sub.is_installed())  # still not there
     res = ds.publish(to=remote, recursive=True, on_failure='ignore')
     assert_result_count(res, 2)
@@ -578,6 +578,7 @@ def _test_target_ssh_inherit(standardgroup, src_path, target_path):
         status='error',
         message=("Unknown target sibling '%s' for publication", 'magical'))
     ds.publish(to=remote, recursive=True, missing='inherit')
+    assert_postupdate_hooks(target_path, installed=ui)
     # we added the remote and set all the
     eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
     eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
@@ -599,5 +600,6 @@ def test_target_ssh_inherit():
     #   https://github.com/datalad/datalad/issues/1274
     # which is now closed but this one is failing ATM, thus leaving as TODO
     # yield _test_target_ssh_inherit, None      # no wanted etc
-    yield _test_target_ssh_inherit, 'manual'  # manual -- no load should be annex copied
-    yield _test_target_ssh_inherit, 'backup'  # backup -- all data files
+    # Takes too long so one will do with UI and another one without
+    yield _test_target_ssh_inherit, 'manual', True  # manual -- no load should be annex copied
+    yield _test_target_ssh_inherit, 'backup', False  # backup -- all data files

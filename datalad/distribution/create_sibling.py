@@ -197,12 +197,22 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
-    if inherit and shared is None:
-        # here we must analyze current_ds's super, not the super_ds
+    if inherit:
         delayed_super = _DelayedSuper(ds)
-        # inherit from the setting on remote end
-        shared = CreateSibling._get_ds_remote_shared_setting(
-            delayed_super, name, ssh)
+        if shared is None:
+            # here we must analyze current_ds's super, not the super_ds
+            # inherit from the setting on remote end
+            shared = CreateSibling._get_ds_remote_shared_setting(
+                delayed_super, name, ssh)
+
+        if not install_postupdate_hook:
+            # Even though directive from above was False due to no UI explicitly
+            # requested, we were asked to inherit the setup, so we might need
+            # to install the hook, if super has it on remote
+            install_postupdate_hook = CreateSibling._has_active_postupdate(
+                delayed_super, name, ssh)
+
+
 
     if group:
         # Either repository existed before or a new directory was created for it,
@@ -665,21 +675,41 @@ class CreateSibling(Interface):
                 yield currentds_ap
 
     @staticmethod
+    def _run_on_ds_ssh_remote(ds, name, ssh, cmd):
+        """Given a dataset, and name of the remote, run command via ssh
+
+        Parameters
+        ----------
+        cmd: str
+          Will be .format()'ed given the `path` to the dataset on remote
+
+        Returns
+        -------
+        out
+
+        Raises
+        ------
+        CommandError
+        """
+        remote_url = CreateSibling._get_remote_url(ds, name)
+        remote_ri = RI(remote_url)
+        out, err = ssh(cmd.format(path=sh_quote(remote_ri.path)))
+        if err:
+            lgr.warning("Got stderr while calling ssh: %s", err)
+        return out
+
+    @staticmethod
     def _get_ds_remote_shared_setting(ds, name, ssh):
         """Figure out setting of sharedrepository for dataset's `name` remote"""
         shared = None
         try:
-            current_super_url = CreateSibling._get_remote_url(
-                ds, name)
-            current_super_ri = RI(current_super_url)
-            out, err = ssh('git -C {} config --get core.sharedrepository'.format(
-                # TODO -- we might need to expanduser taking .user into account
-                # but then it must be done also on remote side
-                sh_quote(current_super_ri.path))
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'git -C {path} config --get core.sharedrepository'
             )
             shared = out.strip()
-            if err:
-                lgr.warning("Got stderr while calling ssh: %s", err)
         except CommandError as e:
             lgr.debug(
                 "Could not figure out remote shared setting of %s for %s due "
@@ -689,6 +719,34 @@ class CreateSibling(Interface):
             # could well be ok if e.g. not shared
             # TODO: more detailed analysis may be?
         return shared
+
+    @staticmethod
+    def _has_active_postupdate(ds, name, ssh):
+        """Figure out either has active post-update hook
+
+        Returns
+        -------
+        bool or None
+          None if something went wrong and we could not figure out
+        """
+        has_active_post_update = None
+        try:
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'cd {path} && [ -x .git/hooks/post-update ] && echo yes || echo no'
+            )
+            out = out.strip()
+            assert out in ('yes', 'no')
+            has_active_post_update = out == "yes"
+        except CommandError as e:
+            lgr.debug(
+                "Could not figure out either %s on remote %s has active "
+                "post_update hook due to %s",
+                ds, name, exc_str(e)
+            )
+        return has_active_post_update
 
     @staticmethod
     def _get_remote_url(ds, name):
