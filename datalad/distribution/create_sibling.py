@@ -197,8 +197,8 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
-    if inherit:
-        delayed_super = _DelayedSuper(ds)
+    delayed_super = _DelayedSuper(ds)
+    if inherit and delayed_super.super:
         if shared is None:
             # here we must analyze current_ds's super, not the super_ds
             # inherit from the setting on remote end

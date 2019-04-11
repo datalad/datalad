@@ -595,21 +595,37 @@ def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
     ds.publish(to=remote, recursive=True, missing='inherit')
     assert_postupdate_hooks(target_path, installed=ui)
 
-    # we added the remote and set all the
-    for subds in subdss:
-        eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
-        eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
+    def check_dss():
+        # we added the remote and set all the
+        for subds in subdss:
+            eq_(subds.repo.get_preferred_content('wanted', remote), 'standard' if standardgroup else '')
+            eq_(subds.repo.get_preferred_content('group', remote), standardgroup or '')
 
-    for target_sub in target_subdss:
-        ok_(target_sub.is_installed())  # it is there now
-        eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
-        # and we have transferred the content
-        if standardgroup and standardgroup == 'backup':
-            # only then content should be copied
-            ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
-        else:
-            # otherwise nothing is copied by default
-            assert_false(target_sub.repo.file_has_content('sub.dat'))
+        for target_sub in target_subdss:
+            ok_(target_sub.is_installed())  # it is there now
+            eq_(target_sub.repo.config.get('core.sharedrepository'), '1')
+            # and we have transferred the content
+            if standardgroup and standardgroup == 'backup':
+                # only then content should be copied
+                ok_file_has_content(opj(target_sub.path, 'sub.dat'), 'lots of data')
+            else:
+                # otherwise nothing is copied by default
+                assert_false(target_sub.repo.file_has_content('sub.dat'))
+
+    check_dss()
+    # and it should be ok to reconfigure the full hierarchy of datasets
+    # while "inheriting". No URL must be specified, and we must not blow
+    # but just issue a warning for the top level dataset which has no super,
+    # so cannot inherit anything - use case is to fixup/establish the full
+    # hierarchy on the remote site
+    with swallow_logs(logging.WARNING) as cml:
+        out = ds.create_sibling(
+            None, name=remote, existing="reconfigure", inherit=True,
+            ui=ui, recursive=True)
+        eq_(len(out), 1 + len(subdss))
+        assert_in("Cannot determine super dataset", cml.out)
+
+    check_dss()
 
 
 @slow  # 49 sec
