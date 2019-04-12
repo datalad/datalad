@@ -14,7 +14,10 @@ from os.path import join as opj
 import tarfile
 import timeit
 
+from time import time
 from subprocess import call
+
+from datalad.cmd import Runner
 
 from datalad.api import add
 from datalad.api import create
@@ -37,6 +40,8 @@ from datalad.utils import getpwd
 
 from .common import SuprocBenchmarks
 
+scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
+script_busyloop = osp.join(scripts_dir, 'busyloop')
 
 class startup(SuprocBenchmarks):
     """
@@ -65,7 +70,6 @@ class runner(SuprocBenchmarks):
     """
 
     def setup(self):
-        from datalad.cmd import Runner
         self.runner = Runner()
         # older versions might not have it
         try:
@@ -80,4 +84,57 @@ class runner(SuprocBenchmarks):
     def time_echo_gitrunner(self):
         self.git_runner.run("echo")
 
+    # Following "track" measures computing overhead comparing to the simplest
+    # os.system call on the same command without carrying for in/out
 
+    unit = "% overhead"
+
+    def _get_overhead(self, cmd, nrepeats=3, **run_kwargs):
+        """Estimate overhead over running command via the simplest os.system
+        and to not care about any output
+        """
+        # asv does not repeat tracking ones I think, so nrepeats
+        overheads = []
+        for _ in range(nrepeats):
+            t0 = time()
+            os.system(cmd + " >/dev/null 2>&1")
+            t1 = time()
+            self.runner.run(cmd, **run_kwargs)
+            t2 = time()
+            overhead = 100 * ((t2 - t1) / (t1 - t0) - 1.0)
+            # print("O :", t1 - t0, t2 - t0, overhead)
+            overheads.append(overhead)
+        overhead = round(sum(overheads) / len(overheads), 2)
+        #overhead = round(min(overheads), 2)
+        return overhead
+
+    def track_overhead_echo(self):
+        return self._get_overhead("echo")
+
+    # 100ms chosen below as providing some sensible stability for me.
+    # at 10ms -- too much variability
+    def track_overhead_100ms(self):
+        return self._get_overhead("sleep 0.1")
+
+    def track_overhead_heavyout(self):
+        # run busyloop for 100ms outputing as much as it could
+        return self._get_overhead(script_busyloop + " 0.1")
+
+    def track_overhead_heavyout_online_through(self):
+        return self._get_overhead(script_busyloop + " 0.1",
+                                  log_stderr='offline',  # needed to would get stuck
+                                  log_online=True)
+
+    def track_overhead_heavyout_online_process(self):
+        return self._get_overhead(script_busyloop + " 0.1",
+                                  log_stdout=lambda s: '',
+                                  log_stderr='offline',  # needed to would get stuck
+                                  log_online=True)
+
+    # Probably not really interesting, and good lord wobbles around 0
+    # def track_overhead_heavyout_offline(self):
+    #     return self._get_overhead(script_busyloop + " 0.1",
+    #                               log_stdout='offline',
+    #                               log_stderr='offline')
+
+    # TODO: track the one with in/out, i.e. for those BatchedProcesses
