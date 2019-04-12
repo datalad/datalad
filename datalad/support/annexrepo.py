@@ -3181,7 +3181,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           Specific paths to query info for. In none are given, info is
           reported for all content.
         init : 'git' or dict-like or None
-          If set to 'git' annex content info will ammend the output of
+          If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
           supplied will receive this information and the present keys will
           limit the report of annex properties. Alternatively, if `None`
