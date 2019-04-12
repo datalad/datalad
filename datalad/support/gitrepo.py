@@ -3287,7 +3287,7 @@ class GitRepo(RepoInterface):
                     else 'clean'
             else:
                 raise ValueError(
-                    'unknown `eval_submodule_state` parameter value: %s',
+                    'unknown `eval_submodule_state` parameter value: %s' %
                     eval_submodule_state)
 
         return status
