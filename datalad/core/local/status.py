@@ -95,10 +95,12 @@ STATE_COLOR_MAP = {
     'untracked': ac.RED,
     'modified': ac.RED,
     'added': ac.GREEN,
+    'unknown': ac.CYAN,
 }
 
 
-def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cache):
+def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
+                  eval_submodule_state, cache):
     # take the datase that went in first
     repo_path = ds.repo.pathobj
     lgr.debug('query %s.diffstatus() for paths: %s', ds.repo, paths)
@@ -108,10 +110,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
         # recode paths with repo reference for low-level API
         paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
         untracked=untracked,
-        # TODO think about potential optimizations in case of
-        # recursive processing, as this will imply a semi-recursive
-        # look into subdatasets
-        ignore_submodules='other',
+        eval_submodule_state=eval_submodule_state,
         _cache=cache)
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
         lgr.debug('query %s.get_content_annexinfo() for paths: %s', ds.repo, paths)
@@ -141,6 +140,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
                         untracked,
                         recursion_limit - 1,
                         queried,
+                        eval_submodule_state,
                         cache):
                     yield r
 
@@ -226,8 +226,11 @@ class Status(Interface):
             doc="""path to be evaluated""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        )
-
+        eval_subdataset_state=Parameter(
+            args=("--eval-subdataset-state",),
+            constraints=EnsureChoice('no', 'commit', 'full'),
+            doc=""""""),
+    )
 
     @staticmethod
     @datasetmethod(name='status')
@@ -238,7 +241,8 @@ class Status(Interface):
             annex=None,
             untracked='normal',
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            eval_subdataset_state='full'):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
@@ -344,6 +348,7 @@ class Status(Interface):
                     if recursion_limit is not None else -1
                     if recursive else 0,
                     queried,
+                    eval_subdataset_state,
                     content_info_cache):
                 yield dict(
                     r,
@@ -370,12 +375,12 @@ class Status(Interface):
             else str(ut.Path(res['path']).relative_to(refds))
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')
-        state = res['state']
+        state = res.get('state', 'unknown')
         ui.message('{fill}{state}: {path}{type_}'.format(
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,
-                STATE_COLOR_MAP.get(res['state'], ac.WHITE)),
+                STATE_COLOR_MAP.get(res.get('state', 'unknown'), ac.WHITE)),
             path=path,
             type_=' ({})'.format(
                 ac.color_word(type_, ac.MAGENTA) if type_ else '')))

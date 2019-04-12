@@ -2311,7 +2311,7 @@ class GitRepo(RepoInterface):
     def dirty(self):
         return len([
             p for p, props in iteritems(self.status(
-                untracked='all', ignore_submodules='other'))
+                untracked='all', eval_submodule_state='full'))
             if props.get('state', None) != 'clean' and
             # -core ignores empty untracked directories, so shall we
             not (p.is_dir() and len(list(p.iterdir())) == 0)]) > 0
@@ -3020,7 +3020,7 @@ class GitRepo(RepoInterface):
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
 
-    def status(self, paths=None, untracked='all', ignore_submodules='no'):
+    def status(self, paths=None, untracked='all', eval_submodule_state='full'):
         """Simplified `git status` equivalent.
 
         Parameters
@@ -3057,10 +3057,10 @@ class GitRepo(RepoInterface):
             to=None,
             paths=paths,
             untracked=untracked,
-            ignore_submodules=ignore_submodules)
+            eval_submodule_state=eval_submodule_state)
 
     def diff(self, fr, to, paths=None, untracked='all',
-             ignore_submodules='no'):
+             eval_submodule_state='full'):
         """Like status(), but reports changes between to arbitrary revisions
 
         Parameters
@@ -3079,7 +3079,8 @@ class GitRepo(RepoInterface):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        ignore_submodules : {'no', 'other', 'all'}
+        eval_submodule_state : {'full', 'commit', 'no'}
+          TODO
 
         Returns
         -------
@@ -3097,11 +3098,11 @@ class GitRepo(RepoInterface):
         return {k: v for k, v in iteritems(self.diffstatus(
             fr=fr, to=to, paths=paths,
             untracked=untracked,
-            ignore_submodules=ignore_submodules))
+            eval_submodule_state=eval_submodule_state))
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   ignore_submodules='no', _cache=None):
+                   eval_submodule_state='full', _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
@@ -3121,7 +3122,6 @@ class GitRepo(RepoInterface):
 
         # TODO report more info from get_content_info() calls in return
         # value, those are cheap and possibly useful to a consumer
-        status = OrderedDict()
         # we need (at most) three calls to git
         if to is None:
             # everything we know about the worktree, including os.stat
@@ -3168,6 +3168,7 @@ class GitRepo(RepoInterface):
                 from_state = {}
             _cache[key] = from_state
 
+        status = OrderedDict()
         for f, to_state_r in iteritems(to_state):
             props = None
             if f not in from_state:
@@ -3178,13 +3179,26 @@ class GitRepo(RepoInterface):
                 )
             elif to_state_r['gitshasum'] == from_state[f]['gitshasum'] and \
                     (modified is None or f not in modified):
-                if ignore_submodules != 'all' or to_state_r['type'] != 'dataset':
+                if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
-                        state='clean' if f.exists() or
+                        state='clean' if f.exists() or \
                               f.is_symlink() else 'deleted',
                         type=to_state_r['type'],
                     )
+                else:
+                    # a dataset
+                    props = dict(type=to_state_r['type'])
+                    if to is not None:
+                        # we can only be confident without looking
+                        # at the worktree, if we compare to a recorded
+                        # state
+                        props['state'] = 'clean'
+                    else:
+                        # report the shasum that we know, for further
+                        # wrangling of subdatasets below
+                        props['gitshasum'] = to_state_r['gitshasum']
+                        props['prev_gitshasum'] = from_state[f]['gitshasum']
             else:
                 # change in git record, or on disk
                 props = dict(
@@ -3192,13 +3206,14 @@ class GitRepo(RepoInterface):
                     # but had subsequent modifications done to it that are
                     # unstaged. Such file would presently show up as 'added'
                     # ATM I think this is OK, but worth stating...
-                    state='modified' if f.exists() or
+                    state='modified' if f.exists() or \
                     f.is_symlink() else 'deleted',
                     # TODO record before and after state for diff-like use
                     # cases
                     type=to_state_r['type'],
                 )
-            if props['state'] in ('clean', 'added', 'modified'):
+            state = props.get('state', None)
+            if state in ('clean', 'added', 'modified'):
                 props['gitshasum'] = to_state_r['gitshasum']
                 if 'bytesize' in to_state_r:
                     # if we got this cheap, report it
@@ -3206,7 +3221,7 @@ class GitRepo(RepoInterface):
                 elif props['state'] == 'clean' and 'bytesize' in from_state[f]:
                     # no change, we can take this old size info
                     props['bytesize'] = from_state[f]['bytesize']
-            if props['state'] in ('clean', 'modified', 'deleted'):
+            if state in ('clean', 'modified', 'deleted'):
                 props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props
 
@@ -3223,7 +3238,7 @@ class GitRepo(RepoInterface):
                     gitshasum=from_state_r['gitshasum'],
                 )
 
-        if ignore_submodules == 'all' or to is not None:
+        if to is not None or eval_submodule_state == 'no':
             # if we have `to` we are specifically comparing against
             # a recorded state, and this function only attempts
             # to label the state of a subdataset, not investigate
@@ -3235,18 +3250,26 @@ class GitRepo(RepoInterface):
 
         # loop over all subdatasets and look for additional modifications
         for f, st in iteritems(status):
-            if not (st['type'] == 'dataset' and st['state'] == 'clean' \
-                    and GitRepo.is_valid_repo(str(f))):
+            f = text_type(f)
+            if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
+            if not GitRepo.is_valid_repo(f):
+                # submodule is not present, no chance for a conflict
+                st['state'] = 'clean'
+                continue
             # we have to recurse into the dataset and get its status
-            subrepo = GitRepo(str(f))
+            subrepo = GitRepo(f)
+            subrepo_commit = subrepo.get_hexsha()
+            st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
-            if st['gitshasum'] != subrepo.get_hexsha():
-                # current commit in subdataset deviates from what is
-                # recorded in the dataset, cheap test
-                st['state'] = 'modified'
-            else:
+            if eval_submodule_state == 'commit':
+                # test if current commit in subdataset deviates from what is
+                # recorded in the dataset
+                st['state'] = 'modified' \
+                    if st['prev_gitshasum'] != subrepo_commit \
+                    else 'clean'
+            elif eval_submodule_state == 'full':
                 # the recorded commit did not change, so we need to make
                 # a more expensive traversal
                 rstatus = subrepo.diffstatus(
@@ -3257,15 +3280,16 @@ class GitRepo(RepoInterface):
                     to=None,
                     paths=None,
                     untracked=untracked,
-                    ignore_submodules='other',
+                    eval_submodule_state=eval_submodule_state,
                     _cache=_cache)
-                if any(v['state'] != 'clean'
-                       for k, v in iteritems(rstatus)):
-                    st['state'] = 'modified'
-            if ignore_submodules == 'other' and st['state'] == 'modified':
-                # we know for sure that at least one subdataset is modified
-                # go home quick
-                break
+                st['state'] = 'modified' if any(
+                    v['state'] != 'clean' for k, v in iteritems(rstatus)) \
+                    else 'clean'
+            else:
+                raise ValueError(
+                    'unknown `eval_submodule_state` parameter value: %s',
+                    eval_submodule_state)
+
         return status
 
     def _save_pre(self, paths, _status, **kwargs):
@@ -3278,7 +3302,7 @@ class GitRepo(RepoInterface):
             status = self.status(
                 paths=paths,
                 **{k: kwargs[k] for k in kwargs
-                   if k in ('untracked', 'ignore_submodules')})
+                   if k in ('untracked', 'eval_submodule_state')})
         else:
             # we want to be able to add items down the line
             # make sure to detach from prev. owner
@@ -3352,12 +3376,6 @@ class GitRepo(RepoInterface):
           dataset status (GitRepo.status()), or a custom status provided
           via `_status`. If no paths are provided, ALL non-clean paths
           present in the repo status or `_status` will be saved.
-        ignore_submodules : {'no', 'all'}
-          If `_status` is not given, will be passed as an argument to
-          Repo.status(). With 'all' no submodule state will be saved in
-          the dataset. Note that submodule content will never be saved
-          in their respective datasets, as this function's scope is
-          limited to a single dataset.
         _status : dict or None
           If None, Repo.status() will be queried for the given `ds`. If
           a dict is given, its content will be used as a constraint.
@@ -3369,7 +3387,8 @@ class GitRepo(RepoInterface):
           Supported:
 
           - git : bool (passed to Repo.add()
-          - ignore_submodules : {'no', 'other', 'all'} passed to Repo.status()
+          - eval_submodule_state : {'full', 'commit', 'no'}
+            passed to Repo.status()
           - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
         """
         return list(
