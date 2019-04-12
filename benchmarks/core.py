@@ -41,7 +41,7 @@ from datalad.utils import getpwd
 from .common import SuprocBenchmarks
 
 scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
-script_busyloop = osp.join(scripts_dir, 'busyloop')
+heavyout_cmd = "{} 1000".format(osp.join(scripts_dir, 'heavyout'))
 
 class startup(SuprocBenchmarks):
     """
@@ -118,22 +118,22 @@ class runner(SuprocBenchmarks):
 
     def track_overhead_heavyout(self):
         # run busyloop for 100ms outputing as much as it could
-        return self._get_overhead(script_busyloop + " 0.1")
+        return self._get_overhead(heavyout_cmd)
 
     def track_overhead_heavyout_online_through(self):
-        return self._get_overhead(script_busyloop + " 0.1",
+        return self._get_overhead(heavyout_cmd,
                                   log_stderr='offline',  # needed to would get stuck
                                   log_online=True)
 
     def track_overhead_heavyout_online_process(self):
-        return self._get_overhead(script_busyloop + " 0.1",
+        return self._get_overhead(heavyout_cmd,
                                   log_stdout=lambda s: '',
                                   log_stderr='offline',  # needed to would get stuck
                                   log_online=True)
 
-    # Probably not really interesting, and good lord wobbles around 0
+    # # Probably not really interesting, and good lord wobbles around 0
     # def track_overhead_heavyout_offline(self):
-    #     return self._get_overhead(script_busyloop + " 0.1",
+    #     return self._get_overhead(heavyout_cmd,
     #                               log_stdout='offline',
     #                               log_stderr='offline')
 
