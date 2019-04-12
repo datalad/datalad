@@ -232,3 +232,12 @@ def test_subds_status(path):
         type='dataset',
         path=subds.path,
         refds=ds.path)
+
+    # path="." gets treated as "this dataset's content" without requiring a
+    # trailing "/".
+    assert_result_count(
+        subds.status(path="."),
+        1,
+        type="dataset",
+        path=op.join(subds.path, "someotherds"),
+        refds=subds.path)
