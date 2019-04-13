@@ -3267,7 +3267,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 eval_availability=False,
                 init=self.status(
                     paths=paths,
-                    ignore_submodules='other')
+                    eval_submodule_state='full')
             )
         )
         self._mark_content_availability(info)

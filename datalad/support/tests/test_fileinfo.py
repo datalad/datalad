@@ -129,6 +129,23 @@ def test_get_content_info(path):
                 # `file` was a POSIX path
                 assert_equal(annexstatus[p]['has_content'], 'dropped' not in s)
 
+    # check the different subds evaluation modes
+    someds = Dataset(ds.pathobj / 'subds_modified' / 'someds')
+    dirtyds_path = someds.pathobj / 'dirtyds'
+    assert_not_in(
+        'state',
+        someds.repo.status(eval_submodule_state='no')[dirtyds_path]
+    )
+    assert_equal(
+        'clean',
+        someds.repo.status(eval_submodule_state='commit')[dirtyds_path]['state']
+    )
+    assert_equal(
+        'modified',
+        someds.repo.status(eval_submodule_state='full')[dirtyds_path]['state']
+    )
+
+
 
 @with_tempfile
 def test_compare_content_info(path):
