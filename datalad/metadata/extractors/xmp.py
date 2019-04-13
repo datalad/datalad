@@ -48,17 +48,17 @@ class MetadataExtractor(BaseMetadataExtractor):
             unit=' Files',
         )
         for f in self.paths:
+            log_progress(
+                lgr.info,
+                'extractorxmp',
+                'Extract XMP metadata from %s', f,
+                update=1,
+                increment=True)
             # run basic file name filter for performance reasons
             # it is OK to let false-positives through
             if fname_match_regex.match(f, re.IGNORECASE) is None:
                 continue
             absfp = opj(self.ds.path, f)
-            log_progress(
-                lgr.info,
-                'extractorxmp',
-                'Extract XMP metadata from %s', absfp,
-                update=1,
-                increment=True)
             info = file_to_dict(absfp)
             if not info:
                 # got nothing, likely nothing there
