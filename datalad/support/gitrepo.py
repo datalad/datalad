@@ -3035,7 +3035,13 @@ class GitRepo(RepoInterface):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        ignore_submodules : {'no', 'other', 'all'}
+        eval_submodule_state : {'full', 'commit', 'no'}
+          If 'full' (the default), the state of a submodule is evaluated by
+          considering all modifications, with the treatment of untracked files
+          determined by `untracked`. If 'commit', the modification check is
+          restricted to comparing the submodule's HEAD commit to the one
+          recorded in the superdataset. If 'no', the state of the subdataset is
+          not evaluated.
 
         Returns
         -------
@@ -3080,7 +3086,12 @@ class GitRepo(RepoInterface):
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
         eval_submodule_state : {'full', 'commit', 'no'}
-          TODO
+          If 'full' (the default), the state of a submodule is evaluated by
+          considering all modifications, with the treatment of untracked files
+          determined by `untracked`. If 'commit', the modification check is
+          restricted to comparing the submodule's HEAD commit to the one
+          recorded in the superdataset. If 'no', the state of the subdataset is
+          not evaluated.
 
         Returns
         -------
