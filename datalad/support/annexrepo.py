@@ -41,6 +41,7 @@ from weakref import WeakValueDictionary
 
 from six import string_types, PY2
 from six import iteritems
+from six import text_type
 from six.moves import filter
 from git import InvalidGitRepositoryError
 
@@ -3049,7 +3050,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if testpath.exists():
                     r.pop('hashdirlower', None)
                     r.pop('hashdirmixed', None)
-                    r['objloc'] = str(testpath)
+                    r['objloc'] = text_type(testpath)
                     r['has_content'] = True
                     break
 
@@ -3117,7 +3118,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             cmd = 'find'
             # stringify any pathobjs
-            opts.extend([str(p) for p in paths]
+            opts.extend([text_type(p) for p in paths]
                         if paths else ['--include', '*'])
         for j in self._run_annex_command_json(cmd, opts=opts):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))

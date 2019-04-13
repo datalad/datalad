@@ -15,6 +15,7 @@ import logging
 import random
 import uuid
 from six import iteritems
+from six import text_type
 from argparse import REMAINDER
 
 from os import listdir
@@ -187,7 +188,8 @@ class Create(Interface):
         assert(path is not None)
 
         # prep for yield
-        res = dict(action='create', path=str(path), logger=lgr, type='dataset',
+        res = dict(action='create', path=text_type(path),
+                   logger=lgr, type='dataset',
                    refds=refds_path)
 
         refds = None
@@ -204,7 +206,7 @@ class Create(Interface):
                     message=(
                         "dataset containing given paths is not underneath "
                         "the reference dataset %s: %s",
-                        dataset, str(path)),
+                        dataset, text_type(path)),
                 )
                 return
 
@@ -215,7 +217,7 @@ class Create(Interface):
         # in this location
         # it will cost some filesystem traversal though...
         parentds_path = rev_get_dataset_root(
-            op.normpath(op.join(str(path), os.pardir)))
+            op.normpath(op.join(text_type(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)
             parentds_path = ut.Path(parentds_path)
@@ -239,8 +241,8 @@ class Create(Interface):
                     'status': 'error',
                     'message': (
                         'collision with content in parent dataset at %s: %s',
-                        str(parentds_path),
-                        [str(c) for c in conflict])})
+                        text_type(parentds_path),
+                        [text_type(c) for c in conflict])})
                 yield res
                 return
             # another set of check to see whether the target path is pointing
@@ -257,15 +259,15 @@ class Create(Interface):
                     'status': 'error',
                     'message': (
                         'collision with %s (dataset) in dataset %s',
-                        str(conflict[0]),
-                        str(parentds_path))})
+                        text_type(conflict[0]),
+                        text_type(parentds_path))})
                 yield res
                 return
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
         tbds = dataset if isinstance(dataset, Dataset) and \
-            dataset.path == path else Dataset(str(path))
+            dataset.path == path else Dataset(text_type(path))
 
         # don't create in non-empty directory without `force`:
         if op.isdir(tbds.path) and listdir(tbds.path) != [] and not force:

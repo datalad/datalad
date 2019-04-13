@@ -14,6 +14,8 @@ import shutil
 import os.path as op
 from os.path import join as opj, abspath, normpath, relpath, exists
 
+from six import text_type
+
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from ..dataset import rev_resolve_path
 from datalad import cfg
@@ -470,10 +472,10 @@ def test_rev_resolve_path(path):
     for d in (opath,) if on_windows else (opath, lpath):
         ds_local = Dataset(d)
         # no symlink resolution
-        eq_(str(rev_resolve_path(d)), d)
+        eq_(text_type(rev_resolve_path(d)), d)
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
-            eq_(str(rev_resolve_path(d).cwd()), opath)
+            eq_(text_type(rev_resolve_path(d).cwd()), opath)
             # using pathlib's `resolve()` will resolve any
             # symlinks
             # also resolve `opath`, as on old windows systems the path might
@@ -482,20 +484,20 @@ def test_rev_resolve_path(path):
             eq_(rev_resolve_path('.').resolve(), ut.Path(opath).resolve())
             # no norming, but absolute paths, without resolving links
             eq_(rev_resolve_path('.'), ut.Path(d))
-            eq_(str(rev_resolve_path('.')), d)
+            eq_(text_type(rev_resolve_path('.')), d)
 
-            eq_(str(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
+            eq_(text_type(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
                 op.join(d, 'bu'))
-            eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+            eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
                 op.join(ds_global.path, 'bu'))
 
         # resolve against a dataset
-        eq_(str(rev_resolve_path('bu', ds=ds_local)), op.join(d, 'bu'))
-        eq_(str(rev_resolve_path('bu', ds=ds_global)), op.join(path, 'bu'))
+        eq_(text_type(rev_resolve_path('bu', ds=ds_local)), op.join(d, 'bu'))
+        eq_(text_type(rev_resolve_path('bu', ds=ds_global)), op.join(path, 'bu'))
         # but paths outside the dataset are left untouched
-        eq_(str(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
+        eq_(text_type(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
             op.join(getpwd(), 'bu'))
-        eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+        eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
             op.normpath(op.join(getpwd(), os.pardir, 'bu')))
 
 
@@ -504,7 +506,7 @@ def test_rev_resolve_path(path):
 @with_tempfile(mkdir=True)
 def test_rev_resolve_path_symlink_edition(path):
     deepest = ut.Path(path) / 'one' / 'two' / 'three'
-    deepest_str = str(deepest)
+    deepest_str = text_type(deepest)
     os.makedirs(deepest_str)
     with chpwd(deepest_str):
         # direct absolute

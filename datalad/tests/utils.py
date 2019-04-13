@@ -1689,7 +1689,7 @@ def get_deeply_nested_structure(path):
     |  .
     |  ├── directory_untracked
     |  │   └── link2dir -> ../subdir
-    |  ├── file_modified
+    |  ├── OBSCURE_FILENAME_file_modified
     |  ├── link2dir -> subdir
     |  ├── link2subdsdir -> subds_modified/subdir
     |  ├── link2subdsroot -> subds_modified
@@ -1703,7 +1703,7 @@ def get_deeply_nested_structure(path):
     |      ├── subdir
     |      │   └── annexed_file.txt -> ../.git/annex/objects/...
     |      └── subds_lvl1_modified
-    |          └── directory_untracked
+    |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
     """
     ds = Dataset(path).rev_create()
@@ -1722,12 +1722,12 @@ def get_deeply_nested_structure(path):
             'subdir': {
                 'file_modified': 'file_modified',
             },
-            'file_modified': 'file_modified',
+            OBSCURE_FILENAME + u'file_modified_': 'file_modified',
         }
     )
     create_tree(
         text_type(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
-        {'directory_untracked' : {"untraced_file": ""}}
+        {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')

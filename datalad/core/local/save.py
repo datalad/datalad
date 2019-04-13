@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from six import iteritems
+from six import text_type
 
 from datalad.interface.base import (
     Interface,
@@ -268,7 +269,7 @@ class Save(Interface):
                     # version
                     for k in ('path', 'refds'):
                         if k in res:
-                            res[k] = str(
+                            res[k] = text_type(
                                 # recode path back to dataset path anchor
                                 pds.pathobj / res[k].relative_to(
                                     pds.repo.pathobj)
