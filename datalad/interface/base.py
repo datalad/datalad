@@ -577,7 +577,7 @@ class Interface(object):
                     parser_kwargs['metavar'] = \
                         '{%s}' % '|'.join(
                             # don't use short_description(), because
-                            # it also need to give valid output for
+                            # it also needs to give valid output for
                             # Python syntax (quotes...), but here we
                             # can simplify to shell syntax where everything
                             # is a string
