@@ -782,7 +782,7 @@ def test_AnnexRepo_add_to_annex(path):
     ok_(repo.file_has_content(filename))
 
     # uncommitted:
-    ok_(repo.is_dirty(submodules=False))
+    ok_(repo.dirty)
 
     repo.commit("Added file to annex.")
     ok_clean_git(repo, annex=True, ignore_submodules=True)
@@ -821,7 +821,7 @@ def test_AnnexRepo_add_to_git(path):
     # not in annex, but in git:
     assert_raises(FileInGitError, repo.get_file_key, filename)
     # uncommitted:
-    ok_(repo.is_dirty(submodules=False))
+    ok_(repo.dirty)
     repo.commit("Added file to annex.")
     ok_clean_git(repo, annex=True, ignore_submodules=True)
 

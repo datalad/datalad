@@ -2280,31 +2280,6 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
-    def is_dirty(self, index=True, working_tree=True, untracked_files=True,
-                 submodules=True, path=None):
-        """Returns true if the repo is considered to be dirty
-
-        Parameters
-        ----------
-        index: bool
-          if True, consider changes to the index
-        working_tree: bool
-          if True, consider changes to the working tree
-        untracked_files: bool
-          if True, consider untracked files
-        submodules: bool
-          if True, consider submodules
-        path: str or list of str
-          path(s) to consider only
-        Returns
-        -------
-          bool
-        """
-
-        return self.repo.is_dirty(index=index, working_tree=working_tree,
-                                  untracked_files=untracked_files,
-                                  submodules=submodules, path=path)
-
     # run() needs this ATM, but should eventually be RF'ed to a
     # status(recursive=True) call
     @property

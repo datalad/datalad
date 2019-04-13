@@ -595,43 +595,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                       for i in json_list if i['status'] == st]
                 for cond, key, st in key_mapping if cond}
 
-    @borrowdoc(GitRepo)
-    def is_dirty(self, index=True, working_tree=False, untracked_files=True,
-                 submodules=True, path=None):
-        # TODO: Add doc on how this differs from GitRepo.is_dirty()
-        # Parameter working_tree exists to meet the signature of GitRepo.is_dirty()
-
-        # TODO: RM DIRECT?
-        if working_tree:
-            # Note: annex repos don't always have a git working tree and the
-            # behaviour in direct mode or V6+ repos is fundamentally different
-            # from that concept. There are no unstaged changes in direct mode
-            # for example. Therefore the need to call this method with
-            # 'working_tree=True' indicates invalid assumptions in the
-            # calling code.
-
-            # TODO: Better exception. InvalidArgumentError or sth ...
-            raise CommandNotAvailableError(
-                "Querying a git-annex repository for a clean/dirty "
-                "working tree is an invalid concept.")
-        # Again note, that 'annex status' isn't distinguishing staged and
-        # unstaged changes, since this makes little sense for an annex repo
-        # in general. Therefore we use only 'index' and 'untracked_files' to
-        # specify what kind of dirtyness we are interested in:
-        status = self.get_status(untracked=untracked_files, deleted=index,
-                                 modified=index, added=index,
-                                 type_changed=index, submodules=submodules,
-                                 path=path)
-        return any([bool(status[i]) for i in status])
-
-    @property
-    def untracked_files(self):
-        """Get a list of untracked files
-        """
-        return self.get_status(untracked=True, deleted=False, modified=False,
-                               added=False, type_changed=False, submodules=False,
-                               path=None)['untracked']
-
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']

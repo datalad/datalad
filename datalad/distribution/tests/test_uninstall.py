@@ -295,7 +295,7 @@ def test_remove_file_handle_only(path):
         ok_(not exists("one"))
     # and we should be able to remove without saving
     ds.remove('three', check=False, save=False)
-    ok_(ds.repo.is_dirty())
+    ok_(ds.repo.dirty)
 
 
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
