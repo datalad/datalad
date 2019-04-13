@@ -227,7 +227,7 @@ class Status(Interface):
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         eval_subdataset_state=Parameter(
-            args=("--eval-subdataset-state",),
+            args=("-e", "--eval-subdataset-state",),
             constraints=EnsureChoice('no', 'commit', 'full'),
             doc=""""""),
     )
