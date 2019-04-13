@@ -2318,7 +2318,13 @@ class GitRepo(RepoInterface):
 
     @property
     def untracked_files(self):
-        return self.repo.untracked_files
+        return [
+            text_type(p.relative_to(self.pathobj))
+            for p, props in iteritems(self.status(
+                untracked='all', eval_submodule_state='no'))
+            if props.get('state', None) == 'untracked' \
+            and props['type'] == 'file'
+        ]
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
