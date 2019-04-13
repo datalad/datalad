@@ -158,10 +158,9 @@ class Run(Interface):
             once. CMD]"""),
         expand=Parameter(
             args=("--expand",),
-            metavar=("WHICH"),
             doc="""Expand globs when storing inputs and/or outputs in the
             commit message.""",
-            constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
+            constraints=EnsureChoice(None, "inputs", "outputs", "both")),
         explicit=Parameter(
             args=("--explicit",),
             action="store_true",
