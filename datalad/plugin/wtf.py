@@ -263,7 +263,7 @@ class WTF(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         sensitive=Parameter(
             args=("-s", "--sensitive",),
-            constraints=EnsureChoice('some', 'all') | EnsureNone(),
+            constraints=EnsureChoice(None, 'some', 'all'),
             doc="""if set to 'some' or 'all', it will display sections such as 
             config and metadata which could potentially contain sensitive 
             information (credentials, names, etc.).  If 'some', the fields

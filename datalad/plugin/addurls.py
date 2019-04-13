@@ -658,13 +658,12 @@ class Addurls(Interface):
             Underneath, this passes the --fast flag to `git annex addurl`."""),
         ifexists=Parameter(
             args=("--ifexists",),
-            metavar="ACTION",
             doc="""What to do if a constructed file name already exists.  The
             default behavior is to proceed with the `git annex addurl`, which
             will fail if the file size has changed.  If set to 'overwrite',
             remove the old file before adding the new one.  If set to 'skip',
             do not add the new file.""",
-            constraints=EnsureNone() | EnsureChoice("overwrite", "skip")),
+            constraints=EnsureChoice(None, "overwrite", "skip")),
         missing_value=Parameter(
             args=("--missing-value",),
             metavar="VALUE",
