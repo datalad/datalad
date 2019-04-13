@@ -32,7 +32,10 @@ from ..dochelpers import exc_str
 
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
-from datalad.support.constraints import EnsureKeyChoice
+from datalad.support.constraints import (
+    EnsureKeyChoice,
+    EnsureChoice,
+)
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import resolve_path
 from datalad.plugin import _get_plugins
@@ -569,6 +572,20 @@ class Interface(object):
                 if cdoc[0] == '(' and cdoc[-1] == ')':
                     cdoc = cdoc[1:-1]
                 help += '  Constraints: %s' % cdoc
+                if 'metavar' not in parser_kwargs and \
+                        isinstance(param.constraints, EnsureChoice):
+                    parser_kwargs['metavar'] = \
+                        '{%s}' % '|'.join(
+                            # don't use short_description(), because
+                            # it also need to give valid output for
+                            # Python syntax (quotes...), but here we
+                            # can simplify to shell syntax where everything
+                            # is a string
+                            p for p in param.constraints._allowed
+                            # in the cmdline None pretty much means
+                            # don't give the options, so listing it
+                            # doesn't make sense
+                            if p is not None)
             if defaults_idx >= 0:
                 help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
