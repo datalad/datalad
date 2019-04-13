@@ -229,7 +229,22 @@ class Status(Interface):
         eval_subdataset_state=Parameter(
             args=("-e", "--eval-subdataset-state",),
             constraints=EnsureChoice('no', 'commit', 'full'),
-            doc=""""""),
+            doc="""Evaluation of subdataset state (clean vs.
+            modified) can be expensive for deep dataset hierarchies
+            as subdataset have to be tested recursively for
+            uncommitted modifications. Setting this option to
+            'no' or 'commit' can substantially boost performance
+            by limiting what is being tested. With 'no' no state
+            is evaluated and subdataset result records typically do
+            not contain a 'state' property.
+            With 'commit' only a discrepancy of the HEAD commit
+            shasum of a subdataset and the shasum recorded in the
+            superdataset's record is evaluated,
+            and the 'state' result property only reflects this
+            aspect. With 'full' any other modification is considered
+            too (see the 'untracked' option for further tailoring
+            modification testing).
+            """),
     )
 
     @staticmethod
