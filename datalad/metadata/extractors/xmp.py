@@ -32,6 +32,13 @@ class MetadataExtractor(BaseMetadataExtractor):
             return {}, []
         context = {}
         contentmeta = []
+
+        # which files to look for
+        fname_match_regex = self.ds.config.get(
+            'datalad.metadata.xmp.fname-match',
+            '.*(jpg|jpeg|pdf|gif|tiff|tif|ps|eps|png|mp3|mp4|avi)$')
+        fname_match_regex = re.compile(fname_match_regex)
+
         log_progress(
             lgr.info,
             'extractorxmp',
@@ -41,6 +48,10 @@ class MetadataExtractor(BaseMetadataExtractor):
             unit=' Files',
         )
         for f in self.paths:
+            # run basic file name filter for performance reasons
+            # it is OK to let false-positives through
+            if fname_match_regex.match(f, re.IGNORECASE) is None:
+                continue
             absfp = opj(self.ds.path, f)
             log_progress(
                 lgr.info,
