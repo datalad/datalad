@@ -95,7 +95,7 @@ STATE_COLOR_MAP = {
     'untracked': ac.RED,
     'modified': ac.RED,
     'added': ac.GREEN,
-    'unknown': ac.CYAN,
+    'unknown': ac.YELLOW,
 }
 
 
