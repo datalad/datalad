@@ -380,7 +380,7 @@ class CreateSibling(Interface):
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
-            metavar='false|true|umask|group|all|world|everybody|0xxx',
+            metavar='{false|true|umask|group|all|world|everybody|0xxx}',
             doc="""if given, configures the access permissions on the server
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
@@ -396,7 +396,7 @@ class CreateSibling(Interface):
         ),
         ui=Parameter(
             args=("--ui",),
-            metavar='false|true|html_filename',
+            metavar='{false|true|html_filename}',
             doc="""publish a web interface for the dataset with an
             optional user-specified name for the html at publication
             target. defaults to `index.html` at dataset root""",

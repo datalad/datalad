@@ -171,7 +171,7 @@ class Run(Interface):
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
-            metavar="yes|no",
+            metavar="{yes|no}",
             doc="""By default, the configuration variable
             'datalad.run.record-sidecar' determines whether a record with
             information on a command's execution is placed into a separate
