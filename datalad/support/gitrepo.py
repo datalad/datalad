@@ -2293,12 +2293,19 @@ class GitRepo(RepoInterface):
 
     @property
     def untracked_files(self):
+        """Legacy interface, do not use! Use the status() method instead.
+
+        Despite its name, it also reports on untracked datasets, and
+        yields their names with trailing path separators.
+        """
         return [
-            text_type(p.relative_to(self.pathobj))
+            '{}{}'.format(
+                text_type(p.relative_to(self.pathobj)),
+                os.sep if props['type'] != 'file' else ''
+            )
             for p, props in iteritems(self.status(
                 untracked='all', eval_submodule_state='no'))
-            if props.get('state', None) == 'untracked' \
-            and props['type'] == 'file'
+            if props.get('state', None) == 'untracked'
         ]
 
     def gc(self, allow_background=False, auto=False):
