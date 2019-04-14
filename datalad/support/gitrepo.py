@@ -2847,6 +2847,10 @@ class GitRepo(RepoInterface):
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
+            # make sure no operations are pending before we figure things
+            # out in the worktree
+            self.precommit()
+
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports
