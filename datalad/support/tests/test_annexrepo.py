@@ -2182,7 +2182,7 @@ def test_ro_operations(path):
 
     try:
         assert not repo2.get('file1')  # should work since file is here already
-        repo2.get_status()  # should be Ok as well
+        repo2.status()  # should be Ok as well
         # and we should get info on the file just fine
         assert repo2.info('file1')
         # The tricky part is the repo_info which might need to update
