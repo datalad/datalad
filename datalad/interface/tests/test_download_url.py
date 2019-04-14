@@ -126,6 +126,7 @@ def test_download_url_dataset(toppath, topurl, path):
 @with_tempfile(mkdir=True)
 def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).rev_create()
+    # TODO opj for URLs?!
     ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
