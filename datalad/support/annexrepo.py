@@ -3194,11 +3194,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if ui.is_interactive:
             # without an interactive UI there is little benefit from
             # progressbar info, hence save the stat calls
-            def _get_file_size(relpath):
-                path = op.join(self.path, relpath)
-                return 0 if not op.exists(path) else os.stat(path).st_size
-
-            expected_additions = {p: _get_file_size(p) for p in files}
+            expected_additions = {p: self.get_file_size(p) for p in files}
 
         for r in self._run_annex_command_json(
                 'add',
