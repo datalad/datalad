@@ -47,7 +47,9 @@ from datalad.tests.utils import assert_repo_status
 _dataset_hierarchy_template = {
     'origin': {
         'file1': '',
-        OBSCURE_FILENAME: {
+        # Add prefix to prevent DATALAD_TESTS_OBSCURE_PREFIX=- from working as
+        # intended. 'git submodule add' cannot handle paths starting with -.
+        u'ds-' + OBSCURE_FILENAME: {
             'file2': 'file2',
             'subsub': {
                 'file3': 'file3'}}}}
@@ -78,34 +80,35 @@ def test_create_raises(path, outside_path):
         message=(
             'dataset containing given paths is not underneath the reference '
             'dataset %s: %s', ds, outside_path))
+    obscure_ds = u"ds-" + OBSCURE_FILENAME
     # create a sub:
-    ds.rev_create(OBSCURE_FILENAME)
+    ds.rev_create(obscure_ds)
     # fail when doing it again
     assert_in_results(
-        ds.rev_create(OBSCURE_FILENAME, **raw),
+        ds.rev_create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [text_type(ds.pathobj / OBSCURE_FILENAME)]),
+                 [text_type(ds.pathobj / obscure_ds)]),
     )
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
-    ds.uninstall(OBSCURE_FILENAME, check=False)
-    assert_in(OBSCURE_FILENAME, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    ds.uninstall(obscure_ds, check=False)
+    assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
-        ds.rev_create(OBSCURE_FILENAME, **raw),
+        ds.rev_create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [text_type(ds.pathobj / OBSCURE_FILENAME)]),
+                 [text_type(ds.pathobj / obscure_ds)]),
     )
     assert_in_results(
-        ds.rev_create(op.join(OBSCURE_FILENAME, 'subsub'), **raw),
+        ds.rev_create(op.join(obscure_ds, 'subsub'), **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
-                 text_type(ds.pathobj / OBSCURE_FILENAME),
+                 text_type(ds.pathobj / obscure_ds),
                  ds.path)
     )
     os.makedirs(op.join(ds.path, 'down'))
@@ -220,7 +223,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(ds.is_installed())
     # ... but it has untracked content
     ok_(ds.repo.dirty)
-    subds = ds.rev_create(OBSCURE_FILENAME, force=True)
+    subds = ds.rev_create(u"ds-" + OBSCURE_FILENAME, force=True)
     ok_(subds.is_installed())
     ok_(subds.repo.dirty)
     subsubds = subds.rev_create('subsub', force=True)
