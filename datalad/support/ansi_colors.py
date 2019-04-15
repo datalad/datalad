@@ -48,6 +48,18 @@ def format_msg(fmt, use_color=False):
 
 
 def color_word(s, color):
+    """Color `s` with `color`.
+
+    Parameters
+    ----------
+    s : string
+    color : int
+        Code for color.
+
+    Returns
+    -------
+    str
+    """
     return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ) \
         if ui.is_interactive \
         else s
