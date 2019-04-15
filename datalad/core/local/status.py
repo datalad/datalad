@@ -396,7 +396,7 @@ class Status(Interface):
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,
-                STATE_COLOR_MAP.get(res.get('state', 'unknown'), ac.WHITE)),
+                STATE_COLOR_MAP.get(res.get('state', 'unknown'))),
             path=path,
             type_=' ({})'.format(
                 ac.color_word(type_, ac.MAGENTA) if type_ else '')))
