@@ -51,10 +51,6 @@ bet we will fix some bugs and make a world even a better place.
 - Discontinued support for git-annex direct-mode (also no longer
   supported upstream).
 
-### Fixes
-
-- Create temporary index files under .git/ to stay on the same filesystem.
-
 ### Enhancements and new features
 
 - Dataset and Repo object instances are now hashable, and can be
