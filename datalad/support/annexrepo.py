@@ -514,124 +514,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                         branch=self.get_corresponding_branch(branch)
                         if corresponding else branch)
 
-    def get_status(self, untracked=True, deleted=True, modified=True, added=True,
-                   type_changed=True, submodules=True, path=None):
-        """Return various aspects of the status of the annex repository
-
-        # TODO: RM DIRECT?
-        Note: Under certain circumstances newly added submodules might be
-        reported as 'modified' rather tha 'added'.
-        See `AnnexRepo._submodules_dirty_direct_mode` for details.
-
-        Parameters
-        ----------
-        untracked
-        deleted
-        modified
-        added
-        type_changed
-        submodules
-        path
-
-        Returns
-        -------
-
-        """
-
-        self.precommit()
-
-        options = assure_list(path) if path else []
-        if not submodules:
-            options.extend(to_options(ignore_submodules='all'))
-
-        # TODO: RM DIRECT? _submodules_dirty_direct_mode is now removed,
-        #   git-annex is >= 7
-        # BEGIN workaround bug (see self._submodules_dirty_direct_mode)
-        # internal call to 'git status' by 'git annex status' will fail
-        # in submodules without a working tree (direct mode)
-        # How to catch this case depends on annex version, since annex
-        # exits zero until version 6.20170307
-
-        def _fake_exception_wrapper(self, options_):
-            """generate a faked `CommandError` from logged stderr output"""
-
-            # this is for use with older annex, which didn't exit non-zero
-            # in case of the failure we are interested in
-
-            # TODO: If we are to keep this workaround (we probably rely on a
-            # newer annex anyway), we should not use swallow_logs, since we
-            # actually don't want to swallow it, but inspect it. Use a proper
-            # handler/filter for the logger instead to not create temp files via
-            # swallow_logs
-
-            old_log_state = self.cmd_call_wrapper.log_outputs
-            self.cmd_call_wrapper._log_opts['outputs'] = True
-
-            with swallow_logs(new_level=logging.ERROR) as cml:
-                # Note, that _run_annex_command_json returns a generator
-                json_list = \
-                    list(self._run_annex_command_json(
-                        'status', opts=options_, expect_stderr=False))
-            self.cmd_call_wrapper._log_opts['outputs'] = old_log_state
-            if "fatal:" in cml.out:
-                raise CommandError(cmd="git annex status",
-                                   msg=cml.out, stderr=cml.out)
-            return json_list
-
-        json_list = \
-            list(self._run_annex_command_json(
-                'status', opts=options, expect_stderr=False))
-
-        key_mapping = [(untracked, 'untracked', '?'),
-                       (deleted, 'deleted', 'D'),
-                       (modified, 'modified', 'M'),
-                       (added, 'added', 'A'),
-                       (type_changed, 'type_changed', 'T')]
-        from datalad.utils import with_pathsep
-        return {key: [with_pathsep(i['file'])
-                      if isdir(opj(self.path, i['file'])) else i['file']
-                      # for consistency with 'git status' return directories
-                      # with trailing path separator
-                      for i in json_list if i['status'] == st]
-                for cond, key, st in key_mapping if cond}
-
-    @borrowdoc(GitRepo)
-    def is_dirty(self, index=True, working_tree=False, untracked_files=True,
-                 submodules=True, path=None):
-        # TODO: Add doc on how this differs from GitRepo.is_dirty()
-        # Parameter working_tree exists to meet the signature of GitRepo.is_dirty()
-
-        # TODO: RM DIRECT?
-        if working_tree:
-            # Note: annex repos don't always have a git working tree and the
-            # behaviour in direct mode or V6+ repos is fundamentally different
-            # from that concept. There are no unstaged changes in direct mode
-            # for example. Therefore the need to call this method with
-            # 'working_tree=True' indicates invalid assumptions in the
-            # calling code.
-
-            # TODO: Better exception. InvalidArgumentError or sth ...
-            raise CommandNotAvailableError(
-                "Querying a git-annex repository for a clean/dirty "
-                "working tree is an invalid concept.")
-        # Again note, that 'annex status' isn't distinguishing staged and
-        # unstaged changes, since this makes little sense for an annex repo
-        # in general. Therefore we use only 'index' and 'untracked_files' to
-        # specify what kind of dirtyness we are interested in:
-        status = self.get_status(untracked=untracked_files, deleted=index,
-                                 modified=index, added=index,
-                                 type_changed=index, submodules=submodules,
-                                 path=path)
-        return any([bool(status[i]) for i in status])
-
-    @property
-    def untracked_files(self):
-        """Get a list of untracked files
-        """
-        return self.get_status(untracked=True, deleted=False, modified=False,
-                               added=False, type_changed=False, submodules=False,
-                               path=None)['untracked']
-
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
@@ -3312,11 +3194,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if ui.is_interactive:
             # without an interactive UI there is little benefit from
             # progressbar info, hence save the stat calls
-            def _get_file_size(relpath):
-                path = op.join(self.path, relpath)
-                return 0 if not op.exists(path) else os.stat(path).st_size
-
-            expected_additions = {p: _get_file_size(p) for p in files}
+            expected_additions = {p: self.get_file_size(p) for p in files}
 
         for r in self._run_annex_command_json(
                 'add',

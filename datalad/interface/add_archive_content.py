@@ -45,7 +45,10 @@ from ..utils import get_dataset_root
 
 from datalad.customremotes.base import init_datalad_remote
 
-from six import string_types
+from six import (
+    string_types,
+    iteritems,
+)
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
@@ -510,7 +513,8 @@ class AddArchiveContent(Interface):
                 commit_stats = outside_stats if outside_stats else stats
                 annex.precommit()  # so batched ones close and files become annex symlinks etc
                 precommitted = True
-                if annex.is_dirty(untracked_files=False):
+                if any(r.get('state', None) != 'clean'
+                       for p, r in iteritems(annex.status(untracked='no'))):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive_rpath, commit_stats.as_str(mode='full')),

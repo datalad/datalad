@@ -231,7 +231,7 @@ class ExportToFigshare(Interface):
                 % dataset
             )
 
-        if dataset.repo.is_dirty():
+        if dataset.repo.dirty:
             raise RuntimeError(
                 "Paranoid authors of DataLad refuse to proceed in a dirty repository"
             )

@@ -2280,31 +2280,6 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
-    def is_dirty(self, index=True, working_tree=True, untracked_files=True,
-                 submodules=True, path=None):
-        """Returns true if the repo is considered to be dirty
-
-        Parameters
-        ----------
-        index: bool
-          if True, consider changes to the index
-        working_tree: bool
-          if True, consider changes to the working tree
-        untracked_files: bool
-          if True, consider untracked files
-        submodules: bool
-          if True, consider submodules
-        path: str or list of str
-          path(s) to consider only
-        Returns
-        -------
-          bool
-        """
-
-        return self.repo.is_dirty(index=index, working_tree=working_tree,
-                                  untracked_files=untracked_files,
-                                  submodules=submodules, path=path)
-
     # run() needs this ATM, but should eventually be RF'ed to a
     # status(recursive=True) call
     @property
@@ -2318,7 +2293,20 @@ class GitRepo(RepoInterface):
 
     @property
     def untracked_files(self):
-        return self.repo.untracked_files
+        """Legacy interface, do not use! Use the status() method instead.
+
+        Despite its name, it also reports on untracked datasets, and
+        yields their names with trailing path separators.
+        """
+        return [
+            '{}{}'.format(
+                text_type(p.relative_to(self.pathobj)),
+                os.sep if props['type'] != 'file' else ''
+            )
+            for p, props in iteritems(self.status(
+                untracked='all', eval_submodule_state='no'))
+            if props.get('state', None) == 'untracked'
+        ]
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
@@ -2859,6 +2847,10 @@ class GitRepo(RepoInterface):
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
+            # make sure no operations are pending before we figure things
+            # out in the worktree
+            self.precommit()
+
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports

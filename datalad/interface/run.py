@@ -471,6 +471,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
+        # MIH: is_dirty() is gone, but status() can do all of the above!
         if not explicit and ds.repo.dirty:
             yield get_status_dict(
                 'run',
