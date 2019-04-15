@@ -674,3 +674,43 @@ def test_gh1763(src, target1, target2):
         assert_in(
             'probe1',
             Dataset(target).repo.get_annexed_files(with_content_only=True))
+
+
+@skip_if_on_windows  # create_sibling incompatible with win servers
+@skip_ssh
+@with_tempfile(mkdir=True)
+@with_tempfile()
+@known_failure_direct_mode  #FIXME
+def test_publish_new_submodule(src, dest):
+    # this test is very similar to test_publish_depends, but more
+    # comprehensible, and directly tests issue 1763
+    src = Dataset(src).create(force=True)
+    src.create_sibling('ssh://datalad-test' + dest, name='dest')
+    # publish
+    src.publish(to='dest')
+
+    # now we create a new submodule and publish it also to the remote.
+    # Ideally it should cause remote to have that submodule properly "init-ed"
+    src.create('sub1')
+    src.publish(to='dest', recursive=True, missing='inherit')
+
+    dest = Dataset(dest)
+    destsubdss = dest.subdatasets(fulfilled=True, recursive=True)
+    # subdatasets is Ok - we do custom parsing
+    # in _parse_gitmodules and then _parse_git_submodules
+    eq_(len(destsubdss), 1)
+    # Even GitRepo.get_submodules() is fine!
+    eq_(len(dest.repo.get_submodules()), 1)
+
+    # but the published module is not initialized (registered to .git/config)
+    # since now (since 0.11.4-5-g78e00dcd) we do not run
+    #    git submodule update --init
+    # in the .hooks/post-update since it might have other undesired effects
+    # (installing/initializing not installed/remote submodules).
+    out, err = dest.repo.cmd_call_wrapper.run(['git', 'submodule'])
+    eq_(err, '')
+    submodules_recs = filter(bool, out.split(os.linesep))
+    eq_(len(submodules_recs), 1)
+    ok_(not submodules_recs[0].startswith('-'),
+        msg="Apparently submodule is still not initialized: %s"
+            % submodules_recs[0])
