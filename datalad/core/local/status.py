@@ -94,6 +94,7 @@ _common_diffstatus_params = dict(
 STATE_COLOR_MAP = {
     'untracked': ac.RED,
     'modified': ac.RED,
+    'deleted': ac.RED,
     'added': ac.GREEN,
     'unknown': ac.YELLOW,
 }
