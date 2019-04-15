@@ -47,7 +47,7 @@ def format_msg(fmt, use_color=False):
         return fmt.replace("$RESET", "").replace("$BOLD", "")
 
 
-def color_word(s, color):
+def color_word(s, color, force=False):
     """Color `s` with `color`.
 
     Parameters
@@ -55,14 +55,16 @@ def color_word(s, color):
     s : string
     color : int
         Code for color.
+    force : boolean, optional
+        Color string even when non-interactive session is detected.
 
     Returns
     -------
     str
     """
-    return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ) \
-        if ui.is_interactive \
-        else s
+    if force or ui.is_interactive:
+        return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ)
+    return s
 
 
 def color_status(status):
