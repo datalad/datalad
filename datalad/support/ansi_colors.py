@@ -20,7 +20,7 @@ BOLD_SEQ = "\033[1m"
 
 LOG_LEVEL_COLORS = {
     'WARNING': YELLOW,
-    'INFO': WHITE,
+    'INFO': None,
     'DEBUG': BLUE,
     'CRITICAL': YELLOW,
     'ERROR': RED
@@ -54,7 +54,8 @@ def color_word(s, color, force=False):
     ----------
     s : string
     color : int
-        Code for color.
+        Code for color. If the value evaluates to false, the string will not be
+        colored.
     force : boolean, optional
         Color string even when non-interactive session is detected.
 
@@ -62,11 +63,10 @@ def color_word(s, color, force=False):
     -------
     str
     """
-    if force or ui.is_interactive:
+    if color and (force or ui.is_interactive):
         return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ)
     return s
 
 
 def color_status(status):
-    col = RESULT_STATUS_COLORS.get(status, None)
-    return color_word(status, col) if col else status
+    return color_word(status, RESULT_STATUS_COLORS.get(status))
