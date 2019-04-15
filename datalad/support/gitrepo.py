@@ -61,6 +61,7 @@ from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
+from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -816,7 +817,11 @@ class GitRepo(RepoInterface):
         if self._repo is None:
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            self._repo = self.cmd_call_wrapper(
+                Repo,
+                # Encode path on Python 2 because, as of v2.1.11, GitPython's
+                # Repo will pass the path to str() otherwise.
+                assure_bytes(self.path) if PY2 else self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
