@@ -386,32 +386,6 @@ class Dataset(object):
 
         return self._cfg
 
-    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None, edges=False):
-        """DEPRECATED: use `subdatasets()`"""
-        # TODO wipe this function out completely once we are comfortable
-        # with it. Internally we don't need or use it anymore.
-        import inspect
-        lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
-        from datalad.coreapi import subdatasets
-        if edges:
-            return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
-                     r['path'] if absolute else relpath(r['path'], start=self.path))
-                    for r in subdatasets(
-                        dataset=self,
-                        fulfilled=fulfilled,
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        bottomup=True)]
-        else:
-            return subdatasets(
-                dataset=self,
-                fulfilled=fulfilled,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                bottomup=True,
-                result_xfm='{}paths'.format('' if absolute else 'rel'))
-
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired

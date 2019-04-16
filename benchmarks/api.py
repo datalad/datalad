@@ -98,12 +98,6 @@ class supers(SampleSuperDatasetBenchmarks):
     def time_ls_recursive_long_all(self):
         ls(self.ds.path, recursive=True, long_=True, all_=True)
 
-    def time_get_subdatasets(self):
-        self.ds.get_subdatasets()
-
-    def time_get_subdatasets_recursive(self):
-        self.ds.get_subdatasets(recursive=True)
-
     def time_subdatasets(self):
         self.ds.subdatasets()
 
