@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -33,6 +34,7 @@ from datalad.tests.utils import (
     get_deeply_nested_structure,
     has_symlink_capability,
     assert_repo_status,
+    OBSCURE_FILENAME,
 )
 from datalad.api import (
     status,
@@ -106,7 +108,7 @@ def test_status_nods(path, otherpath):
 def test_status(_path, linkpath):
     # do the setup on the real path, not the symlink, to have its
     # bugs not affect this test of status()
-    ds = get_deeply_nested_structure(str(_path))
+    ds = get_deeply_nested_structure(text_type(_path))
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(_path, target_is_directory=True)
@@ -126,10 +128,10 @@ def test_status(_path, linkpath):
     assert_result_count(
         ds.status(annex='all'),
         1,
-        path=str(ds.pathobj / 'subdir' / 'annexed_file.txt'),
+        path=text_type(ds.pathobj / 'subdir' / 'annexed_file.txt'),
         key='MD5E-s5--275876e34cf609db118f3d84b799a790.txt',
         has_content=True,
-        objloc=str(ds.repo.pathobj / '.git' / 'annex' / 'objects' /
+        objloc=text_type(ds.repo.pathobj / '.git' / 'annex' / 'objects' /
         # hashdir is different on windows
         ('f33' if on_windows else '7p') /
         ('94b' if on_windows else 'gp') /
@@ -171,9 +173,9 @@ def test_status(_path, linkpath):
     # query for a deeply nested path from the top, should just work with a
     # variety of approaches
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
-                    'directory_untracked')
+                    OBSCURE_FILENAME + u'_directory_untracked')
     apathobj = ds.pathobj / rpath
-    apath = str(apathobj)
+    apath = text_type(apathobj)
     # ds.repo.pathobj will have the symlink resolved
     arealpath = ds.repo.pathobj / rpath
     # TODO include explicit relative path in test

@@ -451,6 +451,8 @@ class Runner(object):
 
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
+        if PY2:
+            popen_cwd = assure_bytes(popen_cwd)
 
         if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must

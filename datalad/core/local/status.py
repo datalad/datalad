@@ -22,6 +22,7 @@ from collections import OrderedDict
 
 from datalad.utils import (
     assure_list,
+    assure_unicode,
 )
 from datalad.interface.base import (
     Interface,
@@ -125,14 +126,14 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         cpath = ds.pathobj / path.relative_to(repo_path)
         yield dict(
             props,
-            path=str(cpath),
+            path=text_type(cpath),
             # report the dataset path rather than the repo path to avoid
             # realpath/symlink issues
             parentds=ds.path,
         )
         queried.add(ds.pathobj)
         if recursion_limit and props.get('type', None) == 'dataset':
-            subds = Dataset(str(cpath))
+            subds = Dataset(text_type(cpath))
             if subds.is_installed():
                 for r in _yield_status(
                         subds,
@@ -281,9 +282,9 @@ class Status(Interface):
                 # it is important to capture the exact form of the
                 # given path argument, before any normalization happens
                 # for further decision logic below
-                orig_path = str(p)
+                orig_path = text_type(p)
                 p = rev_resolve_path(p, dataset)
-                root = rev_get_dataset_root(str(p))
+                root = rev_get_dataset_root(text_type(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
@@ -295,7 +296,7 @@ class Status(Interface):
                         logger=lgr)
                     continue
                 else:
-                    if dataset and root == str(p) and \
+                    if dataset and root == text_type(p) and \
                             not (orig_path.endswith(op.sep) or
                                  orig_path == "."):
                         # the given path is pointing to a dataset
@@ -355,7 +356,7 @@ class Status(Interface):
             if qdspath in queried:
                 # do not report on a single dataset twice
                 continue
-            qds = Dataset(str(qdspath))
+            qds = Dataset(text_type(qdspath))
             for r in _yield_status(
                     qds,
                     qpaths,
@@ -388,12 +389,15 @@ class Status(Interface):
         refds = res.get('refds', None)
         refds = refds if kwargs.get('dataset', None) is not None \
             or refds == os.getcwd() else None
-        path = res['path'] if refds is None \
-            else str(ut.Path(res['path']).relative_to(refds))
+        # Note: We have to force unicode for res['path'] because
+        # interface.utils encodes it on py2 before passing it to
+        # custom_result_renderer().
+        path = assure_unicode(res['path']) if refds is None \
+            else text_type(ut.Path(res['path']).relative_to(refds))
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')
         state = res.get('state', 'unknown')
-        ui.message('{fill}{state}: {path}{type_}'.format(
+        ui.message(u'{fill}{state}: {path}{type_}'.format(
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,

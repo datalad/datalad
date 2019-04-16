@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -10,6 +11,7 @@
 import os
 import os.path as op
 from six import iteritems
+from six import text_type
 
 from datalad.utils import (
     on_windows,
@@ -315,6 +317,19 @@ def test_bf2043p2(path):
     assert_repo_status(ds.path, untracked=['untracked'])
 
 
+@with_tree({
+    OBSCURE_FILENAME + u'_staged': 'staged',
+    OBSCURE_FILENAME + u'_untracked': 'untracked'})
+def test_encoding(path):
+    staged = OBSCURE_FILENAME + u'_staged'
+    untracked = OBSCURE_FILENAME + u'_untracked'
+    ds = Dataset(path).rev_create(force=True)
+    ds.repo.add(staged)
+    assert_repo_status(ds.path, added=[staged], untracked=[untracked])
+    ds.rev_save(updated=True)
+    assert_repo_status(ds.path, untracked=[untracked])
+
+
 @with_tree(**tree_arg)
 def test_add_files(path):
     ds = Dataset(path).rev_create(force=True)
@@ -336,7 +351,7 @@ def test_add_files(path):
         else:
             result = ds.rev_save(arg[0], to_git=arg[1])
             for a in assure_list(arg[0]):
-                assert_result_count(result, 1, path=str(ds.pathobj / a))
+                assert_result_count(result, 1, path=text_type(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
                 ut.Path(p) for p in assure_list(arg[0]))
         for f, p in iteritems(status):
@@ -465,7 +480,7 @@ def test_gh1597_simpler(path):
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).rev_create()
-        sub = create(str(ds.pathobj / 'sub'))
+        sub = create(text_type(ds.pathobj / 'sub'))
         assert_repo_status(ds.path, untracked=['sub'])
         return ds
     # attempt one

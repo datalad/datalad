@@ -61,6 +61,7 @@ from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
+from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -816,7 +817,11 @@ class GitRepo(RepoInterface):
         if self._repo is None:
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            self._repo = self.cmd_call_wrapper(
+                Repo,
+                # Encode path on Python 2 because, as of v2.1.11, GitPython's
+                # Repo will pass the path to str() otherwise.
+                assure_bytes(self.path) if PY2 else self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
@@ -1378,14 +1383,14 @@ class GitRepo(RepoInterface):
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
-                    lgr.debug("nothing to commit in {}. "
+                    lgr.debug(u"nothing to commit in {}. "
                               "Ignored.".format(self))
                 else:
                     raise
             elif 'no changes added to commit' in e.stdout or \
                     'nothing added to commit' in e.stdout:
                 if careless:
-                    lgr.debug("no changes added to commit in {}. "
+                    lgr.debug(u"no changes added to commit in {}. "
                               "Ignored.".format(self))
                 else:
                     raise
@@ -3146,7 +3151,7 @@ class GitRepo(RepoInterface):
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self._git_custom_command(
                         # low-level code cannot handle pathobjs
-                        [str(p) for p in paths] if paths else None,
+                        [text_type(p) for p in paths] if paths else None,
                         ['git', 'ls-files', '-z', '-m'])[0].split('\0')
                     if p)
                 _cache[key] = modified
@@ -3346,7 +3351,7 @@ class GitRepo(RepoInterface):
 
         # TODO remove pathobj stringification when commit() can
         # handle it
-        to_commit = [str(f.relative_to(self.pathobj))
+        to_commit = [text_type(f.relative_to(self.pathobj))
                      for f, props in iteritems(status)] \
                     if partial_commit else None
         if not partial_commit or to_commit:
@@ -3426,7 +3431,7 @@ class GitRepo(RepoInterface):
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
-            str(f.relative_to(self.pathobj))
+            text_type(f.relative_to(self.pathobj))
             for f, props in iteritems(status)
             if props.get('state', None) == 'deleted' and
             # staged deletions have a gitshasum reported for them
@@ -3477,7 +3482,7 @@ class GitRepo(RepoInterface):
             for cand_sm in to_add_submodules:
                 try:
                     self.add_submodule(
-                        str(cand_sm.relative_to(self.pathobj)),
+                        text_type(cand_sm.relative_to(self.pathobj)),
                         url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
@@ -3494,7 +3499,7 @@ class GitRepo(RepoInterface):
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
-                str(f.relative_to(self.pathobj)): props
+                text_type(f.relative_to(self.pathobj)): props
                 for f, props in iteritems(status)
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
@@ -3543,12 +3548,12 @@ class GitRepo(RepoInterface):
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
-            str(f.relative_to(self.pathobj)): props
+            text_type(f.relative_to(self.pathobj)): props
             for f, props in iteritems(status)
             if props.get('state', None) in ('modified', 'untracked')}
         if to_add:
             lgr.debug(
-                '%i path(s) to add to %r %s',
+                '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
             for r in self._save_add(
                     to_add,

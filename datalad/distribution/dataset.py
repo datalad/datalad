@@ -584,7 +584,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
-    lgr.debug("Resolved dataset{0}: {1}".format(
+    lgr.debug(u"Resolved dataset{0}: {1}".format(
         ' for {}'.format(purpose) if purpose else '',
         dataset))
 
@@ -634,9 +634,9 @@ def rev_resolve_path(path, ds=None):
         path = ut.Path(path)
     # we have a dataset
     # stringify in case a pathobj came in
-    elif not op.isabs(str(path)) and \
-            not (str(path).startswith(os.curdir + os.sep) or
-                 str(path).startswith(os.pardir + os.sep)):
+    elif not op.isabs(text_type(path)) and \
+            not (text_type(path).startswith(os.curdir + os.sep) or
+                 text_type(path).startswith(os.pardir + os.sep)):
         # we have a dataset and no abspath nor an explicit relative path ->
         # resolve it against the dataset
         path = ds.pathobj / path
