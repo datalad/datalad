@@ -41,6 +41,7 @@ matrix:
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
+    - _DL_CRON=1
   - python: 3.6
     # Single run for Python 3.6
     env:
@@ -48,6 +49,7 @@ matrix:
     # We cannot have empty -A selector, so the one which always will be fulfilled
     - NOSE_SELECTION=
     - NOSE_SELECTION_OP=not
+    - _DL_CRON=1
   - python: 3.5
     # Split runs for v6 since a single one is too long now
     env:
@@ -68,6 +70,7 @@ matrix:
     # And the leading - in filenames for the most challenge
     - DATALAD_TESTS_OBSCURE_PREFIX=-
     - DATALAD_LOG_TRACEBACK=collide  # just a smoke test for now
+    - _DL_CRON=1
   - python: 3.5
     # A run loaded with various customizations to smoke test those functionalities
     # apparently moving symlink outside has different effects on abspath
@@ -101,6 +104,7 @@ matrix:
     - GIT_COMMITTER_DATE="Thu, 07 Apr 2005 22:13:13 +0200"
     - GIT_COMMITTER_NAME=blah
     - GIT_COMMITTER_EMAIL=committer@example.com
+    - _DL_CRON=1
   - python: 3.5
     # Test some under NFS mount  (only selected sub-set)
     env:
