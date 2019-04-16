@@ -94,6 +94,7 @@ _common_diffstatus_params = dict(
 STATE_COLOR_MAP = {
     'untracked': ac.RED,
     'modified': ac.RED,
+    'deleted': ac.RED,
     'added': ac.GREEN,
     'unknown': ac.YELLOW,
 }
@@ -396,7 +397,7 @@ class Status(Interface):
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,
-                STATE_COLOR_MAP.get(res.get('state', 'unknown'), ac.WHITE)),
+                STATE_COLOR_MAP.get(res.get('state', 'unknown'))),
             path=path,
             type_=' ({})'.format(
                 ac.color_word(type_, ac.MAGENTA) if type_ else '')))
