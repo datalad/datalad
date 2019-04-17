@@ -33,7 +33,7 @@ recursion_flag = Parameter(
     doc="""if set, recurse into potential subdataset""")
 
 recursion_limit = Parameter(
-    args=("--recursion-limit",),
+    args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
