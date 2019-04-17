@@ -3112,6 +3112,14 @@ class GitRepo(RepoInterface):
     def diffstatus(self, fr, to, paths=None, untracked='all',
                    eval_submodule_state='full', _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
+        return self._diffstatus(
+            fr,to, paths, untracked, eval_submodule_state, _cache)
+
+    def _diffstatus(self, fr, to, paths, untracked, eval_state, _cache):
+        """Just like diffstatus(), but supports an additional evaluation
+        state 'global'. If given, it will return a single 'modified'
+        (vs. 'clean') state label for the entire repository, as soon as
+        it can."""
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
@@ -3221,6 +3229,10 @@ class GitRepo(RepoInterface):
                     type=to_state_r['type'],
                 )
             state = props.get('state', None)
+            if eval_state == 'global' and \
+                    state not in ('clean', None):
+                # any modification means globally 'modified'
+                return 'modified'
             if state in ('clean', 'added', 'modified'):
                 props['gitshasum'] = to_state_r['gitshasum']
                 if 'bytesize' in to_state_r:
@@ -3245,8 +3257,10 @@ class GitRepo(RepoInterface):
                     # file
                     gitshasum=from_state_r['gitshasum'],
                 )
+                if eval_state == 'global':
+                    return 'modified'
 
-        if to is not None or eval_submodule_state == 'no':
+        if to is not None or eval_state == 'no':
             # if we have `to` we are specifically comparing against
             # a recorded state, and this function only attempts
             # to label the state of a subdataset, not investigate
@@ -3254,7 +3268,10 @@ class GitRepo(RepoInterface):
             # this is done by a high-level command like rev-diff
             # so the comparison within this repo and the present
             # `state` label are all we need, and they are done already
-            return status
+            if eval_state == 'global':
+                return 'clean'
+            else:
+                return status
 
         # loop over all subdatasets and look for additional modifications
         for f, st in iteritems(status):
@@ -3271,34 +3288,34 @@ class GitRepo(RepoInterface):
             subrepo_commit = subrepo.get_hexsha()
             st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
-            if eval_submodule_state == 'commit':
-                # test if current commit in subdataset deviates from what is
-                # recorded in the dataset
-                st['state'] = 'modified' \
-                    if st['prev_gitshasum'] != subrepo_commit \
-                    else 'clean'
-            elif eval_submodule_state == 'full':
-                # the recorded commit did not change, so we need to make
-                # a more expensive traversal
-                rstatus = subrepo.diffstatus(
-                    # we can use 'HEAD' because we know that the commit
-                    # did not change. using 'HEAD' will facilitate
-                    # caching the result
-                    fr='HEAD',
-                    to=None,
-                    paths=None,
-                    untracked=untracked,
-                    eval_submodule_state=eval_submodule_state,
-                    _cache=_cache)
-                st['state'] = 'modified' if any(
-                    v['state'] != 'clean' for k, v in iteritems(rstatus)) \
-                    else 'clean'
-            else:
-                raise ValueError(
-                    'unknown `eval_submodule_state` parameter value: %s' %
-                    eval_submodule_state)
+            # test if current commit in subdataset deviates from what is
+            # recorded in the dataset
+            st['state'] = 'modified' \
+                if st['prev_gitshasum'] != subrepo_commit \
+                else 'clean'
+            if eval_state == 'global' and st['state'] == 'modified':
+                return 'modified'
+            if eval_state == 'commit':
+                continue
+            # the recorded commit did not change, so we need to make
+            # a more expensive traversal
+            st['state'] = subrepo._diffstatus(
+                # we can use 'HEAD' because we know that the commit
+                # did not change. using 'HEAD' will facilitate
+                # caching the result
+                fr='HEAD',
+                to=None,
+                paths=None,
+                untracked=untracked,
+                eval_state='global',
+                _cache=_cache) if st['state'] == 'clean' else 'modified'
+            if eval_state == 'global' and st['state'] == 'modified':
+                return 'modified'
 
-        return status
+        if eval_state == 'global':
+            return 'clean'
+        else:
+            return status
 
     def _save_pre(self, paths, _status, **kwargs):
         # helper to get an actionable status report
