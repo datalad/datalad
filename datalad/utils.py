@@ -2247,11 +2247,14 @@ def collect_call_sigs_stats(f,
         print("===== Call signature statistics for %s" % name)
         # sort by count
         items = sorted(CALL_SIGS_STATS.items(), key=lambda x: x[1], reverse=True)
-        for (args, kwargs), count in items:
+        for (args, kwargs), (count, total_times) in items:
             kwargs = tuple("%s=%r" % x for x in kwargs)
-            print("%d of %s" % (count, ', '.join(map(str, tuple(args) + kwargs))))
+            print(
+                "%-5d (%2.2f wall, %2.2f user, %2.2f sys) of %s"
+                % tuple([count] + total_times + [', '.join(map(str, tuple(args) + kwargs))])
+            )
 
-    import atexit
+    import atexit, resource
     atexit.register(display_call_sigs_stats)
 
     def immutable(x):
@@ -2279,9 +2282,19 @@ def collect_call_sigs_stats(f,
         sig_kwargs = immutable(sig_kwargs)
         SIG = (sig_args, sig_kwargs)
         if SIG not in CALL_SIGS_STATS:
-            CALL_SIGS_STATS[SIG] = 0
-        CALL_SIGS_STATS[SIG] += 1
-        return f(*args, **kwargs)
+            CALL_SIGS_STATS[SIG] = [0, [0., 0., 0.]]  # ncalls, time [wall, user, system]
+        CALL_SIGS_STATS[SIG][0] += 1
+        time0 = time.time()
+        try:
+            res_start = resource.getrusage(resource.RUSAGE_SELF)
+            ret = f(*args, **kwargs)
+        finally:
+            res_end = resource.getrusage(resource.RUSAGE_SELF)
+            dt = time.time() - time0
+            CALL_SIGS_STATS[SIG][1][0] += dt
+            CALL_SIGS_STATS[SIG][1][1] += res_end.ru_utime - res_start.ru_utime
+            CALL_SIGS_STATS[SIG][1][2] += res_end.ru_stime - res_start.ru_stime
+        return ret
 
     return wrapped
 
