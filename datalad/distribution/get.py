@@ -391,7 +391,7 @@ class Get(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=Parameter(
-            args=("--recursion-limit",),
+            args=("-R", "--recursion-limit",),
             metavar="LEVELS",
             constraints=EnsureInt() | EnsureChoice('existing') | EnsureNone(),
             doc="""limit recursion into subdataset to the given number of levels.
