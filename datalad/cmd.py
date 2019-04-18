@@ -390,7 +390,7 @@ class Runner(object):
         elif hasattr(x, '__call__'):
             if getattr(x, '__name__', None) == '<lambda>':
                 try:
-                    return "lambda %s" % getsource(x)
+                    return getsource(x).strip()
                 except IOError:
                     return "<unknown-lambda>"
             return x.__class__.__name__
