@@ -2229,5 +2229,62 @@ def get_suggestions_msg(values, known, sep="\n        "):
     return ''
 
 
+@optional_args
+def collect_call_sigs_stats(f,
+                            name=None,
+                            ignore_args=set(),
+                            kwargs_handlers={},
+                            ):
+    """Collect function call statistics.
+
+    """
+    if not name:
+        name = f.__name__
+
+    CALL_SIGS_STATS = {}
+
+    def display_call_sigs_stats():
+        print("===== Call signature statistics for %s" % name)
+        # sort by count
+        items = sorted(CALL_SIGS_STATS.items(), key=lambda x: x[1], reverse=True)
+        for (args, kwargs), count in items:
+            kwargs = tuple("%s=%r" % x for x in kwargs)
+            print("%d of %s" % (count, ', '.join(map(str, tuple(args) + kwargs))))
+
+    import atexit
+    atexit.register(display_call_sigs_stats)
+
+    def immutable(x):
+        if isinstance(x, (list, tuple, set)):
+            return tuple(map(immutable, x))
+        elif isinstance(x, dict):
+            return tuple(map(immutable, x.items()))
+        else:
+            return x
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        # dummy one, assumes that args aren't mentioned as kwargs
+        sig_args = tuple(immutable(a) for i, a in enumerate(args)
+                        if i not in ignore_args)
+        # import inspect
+        # if inspect.isgenerator(sig_args[0]):
+        #     import pdb; pdb.set_trace()
+        sig_kwargs = {}
+        for kwarg, value in kwargs.items():
+            if kwarg in kwargs_handlers:
+                value = kwargs_handlers[kwarg](value)
+            sig_kwargs[kwarg] = value
+
+        sig_kwargs = immutable(sig_kwargs)
+        SIG = (sig_args, sig_kwargs)
+        if SIG not in CALL_SIGS_STATS:
+            CALL_SIGS_STATS[SIG] = 0
+        CALL_SIGS_STATS[SIG] += 1
+        return f(*args, **kwargs)
+
+    return wrapped
+
+
 
 lgr.log(5, "Done importing datalad.utils")

@@ -11,6 +11,8 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
+from dill.source import getsource
+
 import time
 import subprocess
 import sys
@@ -45,6 +47,7 @@ from .utils import (
     assure_bytes,
     unlink,
     auto_repr,
+    collect_call_sigs_stats,
 )
 from .dochelpers import borrowdoc
 
@@ -377,6 +380,31 @@ class Runner(object):
         # it was output already directly but for code to work, return ""
         return binary_type()
 
+    def present(x):
+        return "<some-%s>" % bool(x) if x is not None else None
+
+
+    def log_stdvalue(x):
+        if isinstance(x, (bool, text_type)):
+            return x
+        elif hasattr(x, '__call__'):
+            if getattr(x, '__name__', None) == '<lambda>':
+                try:
+                    return "lambda %s" % getsource(x)
+                except IOError:
+                    return "<unknown-lambda>"
+            return x.__class__.__name__
+        return x # dunno any better
+
+    @collect_call_sigs_stats(
+        ignore_args=[0, 1],
+        kwargs_handlers={
+            'env': present,  # do not care about values, just either it was specified
+            'cwd': present,
+            'log_stdout': log_stdvalue,
+            'log_stderr': log_stdvalue,
+        }
+    ) # i.e. ignore self, cmd
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
             cwd=None, env=None, shell=None, stdin=None):
