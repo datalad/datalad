@@ -13,7 +13,12 @@
 import mock
 from datalad.tests.utils import *
 from datalad.utils import updated
-from ..base import Interface
+from ..base import (
+    Interface,
+    nadict,
+    nagen,
+    NA_STRING,
+)
 from argparse import Namespace
 
 
@@ -36,8 +41,10 @@ def _new_args(**kwargs):
         **updated(
             dict(
                 common_on_failure=None,  # ['ignore', 'continue', 'stop']
-                common_report_status=None,  # ['success', 'failure', 'ok', 'notneeded', 'impossible', 'error']
+                common_report_status=None,  # ['all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error']
                 common_report_type=None,  # ['dataset', 'file']
+                common_proc_pre=None,
+                common_proc_post=None,
             ),
             kwargs
         )
@@ -90,6 +97,22 @@ def test_call_from_parser_default_args():
         eq_(val, ["nothing is", "magical"])
 
 
+def test_call_from_parser_result_filter():
+    class DummyOne(Interface):
+        @staticmethod
+        def __call__(**kwargs):
+            yield kwargs
+
+    with mock.patch.object(Interface, '_OLDSTYLE_COMMANDS', tuple()):
+        # call_from_parser doesn't add result_filter to the keyword arguments
+        # unless a CLI option sets it to a non-None value.
+        assert_not_in("result_filter",
+                      DummyOne.call_from_parser(_new_args())[0])
+        assert_in("result_filter",
+                  DummyOne.call_from_parser(
+                      _new_args(common_report_type="dataset"))[0])
+
+
 def test_get_result_filter_arg_vs_config():
     # just tests that we would be obtaining the same constraints via
     # cmdline argument or via config variable.  With cmdline overloading
@@ -102,11 +125,30 @@ def test_get_result_filter_arg_vs_config():
         assert cargs is not None
         with patch_config({"datalad.runtime.report-status": v}):
             ccfg = f(_new_args())
+            ccfg_none = f(_new_args(common_report_status="all"))
         # cannot compare directly but at least could verify based on repr
         print("%s -> %s" % (v, repr(cargs)))
         eq_(repr(cargs), repr(ccfg))
+        # and if 'all' - none filter
+        eq_(None, ccfg_none)
 
         # and we overload the "error" in config
         with patch_config({"datalad.runtime.report-status": "error"}):
             cargs_overload = f(_new_args(common_report_status=v))
         eq_(repr(cargs), repr(cargs_overload))
+
+
+def test_nagen():
+    na = nagen()
+    eq_(str(na), NA_STRING)
+    eq_(repr(na), 'nagen()')
+    assert na.unknown is na
+    assert na['unknown'] is na
+
+    eq_(str(nagen('-')), '-')
+
+
+def test_nadict():
+    d = nadict({1: 2})
+    eq_(d[1], 2)
+    eq_(str(d[2]), NA_STRING)

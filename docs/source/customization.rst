@@ -36,9 +36,9 @@ overview of plugins included in this DataLad release.
 
    add_readme
    addurls
+   check_dates
    export_archive
    export_to_figshare
-   extract_metadata
    no_annex
    wtf
 
@@ -173,6 +173,8 @@ The following keys should exists if possible:
     expansion.
 
 
+.. _sec_extension_packages:
+
 Extension packages
 ^^^^^^^^^^^^^^^^^^
 
@@ -188,6 +190,8 @@ useful features for extension developers:
   that become automatically available to DataLad
 - extensions can define `entry_points` for their test suites, such that the standard `datalad test`
   command will automatically run these tests in addition to the tests shipped with Datalad core
+- extensions can ship additional dataset procedures by installing them into a
+  directory ``resources/procedures`` underneath the extension module directory
 
 
 Using an extension

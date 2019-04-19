@@ -12,10 +12,15 @@ from datalad.metadata.extractors.base import BaseMetadataExtractor
 
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.datalad_core')
+from datalad.log import log_progress
 
 from os.path import join as opj
 from os.path import exists
 
+from datalad.consts import (
+    DATASET_METADATA_FILE,
+    DATALAD_DOTDIR,
+)
 from datalad.support.json_py import load as jsonload
 from datalad.support.annexrepo import AnnexRepo
 from datalad.coreapi import subdatasets
@@ -25,7 +30,7 @@ from datalad.metadata.definitions import version as vocabulary_version
 
 
 class MetadataExtractor(BaseMetadataExtractor):
-    _dataset_metadata_filename = opj('.datalad', 'metadata', 'dataset.json')
+    _unique_exclude = {"url"}
 
     def _get_dataset_metadata(self):
         """
@@ -34,7 +39,7 @@ class MetadataExtractor(BaseMetadataExtractor):
         dict
           keys are homogenized datalad metadata keys, values are arbitrary
         """
-        fpath = opj(self.ds.path, self._dataset_metadata_filename)
+        fpath = opj(self.ds.path, DATASET_METADATA_FILE)
         obj = {}
         if exists(fpath):
             obj = jsonload(fpath, fixup=True)
@@ -73,6 +78,14 @@ class MetadataExtractor(BaseMetadataExtractor):
         -------
         generator((location, metadata_dict))
         """
+        log_progress(
+            lgr.info,
+            'extractordataladcore',
+            'Start core metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='Core metadata extraction',
+            unit=' Files',
+        )
         if not isinstance(self.ds.repo, AnnexRepo):
             for p in self.paths:
                 # this extractor does give a response for ANY file as it serves
@@ -80,6 +93,11 @@ class MetadataExtractor(BaseMetadataExtractor):
                 # content metadata, even if we know nothing but the filename
                 # about a file
                 yield (p, dict())
+            log_progress(
+                lgr.info,
+                'extractordataladcore',
+                'Finished core metadata extraction from %s', self.ds
+            )
             return
         valid_paths = None
         if self.paths and sum(len(i) for i in self.paths) > 500000:
@@ -88,9 +106,15 @@ class MetadataExtractor(BaseMetadataExtractor):
         for file, whereis in self.ds.repo.whereis(
                 self.paths if self.paths and valid_paths is None else '.',
                 output='full').items():
-            if file.startswith('.datalad') or valid_paths and file not in valid_paths:
+            if file.startswith(DATALAD_DOTDIR) or valid_paths and file not in valid_paths:
                 # do not report on our own internal annexed files (e.g. metadata blobs)
                 continue
+            log_progress(
+                lgr.info,
+                'extractordataladcore',
+                'Extracted core metadata from %s', file,
+                update=1,
+                increment=True)
             # pull out proper (public) URLs
             # TODO possibly extend with special remote info later on
             meta = {'url': whereis[remote].get('urls', [])
@@ -99,3 +123,8 @@ class MetadataExtractor(BaseMetadataExtractor):
                     if remote == "00000000-0000-0000-0000-000000000001" and
                     whereis[remote].get('urls', None)}
             yield (file, meta)
+        log_progress(
+            lgr.info,
+            'extractordataladcore',
+            'Finished core metadata extraction from %s', self.ds
+        )

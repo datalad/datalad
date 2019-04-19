@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
-from os.path import join as opj
+from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
@@ -31,33 +31,6 @@ definitions = {
         'destination': 'local',
         'type': bool,
     },
-    'datalad.crawl.default_backend': {
-        'ui': ('question', {
-               'title': 'Default annex backend',
-               # XXX we could add choices... but might get out of sync
-               'text': 'Content hashing method to be used by git-annex'}),
-        'destination': 'dataset',
-    },
-    'datalad.crawl.dryrun': {
-        'ui': ('yesno', {
-               'title': 'Crawler dry-run',
-               'text': 'Should the crawler ... I AM NOT QUITE SURE WHAT?'}),
-        'destination': 'local',
-        'type': EnsureBool(),
-    },
-    'datalad.crawl.init_direct': {
-        'ui': ('question', {
-               'title': 'Default annex repository mode',
-               'text': 'Should dataset be initialized in direct mode?'}),
-        'destination': 'global',
-    },
-    'datalad.crawl.pipeline.housekeeping': {
-        'ui': ('yesno', {
-               'title': 'Crawler pipeline house keeping',
-               'text': 'Should the crawler tidy up datasets (git gc, repack, clean)?'}),
-        'destination': 'global',
-        'type': EnsureBool(),
-    },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
                'title': 'NDA database server',
@@ -70,6 +43,14 @@ definitions = {
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
         'default': dirs.user_cache_dir,
+    },
+    'datalad.locations.default-dataset': {
+        'ui': ('question', {
+               'title': 'Default dataset path',
+               'text': 'Where should datalad should look for (or install) a '
+                       'default dataset?'}),
+        'destination': 'global',
+        'default': opj(expanduser('~'), 'datalad'),
     },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
@@ -85,9 +66,45 @@ definitions = {
         'destination': 'global',
         'default': opj(dirs.user_config_dir, 'plugins'),
     },
+    'datalad.locations.system-procedures': {
+        'ui': ('question', {
+               'title': 'System procedure directory',
+               'text': 'Where should datalad search for system procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'procedures'),
+    },
+    'datalad.locations.user-procedures': {
+        'ui': ('question', {
+               'title': 'User procedure directory',
+               'text': 'Where should datalad search for user procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.dataset-procedures': {
+        'ui': ('question', {
+               'title': 'Dataset procedure directory',
+               'text': 'Where should datalad search for dataset procedures (relative to a dataset root)?'}),
+        'destination': 'dataset',
+        'default': opj('.datalad', 'procedures'),
+    },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+    },
+    'datalad.fake-dates': {
+        'ui': ('yesno', {
+               'title': 'Fake (anonymize) dates',
+               'text': 'Should the dates in the logs be faked?'}),
+        'destination': 'local',
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.fake-dates-start': {
+        'ui': ('question', {
+            'title': 'Initial fake date',
+            'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.'}),
+        'type': EnsureInt(),
+        'default': 1112911993,
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
@@ -183,7 +200,7 @@ definitions = {
     },
     'datalad.log.outputs': {
         'ui': ('question', {
-               'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+               'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
@@ -202,6 +219,12 @@ definitions = {
     'datalad.cmd.protocol.prefix': {
         'ui': ('question', {
                'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
+    },
+    'datalad.ssh.identityfile': {
+        'ui': ('question', {
+               'title': "If set, pass this file as ssh's -i option."}),
+        'destination': 'global',
+        'default': None,
     },
     'datalad.repo.direct': {
         'ui': ('yesno', {
@@ -254,7 +277,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Limit configuration annexing aggregated metadata in new dataset',
                'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
-        'default': 'largerthan=20kb',
+        'default': 'anything',
     },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
@@ -266,8 +289,8 @@ definitions = {
     'datalad.runtime.report-status': {
         'ui': ('question', {
                'title': 'Command line result reporting behavior',
-               'text': "If set, constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
-        'type': EnsureChoice('success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
+               'text': "If set (to other than 'all'), constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
+        'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
         'default': None,
     },
     'datalad.search.indexercachesize': {

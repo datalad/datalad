@@ -10,6 +10,9 @@
 
 
 class BaseMetadataExtractor(object):
+
+    NEEDS_CONTENT = True   # majority of the extractors need data content
+
     def __init__(self, ds, paths):
         """
         Parameters

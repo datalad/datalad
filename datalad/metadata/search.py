@@ -11,19 +11,23 @@
 
 __docformat__ = 'restructuredtext'
 
+import collections
 import logging
+from datalad.log import log_progress
 lgr = logging.getLogger('datalad.metadata.search')
 
 import os
 import re
+from functools import partial
 from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
-from six import reraise
-from six import string_types
-from six import PY3
-from six import iteritems
+from six import (
+    reraise,
+    iteritems,
+    PY2,
+)
 from time import time
 
 from datalad import cfg
@@ -33,46 +37,53 @@ from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
-from datalad.distribution.utils import get_git_dir
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
-from datalad.support.constraints import EnsureBool
 
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.utils import assure_list, assure_iter
-from datalad.utils import assure_unicode
+from datalad.utils import (
+    assure_list, assure_iter, unicode_srctypes, as_unicode,
+    assure_unicode,
+    get_suggestions_msg,
+    unique,
+)
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
 from datalad.dochelpers import exc_str
 from datalad.metadata.metadata import query_aggregated_metadata
 
-if PY3:
-    unicode_srctypes = string_types + (bytes,)
-    str_contructor = str
-else:
-    unicode_srctypes = string_types
-    str_contructor = unicode
+# TODO: consider using plain as_unicode, without restricting
+# the types?
+_any2unicode = partial(as_unicode, cast_types=(int, float, tuple, list, dict))
 
 
-def _any2unicode(val):
-    if val is None:
-        return u''
-    return str_contructor(val) \
-        if isinstance(val, (int, float, tuple, list, dict)) \
-        else assure_unicode(val)
+def _listdict2dictlist(lst, strict=True):
+    """Helper to deal with DataLad's unique value reports
 
-
-def _listdict2dictlist(lst):
+    Parameters
+    ----------
+    lst : list
+      List of dicts
+    strict : bool
+      In strict mode any dictionary items that doesn't have a simple value
+      (but another container) is discarded. In non-strict mode, arbitrary
+      levels of nesting are preserved, and no unique-ification of values
+      is performed. The latter can be used when it is mostly (or merely)
+      interesting to get a list of metadata keys.
+    """
     # unique values that we got, always a list
     if all(not isinstance(uval, dict) for uval in lst):
         # no nested structures, take as is
         return lst
 
+    type_excluder = (tuple, list)
+    if strict:
+        type_excluder += (dict,)
     # we need to turn them inside out, instead of a list of
-    # dicts, we want a dict where keys are lists, because we
+    # dicts, we want a dict where values are lists, because we
     # cannot handle hierarchies in a tabular search index
     # if you came here to find that out, go ahead and use a graph
     # DB/search
@@ -83,7 +94,7 @@ def _listdict2dictlist(lst):
             # in favor of the structured metadata
             continue
         for k, v in uv.items():
-            if isinstance(v, (tuple, list, dict)):
+            if isinstance(v, type_excluder):
                 # this is where we draw the line, two levels of
                 # nesting. whoosh can only handle string values
                 # injecting a stringified blob of something doesn't
@@ -92,8 +103,14 @@ def _listdict2dictlist(lst):
             if v == "":
                 # no cruft
                 continue
-            uvals = udict.get(k, set())
-            uvals.add(v)
+            if strict:
+                # no duplicate values, only hashable stuff
+                uvals = udict.get(k, set())
+                uvals.add(v)
+            else:
+                # whatever it is, we'll take it
+                uvals = udict.get(k, [])
+                uvals.append(v)
             udict[k] = uvals
     return {
         # set not good for JSON, have plain list
@@ -106,6 +123,10 @@ def _listdict2dictlist(lst):
 def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
     """Takes care of dtype conversion into unicode, potential key mappings
     and concatenation of sequence-type fields into CSV strings
+
+    - if `consider_ucn` (default) it would copy keys from
+      datalad_unique_content_properties into `meta` for that extractor
+    - ... TODO ...
     """
     if consider_ucn:
         # loop over all metadata sources and the report of their unique values
@@ -118,7 +139,11 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+                srcmeta[uk] = _listdict2dictlist(umeta[uk], strict=False) if umeta[uk] is not None else None
+            if src not in meta and srcmeta:
+                meta[src] = srcmeta  # assign the new one back
+
+    srcmeta = None   # for paranoids to avoid some kind of manipulation of the last
 
     def _deep_kv(basekey, dct):
         """Return key/value pairs of any depth following a rule for key
@@ -176,17 +201,18 @@ def _search_from_virgin_install(dataset, query):
                 "searched, or run interactively to get assistance "
                 "installing a queriable superdataset."
             )
-        # none was provided so we could ask user either he possibly wants
+        # none was provided so we could ask user whether he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        if os.path.exists(LOCAL_CENTRAL_PATH):
-            central_ds = Dataset(LOCAL_CENTRAL_PATH)
-            if central_ds.is_installed():
+        DEFAULT_DATASET_PATH = cfg.obtain('datalad.locations.default-dataset')
+        if os.path.exists(DEFAULT_DATASET_PATH):
+            default_ds = Dataset(DEFAULT_DATASET_PATH)
+            if default_ds.is_installed():
                 if ui.yesno(
                     title="No DataLad dataset found at current location",
                     text="Would you like to search the DataLad "
                          "superdataset at %r?"
-                          % LOCAL_CENTRAL_PATH):
+                          % DEFAULT_DATASET_PATH):
                     pass
                 else:
                     reraise(*exc_info)
@@ -195,14 +221,14 @@ def _search_from_virgin_install(dataset, query):
                     "No DataLad dataset found at current location. "
                     "The DataLad superdataset location %r exists, "
                     "but does not contain an dataset."
-                    % LOCAL_CENTRAL_PATH)
+                    % DEFAULT_DATASET_PATH)
         elif ui.yesno(
                 title="No DataLad dataset found at current location",
                 text="Would you like to install the DataLad "
                      "superdataset at %r?"
-                     % LOCAL_CENTRAL_PATH):
+                     % DEFAULT_DATASET_PATH):
             from datalad.api import install
-            central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+            default_ds = install(DEFAULT_DATASET_PATH, source='///')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -212,9 +238,9 @@ def _search_from_virgin_install(dataset, query):
 
         lgr.info(
             "Performing search using DataLad superdataset %r",
-            central_ds.path
+            default_ds.path
         )
-        for res in central_ds.search(query):
+        for res in default_ds.search(query):
             yield res
         return
     else:
@@ -235,7 +261,18 @@ class _Search(object):
         raise NotImplementedError(args)
 
     def get_query(self, query):
+        """Prepare query structure specific for a search backend.
+
+        It can also memorize within instance some parameters of the last query
+        which could be used to assist output formatting/structuring later on
+        """
         raise NotImplementedError
+
+    def get_nohits_msg(self):
+        """Given what it knows, provide recommendation in the case of no hits"""
+        return "No search hits, wrong query? " \
+               "See 'datalad search --show-keys name' for known keys " \
+               "and 'datalad search --help' on how to prepare your query."
 
 
 class _WhooshSearch(_Search):
@@ -244,12 +281,15 @@ class _WhooshSearch(_Search):
 
         self.idx_obj = None
         # where does the bunny have the eggs?
-        self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self.index_dir = opj(self.ds.path, GitRepo.get_git_dir(ds), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
     def show_keys(self, mode):
         if mode != 'name':
-            raise NotImplementedError()
+            raise NotImplementedError(
+                "ATM %s can show only names, so please use show_keys with 'name'"
+                % self.__class__.__name__
+            )
         for k in self.idx_obj.schema.names():
             print(u'{}'.format(k))
 
@@ -281,9 +321,10 @@ class _WhooshSearch(_Search):
         `meta2doc` - must return dict for index document from result input
         """
         from whoosh import index as widx
-        from .metadata import agginfo_relpath
+        from .metadata import get_ds_aggregate_db_locations
+        dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
         # what is the lastest state of aggregated metadata
-        metadata_state = self.ds.repo.get_last_commit_hash(agginfo_relpath)
+        metadata_state = self.ds.repo.get_last_commit_hash(relpath(dbloc, start=self.ds.path))
         # use location common to all index types, they would all invalidate
         # simultaneously
         stamp_fname = opj(self.index_dir, 'datalad_metadata_state')
@@ -308,8 +349,10 @@ class _WhooshSearch(_Search):
             except widx.IndexError as e:
                 # Generic index error.
                 # we try to regenerate
-                # TODO log this
-                pass
+                lgr.warning(
+                    "Cannot open existing index %s (%s), will regenerate",
+                    index_dir, exc_str(e)
+                )
             except widx.IndexVersionError as e:  # (msg, version, release=None)
                 # Raised when you try to open an index using a format that the
                 # current version of Whoosh cannot read. That is, when the index
@@ -322,12 +365,20 @@ class _WhooshSearch(_Search):
                 # Raised when you try to commit changes to an index which is not
                 # the latest generation.
                 # this should not happen here, but if it does ... KABOOM
-                raise e
+                raise
             except widx.EmptyIndexError as e:
                 # Raised when you try to work with an index that has no indexed
                 # terms.
                 # we can just continue with generating an index
                 pass
+            except ValueError as e:
+                if 'unsupported pickle protocol' in str(e):
+                    lgr.warning(
+                        "Cannot open existing index %s (%s), will regenerate",
+                        index_dir, exc_str(e)
+                    )
+                else:
+                    raise
 
         lgr.info('{} search index'.format(
             'Rebuilding' if exists(index_dir) else 'Building'))
@@ -360,10 +411,14 @@ class _WhooshSearch(_Search):
         old_idx_size = 0
         old_ds_rpath = ''
         idx_size = 0
-        pbar = ui.get_progressbar(
-            label='Datasets',
-            unit='ds',
-            total=len(dsinfo))
+        log_progress(
+            lgr.info,
+            'autofieldidxbuild',
+            'Start building search index',
+            total=len(dsinfo),
+            label='Building search index',
+            unit=' Datasets',
+        )
         for res in query_aggregated_metadata(
                 reporton=self.documenttype,
                 ds=self.ds,
@@ -392,10 +447,12 @@ class _WhooshSearch(_Search):
                             idx_size - old_idx_size,
                             include_count=True),
                         old_ds_rpath)
+                log_progress(lgr.info, 'autofieldidxbuild',
+                             'Indexed dataset at %s', old_ds_rpath,
+                             update=1, increment=True)
                 old_idx_size = idx_size
                 old_ds_rpath = admin['path']
                 admin['id'] = res.get('dsid', None)
-                pbar.update(1, increment=True)
 
             doc.update({k: assure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
@@ -415,7 +472,8 @@ class _WhooshSearch(_Search):
 
         lgr.debug("Committing index")
         idx.commit(optimize=True)
-        pbar.finish()
+        log_progress(
+            lgr.info, 'autofieldidxbuild', 'Done building search index')
 
         # "timestamp" the search index to allow for automatic invalidation
         with open(stamp_fname, 'w') as f:
@@ -425,6 +483,10 @@ class _WhooshSearch(_Search):
         self.idx_obj = idx_obj
 
     def __call__(self, query, max_nresults=None, force_reindex=False, full_record=False):
+        if max_nresults is None:
+            # mode default
+            max_nresults = 20
+
         with self.idx_obj.searcher() as searcher:
             wquery = self.get_query(query)
 
@@ -499,7 +561,7 @@ class _WhooshSearch(_Search):
 
 
 class _BlobSearch(_WhooshSearch):
-    _mode_label = 'default'
+    _mode_label = 'textblob'
     _default_documenttype = 'datasets'
 
     def _meta2doc(self, meta):
@@ -532,10 +594,14 @@ class _BlobSearch(_WhooshSearch):
         from whoosh import qparser as qparse
 
         # use whoosh default query parser for now
-        self.parser = qparse.QueryParser(
+        parser = qparse.QueryParser(
             "meta",
             schema=self.idx_obj.schema
         )
+        parser.add_plugin(qparse.FuzzyTermPlugin())
+        parser.remove_plugin_class(qparse.PhrasePlugin)
+        parser.add_plugin(qparse.SequencePlugin())
+        self.parser = parser
 
 
 class _AutofieldSearch(_WhooshSearch):
@@ -547,7 +613,6 @@ class _AutofieldSearch(_WhooshSearch):
 
     def _mk_schema(self, dsinfo):
         from whoosh import fields as wf
-        from whoosh.analysis import StandardAnalyzer
         from whoosh.analysis import SimpleAnalyzer
 
         # haven for terms that have been found to be undefined
@@ -569,10 +634,14 @@ class _AutofieldSearch(_WhooshSearch):
 
         lgr.debug('Scanning for metadata keys')
         # quick 1st pass over all dataset to gather the needed schema fields
-        pbar = ui.get_progressbar(
-            label='Datasets',
-            unit='ds',
-            total=len(dsinfo))
+        log_progress(
+            lgr.info,
+            'idxschemabuild',
+            'Start building search schema',
+            total=len(dsinfo),
+            label='Building search schema',
+            unit=' Datasets',
+        )
         for res in query_aggregated_metadata(
                 # XXX TODO After #2156 datasets may not necessarily carry all
                 # keys in the "unique" summary
@@ -588,8 +657,11 @@ class _AutofieldSearch(_WhooshSearch):
             for k in idxd:
                 schema_fields[k] = wf.TEXT(stored=False,
                                            analyzer=SimpleAnalyzer())
-            pbar.update(1, increment=True)
-        pbar.finish()
+            log_progress(lgr.info, 'idxschemabuild',
+                         'Scanned dataset at %s', res['path'],
+                         update=1, increment=True)
+        log_progress(
+            lgr.info, 'idxschemabuild', 'Done building search schema')
 
         self.schema = wf.Schema(**schema_fields)
 
@@ -609,15 +681,22 @@ class _AutofieldSearch(_WhooshSearch):
         self.parser = parser
 
 
-class _EGrepSearch(_Search):
-    _mode_label = 'egrep'
+class _EGrepCSSearch(_Search):
+    _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
+
+    def __init__(self, ds, **kwargs):
+        super(_EGrepCSSearch, self).__init__(ds, **kwargs)
+        self._queried_keys = None  # to be memoized by get_query
 
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
     def __call__(self, query, max_nresults=None, consider_ucn=False, full_record=True):
-        query_re = re.compile(self.get_query(query))
+        if max_nresults is None:
+            # no limit by default
+            max_nresults = 0
+        query = self.get_query(query)
 
         nhits = 0
         for res in query_aggregated_metadata(
@@ -633,24 +712,36 @@ class _EGrepSearch(_Search):
             meta = res.get('metadata', {})
             # produce a flattened metadata dict to search through
             doc = _meta2autofield_dict(meta, val2str=True, consider_ucn=consider_ucn)
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            doc.update({
+                k: res[k] for k in ('@id', 'type', 'path', 'parentds')
+                if k in res})
             # use search instead of match to not just get hits at the start of the string
             # this will be slower, but avoids having to use actual regex syntax at the user
             # side even for simple queries
             # DOTALL is needed to handle multiline description fields and such, and still
             # be able to match content coming for a later field
-            lgr.log(7, "Querying %s among %d items", query_re, len(doc))
+            lgr.log(7, "Querying %s among %d items", query, len(doc))
             t0 = time()
-            matches = {k: query_re.search(v.lower())
-                       for k, v in iteritems(doc)}
+            matches = {(q['query'] if isinstance(q, dict) else q, k):
+                       q['query'].search(v) if isinstance(q, dict) else q.search(v)
+                       for k, v in iteritems(doc)
+                       for q in query
+                       if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
             lgr.log(7, "Finished querying in %f sec", dt)
             # retain what actually matched
-            matches = {k: match.group() for k, match in matches.items() if match}
-            if matches:
+            matched = {k[1]: match.group() for k, match in matches.items() if match}
+            # implement AND behavior across query expressions, but OR behavior
+            # across queries matching multiple fields for a single query expression
+            # for multiple queries, this makes it consistent with a query that
+            # has no field specification
+            if matched and len(query) == len(set(k[0] for k in matches if matches[k])):
                 hit = dict(
                     res,
                     action='search',
-                    query_matched=matches,
+                    query_matched=matched,
                 )
                 yield hit
                 nhits += 1
@@ -671,47 +762,23 @@ class _EGrepSearch(_Search):
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
 
-        class key_stat:
-            def __init__(self):
-                self.ndatasets = 0  # how many datasets have this field
-                self.uvals = set()
-
-        from collections import defaultdict
-        keys = defaultdict(key_stat)
-
-        for res in query_aggregated_metadata(
-                # XXX TODO After #2156 datasets may not necessarily carry all
-                # keys in the "unique" summary
-                reporton='datasets',
-                ds=self.ds,
-                aps=[dict(path=self.ds.path, type='dataset')],
-                recursive=True):
-            meta = res.get('metadata', {})
-            # no stringification of values for speed
-            idxd = _meta2autofield_dict(meta, val2str=False)
-
-            for k, kvals in iteritems(idxd):
-                # TODO deal with conflicting definitions when available
-                keys[k].ndatasets += 1
-                if mode == 'name':
-                    continue
-                try:
-                    kvals_set = assure_iter(kvals, set)
-                except TypeError:
-                    kvals_set = {'unhashable'}
-                keys[k].uvals |= kvals_set
+        keys = self._get_keys(mode)
 
         for k in sorted(keys):
             if mode == 'name':
-                print(k)
+                from datalad.utils import assure_bytes
+                # without assure_bytes UnicodeEncodeError in PY2 when
+                # output is piped into e.g. grep
+                print(assure_bytes(k) if PY2 else k)
                 continue
 
             # do a bit more
             stat = keys[k]
             uvals = stat.uvals
-            # show only up to X uvals
-            if len(stat.uvals) > 10:
-                uvals = {v for i, v in enumerate(uvals) if i < 10}
+            if mode == 'short':
+                # show only up to X uvals
+                if len(stat.uvals) > 10:
+                    uvals = {v for i, v in enumerate(uvals) if i < 10}
             # all unicode still scares yoh -- he will just use repr
             # def conv(s):
             #     try:
@@ -736,72 +803,338 @@ class _EGrepSearch(_Search):
                 '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
                 k=k, stat=stat
             ))
+        # After #2156 datasets may not necessarily carry all
+        # keys in the "unique" summary
+        lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
+
+
+    def _get_keys(self, mode=None):
+        """Return keys and their statistics if mode != 'name'."""
+        class key_stat:
+            def __init__(self):
+                self.ndatasets = 0  # how many datasets have this field
+                self.uvals = set()
+
+        from collections import defaultdict
+        keys = defaultdict(key_stat)
+        for res in query_aggregated_metadata(
+                # XXX TODO After #2156 datasets may not necessarily carry all
+                # keys in the "unique" summary
+                reporton='datasets',
+                ds=self.ds,
+                aps=[dict(path=self.ds.path, type='dataset')],
+                recursive=True):
+            meta = res.get('metadata', {})
+            # inject a few basic properties into the dict
+            # analog to what the other modes do in their index
+            meta.update({
+                k: res.get(k, None) for k in ('@id', 'type', 'path', 'parentds')
+                # parentds is tricky all files will have it, but the dataset
+                # queried above might not (single dataset), let's force it in
+                if k == 'parentds' or k in res})
+
+            # no stringification of values for speed
+            idxd = _meta2autofield_dict(meta, val2str=False)
+
+            for k, kvals in iteritems(idxd):
+                # TODO deal with conflicting definitions when available
+                keys[k].ndatasets += 1
+                if mode == 'name':
+                    continue
+                try:
+                    kvals_set = assure_iter(kvals, set)
+                except TypeError:
+                    # TODO: may be do show hashable ones???
+                    nunhashable = sum(
+                        isinstance(x, collections.Hashable) for x in kvals
+                    )
+                    kvals_set = {
+                        'unhashable %d out of %d entries'
+                        % (nunhashable, len(kvals))
+                    }
+                keys[k].uvals |= kvals_set
+        return keys
 
     def get_query(self, query):
-        # cmdline args might come in as a list
-        if isinstance(query, list):
-            query = u' '.join(query)
-        return query.lower()
+        query = assure_list(query)
+        simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
+        quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
+        query_rec_matches = [
+            simple_fieldspec.match(q) or
+            quoted_fieldspec.match(q) or
+            q
+            for q in query]
+        query_group_dicts_only = [
+            q.groupdict() for q in query_rec_matches if hasattr(q, 'groupdict')
+        ]
+        self._queried_keys = [
+            qgd['field']
+            for qgd in query_group_dicts_only
+            if ('field' in qgd and qgd['field'])
+        ]
+        if len(query_group_dicts_only) != len(query_rec_matches):
+            # we had a query element without field specification add
+            # None as an indicator of that
+            self._queried_keys.append(None)
+        # expand matches, compile expressions
+        query = [
+            {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
+            if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
+            for q in query_rec_matches
+        ]
+
+        # turn "empty" field specs into simple queries
+        # this is used to forcibly disable field-based search
+        # e.g. when searching for a value
+        query = [q['query']
+                 if isinstance(q, dict) and q['field'].pattern == '' else q
+                 for q in query]
+        return query
+
+    def _xfm_query(self, q):
+        # implement potential transformations of regex before they get compiled
+        return q
+
+    def get_nohits_msg(self):
+        """Given the query and performed search, provide recommendation
+
+        Quite often a key in the query is mistyped or I simply query for something
+        which is not actually known.  It requires --show-keys  run first, doing
+        visual search etc to mitigate.  Here we can analyze either all queried
+        keys are actually known, and if not known -- what would be the ones available.
+
+        Returns
+        -------
+        str
+          A sentence or a paragraph to be logged/output
+        """
+        #
+        queried_keys = self._queried_keys[:]
+        if queried_keys and None in queried_keys:
+            queried_keys.pop(queried_keys.index(None))
+        if not queried_keys:
+            return  # No keys were queried, we are of no use here
+        known_keys = self._get_keys(mode='name')
+        unknown_keys = sorted(list(set(queried_keys).difference(known_keys)))
+        if not unknown_keys:
+            return  # again we are of no help here
+        msg = super(_EGrepCSSearch, self).get_nohits_msg()
+        msg += " Following keys were not found in available metadata: %s. " \
+              % ", ".join(unknown_keys)
+        suggestions_msg = get_suggestions_msg(unknown_keys, known_keys)
+        if suggestions_msg:
+            msg += ' ' + suggestions_msg
+        return msg
+
+
+class _EGrepSearch(_EGrepCSSearch):
+    _mode_label = 'egrep'
+    _default_documenttype = 'datasets'
+
+    def _xfm_query(self, q):
+        if q == q.lower():
+            # we have no upper case symbol in the query, go case-insensitive
+            return '(?i){}'.format(q)
+        else:
+            return q
 
 
 @build_doc
 class Search(Interface):
-    """Search a dataset's metadata.
+    """Search dataset metadata
 
-    Search capabilities depend on the amount and nature of metadata available
-    in a dataset. This can include metadata about a dataset as a whole, or
-    metadata on dataset content (e.g. one or more files). One dataset can also
-    contain metadata from multiple subdatasets (see the 'aggregate-metadata'
-    command), in which case a search can discover any dataset or any file in
-    of these datasets.
+    DataLad can search metadata extracted from a dataset and/or aggregated into
+    a superdataset (see the `aggregate-metadata` command). This makes it
+    possible to discover datasets, or individual files in a dataset even when
+    they are not available locally.
 
-    *Search modes*
+    Ultimately DataLad metadata are a graph of linked data structures. However,
+    this command does not (yet) support queries that can exploit all
+    information stored in the metadata. At the moment the following search
+    modes are implemented that represent different trade-offs between the
+    expressiveness of a query and the computational and storage resources
+    required to execute a query.
 
-    WRITE ME
+    - egrep (default)
 
-    A search index is automatically built from the available metadata of any
-    dataset or file, and a schema for this index is generated dynamically, too.
-    Consequently, the search index will be tailored to data provided in a
-    particular collection of datasets.
+    - egrepcs [case-sensitive egrep]
 
-    Metadata fields (and possibly also values) are typically defined terms from
-    a controlled vocabulary. Field names are accessible via the --show-keys
-    flag.
+    - textblob
 
-    DataLad's search is built on the Python package 'Whoosh', which provides
-    a powerful query language. Links to a description of the language and
-    particular feature can be found below.
+    - autofield
 
-    Here are a few examples. Basic search::
-
-      % datalad search searchterm
-
-    Search for a file::
-
-      % datalad search searchterm type:file
-
-
-    *Performance considerations*
-
-    For dataset collections with many files (100k+) generating a comprehensive
-    search index comprised of documents for datasets and individual files can
-    take a considerable amount of time. If this becomes an issue, search index
-    generation can be limited to a particular type of document (see the
-    'metadata --reporton' option for possible values). The per-mode configuration
-    setting 'datalad.search.index-<mode>-documenttype' will be queried on
-    search index generation. It is recommended to place an appropriate
-    configuration into a dataset's configuration file (.datalad/config)::
+    An alternative default mode can be configured by tuning the
+    configuration variable 'datalad.search.default-mode'::
 
       [datalad "search"]
-        index-default-documenttype = datasets
+        default-mode = egrepcs
 
-    .. seealso::
+    Each search mode has its own default configuration for what kind of
+    documents to query. The respective default can be changed via configuration
+    variables::
+
+      [datalad "search"]
+        index-<mode_name>-documenttype = (all|datasets|files)
+
+
+    *Mode: egrep/egrepcs*
+
+    These search modes are largely ignorant of the metadata structure, and
+    simply perform matching of a search pattern against a flat
+    string-representation of metadata. This is advantageous when the query is
+    simple and the metadata structure is irrelevant, or precisely known.
+    Moreover, it does not require a search index, hence results can be reported
+    without an initial latency for building a search index when the underlying
+    metadata has changed (e.g. due to a dataset update). By default, these
+    search modes only consider datasets and do not investigate records for
+    individual files for speed reasons. Search results are reported in the
+    order in which they were discovered.
+
+    Queries can make use of Python regular expression syntax
+    (https://docs.python.org/3/library/re.html). In `egrep` mode, matching is
+    case-insensitive when the query does not contain upper case characters, but
+    is case-sensitive when it does. In `egrepcs` mode, matching is always
+    case-sensitive. Expressions will match anywhere in a metadata string, not
+    only at the start.
+
+    When multiple queries are given, all queries have to match for a search hit
+    (AND behavior).
+
+    It is possible to search individual metadata key/value items by prefixing
+    the query with a metadata key name, separated by a colon (':'). The key
+    name can also be a regular expression to match multiple keys. A query match
+    happens when any value of an item with a matching key name matches the query
+    (OR behavior). See examples for more information.
+
+    Examples:
+
+      Query for (what happens to be) an author::
+
+        % datalad search haxby
+
+      Queries are case-INsensitive when the query contains no upper case characters,
+      and can be regular expressions. Use `egrepcs` mode when it is desired
+      to perform a case-sensitive lowercase match::
+
+        % datalad search --mode egrepcs halchenko.*haxby
+
+      This search mode performs NO analysis of the metadata content.  Therefore
+      queries can easily fail to match. For example, the above query implicitly
+      assumes that authors are listed in alphabetical order.  If that is the
+      case (which may or may not be true), the following query would yield NO
+      hits::
+
+        % datalad search Haxby.*Halchenko
+
+      The ``textblob`` search mode represents an alternative that is more
+      robust in such cases.
+
+      For more complex queries multiple query expressions can be provided that
+      all have to match to be considered a hit (AND behavior). This query
+      discovers all files (non-default behavior) that match 'bids.type=T1w'
+      AND 'nifti1.qform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.qform_code:scanner
+
+      Key name selectors can also be expressions, which can be used to select
+      multiple keys or construct "fuzzy" queries. In such cases a query matches
+      when any item with a matching key matches the query (OR behavior).
+      However, multiple queries are always evaluated using an AND conjunction.
+      The following query extends the example above to match any files that
+      have either 'nifti1.qform_code=scanner' or 'nifti1.sform_code=scanner'::
+
+        % datalad -c datalad.search.index-egrep-documenttype=all search bids.type:T1w nifti1.(q|s)form_code:scanner
+
+    *Mode: textblob*
+
+    This search mode is very similar to the ``egrep`` mode, but with a few key
+    differences. A search index is built from the string-representation of
+    metadata records. By default, only datasets are included in this index, hence
+    the indexing is usually completed within a few seconds, even for hundreds
+    of datasets. This mode uses its own query language (not regular expressions)
+    that is similar to other search engines. It supports logical conjunctions
+    and fuzzy search terms. More information on this is available from the Whoosh
+    project (search engine implementation):
+
       - Description of the Whoosh query language:
         http://whoosh.readthedocs.io/en/latest/querylang.html)
+
       - Description of a number of query language customizations that are
-        enabled in DataLad, such as, querying multiple fields by default and
-        fuzzy term matching:
+        enabled in DataLad, such as, fuzzy term matching:
         http://whoosh.readthedocs.io/en/latest/parsing.html#common-customizations
+
+    Importantly, search hits are scored and reported in order of descending
+    relevance, hence limiting the number of search results is more meaningful
+    than in the 'egrep' mode and can also reduce the query duration.
+
+    Examples:
+
+      Search for (what happens to be) two authors, regardless of the order in
+      which those names appear in the metadata::
+
+        % datalad search --mode textblob halchenko haxby
+
+      Fuzzy search when you only have an approximate idea what you are looking
+      for or how it is spelled::
+
+        % datalad search --mode textblob haxbi~
+
+      Very fuzzy search, when you are basically only confident about the first
+      two characters and how it sounds approximately (or more precisely: allow
+      for three edits and require matching of the first two characters)::
+
+        % datalad search --mode textblob haksbi~3/2
+
+      Combine fuzzy search with logical constructs::
+
+        % datalad search --mode textblob 'haxbi~ AND (hanke OR halchenko)'
+
+
+    *Mode: autofield*
+
+    This mode is similar to the 'textblob' mode, but builds a vastly more
+    detailed search index that represents individual metadata variables as
+    individual fields. By default, this search index includes records for
+    datasets and individual fields, hence it can grow very quickly into
+    a huge structure that can easily take an hour or more to build and require
+    more than a GB of storage. However, limiting it to documents on datasets
+    (see above) retains the enhanced expressiveness of queries while
+    dramatically reducing the resource demands.
+
+    Examples:
+
+      List names of search index fields (auto-discovered from the set of
+      indexed datasets)::
+
+        % datalad search --mode autofield --show-keys name
+
+      Fuzzy search for datasets with an author that is specified in a particular
+      metadata field::
+
+        % datalad search --mode autofield bids.author:haxbi~ type:dataset
+
+      Search for individual files that carry a particular description
+      prefix in their 'nifti1' metadata::
+
+        % datalad search --mode autofield nifti1.description:FSL* type:file
+
+
+    *Reporting*
+
+    Search hits are returned as standard DataLad results. On the command line
+    the '--output-format' (or '-f') option can be used to tweak results for
+    further processing.
+
+    Examples:
+
+      Format search hits as a JSON stream (one hit per line)::
+
+        % datalad -f json search haxby
+
+      Custom formatting: which terms matched the query of particular
+      results. Useful for investigating fuzzy search results::
+
+        $ datalad -f '{path}: {query_matched}' search --mode autofield bids.author:haxbi~
     """
     _params_ = dict(
         dataset=Parameter(
@@ -814,35 +1147,32 @@ class Search(Interface):
             args=("query",),
             metavar='QUERY',
             nargs="*",
-            doc="""search query using the Whoosh query language (see link to
-            detailed description above). For simple queries, any number of search
-            terms can be given as a list[CMD: (space-separated) CMD], and the
-            query will return all hits that match all terms (AND) in any combination
-            of fields (OR)."""),
+            doc="""query string, supported syntax and features depends on the
+            selected search mode (see documentation)"""),
         force_reindex=Parameter(
             args=("--reindex",),
             dest='force_reindex',
             action='store_true',
             doc="""force rebuilding the search index, even if no change in the
-            dataset's state has been detected. This is mostly useful for
-            developing new metadata support extensions."""),
+            dataset's state has been detected, for example, when the index
+            documenttype configuration has changed."""),
         max_nresults=Parameter(
             args=("--max-nresults",),
             doc="""maxmimum number of search results to report. Setting this
-            to 0 will report all search matches, and make searching substantially
-            slower on large metadata sets.""",
-            constraints=EnsureInt()),
+            to 0 will report all search matches. Depending on the mode this
+            can search substantially slower. If not specified, a
+            mode-specific default setting will be used.""",
+            constraints=EnsureInt() | EnsureNone()),
         mode=Parameter(
             args=("--mode",),
             choices=('egrep', 'textblob', 'autofield'),
             doc="""Mode of search index structure and content. See section
-            SEARCH MODES for details.
-            """),
+            SEARCH MODES for details."""),
         full_record=Parameter(
             args=("--full-record", '-f'),
             action='store_true',
             doc="""If set, return the full metadata record for each search hit.
-            Depending on the search mode this might require additonal queries.
+            Depending on the search mode this might require additional queries.
             By default, only data that is available to the respective search modes
             is returned. This always includes essential information, such as the
             path and the type."""),
@@ -851,9 +1181,9 @@ class Search(Interface):
             choices=('name', 'short', 'full'),
             default=None,
             doc="""if given, a list of known search keys is shown. If 'name' -
-            only the name is printed one per line. If 'short' or 'full' - 
-            statistics (in how many datasets, and unique values) are printed.
-            'short' truncates the listing of unique values.
+            only the name is printed one per line. If 'short' or 'full',
+            statistics (in how many datasets, and how many unique values) are
+            printed. 'short' truncates the listing of unique values.
             No other action is performed (except for reindexing), even if other
             arguments are given. Each key is accompanied by a term definition in
             parenthesis (TODO). In most cases a definition is given in the form
@@ -876,7 +1206,7 @@ class Search(Interface):
     def __call__(query=None,
                  dataset=None,
                  force_reindex=False,
-                 max_nresults=20,
+                 max_nresults=None,
                  mode=None,
                  full_record=False,
                  show_keys=None,
@@ -900,6 +1230,8 @@ class Search(Interface):
 
         if mode == 'egrep':
             searcher = _EGrepSearch
+        elif mode == 'egrepcs':
+            searcher = _EGrepCSSearch
         elif mode == 'textblob':
             searcher = _BlobSearch
         elif mode == 'autofield':
@@ -921,8 +1253,12 @@ class Search(Interface):
             print(repr(searcher.get_query(query)))
             return
 
+        nhits = 0
         for r in searcher(
                 query,
                 max_nresults=max_nresults,
                 full_record=full_record):
+            nhits += 1
             yield r
+        if not nhits:
+            lgr.info(searcher.get_nohits_msg() or 'no hits')

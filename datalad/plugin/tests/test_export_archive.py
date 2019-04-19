@@ -110,3 +110,8 @@ def test_zip_archive(path):
         time.sleep(1.1)
         ds.export_archive(filename='my', archivetype='zip')
         assert_equal(md5sum('my.zip'), custom1_md5)
+
+    # should be able to export without us cd'ing to that ds directory
+    ds.export_archive(filename=ds.path, archivetype='zip')
+    default_name = 'datalad_{}.zip'.format(ds.id)
+    assert_true(os.path.exists(os.path.join(ds.path, default_name)))

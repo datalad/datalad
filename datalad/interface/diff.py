@@ -105,9 +105,12 @@ def _get_untracked_content(dspath, report_untracked, paths=None):
             # nothing to filter
             paths = None
 
+    from datalad.utils import assure_unicode
+
     for line in stdout.split('\0'):
         if not line:
             continue
+        line = assure_unicode(line)
         if not line.startswith('?? '):
             # nothing untracked, ignore, task of `diff`
             continue
@@ -163,7 +166,7 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
                 status='impossible',
                 message=e.stderr.strip())
             return
-        raise e
+        raise
 
     ap = None
     for line in stdout.split('\0'):

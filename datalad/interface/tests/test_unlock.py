@@ -12,8 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
-from os import geteuid
+import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -29,11 +28,8 @@ from datalad.tests.utils import getpwd
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import assert_in
 from datalad.tests.utils import on_windows, skip_if
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
-from datalad.utils import swallow_logs
 
 
 @assert_cwd_unchanged
@@ -69,10 +65,9 @@ def test_unlock_raises(path, path2, path3):
     chpwd(_cwd)
 
 
-@known_failure_v6  # FIXME: See TODOs in the comments below
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
-@skip_if(cond=not on_windows and geteuid() == 0)  # uid not available on windows
+@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 
@@ -88,8 +83,8 @@ def test_unlock(path):
         assert_result_count(res, 1)
         assert_status('notneeded', res)
 
-    # in V6 we can unlock even if the file's content isn't present:
-    elif ds.repo.config.getint("annex", "version") == 6:
+    # in V6+ we can unlock even if the file's content isn't present:
+    elif ds.repo.supports_unlocked_pointers:
         res = ds.unlock()
         assert_result_count(res, 1)
         assert_status('ok', res)
@@ -112,8 +107,8 @@ def test_unlock(path):
         f.write("change content")
 
     ds.repo.add('test-annex.dat')
-    # in V6 we need to explicitly re-lock it:
-    if ds.repo.config.getint("annex", "version") == 6:
+    # in V6+ we need to explicitly re-lock it:
+    if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:
         ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
@@ -140,8 +135,8 @@ def test_unlock(path):
         f.write("change content again")
 
     ds.repo.add('test-annex.dat')
-    # in V6 we need to explicitly re-lock it:
-    if ds.repo.config.getint("annex", "version") == 6:
+    # in V6+ we need to explicitly re-lock it:
+    if ds.repo.supports_unlocked_pointers:
         # TODO: RF: make 'lock' a command as well
         # re-lock to further on have a consistent situation with V5:
         ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])

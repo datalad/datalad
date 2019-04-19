@@ -36,6 +36,8 @@ class SSHRun(Interface):
     In addition to SSH alone, this command can make use of datalad's SSH
     connection management. Its primary use case is to be used with Git
     as 'core.sshCommand' or via "GIT_SSH_COMMAND".
+
+    Configure `datalad.ssh.identityfile` to pass a file to the ssh's -i option.
     """
     # prevent common args from being added to the docstring
     _no_eval_results = True

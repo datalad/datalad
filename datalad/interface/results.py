@@ -23,12 +23,13 @@ from os.path import normpath
 from datalad.utils import assure_list
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_is_subpath
+from datalad.support.path import robust_abspath
 
 from datalad.distribution.dataset import Dataset
 
 
 lgr = logging.getLogger('datalad.interface.results')
-
+lgr.log(5, "Importing datalad.interface.results")
 
 # which status is a success , which is failure
 success_status_map = {
@@ -224,10 +225,12 @@ def annexjson2result(d, ds, **kwargs):
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
     # avoid meaningless standard messages
-    if 'note' in d and (
-            d['note'] != 'checksum...' and
-            not d['note'].startswith('checking file')):
-        res['message'] = translate_annex_notes.get(d['note'], d['note'])
+    if 'note' in d:
+        note = "; ".join(ln for ln in d['note'].splitlines()
+                         if ln != 'checksum...'
+                         and not ln.startswith('checking file'))
+        if note:
+            res['message'] = translate_annex_notes.get(note, note)
     return res
 
 
@@ -274,7 +277,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # path of a result matches in input argument -- not 100% exhaustive
         # test, but could be good enough
         return True
-    elif any(abspath(p) == respath for p in paths):
+    elif any(robust_abspath(p) == respath for p in paths):
         # one absolutified input path matches the result path
         # I'd say: got for it!
         return True
@@ -282,7 +285,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
         # this was installed from a URL that was given, we'll take that too
         return True
     else:
-        False
+        return False
 
 
 def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_msg,
@@ -367,3 +370,6 @@ def results_from_annex_noinfo(ds, requested_paths, respath_by_status, dir_fail_m
                 status=noinfo_status, type='file',
                 message=noinfo_file_msg,
                 **common_report)
+
+
+lgr.log(5, "Done importing datalad.interface.results")

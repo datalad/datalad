@@ -30,7 +30,7 @@ from .utils import getpwd
 from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .cmdline.helpers import get_repo_instance
-from .consts import HANDLE_META_DIR
+from .consts import DATALAD_DOTDIR
 
 # To be used for a quick detection of path being under .git/
 _DOT_GIT_DIR = pathsep + '.git' + pathsep
@@ -54,6 +54,9 @@ except Exception as exc:
 
 lzma = None
 try:
+    # Our mocking would not work with backports.lzma ATM, so only lzma
+    # would be supported
+    # from datalad.support.lzma import lzma
     import lzma
 except ImportError:
     pass
@@ -96,6 +99,7 @@ class AutomagicIO(object):
         self._active = False
         self._builtin_open = __builtin__.open
         self._io_open = io.open
+        self._os_stat = os.stat
         self._builtin_exists = os.path.exists
         self._builtin_isfile = os.path.isfile
         if h5py:
@@ -199,6 +203,10 @@ class AutomagicIO(object):
         return self._proxy_open_name_mode('io.open', self._io_open,
                                           *args, **kwargs)
 
+    def _proxy_os_stat(self, *args, **kwargs):
+        return self._proxy_open_name_mode('os.stat', self._os_stat,
+                                          *args, **kwargs)
+
     def _proxy_h5py_File(self, *args, **kwargs):
         return self._proxy_open_name_mode('h5py.File', self._h5py_File,
                                           *args, **kwargs)
@@ -237,7 +245,7 @@ class AutomagicIO(object):
             # level dataset for that
             try:
                 filedir = pathsep.join(
-                    filedir_parts[:filedir_parts.index(HANDLE_META_DIR)]
+                    filedir_parts[:filedir_parts.index(DATALAD_DOTDIR)]
                 )
             except ValueError:
                 # would happen if no .datalad
@@ -307,6 +315,7 @@ class AutomagicIO(object):
         # overloads
         __builtin__.open = self._proxy_open
         io.open = self._proxy_io_open
+        os.stat = self._proxy_os_stat
         os.path.exists = self._proxy_exists
         os.path.isfile = self._proxy_isfile
         if h5py:
@@ -323,6 +332,7 @@ class AutomagicIO(object):
             return
         __builtin__.open = self._builtin_open
         io.open = self._io_open
+        os.stat = self._os_stat
         if h5py:
             h5py.File = self._h5py_File
         if lzma:

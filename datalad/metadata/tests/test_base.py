@@ -9,17 +9,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test metadata """
 
-import os
+import logging
 
 from os.path import join as opj
 from os.path import relpath
+import os.path as op
 
 from datalad.api import Dataset
 from datalad.api import aggregate_metadata
 from datalad.api import install
-from datalad.api import search
 from datalad.api import metadata
-from datalad.metadata.metadata import get_metadata_type
+from datalad.metadata.metadata import (
+    get_metadata_type,
+    query_aggregated_metadata,
+    _get_containingds_from_agginfo,
+)
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.tests.utils import with_tree, with_tempfile
@@ -31,6 +35,11 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_direct_mode
+from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import ok_file_has_content
+from datalad.tests.utils import ok_
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_re_in
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
@@ -60,9 +69,9 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
+    Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(Dataset(path)), [])
-    os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
     open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
     assert_equal(get_metadata_type(Dataset(path)), [])
@@ -88,7 +97,7 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
-@skip_direct_mode  #FIXME
+@known_failure_direct_mode  #FIXME
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
@@ -96,6 +105,10 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
+    # before anything aggregated we would get nothing and only a log warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
+    assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                   where='dataset')
     subds = ds.create('sub', force=True)
@@ -129,7 +142,7 @@ def test_aggregation(path):
     # basic sanity check
     assert_result_count(origres, 6)
     assert_result_count(origres, 3, type='dataset')
-    assert_result_count(origres, 3, type='file')
+    assert_result_count(origres, 3, type='file')  # Now that we have annex.key
     # three different IDs
     assert_equal(3, len(set([s['dsid'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
@@ -164,7 +177,7 @@ def test_aggregation(path):
     # test search in search tests, not all over the place
     ## query smoke test
     assert_result_count(clone.search('mother', mode='egrep'), 1)
-    assert_result_count(clone.search('MoTHER', mode='egrep'), 1)
+    assert_result_count(clone.search('(?i)MoTHER', mode='egrep'), 1)
 
     child_res = clone.search('child', mode='egrep')
     assert_result_count(child_res, 2)
@@ -195,7 +208,7 @@ def test_ignore_nondatasets(path):
         return meta
 
     ds = Dataset(path).create()
-    meta = _kill_time(ds.metadata(reporton='datasets'))
+    meta = _kill_time(ds.metadata(reporton='datasets', on_failure='ignore'))
     n_subm = 0
     # placing another repo in the dataset has no effect on metadata
     for cls, subpath in ((GitRepo, 'subm'), (AnnexRepo, 'annex_subm')):
@@ -206,11 +219,11 @@ def test_ignore_nondatasets(path):
         r.add('test')
         r.commit('some')
         assert_true(Dataset(subm_path).is_installed())
-        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
         ds.add(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
-        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets')))
+        assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
 
 
@@ -221,3 +234,39 @@ def test_get_aggregates_fails(path):
     ds = Dataset(path).create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')
     assert_result_count(res, 1, path=ds.path, status='impossible')
+
+
+@with_tree({'dummy': 'content'})
+@with_tempfile(mkdir=True)
+def test_bf2458(src, dst):
+    ds = Dataset(src).create(force=True)
+    ds.add('.', to_git=False)
+
+    # no clone (empty) into new dst
+    clone = install(source=ds.path, path=dst)
+    # XXX whereis says nothing in direct mode
+    # content is not here
+    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+    # check that plain metadata access does not `get` stuff
+    clone.metadata('.', on_failure='ignore')
+    # XXX whereis says nothing in direct mode
+    eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+
+
+def test_get_containingds_from_agginfo():
+    eq_(None, _get_containingds_from_agginfo({}, 'any'))
+    # direct hit returns itself
+    eq_('match', _get_containingds_from_agginfo({'match': {}, 'other': {}}, 'match'))
+    # matches
+    down = op.join('match', 'down')
+    eq_('match', _get_containingds_from_agginfo({'match': {}}, down))
+    # closest match
+    down_under = op.join(down, 'under')
+    eq_(down, _get_containingds_from_agginfo({'match': {}, down: {}}, down_under))
+    # absolute works too
+    eq_(op.abspath(down),
+        _get_containingds_from_agginfo(
+            {op.abspath('match'): {}, op.abspath(down): {}}, op.abspath(down_under)))
+    # will not tollerate mix'n'match
+    assert_raises(ValueError, _get_containingds_from_agginfo, {'match': {}}, op.abspath(down))
+    assert_raises(ValueError, _get_containingds_from_agginfo, {op.abspath('match'): {}}, down)

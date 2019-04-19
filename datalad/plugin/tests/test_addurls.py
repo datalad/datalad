@@ -151,20 +151,6 @@ def test_fmt_to_name():
     assert_false(au.fmt_to_name("{}", {}))
 
 
-def test_split_ext():
-    eq_(au.split_ext("file"), ("file", ""))
-
-    eq_(au.split_ext("file.py"), ("file", ".py"))
-    eq_(au.split_ext("file.tar.gz"), ("file", ".tar.gz"))
-    eq_(au.split_ext("file.toolong.gz"), ("file.toolong", ".gz"))
-
-    eq_(au.split_ext("file.a.b.c.d"), ("file", ".a.b.c.d"))
-    eq_(au.split_ext("file.a.b.cccc.d"), ("file", ".a.b.cccc.d"))
-    eq_(au.split_ext("file.a.b.ccccc.d"), ("file.a.b.ccccc", ".d"))
-
-    eq_(au.split_ext("file.a.b..c"), ("file", ".a.b..c"))
-
-
 def test_get_file_parts():
     assert_dict_equal(au.get_file_parts("file.tar.gz", "prefix"),
                       {"prefix": "file.tar.gz",
@@ -391,9 +377,12 @@ class TestAddurls(object):
                 assert_dict_equal(meta,
                                   {"subdir": [subdir], "name": [fname]})
 
-            # We should have two new commits on the git-annex: one for the
-            # added urls and one for the added metadata.
-            eq_(n_annex_commits + 2, get_annex_commit_counts())
+            # Ignore this check if we're faking dates because that disables
+            # batch mode.
+            if not os.environ.get('DATALAD_FAKE__DATES'):
+                # We should have two new commits on the git-annex: one for the
+                # added urls and one for the added metadata.
+                eq_(n_annex_commits + 2, get_annex_commit_counts())
 
             # Add to already existing links, overwriting.
             with swallow_logs(new_level=logging.DEBUG) as cml:

@@ -9,7 +9,7 @@ Overview
 DataLad has built-in, modular, and extensible support for metadata in various
 formats. Metadata is extracted from a dataset and its content by one or more
 extractors that have to be enabled in a dataset's configuration. Extractors
-yield metadata in a JSON-LD-like structure that can be arbitrarily complex and
+yield metadata in a JSON-LD_-like structure that can be arbitrarily complex and
 deeply nested. Metadata from each extractor is kept unmodified, unmangled, and
 separate from metadata of other extractors. This design enables tailored
 applications using particular metadata that can use Datalad as a
@@ -40,7 +40,123 @@ Supported metadata sources
 ==========================
 
 This following sections provide an overview of included metadata extractors for
-particular types of data structures and file formats.
+particular types of data structures and file formats. Note that :ref:`DataLad
+extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+<https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
+extractors for particular domains and formats.
+
+Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
+extractors are enabled by default.  Any additional metadata extractor should be
+enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
+via the ``git config`` command or by editing ``.datalad/config`` directly.
+For example, ``git config -f .datalad/config --add datalad.metadata.nativetype audio``
+would add :ref:`audio <metadata-audio>` metadata extractor to the list.
+
+
+.. _metadata-annex:
+
+Annex metadata (``annex``)
+--------------------------
+
+Content tracked by git-annex can have associated
+`metadata records <http://git-annex.branchable.com/metadata/>`_.
+From DataLad's perspective, git-annex metadata is just another source of
+metadata that can be extracted and aggregated.
+
+You can use the `git-annex metadata`_ command to assign git-annex
+metadata.  And, if you have a table or records that contain data
+sources and metadata, you can use :ref:`datalad addurls <man_datalad-addurls>`
+to quickly populate a dataset with files and associated
+git-annex metadata. (`///labs/openneurolab/metasearch
+<http://datasets.datalad.org/?dir=/labs/openneurolab/metasearch>`_ is
+an example of such a dataset.)
+
+
+Pros of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Many git-annex commands, such as `git-annex get`_ and `git-annex copy`_, can
+  use metadata to decide which files (keys) to operate on, making it possible to
+  automate file (re)distribution based on their metadata annotation
+- Assigned metadata is available for use by git-annex right away without
+  requiring any additional "aggregation" step
+- `git-annex view`_ can be used to quickly generate completely new layouts
+  of the repository solely based on the metadata fields associated with the files
+
+.. _git-annex get: https://git-annex.branchable.com/git-annex-get/
+.. _git-annex copy: https://git-annex.branchable.com/git-annex-copy/
+.. _git-annex metadata: https://git-annex.branchable.com/git-annex-metadata/
+.. _git-annex view: https://git-annex.branchable.com/git-annex-view/
+
+
+Cons of git-annex level metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- Metadata fields are actually stored per git-annex key rather than per file.
+  If multiple files contain the same content, metadata will be shared among them.
+- Files whose content is tracked directly by git cannot have git-annex metadata assigned.
+- No per repository/directory metadata, and no mechanism to use/aggregate
+  metadata from sub-datasets
+- Field names cannot contain some symbols, such as ':'
+- Metadata is stored within the `git-annex` branch, so it is distributed
+  across all clones of the dataset, making it hard to scale for large metadata
+  sizes or to work with sensitive metadata (not intended to be redistributed)
+- It is a generic storage with no prescribed vocabularly,
+  making it very flexible but also requiring consistency and
+  harmonization to make the stored metadata useful for search
+
+
+Example uses of git-annex metadata
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Annotating files for different purposes
+#######################################
+
+FreeSurfer project `uses <https://surfer.nmr.mgh.harvard.edu/fswiki/DevelopersGuide_git#GettheDataFiles>`_
+`git-annex` for managing their source code+data base within a single
+git/git-annex repository. Files necessary for different scenarios (deployment,
+testing) are annotated and can be fetched selectively for the scenario at hand.
+
+Automating "non-distribution" of sensitive files
+################################################
+
+In the `ReproIn <http://reproin.repronim.org>`_ framework for automated
+conversion of BIDS dataset and in some manually prepared datasets
+(such as
+`///labs/gobbini/famface/data <http://datasets.datalad.org/?dir=/labs/gobbini/famface/data>`_
+and
+`///labs/haxby/raiders <http://datasets.datalad.org/?dir=/labs/haxby/raiders>`_),
+we annotated materials that must not be publicly shared with a git-annex
+metadata field `distribution-restrictions`.  We used the following of values to
+describe why any particular file (content) should not be redistributed:
+
+- **sensitive** - files which potentially contain participant sensitive
+  information, such as non-defaced anatomicals
+- **proprietary** - files which contain proprietary data, which we have no
+  permissions to share (e.g., movie video files)
+
+Having annotated files this way, we could instruct git-annex
+to :ref:`publish <man_datalad-publish>` all but those restricted files to our
+server: `git annex wanted datalad-public "not metadata=distribution-restrictions=*"`.
+
+
+Flexible directory layout
+#########################
+
+If you are maintaining a collection of music files or PDFs for the lab, you
+may want to display the files in an alternative or filtered hierarchy.
+`git-annex view`_ could be of help. Example:
+
+.. code-block:: sh
+
+  datalad install ///labs/openneurolab/metasearch
+  cd metasearch
+  git annex view sex=* handedness=ambidextrous
+
+would give you two directories (Male, Female) with only the files belonging to
+ambidextrous subjects.
+
+
+.. _metadata-audio:
 
 Various audio file formats (``audio``)
 --------------------------------------
@@ -56,6 +172,8 @@ datacite.org compliant datasets (``datacite``)
 This extractor can handle dataset-level metadata following the `datacite.org
 <https://www.datacite.org>`_ specification. No constrained vocabulary is
 identified at the moment.
+
+.. _metadata-datalad_core:
 
 Datalad's internal metadata storage (``datalad_core``)
 ------------------------------------------------------
@@ -215,6 +333,156 @@ Besides full access to all aggregated metadata by path (via the :ref:`metadata
 entirety of the locally available metadata. Its capabilities include simple
 keyword searches as well as more complex queries using date ranges or logical
 conjunctions.
+
+Internal metadata representation
+================================
+
+.. warning::
+  The information in this section is meant to provide insight into how
+  DataLad structures extracted and aggregated metadata. However, this
+  representation is not considered stable or part of the public API,
+  hence these data should not be accessed directly. Instead, all
+  metadata access should happen via the :command:`metadata` API command.
+
+A dataset's metadata is stored in the `.datalad/metadata` directory. This
+directory contains two main elements:
+
+- a metadata inventory or catalog
+- a store for metadata "objects"
+
+The metadata inventory
+----------------------
+
+The inventory is kept in a JSON file, presently named ``aggregate_v1.json``.
+It contains a single top-level dictionary/object. Each element in this
+dictionary represents one subdataset from which metadata has been extracted
+and aggregated into the dataset at hand. Keys in this dictionary are
+paths to the respective (sub)datasets (relative to the root of the dataset).
+If a dataset has no subdataset and metadata extraction was performed, the
+dictionary will only have a single element under the key ``"."``.
+
+Here is an excerpt of an inventory dictionary showing the record of the
+root dataset itself.
+
+.. code-block:: json
+
+   {
+
+      ".": {
+         "content_info":
+            "objects/0c/cn-b046b2c3a5e2b9c5599c980c7b5fab.xz",
+         "datalad_version":
+            "0.10.0.rc4.dev191",
+         "dataset_info":
+            "objects/0c/ds-b046b2c3a5e2b9c5599c980c7b5fab",
+         "extractors": [
+            "datalad_core",
+            "annex",
+            "bids",
+            "nifti1"
+         ],
+         "id":
+            "00ce405e-6589-11e8-b749-a0369fb55db0",
+         "refcommit":
+            "d170979ef33a82c67e6fefe3084b9fe7391b422b"
+      },
+
+   }
+
+The record of each dataset contains the following elements:
+
+``id``
+  The DataLad dataset UUID of the dataset metadata was extracted and
+  aggregated from.
+``refcommit``
+  The SHA sum of the last metadata-relevant commit in the history of
+  the dataset metadata was extracted from. Metadata-relevant commits
+  are any commits that modify dataset content that is not exclusively
+  concerning DataLad's own internal status and configuration.
+``datalad_version``
+  The version string of the DataLad version that was used to perform
+  the metadata extraction (not necessarily the metadata aggregation,
+  as pre-extracted metadata can be aggregated from other superdatasets
+  for a dataset that is itself not available locally).
+``extractors``
+  A list with the names of all enabled metadata extractors for this
+  dataset. This list may include names for extractors that are provided
+  by extensions, and may not be available for any given DataLad
+  installation.
+``content_info``, ``dataset_info``
+  Path to the object files containing the actual metadata on the dataset
+  as a whole, and on individual files in a dataset (content). Paths
+  are to be interpreted relative to the inventory file, and point to
+  the metadata object store.
+
+Read-access to the metadata inventory is available via the ``metadata``
+command and its ``--get-aggregates`` option.
+
+The metadata object store
+-------------------------
+
+The object store holds the files containing dataset and content metadata for
+each aggregated dataset. The object store is located in
+`.datalad/metadata/objects`. However, this directory itself and the
+subdirectory structure within it have no significance, they are completely
+defined and exclusively discoverable via the ``content_info`` and
+``dataset_info`` values in the metadata inventory records.
+
+Metadata objects for datasets and content use a slightly different internal
+format. Both files could be either compressed (XZ) or uncompressed. Current
+practice uses compression for content metadata, but not for dataset metadata.
+Any metadata object file could be directly committed to Git, or it could be
+tracked via Git-annex. Reasons to choose one over the other could be file size,
+or privacy concerns.
+
+Read-access to the metadata objects of dataset and individual files is
+available via the ``metadata`` command. Importantly, metadata can be requested
+
+
+Metadata objects for datasets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These files have a single top-level JSON object/dictionary as content. A
+JSON-LD ``@content`` field is used to assign a semantic markup to allow for
+programmatic interpretation of metadata as linked data. Any other top-level key
+identifies the name of a metadata extractor, and the value stored under this
+key represents the output of the corresponding extractor.
+
+Structure and content of an extractor's output are unconstrained and completely
+up to the implementation of that particular extractor. Extractor can report
+additional JSON-LD context information (but there is no requirement).
+
+The output of one extractor does not interfere or collide with the output
+of any other extractor.
+
+Metadata objects for content/file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In contrast to metadata objects for entire datasets, these files use a JSON
+stream format, i.e. one JSON object/dictionary per line (no surrounding list).
+This makes it possible to process the content line-by-line instead of having
+to load an entire files (with potentially millions of records).
+
+The only other difference to dataset metadata objects is an additional top-level
+key ``path`` that identifies the relative path (relative to the root of its parent
+dataset) of the file the metadata record is associated with.
+
+Otherwise, the extractor-specific metadata structure and content is unconstrained.
+
+Content metadata objects tend to contain massively redundant information (e.g.
+a dataset with a thousand 12 megapixel images will report the identical resolution
+information a thousand times). Therefore, content metadata objects are by default
+XZ compressed -- as this compressor is particularly capable discovering such
+redundancy and yield a very compact file size.
+
+The reason for gathering all metadata into a single file across all content files and
+metadata extractors is to limit the impact on the performance of the underlying
+Git repository. Large superdataset could otherwise quickly grow into dimensions
+where tens of thousands of files would be required just to manage the metadata.
+Such a configuration would also limit the compatibility of DataLad datasets with
+constrained storage environments (think e.g. inode limits on super computers),
+as these files are tracked in Git and would therefore be present in any copy,
+regardless of whether metadata access is desired or not.
 
 
 Vocabulary

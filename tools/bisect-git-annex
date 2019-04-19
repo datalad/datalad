@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# A helper script that first builds git-annex using a Singularity image before
+# running the bisection command. It should be called from the git-annex source
+# tree as
+#
+#     $ git bisect run /path/to/bisect-git-annex IMAGE CMD...
+#
+# where IMAGE is the singularity image or, if an image doesn't exist, the path
+# to which the Singularity image should be downloaded. CMD will be executed if
+# the build completes successfully.
+
+set -eu
+SINGULARITY_IMAGE="$1"
+# The rest of cmdline is to execute
+shift
+
+if [ ! -e "$SINGULARITY_IMAGE" ]; then
+    echo "I: trying to fetch singularity image with build env"
+    singularity pull --name "$SINGULARITY_IMAGE" shub://datalad/datalad:git-annex-dev
+fi
+
+SINGULARITY_IMAGE=$(readlink -f "$SINGULARITY_IMAGE")
+annex_gitver=$(git describe)
+logfile=$(mktemp -p '' git-annex-build-${annex_gitver}-XXXXXX.log)
+
+[ -e Annex.hs ]  # just to make sure that it is invoked in the correct location
+echo "I: cleaning $PWD"
+git clean -dfx >/dev/null 2>&1
+
+echo "I: building $annex_gitver"
+if ! singularity exec -e $SINGULARITY_IMAGE make linuxstandalone 1>"$logfile" 2>&1; then
+    echo "E: failed to build, can't test this one. See $logfile"
+    exit 125
+fi
+export PATH=$PWD/tmp/git-annex.linux/:$PATH
+
+echo "I: running the script"
+eval "$@"

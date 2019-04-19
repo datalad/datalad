@@ -60,10 +60,7 @@ class AddReadme(Interface):
         import logging
         lgr = logging.getLogger('datalad.plugin.add_readme')
 
-        from datalad.distribution.add import Add
         from datalad.distribution.dataset import require_dataset
-        from datalad.interface.unlock import Unlock
-        from datalad.metadata.metadata import Metadata
         from datalad.utils import assure_list
 
         dataset = require_dataset(dataset, check_installed=True,
@@ -84,7 +81,9 @@ class AddReadme(Interface):
             dataset.unlock(filename)
 
         # get any metadata on the dataset itself
-        dsinfo = dataset.metadata('.', reporton='datasets', return_type='item-or-list')
+        dsinfo = dataset.metadata(
+            '.', reporton='datasets', return_type='item-or-list',
+            on_failure='ignore')
         meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
             lgr.warn("Could not obtain dataset metadata, proceeding without")

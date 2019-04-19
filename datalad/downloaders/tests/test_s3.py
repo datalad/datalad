@@ -12,6 +12,7 @@ import os
 from mock import patch
 
 from ..s3 import S3Authenticator
+from ..s3 import S3Downloader
 from ..providers import Providers  # to test against crcns
 
 from ...tests.utils import swallow_outputs
@@ -22,8 +23,10 @@ from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import assert_raises
 from ...tests.utils import skip_if_no_network
+from ...tests.utils import with_testsui
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
+from ...support.exceptions import AccessDeniedError
 
 try:
     import boto
@@ -38,7 +41,7 @@ skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
-
+url_1version_bucketwithdot = 's3://datalad.test1/version1.txt'
 
 @use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
@@ -47,9 +50,9 @@ def test_s3_download_basic():
         (url_2versions_nonversioned1, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
         (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
+        (url_1version_bucketwithdot, 'version1', 'nothing')
     ]:
         yield check_download_external_url, url, failed_str, success_str
-
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @use_cassette('test_s3_mtime')
@@ -105,3 +108,15 @@ def test_parse_url():
     assert_equal(f("s3://b/f%20name"), ('b', 'f name', {}))
     assert_equal(f("s3://b/f%2Bname"), ('b', 'f+name', {}))
     assert_equal(f("s3://b/f%2bname?r=%20"), ('b', 'f+name', {'r': '%20'}))
+
+
+@with_testsui(interactive=True)
+def test_deny_access():
+    downloader = S3Downloader(authenticator=S3Authenticator())
+
+    def deny_access(*args, **kwargs):
+        raise AccessDeniedError
+
+    with assert_raises(DownloadError):
+        with patch.object(downloader, '_download', deny_access):
+            downloader.download("doesn't matter")

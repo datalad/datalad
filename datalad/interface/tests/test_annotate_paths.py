@@ -80,7 +80,6 @@ def test_invalid_call(path):
 @slow  # 15.3509s
 @with_tree(demo_hierarchy)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_annotate_paths(dspath, nodspath):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(dspath, demo_hierarchy)

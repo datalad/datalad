@@ -8,13 +8,16 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test all extractors at a basic level"""
 
+from pkg_resources import iter_entry_points
 from inspect import isgenerator
 from datalad.api import Dataset
-from datalad.metadata import extractors
-from nose.tools import assert_equal
+from datalad.utils import on_osx
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import known_failure_direct_mode
+
+from nose import SkipTest
+from nose.tools import assert_equal
 
 
 @with_tree(tree={'file.dat': ''})
@@ -22,18 +25,22 @@ def check_api(no_annex, path):
     ds = Dataset(path).create(force=True, no_annex=no_annex)
     ds.add('.')
     ok_clean_git(ds.path)
-    processed_extractors = []
-    for p in dir(extractors):
-        if p.startswith('_') or p in ('tests', 'base'):
-            continue
-        processed_extractors.append(p)
+
+    processed_extractors, skipped_extractors = [], []
+    for extractor_ep in iter_entry_points('datalad.metadata.extractors'):
         # we need to be able to query for metadata, even if there is none
         # from any extractor
-        extractor = getattr(extractors, p).MetadataExtractor(
+        try:
+            extractor_cls = extractor_ep.load()
+        except Exception as exc:
+            exc_ = str(exc)
+            skipped_extractors += [exc_]
+            continue
+        extractor = extractor_cls(
             ds, paths=['file.dat'])
         meta = extractor.get_metadata(
-                dataset=True,
-                content=True)
+            dataset=True,
+            content=True)
         # we also get something for the dataset and something for the content
         # even if any of the two is empty
         assert_equal(len(meta), 2)
@@ -45,10 +52,25 @@ def check_api(no_annex, path):
         cm = dict(contentmeta)
         # datalad_core does provide some (not really) information about our
         # precious file
-        if p == 'datalad_core':
+        if extractor_ep.name == 'datalad_core':
             assert 'file.dat' in cm
+        elif extractor_ep.name == 'annex':
+            if not no_annex:
+                # verify correct key, which is the same for all files of 0 size
+                assert_equal(
+                    cm['file.dat']['key'],
+                    'MD5E-s0--d41d8cd98f00b204e9800998ecf8427e.dat'
+                )
+            else:
+                # no metadata on that file
+                assert not cm
+        processed_extractors.append(extractor_ep.name)
     assert "datalad_core" in processed_extractors, \
         "Should have managed to find at least the core extractor extractor"
+    if skipped_extractors:
+        raise SkipTest(
+            "Not fully tested/succeded since some extractors failed"
+            " to load:\n%s" % ("\n".join(skipped_extractors)))
 
 
 def test_api_git():
@@ -56,6 +78,5 @@ def test_api_git():
     yield check_api, True
 
 
-@known_failure_direct_mode
 def test_api_annex():
     yield check_api, False

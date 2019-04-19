@@ -37,7 +37,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
-from datalad.utils import with_pathsep as _with_sep
+from datalad.utils import _path_
 from datalad.utils import path_startswith
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
@@ -109,7 +109,7 @@ def _parse_git_submodules(dspath):
         sm = {}
         props = submodule_full_props.match(line)
         sm['revision'] = props.group(2)
-        subpath = opj(dspath, props.group(4))
+        subpath = _path_(dspath, props.group(4))
         sm['path'] = subpath
         if not exists(subpath) or not GitRepo.is_valid_repo(subpath):
             sm['state'] = 'absent'

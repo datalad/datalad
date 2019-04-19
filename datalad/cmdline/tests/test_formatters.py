@@ -83,6 +83,7 @@ def test_cmdline_example_to_rst():
     assert_not_in('shame', out_text)  # no SKIP'ed
     assert_not_in('#', out_text)      # no comments
 
+
 def test_parser_access():
     parsers = setup_parser(['datalad'], return_subparsers=True)
     # we have a bunch
@@ -97,7 +98,7 @@ def test_manpage_formatter():
     for p in parsers:
         mp = fmt.ManPageFormatter(
             p, ext_sections=addonsections).format_man_page(parsers[p])
-        for section in ('SYNOPSIS', 'DESCRIPTION', 'OPTIONS', 'MYTEST'):
+        for section in ('SYNOPSIS', 'NAME', 'OPTIONS', 'MYTEST'):
             assert_in('.SH {0}'.format(section), mp)
         assert_in('uniquedummystring', mp)
 

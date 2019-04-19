@@ -11,22 +11,20 @@
 __docformat__ = 'restructuredtext'
 
 
+import glob
 import logging
 import re
 import os
-from os.path import dirname
-from os.path import relpath
-from os.path import normpath
-from os.path import curdir
-from os.path import exists
-from os.path import lexists
-from os.path import join as opj
-from collections import OrderedDict
-from collections import Mapping
-from six import binary_type, string_types
-
-from pkg_resources import iter_entry_points
-
+import os.path as op
+from collections import (
+    OrderedDict,
+    Mapping,
+)
+from six import (
+    binary_type,
+    string_types,
+    iteritems,
+)
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
@@ -34,39 +32,53 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.metadata.definitions import version as vocabulary_version
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureBool,
+    EnsureStr,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 import datalad.support.ansi_colors as ac
-from datalad.support.json_py import load as jsonload
-from datalad.support.json_py import load_xzstream
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import reporton_opt
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import datasetmethod
-from datalad.distribution.dataset import require_dataset
-from datalad.utils import assure_list
-from datalad.utils import path_is_subpath, path_startswith
+from datalad.support.json_py import (
+    load as jsonload,
+    load_xzstream,
+)
+from datalad.interface.common_opts import (
+    recursion_flag,
+    reporton_opt,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    EnsureDataset,
+    datasetmethod,
+    require_dataset,
+)
+from datalad.utils import (
+    assure_list,
+    path_is_subpath,
+    path_startswith,
+    as_unicode,
+)
 from datalad.ui import ui
 from datalad.dochelpers import exc_str
-from datalad.dochelpers import single_or_plural
-
+from datalad.consts import (
+    OLDMETADATA_DIR,
+    OLDMETADATA_FILENAME,
+)
+from datalad.log import log_progress
 
 lgr = logging.getLogger('datalad.metadata.metadata')
 
 aggregate_layout_version = 1
-agginfo_relpath = opj(
-    '.datalad',
-    'metadata',
-    'aggregate_v{}.json'.format(aggregate_layout_version))
 
 # relative paths which to exclude from any metadata processing
 # including anything underneath them
 exclude_from_metadata = ('.datalad', '.git', '.gitmodules', '.gitattributes')
+
+# TODO filepath_info is obsolete
+location_keys = ('dataset_info', 'content_info', 'filepath_info')
 
 
 def get_metadata_type(ds):
@@ -94,19 +106,12 @@ def get_metadata_type(ds):
     return []
 
 
-class MetadataDict(dict):
-    """Metadata dict helper class"""
-    # TODO no longer needed ATM, but keeping for now, avoiding the
-    # big diff
-    pass
-
-
 def _load_json_object(fpath, cache=None):
     if cache is None:
         cache = {}
     obj = cache.get(
         fpath,
-        jsonload(fpath, fixup=True) if lexists(fpath) else {})
+        jsonload(fpath, fixup=True) if op.lexists(fpath) else {})
     cache[fpath] = obj
     return obj
 
@@ -116,9 +121,9 @@ def _load_xz_json_stream(fpath, cache=None):
         cache = {}
     obj = cache.get(
         fpath,
-        {s['path']: {k: v for k, v in s.items() if k != 'path'}
+        {s['path']: {k: v for k, v in iteritems(s) if k != 'path'}
          # take out the 'path' from the payload
-         for s in load_xzstream(fpath)} if lexists(fpath) else {})
+         for s in load_xzstream(fpath)} if op.lexists(fpath) else {})
     cache[fpath] = obj
     return obj
 
@@ -130,20 +135,25 @@ def _get_metadatarelevant_paths(ds, subds_relpaths):
 
 
 def _get_containingds_from_agginfo(info, rpath):
-    """Return the relative path of a dataset that contains a relative query path
+    """Return the path of a dataset that contains a query path
+
+    If a query path matches a dataset path directly, the matching dataset path
+    is return -- not the parent dataset!
 
     Parameters
     ----------
     info : dict
-      Content of aggregate.json (dict with relative subdataset paths as keys)
+      Content of aggregate.json (dict with (relative) subdataset paths as keys)
     rpath : str
-      Relative query path
+      Query path can be absolute or relative, but must match the convention
+      used in the info dict.
 
     Returns
     -------
     str or None
-      None is returned if the is no match, the relative path of the closest
-      containing subdataset otherwise.
+      None is returned if there is no match, the path of the closest
+      containing subdataset otherwise (in the convention used in the
+      info dict).
     """
     if rpath in info:
         dspath = rpath
@@ -194,9 +204,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     """
     from datalad.coreapi import get
     # look for and load the aggregation info for the base dataset
-    info_fpath = opj(ds.path, agginfo_relpath)
-    agg_base_path = dirname(info_fpath)
-    agginfos = _load_json_object(info_fpath)
+    agginfos, agg_base_path = load_ds_aggregate_db(ds)
 
     # cache once loaded metadata objects for additional lookups
     # TODO possibly supply this cache from outside, if objects could
@@ -212,7 +220,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
     for ap in aps:
         # all metadata is registered via its relative path to the
         # dataset that is being queried
-        rpath = relpath(ap['path'], start=ds.path)
+        rpath = op.relpath(ap['path'], start=ds.path)
         if rpath in reported:
             # we already had this, probably via recursion of some kind
             continue
@@ -228,7 +236,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             # could happen if there was no aggregated metadata at all
             # or the path is in this dataset, but luckily the queried dataset
             # is known to be present
-            containing_ds = curdir
+            containing_ds = op.curdir
         rap['metaprovider'] = containing_ds
 
         # build list of datasets and paths to be queried for this annotated path
@@ -241,26 +249,50 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             matching_subds = [{'metaprovider': sub, 'rpath': sub, 'type': 'dataset'}
                               for sub in sorted(agginfos)
                               # we already have the base dataset
-                              if (rpath == curdir and sub != curdir) or
+                              if (rpath == op.curdir and sub != op.curdir) or
                               path_is_subpath(sub, rpath)]
             to_query.extend(matching_subds)
+
+        to_query_available = []
+        for qap in to_query:
+            if qap['metaprovider'] not in agginfos:
+                res = get_status_dict(
+                    status='impossible',
+                    path=qap['path'],
+                    message=(
+                        'Dataset at %s contains no aggregated metadata on this path',
+                        qap['metaprovider']),
+                )
+                res.update(res, **kwargs)
+                if 'type' in qap:
+                    res['type'] = qap['type']
+                yield res
+            else:
+                to_query_available.append(qap)
 
         # one heck of a beast to get the set of filenames for all metadata objects that are
         # required to be present to fulfill this query
         objfiles = set(
             agginfos.get(qap['metaprovider'], {}).get(t, None)
-            for qap in to_query
+            for qap in to_query_available
             for t in ('dataset_info',) + \
             (('content_info',)
                 if ((reporton is None and qap.get('type', None) == 'file') or
                     reporton in ('files', 'all')) else tuple())
         )
-        lgr.debug('Verifying/achieving local availability of %i metadata objects', len(objfiles))
-        get(path=[dict(path=opj(agg_base_path, of), parentds=ds.path, type='file')
-                  for of in objfiles if of],
-            dataset=ds,
-            result_renderer='disabled')
-        for qap in to_query:
+        # in case there was no metadata provider, we do not want to start
+        # downloading everything: see https://github.com/datalad/datalad/issues/2458
+        objfiles.difference_update([None])
+        lgr.debug(
+            'Verifying/achieving local availability of %i metadata objects',
+            len(objfiles))
+        if objfiles:
+            get(path=[dict(path=op.join(agg_base_path, of),
+                           parentds=ds.path, type='file')
+                      for of in objfiles if of],
+                dataset=ds,
+                result_renderer='disabled')
+        for qap in to_query_available:
             # info about the dataset that contains the query path
             dsinfo = agginfos.get(qap['metaprovider'], dict(id=ds.id))
             res_tmpl = get_status_dict()
@@ -273,7 +305,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             dsobjloc = dsinfo.get('dataset_info', None)
             if dsobjloc is not None:
                 dsmeta = _load_json_object(
-                    opj(agg_base_path, dsobjloc),
+                    op.join(agg_base_path, dsobjloc),
                     cache=cache['objcache'])
 
             for r in _query_aggregated_metadata_singlepath(
@@ -286,7 +318,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
                 if 'query_matched' in ap:
                     r['query_matched'] = ap['query_matched']
                 if r.get('type', None) == 'file':
-                    r['parentds'] = normpath(opj(ds.path, qap['metaprovider']))
+                    r['parentds'] = op.normpath(op.join(ds.path, qap['metaprovider']))
                 yield r
                 reported.add(qap['rpath'])
 
@@ -299,7 +331,7 @@ def _query_aggregated_metadata_singlepath(
     rpath = qap['rpath']
     containing_ds = qap['metaprovider']
     qtype = qap.get('type', None)
-    if (rpath == curdir or rpath == containing_ds) and \
+    if (rpath == op.curdir or rpath == containing_ds) and \
             ((reporton is None and qtype == 'dataset') or \
              reporton in ('datasets', 'all')):
         # this is a direct match for a dataset (we only have agginfos for
@@ -308,7 +340,7 @@ def _query_aggregated_metadata_singlepath(
             status='ok',
             metadata=dsmeta,
             # normpath to avoid trailing dot
-            path=normpath(opj(ds.path, rpath)),
+            path=op.normpath(op.join(ds.path, rpath)),
             type='dataset')
         # all info on the dataset is gathered -> eject
         yield res
@@ -321,18 +353,18 @@ def _query_aggregated_metadata_singlepath(
     #
     # content info dicts have metadata stored under paths that are relative
     # to the dataset they were aggregated from
-    rparentpath = relpath(rpath, start=containing_ds)
+    rparentpath = op.relpath(rpath, start=containing_ds)
 
     # so we have some files to query, and we also have some content metadata
     contentmeta = _load_xz_json_stream(
-        opj(agg_base_path, contentinfo_objloc),
+        op.join(agg_base_path, contentinfo_objloc),
         cache=cache['objcache']) if contentinfo_objloc else {}
 
     for fpath in [f for f in contentmeta.keys()
-                  if rparentpath == curdir or
+                  if rparentpath == op.curdir or
                   path_startswith(f, rparentpath)]:
         # we might be onto something here, prepare result
-        metadata = MetadataDict(contentmeta.get(fpath, {}))
+        metadata = contentmeta.get(fpath, {})
 
         # we have to pull out the context for each extractor from the dataset
         # metadata
@@ -349,8 +381,8 @@ def _query_aggregated_metadata_singlepath(
         res = get_status_dict(
             status='ok',
             # the specific match within the containing dataset
-            # normpath() because containing_ds could be `curdir`
-            path=normpath(opj(ds.path, containing_ds, fpath)),
+            # normpath() because containing_ds could be `op.curdir`
+            path=op.normpath(op.join(ds.path, containing_ds, fpath)),
             # we can only match files
             type='file',
             metadata=metadata)
@@ -358,19 +390,23 @@ def _query_aggregated_metadata_singlepath(
 
 
 def _filter_metadata_fields(d, maxsize=None, blacklist=None):
-    o = d
+    lgr.log(5, "Analyzing metadata fields for maxsize=%s with blacklist=%s on "
+            "input with %d entries",
+            maxsize, blacklist, len(d))
+    orig_keys = set(d.keys())
     if blacklist:
-        o = {k: v for k, v in o.items()
+        d = {k: v for k, v in iteritems(d)
              if k.startswith('@') or not any(bl.match(k) for bl in blacklist)}
     if maxsize:
-        o = {k: v for k, v in o.items()
+        d = {k: v for k, v in iteritems(d)
              if k.startswith('@') or (len(str(v)
                                       if not isinstance(v, string_types + (binary_type,))
                                       else v) <= maxsize)}
-    if len(d) != len(o):
-        lgr.info('Removed metadata field(s) due to blacklisting and max size settings: %s',
-                 set(d.keys()).difference(o.keys()))
-    return o
+    if len(d) != len(orig_keys):
+        lgr.info(
+            'Removed metadata field(s) due to blacklisting and max size settings: %s',
+            orig_keys.difference(d.keys()))
+    return d
 
 
 def _ok_metadata(meta, mtype, ds, loc):
@@ -402,8 +438,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     types : list
     """
     errored = False
-    dsmeta = MetadataDict()
-    # each item in here will be a MetadataDict, but not the whole thing
+    dsmeta = dict()
     contentmeta = {}
 
     if global_meta is not None and content_meta is not None and \
@@ -424,9 +459,12 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
             lgr.warn(
-                '{} files have no content present, skipped metadata extraction for {}'.format(
+                '{} files have no content present, '
+                'some extractors will not operate on {}'.format(
                     nocontent,
-                    'them' if nocontent > 10 else [p for p, c, a in content_info if not c and a]))
+                    'them' if nocontent > 10
+                           else [p for p, c, a in content_info if not c and a])
+            )
 
     # pull out potential metadata field blacklist config settings
     blacklist = [re.compile(bl) for bl in assure_list(ds.config.obtain(
@@ -435,19 +473,46 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     # enforce size limits
     max_fieldsize = ds.config.obtain('datalad.metadata.maxfieldsize')
     # keep local, who knows what some extractors might pull in
+    from pkg_resources import iter_entry_points  # delayed heavy import
     extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
-    lgr.info('Engage metadata extractors: %s', types)
+
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Start metadata extraction from %s', ds,
+        total=len(types),
+        label='Metadata extraction',
+        unit=' extractors',
+    )
     for mtype in types:
         mtype_key = mtype
+        log_progress(
+            lgr.info,
+            'metadataextractors',
+            'Engage %s metadata extractor', mtype_key,
+            update=1,
+            increment=True)
         if mtype_key not in extractors:
             # we said that we want to fail, rather then just moan about less metadata
+            log_progress(
+                lgr.error,
+                'metadataextractors',
+                'Failed %s metadata extraction from %s', mtype_key, ds,
+            )
             raise ValueError(
-                'Enable metadata extractor %s is not available in this installation',
+                'Enabled metadata extractor %s is not available in this installation',
                 mtype_key)
         try:
             extractor_cls = extractors[mtype_key].load()
-            extractor = extractor_cls(ds, paths=paths)
+            extractor = extractor_cls(
+                ds,
+                paths=paths if extractor_cls.NEEDS_CONTENT else fullpathlist)
         except Exception as e:
+            log_progress(
+                lgr.error,
+                'metadataextractors',
+                'Failed %s metadata extraction from %s', mtype_key, ds,
+            )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
                 "broken dataset configuration (%s)?: %s",
@@ -467,6 +532,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             lgr.error('Failed to get dataset metadata ({}): {}'.format(
                 mtype, exc_str(e)))
             if cfg.get('datalad.runtime.raiseonerror'):
+                log_progress(
+                    lgr.error,
+                    'metadataextractors',
+                    'Failed %s metadata extraction from %s', mtype_key, ds,
+                )
                 raise
             errored = True
             # if we dont get global metadata we do not want content metadata
@@ -484,9 +554,36 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
         unique_cm = {}
         extractor_unique_exclude = getattr(extractor_cls, "_unique_exclude", set())
+        # TODO: ATM neuroimaging extractors all provide their own internal
+        #  log_progress but if they are all generators, we could provide generic
+        #  handling of the progress here.  Note also that log message is actually
+        #  seems to be ignored and not used, only the label ;-)
+        # log_progress(
+        #     lgr.debug,
+        #     'metadataextractors_loc',
+        #     'Metadata extraction per location for %s', mtype,
+        #     # contentmeta_t is a generator... so no cound is known
+        #     # total=len(contentmeta_t or []),
+        #     label='Metadata extraction per location',
+        #     unit=' locations',
+        # )
         for loc, meta in contentmeta_t or {}:
+            lgr.log(5, "Analyzing metadata for %s", loc)
+            # log_progress(
+            #     lgr.debug,
+            #     'metadataextractors_loc',
+            #     'ignoredatm',
+            #     label=loc,
+            #     update=1,
+            #     increment=True)
             if not _ok_metadata(meta, mtype, ds, loc):
                 errored = True
+                # log_progress(
+                #     lgr.debug,
+                #     'metadataextractors_loc',
+                #     'ignoredatm',
+                #     label='Failed for %s' % loc,
+                # )
                 continue
             # we also want to store info that there was no metadata(e.g. to get a list of
             # files that have no metadata)
@@ -496,19 +593,19 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             #elif not meta:
             #    continue
 
-            meta = MetadataDict(meta)
             # apply filters
             meta = _filter_metadata_fields(
                 meta,
                 maxsize=max_fieldsize,
                 blacklist=blacklist)
 
+            if not meta:
+                continue
+
             # assign
             # only ask each metadata extractor once, hence no conflict possible
             loc_dict = contentmeta.get(loc, {})
-            if meta:
-                # do not store empty stuff
-                loc_dict[mtype_key] = meta
+            loc_dict[mtype_key] = meta
             contentmeta[loc] = loc_dict
 
             if ds.config.obtain(
@@ -517,7 +614,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     valtype=EnsureBool()):
                 # go through content metadata and inject report of unique keys
                 # and values into `dsmeta`
-                for k, v in meta.items():
+                for k, v in iteritems(meta):
                     if k in dsmeta.get(mtype_key, {}):
                         # if the dataset already has a dedicated idea
                         # about a key, we skip it from the unique list
@@ -539,6 +636,11 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     vset.add(_val2hashable(v))
                     unique_cm[k] = vset
 
+        # log_progress(
+        #     lgr.debug,
+        #     'metadataextractors_loc',
+        #     'Finished metadata extraction across locations for %s', mtype)
+
         if unique_cm:
             # per source storage here too
             ucp = dsmeta.get('datalad_unique_content_properties', {})
@@ -551,12 +653,21 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             # we also want to have each unique value set always come
             # in a top-level list, so we known if some unique value
             # was a list, os opposed to a list of unique values
+
+            def _ensure_serializable(val):
+                if isinstance(val, ReadOnlyDict):
+                    return {k: _ensure_serializable(v) for k, v in iteritems(val)}
+                if isinstance(val, (tuple, list)):
+                    return [_ensure_serializable(v) for v in val]
+                else:
+                    return val
+
             ucp[mtype_key] = {
-                k: [dict(i) if isinstance(i, ReadOnlyDict) else i
+                k: [_ensure_serializable(i)
                     for i in sorted(
                         v,
                         key=_unique_value_key)] if v is not None else None
-                for k, v in unique_cm.items()
+                for k, v in iteritems(unique_cm)
                 # v == None (disable unique, but there was a value at some point)
                 # otherwise we only want actual values, and also no single-item-lists
                 # of a non-value
@@ -564,6 +675,12 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                 # (inflated number of keys, inflated storage, inflated search index, ...)
                 if v is None or (v and not v == {''})}
             dsmeta['datalad_unique_content_properties'] = ucp
+
+    log_progress(
+        lgr.info,
+        'metadataextractors',
+        'Finished metadata extraction from %s', ds,
+    )
 
     # always identify the effective vocabulary - JSON-LD style
     if context:
@@ -583,7 +700,7 @@ def _unique_value_key(x):
              for k in sorted(x)]
     # we need to force str, because sorted in PY3 refuses to compare
     # any heterogeneous type combinations, such as str/int, tuple(int)/tuple(str)
-    return str(x)
+    return as_unicode(x)
 
 
 def _val2hashable(val):
@@ -634,13 +751,114 @@ class ReadOnlyDict(Mapping):
         return '<%s %r>' % (self.__class__.__name__, self._dict)
 
     def __hash__(self):
-        iteritems = getattr(dict, 'iteritems', dict.items) # py2-3 compatibility
         if self._hash is None:
             h = 0
             for key, value in iteritems(self._dict):
-                h ^= hash((key, value))
+                h ^= hash((key, _val2hashable(value)))
             self._hash = h
         return self._hash
+
+
+def get_ds_aggregate_db_locations(ds, version='default', warn_absent=True):
+    """Returns the location of a dataset's aggregate metadata DB
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to query
+    version : str
+      DataLad aggregate metadata layout version. At the moment only a single
+      version exists. 'default' will return the locations for the current default
+      layout version.
+    warn_absent : bool
+      If True, warn if the desired DB version is not present and give hints on
+      what else is available. This is useful when using this function from
+      a user-facing command.
+
+    Returns
+    -------
+    db_location, db_object_base_path
+      Absolute paths to the DB itself, and to the basepath to resolve relative
+      object references in the database. Either path may not exist in the
+      queried dataset.
+    """
+    layout_version = aggregate_layout_version \
+        if version == 'default' else version
+
+    agginfo_relpath_template = op.join(
+        '.datalad',
+        'metadata',
+        'aggregate_v{}.json')
+    agginfo_relpath = agginfo_relpath_template.format(layout_version)
+    info_fpath = op.join(ds.path, agginfo_relpath)
+    agg_base_path = op.dirname(info_fpath)
+    # not sure if this is the right place with these check, better move then to a higher level
+    if warn_absent and not op.exists(info_fpath):
+        if version == 'default':
+            # caller had no specific idea what metadata version is needed/available
+            # This dataset does not have aggregated metadata.  Does it have any
+            # other version?
+            info_glob = op.join(ds.path, agginfo_relpath_template).format('*')
+            info_files = glob.glob(info_glob)
+            msg = "Found no aggregated metadata info file %s." \
+                  % info_fpath
+            old_metadata_file = op.join(ds.path, OLDMETADATA_DIR, OLDMETADATA_FILENAME)
+            if op.exists(old_metadata_file):
+                msg += " Found metadata generated with pre-0.10 version of " \
+                       "DataLad, but it will not be used."
+            upgrade_msg = ""
+            if info_files:
+                msg += " Found following info files, which might have been " \
+                       "generated with newer version(s) of datalad: %s." \
+                       % (', '.join(info_files))
+                upgrade_msg = ", upgrade datalad"
+            msg += " You will likely need to either update the dataset from its " \
+                   "original location%s or reaggregate metadata locally." \
+                   % upgrade_msg
+            lgr.warning(msg)
+    return info_fpath, agg_base_path
+
+
+def load_ds_aggregate_db(ds, version='default', abspath=False, warn_absent=True):
+    """Load a dataset's aggregate metadata database
+
+    Parameters
+    ----------
+    ds : Dataset
+      Dataset instance to query
+    version : str
+      DataLad aggregate metadata layout version. At the moment only a single
+      version exists. 'default' will return the content of the current default
+      aggregate database version.
+    warn_absent : bool
+      If True, warn if the desired DB version is not present and give hints on
+      what else is available. This is useful when using this function from
+      a user-facing command.
+
+    Returns
+    -------
+    dict [, str]
+      A dictionary with the database content is return. If abspath is True,
+      all paths in the dictionary (datasets, metadata object archives) are
+      absolute. If abspath is False, all paths are relative, and the metadata
+      object base path is return as a second value.
+    """
+    info_fpath, agg_base_path = get_ds_aggregate_db_locations(ds, version, warn_absent)
+
+    # save to call even with a non-existing location
+    agginfos = _load_json_object(info_fpath)
+
+    if abspath:
+        return {
+            # paths in DB on disk are always relative
+            # make absolute to ease processing during aggregation
+            op.normpath(op.join(ds.path, p)):
+            {k: op.normpath(op.join(agg_base_path, v)) if k in location_keys else v
+             for k, v in props.items()}
+            for p, props in agginfos.items()
+        }
+    else:
+        return agginfos, agg_base_path
 
 
 @build_doc
@@ -737,8 +955,12 @@ class Metadata(Interface):
                 refds_path,
                 check_installed=True,
                 purpose='aggregate metadata query')
-            info_fpath = opj(ds.path, agginfo_relpath)
-            if not exists(info_fpath):
+            agginfos = load_ds_aggregate_db(
+                ds,
+                version=str(aggregate_layout_version),
+                abspath=True
+            )
+            if not agginfos:
                 # if there has ever been an aggregation run, this file would
                 # exist, hence there has not been and we need to tell this
                 # to people
@@ -749,11 +971,9 @@ class Metadata(Interface):
                     logger=lgr,
                     message='metadata aggregation has never been performed in this dataset')
                 return
-            agginfos = _load_json_object(info_fpath)
             parentds = []
-            for sd in sorted(agginfos):
-                info = agginfos[sd]
-                dspath = normpath(opj(ds.path, sd))
+            for dspath in sorted(agginfos):
+                info = agginfos[dspath]
                 if parentds and not path_is_subpath(dspath, parentds[-1]):
                     parentds.pop()
                 info.update(
@@ -761,7 +981,7 @@ class Metadata(Interface):
                     type='dataset',
                     status='ok',
                 )
-                if sd == curdir:
+                if dspath == ds.path:
                     info['layout_version'] = aggregate_layout_version
                 if parentds:
                     info['parentds'] = parentds[-1]
@@ -775,7 +995,7 @@ class Metadata(Interface):
         if not dataset and not path:
             # makes no sense to have no dataset, go with "here"
             # error generation happens during annotation
-            path = curdir
+            path = op.curdir
 
         content_by_ds = OrderedDict()
         for ap in AnnotatePaths.__call__(
@@ -816,22 +1036,6 @@ class Metadata(Interface):
                 pcontent.append(ap)
                 content_by_ds[to_query] = pcontent
 
-        # test for datasets that will be queried, but have never been aggregated
-        # TODO add option, even even by default, re-aggregate metadata prior query
-        # if it was found to be outdated.
-        # This is superior to re-aggregation upon manipulation, as manipulation
-        # can happen in a gazzilon ways and may even be incremental over multiple
-        # steps where intermediate re-aggregation is pointless and wasteful
-        to_aggregate = [d for d in content_by_ds
-                        if not exists(opj(d, agginfo_relpath))]
-        if to_aggregate:
-            lgr.warning(
-                'Metadata query results might be incomplete, initial '
-                'metadata aggregation was not yet performed in %s at: %s',
-                single_or_plural(
-                    'dataset', 'datasets', len(to_aggregate), include_count=True),
-                to_aggregate)
-
         for ds_path in content_by_ds:
             ds = Dataset(ds_path)
             query_agg = [ap for ap in content_by_ds[ds_path]
@@ -865,7 +1069,7 @@ class Metadata(Interface):
             # logging complained about this already
             return
         # list the path, available metadata keys, and tags
-        path = relpath(res['path'],
+        path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
         meta = res.get('metadata', {})
         ui.message('{path}{type}:{spacer}{meta}{tags}'.format(

@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import gzip
 import inspect
 import shutil
 import stat
@@ -27,6 +28,7 @@ from six import string_types
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
+from contextlib import contextmanager
 from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
@@ -38,6 +40,7 @@ from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 from os.path import relpath
 
+from nose.plugins.attrib import attr
 from nose.tools import \
     assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, assert_is, \
@@ -48,6 +51,7 @@ from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
+from .. import utils
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
@@ -62,6 +66,10 @@ from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
+
+
+# Additional indicators
+on_travis = bool(os.environ.get('TRAVIS', False))
 
 
 # additional shortcuts
@@ -103,86 +111,6 @@ def skip_if_url_is_not_available(url, regex=None):
         raise SkipTest("%s failed to download" % url)
 
 
-# TODO: eventually we might want to make use of attr module
-class File(object):
-    """Helper for a file entry in the create_tree/@with_tree
-
-    It allows to define additional settings for entries
-    """
-    def __init__(self, name, executable=False):
-        """
-
-        Parameters
-        ----------
-        name : str
-          Name of the file
-        executable: bool, optional
-          Make it executable
-        """
-        self.name = name
-        self.executable = executable
-
-    def __str__(self):
-        return self.name
-
-
-def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
-    """Given an archive `name`, create under `path` with specified `load` tree
-    """
-    from ..support.archives import compress_files
-    dirname = file_basename(name)
-    full_dirname = opj(path, dirname)
-    os.makedirs(full_dirname)
-    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
-    # create archive
-    if archives_leading_dir:
-        compress_files([dirname], name, path=path, overwrite=overwrite)
-    else:
-        compress_files(list(map(basename, glob.glob(opj(full_dirname, '*')))),
-                       opj(pardir, name),
-                       path=opj(path, dirname),
-                       overwrite=overwrite)
-    # remove original tree
-    shutil.rmtree(full_dirname)
-
-
-def create_tree(path, tree, archives_leading_dir=True):
-    """Given a list of tuples (name, load) create such a tree
-
-    if load is a tuple itself -- that would create either a subtree or an archive
-    with that content and place it into the tree if name ends with .tar.gz
-    """
-    lgr.log(5, "Creating a tree under %s", path)
-    if not exists(path):
-        os.makedirs(path)
-
-    if isinstance(tree, dict):
-        tree = tree.items()
-
-    for file_, load in tree:
-        if isinstance(file_, File):
-            executable = file_.executable
-            name = file_.name
-        else:
-            executable = False
-            name = file_
-        full_name = opj(path, name)
-        if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
-            else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
-        else:
-            #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, text_type):
-            #    import pydb; pydb.debugger()
-            with open(full_name, 'w') as f:
-                if PY2 and isinstance(load, text_type):
-                    load = load.encode('utf-8')
-                f.write(load)
-        if executable:
-            os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
-
 #
 # Addition "checkers"
 #
@@ -204,8 +132,8 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
     Note
     ----
     Parameters head_modified and index_modified currently work
-    in pure git or indirect mode annex only and are ignored otherwise!
-    Implementation is yet to do!
+    in pure git or indirect mode annex only. If they are given, no
+    test of modification of known repo content is performed.
 
     Parameters
     ----------
@@ -259,18 +187,15 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
 
     if annex and r.is_direct_mode():
         if head_modified or index_modified:
-            lgr.warning("head_modified and index_modified are not quite valid "
-                        "concepts in direct mode! Looking for any change "
-                        "(staged or not) instead.")
-            status = r.get_status(untracked=False, submodules=not ignore_submodules)
-            modified = []
-            for s in status:
-                modified.extend(status[s])
-            eq_(sorted(head_modified + index_modified),
-                sorted(f for f in modified))
+            lgr.warning("head_modified and index_modified are not supported "
+                        "for direct mode repositories!")
         else:
-            ok_(not r.is_dirty(untracked_files=not untracked,
-                               submodules=not ignore_submodules))
+            test_untracked = not untracked
+            test_submodules = not ignore_submodules
+            ok_(not r.is_dirty(untracked_files=test_untracked,
+                               submodules=test_submodules),
+                msg="Repo unexpectedly dirty (tested for: untracked({}), submodules({})".format(
+                    test_untracked, test_submodules))
     else:
         repo = r.repo
 
@@ -285,13 +210,14 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                 eq_(head_diffs, [])
                 eq_(index_diffs, [])
             else:
+                # TODO: These names are confusing/non-descriptive.  REDO
                 if head_modified:
                     # we did ask for interrogating changes
                     head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(head_modified_, head_modified)
+                    eq_(sorted(head_modified_), sorted(head_modified))
                 if index_modified:
                     index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(index_modified_, index_modified)
+                    eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -327,9 +253,10 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True, _datalad_msg=True)
+        repo.add(file_repo_path)
     else:
-        repo.add(file_repo_path, git=True, _datalad_msg=True)
+        repo.add(file_repo_path, git=True)
+    repo.commit(_datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
@@ -355,7 +282,10 @@ def _prep_file_under_git(path, filename):
             raise
 
     # path to the file within the repository
-    file_repo_dir = os.path.relpath(path, repo.path)
+    # repo.path is a "realpath" so to get relpath working correctly
+    # we need to realpath our path as well
+    path = op.realpath(path)  # intentional realpath to match GitRepo behavior
+    file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
 
@@ -462,19 +392,37 @@ def ok_exists(path):
     assert exists(path), 'path %s does not exist' % path
 
 
-def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
+def ok_file_has_content(path, content, strip=False, re_=False,
+                        decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
     ok_exists(path)
-    with open(path, 'r') as f:
-        content_ = f.read()
-
-        if strip:
-            content_ = content_.strip()
-
-        if re_:
-            assert_re_in(content, content_, **kwargs)
+    if decompress:
+        if path.endswith('.gz'):
+            open_func = gzip.open
         else:
-            assert_equal(content, content_, **kwargs)
+            raise NotImplementedError("Don't know how to decompress %s" % path)
+    else:
+        open_func = open
+
+    with open_func(path, 'rb') as f:
+        file_content = f.read()
+
+    if isinstance(content, text_type):
+        file_content = assure_unicode(file_content)
+
+    if os.linesep != '\n':
+        # for consistent comparisons etc. Apparently when reading in `b` mode
+        # on Windows we would also get \r
+        # https://github.com/datalad/datalad/pull/3049#issuecomment-444128715
+        file_content = file_content.replace(os.linesep, '\n')
+
+    if strip:
+        file_content = file_content.strip()
+
+    if re_:
+        assert_re_in(content, file_content, **kwargs)
+    else:
+        assert_equal(content, file_content, **kwargs)
 
 
 #
@@ -589,6 +537,7 @@ def serve_path_via_http(tfunc, *targs):
     """
 
     @wraps(tfunc)
+    @attr('serve_path_via_http')
     def newfunc(*args, **kwargs):
 
         if targs:
@@ -611,6 +560,7 @@ def with_memory_keyring(t):
     """Decorator to use non-persistant MemoryKeyring instance
     """
     @wraps(t)
+    @attr('with_memory_keyring')
     def newfunc(*args, **kwargs):
         keyring = MemoryKeyring()
         with patch("datalad.downloaders.credentials.keyring_", keyring):
@@ -625,6 +575,7 @@ def without_http_proxy(tfunc):
     """
 
     @wraps(tfunc)
+    @attr('without_http_proxy')
     def newfunc(*args, **kwargs):
         # Such tests don't require real network so if http_proxy settings were
         # provided, we remove them from the env for the duration of this run
@@ -809,9 +760,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
-
     @wraps(t)
+    @attr('with_testrepos')
     def newfunc(*arg, **kw):
+        if on_windows:
+            raise SkipTest("Testrepo setup is broken on Windows")
+
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
@@ -825,6 +779,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        fake_dates = os.environ.get("DATALAD_FAKE__DATES")
         ntested = 0
         for uri in testrepos_uris:
             if count and ntested >= count:
@@ -835,6 +790,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
+                # The is_explicit_path check is needed because it may be a URL,
+                # but check_dates needs a local path or GitRepo object.
+                if fake_dates and is_explicit_path(uri):
+                    from ..support.repodates import check_dates
+                    assert_false(
+                        check_dates(uri, annex="tree")["objects"])
                 if uri in _TEMP_PATHS_CLONES:
                     _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
@@ -850,6 +811,7 @@ def with_fake_cookies_db(func, cookies={}):
     from ..support.cookies import cookies_db
 
     @wraps(func)
+    @attr('with_fake_cookies_db')
     def newfunc(*args, **kwargs):
         try:
             orig_cookies_db = cookies_db._cookies_db
@@ -860,11 +822,19 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
+def check_not_generatorfunction(func):
+    """Internal helper to verify that we are not decorating generator tests"""
+    if inspect.isgeneratorfunction(func):
+        raise RuntimeError("{}: must not be decorated, is a generator test"
+                           .format(func.__name__))
+
+
 def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
 
     If not used as a decorator, and just a function, could be used at the module level
     """
+    check_not_generatorfunction(func)
 
     def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
@@ -872,36 +842,64 @@ def skip_if_no_network(func=None):
 
     if func:
         @wraps(func)
+        @attr('network')
+        @attr('skip_if_no_network')
         def newfunc(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
-        # right away tag the test as a networked test
-        tags = getattr(newfunc, 'tags', [])
-        newfunc.tags = tags + ['network']
         return newfunc
     else:
         check_and_raise()
 
 
-def skip_if_on_windows(func):
+def skip_if_on_windows(func=None):
     """Skip test completely under Windows
     """
-    @wraps(func)
-    def newfunc(*args, **kwargs):
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
         if on_windows:
             raise SkipTest("Skipping on Windows")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_on_windows')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
 
 
 @optional_args
-def skip_if(func, cond=True, msg=None):
+def skip_if(func, cond=True, msg=None, method='raise'):
     """Skip test for specific condition
+
+    Parameters
+    ----------
+    cond: bool
+      condition on which to skip
+    msg: str
+      message to print if skipping
+    method: str
+      either 'raise' or 'pass'. Whether to skip by raising `SkipTest` or by
+      just proceeding and simply not calling the decorated function.
+      This is particularly meant to be used, when decorating single assertions
+      in a test with method='pass' in order to not skip the entire test, but
+      just that assertion.
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
-            raise SkipTest(msg if msg else "condition was True")
+            if method == 'raise':
+                raise SkipTest(msg if msg else "condition was True")
+            elif method == 'pass':
+                print(msg if msg else "condition was True")
+                return
         return func(*args, **kwargs)
     return newfunc
 
@@ -910,10 +908,12 @@ def skip_ssh(func):
     """Skips SSH tests if on windows or if environment variable
     DATALAD_TESTS_SSH was not set
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
+    @attr('skip_ssh')
     def newfunc(*args, **kwargs):
-        if on_windows:
-            raise SkipTest("SSH currently not available on windows.")
         from datalad import cfg
         test_ssh = cfg.get("datalad.tests.ssh", '')
         if not test_ssh or test_ssh in ('0', 'false', 'no'):
@@ -935,6 +935,7 @@ def probe_known_failure(func):
     """
 
     @wraps(func)
+    @attr('probe_known_failure')
     def newfunc(*args, **kwargs):
         from datalad import cfg
         if cfg.obtain("datalad.tests.knownfailures.probe"):
@@ -948,7 +949,8 @@ def probe_known_failure(func):
     return newfunc
 
 
-def skip_known_failure(func):
+@optional_args
+def skip_known_failure(func, method='raise'):
     """Test decorator allowing to skip a test that is known to fail
 
     Setting config datalad.tests.knownfailures.skip to a bool enables/disables
@@ -957,8 +959,10 @@ def skip_known_failure(func):
     from datalad import cfg
 
     @skip_if(cond=cfg.obtain("datalad.tests.knownfailures.skip"),
-             msg="Skip test known to fail")
+             msg="Skip test known to fail",
+             method=method)
     @wraps(func)
+    @attr('skip_known_failure')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -974,31 +978,38 @@ def known_failure(func):
     @skip_known_failure
     @probe_known_failure
     @wraps(func)
+    @attr('known_failure')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
 
-def known_failure_v6(func):
-    """Test decorator marking a test as known to fail in a v6 test run
+def known_failure_v6_or_later(func):
+    """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
-    the original (undecorated) function is returned.
+    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
     """
 
     from datalad import cfg
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version == 6:
+    if version and version >= 6:
 
         @known_failure
         @wraps(func)
+        @attr('known_failure_v6_or_later')
+        @attr('v6_or_later')
         def v6_func(*args, **kwargs):
             return func(*args, **kwargs)
 
         return v6_func
 
     return func
+
+
+# TODO: Remove once the released version of datalad-crawler no longer uses it.
+known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
@@ -1010,11 +1021,13 @@ def known_failure_direct_mode(func):
 
     from datalad import cfg
 
-    direct = cfg.obtain("datalad.repo.direct")
+    direct = cfg.obtain("datalad.repo.direct") or on_windows
     if direct:
 
         @known_failure
         @wraps(func)
+        @attr('known_failure_direct_mode')
+        @attr('direct_mode')
         def dm_func(*args, **kwargs):
             return func(*args, **kwargs)
 
@@ -1023,27 +1036,49 @@ def known_failure_direct_mode(func):
     return func
 
 
+def known_failure_windows(func):
+    """Test decorator marking a test as known to fail on windows
+
+    On Windows behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+    if on_windows:
+
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_windows')
+        @attr('windows')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+    return func
+
 # ### ###
 # END known failure decorators
 # ### ###
 
 
-def skip_v6(func):
-    """Skips tests if datalad is configured to use v6 mode
-    (DATALAD_REPO_VERSION=6)
+@optional_args
+def skip_v6_or_later(func, method='raise'):
+    """Skips tests if datalad is configured to use v6 mode or later
+    (e.g., DATALAD_REPO_VERSION=6)
     """
 
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run")
+    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
     @wraps(func)
+    @attr('skip_v6_or_later')
+    @attr('v6_or_later')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
 
 
-def skip_direct_mode(func):
+@optional_args
+def skip_direct_mode(func, method='raise'):
     """Skips tests if datalad is configured to use direct mode
     (set DATALAD_REPO_DIRECT)
     """
@@ -1051,8 +1086,11 @@ def skip_direct_mode(func):
     from datalad import cfg
 
     @skip_if(cfg.obtain("datalad.repo.direct"),
-             msg="Skip test in direct mode test run")
+             msg="Skip test in direct mode test run",
+             method=method)
     @wraps(func)
+    @attr('skip_direct_mode')
+    @attr('direct_mode')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1074,11 +1112,14 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
+        # record previous state of PWD handling
+        utils_pwd_mode = utils._pwd_mode
         try:
-            func(*args, **kwargs)
+            ret = func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
+            utils._pwd_mode = utils_pwd_mode
             try:
                 cwd_after = os.getcwd()
             except OSError as e:
@@ -1087,11 +1128,14 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if cwd_after != cwd_before:
             chpwd(pwd_before)
+            # Above chpwd could also trigger the change of _pwd_mode, so we
+            # would need to reset it again since we know that it is all kosher
+            utils._pwd_mode = utils_pwd_mode
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
                     % (func, cwd_after, pwd_before))
-                # If there was already exception raised, we better re-raise
+                # If there was already exception raised, we better reraise
                 # that one since it must be more important, so not masking it
                 # here with our assertion
                 if exc_info is None:
@@ -1100,6 +1144,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if exc_info is not None:
             reraise(*exc_info)
+
+        return ret
 
     return newfunc
 
@@ -1201,7 +1247,7 @@ def assert_status(label, results):
                 i + 1,
                 len(results),
                 label,
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_message(message, results):
@@ -1232,7 +1278,7 @@ def assert_result_count(results, n, **kwargs):
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_in_results(results, **kwargs):
@@ -1276,26 +1322,22 @@ def assert_result_values_cond(results, prop, cond):
 
 
 def ignore_nose_capturing_stdout(func):
-    """Decorator workaround for nose's behaviour with redirecting sys.stdout
+    """DEPRECATED and will be removed soon.  Does nothing!
 
-    Needed for tests involving the runner and nose redirecting stdout.
-    Counter-intuitively, that means it needed for nosetests without '-s'.
+    Originally was intended as a decorator workaround for nose's behaviour
+    with redirecting sys.stdout, but now we monkey patch nose now so no test
+    should no longer be skipped.
+
     See issue reported here:
     https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
-    """
 
-    @make_decorator(func)
-    def newfunc(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except AttributeError as e:
-            # Use args instead of .message which is PY2 specific
-            message = e.args[0] if e.args else ""
-            if message.find('StringIO') > -1 and message.find('fileno') > -1:
-                raise SkipTest("Triggered nose defect in masking out real stdout")
-            else:
-                raise
-    return newfunc
+    """
+    lgr.warning(
+        "@ignore_nose_capturing_stdout no longer does anything - nose should "
+        "just be monkey patched in setup_package. {} still has it"
+        .format(func.__name__)
+    )
+    return func
 
 
 def skip_httpretty_on_problematic_pythons(func):
@@ -1329,33 +1371,36 @@ def with_batch_direct(t):
     return newfunc
 
 
-def dump_graph(graph, flatten=False):
-    if flatten:
-        from datalad.metadata import flatten_metadata_graph
-        graph = flatten_metadata_graph(graph)
-    return dumps(
-        graph,
-        indent=1,
-        default=lambda x: 'non-serializable object skipped')
-
-
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_PREFIX = os.getenv('DATALAD_TESTS_OBSCURE_PREFIX', '')
 OBSCURE_FILENAMES = (
-    " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
-    " \"';a&b&cd `| ",
-    " \"';abcd `| ",
-    " \"';abcd | ",
-    " \"';abcd ",
-    " ;abcd ",
-    " ;abcd",
-    " ab cd ",
-    " ab cd",
-    "a",
-    " abc d.dat ",
-    "abc d.dat ",  # they all should at least support spaces and dots
+    u" \"';a&b/&c `| ",  # shouldn't be supported anywhere I guess due to /
+    u" \"';a&b&c `| ",
+    u" \"';abc `| ",
+    u" \"';abc | ",
+    u" \"';abc ",
+    u" ;abc ",
+    u" ;abc",
+    u" ab c ",
+    u" ab c",
+    u"ac",
+    u" ab .datc ",
+    u"ab .datc ",  # they all should at least support spaces and dots
 )
+UNICODE_FILENAME = u"ΔЙקم๗あ"
+# OSX is exciting -- some I guess FS might be encoding differently from decoding
+# so Й might get recoded
+# (ref: https://github.com/datalad/datalad/pull/1921#issuecomment-385809366)
+if sys.getfilesystemencoding().lower() == 'utf-8':
+    if on_osx:
+        # TODO: figure it really out
+        UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    # Prepend the list with unicode names first
+    OBSCURE_FILENAMES = tuple(
+        f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
+    ) + OBSCURE_FILENAMES
+
 
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir):
@@ -1377,6 +1422,9 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+OBSCURE_FILENAME = get_most_obscure_supported_name()
 
 
 @optional_args
@@ -1405,6 +1453,29 @@ def with_testsui(t, responses=None, interactive=True):
     return newfunc
 
 with_testsui.__test__ = False
+
+
+@optional_args
+def with_direct(func):
+    """To test functions under both direct and indirect mode
+
+    Unlike fancy generators would just fail on the first failure
+    """
+    @wraps(func)
+    @attr('direct_mode')
+    def newfunc(*args, **kwargs):
+        if on_windows or on_travis:
+            # since on windows would become indirect anyways
+            # on travis -- we have a dedicated matrix run
+            # which would select one or another based on config
+            # if we specify None
+            directs = [None]
+        else:
+            # otherwise we assume that we have to test both modes
+            directs = [True, False]
+        for direct in directs:
+            func(*(args + (direct,)), **kwargs)
+    return newfunc
 
 
 def assert_no_errors_logged(func, skip_re=None):
@@ -1458,6 +1529,24 @@ def patch_config(vars):
     """
     from datalad import cfg
     return patch.dict(cfg._store, vars)
+
+
+@contextmanager
+def set_date(timestamp):
+    """Temporarily override environment variables for git/git-annex dates.
+
+    Parameters
+    ----------
+    timestamp : int
+        Unix timestamp.
+    """
+    git_ts = "@{} +0000".format(timestamp)
+    with patch.dict("os.environ",
+                    {"GIT_COMMITTER_DATE": git_ts,
+                     "GIT_AUTHOR_DATE": git_ts,
+                     "GIT_ANNEX_VECTOR_CLOCK": str(timestamp),
+                     "DATALAD_FAKE__DATES": "0"}):
+        yield
 
 
 #

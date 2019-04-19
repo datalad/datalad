@@ -11,11 +11,16 @@
 
 
 import io
-import lzma
 import codecs
-from os.path import dirname
-from os.path import exists
+from six import PY2
+from os.path import (
+    dirname,
+    exists,
+    lexists,
+)
 from os import makedirs
+import os
+import os.path as op
 
 # wrapped below
 from simplejson import load as jsonload
@@ -49,6 +54,8 @@ def dump(obj, fname):
     indir = dirname(fname)
     if not exists(indir):
         makedirs(indir)
+    if lexists(fname):
+        os.unlink(fname)
     with io.open(fname, 'wb') as f:
         return dump2fileobj(obj, f)
 
@@ -67,6 +74,7 @@ def LZMAFile(*args, **kwargs):
     calling dir() helps to avoid AttributeError __exit__
     see https://bugs.launchpad.net/pyliblzma/+bug/1219296
     """
+    from .lzma import lzma
     lzmafile = lzma.LZMAFile(*args, **kwargs)
     dir(lzmafile)
     return lzmafile
@@ -76,6 +84,12 @@ def dump2stream(obj, fname, compressed=False):
 
     _open = LZMAFile if compressed else open
 
+    indir = dirname(fname)
+
+    if op.lexists(fname):
+        os.remove(fname)
+    elif indir and not exists(indir):
+        makedirs(indir)
     with _open(fname, mode='wb') as f:
         jwriter = codecs.getwriter('utf-8')(f)
         for o in obj:
@@ -131,17 +145,18 @@ def load(fname, fixup=True, **kw):
                 raise
             lgr.warning("Failed to decode content in %s: %s. Trying few tricks", fname, exc_str(exc))
 
-    # Load entire content and replace common "abusers" which break JSON comprehension but in general
-    # are Ok
-    with io.open(fname, 'r', encoding='utf-8') as f:
-        s_orig = s = f.read()
+            # Load entire content and replace common "abusers" which break JSON
+            # comprehension but in general
+            # are Ok
+            with io.open(fname, 'r', encoding='utf-8') as f:
+                s_orig = s = f.read()
 
-    for o, r in {
-        u"\xa0": " ",  # non-breaking space
-    }.items():
-        s = s.replace(o, r)
+            for o, r in {
+                u"\xa0": " ",  # non-breaking space
+            }.items():
+                s = s.replace(o, r)
 
-    if s == s_orig:
-        # we have done nothing, so just reraise previous exception
-        raise
-    return loads(s, **kw)
+            if s == s_orig:
+                # we have done nothing, so just reraise previous exception
+                raise
+            return loads(s, **kw)

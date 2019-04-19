@@ -1,0 +1,117 @@
+build: false
+
+environment:
+  matrix:
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+      DATALAD_TESTS_SSH: 1
+    - PYTHON: "C:\\Python35"
+      PYTHON_VERSION: "3.5.1"
+      PYTHON_ARCH: "32"
+      MINICONDA: C:\Miniconda35
+      DATALAD_TESTS_SSH: 1
+      DATALAD_REPO_VERSION: 6
+
+cache:
+  # cache the pip cache
+  - C:\Users\appveyor\AppData\Local\pip\Cache -> appveyor.yml
+
+init:
+  - "ECHO %PYTHON% %PYTHON_VERSION% %PYTHON_ARCH% %MINICONDA%"
+  # this will display login RDP info for the build VM, but if the build VM should block
+  # see on_finish below instead
+  #- ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+install:
+  - "set PATH=%MINICONDA%;%MINICONDA%\\Scripts;%PATH%"
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  #- "conda create -q -n test-environment python=%PYTHON_VERSION% numpy scipy matplotlib pytest pandas"
+  - "conda create -q -n test-environment python=%PYTHON_VERSION%"
+  - activate test-environment
+  - mkdir resources
+  # define test host alias
+  - echo. >> %SYSTEMROOT%\System32\drivers\etc\hosts
+  - echo.127.0.0.1  datalad-test >> %SYSTEMROOT%\System32\drivers\etc\hosts
+  # OpenSSH server setup
+  - appveyor DownloadFile https://github.com/PowerShell/Win32-OpenSSH/releases/download/v7.6.1.0p1-Beta/OpenSSH-Win32.zip -FileName resources\openssh.zip
+  - 7z x -o"resources" resources\openssh.zip
+  # install
+  - powershell.exe -ExecutionPolicy Bypass -File resources\OpenSSH-Win32\install-sshd.ps1
+  # configure service
+  - powershell.exe New-NetFirewallRule -Name sshd -DisplayName 'OpenSSH Server (sshd)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22
+  # keys in default place
+  - ssh-keygen -f C:\Users\appveyor\.ssh\id_rsa -N ""
+  # authorize access with these keys
+  - copy C:\Users\appveyor\.ssh\id_rsa.pub c:\Users\appveyor\.ssh\authorized_keys
+  - copy tools\ci\appveyor_ssh_config c:\Users\appveyor\.ssh\config
+  # fire up service
+  - net start sshd
+  # test login
+  - ssh -v localhost exit
+  - ssh datalad-test exit
+  # git annex setup
+  - appveyor DownloadFile https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -FileName resources\git-annex-installer.exe
+  # extract git annex into the system Git installation path
+  - 7z x -o"C:\\Program Files\Git" resources\git-annex-installer.exe
+  # info on how python is ticking
+  - python -c "import sys; print(sys.path)"
+  # cannot do full, e.g. because libxmp is N/A, causes unguarded ERRORs
+  #- pip install ".[full]"
+  - pip install ".[tests]"
+  - pip install ".[devel-utils]"
+  # fixup
+  # ATM datalad does not pull in colorama, which is needed for color output
+  # on windows
+  - pip install colorama
+  - git config --global user.email "test@appveyor.land"
+  - git config --global user.name "Appveyor Almighty"
+
+test_script:
+  # establish baseline, if annex doesn't work, we are not even trying
+  #- git annex test
+  # run tests on installed module, not source tree files
+  - mkdir __testhome__
+  - cd __testhome__
+  # report basic info
+  - git version
+  - git annex version
+  # first sign of life
+  - datalad wtf
+  # and now this... [keep appending tests that should work!!]
+  # one call per datalad component for now -- to better see what is being tested
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.cmdline"
+  # remaining fails: test_archives.test_basic_scenario test_datalad.test_basic_scenario_local_url
+  #- python -m nose -s -v datalad.customremotes
+  # remaining fails: test_add test_create_test_dataset test_get test_uninstall test_utils
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.distribution.tests.test_create datalad.distribution.tests.test_create_github datalad.distribution.tests.test_dataset_binding datalad.distribution.tests.test_siblings datalad.distribution.tests.test_update datalad.distribution.tests.test_dataset datalad.distribution.tests.test_publish datalad.distribution.tests.test_subdataset datalad.distribution.tests.test_clone datalad.distribution.tests.test_create_sibling"
+  # remaining fails: test_http
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.downloaders.tests.test_credentials datalad.downloaders.tests.test_providers datalad.downloaders.tests.test_s3"
+  # remaining fails: test_add_archive_content test_annotate_paths test_diff test_ls_webui test_run test_save test_utils
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.interface.tests.test_base datalad.interface.tests.test_clean datalad.interface.tests.test_docs datalad.interface.tests.test_ls datalad.interface.tests.test_unlock datalad.interface.tests.test_run_procedure"
+  # remaining fails: extractors.tests.test_base test_aggregation test_base  datalad.metadata.extractors.tests.test_datacite_xml
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.metadata.tests.test_search datalad.metadata.tests.test_extract_metadata datalad.metadata.extractors.tests.test_frictionless_datapackage datalad.metadata.extractors.tests.test_rfc822"
+  # remaining fails: test_addurls test_export_archive test_plugins"
+  # additional tests need module `dateutil`!!
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.plugin.tests.test_check_dates"
+  # remaining fails: test_annexrepo test_digests test_gitrepo test_locking test_repodates test_sshrun 
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.support.tests.test_cache datalad.support.tests.test_stats datalad.support.tests.test_status datalad.support.tests.test_versions datalad.support.tests.test_network datalad.support.tests.test_external_versions datalad.support.tests.test_sshconnector datalad.support.tests.test_json_py datalad.support.tests.test_vcr_"
+  # remaining fails: test__main__ test_archives test_cmd test_log  test_protocols test_test_utils test_utils test_auto
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.tests.test_api datalad.tests.test_base datalad.tests.test_config datalad.tests.test_constraints datalad.tests.test_dochelpers datalad.tests.test_installed datalad.tests.test_interface datalad.tests.test_misc datalad.tests.test_s3 datalad.tests.test_testrepos"
+
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.ui"
+  
+  - "python -m nose -s -v --with-cov --cover-package datalad --cover-xml --cover-xml-file=coverage.xml datalad.distribution.tests.test_install"
+
+after_test:
+  - ps: |
+      $env:PATH = 'C:\msys64\usr\bin;' + $env:PATH
+      Invoke-WebRequest -Uri 'https://codecov.io/bash' -OutFile codecov.sh
+      bash codecov.sh -f "coverage.xml"
+
+on_finish:
+  # enable the next to let the build VM block for up to 60min to log in via RDP and debug
+  #- ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

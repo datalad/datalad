@@ -45,9 +45,23 @@ Metadata handling
 .. autosummary::
    :toctree: generated
 
+   api.search
    api.metadata
    api.aggregate_metadata
-   api.search
+   api.extract_metadata
+
+
+Reproducible execution
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.run
+   api.rerun
+   api.run_procedure
+
 
 Plumbing commands
 -----------------
@@ -75,8 +89,6 @@ Miscellaneous commands
    :toctree: generated
 
    api.add_archive_content
-   api.crawl
-   api.crawl_init
    api.test
 
 Plugins
@@ -91,9 +103,9 @@ with DataLad.
 
    add_readme
    addurls
+   check_dates
    export_archive
    export_to_figshare
-   extract_metadata
    no_annex
    wtf
 
@@ -126,16 +138,6 @@ Configuration management
    :toctree: generated
 
    config
-
-Crawler
-=======
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   crawler.base
-   crawler.pipeline
 
 Test infrastructure
 ===================

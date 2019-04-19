@@ -9,27 +9,33 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Some additional tests for search command (some are within test_base)"""
 
+import logging
 from shutil import copy
 from mock import patch
 from os import makedirs
 from os.path import join as opj
 from os.path import dirname
-from datalad.api import Dataset, install
+from datalad.api import Dataset
 from nose.tools import assert_equal, assert_raises
-from datalad.utils import chpwd
-from datalad.utils import swallow_outputs
+from datalad.utils import (
+    chpwd,
+    swallow_logs,
+    swallow_outputs,
+)
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_is_generator
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import patch_config
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
-from datalad.metadata import search as search_mod
 
 from ..search import _listdict2dictlist
 from ..search import _meta2autofield_dict
@@ -51,7 +57,7 @@ def test_search_outside1(tdir, newhome):
     with chpwd(tdir):
         # should fail since directory exists, but not a dataset
         # should not even waste our response ;)
-        with patch.object(search_mod, 'LOCAL_CENTRAL_PATH', newhome):
+        with patch_config({'datalad.locations.default-dataset': newhome}):
             gen = search("bu", return_type='generator')
             assert_is_generator(gen)
             assert_raises(NoDatasetArgumentFound, next, gen)
@@ -64,16 +70,16 @@ def test_search_outside1(tdir, newhome):
 @with_testsui(responses='yes')
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_search_outside1_install_central_ds(tdir, central_dspath):
+def test_search_outside1_install_default_ds(tdir, default_dspath):
     with chpwd(tdir):
         # let's mock out even actual install/search calls
         with \
-            patch.object(search_mod, 'LOCAL_CENTRAL_PATH', central_dspath), \
+            patch_config({'datalad.locations.default-dataset': default_dspath}), \
             patch('datalad.api.install',
-                  return_value=Dataset(central_dspath)) as mock_install, \
+                  return_value=Dataset(default_dspath)) as mock_install, \
             patch('datalad.distribution.dataset.Dataset.search',
                   new_callable=_mock_search):
-            _check_mocked_install(central_dspath, mock_install)
+            _check_mocked_install(default_dspath, mock_install)
 
             # now on subsequent run, we want to mock as if dataset already exists
             # at central location and then do search again
@@ -83,7 +89,7 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
             with patch(
                     'datalad.distribution.dataset.Dataset.is_installed',
                     True):
-                _check_mocked_install(central_dspath, mock_install)
+                _check_mocked_install(default_dspath, mock_install)
 
             # and what if we say "no" to install?
             ui.add_responses('no')
@@ -92,7 +98,7 @@ def test_search_outside1_install_central_ds(tdir, central_dspath):
                 list(search("."))
 
             # and if path exists and is a valid dataset and we say "no"
-            Dataset(central_dspath).create()
+            Dataset(default_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
@@ -121,7 +127,7 @@ class _mock_search(object):
             yield report
 
 
-def _check_mocked_install(central_dspath, mock_install):
+def _check_mocked_install(default_dspath, mock_install):
     gen = search(".", return_type='generator')
     assert_is_generator(gen)
     # we no longer do any custom path tune up from the one returned by search
@@ -129,7 +135,7 @@ def _check_mocked_install(central_dspath, mock_install):
     assert_equal(
         list(gen), [report
                     for report in _mocked_search_results])
-    mock_install.assert_called_once_with(central_dspath, source='///')
+    mock_install.assert_called_once_with(default_dspath, source='///')
 
 
 @with_tempfile
@@ -180,6 +186,11 @@ def test_within_ds_file_search(path):
     except ImportError:
         raise SkipTest
     ds = Dataset(path).create(force=True)
+    # override default and search for datasets and files for this test
+    for m in ('egrep', 'textblob', 'autofield'):
+        ds.config.add(
+            'datalad.search.index-{}-documenttype'.format(m), 'all',
+            where='dataset')
     ds.config.add('datalad.metadata.nativetype', 'audio', where='dataset')
     makedirs(opj(path, 'stim'))
     for src, dst in (
@@ -188,6 +199,15 @@ def test_within_ds_file_search(path):
             opj(dirname(dirname(__file__)), 'tests', 'data', src),
             opj(path, dst))
     ds.add('.')
+    # yoh: CANNOT FIGURE IT OUT since in direct mode it gets added to git
+    # directly BUT
+    #  - output reports key, so seems to be added to annex!
+    #  - when I do manually in cmdline - goes to annex
+    ok_file_under_git(path, opj('stim', 'stim1.mp3'), annexed=True)
+    # If it is not under annex, below addition of metadata silently does
+    # not do anything
+    list(ds.repo.set_metadata(
+        opj('stim', 'stim1.mp3'), init={'importance': 'very'}))
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     # basic sanity check on the metadata structure of the dataset
@@ -213,6 +233,8 @@ type
 """, cmo.out)
 
     target_out = """\
+annex.importance
+annex.key
 audio.bitrate
 audio.duration(s)
 audio.format
@@ -239,49 +261,80 @@ type
 
     assert_result_count(ds.search('blablob#'), 0)
     # now check that we can discover things from the aggregated metadata
-    for mode, query, hitpath, matched_key, matched_val in (
-            # random keyword query
-            ('textblob',
-             'mp3',
-             opj('stim', 'stim1.mp3'),
-             'meta', 'mp3'),
-            # report which field matched with auto-field
-            ('autofield',
-             'mp3',
-             opj('stim', 'stim1.mp3'),
-             'audio.format', 'mp3'),
-            # XXX next one is not supported by current text field analyser
-            # decomposes the mime type in [mime, audio, mp3]
-            # ('autofield',
-            # "'mime:audio/mp3'",
-            # opj('stim', 'stim1.mp3'),
-            # 'audio.format', 'mime:audio/mp3'),
-            # but this one works
-            ('autofield',
-             "'mime audio mp3'",
-             opj('stim', 'stim1.mp3'),
-             'audio.format', 'mp3'),
-            # TODO extend with more complex queries to test whoosh
-            # query language configuration
+    for mode, query, hitpath, matched in (
+        ('egrep',
+         ':mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # same as above, leading : is stripped, in indicates "ALL FIELDS"
+        ('egrep',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # same as above, but with AND condition
+        # get both matches
+        ('egrep',
+         ['mp3', 'type:file'],
+         opj('stim', 'stim1.mp3'),
+         {'type': 'file', 'audio.format': 'mp3'}),
+        # case insensitive search
+        ('egrep',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # field selection by expression
+        ('egrep',
+         'audio\.+:mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # random keyword query
+        ('textblob',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'meta': 'mp3'}),
+        # report which field matched with auto-field
+        ('autofield',
+         'mp3',
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # XXX next one is not supported by current text field analyser
+        # decomposes the mime type in [mime, audio, mp3]
+        # ('autofield',
+        # "'mime:audio/mp3'",
+        # opj('stim', 'stim1.mp3'),
+        # 'audio.format', 'mime:audio/mp3'),
+        # but this one works
+        ('autofield',
+         "'mime audio mp3'",
+         opj('stim', 'stim1.mp3'),
+         {'audio.format': 'mp3'}),
+        # TODO extend with more complex queries to test whoosh
+        # query language configuration
     ):
         res = ds.search(query, mode=mode, full_record=True)
-        if mode == 'textblob':
-            # 'textblob' does datasets by default only (be could be configured otherwise
-            assert_result_count(res, 1)
-        else:
-            # the rest has always a file and the dataset, because they carry metadata in
-            # the same structure
-            assert_result_count(res, 2)
-            assert_result_count(
-                res, 1, type='file', path=opj(ds.path, hitpath),
-                # each file must report the ID of the dataset it is from, critical for
-                # discovering related content
-                dsid=ds.id)
         assert_result_count(
-            res, 1, type='dataset', path=ds.path, dsid=ds.id)
+            res, 1, type='file', path=opj(ds.path, hitpath),
+            # each file must report the ID of the dataset it is from, critical for
+            # discovering related content
+            dsid=ds.id)
+        # in egrep we currently do not search unique values
+        # and the queries above aim at files
+        assert_result_count(res, 1 if mode == 'egrep' else 2)
+        if mode != 'egrep':
+            assert_result_count(
+                res, 1, type='dataset', path=ds.path, dsid=ds.id)
         # test the key and specific value of the match
-        assert_in(matched_key, res[-1]['query_matched'])
-        assert_equal(res[-1]['query_matched'][matched_key], matched_val)
+        for matched_key, matched_val in matched.items():
+            assert_in(matched_key, res[-1]['query_matched'])
+            assert_equal(res[-1]['query_matched'][matched_key], matched_val)
+
+    # test a suggestion msg being logged if no hits and key is a bit off
+    with swallow_logs(new_level=logging.INFO) as cml:
+        res = ds.search('audio.formats:mp3 audio.bitsrate:1', mode='egrep')
+        assert not res
+        assert_in('Did you mean any of', cml.out)
+        assert_in('audio.format', cml.out)
+        assert_in('audio.bitrate', cml.out)
 
 
 def test_listdict2dictlist():

@@ -15,8 +15,6 @@ import logging
 from os.path import join as opj
 from os.path import relpath
 
-from six.moves.urllib.parse import quote as urlquote
-
 from datalad.interface.base import Interface
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.annotate_paths import annotated2content_by_ds
@@ -42,12 +40,16 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    _fixup_submodule_dotgit_setup,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.network import URL
 from datalad.support.network import RI
+from datalad.support.network import urlquote
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 from datalad.utils import get_dataset_root
@@ -62,7 +64,6 @@ from .dataset import datasetmethod
 from .clone import Clone
 from .utils import _get_flexible_source_candidates
 from .utils import _get_tracking_source
-from .utils import _fixup_submodule_dotgit_setup
 
 __docformat__ = 'restructuredtext'
 
@@ -390,7 +391,7 @@ class Get(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=Parameter(
-            args=("--recursion-limit",),
+            args=("-R", "--recursion-limit",),
             metavar="LEVELS",
             constraints=EnsureInt() | EnsureChoice('existing') | EnsureNone(),
             doc="""limit recursion into subdataset to the given number of levels.

@@ -34,6 +34,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AccessDeniedError
 from datalad.support.exceptions import AccessFailedError
 from datalad.support.exceptions import RemoteNotAvailableError
+from datalad.support.exceptions import DownloadError
 from datalad.support.network import RI
 from datalad.support.network import URL
 from datalad.support.gitrepo import GitRepo
@@ -438,9 +439,9 @@ def _configure_remote(
                 r.update(res_kwargs)
                 yield r
 
-        if inherit:
+        delayed_super = _DelayedSuper(ds.repo)
+        if inherit and delayed_super.super is not None:
             # Adjust variables which we should inherit
-            delayed_super = _DelayedSuper(ds.repo)
             publish_depends = _inherit_config_var(
                 delayed_super, depvar, publish_depends)
             publish_by_default = _inherit_config_var(
@@ -496,19 +497,26 @@ def _configure_remote(
             # we need to check if added sibling an annex, and try to enable it
             # another part of the fix for #463 and #432
             try:
+                exc = None
                 if not ds.config.obtain(
                         'remote.{}.annex-ignore'.format(name),
                         default=False,
                         valtype=EnsureBool(),
                         store=False):
                     ds.repo.enable_remote(name)
-            except CommandError as exc:
+            except (CommandError, DownloadError) as exc:
                 # TODO yield
-                # this is unlikely to ever happen, now done for AnnexRepo instances
-                # only
-                lgr.info("Failed to enable annex remote %s, "
-                         "could be a pure git" % name)
+                # this is unlikely to ever happen, now done for AnnexRepo
+                # instances only
+                # Note: CommandError happens with git-annex
+                # 6.20180416+gitg86b18966f-1~ndall+1 (prior 6.20180510, from
+                # which starts to fail with AccessFailedError) if URL is bogus,
+                # so enableremote fails. E.g. as "tested" in test_siblings
+                lgr.info(
+                    "Failed to enable annex remote %s, could be a pure git "
+                    "or not accessible", name)
                 lgr.debug("Exception was: %s" % exc_str(exc))
+
             if as_common_datasrc:
                 ri = RI(url)
                 if isinstance(ri, URL) and ri.scheme in ('http', 'https'):
@@ -804,33 +812,36 @@ def _inherit_config_var(ds, cfgvar, var):
 class _DelayedSuper(object):
     """A helper to delay deduction on super dataset until needed
 
-    But if asked and not found -- blow up
+    But if asked and not found -- would return None for everything
     """
 
     def __init__(self, repo):
         self._child_dataset = Dataset(repo.path)
         self._super = None
+        self._super_tried = False
 
     def __str__(self):
         return str(self.super)
 
     @property
     def super(self):
-        if self._super is None:
+        if not self._super_tried:
+            self._super_tried = True
             # here we must analyze current_ds's super, not the super_ds
             self._super = self._child_dataset.get_superdataset()
             if not self._super:
-                raise RuntimeError(
+                lgr.warning(
                     "Cannot determine super dataset for %s, thus "
-                    "cannot inherit anything" % self._child_dataset
+                    "probably nothing would be inherited where desired"
+                    % self._child_dataset
                 )
         return self._super
 
     # Lean proxies going through .super
     @property
     def config(self):
-        return self.super.config
+        return self.super.config if self.super else None
 
     @property
     def repo(self):
-        return self.super.repo
+        return self.super.repo if self.super else None

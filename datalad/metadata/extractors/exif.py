@@ -11,6 +11,7 @@
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.exif')
+from datalad.log import log_progress
 
 from exifread import process_file
 from datalad.metadata.definitions import vocabulary_id
@@ -34,8 +35,23 @@ class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []
+        log_progress(
+            lgr.info,
+            'extractorexif',
+            'Start EXIF metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='EXIF metadata extraction',
+            unit=' Files',
+        )
         contentmeta = []
         for f in self.paths:
+            absfp = opj(self.ds.path, f)
+            log_progress(
+                lgr.info,
+                'extractorexif',
+                'Extract EXIF metadata from %s', absfp,
+                update=1,
+                increment=True)
             # TODO we might want to do some more elaborate extraction in the future
             # but for now plain EXIF, no maker extensions, no thumbnails
             info = process_file(open(opj(self.ds.path, f), 'rb'), details=False)
@@ -46,6 +62,11 @@ class MetadataExtractor(BaseMetadataExtractor):
                     for k in info}
             contentmeta.append((f, meta))
 
+        log_progress(
+            lgr.info,
+            'extractorexif',
+            'Finished EXIF metadata extraction from %s', self.ds
+        )
         return {
             '@context': {
                 'exif': {

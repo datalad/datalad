@@ -11,7 +11,11 @@
 
 import logging
 import os
+import os.path as op
 from os.path import exists, isdir, getmtime, join as opj
+from mock import patch
+
+from nose import SkipTest
 
 from datalad.support.external_versions import external_versions
 
@@ -24,6 +28,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import ok_
 from datalad.tests.utils import assert_is_instance
+from datalad.tests.utils import skip_if_on_windows
 
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
@@ -63,6 +68,7 @@ def test_ssh_get_connection():
     manager.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
@@ -99,14 +105,17 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path) == existed_before)
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_manager_close():
 
     manager = SSHManager()
 
     # check for previously existing sockets:
-    existed_before_1 = exists(opj(manager.socket_dir, 'localhost'))
-    existed_before_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+    existed_before_1 = exists(opj(manager.socket_dir,
+                                  get_connection_hash('localhost')))
+    existed_before_2 = exists(opj(manager.socket_dir,
+                                  get_connection_hash('datalad-test')))
 
     manager.get_connection('ssh://localhost').open()
     manager.get_connection('ssh://datalad-test').open()
@@ -122,8 +131,10 @@ def test_ssh_manager_close():
 
     manager.close()
 
-    still_exists_1 = exists(opj(manager.socket_dir, 'localhost'))
-    still_exists_2 = exists(opj(manager.socket_dir, 'datalad-test'))
+    still_exists_1 = exists(opj(manager.socket_dir,
+                                get_connection_hash('localhost')))
+    still_exists_2 = exists(opj(manager.socket_dir,
+                                get_connection_hash('datalad-test')))
 
     eq_(existed_before_1, still_exists_1)
     eq_(existed_before_2, still_exists_2)
@@ -155,13 +166,14 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
+@skip_if_on_windows  # our test setup has no `scp` command
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
 @with_tempfile(content="two")
 def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
-    remote_url = 'ssh://localhost'
+    remote_url = 'ssh://localhost:22'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     ssh.open()
@@ -197,6 +209,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     ssh.close()
 
 
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
@@ -205,6 +218,35 @@ def test_ssh_compound_cmds():
     ssh.close()  # so we get rid of the possibly lingering connections
 
 
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_custom_identity_file():
+    ifile = "/tmp/dl-test-ssh-id"  # Travis
+    if not op.exists(ifile):
+        raise SkipTest("Travis-specific '{}' identity file does not exist"
+                       .format(ifile))
+
+    from datalad import cfg
+    try:
+        with patch.dict("os.environ", {"DATALAD_SSH_IDENTITYFILE": ifile}):
+            cfg.reload(force=True)
+            with swallow_logs(new_level=logging.DEBUG) as cml:
+                manager = SSHManager()
+                ssh = manager.get_connection('ssh://localhost')
+                cmd_out, _ = ssh("echo blah")
+                expected_socket = op.join(
+                    manager.socket_dir,
+                    get_connection_hash("localhost", identity_file=ifile))
+                ok_(exists(expected_socket))
+                manager.close()
+                assert_in("-i", cml.out)
+                assert_in(ifile, cml.out)
+    finally:
+        # Prevent overridden DATALAD_SSH_IDENTITYFILE from lingering.
+        cfg.reload(force=True)
+
+
+@skip_if_on_windows  # our test setup has no SSH server running
 @skip_ssh
 def test_ssh_git_props():
     remote_url = 'ssh://localhost'

@@ -44,6 +44,7 @@ Metadata handling
    generated/man/datalad-search
    generated/man/datalad-metadata
    generated/man/datalad-aggregate-metadata
+   generated/man/datalad-extract-metadata
 
 Reproducible execution
 ======================
@@ -53,6 +54,7 @@ Reproducible execution
 
    generated/man/datalad-run
    generated/man/datalad-rerun
+   generated/man/datalad-run-procedure
 
 Miscellaneous commands
 ======================
@@ -62,8 +64,6 @@ Miscellaneous commands
 
    generated/man/datalad-add-archive-content
    generated/man/datalad-clean
-   generated/man/datalad-crawl
-   generated/man/datalad-crawl-init
    generated/man/datalad-download-url
    generated/man/datalad-ls
    generated/man/datalad-test
@@ -77,9 +77,9 @@ Plugin commands
 
    generated/man/datalad-add-readme
    generated/man/datalad-addurls
+   generated/man/datalad-check-dates
    generated/man/datalad-export-archive
    generated/man/datalad-export-to-figshare
-   generated/man/datalad-extract-metadata
    generated/man/datalad-no-annex
    generated/man/datalad-wtf
 

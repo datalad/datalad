@@ -25,8 +25,10 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
+from datalad.tests.utils import known_failure_direct_mode
 
 
+@known_failure_direct_mode  #FIXME
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)

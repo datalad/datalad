@@ -12,6 +12,7 @@ from __future__ import absolute_import
 from os.path import join as opj
 import logging
 lgr = logging.getLogger('datalad.metadata.extractors.audio')
+from datalad.log import log_progress
 
 from mutagen import File as audiofile
 from datalad.metadata.definitions import vocabulary_id
@@ -39,9 +40,24 @@ class MetadataExtractor(BaseMetadataExtractor):
     def get_metadata(self, dataset, content):
         if not content:
             return {}, []
+        log_progress(
+            lgr.info,
+            'extractoraudio',
+            'Start audio metadata extraction from %s', self.ds,
+            total=len(self.paths),
+            label='audio metadata extraction',
+            unit=' Files',
+        )
         contentmeta = []
         for f in self.paths:
-            info = audiofile(opj(self.ds.path, f), easy=True)
+            absfp = opj(self.ds.path, f)
+            log_progress(
+                lgr.info,
+                'extractoraudio',
+                'Extract audio metadata from %s', absfp,
+                update=1,
+                increment=True)
+            info = audiofile(absfp, easy=True)
             if info is None:
                 continue
             meta = {vocab_map.get(k, k): info[k][0]
@@ -58,6 +74,11 @@ class MetadataExtractor(BaseMetadataExtractor):
                     meta[vocab_map.get(k, k)] = val
             contentmeta.append((f, meta))
 
+        log_progress(
+            lgr.info,
+            'extractoraudio',
+            'Finished audio metadata extraction from %s', self.ds
+        )
         return {
             '@context': {
                 'music': {

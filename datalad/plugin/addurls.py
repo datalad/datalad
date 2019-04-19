@@ -9,30 +9,30 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import defaultdict, Mapping
+from collections import Mapping
 from functools import partial
-from itertools import dropwhile
 import logging
 import os
 import re
 import string
 
-from mock import patch
-
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
+from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.interface.results import annexjson2result, get_status_dict
 from datalad.interface.common_opts import nosave_opt
-from datalad.support import ansi_colors
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.network import get_url_filename
+from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
-from datalad.ui import ui
-from datalad.utils import assure_list, optional_args
+from datalad.utils import (
+    assure_list,
+    unlink,
+)
 
 lgr = logging.getLogger("datalad.plugin.addurls")
 
@@ -279,41 +279,6 @@ def _format_filenames(format_fn, rows, row_infos):
     return subpaths
 
 
-def split_ext(filename):
-    """Use git-annex's splitShortExtensions rule for splitting extensions.
-
-    Parameters
-    ----------
-    filename : str
-
-    Returns
-    -------
-    A tuple with (root, extension)
-
-    Examples
-    --------
-    >>> from datalad.plugin.addurls import split_ext
-    >>> split_ext("filename.py")
-    ('filename', '.py')
-
-    >>> split_ext("filename.tar.gz")
-    ('filename', '.tar.gz')
-
-    >>> split_ext("filename.above4chars.ext")
-    ('filename.above4chars', '.ext')
-    """
-    parts = filename.split(".")
-    if len(parts) == 1:
-        return filename, ""
-
-    tail = list(dropwhile(lambda x: len(x) < 5,
-                          reversed(parts[1:])))
-
-    file_parts = parts[:1] + tail[::-1]
-    ext_parts = parts[1+len(tail):]
-    return ".".join(file_parts), "." + ".".join(ext_parts)
-
-
 def get_file_parts(filename, prefix="name"):
     """Assign a name to various parts of a file.
 
@@ -385,8 +350,11 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                 row.update(
                     {k: v + str(idx) for k, v in dummy.items()})
         else:
-            pbar = ui.get_progressbar(total=len(urls),
-                                      label="Requesting names", unit=" Files")
+            num_urls = len(urls)
+            log_progress(lgr.info, "addurls_requestnames",
+                         "Requesting file names for %d URLs", num_urls,
+                         label="Requesting names", total=num_urls,
+                         unit=" Files")
             for row, url in zip(rows, urls):
                 # If we run into any issues here, we're just going to raise an
                 # exception and then abort inside dlplugin.  It'd be good to
@@ -398,8 +366,11 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                 else:
                     raise ValueError(
                         "{} does not contain a filename".format(url))
-                pbar.update(1, increment=True)
-            pbar.finish()
+                log_progress(lgr.info, "addurls_requestnames",
+                             "%s returned for %s", url, filename,
+                             update=1, increment=True)
+            log_progress(lgr.info, "addurls_requestnames",
+                         "Finished requesting file names")
 
 
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
@@ -472,59 +443,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     return infos, subpaths
 
 
-@optional_args
-def progress(fn, label="Total", unit="Files"):
-    """Wrap a progress bar, with status counts, around a function.
-
-    Parameters
-    ----------
-    fn : generator function
-        This function should accept a collection of items as a
-        positional argument and any number of keyword arguments.  After
-        processing each item in the collection, it should yield a status
-        dict.
-    label, unit : str
-        Passed to ui.get_progressbar.
-
-    Returns
-    -------
-    A variant of `fn` that shows a progress bar.  Note that the wrapped
-    function is not a generator function; the status dicts will be
-    returned as a list.
-    """
-    # FIXME: This emulates annexrepo.ProcessAnnexProgressIndicators.  It'd be
-    # nice to rewire things so that it could be used directly.
-
-    def count_str(count, verb, omg=False):
-        if count:
-            msg = "{:d} {}".format(count, verb)
-            if omg:
-                msg = ansi_colors.color_word(msg, ansi_colors.RED)
-            return msg
-
-    def wrapped(items, **kwargs):
-        counts = defaultdict(int)
-        pbar = ui.get_progressbar(total=len(items),
-                                  label=label, unit=" " + unit)
-        results = []
-        for res in fn(items, **kwargs):
-            counts[res["status"]] += 1
-            count_strs = (count_str(*args)
-                          for args in [(counts["notneeded"], "skipped", False),
-                                       (counts["error"], "failed", True)])
-            pbar.update(1, increment=True)
-            if counts["notneeded"] or counts["error"]:
-                pbar.set_desc("{label} ({counts})".format(
-                    label=label,
-                    counts=", ".join(filter(None, count_strs))))
-            pbar.refresh()
-            results.append(res)
-        pbar.finish()
-        return results
-    return wrapped
-
-
-@progress("Adding URLs")
+@with_result_progress("Adding URLs")
 def add_urls(rows, ifexists=None, options=None):
     """Call `git annex addurl` using information in `rows`.
     """
@@ -543,13 +462,13 @@ def add_urls(rows, ifexists=None, options=None):
                 continue
             elif ifexists == "overwrite":
                 lgr.debug("Removing %s", filename_abs)
-                os.unlink(filename_abs)
+                unlink(filename_abs)
             else:
                 lgr.debug("File %s already exists", filename_abs)
 
         try:
-            ds.repo.add_url_to_file(filename, row["url"],
-                                    batch=True, options=options)
+            out_json = ds.repo.add_url_to_file(filename, row["url"],
+                                               batch=True, options=options)
         except AnnexBatchCommandError as exc:
             yield get_status_dict(action="addurls",
                                   ds=ds,
@@ -558,18 +477,20 @@ def add_urls(rows, ifexists=None, options=None):
                                   message=exc_str(exc),
                                   status="error")
             continue
-        else:
-            yield get_status_dict(action="addurls",
-                                  ds=ds,
-                                  type="file",
-                                  path=filename_abs,
-                                  status="ok")
+
+        # In the case of an error, the json object has file=None.
+        if out_json["file"] is None:
+            out_json["file"] = filename_abs
+        yield annexjson2result(out_json, ds, action="addurls",
+                               type="file", logger=lgr)
 
 
-@progress("Adding metadata")
+@with_result_progress("Adding metadata")
 def add_meta(rows):
     """Call `git annex metadata --set` using information in `rows`.
     """
+    from mock import patch
+
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
 
@@ -771,8 +692,6 @@ class Addurls(Interface):
 
         from requests.exceptions import RequestException
 
-        from datalad.distribution.add import Add
-        from datalad.distribution.create import Create
         from datalad.distribution.dataset import Dataset, require_dataset
         from datalad.interface.results import get_status_dict
         from datalad.support.annexrepo import AnnexRepo
@@ -863,12 +782,15 @@ class Addurls(Interface):
                         "ds_filename": ds_filename})
 
         if version_urls:
-            lgr.info("Versioning URLs")
-            pbar = ui.get_progressbar(total=len(rows),
-                                      label="Versioning URLs", unit=" URLs")
+            num_urls = len(rows)
+            log_progress(lgr.info, "addurls_versionurls",
+                         "Versioning %d URLs", num_urls,
+                         label="Versioning URLs",
+                         total=num_urls, unit=" URLs")
             for row in rows:
+                url = row["url"]
                 try:
-                    row["url"] = get_versioned_url(row["url"])
+                    row["url"] = get_versioned_url(url)
                 except (ValueError, NotImplementedError) as exc:
                     # We don't expect this to happen because get_versioned_url
                     # should return the original URL if it isn't an S3 bucket.
@@ -876,8 +798,10 @@ class Addurls(Interface):
                     # handle the scheme for what looks like an S3 bucket.
                     lgr.warning("error getting version of %s: %s",
                                 row["url"], exc_str(exc))
-                pbar.update(1, increment=True)
-            pbar.finish()
+                log_progress(lgr.info, "addurls_versionurls",
+                             "Versioned result for %s: %s", url, row["url"],
+                             update=1, increment=True)
+            log_progress(lgr.info, "addurls_versionurls", "Finished versioning URLs")
 
         files_to_add = set()
         for r in add_urls(rows, ifexists=ifexists, options=annex_options):

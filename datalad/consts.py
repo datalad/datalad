@@ -14,17 +14,20 @@ from os.path import join
 from os.path import expanduser
 
 # directory containing prepared metadata of a dataset repository:
-HANDLE_META_DIR = ".datalad"
-CRAWLER_META_DIR = join(HANDLE_META_DIR, 'crawl')
-CRAWLER_META_CONFIG_FILENAME = 'crawl.cfg'
-CRAWLER_META_CONFIG_PATH = join(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
-CRAWLER_META_VERSIONS_DIR = join(CRAWLER_META_DIR, 'versions')
-# TODO: RENAME THIS UGLINESS?
-CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
+DATALAD_DOTDIR = ".datalad"
+# Compatibility: Used at least in the crawler
+# TODO: figure out how to make it possible to issue DeprecationWarning
+# upon use.  Possible way: make consts into a class instance, but then they
+# all must be imported as `from datalad import consts` and as `consts.CONSTANT`
+HANDLE_META_DIR = DATALAD_DOTDIR
 
 # Make use of those in datalad.metadata
-METADATA_DIR = join(HANDLE_META_DIR, 'meta')
-METADATA_FILENAME = 'meta.json'
+OLDMETADATA_DIR = join(DATALAD_DOTDIR, 'meta')
+OLDMETADATA_FILENAME = 'meta.json'
+
+METADATA_DIR = join(DATALAD_DOTDIR, 'metadata')
+DATASET_METADATA_FILE = join(METADATA_DIR, 'dataset.json')
+DATASET_CONFIG_FILE = join(DATALAD_DOTDIR, 'config')
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
@@ -48,9 +51,6 @@ DATASETS_TOPURL = os.environ.get("DATALAD_DATASETS_TOPURL", None) \
 # safeguard
 if not DATASETS_TOPURL.endswith('/'):
     DATASETS_TOPURL += '/'
-
-# Centralized deployment
-LOCAL_CENTRAL_PATH = join(expanduser('~'), 'datalad')
 
 WEB_META_LOG = join(DATALAD_GIT_DIR, 'logs')
 WEB_META_DIR = join(DATALAD_GIT_DIR, 'metadata')

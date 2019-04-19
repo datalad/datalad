@@ -40,7 +40,6 @@ from ..utils import eval_results
 from ..utils import discover_dataset_trace_to_targets
 from datalad.interface.base import build_doc
 from ..utils import handle_dirty_dataset
-from datalad.api import create
 
 
 __docformat__ = 'restructuredtext'
@@ -264,6 +263,11 @@ def test_eval_results_plus_build_doc():
     result = Dataset('/does/not/matter').fake_command(3)
     assert_equal(len(list(result)), 3)
 
+    # test absent side-effect of popping eval_defaults
+    kwargs = dict(return_type='list')
+    TestUtils().__call__(2, **kwargs)
+    assert_equal(list(kwargs), ['return_type'])
+
     # test signature:
     from inspect import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
@@ -309,7 +313,6 @@ def test_result_filter():
 
 @with_tree({k: v for k, v in demo_hierarchy.items() if k in ['a', 'd']})
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_discover_ds_trace(path, otherdir):
     ds = make_demo_hierarchy_datasets(
         path,

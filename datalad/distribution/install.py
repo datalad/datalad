@@ -156,7 +156,7 @@ class Install(Interface):
             # git_clone_opts=None,
             # annex_opts=None,
             # annex_init_opts=None,
-            jobs=None):
+            jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
@@ -362,6 +362,10 @@ class Install(Interface):
 
         # Now, recursive calls:
         if recursive or get_data:
+            # dataset argument must not be passed inside since we use bound .get
+            # It is ok to do "inplace" as long as we still return right
+            # after the loop ends
+            common_kwargs.pop('dataset', '')
             for r in destination_dataset.get(
                     curdir,
                     description=description,

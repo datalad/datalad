@@ -36,7 +36,6 @@ from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
-
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
 
@@ -507,8 +506,6 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
             if not superds:
                 return ('error',
                         ("No super-dataset to inherit settings for remote %s", to))
-            # avoid global import, only needed for this corner case
-            from datalad.distribution.create_sibling import CreateSibling
             # XXX due to difference between create-sibling and create-sibling-github
             # would not be as transparent to inherit for -github
             lgr.info("Will try to create a sibling inheriting settings from %s", superds)
@@ -581,7 +578,7 @@ class Publish(Interface):
     .. note::
       Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
       to publish a dataset. Publication targets are either configured remote
-      Git repositories, or git-annex special remotes (if their support data
+      Git repositories, or git-annex special remotes (if they support data
       upload).
     """
     # XXX prevent common args from being added to the docstring
@@ -614,7 +611,7 @@ class Publish(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
             from which to look for changes
-            to decide either updated publishing is necessary for this and which children.
+            to decide whether updated publishing is necessary for this and which children.
             If empty argument is provided, then we would take from the previously 
             published to that remote/sibling state (for the current branch)"""),
         # since: commit => .gitmodules diff to head => submodules to publish

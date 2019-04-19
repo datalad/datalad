@@ -34,15 +34,17 @@ from nose import SkipTest
 from ..utils import getpwd, chpwd
 
 from . import utils
-from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
-    with_tempfile, with_testrepos, with_tree, \
-    rmtemp, \
-    OBSCURE_PREFIX, OBSCURE_FILENAMES,\
-    get_most_obscure_supported_name, \
-    swallow_outputs, swallow_logs, \
-    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
-    ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
-
+from .utils import (
+    eq_, ok_, assert_false, ok_startswith, nok_startswith,
+    with_tempfile, with_testrepos, with_tree,
+    rmtemp,
+    OBSCURE_PREFIX, OBSCURE_FILENAMES,
+    get_most_obscure_supported_name,
+    swallow_outputs, swallow_logs,
+    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http,
+    ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink,
+    ok_file_under_git
+)
 from .utils import ok_generator
 from .utils import assert_dict_equal
 from .utils import assert_str_equal
@@ -50,6 +52,7 @@ from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import skip_if_no_module
+from .utils import skip_if_on_windows
 from .utils import run_under_dir
 from .utils import skip_if
 from .utils import ok_file_has_content
@@ -60,6 +63,8 @@ from .utils import probe_known_failure
 from .utils import patch_config
 from .utils import ignore_nose_capturing_stdout
 
+from ..support.gitrepo import GitRepo
+from ..support import path as op
 #
 # Test with_tempfile, especially nested invocations
 #
@@ -326,18 +331,21 @@ def _test_assert_Xwd_unchanged_ok_chdir(func):
     @assert_cwd_unchanged(ok_to_chdir=True)
     def do_chdir_value_error():
         func(os.pardir)
+        return "a value"
 
     with swallow_logs() as cml:
-        do_chdir_value_error()
+        eq_(do_chdir_value_error(), "a value")
         eq_(orig_cwd, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_cwd)
         eq_(orig_pwd, getpwd(),
             "assert_cwd_unchanged didn't return us back to cwd %s" % orig_pwd)
         assert_not_in("Mitigating and changing back", cml.out)
 
+
 def test_assert_Xwd_unchanged_ok_chdir():
     yield _test_assert_Xwd_unchanged_ok_chdir, os.chdir
     yield _test_assert_Xwd_unchanged_ok_chdir, chpwd
+
 
 def test_assert_cwd_unchanged_not_masking_exceptions():
     # Test that we are not masking out other "more important" exceptions
@@ -492,7 +500,7 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
-        eq_(somefunc.tags, ['network'])
+        ok_(hasattr(somefunc, "network"))
         with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
@@ -612,11 +620,6 @@ def test_setup():
 
 
 def test_skip_ssh():
-    # no ssh testing on Windows ATM
-    with patch.object(utils, 'on_windows', return_value=True):
-        with assert_raises(SkipTest):
-            skip_ssh(lambda: False)()
-
     with patch_config({'datalad.tests.ssh': False}):
         with assert_raises(SkipTest):
             skip_ssh(lambda: False)()
@@ -637,5 +640,25 @@ def test_ignore_nose_capturing_stdout():
     def raise_exc():
         raise AttributeError('nose causes a message which includes words '
                              'StringIO and fileno')
-    with assert_raises(SkipTest):
+    with assert_raises(AttributeError):
         ignore_nose_capturing_stdout(raise_exc)()
+
+
+@skip_if_on_windows  # no symlinks. may be skip if not hasattr(os, "symlink")
+@with_tree(tree={'ingit': '', 'staged': 'staged', 'notingit': ''})
+def test_ok_file_under_git_symlinks(path):
+    # Test that works correctly under symlinked path
+    orepo = GitRepo(path)
+    orepo.add('ingit')
+    orepo.commit('msg')
+    orepo.add('staged')
+    lpath = path + "-symlink"  # will also be removed AFAIK by our tempfile handling
+    os.symlink(path, lpath)
+    ok_symlink(lpath)
+    ok_file_under_git(op.join(path, 'ingit'))
+    ok_file_under_git(op.join(lpath, 'ingit'))
+    ok_file_under_git(op.join(lpath, 'staged'))
+    with assert_raises(AssertionError):
+        ok_file_under_git(op.join(lpath, 'notingit'))
+    with assert_raises(AssertionError):
+        ok_file_under_git(op.join(lpath, 'nonexisting'))

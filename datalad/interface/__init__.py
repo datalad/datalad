@@ -52,14 +52,15 @@ _group_metadata = (
          'metadata'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
+        ('datalad.metadata.extract_metadata', 'ExtractMetadata',
+         'extract-metadata', 'extract_metadata'),
     ])
 
 _group_misc = (
     'Miscellaneous commands',
     [
+        ('datalad.plugin.wtf', 'WTF'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.crawl', 'Crawl'),
-        ('datalad.interface.crawl_init', 'CrawlInit', 'crawl-init'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
@@ -67,6 +68,7 @@ _group_misc = (
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         ('datalad.interface.run', 'Run', 'run'),
         ('datalad.interface.rerun', 'Rerun', 'rerun'),
+        ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
     ])
 
 _group_plumbing = (
@@ -81,3 +83,9 @@ _group_plumbing = (
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
         ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
+
+# Some known extensions and their commands to suggest whenever lookup fails
+_known_extension_commands = {
+    'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-neuroimaging': ('bids2scidata',)
+}

@@ -33,7 +33,7 @@ recursion_flag = Parameter(
     doc="""if set, recurse into potential subdataset""")
 
 recursion_limit = Parameter(
-    args=("--recursion-limit",),
+    args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
@@ -110,13 +110,19 @@ nosave_opt = Parameter(
     args=("--nosave",),
     dest='save',
     action="store_false",
-    doc="""by default all modifications to a dataset are immediately saved. Given
+    doc="""by default all modifications to a dataset are immediately saved. Giving
     this option will disable this behavior.""")
 
 save_message_opt = Parameter(
     args=("-m", "--message",),
     metavar='MESSAGE',
     doc="""a description of the state or the changes made to a dataset.""",
+    constraints=EnsureStr() | EnsureNone())
+
+message_file_opt = Parameter(
+    args=("-F", "--message-file"),
+    doc="""take the commit message from this file. This flag is
+    mutually exclusive with -m.""",
     constraints=EnsureStr() | EnsureNone())
 
 reckless_opt = Parameter(
@@ -302,18 +308,14 @@ eval_params = dict(
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
-    run_before=Parameter(
-        doc="""DataLad plugin to run before the command. PLUGINSPEC is a list
-        comprised of a plugin name plus optional 2-tuples of key-value pairs
-        with arguments for the plugin call (see `plugin` command documentation
-        for details).
-        PLUGINSPECs must be wrapped in list where each item configures
-        one plugin call. Plugins are called in the order defined by this list.
-        For running plugins that require a `dataset` argument it is important
-        to provide the respective dataset as the `dataset` argument of the main
-        command, if it is not in the list of plugin arguments."""),
-    run_after=Parameter(
-        doc="""Like `run_before`, but plugins are executed after the main command
+    proc_pre=Parameter(
+        doc="""DataLad procedure to run prior to the main command. The argument
+        a list of lists with procedure names and optional arguments.
+        Procedures are called in the order their are given in this list.
+        It is important to provide the respective target dataset to run a procedure
+        on as the `dataset` argument of the main command."""),
+    proc_post=Parameter(
+        doc="""Like `proc_pre`, but procedures are executed after the main command
         has finished."""),
 )
 
@@ -323,6 +325,6 @@ eval_defaults = dict(
     result_renderer=None,
     result_xfm=None,
     on_failure='continue',
-    run_before=None,
-    run_after=None,
+    proc_pre=None,
+    proc_post=None,
 )

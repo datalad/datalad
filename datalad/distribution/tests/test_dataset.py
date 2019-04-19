@@ -14,23 +14,28 @@ import shutil
 from os.path import join as opj, abspath, normpath, relpath, exists
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
+from datalad import cfg
 from datalad.api import create
-from datalad.api import install
 from datalad.api import get
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.utils import get_dataset_root
+from datalad.utils import on_windows
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, assert_is_instance
+from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
+    assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import assert_is
+from datalad.tests.utils import assert_not_equal
+
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathOutsideRepositoryError
+from datalad.support.exceptions import PathKnownToRepositoryError
 
 
 def test_EnsureDataset():
@@ -82,8 +87,6 @@ def test_resolve_path(somedir):
 # TODO: test remember/recall more extensive?
 
 
-# TODO: There's something wrong with the nested testrepo!
-# Fear mongering detected!
 @with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
 def test_is_installed(src, path):
@@ -96,7 +99,16 @@ def test_is_installed(src, path):
     # submodule still not installed:
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
-    subds.create()
+    # We must not be able to create a new repository under a known
+    # subdataset path.
+    # Note: Unfortunately we would still be able to generate it under
+    # subdirectory within submodule, e.g. `subm 1/subdir` but that is
+    # not checked here. `rev-create` will provide that protection
+    # when create/rev-create merge.
+    # Unfortunately such protection does not work in direct mode
+    if not ds.repo.is_direct_mode():
+        with assert_raises(PathKnownToRepositoryError):
+            subds.create()
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would
@@ -149,6 +161,7 @@ def test_repo_cache(path):
     assert_true(isinstance(ds.repo, AnnexRepo))
 
 
+@known_failure_windows  # leaves modified .gitmodules behind
 @with_tempfile(mkdir=True)
 def test_subdatasets(path):
     # from scratch
@@ -202,7 +215,8 @@ def test_subdatasets(path):
         eq_(dstop, subds)
         # and while in the dataset we still can resolve into central one
         dscentral = Dataset('///')
-        eq_(dscentral.path, LOCAL_CENTRAL_PATH)
+        eq_(dscentral.path,
+            cfg.obtain('datalad.locations.default-dataset'))
 
     with chpwd(ds.path):
         dstop = Dataset('^')
@@ -311,9 +325,120 @@ def test_Dataset_flyweight(path1, path2):
         ok_(ds1 == ds3)
         ok_(ds1 is ds3)
 
-    # reference the same via symlink:
-    with chpwd(path2):
-        os.symlink(path1, 'linked')
-        ds3 = Dataset('linked')
-        ok_(ds3 == ds1)
-        ok_(ds3 is not ds1)
+    # on windows as symlink is not what you think it is
+    if not on_windows:
+        # reference the same via symlink:
+        with chpwd(path2):
+            os.symlink(path1, 'linked')
+            ds3 = Dataset('linked')
+            ok_(ds3 == ds1)
+            ok_(ds3 is not ds1)
+
+
+@with_tempfile
+def test_property_reevaluation(repo1):
+
+    from os.path import lexists
+    from datalad.tests.utils import ok_clean_git
+
+    ds = Dataset(repo1)
+    assert_is_none(ds.repo)
+    assert_is_not_none(ds.config)
+    first_config = ds.config
+    assert_false(ds._cfg_bound)
+    assert_is_none(ds.id)
+
+    ds.create()
+    ok_clean_git(repo1)
+    # after creation, we have `repo`, and `config` was reevaluated to point
+    # to the repo's config:
+    assert_is_not_none(ds.repo)
+    assert_is_not_none(ds.config)
+    second_config = ds.config
+    assert_true(ds._cfg_bound)
+    assert_is(ds.config, ds.repo.config)
+    assert_is_not(first_config, second_config)
+    assert_is_not_none(ds.id)
+    first_id = ds.id
+
+    ds.remove()
+    # repo is gone, and config is again reevaluated to only provide user/system
+    # level config:
+    assert_false(lexists(ds.path))
+    assert_is_none(ds.repo)
+    assert_is_not_none(ds.config)
+    third_config = ds.config
+    assert_false(ds._cfg_bound)
+    assert_is_not(second_config, third_config)
+    assert_is_none(ds.id)
+
+    ds.create()
+    ok_clean_git(repo1)
+    # after recreation everything is sane again:
+    assert_is_not_none(ds.repo)
+    assert_is_not_none(ds.config)
+    assert_is(ds.config, ds.repo.config)
+    forth_config = ds.config
+    assert_true(ds._cfg_bound)
+    assert_is_not(third_config, forth_config)
+    assert_is_not_none(ds.id)
+    assert_not_equal(ds.id, first_id)
+
+
+# While os.symlink does work on windows (since vista), os.path.realpath
+# doesn't resolve such symlinks. This has all kinds of implications.
+# Hopefully this can be dealt with, when we switch to using pathlib
+# (see datalad-revolution).
+@known_failure_windows
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
+
+    ds = Dataset(repo1).create()
+
+    # now, let ds be a symlink and change that symlink to point to different
+    # things:
+    ar2 = AnnexRepo(repo2)
+    ar3 = AnnexRepo(repo3)
+    assert_true(os.path.isabs(non_repo))
+
+    os.symlink(repo1, symlink)
+    ds_link = Dataset(symlink)
+    assert_is(ds_link.repo, ds.repo)  # same Repo instance
+    assert_is_not(ds_link, ds)  # but not the same Dataset instance
+    assert_is(ds_link.config, ds.repo.config)
+    assert_true(ds_link._cfg_bound)
+    assert_is_not_none(ds_link.id)
+    # same id, although different Dataset instance:
+    assert_equal(ds_link.id, ds.id)
+
+    os.unlink(symlink)
+    os.symlink(repo2, symlink)
+
+    assert_is(ds_link.repo, ar2)  # same Repo instance
+    assert_is(ds_link.config, ar2.config)
+    assert_true(ds_link._cfg_bound)
+    # id is None again, since this repository is an annex but there was no
+    # Dataset.create() called yet.
+    assert_is_none(ds_link.id)
+
+    os.unlink(symlink)
+    os.symlink(repo3, symlink)
+
+    assert_is(ds_link.repo, ar3)  # same Repo instance
+    assert_is(ds_link.config, ar3.config)
+    assert_true(ds_link._cfg_bound)
+    # id is None again, since this repository is an annex but there was no
+    # Dataset.create() called yet.
+    assert_is_none(ds_link.id)
+
+    os.unlink(symlink)
+    os.symlink(non_repo, symlink)
+
+    assert_is_none(ds_link.repo)
+    assert_is_not(ds_link.config, ar3.config)
+    assert_false(ds_link._cfg_bound)
+    assert_is_none(ds_link.id)

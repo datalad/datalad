@@ -26,12 +26,13 @@ class CommandError(RuntimeError):
         self.stderr = stderr
 
     def __str__(self):
+        from datalad.utils import assure_unicode
         to_str = "%s: " % self.__class__.__name__
         if self.cmd:
             to_str += "command '%s'" % (self.cmd,)
         if self.code:
             to_str += " failed with exitcode %d" % self.code
-        to_str += "\n%s" % self.msg
+        to_str += "\n%s" % assure_unicode(self.msg)
         return to_str
 
 
@@ -172,6 +173,12 @@ class PathOutsideRepositoryError(Exception):
         return "path {0} not within repository {1}".format(self.file_, self.repo)
 
 
+class PathKnownToRepositoryError(Exception):
+    """Thrown if file/path is under Git control, and attempted operation
+    must not be ran"""
+    pass
+
+
 class MissingBranchError(Exception):
     """Thrown if accessing a repository's branch, that is not available"""
 
@@ -261,6 +268,11 @@ class InvalidInstanceRequestError(RuntimeError):
         self.msg = msg
 
 
+class InvalidAnnexRepositoryError(RuntimeError):
+    """Thrown if AnnexRepo was instantiated on a non-annex and
+    without init=True"""
+
+
 class IncompleteResultsError(RuntimeError):
     """Exception to be raised whenever results are incomplete.
 
@@ -310,6 +322,12 @@ class TargetFileAbsent(DownloadError):
 
 
 class AccessDeniedError(DownloadError):
+    def __init__(self, msg=None, supported_types=None, **kwargs):
+        super(AccessDeniedError, self).__init__(msg, **kwargs)
+        self.supported_types = supported_types
+
+
+class AnonymousAccessDeniedError(AccessDeniedError):
     pass
 
 

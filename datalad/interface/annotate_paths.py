@@ -20,6 +20,7 @@ from os import curdir
 from os.path import join as opj
 from os.path import lexists
 from os.path import isdir
+from os.path import islink
 from os.path import dirname
 from os.path import pardir
 from os.path import normpath
@@ -132,7 +133,6 @@ def yield_recursive(ds, path, action, recursion_limit):
     # make sure we get everything relevant in all _checked out_
     # subdatasets, obtaining of previously unavailable subdataset
     # is elsewhere
-    from datalad.distribution.subdatasets import Subdatasets
     for subd_res in ds.subdatasets(
             recursive=True,
             recursion_limit=recursion_limit,
@@ -164,8 +164,6 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
     revision : str
       Commit-ish
     """
-    from datalad.interface.diff import Diff
-
     # TODO needs recursion limit
     # NOTE this is implemented as a generator despite that fact that we need
     # to sort through _all_ the inputs initially, diff'ing each involved
@@ -590,9 +588,9 @@ class AnnotatePaths(Interface):
                 path_props['type'] = \
                     path_props.get(
                         'type',
-                        'dataset' if GitRepo.is_valid_repo(path) else 'directory')
+                        'dataset' if not islink(path) and GitRepo.is_valid_repo(path) else 'directory')
                 # this could contain all types of additional content
-                containing_dir = path
+                containing_dir = path if not islink(path) else normpath(opj(path, pardir))
             else:
                 if lexists(path):
                     path_props['type'] = 'file'
@@ -667,7 +665,6 @@ class AnnotatePaths(Interface):
                     (path_type == 'dataset' and 'registered_subds' not in path_props) or
                     path_type == 'directory' or
                     not lexists(path)):
-                from datalad.distribution.subdatasets import Subdatasets
                 # if the path doesn't exist, or is labeled a directory, or a dataset even
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent

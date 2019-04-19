@@ -44,11 +44,11 @@ class Keyring(object):
 
     # proxy few methods of interest explicitly, to be rebound to the module's
     def get(self, name, field):
-        # consult environment, might be provided there
-        val = self._keyring.get_password(self._get_service_name(name), field)
-        if val is None:
-            val = os.environ.get(('DATALAD_%s_%s' % (name, field)).replace('-', '_'), None)
-        return val
+        # consult environment, might be provided there and should take precedence
+        env_var = ('DATALAD_%s_%s' % (name, field)).replace('-', '_')
+        if env_var in os.environ:
+            return os.environ[env_var]
+        return self._keyring.get_password(self._get_service_name(name), field)
 
     def set(self, name, field, value):
         return self._keyring.set_password(self._get_service_name(name), field, value)

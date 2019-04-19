@@ -11,7 +11,7 @@
 
 """
 
-import os
+import os, os.path as op
 import shutil
 import sys
 import logging
@@ -34,13 +34,17 @@ from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import is_interactive
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
+from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import all_same
+from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..utils import on_windows
@@ -55,18 +59,32 @@ from ..utils import dlabspath
 from ..utils import safe_print
 from ..utils import generate_chunks
 from ..utils import disable_logger
-from ..utils import import_modules
+from ..utils import import_modules, import_module_from_file
+from ..utils import get_open_files
+from ..utils import map_items
+from ..utils import unlink
+from ..utils import CMD_MAX_ARG
+from ..utils import create_tree
+from ..utils import never_fail
 
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
-from datalad.tests.utils import nok_
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_true,
+    eq_,
+    ok_,
+)
+from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import assure_unicode
+from .utils import as_unicode
 from .utils import assure_bool
 from .utils import assure_iter
 from .utils import assure_list
@@ -77,7 +95,8 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode
+    known_failure_direct_mode, skip_if,
+    ok_file_has_content
 )
 
 
@@ -136,14 +155,15 @@ def test_rotree(d):
     # under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
     # so explicit 'or'
     if not (ar.is_crippled_fs() or (os.getuid() == 0)):
-        assert_raises(OSError, os.unlink, f)
+        assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
+        assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
         with open(f) as f_:
             eq_(f_.read(), "LOAD")
     # make it RW
     rotree(d, False)
-    os.unlink(f)
+    unlink(f)
     shutil.rmtree(d)
 
 
@@ -326,6 +346,23 @@ def test_getpwd_basic():
         with chpwd(None):
             eq_(getpwd(), pwd)
         assert_false(oschdir.called)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tempfile(mkdir=True)
+def test_getpwd_change_mode(tdir):
+    from datalad import utils
+    if utils._pwd_mode != 'PWD':
+        raise SkipTest("Makes sense to be tested only in PWD mode, "
+                       "but we seems to be beyond that already")
+    # The evil plain chdir call
+    os.chdir(tdir)
+    # Just testing the logic of switching to cwd mode and issuing a warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        pwd = getpwd()
+        eq_(pwd, os.path.realpath(pwd))  # might have symlinks, thus realpath
+    assert_in("symlinks in the paths will be resolved", cml.out)
+    eq_(utils._pwd_mode, 'cwd')
 
 
 @skip_if_on_windows
@@ -576,6 +613,43 @@ def test_unique():
                key=itemgetter(1)), [(1, 2), (1, 3)])
 
 
+def test_all_same():
+    ok_(all_same([0, 0, 0]))
+    ok_(not all_same([0, 0, '0']))
+    ok_(not all_same([]))
+
+    def never_get_to_not_needed():
+        yield 'a'
+        yield 'a'
+        yield 'b'
+        raise ValueError("Should not get here since on b should return")
+
+    ok_(not all_same(never_get_to_not_needed()))
+
+    def gen1(n):
+        for x in range(n):
+            yield 'a'
+    ok_(not all_same(gen1(0)))
+    ok_(all_same(gen1(1)))
+    ok_(all_same(gen1(2)))
+    ok_(all_same(gen1(10)))
+
+
+def test_partition():
+    def fn(*args, **kwargs):
+        left, right = partition(*args, **kwargs)
+        return list(left), list(right)
+
+    eq_(fn([False, True, False]),
+        ([False, False], [True]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x > 4),
+        ([1, 4], [5, 10]))
+
+    eq_(fn([1, 5, 4, 10], lambda x: x < 0),
+        ([1, 5, 4, 10], []))
+
+
 def test_path_():
     eq_(_path_('a'), 'a')
     if on_windows:
@@ -652,6 +726,24 @@ def test_assure_unicode():
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
         assure_unicode(mixedin, confidence=0.9)
+    # For other, non string values, actually just returns original value
+    # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
+    assert assure_unicode(1) is 1
+
+
+def test_as_unicode():
+    eq_(as_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+    eq_(as_unicode(None), u"")
+    eq_(as_unicode(1), u"1")
+    # NOTE: u? is because result is different between PY2 (prefixes unicode repr
+    # while in PY3 is no longer needed!  So aggregation result would differ between
+    # PY2 and PY3
+    # Didn't manage to make it work in PY2
+    #TODO assert_re_in(u'\[1, .s., u?.東.\]', as_unicode([1, "s", u"東"]))
+    eq_(as_unicode("01"), u"01")  # no some kind of conversion/stripping of numerals
+    with assert_raises(TypeError) as cme:
+        as_unicode(1, list)
+    assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
 @with_tempfile(mkdir=True)
@@ -756,7 +848,7 @@ def test_safe_print():
     """Just to test that we are getting two attempts to print"""
 
     called = [0]
-    
+
     def _print(s):
         assert_equal(s, "bua")
         called[0] += 1
@@ -796,6 +888,23 @@ def test_probe_known_failure():
         # if probing is disabled it should just fail/pass as is:
         assert_raises(AssertionError, failing)
         not_failing()
+
+
+def test_skip_if():
+
+    def dummy():
+        raise AssertionError
+
+    assert_raises(AssertionError, dummy)
+    # if cond is False, call the decorated function:
+    assert_raises(AssertionError, skip_if(cond=False, method='raise')(dummy))
+    # raises SkipTest if cond is True
+    assert_raises(SkipTest, skip_if(cond=True, method='raise')(dummy))
+    # but with method 'pass', there is neither SkipTest nor AssertionError.
+    # Instead the function call is just skipped:
+    skip_if(cond=True, method='pass')(dummy)
+    # But if condition is False, the original function is still called:
+    assert_raises(AssertionError, skip_if(cond=False, method='pass')(dummy))
 
 
 def test_skip_known_failure():
@@ -941,6 +1050,52 @@ def test_read_csv_lines_one_column(infile):
     )
 
 
+def _get_testm_tree(ind):
+    """Generate a fake package with submodules
+
+    We need to increment index for different tests since otherwise e.g.
+    import_modules fails to import submodule if first import_module_from_file
+    imports that one
+    """
+    return {
+        'dltestm%d' % ind: {
+            '__init__.py': '',
+            'dlsub1': {'__init__.py': 'var = 1'},
+            'dlsub2.py': 'var = 2'}
+    }
+
+@with_tree(tree=_get_testm_tree(1))
+def test_import_modules(topdir):
+    try:
+        sys.path.append(topdir)
+        mods = import_modules(['dlsub1', 'bogus'], 'dltestm1')
+    finally:
+        sys.path.pop(sys.path.index(topdir))
+    eq_(len(mods), 1)
+    eq_(mods[0].__name__, 'dltestm1.dlsub1')
+
+
+@with_tree(tree=_get_testm_tree(2))
+def test_import_module_from_file(topdir):
+    with assert_raises(AssertionError):
+        # we support only submodule files ending with .py ATM. TODO
+        import_module_from_file(op.join(topdir, 'dltestm2', 'dlsub1'))
+
+    dlsub2_path = op.join(topdir, 'dltestm2', 'dlsub2.py')
+    mod = import_module_from_file(dlsub2_path)
+    eq_(mod.__name__, 'dlsub2')  # we are not asking to import as submod of the dltestm1
+    assert_in('dlsub2', sys.modules)
+
+    try:
+        sys.path.append(topdir)
+        import dltestm2
+        mod = import_module_from_file(dlsub2_path, pkg=dltestm2)
+        eq_(mod.__name__, 'dltestm2.dlsub2')
+        assert_in('dltestm2.dlsub2', sys.modules)
+    finally:
+        sys.path.pop(sys.path.index(topdir))
+
+
 def test_import_modules_fail():
     # test that we log failures correctly
     failures = []
@@ -980,4 +1135,135 @@ def test_dlabspath(path):
             eq_(dlabspath("bu"), opj(d, "bu"))
             eq_(dlabspath("./bu"), opj(d, "./bu"))  # we do not normpath by default
             eq_(dlabspath("./bu", norm=True), opj(d, "bu"))
+
+
+@with_tree({'1': 'content', 'd': {'2': 'more'}})
+def test_get_open_files(p):
+    skip_if_no_module('psutil')
+    eq_(get_open_files(p), {})
+    f1 = opj(p, '1')
+    subd = opj(p, 'd')
+    with open(f1) as f:
+        # since lsof does not care about PWD env var etc, paths
+        # will not contain symlinks, we better realpath them
+        # all before comparison
+        eq_(get_open_files(p, log_open=40)[op.realpath(f1)].pid,
+            os.getpid())
+
+    assert not get_open_files(subd)
+    # if we start a process within that directory, should get informed
+    from subprocess import Popen, PIPE
+    from time import time
+    t0 = time()
+    proc = Popen([sys.executable, '-c',
+                  r'import sys; sys.stdout.write("OK\n"); sys.stdout.flush();'
+                  r'import time; time.sleep(10)'],
+                 stdout=PIPE,
+                 cwd=subd)
+    # Assure that it started and we read the OK
+    eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
+    assert time() - t0 < 5 # that we were not stuck waiting for process to finish
+    eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
+    eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)
+    proc.terminate()
+    assert not get_open_files(subd)
+
+
+def test_map_items():
+    def add10(x):
+        return x + 10
+    eq_(map_items(add10, {2: 3}), {12: 13})
+
+    class Custom(object):
+        """For testing with custom items possibly of varying length etc"""
+        def __init__(self, items):
+            self._items = list(items)
+
+        def items(self):
+            return self._items
+
+    c = Custom([(1,), (2, 3), (4, 5, 6)])
+    c_mapped = map_items(add10, c)
+    assert type(c) is type(c_mapped)
+    eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
+
+
+def test_CMD_MAX_ARG():
+    # 100 is arbitrarily large small integer ;)
+    # if fails -- we are unlikely to be able to work on this system
+    # and something went really wrong!
+    assert_greater(CMD_MAX_ARG, 100)
+
+
+@with_tempfile(mkdir=True)
+def test_create_tree(path):
+    content = u"мама мыла раму"
+    create_tree(path, OrderedDict([
+        ('1', content),
+        ('sd', OrderedDict(
+            [
+            # right away an obscure case where we have both 1 and 1.gz
+                ('1', content*2),
+                ('1.gz', content*3),
+            ]
+        )),
+    ]))
+    ok_file_has_content(op.join(path, '1'), content)
+    ok_file_has_content(op.join(path, 'sd', '1'), content*2)
+    ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+
+
+def test_never_fail():
+
+    @never_fail
+    def iamok(arg):
+        return arg
+    eq_(iamok(1), 1)
+
+    @never_fail
+    def ifail(arg):
+        raise ValueError
+    eq_(ifail(1), None)
+
+    with patch.dict('os.environ', {'DATALAD_ALLOW_FAIL': '1'}):
+        # decision to create failing or not failing function
+        # is done at the time of decoration
+        @never_fail
+        def ifail2(arg):
+            raise ValueError
+
+        assert_raises(ValueError, ifail2, 1)
+
+
+@with_tempfile
+def test_is_interactive(fout):
+    # must not fail if one of the streams is no longer open:
+    # https://github.com/datalad/datalad/issues/3267
+    from ..cmd import Runner
+
+    bools = ["False", "True"]
+
+    def get_interactive(py_pre="", **run_kwargs):
+        out, err = Runner().run(
+            [sys.executable,
+             "-c",
+             py_pre +
+             'from datalad.utils import is_interactive; '
+             'f = open(%r, "w"); '
+             'f.write(str(is_interactive())); '
+             'f.close()'
+             % fout
+             ],
+            **run_kwargs
+        )
+        with open(fout) as f:
+            out = f.read()
+        assert_in(out, bools)
+        return bool(bools.index(out))
+
+    # we never request for pty in our Runner, so can't be interactive
+    eq_(get_interactive(), False)
+    # and it must not crash if smth is closed
+    for o in ('stderr', 'stdin', 'stdout'):
+        eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
 

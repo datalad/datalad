@@ -125,6 +125,8 @@ class ExternalVersions(object):
         'gitdb',
         'humanize',
         'iso8601',
+        'keyring',
+        'keyrings.alt',
         'msgpack',
         'mutagen',
         'patool',
@@ -223,7 +225,7 @@ class ExternalVersions(object):
         return self._versions.keys()
 
     def __contains__(self, item):
-        return item in self._versions
+        return bool(self[item])
 
     @property
     def versions(self):

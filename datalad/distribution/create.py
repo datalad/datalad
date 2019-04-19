@@ -15,6 +15,7 @@ import random
 import uuid
 
 from os import listdir
+import os.path as op
 from os.path import isdir
 from os.path import join as opj
 
@@ -39,9 +40,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
-
-# required to get the binding of `add` as a dataset method
-from datalad.distribution.add import Add
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -82,7 +80,7 @@ class Create(Interface):
     << REFLOW ||
 
     .. note::
-      Power-user info: This command uses :command:`git init`, and
+      Power-user info: This command uses :command:`git init` and
       :command:`git annex init` to prepare the new dataset. Registering to a
       superdataset is performed via a :command:`git submodule add` operation
       in the discovered superdataset.
@@ -112,7 +110,7 @@ class Create(Interface):
             args=("-d", "--dataset"),
             metavar='PATH',
             doc="""specify the dataset to perform the create operation on. If
-            a dataset is give, a new subdataset will be created in it.""",
+            a dataset is given, a new subdataset will be created in it.""",
             constraints=EnsureDataset() | EnsureNone()),
         force=Parameter(
             args=("-f", "--force",),
@@ -166,6 +164,12 @@ class Create(Interface):
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
+        fake_dates=Parameter(
+            args=('--fake-dates',),
+            action='store_true',
+            doc="""Configure the repository to use fake dates. The date for a
+            new commit will be set to one second later than the latest commit
+            in the repository. This can be used to anonymize dates."""),
     )
 
     @staticmethod
@@ -185,7 +189,8 @@ class Create(Interface):
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None,
-            text_no_annex=None
+            text_no_annex=None,
+            fake_dates=False
     ):
 
         # two major cases
@@ -307,13 +312,17 @@ class Create(Interface):
             yield path
             return
 
+        # stuff that we create and want to have tracked with git (not annex)
+        add_to_git = []
+
         if no_annex:
             lgr.info("Creating a new git repo at %s", tbds.path)
             GitRepo(
                 tbds.path,
                 url=None,
                 create=True,
-                git_opts=git_opts)
+                git_opts=git_opts,
+                fake_dates=fake_dates)
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", tbds.path)
@@ -326,19 +335,18 @@ class Create(Interface):
                 description=description,
                 git_opts=git_opts,
                 annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts
+                annex_init_opts=annex_init_opts,
+                fake_dates=fake_dates
             )
 
             if text_no_annex:
-                git_attributes_file = opj(tbds.path, '.gitattributes')
-                with open(git_attributes_file, 'a') as f:
-                    f.write('* annex.largefiles=(not(mimetype=text/*))\n')
-                tbrepo.add([git_attributes_file], git=True)
-                tbrepo.commit(
-                    "Instructed annex to add text files to git",
-                    _datalad_msg=True,
-                    files=[git_attributes_file]
-                )
+                attrs = tbrepo.get_gitattributes('.')
+                # some basic protection against useless duplication
+                # on rerun with --force
+                if not attrs.get('.', {}).get('annex.largefiles', None) == '(not(mimetype=text/*))':
+                    tbrepo.set_gitattributes([
+                        ('*', {'annex.largefiles': '(not(mimetype=text/*))'})])
+                    add_to_git.append('.gitattributes')
 
         if native_metadata_type is not None:
             if not isinstance(native_metadata_type, list):
@@ -349,8 +357,13 @@ class Create(Interface):
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
+
+        # Note, that Dataset property `id` will change when we unset the
+        # respective config. Therefore store it before:
+        tbds_id = tbds.id
         if id_var in tbds.config:
-            # make sure we reset this variable completely, in case of a re-create
+            # make sure we reset this variable completely, in case of a
+            # re-create
             tbds.config.unset(id_var, where='dataset')
 
         if _seed is None:
@@ -361,23 +374,42 @@ class Create(Interface):
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
         tbds.config.add(
             id_var,
-            tbds.id if tbds.id is not None else uuid_id,
+            tbds_id if tbds_id is not None else uuid_id,
             where='dataset')
 
-        # make sure that v6 annex repos never commit content under .datalad
-        with open(opj(tbds.path, '.datalad', '.gitattributes'), 'a') as gitattr:
-            # TODO this will need adjusting, when annex'ed aggregate metadata
-            # comes around
-            gitattr.write('# Text files (according to file --mime-type) are added directly to git.\n')
-            gitattr.write('# See http://git-annex.branchable.com/tips/largefiles/ for more info.\n')
-            gitattr.write('** annex.largefiles=nothing\n')
-            gitattr.write('metadata/objects/** annex.largefiles=({})\n'.format(
-                cfg.obtain('datalad.metadata.create-aggregate-annex-limit')))
+        add_to_git.append('.datalad')
+
+        # make sure that v6+ annex repos never commit content under .datalad
+        attrs_cfg = (
+            ('config', 'annex.largefiles', 'nothing'),
+            ('metadata/aggregate*', 'annex.largefiles', 'nothing'),
+            ('metadata/objects/**', 'annex.largefiles',
+             '({})'.format(cfg.obtain(
+                 'datalad.metadata.create-aggregate-annex-limit'))))
+        attrs = tbds.repo.get_gitattributes(
+            [op.join('.datalad', i[0]) for i in attrs_cfg])
+        set_attrs = []
+        for p, k, v in attrs_cfg:
+            if not attrs.get(
+                    op.join('.datalad', p), {}).get(k, None) == v:
+                set_attrs.append((p, {k: v}))
+        if set_attrs:
+            tbds.repo.set_gitattributes(
+                set_attrs,
+                attrfile=op.join('.datalad', '.gitattributes'))
+            add_to_git.append('.datalad')
+
+        # prevent git annex from ever annexing .git* stuff (gh-1597)
+        attrs = tbds.repo.get_gitattributes('.git')
+        if not attrs.get('.git', {}).get('annex.largefiles', None) == 'nothing':
+            tbds.repo.set_gitattributes([
+                ('**/.git*', {'annex.largefiles': 'nothing'})])
+            add_to_git.append('.gitattributes')
 
         # save everything, we need to do this now and cannot merge with the
         # call below, because we may need to add this subdataset to a parent
         # but cannot until we have a first commit
-        tbds.add('.datalad', to_git=True, save=save,
+        tbds.add(add_to_git, to_git=True, save=save,
                  message='[DATALAD] new dataset')
 
         # the next only makes sense if we saved the created dataset,
