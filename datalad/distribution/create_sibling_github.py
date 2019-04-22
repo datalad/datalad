@@ -27,6 +27,7 @@ from datalad.downloaders.credentials import UserPassword
 from datalad.dochelpers import exc_str
 from datalad.utils import (
     assure_list,
+    assure_tuple_or_list,
     unique,
 )
 from datalad.support.param import Parameter
@@ -305,14 +306,16 @@ def _make_github_repos(
         ncredattempts += 1
         for ds, reponame in rinfo:
             try:
-                access_url, existed = _make_github_repo(
+                res_ = _make_github_repo(
                     github_login,
                     entity,
                     reponame,
                     existing,
                     access_protocol,
                     dryrun)
-                res.append((ds, access_url, existed))
+                # output will contain whatever is returned by _make_github_repo
+                # but with a dataset prepended to the record
+                res.append((ds,) + assure_tuple_or_list(res_))
             except gh.BadCredentialsException as e:
                 if res:
                     # so we have succeeded with at least one repo already -
@@ -328,7 +331,8 @@ def _make_github_repos(
                 else:
                     lgr.warning("Authentication failed using a token.")
                 break  # go to the next attempt to authenticate
-        return res
+        if res:
+            return res
 
     # External loop should stop querying for the next possible way when it succeeds,
     # so we should never get here if everything worked out
