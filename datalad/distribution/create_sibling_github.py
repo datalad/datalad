@@ -538,7 +538,7 @@ class CreateSiblingGithub(Interface):
         for d, mp in toprocess:
             if name in d.repo.get_remotes():
                 if existing == 'error':
-                    msg = '{} already had a configured sibling "{}"'.format(
+                    msg = '{} already has a configured sibling "{}"'.format(
                         d, name)
                     if dryrun:
                         lgr.error(msg)
