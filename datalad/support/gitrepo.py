@@ -18,6 +18,7 @@ import shlex
 import time
 import os
 import os.path as op
+import warnings
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -72,6 +73,7 @@ from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
+from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -729,7 +731,17 @@ class GitRepo(RepoInterface):
         self._fake_dates_enabled = None
 
     def _create_empty_repo(self, path, **kwargs):
-        if op.lexists(path):
+        # the issue: https://github.com/datalad/datalad/issues/3295
+        # discussion to just issue a warning:
+        #   https://github.com/datalad/datalad/pull/3296
+        if external_versions['cmd:git'] < '2.14.0':
+            warnings.warn(
+                "Your git version (%s) is too old, we will not safe-guard "
+                "against creating a new repository under already known to git "
+                "subdirectory" % external_versions['cmd:git'],
+                OutdatedExternalDependencyWarning
+            )
+        elif op.lexists(path):
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
