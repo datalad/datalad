@@ -21,6 +21,7 @@ from datalad.tests.utils import (
     eq_,
     swallow_logs,
     with_tempfile,
+    use_cassette as use_cassette_,
 )
 from nose.tools import assert_raises, assert_in, assert_true, assert_false, \
     assert_not_in, assert_equal
@@ -36,6 +37,19 @@ except ImportError:
     # make sure that the command complains too
     assert_raises(MissingExternalDependency, create_sibling_github, 'some')
     raise SkipTest
+
+
+# Keep fixtures local to this test file
+from datalad.support import path as op
+
+FIXTURES_PATH = op.join(op.dirname(__file__), 'vcr_cassettes')
+
+def use_cassette(name, *args, **kwargs):
+    """Adapter to store fixtures locally
+
+    TODO: RF so could be used in other places as well
+    """
+    return use_cassette_(op.join(FIXTURES_PATH, name + '.yaml'), *args, **kwargs)
 
 
 @with_tempfile
@@ -172,3 +186,29 @@ def test__make_github_repos():
         with assert_raises(AccessDeniedError) as cme:
             csgh._make_github_repos(*args)
         assert_in("Tried 3 times", str(cme.exception))
+
+
+# Ran on Yarik's laptop, so would use his available token
+@use_cassette('github_yarikoptic')
+@with_tempfile(mkdir=True)
+def test_integration1(path):
+    ds = Dataset(path).create()
+    # everything works just nice, no conflicts etc
+    res = ds.create_sibling_github('test_integration1')
+    eq_(res, [(ds, 'https://github.com/yarikoptic/test_integration1.git', False)])
+
+    # but if we rerun - should kaboom since already has this sibling:
+    with assert_raises(ValueError) as cme:
+        ds.create_sibling_github('test_integration1')
+    assert_in("already has a configured sibling", str(cme.exception))
+
+    # but we can give it a new name, but it should kaboom since the remote one
+    # exists already
+    with assert_raises(ValueError) as cme:
+        ds.create_sibling_github('test_integration1', name="github2")
+        assert_in("already exists on", str(cme.exception))
+    # we should not leave the broken sibling behind
+    assert_not_in('github2', ds.repo.get_remotes())
+
+    # If we ask to reconfigure - should proceed normally
+    ds.create_sibling_github('test_integration1', existing='reconfigure')
