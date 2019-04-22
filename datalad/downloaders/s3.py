@@ -6,8 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Provide access to stuff (html, data files) via HTTP and HTTPS
-
+"""Provide access to Amazon S3 objects.
 """
 
 import re
@@ -29,7 +28,7 @@ from ..support.status import FileStatus
 
 import logging
 from logging import getLogger
-lgr = getLogger('datalad.http')
+lgr = getLogger('datalad.s3')
 boto_lgr = logging.getLogger('boto')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
