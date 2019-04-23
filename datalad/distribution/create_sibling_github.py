@@ -257,13 +257,22 @@ def _get_2fa_token(user):
     )
     if where_to_store:
         try:
-            cfg.set(CONFIG_HUB_TOKEN_FIELD, auth.token,
+            # Using .add so other (possibly still legit tokens) are not lost
+            if cfg.get(CONFIG_HUB_TOKEN_FIELD, None):
+                lgr.info("Found that there is some other known tokens already, "
+                         "adding one more")
+            cfg.add(CONFIG_HUB_TOKEN_FIELD, auth.token,
                     where=where_to_store)
             lgr.info("Stored %s=%s in %s config.",
                      CONFIG_HUB_TOKEN_FIELD, _token_str(token),
                      where_to_store)
         except Exception as exc:
-            lgr.debug("Failed to store token: %s", exc_str(exc))
+            lgr.error("Failed to store token: %s",
+                      # sanitize away the token
+                      exc_str(exc).replace(token, _token_str(token)))
+            # assuming that it is ok to display the token to the user, since
+            # otherwise it would be just lost.  ui  shouldn't log it (at least
+            # ATM)
             ui.error(
                 "Failed to store the token (%s), please store manually as %s"
                 % (token, CONFIG_HUB_TOKEN_FIELD)
@@ -275,6 +284,7 @@ def _gen_github_entity(
     github_login, github_passwd,
     github_organization
 ):
+    import github as gh
     for ses, cred in _gen_github_ses(github_login, github_passwd):
         if github_organization:
             try:
@@ -303,8 +313,10 @@ def _make_github_repos(
             github_login,
             github_passwd,
             github_organization):
+        lgr.debug("Using entity %s with credential %s", entity, cred)
         ncredattempts += 1
         for ds, reponame in rinfo:
+            lgr.debug("Trying to create %s for %s", reponame, ds)
             try:
                 res_ = _make_github_repo(
                     github_login,

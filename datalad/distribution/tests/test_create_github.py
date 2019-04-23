@@ -19,6 +19,7 @@ from datalad.support.exceptions import (
     MissingExternalDependency,
 )
 from datalad.utils import (
+    assure_list,
     chpwd,
 )
 from datalad.tests.utils import (
@@ -198,7 +199,10 @@ def test__make_github_repos():
 @use_cassette('github_yarikoptic')
 def test_integration1_yarikoptic():
     # use case 1 - oauthtoken is known to git config, no 2FA (although irrelevant)
-    check_integration1('yarikoptic', oauthtoken='does not matter - vcr has "token"')
+    check_integration1(
+        'yarikoptic',
+        oauthtokens='does not matter - vcr has "token"'
+    )
 
 
 @use_cassette('github_datalad_tester')
@@ -214,12 +218,44 @@ def test_integration1_datalad_tester():
     check_integration1('datalad-tester')
 
 
+@use_cassette('github_datalad_tester_org')
+@with_testsui(responses=[
+     'datalad-tester',  # bug -- shouldn't ask probably
+     'secret-password',
+     'yes',      # Generate a GitHub token?
+     '2FA code', # VCR tape has a real one
+     'local',    # Where to store the token?
+])
+def test_integration1_datalad_tester_org():
+    # similar to use case 2 but into another organization,
+    # providing login into the call
+    check_integration1(
+        'datalad-tester',
+        organization='datalad-tester-org',
+        # we do provide into the call as well
+        kwargs={
+            'github_login': 'datalad-tester'
+        },
+        # and we will give a number of tokens to "reject"
+        oauthtokens=['fake1', 'fake2']
+    )
+
+
 @with_memory_keyring  # so that there is no leakage of credentials/side effects
 @with_tempfile(mkdir=True)
-def check_integration1(login, keyring, path, oauthtoken=None):
+def check_integration1(login, keyring,
+                       path,
+                       organization=None,
+                       kwargs={},
+                       oauthtokens=None):
+    kwargs = kwargs.copy()
+    if organization:
+        kwargs['github_organization'] = organization
+
     ds = Dataset(path).create()
-    if oauthtoken:
-        ds.config.add('hub.oauthtoken', oauthtoken, where='local')
+    if oauthtokens:
+        for oauthtoken in assure_list(oauthtokens):
+            ds.config.add('hub.oauthtoken', oauthtoken, where='local')
 
     # so we do not pick up local repo configuration/token
     repo_name = 'test_integration1'
@@ -228,22 +264,27 @@ def check_integration1(login, keyring, path, oauthtoken=None):
         # so force "process wide" cfg to pick up our defined above oauthtoken
         cfg.reload(force=True)
         # everything works just nice, no conflicts etc
-        res = ds.create_sibling_github(repo_name)
-        eq_(res, [(ds, 'https://github.com/%s/test_integration1.git' % login, False)])
+        res = ds.create_sibling_github(repo_name, **kwargs)
+
+        if organization:
+            url_fmt = 'https://{login}@github.com/{organization}/{repo_name}.git'
+        else:
+            url_fmt = 'https://github.com/{login}/{repo_name}.git'
+        eq_(res, [(ds, url_fmt.format(**locals()), False)])
 
         # but if we rerun - should kaboom since already has this sibling:
         with assert_raises(ValueError) as cme:
-            ds.create_sibling_github(repo_name)
+            ds.create_sibling_github(repo_name, **kwargs)
         assert_in("already has a configured sibling", str(cme.exception))
 
         # but we can give it a new name, but it should kaboom since the remote one
         # exists already
         with assert_raises(ValueError) as cme:
-            ds.create_sibling_github(repo_name, name="github2")
+            ds.create_sibling_github(repo_name, name="github2", **kwargs)
             assert_in("already exists on", str(cme.exception))
         # we should not leave the broken sibling behind
         assert_not_in('github2', ds.repo.get_remotes())
 
         # If we ask to reconfigure - should proceed normally
-        ds.create_sibling_github(repo_name, existing='reconfigure')
+        ds.create_sibling_github(repo_name, existing='reconfigure', **kwargs)
     cfg.reload(force=True)
