@@ -2694,7 +2694,6 @@ class GitRepo(RepoInterface):
         """
         return self.get_gitattributes('.')['.']
 
-
     def get_gitattributes(self, path, index_only=False):
         """Query gitattributes for one or more paths
 
@@ -2784,7 +2783,6 @@ class GitRepo(RepoInterface):
                     else:
                         attrline += ' {}={}'.format(a, val)
                 f.write('\n{}'.format(attrline))
-
 
     def get_content_info(self, paths=None, ref=None, untracked='all'):
         """Get identifier and type information from repository content.
@@ -3119,7 +3117,7 @@ class GitRepo(RepoInterface):
                    eval_submodule_state='full', _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
         return self._diffstatus(
-            fr,to, paths, untracked, eval_submodule_state, _cache)
+            fr, to, paths, untracked, eval_submodule_state, _cache)
 
     def _diffstatus(self, fr, to, paths, untracked, eval_state, _cache):
         """Just like diffstatus(), but supports an additional evaluation
