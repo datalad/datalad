@@ -2796,7 +2796,7 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        paths : list(patlib.PurePath)
+        paths : list(pathlib.PurePath)
           Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
