@@ -8,8 +8,9 @@
 """Test create publication target github"""
 
 import mock
-
 from os.path import join as opj
+
+from datalad import cfg
 # this must with with and without pygithub
 from datalad.api import create_sibling_github
 from datalad.api import Dataset
@@ -17,9 +18,13 @@ from datalad.support.exceptions import (
     AccessDeniedError,
     MissingExternalDependency,
 )
+from datalad.utils import (
+    chpwd,
+)
 from datalad.tests.utils import (
     eq_,
     swallow_logs,
+    with_memory_keyring,
     with_tempfile,
     use_cassette as use_cassette_,
 )
@@ -190,25 +195,34 @@ def test__make_github_repos():
 
 # Ran on Yarik's laptop, so would use his available token
 @use_cassette('github_yarikoptic')
+@with_memory_keyring  # so that there is no leakage of credentials/side effects
 @with_tempfile(mkdir=True)
-def test_integration1(path):
+def test_integration1(keyring, path):
     ds = Dataset(path).create()
-    # everything works just nice, no conflicts etc
-    res = ds.create_sibling_github('test_integration1')
-    eq_(res, [(ds, 'https://github.com/yarikoptic/test_integration1.git', False)])
+    ds.config.add('hub.oauthtoken', 'does not matter - vcr has "token"', where='local')
+    # so we do not pick up local repo configuration/token
+    repo_name = 'test_integration1'
+    with chpwd(path):
+        # ATM all the github goodness does not care about "this dataset"
+        # so force "process wide" cfg to pick up our defined above oauthtoken
+        cfg.reload(force=True)
+        # everything works just nice, no conflicts etc
+        res = ds.create_sibling_github(repo_name)
+        eq_(res, [(ds, 'https://github.com/yarikoptic/test_integration1.git', False)])
 
-    # but if we rerun - should kaboom since already has this sibling:
-    with assert_raises(ValueError) as cme:
-        ds.create_sibling_github('test_integration1')
-    assert_in("already has a configured sibling", str(cme.exception))
+        # but if we rerun - should kaboom since already has this sibling:
+        with assert_raises(ValueError) as cme:
+            ds.create_sibling_github(repo_name)
+        assert_in("already has a configured sibling", str(cme.exception))
 
-    # but we can give it a new name, but it should kaboom since the remote one
-    # exists already
-    with assert_raises(ValueError) as cme:
-        ds.create_sibling_github('test_integration1', name="github2")
-        assert_in("already exists on", str(cme.exception))
-    # we should not leave the broken sibling behind
-    assert_not_in('github2', ds.repo.get_remotes())
+        # but we can give it a new name, but it should kaboom since the remote one
+        # exists already
+        with assert_raises(ValueError) as cme:
+            ds.create_sibling_github(repo_name, name="github2")
+            assert_in("already exists on", str(cme.exception))
+        # we should not leave the broken sibling behind
+        assert_not_in('github2', ds.repo.get_remotes())
 
-    # If we ask to reconfigure - should proceed normally
-    ds.create_sibling_github('test_integration1', existing='reconfigure')
+        # If we ask to reconfigure - should proceed normally
+        ds.create_sibling_github(repo_name, existing='reconfigure')
+    cfg.reload(force=True)
