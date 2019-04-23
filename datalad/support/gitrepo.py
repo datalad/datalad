@@ -3032,7 +3032,7 @@ class GitRepo(RepoInterface):
           into a subdataset, a report is made on the subdataset record
           within the queried dataset only (no recursion).
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
@@ -3082,7 +3082,7 @@ class GitRepo(RepoInterface):
           If given, limits the query to the specified paths. To query all
           paths specify `None`, not an empty list.
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported when `to` is None:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
