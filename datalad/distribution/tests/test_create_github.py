@@ -26,6 +26,7 @@ from datalad.tests.utils import (
     swallow_logs,
     with_memory_keyring,
     with_tempfile,
+    with_testsui,
     use_cassette as use_cassette_,
 )
 from nose.tools import assert_raises, assert_in, assert_true, assert_false, \
@@ -195,11 +196,31 @@ def test__make_github_repos():
 
 # Ran on Yarik's laptop, so would use his available token
 @use_cassette('github_yarikoptic')
+def test_integration1_yarikoptic():
+    # use case 1 - oauthtoken is known to git config, no 2FA (although irrelevant)
+    check_integration1('yarikoptic', oauthtoken='does not matter - vcr has "token"')
+
+
+@use_cassette('github_datalad_tester')
+@with_testsui(responses=[
+    'datalad-tester',
+    'secret-password',
+    'yes',      # Generate a GitHub token?
+    '2FA code', # VCR tape has a real one
+    'local',    # Where to store the token?
+])
+def test_integration1_datalad_tester():
+    # use case 2 - nothing is known, 2FA, would generate 'DataLad token', and save it
+    check_integration1('datalad-tester')
+
+
 @with_memory_keyring  # so that there is no leakage of credentials/side effects
 @with_tempfile(mkdir=True)
-def test_integration1(keyring, path):
+def check_integration1(login, keyring, path, oauthtoken=None):
     ds = Dataset(path).create()
-    ds.config.add('hub.oauthtoken', 'does not matter - vcr has "token"', where='local')
+    if oauthtoken:
+        ds.config.add('hub.oauthtoken', oauthtoken, where='local')
+
     # so we do not pick up local repo configuration/token
     repo_name = 'test_integration1'
     with chpwd(path):
@@ -208,7 +229,7 @@ def test_integration1(keyring, path):
         cfg.reload(force=True)
         # everything works just nice, no conflicts etc
         res = ds.create_sibling_github(repo_name)
-        eq_(res, [(ds, 'https://github.com/yarikoptic/test_integration1.git', False)])
+        eq_(res, [(ds, 'https://github.com/%s/test_integration1.git' % login, False)])
 
         # but if we rerun - should kaboom since already has this sibling:
         with assert_raises(ValueError) as cme:
