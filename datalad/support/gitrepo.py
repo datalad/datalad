@@ -3072,7 +3072,7 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        fr : str
+        fr : str or None
           Revision specification (anything that Git understands). Passing
           `None` considers anything in the target state as new.
         to : str or None
