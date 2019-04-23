@@ -43,7 +43,6 @@ from six import text_type
 from six import add_metaclass
 from six import iteritems
 from six import PY2
-from functools import wraps
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
@@ -67,7 +66,6 @@ from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
-from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
 from datalad.utils import CMD_MAX_ARG
@@ -1205,7 +1203,6 @@ class GitRepo(RepoInterface):
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
-        from datalad.utils import assure_unicode
         return [{u'file': f, u'success': True}
                 for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
