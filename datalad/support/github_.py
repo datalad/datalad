@@ -125,6 +125,7 @@ def _gen_github_ses(github_login, github_passwd):
 
     # if login and passwd were provided - try that one first
     try_creds = github_login and github_passwd
+    try_login = bool(github_login)
 
     while True:
         if try_creds:
@@ -136,8 +137,12 @@ def _gen_github_ses(github_login, github_passwd):
             try_creds = None
         else:
             cred = UserPassword(cred_identity, 'https://github.com/login')
+            # if github_login was provided, we should first try it as is,
+            # and only ask for password
             if not cred.is_known:
-                cred.enter_new()
+                creds = {'user': github_login} if try_login else {}
+                cred.enter_new(**creds)
+            try_login = None
             creds = cred()
             user_name = creds['user']
             ses = gh.Github(user_name, password=creds['password'])

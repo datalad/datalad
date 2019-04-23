@@ -126,7 +126,6 @@ def test_integration1_datalad_tester():
 
 @use_cassette('github_datalad_tester_org')
 @with_testsui(responses=[
-     'datalad-tester',  # bug -- shouldn't ask probably
      'secret-password',
      'yes',      # Generate a GitHub token?
      '2FA code', # VCR tape has a real one
