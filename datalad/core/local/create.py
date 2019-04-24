@@ -16,7 +16,10 @@ import random
 import uuid
 from six import iteritems
 from six import text_type
-from argparse import REMAINDER
+from argparse import (
+    REMAINDER,
+    ONE_OR_MORE,
+)
 
 from os import listdir
 import os.path as op
@@ -148,6 +151,16 @@ class Create(Interface):
             doc="""Configure the repository to use fake dates. The date for a
             new commit will be set to one second later than the latest commit
             in the repository. This can be used to anonymize dates."""),
+        cfg_proc=Parameter(
+            args=("-c", "--cfg-proc"),
+            metavar="PROC",
+            action='append',
+            doc="""Run cfg_PROC procedure(s) (can be specified multiple times)
+            on the created dataset. Use
+            [PY: `run_procedure(discover=True)` PY][CMD: run_procedure --discover CMD]
+            to get a list of available procedures, such as cfg_text2git.
+            """
+        )
     )
 
     @staticmethod
@@ -160,7 +173,8 @@ class Create(Interface):
             description=None,
             dataset=None,
             no_annex=False,
-            fake_dates=False
+            fake_dates=False,
+            cfg_proc=None
     ):
         refds_path = dataset.path if hasattr(dataset, 'path') else dataset
 
@@ -419,6 +433,11 @@ class Create(Interface):
 
         res.update({'status': 'ok'})
         yield res
+
+        for cfg_proc_ in cfg_proc or []:
+            for r in tbds.run_procedure('cfg_' + cfg_proc_):
+                yield r
+
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: no cover
