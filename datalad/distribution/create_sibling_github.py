@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """High-level interface for creating a publication target on GitHub
 """
+
 __docformat__ = 'restructuredtext'
 
 

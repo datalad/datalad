@@ -10,27 +10,33 @@
 from os.path import join as opj
 
 from datalad import cfg
-# this must with with and without pygithub
-from datalad.api import create_sibling_github
-from datalad.api import Dataset
-from datalad.support.exceptions import (
-    MissingExternalDependency,
+
+# this must import ok with and without pygithub
+from datalad.api import (
+    create_sibling_github,
+    Dataset,
 )
 from datalad.utils import (
     assure_list,
     chpwd,
 )
 from datalad.tests.utils import (
+    assert_equal,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_raises,
+    assert_true,
     eq_,
+    SkipTest,
+    use_cassette as use_cassette_,
     with_memory_keyring,
     with_tempfile,
     with_testsui,
-    use_cassette as use_cassette_,
 )
-from nose.tools import assert_raises, assert_in, assert_true, assert_false, \
-    assert_not_in, assert_equal
-from nose import SkipTest
-
+from datalad.support.exceptions import (
+    MissingExternalDependency,
+)
 try:
     import github as gh
 except ImportError:
