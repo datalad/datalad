@@ -778,8 +778,12 @@ class BatchedCommand(object):
         if not input_multiple:
             cmds = [cmds]
 
-        output = [o for o in self.yield_(cmds)]
-        return output if input_multiple else output[0]
+        output = list(self.yield_(cmds))
+        if input_multiple:
+            return output
+        else:
+            assert len(output) == 1, "There should be a single output item"
+            return output[0]
 
     def yield_(self, cmds):
         for entry in cmds:

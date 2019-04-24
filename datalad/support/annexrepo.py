@@ -2234,7 +2234,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         ------
         dict
             A response dictionary to each query path with the following keys:
-            'path' with the queried path in the same form t was provided;
+            'path' with the queried path in the same form it was provided;
             'status' {ok|error} indicating whether git annex was queried
             successfully for a path; 'key' with the annex key for the file;
             'remotes' with a dictionary of remotes that have a copy of the
@@ -2244,7 +2244,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """
         if isinstance(paths, string_types):
             raise ValueError('AnnexRepo.whereis_file(paths): paths must be '
-                             'iterable, not a string type')
+                             'a non-string type iterable')
 
         cmd = self._batched.get('whereis', json=True, path=self.path)
         for path in paths:
