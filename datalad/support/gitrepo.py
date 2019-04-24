@@ -2601,7 +2601,8 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
+                          files=None):
         """Return files that have changed between the index and working tree.
 
         Parameters
@@ -2624,6 +2625,9 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
+        if files:
+            opts.append('--')
+            opts += assure_list(files)
         return [normpath(f)  # Call normpath to convert separators on Windows.
                 for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
 
