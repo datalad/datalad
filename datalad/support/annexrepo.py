@@ -2217,6 +2217,54 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if not j.get('key').endswith('.this-is-a-test-key')
             }
 
+    def whereis_file(self, path):
+        """Same as `whereis_file_()`, but for a single path and return-dict"""
+        return list(self.whereis_file_([path]))[0]
+
+    def whereis_file_(self, paths):
+        """
+        Parameters
+        ----------
+        paths : iterable
+            Paths of files to query for, either absolute paths matching the
+            repository root (self.path), or paths relative to the root of the
+            repository
+
+        Yields
+        ------
+        dict
+            A response dictionary to each query path with the following keys:
+            'path' with the queried path in the same form t was provided;
+            'status' {ok|error} indicating whether git annex was queried
+            successfully for a path; 'key' with the annex key for the file;
+            'remotes' with a dictionary of remotes that have a copy of the
+            respective file (annex UUIDs are keys, and values are dictionaries
+            with keys: 'description', 'here', 'urls' (list) that contain
+            the values of the respective 'git annex whereis' response.
+        """
+        if isinstance(paths, string_types):
+            raise ValueError('AnnexRepo.whereis_file(paths): paths must be '
+                             'iterable, not a string type')
+
+        cmd = self._batched.get('whereis', json=True, path=self.path)
+        for path in paths:
+            r = cmd(path)
+            # give path back in the same shape as it came in
+            res = dict(path=path)
+            if not r:
+                yield dict(res, status='error')
+                continue
+            yield dict(
+                res,
+                status='ok' if r.get('success', False) else 'error',
+                key=r['key'],
+                remotes={
+                    remote['uuid']:
+                    {x: remote.get(x, None)
+                     for x in ('description', 'here', 'urls')}
+                    for remote in r['whereis']},
+            )
+
     # TODO:
     # I think we should make interface cleaner and less ambigious for those annex
     # commands which could operate on globs, files, and entire repositories, separating
