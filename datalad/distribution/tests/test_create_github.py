@@ -192,7 +192,7 @@ def check_integration1(login, keyring,
         # exists already
         with assert_raises(ValueError) as cme:
             ds.create_sibling_github(repo_name, name="github2", **kwargs)
-            assert_in("already exists on", str(cme.exception))
+        assert_in("already exists on", str(cme.exception))
         # we should not leave the broken sibling behind
         assert_not_in('github2', ds.repo.get_remotes())
 
