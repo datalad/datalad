@@ -451,6 +451,7 @@ class RunProcedure(Interface):
         lgr.debug('Attempt to run procedure {} as: {}'.format(
             name,
             cmd))
+        lgr.info("Running procedure %s", name)
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,
