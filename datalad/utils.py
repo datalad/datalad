@@ -871,7 +871,7 @@ def generate_file_chunks(files, cmd=None):
     files = assure_list(files)
     cmd = assure_list(cmd)
 
-    maxl = max(map(len, files))
+    maxl = max(map(len, files)) if files else 0
     chunk_size = max(
         1,  # should at least be 1. If blows then - not our fault
         (CMD_MAX_ARG

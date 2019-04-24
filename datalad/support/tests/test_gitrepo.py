@@ -1068,6 +1068,9 @@ def test_get_missing(path):
     # providing 'files' pointing to subdirectory lists files within
     eq_(set(repo.get_changed_files(staged=True, diff_filter='AD', files=['deep'])),
         {op.join('deep', 'test2')})
+    # empty list should cause no files being reported in either scenario
+    eq_(repo.get_changed_files(staged=True, files=[]), [])
+    eq_(repo.get_changed_files(staged=False, files=[]), [])
     eq_(repo.get_changed_files(staged=True, diff_filter='D'), [])
     repo.commit()
     eq_(repo.get_changed_files(), [])

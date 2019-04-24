@@ -2609,7 +2609,7 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        if files:
+        if files is not None:
             opts.append('--')
             # might be too many, need to chunk up
             optss = (
