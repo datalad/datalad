@@ -18,6 +18,7 @@ Concepts and technologies
    background
    related
    basics
+   4git_users
    usecases/index
    metadata
    customization
