@@ -778,8 +778,10 @@ class BatchedCommand(object):
         if not input_multiple:
             cmds = [cmds]
 
-        output = []
+        output = [o for o in self.yield_(cmds)]
+        return output if input_multiple else output[0]
 
+    def yield_(self, cmds):
         for entry in cmds:
             if not isinstance(entry, string_types):
                 entry = ' '.join(entry)
@@ -805,9 +807,7 @@ class BatchedCommand(object):
             if stderr:
                 lgr.warning("Received output in stderr: %r", stderr)
             lgr.log(5, "Received output: %r" % stdout)
-            output.append(stdout)
-
-        return output if input_multiple else output[0]
+            yield stdout
 
     def __del__(self):
         self.close()
