@@ -43,7 +43,6 @@ from six import text_type
 from six import add_metaclass
 from six import iteritems
 from six import PY2
-from functools import wraps
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
@@ -67,7 +66,6 @@ from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
-from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
 from datalad.utils import CMD_MAX_ARG
@@ -1205,7 +1203,6 @@ class GitRepo(RepoInterface):
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
-        from datalad.utils import assure_unicode
         return [{u'file': f, u'success': True}
                 for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
@@ -2697,7 +2694,6 @@ class GitRepo(RepoInterface):
         """
         return self.get_gitattributes('.')['.']
 
-
     def get_gitattributes(self, path, index_only=False):
         """Query gitattributes for one or more paths
 
@@ -2788,7 +2784,6 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('\n{}'.format(attrline))
 
-
     def get_content_info(self, paths=None, ref=None, untracked='all'):
         """Get identifier and type information from repository content.
 
@@ -2801,7 +2796,7 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        paths : list(patlib.PurePath)
+        paths : list(pathlib.PurePath)
           Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
@@ -3037,7 +3032,7 @@ class GitRepo(RepoInterface):
           into a subdataset, a report is made on the subdataset record
           within the queried dataset only (no recursion).
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
@@ -3077,7 +3072,7 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        fr : str
+        fr : str or None
           Revision specification (anything that Git understands). Passing
           `None` considers anything in the target state as new.
         to : str or None
@@ -3087,7 +3082,7 @@ class GitRepo(RepoInterface):
           If given, limits the query to the specified paths. To query all
           paths specify `None`, not an empty list.
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported when `to` is None:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
@@ -3122,7 +3117,7 @@ class GitRepo(RepoInterface):
                    eval_submodule_state='full', _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
         return self._diffstatus(
-            fr,to, paths, untracked, eval_submodule_state, _cache)
+            fr, to, paths, untracked, eval_submodule_state, _cache)
 
     def _diffstatus(self, fr, to, paths, untracked, eval_state, _cache):
         """Just like diffstatus(), but supports an additional evaluation
