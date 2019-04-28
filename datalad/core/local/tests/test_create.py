@@ -341,6 +341,17 @@ def test_create_withprocedure(path):
 
 
 @with_tempfile(mkdir=True)
+def test_create_withcfg(path):
+    ds = create(
+        dataset=path,
+        cfg_proc=['text2git'])
+    assert_repo_status(path)
+    eq_('(not(mimetype=text/*))',
+        ds.repo.get_gitattributes('.')['.']['annex.largefiles']
+    )
+
+
+@with_tempfile(mkdir=True)
 def test_create_fake_dates(path):
     ds = create(path, fake_dates=True)
 
