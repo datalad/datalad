@@ -11,7 +11,7 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-
+from itertools import chain
 import logging
 import re
 import shlex
@@ -62,8 +62,7 @@ from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
-from datalad.utils import CMD_MAX_ARG
-from datalad.utils import generate_chunks
+from datalad.utils import generate_file_chunks
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -1826,22 +1825,7 @@ class GitRepo(RepoInterface):
         if not files:
             file_chunks = [[]]
         else:
-            files = assure_list(files)
-
-            maxl = max(map(len, files))
-            chunk_size = max(
-                1,  # should at least be 1. If blows then - not our fault
-                (CMD_MAX_ARG
-                 - sum((len(x) + 3) for x in cmd)
-                 - 4   # for '--' below
-                 ) // (maxl + 3)  # +3 for possible quotes and a space
-            )
-            # TODO: additional treatment for "too many arguments"? although
-            # as https://github.com/datalad/datalad/issues/1883#issuecomment-436272758
-            # shows there seems to be no hardcoded limit on # of arguments,
-            # but may be we decide to go for smth like follow to be on safe side
-            # chunk_size = min(10240 - len(cmd), chunk_size)
-            file_chunks = generate_chunks(files, chunk_size)
+            file_chunks = generate_file_chunks(files, cmd)
 
         out, err = "", ""
         for file_chunk in file_chunks:
@@ -2613,7 +2597,8 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
+                          files=None):
         """Return files that have changed between the index and working tree.
 
         Parameters
@@ -2636,8 +2621,23 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        return [normpath(f)  # Call normpath to convert separators on Windows.
-                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
+        if files is not None:
+            opts.append('--')
+            # might be too many, need to chunk up
+            optss = (
+                opts + file_chunk
+                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
+            )
+        else:
+            optss = [opts]
+        return [
+            normpath(f)  # Call normpath to convert separators on Windows.
+            for f in chain(
+                *(self.repo.git.diff(*opts, **kwargs).split('\0')
+                for opts in optss)
+            )
+            if f
+        ]
 
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
