@@ -879,6 +879,37 @@ def generate_chunks(container, size):
         yield container[:size]
         container = container[size:]
 
+
+def generate_file_chunks(files, cmd=None):
+    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+
+    Parameters
+    ----------
+    files: list of str
+    cmd: str or list of str, optional
+      Command to account for as well
+    """
+    files = assure_list(files)
+    cmd = assure_list(cmd)
+
+    maxl = max(map(len, files)) if files else 0
+    chunk_size = max(
+        1,  # should at least be 1. If blows then - not our fault
+        (CMD_MAX_ARG
+         - sum((len(x) + 3) for x in cmd)
+         - 4  # for '--' below
+         ) // (maxl + 3)  # +3 for possible quotes and a space
+    )
+    # TODO: additional treatment for "too many arguments"? although
+    # as https://github.com/datalad/datalad/issues/1883#issuecomment
+    # -436272758
+    # shows there seems to be no hardcoded limit on # of arguments,
+    # but may be we decide to go for smth like follow to be on safe side
+    # chunk_size = min(10240 - len(cmd), chunk_size)
+    file_chunks = generate_chunks(files, chunk_size)
+    return file_chunks
+
+
 #
 # Generators helpers
 #
