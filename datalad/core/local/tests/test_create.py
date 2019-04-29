@@ -344,11 +344,9 @@ def test_create_withprocedure(path):
 def test_create_withcfg(path):
     ds = create(
         dataset=path,
-        cfg_proc=['text2git'])
+        cfg_proc=['yoda'])
     assert_repo_status(path)
-    eq_('(not(mimetype=text/*))',
-        ds.repo.get_gitattributes('.')['.']['annex.largefiles']
-    )
+    assert((ds.pathobj / 'README.md').exists())
 
 
 @with_tempfile(mkdir=True)
