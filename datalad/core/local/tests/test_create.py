@@ -341,6 +341,15 @@ def test_create_withprocedure(path):
 
 
 @with_tempfile(mkdir=True)
+def test_create_withcfg(path):
+    ds = create(
+        dataset=path,
+        cfg_proc=['yoda'])
+    assert_repo_status(path)
+    assert((ds.pathobj / 'README.md').exists())
+
+
+@with_tempfile(mkdir=True)
 def test_create_fake_dates(path):
     ds = create(path, fake_dates=True)
 

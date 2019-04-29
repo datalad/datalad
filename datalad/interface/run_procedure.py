@@ -448,9 +448,8 @@ class RunProcedure(Interface):
             script=procedure_file,
             ds=ds.path if ds else '',
             args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
-        lgr.debug('Attempt to run procedure {} as: {}'.format(
-            name,
-            cmd))
+        lgr.info("Running procedure %s", name)
+        lgr.debug('Full procedure command: %r', cmd)
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,

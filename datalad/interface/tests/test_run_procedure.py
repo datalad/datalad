@@ -62,7 +62,7 @@ rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 @with_tempfile
 def test_basics(path, super_path):
     ds = Dataset(path).rev_create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
+    ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     assert_false(ds.repo.is_under_annex("README.md"))
     # configure dataset to look for procedures in its code folder
@@ -130,7 +130,7 @@ def test_procedure_discovery(path, super_path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).rev_create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
+    ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
@@ -214,7 +214,7 @@ def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).rev_create(force=True)
-    ds.run_procedure('setup_yoda_dataset')
+    ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
