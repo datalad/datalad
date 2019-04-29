@@ -2816,7 +2816,7 @@ class GitRepo(RepoInterface):
         eval_file_type : bool
           If True, inspect file type of untracked files, and report annex
           symlink pointers as type 'file'. This convenience comes with a
-          cost, disable for to get faster performance if this information
+          cost; disable to get faster performance if this information
           is not needed.
 
         Returns
