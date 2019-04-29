@@ -2784,7 +2784,8 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('\n{}'.format(attrline))
 
-    def get_content_info(self, paths=None, ref=None, untracked='all'):
+    def get_content_info(self, paths=None, ref=None, untracked='all',
+                         eval_file_type=True):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2812,6 +2813,11 @@ class GitRepo(RepoInterface):
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
+        eval_file_type : bool
+          If True, inspect file type of untracked files, and report annex
+          symlink pointers as type 'file'. This convenience comes with a
+          cost, disable for to get faster performance if this information
+          is not needed.
 
         Returns
         -------
@@ -2905,7 +2911,9 @@ class GitRepo(RepoInterface):
             raise
         lgr.debug('Done query repo: %s', cmd)
 
-        if ref:
+        if not eval_file_type:
+            _get_link_target = None
+        elif ref:
             def _read_symlink_target_from_catfile(lines):
                 # it is always the second line, all checks done upfront
                 header = lines.readline()
@@ -2941,7 +2949,7 @@ class GitRepo(RepoInterface):
                 props_re,
                 _get_link_target)
         finally:
-            if ref:
+            if ref and _get_link_target:
                 # cancel batch process
                 _get_link_target.close()
 
@@ -2993,7 +3001,7 @@ class GitRepo(RepoInterface):
                 inf['gitshasum'] = props.group('sha')
                 inf['type'] = mode_type_map.get(
                     props.group('type'), props.group('type'))
-                if inf['type'] == 'symlink' and \
+                if get_link_target and inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
                           ut.Path(
                             get_link_target(text_type(self.pathobj / path))
@@ -3114,12 +3122,15 @@ class GitRepo(RepoInterface):
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   eval_submodule_state='full', _cache=None):
+                   eval_submodule_state='full', eval_file_type=True,
+                   _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
         return self._diffstatus(
-            fr, to, paths, untracked, eval_submodule_state, _cache)
+            fr, to, paths, untracked, eval_submodule_state, eval_file_type,
+            _cache)
 
-    def _diffstatus(self, fr, to, paths, untracked, eval_state, _cache):
+    def _diffstatus(self, fr, to, paths, untracked, eval_state,
+                    eval_file_type, _cache):
         """Just like diffstatus(), but supports an additional evaluation
         state 'global'. If given, it will return a single 'modified'
         (vs. 'clean') state label for the entire repository, as soon as
@@ -3151,7 +3162,8 @@ class GitRepo(RepoInterface):
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked)
+                    paths=paths, ref=None, untracked=untracked,
+                    eval_file_type=eval_file_type)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
@@ -3172,7 +3184,8 @@ class GitRepo(RepoInterface):
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(paths=paths, ref=to)
+                to_state = self.get_content_info(
+                    paths=paths, ref=to, eval_file_type=eval_file_type)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
@@ -3182,7 +3195,8 @@ class GitRepo(RepoInterface):
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(paths=paths, ref=fr)
+                from_state = self.get_content_info(
+                    paths=paths, ref=fr, eval_file_type=eval_file_type)
             else:
                 # no ref means from nothing
                 from_state = {}
@@ -3195,8 +3209,9 @@ class GitRepo(RepoInterface):
                 # this is new, or rather not known to the previous state
                 props = dict(
                     state='added' if to_state_r['gitshasum'] else 'untracked',
-                    type=to_state_r['type'],
                 )
+                if 'type' in to_state_r:
+                    props['type'] = to_state_r['type']
             elif to_state_r['gitshasum'] == from_state[f]['gitshasum'] and \
                     (modified is None or f not in modified):
                 if to_state_r['type'] != 'dataset':
@@ -3312,6 +3327,7 @@ class GitRepo(RepoInterface):
                 paths=None,
                 untracked=untracked,
                 eval_state='global',
+                eval_file_type=False,
                 _cache=_cache) if st['state'] == 'clean' else 'modified'
             if eval_state == 'global' and st['state'] == 'modified':
                 return 'modified'
