@@ -1851,6 +1851,9 @@ def test_AnnexRepo_metadata(path):
         playfile: {
             'tag': ['one and= ']}}
     deq_(target, dict(ar.get_metadata('.')))
+    for batch in (True, False):
+        # no difference in reporting between modes
+        deq_(target, dict(ar.get_metadata(['up.dat', playfile], batch=batch)))
     # incremental work like a set
     ar.set_metadata(playfile, add={'tag': 'one and= '})
     deq_(target, dict(ar.get_metadata('.')))
