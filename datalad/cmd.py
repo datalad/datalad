@@ -770,10 +770,6 @@ class BatchedCommand(object):
         str or list
           Output received from process.  list in case if cmds was a list
         """
-        # TODO: add checks -- may be process died off and needs to be reinitiated
-        if not self._process:
-            self._initialize()
-
         input_multiple = isinstance(cmds, list)
         if not input_multiple:
             cmds = [cmds]
@@ -782,32 +778,46 @@ class BatchedCommand(object):
         return output if input_multiple else output[0]
 
     def yield_(self, cmds):
+        """Same as __call__, but requires `cmds` to be an iterable
+
+        and yields results for each item."""
         for entry in cmds:
             if not isinstance(entry, string_types):
                 entry = ' '.join(entry)
-            entry = entry + '\n'
-            lgr.log(5, "Sending %r to batched command %s" % (entry, self))
-            # apparently communicate is just a one time show
-            # stdout, stderr = self._process.communicate(entry)
-            # according to the internet wisdom there is no easy way with subprocess
-            self._check_process(restart=True)
-            process = self._process  # _check_process might have restarted it
-            process.stdin.write(assure_bytes(entry) if PY2 else entry)
-            process.stdin.flush()
-            lgr.log(5, "Done sending.")
-            still_alive, stderr = self._check_process(restart=False)
-            # TODO: we might want to handle still_alive, e.g. to allow for
-            #       a number of restarts/resends, but it should be per command
-            #       since for some we cannot just resend the same query. But if
-            #       it is just a "get"er - we could resend it few times
-            # The default output_proc expects a single line output.
-            # TODO: timeouts etc
-            stdout = assure_unicode(self.output_proc(process.stdout)) \
-                if not process.stdout.closed else None
-            if stderr:
-                lgr.warning("Received output in stderr: %r", stderr)
-            lgr.log(5, "Received output: %r" % stdout)
-            yield stdout
+            yield self.proc1(entry)
+
+    def proc1(self, arg):
+        """Same as __call__, but only takes a single command argument
+
+        and returns a single result.
+        """
+        # TODO: add checks -- may be process died off and needs to be reinitiated
+        if not self._process:
+            self._initialize()
+
+        entry = arg + '\n'
+        lgr.log(5, "Sending %r to batched command %s" % (entry, self))
+        # apparently communicate is just a one time show
+        # stdout, stderr = self._process.communicate(entry)
+        # according to the internet wisdom there is no easy way with subprocess
+        self._check_process(restart=True)
+        process = self._process  # _check_process might have restarted it
+        process.stdin.write(assure_bytes(entry) if PY2 else entry)
+        process.stdin.flush()
+        lgr.log(5, "Done sending.")
+        still_alive, stderr = self._check_process(restart=False)
+        # TODO: we might want to handle still_alive, e.g. to allow for
+        #       a number of restarts/resends, but it should be per command
+        #       since for some we cannot just resend the same query. But if
+        #       it is just a "get"er - we could resend it few times
+        # The default output_proc expects a single line output.
+        # TODO: timeouts etc
+        stdout = assure_unicode(self.output_proc(process.stdout)) \
+            if not process.stdout.closed else None
+        if stderr:
+            lgr.warning("Received output in stderr: %r", stderr)
+        lgr.log(5, "Received output: %r" % stdout)
+        return stdout
 
     def __del__(self):
         self.close()
