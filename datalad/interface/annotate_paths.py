@@ -177,7 +177,9 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
 
     # life is simple: we diff the base dataset
     modified = []
-    for r in refds.diff(
+    from datalad.interface.diff import Diff
+    for r in Diff.__call__(
+            dataset=refds,
             # we cannot really limit the diff paths easily because we might get
             # or miss content (e.g. subdatasets) if we don't figure out which
             # ones are known -- and we don't want that

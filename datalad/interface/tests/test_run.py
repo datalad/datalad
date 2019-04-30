@@ -325,7 +325,7 @@ def test_rerun_onto(path):
     ok_(ds.repo.get_active_branch() is None)
     neq_(ds.repo.get_hexsha(),
          ds.repo.get_hexsha("static"))
-    assert_result_count(ds.diff(revision="HEAD..static"), 0)
+    ok_(all(r["state"] == "clean" for r in ds.diff(fr="HEAD", to="static")))
     for revrange in ["..static", "static.."]:
         assert_result_count(
             ds.repo.repo.git.rev_list(revrange).split(), 1)
@@ -353,7 +353,8 @@ def test_rerun_onto(path):
     with swallow_outputs():
         ds.rerun(since="", onto="", branch="from-base")
     eq_(ds.repo.get_active_branch(), "from-base")
-    assert_result_count(ds.diff(revision="master..from-base"), 0)
+    ok_(all(r["state"] == "clean"
+            for r in ds.diff(fr="master", to="from-base")))
     eq_(ds.repo.get_merge_base(["static", "from-base"]),
         ds.repo.get_hexsha("static^"))
 
