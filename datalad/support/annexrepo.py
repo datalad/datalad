@@ -2937,15 +2937,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # Files which were staged but not among files
                     staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
 
-                    if staged_not_to_commit or files_changed_notstaged:
+                    if files_changed_notstaged:
+                        self.add(files=list(files_changed_notstaged))
+
+                    if staged_not_to_commit:
                         # Need an alternative index_file
                         with make_tempfile(dir=opj(self.path,
                                                    GitRepo.get_git_dir(self)),
                                            prefix="datalad-",
                                            suffix=".index") as index_file:
-                            # First add those which were changed but not staged yet
-                            if files_changed_notstaged:
-                                self.add(files=list(files_changed_notstaged))
 
                             alt_index_file = index_file
                             index_tree = self.repo.git.write_tree()
