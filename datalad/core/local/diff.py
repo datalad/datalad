@@ -12,7 +12,6 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-import os
 import os.path as op
 from six import (
     iteritems,
@@ -40,7 +39,6 @@ from datalad.distribution.dataset import (
 from datalad.support.constraints import (
     EnsureNone,
     EnsureStr,
-    EnsureChoice,
 )
 from datalad.support.param import Parameter
 from datalad.consts import PRE_INIT_COMMIT_SHA
