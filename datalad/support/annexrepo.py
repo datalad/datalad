@@ -2900,18 +2900,26 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
-    def get_metadata(self, files, timestamps=False):
+    def get_metadata(self, files, timestamps=False, batch=False):
         """Query git-annex file metadata
 
         Parameters
         ----------
-        files : str or list(str)
-          One or more paths for which metadata is to be queried.
+        files : str or iterable(str)
+          One or more paths for which metadata is to be queried. If one
+          or more paths could be directories, `batch=False` must be given
+          to prevent git-annex given an error. Due to technical limitations,
+          such error will lead to a hanging process.
         timestamps: bool, optional
           If True, the output contains a '<metadatakey>-lastchanged'
           key for every metadata item, reflecting the modification
           time, as well as a 'lastchanged' key with the most recent
           modification time of any metadata item.
+        batch: bool, optional
+          If True, a `metadata --batch` process will be used, and only
+          confirmed annex'ed files can be queried (else query will hang
+          indefinitely). If False, invokes without --batch, and gives all files
+          as arguments (this can be problematic with a large number of files).
 
         Returns
         -------
@@ -2922,17 +2930,33 @@ class AnnexRepo(GitRepo, RepoInterface):
           metadata tags are stored under the key 'tag', which is a
           regular metadata item that can be manipulated like any other.
         """
-        if not files:
-            return
-        files = assure_list(files)
-        opts = ['--json']
-        for res in self._run_annex_command_json(
-                'metadata', opts=opts, files=files):
-            yield (
+        def _format_response(res):
+            return (
                 res['file'],
                 res['fields'] if timestamps else \
                 {k: v for k, v in res['fields'].items()
-                 if not k.endswith('lastchanged')})
+                 if not k.endswith('lastchanged')}
+            )
+
+        if not files:
+            return
+        if batch is False:
+            # we can be lazy
+            files = assure_list(files)
+        else:
+            if isinstance(files, text_type):
+                files = [files]
+            # anything else is assumed to be an iterable (e.g. a generator)
+        if batch is False:
+            for res in self._run_annex_command_json(
+                    'metadata', opts=['--json'], files=files):
+                yield _format_response(res)
+        else:
+            # batch mode is different: we need to compose a JSON request object
+            batched = self._batched.get('metadata', json=True, path=self.path)
+            for f in files:
+                res = batched.proc1(json.dumps({'file': f}))
+                yield _format_response(res)
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,
