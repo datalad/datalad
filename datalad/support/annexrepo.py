@@ -2964,12 +2964,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 careless=careless,
                                 index_file=alt_index_file)
 
-                            if files_changed_notstaged:
-                                # reset current index to reflect the changes annex might have done
-                                self._git_custom_command(
-                                    list(files_changed_notstaged),
-                                    ['git', 'reset']
-                                )
+                            # reset current index to reflect the changes annex might have done
+                            self._git_custom_command(
+                                list(files_changed_notstaged |
+                                     files_changed_staged),
+                                ['git', 'reset']
+                            )
 
                     # in any case we will not specify files explicitly
                     files_to_commit = None

@@ -482,3 +482,17 @@ def test_save_directory(path):
     with chpwd(opj(path, 'sdir3')):
         save(path='sdir')
     ok_clean_git(ds.path)
+
+
+@with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
+            "foo": "in annex"})
+def test_save_partial_index(path):
+    ds = Dataset(path).create(force=True)
+    ds.add("foo")
+    ok_clean_git(ds.path)
+    ds.unlock(path="foo")
+    create_tree(ds.path, tree={"foo": "a", "staged": ""},
+                remove_existing=True)
+    ds.repo.add("staged", git=True)
+    ds.save(path="foo")
+    ok_clean_git(ds.path, head_modified=["staged"])
