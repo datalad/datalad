@@ -103,9 +103,9 @@ class Diff(Interface):
     @datasetmethod(name='diff')
     @eval_results
     def __call__(
+            path=None,
             fr='HEAD',
             to=None,
-            path=None,
             dataset=None,
             annex=None,
             untracked='normal',
