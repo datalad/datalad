@@ -22,6 +22,7 @@ from collections import OrderedDict
 
 from datalad.utils import (
     assure_list,
+    assure_unicode,
 )
 from datalad.interface.base import (
     Interface,
@@ -94,27 +95,28 @@ _common_diffstatus_params = dict(
 STATE_COLOR_MAP = {
     'untracked': ac.RED,
     'modified': ac.RED,
+    'deleted': ac.RED,
     'added': ac.GREEN,
+    'unknown': ac.YELLOW,
 }
 
 
-def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cache):
+def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
+                  eval_submodule_state, cache):
     # take the datase that went in first
     repo_path = ds.repo.pathobj
-    lgr.debug('query %s.status() for paths: %s', ds.repo, paths)
+    lgr.debug('query %s.diffstatus() for paths: %s', ds.repo, paths)
     status = ds.repo.diffstatus(
         fr='HEAD' if ds.repo.get_hexsha() else None,
         to=None,
         # recode paths with repo reference for low-level API
         paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
         untracked=untracked,
-        # TODO think about potential optimizations in case of
-        # recursive processing, as this will imply a semi-recursive
-        # look into subdatasets
-        ignore_submodules='other',
+        eval_submodule_state=eval_submodule_state,
         _cache=cache)
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
-        # this will ammend `status`
+        lgr.debug('query %s.get_content_annexinfo() for paths: %s', ds.repo, paths)
+        # this will amend `status`
         ds.repo.get_content_annexinfo(
             paths=paths if paths else None,
             init=status,
@@ -124,14 +126,14 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
         cpath = ds.pathobj / path.relative_to(repo_path)
         yield dict(
             props,
-            path=str(cpath),
+            path=text_type(cpath),
             # report the dataset path rather than the repo path to avoid
             # realpath/symlink issues
             parentds=ds.path,
         )
         queried.add(ds.pathobj)
         if recursion_limit and props.get('type', None) == 'dataset':
-            subds = Dataset(str(cpath))
+            subds = Dataset(text_type(cpath))
             if subds.is_installed():
                 for r in _yield_status(
                         subds,
@@ -140,6 +142,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried, cac
                         untracked,
                         recursion_limit - 1,
                         queried,
+                        eval_submodule_state,
                         cache):
                     yield r
 
@@ -225,8 +228,26 @@ class Status(Interface):
             doc="""path to be evaluated""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        )
-
+        eval_subdataset_state=Parameter(
+            args=("-e", "--eval-subdataset-state",),
+            constraints=EnsureChoice('no', 'commit', 'full'),
+            doc="""Evaluation of subdataset state (clean vs.
+            modified) can be expensive for deep dataset hierarchies
+            as subdataset have to be tested recursively for
+            uncommitted modifications. Setting this option to
+            'no' or 'commit' can substantially boost performance
+            by limiting what is being tested. With 'no' no state
+            is evaluated and subdataset result records typically do
+            not contain a 'state' property.
+            With 'commit' only a discrepancy of the HEAD commit
+            shasum of a subdataset and the shasum recorded in the
+            superdataset's record is evaluated,
+            and the 'state' result property only reflects this
+            aspect. With 'full' any other modification is considered
+            too (see the 'untracked' option for further tailoring
+            modification testing).
+            """),
+    )
 
     @staticmethod
     @datasetmethod(name='status')
@@ -237,7 +258,8 @@ class Status(Interface):
             annex=None,
             untracked='normal',
             recursive=False,
-            recursion_limit=None):
+            recursion_limit=None,
+            eval_subdataset_state='full'):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
@@ -260,9 +282,9 @@ class Status(Interface):
                 # it is important to capture the exact form of the
                 # given path argument, before any normalization happens
                 # for further decision logic below
-                orig_path = str(p)
+                orig_path = text_type(p)
                 p = rev_resolve_path(p, dataset)
-                root = rev_get_dataset_root(str(p))
+                root = rev_get_dataset_root(text_type(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
@@ -274,8 +296,9 @@ class Status(Interface):
                         logger=lgr)
                     continue
                 else:
-                    if dataset and root == str(p) and \
-                            not orig_path.endswith(op.sep):
+                    if dataset and root == text_type(p) and \
+                            not (orig_path.endswith(op.sep) or
+                                 orig_path == "."):
                         # the given path is pointing to a dataset
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
@@ -333,7 +356,7 @@ class Status(Interface):
             if qdspath in queried:
                 # do not report on a single dataset twice
                 continue
-            qds = Dataset(str(qdspath))
+            qds = Dataset(text_type(qdspath))
             for r in _yield_status(
                     qds,
                     qpaths,
@@ -343,6 +366,7 @@ class Status(Interface):
                     if recursion_limit is not None else -1
                     if recursive else 0,
                     queried,
+                    eval_subdataset_state,
                     content_info_cache):
                 yield dict(
                     r,
@@ -365,16 +389,19 @@ class Status(Interface):
         refds = res.get('refds', None)
         refds = refds if kwargs.get('dataset', None) is not None \
             or refds == os.getcwd() else None
-        path = res['path'] if refds is None \
-            else str(ut.Path(res['path']).relative_to(refds))
+        # Note: We have to force unicode for res['path'] because
+        # interface.utils encodes it on py2 before passing it to
+        # custom_result_renderer().
+        path = assure_unicode(res['path']) if refds is None \
+            else text_type(ut.Path(res['path']).relative_to(refds))
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')
-        state = res['state']
-        ui.message('{fill}{state}: {path}{type_}'.format(
+        state = res.get('state', 'unknown')
+        ui.message(u'{fill}{state}: {path}{type_}'.format(
             fill=' ' * max(0, max_len - len(state)),
             state=ac.color_word(
                 state,
-                STATE_COLOR_MAP.get(res['state'], ac.WHITE)),
+                STATE_COLOR_MAP.get(res.get('state', 'unknown'))),
             path=path,
             type_=' ({})'.format(
                 ac.color_word(type_, ac.MAGENTA) if type_ else '')))

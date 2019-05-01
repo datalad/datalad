@@ -505,13 +505,13 @@ class TestAddurls(object):
         ds = Dataset(path).rev_create(force=True)
 
         # Force failure by passing a non-existent file name to annex.
-        fn = ds.repo.set_metadata
+        fn = ds.repo.set_metadata_
 
         def set_meta(_, **kwargs):
             for i in fn("wreaking-havoc-and-such", **kwargs):
                 yield i
 
-        with chpwd(path), patch.object(ds.repo, 'set_metadata', set_meta):
+        with chpwd(path), patch.object(ds.repo, 'set_metadata_', set_meta):
             with assert_raises(IncompleteResultsError):
                 ds.addurls(self.json_file, "{url}", "{name}")
 

@@ -203,11 +203,28 @@ def auto_repr(cls):
     return cls
 
 
+def _is_stream_tty(stream):
+    try:
+        # TODO: check on windows if hasattr check would work correctly and
+        # add value:
+        return stream.isatty()
+    except ValueError as exc:
+        # Who knows why it is a ValueError, but let's try to be specific
+        # If there is a problem with I/O - non-interactive, otherwise reraise
+        if "I/O" in str(exc):
+            return False
+        raise
+
+
 def is_interactive():
-    """Return True if all in/outs are tty"""
-    # TODO: check on windows if hasattr check would work correctly and add value:
-    #
-    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+    """Return True if all in/outs are open and tty.
+
+    Note that in a somewhat abnormal case where e.g. stdin is explicitly
+    closed, and any operation on it would raise a
+    `ValueError("I/O operation on closed file")` exception, this function
+    would just return False, since the session cannot be used interactively.
+    """
+    return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
 def get_ipython_shell():
@@ -318,6 +335,11 @@ if PY2:
         PurePath,
         PurePosixPath,
     )
+
+    def _unicode_path(pathobj):
+        return assure_unicode(str(pathobj))
+
+    PurePath.__unicode__ = _unicode_path
 else:
     from pathlib import (
         Path,
@@ -856,6 +878,37 @@ def generate_chunks(container, size):
     while container:
         yield container[:size]
         container = container[size:]
+
+
+def generate_file_chunks(files, cmd=None):
+    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+
+    Parameters
+    ----------
+    files: list of str
+    cmd: str or list of str, optional
+      Command to account for as well
+    """
+    files = assure_list(files)
+    cmd = assure_list(cmd)
+
+    maxl = max(map(len, files)) if files else 0
+    chunk_size = max(
+        1,  # should at least be 1. If blows then - not our fault
+        (CMD_MAX_ARG
+         - sum((len(x) + 3) for x in cmd)
+         - 4  # for '--' below
+         ) // (maxl + 3)  # +3 for possible quotes and a space
+    )
+    # TODO: additional treatment for "too many arguments"? although
+    # as https://github.com/datalad/datalad/issues/1883#issuecomment
+    # -436272758
+    # shows there seems to be no hardcoded limit on # of arguments,
+    # but may be we decide to go for smth like follow to be on safe side
+    # chunk_size = min(10240 - len(cmd), chunk_size)
+    file_chunks = generate_chunks(files, chunk_size)
+    return file_chunks
+
 
 #
 # Generators helpers

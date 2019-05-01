@@ -22,7 +22,11 @@ class ExportArchive(Interface):
     from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
     from datalad.distribution.dataset import EnsureDataset
-    from datalad.support.constraints import EnsureNone, EnsureStr
+    from datalad.support.constraints import (
+        EnsureChoice,
+        EnsureNone,
+        EnsureStr,
+    )
 
     _params_ = dict(
         dataset=Parameter(
@@ -43,19 +47,16 @@ class ExportArchive(Interface):
             constraints=EnsureStr() | EnsureNone()),
         archivetype=Parameter(
             args=("-t", "--archivetype"),
-            metavar="tar|zip",
             doc="""Type of archive to generate.""",
-            constraints=EnsureStr()),
+            constraints=EnsureChoice("tar", "zip")),
         compression=Parameter(
             args=("-c", "--compression"),
-            metavar="gz|bz2|",
             doc="""Compression method to use.  'bz2' is not supported for ZIP
             archives.  No compression is used when an empty string is
             given.""",
-            constraints=EnsureStr()),
+            constraints=EnsureChoice("gz", "bz2", "")),
         missing_content=Parameter(
             args=("--missing-content",),
-            metavar="error|continue|ignore",
             doc="""By default, any discovered file with missing content will
             result in an error and the export is aborted. Setting this to
             'continue' will issue warnings instead of failing on error. The
@@ -63,7 +64,7 @@ class ExportArchive(Interface):
             level. The latter two can be helpful when generating a TAR archive
             from a dataset where some file content is not available
             locally.""",
-            constraints=EnsureStr()),
+            constraints=EnsureChoice("error", "continue", "ignore")),
     )
 
     @staticmethod

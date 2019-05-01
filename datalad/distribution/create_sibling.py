@@ -73,6 +73,7 @@ def _create_dataset_sibling(
         group,
         publish_depends,
         publish_by_default,
+        install_postupdate_hook,
         as_common_datasrc,
         annex_wanted,
         annex_group,
@@ -196,12 +197,22 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
-    if inherit and shared is None:
-        # here we must analyze current_ds's super, not the super_ds
-        delayed_super = _DelayedSuper(ds)
-        # inherit from the setting on remote end
-        shared = CreateSibling._get_ds_remote_shared_setting(
-            delayed_super, name, ssh)
+    delayed_super = _DelayedSuper(ds)
+    if inherit and delayed_super.super:
+        if shared is None:
+            # here we must analyze current_ds's super, not the super_ds
+            # inherit from the setting on remote end
+            shared = CreateSibling._get_ds_remote_shared_setting(
+                delayed_super, name, ssh)
+
+        if not install_postupdate_hook:
+            # Even though directive from above was False due to no UI explicitly
+            # requested, we were asked to inherit the setup, so we might need
+            # to install the hook, if super has it on remote
+            install_postupdate_hook = CreateSibling._has_active_postupdate(
+                delayed_super, name, ssh)
+
+
 
     if group:
         # Either repository existed before or a new directory was created for it,
@@ -265,14 +276,15 @@ def _create_dataset_sibling(
                   " and run with --existing=reconfigure",
                   ssh.get_git_version())
 
-    # enable metadata refresh on dataset updates to publication server
-    lgr.info("Enabling git post-update hook ...")
-    try:
-        CreateSibling.create_postupdate_hook(
-            remoteds_path, ssh, ds)
-    except CommandError as e:
-        lgr.error("Failed to add json creation command to post update "
-                  "hook.\nError: %s" % exc_str(e))
+    if install_postupdate_hook:
+        # enable metadata refresh on dataset updates to publication server
+        lgr.info("Enabling git post-update hook ...")
+        try:
+            CreateSibling.create_postupdate_hook(
+                remoteds_path, ssh, ds)
+        except CommandError as e:
+            lgr.error("Failed to add json creation command to post update "
+                      "hook.\nError: %s" % exc_str(e))
 
     return remoteds_path
 
@@ -380,7 +392,7 @@ class CreateSibling(Interface):
         inherit=inherit_opt,
         shared=Parameter(
             args=("--shared",),
-            metavar='false|true|umask|group|all|world|everybody|0xxx',
+            metavar='{false|true|umask|group|all|world|everybody|0xxx}',
             doc="""if given, configures the access permissions on the server
             for multi-users (this could include access by a webserver!).
             Possible values for this option are identical to those of
@@ -396,7 +408,7 @@ class CreateSibling(Interface):
         ),
         ui=Parameter(
             args=("--ui",),
-            metavar='false|true|html_filename',
+            metavar='{false|true|html_filename}',
             doc="""publish a web interface for the dataset with an
             optional user-specified name for the html at publication
             target. defaults to `index.html` at dataset root""",
@@ -608,6 +620,7 @@ class CreateSibling(Interface):
                 group,
                 publish_depends,
                 publish_by_default,
+                ui,
                 as_common_datasrc,
                 annex_wanted,
                 annex_group,
@@ -643,10 +656,11 @@ class CreateSibling(Interface):
         # TODO: add progressbar
         for path, currentds_ap in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
-            lgr.debug("Running hook for %s", path)
+            lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
-                ssh("cd {} && hooks/post-update".format(
-                    sh_quote(_path_(path, ".git"))))
+                ssh("cd {} "
+                    "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                    "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
                 currentds_ap['status'] = 'error'
                 currentds_ap['message'] = (
@@ -661,21 +675,41 @@ class CreateSibling(Interface):
                 yield currentds_ap
 
     @staticmethod
+    def _run_on_ds_ssh_remote(ds, name, ssh, cmd):
+        """Given a dataset, and name of the remote, run command via ssh
+
+        Parameters
+        ----------
+        cmd: str
+          Will be .format()'ed given the `path` to the dataset on remote
+
+        Returns
+        -------
+        out
+
+        Raises
+        ------
+        CommandError
+        """
+        remote_url = CreateSibling._get_remote_url(ds, name)
+        remote_ri = RI(remote_url)
+        out, err = ssh(cmd.format(path=sh_quote(remote_ri.path)))
+        if err:
+            lgr.warning("Got stderr while calling ssh: %s", err)
+        return out
+
+    @staticmethod
     def _get_ds_remote_shared_setting(ds, name, ssh):
         """Figure out setting of sharedrepository for dataset's `name` remote"""
         shared = None
         try:
-            current_super_url = CreateSibling._get_remote_url(
-                ds, name)
-            current_super_ri = RI(current_super_url)
-            out, err = ssh('git -C {} config --get core.sharedrepository'.format(
-                # TODO -- we might need to expanduser taking .user into account
-                # but then it must be done also on remote side
-                sh_quote(current_super_ri.path))
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'git -C {path} config --get core.sharedrepository'
             )
             shared = out.strip()
-            if err:
-                lgr.warning("Got stderr while calling ssh: %s", err)
         except CommandError as e:
             lgr.debug(
                 "Could not figure out remote shared setting of %s for %s due "
@@ -685,6 +719,34 @@ class CreateSibling(Interface):
             # could well be ok if e.g. not shared
             # TODO: more detailed analysis may be?
         return shared
+
+    @staticmethod
+    def _has_active_postupdate(ds, name, ssh):
+        """Figure out either has active post-update hook
+
+        Returns
+        -------
+        bool or None
+          None if something went wrong and we could not figure out
+        """
+        has_active_post_update = None
+        try:
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'cd {path} && [ -x .git/hooks/post-update ] && echo yes || echo no'
+            )
+            out = out.strip()
+            assert out in ('yes', 'no')
+            has_active_post_update = out == "yes"
+        except CommandError as e:
+            lgr.debug(
+                "Could not figure out either %s on remote %s has active "
+                "post_update hook due to %s",
+                ds, name, exc_str(e)
+            )
+        return has_active_post_update
 
     @staticmethod
     def _get_remote_url(ds, name):
@@ -757,9 +819,6 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
   && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
-
-# Some submodules might have been added and thus we better init them
-( cd "$dsdir"; git submodule update --init || : ; ) >> "$logfile" 2>&1
 '''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:

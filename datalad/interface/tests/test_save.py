@@ -453,3 +453,25 @@ def test_bf2043p2(path):
     with chpwd(path):
         save()
     ok_clean_git(ds.path, untracked=['untracked'])
+
+
+# https://github.com/datalad/datalad/issues/3087
+@with_tree({
+    'sdir1': {'foo': 'foo'},
+    'sdir2': {'foo': 'foo'},
+    'sdir3': {'sdir': {'subsub': {'foo': 'foo'}}},
+})
+def test_save_directory(path):
+    # Sequence of save invocations on subdirectories.
+    ds = Dataset(path).create(force=True)
+    ds.save(path='sdir1')
+    ok_clean_git(ds.path, untracked=['sdir2/foo', 'sdir3/sdir/subsub/foo'])
+
+    # There is also difference from
+    with chpwd(path):
+        save(path='sdir2')
+    ok_clean_git(ds.path, untracked=['sdir3/sdir/subsub/foo'])
+
+    with chpwd(opj(path, 'sdir3')):
+        save(path='sdir')
+    ok_clean_git(ds.path)

@@ -20,7 +20,7 @@ from os import makedirs, remove, listdir
 from os.path import split, abspath, basename, join as opj, realpath, relpath, \
     isabs, dirname
 
-from datalad.consts import METADATA_DIR, METADATA_FILENAME
+from datalad.consts import OLDMETADATA_DIR, OLDMETADATA_FILENAME
 from datalad.distribution.dataset import Dataset
 from datalad.interface.ls import FsModel, lgr, GitModel
 from datalad.support.network import is_datalad_compat_ri
@@ -137,7 +137,7 @@ def fs_extract(nodepath, repo, basepath='/'):
     }
     # if there is meta-data for the dataset (done by aggregate-metadata)
     # we include it
-    metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
+    metadata_path = opj(nodepath, OLDMETADATA_DIR, OLDMETADATA_FILENAME)
     if exists(metadata_path):
         # might need flattening!  TODO: flatten when aggregating?  why wasn't done?
         with open(metadata_path) as t:

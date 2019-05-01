@@ -496,7 +496,7 @@ def add_meta(rows):
 
         with patch.object(ds.repo, "always_commit", False):
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
-            for a in ds.repo.set_metadata(filename, add=row["meta_args"]):
+            for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
                 # Don't show all added metadata for the file because that
                 # could quickly flood the output.
@@ -658,13 +658,12 @@ class Addurls(Interface):
             Underneath, this passes the --fast flag to `git annex addurl`."""),
         ifexists=Parameter(
             args=("--ifexists",),
-            metavar="ACTION",
             doc="""What to do if a constructed file name already exists.  The
             default behavior is to proceed with the `git annex addurl`, which
             will fail if the file size has changed.  If set to 'overwrite',
             remove the old file before adding the new one.  If set to 'skip',
             do not add the new file.""",
-            constraints=EnsureNone() | EnsureChoice("overwrite", "skip")),
+            constraints=EnsureChoice(None, "overwrite", "skip")),
         missing_value=Parameter(
             args=("--missing-value",),
             metavar="VALUE",

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -14,6 +15,8 @@ from datalad.tests.utils import known_failure_windows
 
 import os
 import os.path as op
+
+from six import text_type
 
 from datalad.distribution.dataset import (
     Dataset
@@ -35,6 +38,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_in_results,
     with_tree,
+    OBSCURE_FILENAME,
 )
 
 from datalad.tests.utils import assert_repo_status
@@ -43,7 +47,9 @@ from datalad.tests.utils import assert_repo_status
 _dataset_hierarchy_template = {
     'origin': {
         'file1': '',
-        'sub': {
+        # Add prefix to prevent DATALAD_TESTS_OBSCURE_PREFIX=- from working as
+        # intended. 'git submodule add' cannot handle paths starting with -.
+        u'ds-' + OBSCURE_FILENAME: {
             'file2': 'file2',
             'subsub': {
                 'file3': 'file3'}}}}
@@ -74,34 +80,35 @@ def test_create_raises(path, outside_path):
         message=(
             'dataset containing given paths is not underneath the reference '
             'dataset %s: %s', ds, outside_path))
+    obscure_ds = u"ds-" + OBSCURE_FILENAME
     # create a sub:
-    ds.rev_create('sub')
+    ds.rev_create(obscure_ds)
     # fail when doing it again
     assert_in_results(
-        ds.rev_create('sub', **raw),
+        ds.rev_create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [str(ds.pathobj / 'sub')]),
+                 [text_type(ds.pathobj / obscure_ds)]),
     )
 
     # now deinstall the sub and fail trying to create a new one at the
     # same location
-    ds.uninstall('sub', check=False)
-    assert_in('sub', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
+    ds.uninstall(obscure_ds, check=False)
+    assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
-        ds.rev_create('sub', **raw),
+        ds.rev_create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [str(ds.pathobj / 'sub')]),
+                 [text_type(ds.pathobj / obscure_ds)]),
     )
     assert_in_results(
-        ds.rev_create(_path_('sub/subsub'), **raw),
+        ds.rev_create(op.join(obscure_ds, 'subsub'), **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
-                 str(ds.pathobj / 'sub'),
+                 text_type(ds.pathobj / obscure_ds),
                  ds.path)
     )
     os.makedirs(op.join(ds.path, 'down'))
@@ -113,7 +120,7 @@ def test_create_raises(path, outside_path):
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [str(ds.pathobj / 'down' / 'someotherfile.tst')]),
+                 [text_type(ds.pathobj / 'down' / 'someotherfile.tst')]),
     )
 
 
@@ -164,10 +171,17 @@ def test_create_sub(path):
     ds.rev_create()
 
     # 1. create sub and add to super:
-    subds = ds.rev_create("some/what/deeper")
+    subds = ds.rev_create(op.join("some", "what", "deeper"))
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     assert_repo_status(subds.path, annex=True)
+    assert_in(
+        'submodule.some/what/deeper.datalad-id={}'.format(
+            subds.id),
+        ds.repo._git_custom_command(
+            '',
+            ['git', 'config', '--file', '.gitmodules', '--list'])[0]
+    )
 
     # subdataset is known to superdataset:
     assert_in(op.join("some", "what", "deeper"),
@@ -209,7 +223,7 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(ds.is_installed())
     # ... but it has untracked content
     ok_(ds.repo.dirty)
-    subds = ds.rev_create('sub', force=True)
+    subds = ds.rev_create(u"ds-" + OBSCURE_FILENAME, force=True)
     ok_(subds.is_installed())
     ok_(subds.repo.dirty)
     subsubds = subds.rev_create('subsub', force=True)
@@ -324,6 +338,15 @@ def test_create_withprocedure(path):
     assert_repo_status(path)
     ds.config.reload()
     eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
+
+
+@with_tempfile(mkdir=True)
+def test_create_withcfg(path):
+    ds = create(
+        dataset=path,
+        cfg_proc=['yoda'])
+    assert_repo_status(path)
+    assert((ds.pathobj / 'README.md').exists())
 
 
 @with_tempfile(mkdir=True)

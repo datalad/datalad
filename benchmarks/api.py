@@ -7,14 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Benchmarks of the datalad.api functionality"""
 
-import os
-import sys
-import os.path as osp
 from os.path import join as opj
-import tarfile
-import timeit
-
-from subprocess import call
 
 try:
     from datalad.api import rev_save
@@ -23,17 +16,26 @@ except ImportError:
     # If it is a version without revolution - those will not be benchmarked
     pass
 
-from datalad.api import add
 from datalad.api import create
 from datalad.api import create_test_dataset
-from datalad.api import Dataset
 from datalad.api import install
 from datalad.api import ls
 from datalad.api import remove
 from datalad.api import uninstall
 
-from datalad.utils import rmtree
-from datalad.utils import getpwd
+#
+# Following ones could be absent in older versions
+#
+try:
+    from datalad.api import diff
+except ImportError:
+    diff = None
+
+try:
+    from datalad.api import status
+except ImportError:
+    status = None
+
 
 # Some tracking example -- may be we should track # of datasets.datalad.org
 #import gc
@@ -42,7 +44,10 @@ from datalad.utils import getpwd
 #track_num_objects.unit = "objects"
 
 
-from .common import SuprocBenchmarks
+from .common import (
+    SampleSuperDatasetBenchmarks,
+    SuprocBenchmarks,
+)
 
 
 class testds(SuprocBenchmarks):
@@ -51,89 +56,73 @@ class testds(SuprocBenchmarks):
     """
 
     def time_create_test_dataset1(self):
-        create_test_dataset(spec='1', seed=0)
+        self.remove_paths.extend(
+            create_test_dataset(spec='1', seed=0)
+        )
 
     def time_create_test_dataset2x2(self):
-        create_test_dataset(spec='2/2', seed=0)
+        self.remove_paths.extend(
+            create_test_dataset(spec='2/2', seed=0)
+        )
 
 
-class supers(SuprocBenchmarks):
+class supers(SampleSuperDatasetBenchmarks):
     """
     Benchmarks on common operations on collections of datasets using datalad API
     """
 
-    timeout = 3600
-    # need to assure that we are working in a different repository now
-    # see https://github.com/datalad/datalad/issues/1512
-    # might not be sufficient due to side effects between tests and
-    # thus getting into the same situation
-    ds_count = 0
-    def setup_cache(self):
-        # creating in CWD so things get removed when ASV is done
-        ds_path = create_test_dataset("testds1", spec='2/-2/-2', seed=0)[0]
-        # Will store into a tarfile since otherwise install -r is way too slow
-        # to be invoked for every benchmark
-        tarfile_path = opj(osp.dirname(ds_path), 'testds1.tar')
-        with tarfile.open(tarfile_path, "w") as tar:
-            # F.CK -- Python tarfile can't later extract those because key dirs are
-            # read-only.  For now just a workaround - make it all writeable
-            from datalad.utils import rotree
-            rotree('testds1', ro=False, chmod_files=False)
-            tar.add('testds1', recursive=True)
-        rmtree('testds1')
-
-        return tarfile_path
-
-    def setup(self, tarfile_path):
-        import tarfile
-        tempdir = osp.dirname(tarfile_path)
-        with tarfile.open(tarfile_path) as tar:
-            tar.extractall(tempdir)
-
-        # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
-        epath = opj(tempdir, 'testds1')
-        epath_unique = epath + str(self.__class__.ds_count)
-        os.rename(epath, epath_unique)
-        self.__class__.ds_count += 1
-        self.ds = Dataset(epath_unique)
-        print("Finished setup for %s" % tempdir)
-
-    def teardown(self, tarfile_path):
-        for path in [self.ds.path + '_', self.ds.path]:
-            print("Cleaning up %s" % path)
-            if osp.exists(path):
-                rmtree(path)
-
-    def time_installr(self, tarfile_path):
+    def time_installr(self):
         # somewhat duplicating setup but lazy to do different one for now
         assert install(self.ds.path + '_', source=self.ds.path, recursive=True)
 
-    def time_rev_createadd(self, tarfile_path):
+    def time_createadd(self):
+        assert self.ds.create('newsubds')
+
+    def time_rev_createadd(self):
         assert self.ds.rev_create('newsubds')
 
-    def time_rev_createadd_to_dataset(self, tarfile_path):
+    def time_rev_createadd_to_dataset(self):
         subds = rev_create(opj(self.ds.path, 'newsubds'))
         self.ds.rev_save(subds.path)
 
-    def time_createadd(self, tarfile_path):
-        assert self.ds.create('newsubds')
-
-    def time_createadd_to_dataset(self, tarfile_path):
+    def time_createadd_to_dataset(self):
         subds = create(opj(self.ds.path, 'newsubds'))
         self.ds.add(subds.path)
 
-    def time_ls(self, tarfile_path):
+    def time_ls(self):
         ls(self.ds.path)
 
-    def time_ls_recursive(self, tarfile_path):
+    def time_ls_recursive(self):
         ls(self.ds.path, recursive=True)
 
-    def time_ls_recursive_long_all(self, tarfile_path):
+    def time_ls_recursive_long_all(self):
         ls(self.ds.path, recursive=True, long_=True, all_=True)
 
-    # TODO: since doesn't really allow to uninstall top level ds... bleh ;)
-    #def time_uninstall(self, tarfile_path):
-    #    uninstall(self.ds.path, recursive=True)
+    def time_subdatasets(self):
+        self.ds.subdatasets()
 
-    def time_remove(self, tarfile_path):
+    def time_subdatasets_recursive(self):
+        self.ds.subdatasets(recursive=True)
+
+    def time_subdatasets_recursive_first(self):
+        next(self.ds.subdatasets(recursive=True, return_type='generator'))
+
+    def time_uninstall(self):
+        for subm in self.ds.repo.get_submodules():
+            self.ds.uninstall(subm.path, recursive=True, check=False)
+
+    def time_remove(self):
         remove(self.ds.path, recursive=True)
+
+    def time_diff(self):
+        diff(self.ds.path, revision="HEAD^")
+
+    def time_diff_recursive(self):
+        diff(self.ds.path, revision="HEAD^", recursive=True)
+
+    # Status must be called with the dataset, unlike diff
+    def time_status(self):
+        self.ds.status()
+
+    def time_status_recursive(self):
+        self.ds.status(recursive=True)

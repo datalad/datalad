@@ -158,10 +158,9 @@ class Run(Interface):
             once. CMD]"""),
         expand=Parameter(
             args=("--expand",),
-            metavar=("WHICH"),
             doc="""Expand globs when storing inputs and/or outputs in the
             commit message.""",
-            constraints=EnsureNone() | EnsureChoice("inputs", "outputs", "both")),
+            constraints=EnsureChoice(None, "inputs", "outputs", "both")),
         explicit=Parameter(
             args=("--explicit",),
             action="store_true",
@@ -171,7 +170,7 @@ class Run(Interface):
         message=save_message_opt,
         sidecar=Parameter(
             args=('--sidecar',),
-            metavar="yes|no",
+            metavar="{yes|no}",
             doc="""By default, the configuration variable
             'datalad.run.record-sidecar' determines whether a record with
             information on a command's execution is placed into a separate
@@ -472,6 +471,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # For explicit=True, we probably want to check whether any inputs have
         # modifications. However, we can't just do is_dirty(..., path=inputs)
         # because we need to consider subdatasets and untracked files.
+        # MIH: is_dirty() is gone, but status() can do all of the above!
         if not explicit and ds.repo.dirty:
             yield get_status_dict(
                 'run',

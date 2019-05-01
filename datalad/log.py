@@ -177,10 +177,10 @@ class ColorFormatter(logging.Formatter):
         levelname = record.levelname
 
         if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
-            fore_color = colors.LOG_LEVEL_COLORS[levelname]
-            levelname_color = (colors.COLOR_SEQ % fore_color) + \
-                              ("%-7s" % levelname) + colors.RESET_SEQ
-            record.levelname = levelname_color
+            record.levelname = colors.color_word(
+                "{:7}".format(levelname),
+                colors.LOG_LEVEL_COLORS[levelname],
+                force=True)
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:
             if not getattr(record, 'notraceback', False):

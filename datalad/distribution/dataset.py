@@ -386,32 +386,6 @@ class Dataset(object):
 
         return self._cfg
 
-    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                        recursive=False, recursion_limit=None, edges=False):
-        """DEPRECATED: use `subdatasets()`"""
-        # TODO wipe this function out completely once we are comfortable
-        # with it. Internally we don't need or use it anymore.
-        import inspect
-        lgr.warning('%s still uses Dataset.get_subdatasets(). RF to use `subdatasets` command', inspect.stack()[1][3])
-        from datalad.coreapi import subdatasets
-        if edges:
-            return [(r['parentpath'] if absolute else relpath(r['parentpath'], start=self.path),
-                     r['path'] if absolute else relpath(r['path'], start=self.path))
-                    for r in subdatasets(
-                        dataset=self,
-                        fulfilled=fulfilled,
-                        recursive=recursive,
-                        recursion_limit=recursion_limit,
-                        bottomup=True)]
-        else:
-            return subdatasets(
-                dataset=self,
-                fulfilled=fulfilled,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
-                bottomup=True,
-                result_xfm='{}paths'.format('' if absolute else 'rel'))
-
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired
@@ -610,7 +584,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
-    lgr.debug("Resolved dataset{0}: {1}".format(
+    lgr.debug(u"Resolved dataset{0}: {1}".format(
         ' for {}'.format(purpose) if purpose else '',
         dataset))
 
@@ -660,9 +634,9 @@ def rev_resolve_path(path, ds=None):
         path = ut.Path(path)
     # we have a dataset
     # stringify in case a pathobj came in
-    elif not op.isabs(str(path)) and \
-            not (str(path).startswith(os.curdir + os.sep) or
-                 str(path).startswith(os.pardir + os.sep)):
+    elif not op.isabs(text_type(path)) and \
+            not (text_type(path).startswith(os.curdir + os.sep) or
+                 text_type(path).startswith(os.pardir + os.sep)):
         # we have a dataset and no abspath nor an explicit relative path ->
         # resolve it against the dataset
         path = ds.pathobj / path

@@ -430,13 +430,14 @@ def test_run_failure(path):
     hexsha_initial = ds.repo.get_hexsha()
 
     with assert_raises(CommandError):
-        if on_windows:
-            # this does not do exactly the same as the cmd on other systems
-            # but is close enough to make running the test worthwhile
-            ds.run("echo x>{} & false".format(op.join("sub", "grows")))
-        else:
-            ds.run("echo x$(cat {0}) > {0} && false"
-                   .format(op.join("sub", "grows")))
+        with swallow_outputs():
+            if on_windows:
+                # this does not do exactly the same as the cmd on other systems
+                # but is close enough to make running the test worthwhile
+                ds.run("echo x>{} & false".format(op.join("sub", "grows")))
+            else:
+                ds.run("echo x$(cat {0}) > {0} && false"
+                       .format(op.join("sub", "grows")))
     eq_(hexsha_initial, ds.repo.get_hexsha())
     ok_(ds.repo.dirty)
 
@@ -479,6 +480,16 @@ def test_run_save_deletion(path):
     ds.rev_save()
     ds.run("{} to_remove".format("del" if on_windows else "rm"))
     assert_repo_status(ds.path)
+
+
+@with_tempfile(mkdir=True)
+def test_run_from_subds(path):
+    if 'APPVEYOR' in os.environ:
+        raise SkipTest('test causes appveyor (only) to crash, reason unknown')
+
+    subds = Dataset(path).rev_create().rev_create("sub")
+    subds.run("cd .> foo")
+    assert_repo_status(subds.path)
 
 
 @known_failure_windows

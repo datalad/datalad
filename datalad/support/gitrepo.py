@@ -11,7 +11,7 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-
+from itertools import chain
 import logging
 from collections import OrderedDict
 import re
@@ -19,6 +19,7 @@ import shlex
 import time
 import os
 import os.path as op
+import warnings
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -42,7 +43,6 @@ from six import text_type
 from six import add_metaclass
 from six import iteritems
 from six import PY2
-from functools import wraps
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
@@ -55,19 +55,20 @@ from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
+from datalad.cmd import BatchedCommand
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
+from datalad.utils import Path
+from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
-from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
-from datalad.utils import CMD_MAX_ARG
-from datalad.utils import generate_chunks
+from datalad.utils import generate_file_chunks
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -77,6 +78,7 @@ from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
+from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -754,6 +756,13 @@ class GitRepo(RepoInterface):
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
             os.makedirs(path)
+        elif sanity_checks and external_versions['cmd:git'] < '2.14.0':
+            warnings.warn(
+                "Your git version (%s) is too old, we will not safe-guard "
+                "against creating a new repository under already known to git "
+                "subdirectory" % external_versions['cmd:git'],
+                OutdatedExternalDependencyWarning
+            )
         elif sanity_checks:
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
@@ -814,7 +823,11 @@ class GitRepo(RepoInterface):
         if self._repo is None:
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            self._repo = self.cmd_call_wrapper(
+                Repo,
+                # Encode path on Python 2 because, as of v2.1.11, GitPython's
+                # Repo will pass the path to str() otherwise.
+                assure_bytes(self.path) if PY2 else self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
@@ -993,10 +1006,7 @@ class GitRepo(RepoInterface):
         if not op.exists(dot_git):
             raise RuntimeError("Missing .git in %s." % repo)
         elif op.islink(dot_git):
-            # readlink cannot be imported on windows, but there should also
-            # be no symlinks
-            from os import readlink
-            git_dir = readlink(dot_git)
+            git_dir = os.readlink(dot_git)
         elif op.isdir(dot_git):
             git_dir = ".git"
         elif op.isfile(dot_git):
@@ -1192,7 +1202,6 @@ class GitRepo(RepoInterface):
         Primarily to centralize handling in both indirect annex and direct
         modes when ran through proxy
         """
-        from datalad.utils import assure_unicode
         return [{u'file': f, u'success': True}
                 for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
 
@@ -1379,14 +1388,14 @@ class GitRepo(RepoInterface):
         except CommandError as e:
             if 'nothing to commit' in e.stdout:
                 if careless:
-                    lgr.debug("nothing to commit in {}. "
+                    lgr.debug(u"nothing to commit in {}. "
                               "Ignored.".format(self))
                 else:
                     raise
             elif 'no changes added to commit' in e.stdout or \
                     'nothing added to commit' in e.stdout:
                 if careless:
-                    lgr.debug("no changes added to commit in {}. "
+                    lgr.debug(u"no changes added to commit in {}. "
                               "Ignored.".format(self))
                 else:
                     raise
@@ -1842,22 +1851,7 @@ class GitRepo(RepoInterface):
         if not files:
             file_chunks = [[]]
         else:
-            files = assure_list(files)
-
-            maxl = max(map(len, files))
-            chunk_size = max(
-                1,  # should at least be 1. If blows then - not our fault
-                (CMD_MAX_ARG
-                 - sum((len(x) + 3) for x in cmd)
-                 - 4   # for '--' below
-                 ) // (maxl + 3)  # +3 for possible quotes and a space
-            )
-            # TODO: additional treatment for "too many arguments"? although
-            # as https://github.com/datalad/datalad/issues/1883#issuecomment-436272758
-            # shows there seems to be no hardcoded limit on # of arguments,
-            # but may be we decide to go for smth like follow to be on safe side
-            # chunk_size = min(10240 - len(cmd), chunk_size)
-            file_chunks = generate_chunks(files, chunk_size)
+            file_chunks = generate_file_chunks(files, cmd)
 
         out, err = "", ""
         for file_chunk in file_chunks:
@@ -2281,45 +2275,33 @@ class GitRepo(RepoInterface):
         )
         # TODO: Return values?
 
-    def is_dirty(self, index=True, working_tree=True, untracked_files=True,
-                 submodules=True, path=None):
-        """Returns true if the repo is considered to be dirty
-
-        Parameters
-        ----------
-        index: bool
-          if True, consider changes to the index
-        working_tree: bool
-          if True, consider changes to the working tree
-        untracked_files: bool
-          if True, consider untracked files
-        submodules: bool
-          if True, consider submodules
-        path: str or list of str
-          path(s) to consider only
-        Returns
-        -------
-          bool
-        """
-
-        return self.repo.is_dirty(index=index, working_tree=working_tree,
-                                  untracked_files=untracked_files,
-                                  submodules=submodules, path=path)
-
     # run() needs this ATM, but should eventually be RF'ed to a
     # status(recursive=True) call
     @property
     def dirty(self):
         return len([
             p for p, props in iteritems(self.status(
-                untracked='all', ignore_submodules='other'))
+                untracked='all', eval_submodule_state='full'))
             if props.get('state', None) != 'clean' and
             # -core ignores empty untracked directories, so shall we
             not (p.is_dir() and len(list(p.iterdir())) == 0)]) > 0
 
     @property
     def untracked_files(self):
-        return self.repo.untracked_files
+        """Legacy interface, do not use! Use the status() method instead.
+
+        Despite its name, it also reports on untracked datasets, and
+        yields their names with trailing path separators.
+        """
+        return [
+            '{}{}'.format(
+                text_type(p.relative_to(self.pathobj)),
+                os.sep if props['type'] != 'file' else ''
+            )
+            for p, props in iteritems(self.status(
+                untracked='all', eval_submodule_state='no'))
+            if props.get('state', None) == 'untracked'
+        ]
 
     def gc(self, allow_background=False, auto=False):
         """Perform house keeping (garbage collection, repacking)"""
@@ -2398,7 +2380,7 @@ class GitRepo(RepoInterface):
           as a tracking branch. If `None`, remote HEAD will be checked out.
         """
         if name is None:
-            name = path
+            name = Path(path).as_posix()
         # XXX the following should do it, but GitPython will refuse to add a submodule
         # unless you specify a URL that is configured as one of its remotes, or you
         # specify no URL, but the repo has at least one remote.
@@ -2434,6 +2416,15 @@ class GitRepo(RepoInterface):
                 url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+        # record dataset ID if possible for comprehesive metadata on
+        # dataset components within the dataset itself
+        subm_id = GitRepo(op.join(self.path, path)).config.get(
+            'datalad.dataset.id', None)
+        if subm_id:
+            self._git_custom_command(
+                '',
+                ['git', 'config', '--file', '.gitmodules', '--replace-all',
+                 'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
         # TODO: return value
@@ -2636,7 +2627,8 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
+                          files=None):
         """Return files that have changed between the index and working tree.
 
         Parameters
@@ -2659,8 +2651,23 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        return [normpath(f)  # Call normpath to convert separators on Windows.
-                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
+        if files is not None:
+            opts.append('--')
+            # might be too many, need to chunk up
+            optss = (
+                opts + file_chunk
+                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
+            )
+        else:
+            optss = [opts]
+        return [
+            normpath(f)  # Call normpath to convert separators on Windows.
+            for f in chain(
+                *(self.repo.git.diff(*opts, **kwargs).split('\0')
+                for opts in optss)
+            )
+            if f
+        ]
 
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""
@@ -2686,7 +2693,6 @@ class GitRepo(RepoInterface):
           repo.
         """
         return self.get_gitattributes('.')['.']
-
 
     def get_gitattributes(self, path, index_only=False):
         """Query gitattributes for one or more paths
@@ -2778,8 +2784,8 @@ class GitRepo(RepoInterface):
                         attrline += ' {}={}'.format(a, val)
                 f.write('\n{}'.format(attrline))
 
-
-    def get_content_info(self, paths=None, ref=None, untracked='all'):
+    def get_content_info(self, paths=None, ref=None, untracked='all',
+                         eval_file_type=True):
         """Get identifier and type information from repository content.
 
         This is simplified front-end for `git ls-files/tree`.
@@ -2791,20 +2797,27 @@ class GitRepo(RepoInterface):
 
         Parameters
         ----------
-        paths : list(patlib.PurePath)
-          Specific paths, relative to the (resolved repository root, to query
+        paths : list(pathlib.PurePath)
+          Specific paths, relative to the resolved repository root, to query
           info for. Paths must be normed to match the reporting done by Git,
           i.e. no parent dir components (ala "some/../this").
           If none are given, info is reported for all content.
         ref : gitref or None
           If given, content information is retrieved for this Git reference
           (via ls-tree), otherwise content information is produced for the
-          present work tree (via ls-files).
+          present work tree (via ls-files). With a given reference, the
+          reported content properties also contain a 'bytesize' record,
+          stating the size of a file in bytes.
         untracked : {'no', 'normal', 'all'}
           If and how untracked content is reported when no `ref` was given:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
+        eval_file_type : bool
+          If True, inspect file type of untracked files, and report annex
+          symlink pointers as type 'file'. This convenience comes with a
+          cost; disable to get faster performance if this information
+          is not needed.
 
         Returns
         -------
@@ -2818,7 +2831,7 @@ class GitRepo(RepoInterface):
             Can be 'file', 'symlink', 'dataset', 'directory'
 
             Note that the reported type will not always match the type of
-            content commited to Git, rather it will reflect the nature
+            content committed to Git, rather it will reflect the nature
             of the content minus platform/mode-specifics. For example,
             a symlink to a locked annexed file on Unix will have a type
             'file', reported, while a symlink to a file in Git or directory
@@ -2835,15 +2848,10 @@ class GitRepo(RepoInterface):
           In case of an invalid Git reference (e.g. 'HEAD' in an empty
           repository)
         """
+        lgr.debug('%s.get_content_info(...)', self)
         # TODO limit by file type to replace code in subdatasets command
         info = OrderedDict()
 
-        mode_type_map = {
-            '100644': 'file',
-            '100755': 'file',
-            '120000': 'symlink',
-            '160000': 'dataset',
-        }
         if paths:
             # path matching will happen against what Git reports
             # and Git always reports POSIX paths
@@ -2854,6 +2862,10 @@ class GitRepo(RepoInterface):
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
+            # make sure no operations are pending before we figure things
+            # out in the worktree
+            self.precommit()
+
             # --exclude-standard will make sure to honor and standard way
             # git can be instructed to ignore content, and will prevent
             # crap from contaminating untracked file reports
@@ -2869,11 +2881,14 @@ class GitRepo(RepoInterface):
             else:
                 raise ValueError(
                     'unknown value for `untracked`: %s', untracked)
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
         else:
-            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree']
-        # works for both modes
-        props_re = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
+            cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
+            props_re = re.compile(
+                r'(?P<type>[0-9]+) ([a-z]*) (?P<sha>[^ ]*) [\s]*(?P<size>[0-9-]+)\t(?P<fname>.*)$')
 
+        lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
                 # specifically always ask for a full report and
@@ -2894,8 +2909,63 @@ class GitRepo(RepoInterface):
             if "fatal: Not a valid object name" in str(exc):
                 raise ValueError("Git reference '{}' invalid".format(ref))
             raise
+        lgr.debug('Done query repo: %s', cmd)
 
-        for line in stdout.split('\0'):
+        if not eval_file_type:
+            _get_link_target = None
+        elif ref:
+            def _read_symlink_target_from_catfile(lines):
+                # it is always the second line, all checks done upfront
+                header = lines.readline()
+                if header.rstrip().endswith('missing'):
+                    # something we do not know about, should not happen
+                    # in real use, but guard against to avoid stalling
+                    return ''
+                return lines.readline().rstrip()
+
+            _get_link_target = BatchedCommand(
+                ['git', 'cat-file', '--batch'],
+                path=self.path,
+                output_proc=_read_symlink_target_from_catfile,
+            )
+        else:
+            def try_readlink(path):
+                try:
+                    return os.readlink(path)
+                except OSError:
+                    # readlink will fail if the symlink reported by ls-files is
+                    # not in the working tree (it could be removed or
+                    # unlocked). Fall back to a slower method.
+                    return op.realpath(path)
+
+            _get_link_target = try_readlink
+
+        try:
+            self._get_content_info_line_helper(
+                paths,
+                ref,
+                info,
+                stdout.split('\0'),
+                props_re,
+                _get_link_target)
+        finally:
+            if ref and _get_link_target:
+                # cancel batch process
+                _get_link_target.close()
+
+        lgr.debug('Done %s.get_content_info(...)', self)
+        return info
+
+    def _get_content_info_line_helper(self, paths, ref, info, lines,
+                                      props_re, get_link_target):
+        """Internal helper of get_content_info() to parse Git output"""
+        mode_type_map = {
+            '100644': 'file',
+            '100755': 'file',
+            '120000': 'symlink',
+            '160000': 'dataset',
+        }
+        for line in lines:
             if not line:
                 continue
             inf = {}
@@ -2906,29 +2976,9 @@ class GitRepo(RepoInterface):
                 inf['gitshasum'] = None
             else:
                 # again Git reports always in POSIX
-                path = ut.PurePosixPath(props.group(4))
-                inf['gitshasum'] = props.group(2 if not ref else 3)
-                inf['type'] = mode_type_map.get(
-                    props.group(1), props.group(1))
-                if inf['type'] == 'symlink' and \
-                        '.git/annex/objects' in \
-                        ut.Path(
-                            op.realpath(op.join(
-                                # this is unicode
-                                self.path,
-                                # this has to become unicode on older Pythons
-                                # it doesn't only look ugly, it is ugly
-                                # and probably wrong
-                                unicode(str(path), 'utf-8')
-                                if PY2 else str(path)))).as_posix():
-                    # ugly thing above could be just
-                    #  (self.pathobj / path).resolve().as_posix()
-                    # but PY3.5 does not support resolve(strict=False)
+                path = ut.PurePosixPath(props.group('fname'))
 
-                    # report locked annexed files as file, their
-                    # symlink-nature is a technicality that is dependent
-                    # on the particular mode annex is in
-                    inf['type'] = 'file'
+            # rejects paths as early as possible
 
             # the function assumes that any `path` is a relative path lib
             # instance if there were path constraints given, we need to reject
@@ -2946,6 +2996,29 @@ class GitRepo(RepoInterface):
                     for c in paths):
                 continue
 
+            # revisit the file props after this path has not been rejected
+            if props:
+                inf['gitshasum'] = props.group('sha')
+                inf['type'] = mode_type_map.get(
+                    props.group('type'), props.group('type'))
+                if get_link_target and inf['type'] == 'symlink' and \
+                        ((ref is None and '.git/annex/objects' in \
+                          ut.Path(
+                            get_link_target(text_type(self.pathobj / path))
+                          ).as_posix()) or \
+                         (ref and \
+                          '.git/annex/objects' in get_link_target(
+                              u'{}:{}'.format(
+                                  ref, text_type(path))))
+                        ):
+                    # report annex symlink pointers as file, their
+                    # symlink-nature is a technicality that is dependent
+                    # on the particular mode annex is in
+                    inf['type'] = 'file'
+
+                if ref and inf['type'] == 'file':
+                    inf['bytesize'] = int(props.group('size'))
+
             # join item path with repo path to get a universally useful
             # path representation with auto-conversion and tons of other
             # stuff
@@ -2956,9 +3029,7 @@ class GitRepo(RepoInterface):
                     else 'directory' if path.is_dir() else 'file'
             info[path] = inf
 
-        return info
-
-    def status(self, paths=None, untracked='all', ignore_submodules='no'):
+    def status(self, paths=None, untracked='all', eval_submodule_state='full'):
         """Simplified `git status` equivalent.
 
         Parameters
@@ -2969,11 +3040,17 @@ class GitRepo(RepoInterface):
           into a subdataset, a report is made on the subdataset record
           within the queried dataset only (no recursion).
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        ignore_submodules : {'no', 'other', 'all'}
+        eval_submodule_state : {'full', 'commit', 'no'}
+          If 'full' (the default), the state of a submodule is evaluated by
+          considering all modifications, with the treatment of untracked files
+          determined by `untracked`. If 'commit', the modification check is
+          restricted to comparing the submodule's HEAD commit to the one
+          recorded in the superdataset. If 'no', the state of the subdataset is
+          not evaluated.
 
         Returns
         -------
@@ -2995,15 +3072,15 @@ class GitRepo(RepoInterface):
             to=None,
             paths=paths,
             untracked=untracked,
-            ignore_submodules=ignore_submodules)
+            eval_submodule_state=eval_submodule_state)
 
     def diff(self, fr, to, paths=None, untracked='all',
-             ignore_submodules='no'):
+             eval_submodule_state='full'):
         """Like status(), but reports changes between to arbitrary revisions
 
         Parameters
         ----------
-        fr : str
+        fr : str or None
           Revision specification (anything that Git understands). Passing
           `None` considers anything in the target state as new.
         to : str or None
@@ -3013,11 +3090,17 @@ class GitRepo(RepoInterface):
           If given, limits the query to the specified paths. To query all
           paths specify `None`, not an empty list.
         untracked : {'no', 'normal', 'all'}
-          If and how untracked content is reported when no `ref` was given:
+          If and how untracked content is reported when `to` is None:
           'no': no untracked files are reported; 'normal': untracked files
           and entire untracked directories are reported as such; 'all': report
           individual files even in fully untracked directories.
-        ignore_submodules : {'no', 'other', 'all'}
+        eval_submodule_state : {'full', 'commit', 'no'}
+          If 'full' (the default), the state of a submodule is evaluated by
+          considering all modifications, with the treatment of untracked files
+          determined by `untracked`. If 'commit', the modification check is
+          restricted to comparing the submodule's HEAD commit to the one
+          recorded in the superdataset. If 'no', the state of the subdataset is
+          not evaluated.
 
         Returns
         -------
@@ -3035,12 +3118,23 @@ class GitRepo(RepoInterface):
         return {k: v for k, v in iteritems(self.diffstatus(
             fr=fr, to=to, paths=paths,
             untracked=untracked,
-            ignore_submodules=ignore_submodules))
+            eval_submodule_state=eval_submodule_state))
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
-                   ignore_submodules='no', _cache=None):
+                   eval_submodule_state='full', eval_file_type=True,
+                   _cache=None):
         """Like diff(), but reports the status of 'clean' content too"""
+        return self._diffstatus(
+            fr, to, paths, untracked, eval_submodule_state, eval_file_type,
+            _cache)
+
+    def _diffstatus(self, fr, to, paths, untracked, eval_state,
+                    eval_file_type, _cache):
+        """Just like diffstatus(), but supports an additional evaluation
+        state 'global'. If given, it will return a single 'modified'
+        (vs. 'clean') state label for the entire repository, as soon as
+        it can."""
         def _get_cache_key(label, paths, ref, untracked=None):
             return self.path, label, tuple(paths) if paths else None, \
                 ref, untracked
@@ -3059,7 +3153,6 @@ class GitRepo(RepoInterface):
 
         # TODO report more info from get_content_info() calls in return
         # value, those are cheap and possibly useful to a consumer
-        status = OrderedDict()
         # we need (at most) three calls to git
         if to is None:
             # everything we know about the worktree, including os.stat
@@ -3069,7 +3162,8 @@ class GitRepo(RepoInterface):
                 to_state = _cache[key]
             else:
                 to_state = self.get_content_info(
-                    paths=paths, ref=None, untracked=untracked)
+                    paths=paths, ref=None, untracked=untracked,
+                    eval_file_type=eval_file_type)
                 _cache[key] = to_state
             # we want Git to tell us what it considers modified and avoid
             # reimplementing logic ourselves
@@ -3081,7 +3175,7 @@ class GitRepo(RepoInterface):
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self._git_custom_command(
                         # low-level code cannot handle pathobjs
-                        [str(p) for p in paths] if paths else None,
+                        [text_type(p) for p in paths] if paths else None,
                         ['git', 'ls-files', '-z', '-m'])[0].split('\0')
                     if p)
                 _cache[key] = modified
@@ -3090,7 +3184,8 @@ class GitRepo(RepoInterface):
             if key in _cache:
                 to_state = _cache[key]
             else:
-                to_state = self.get_content_info(paths=paths, ref=to)
+                to_state = self.get_content_info(
+                    paths=paths, ref=to, eval_file_type=eval_file_type)
                 _cache[key] = to_state
             # we do not need worktree modification detection in this case
             modified = None
@@ -3100,29 +3195,45 @@ class GitRepo(RepoInterface):
             from_state = _cache[key]
         else:
             if fr:
-                from_state = self.get_content_info(paths=paths, ref=fr)
+                from_state = self.get_content_info(
+                    paths=paths, ref=fr, eval_file_type=eval_file_type)
             else:
                 # no ref means from nothing
                 from_state = {}
             _cache[key] = from_state
 
+        status = OrderedDict()
         for f, to_state_r in iteritems(to_state):
             props = None
             if f not in from_state:
                 # this is new, or rather not known to the previous state
                 props = dict(
                     state='added' if to_state_r['gitshasum'] else 'untracked',
-                    type=to_state_r['type'],
                 )
+                if 'type' in to_state_r:
+                    props['type'] = to_state_r['type']
             elif to_state_r['gitshasum'] == from_state[f]['gitshasum'] and \
                     (modified is None or f not in modified):
-                if ignore_submodules != 'all' or to_state_r['type'] != 'dataset':
+                if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
-                        state='clean' if f.exists() or
+                        state='clean' if f.exists() or \
                               f.is_symlink() else 'deleted',
                         type=to_state_r['type'],
                     )
+                else:
+                    # a dataset
+                    props = dict(type=to_state_r['type'])
+                    if to is not None:
+                        # we can only be confident without looking
+                        # at the worktree, if we compare to a recorded
+                        # state
+                        props['state'] = 'clean'
+                    else:
+                        # report the shasum that we know, for further
+                        # wrangling of subdatasets below
+                        props['gitshasum'] = to_state_r['gitshasum']
+                        props['prev_gitshasum'] = from_state[f]['gitshasum']
             else:
                 # change in git record, or on disk
                 props = dict(
@@ -3130,15 +3241,26 @@ class GitRepo(RepoInterface):
                     # but had subsequent modifications done to it that are
                     # unstaged. Such file would presently show up as 'added'
                     # ATM I think this is OK, but worth stating...
-                    state='modified' if f.exists() or
+                    state='modified' if f.exists() or \
                     f.is_symlink() else 'deleted',
                     # TODO record before and after state for diff-like use
                     # cases
                     type=to_state_r['type'],
                 )
-            if props['state'] in ('clean', 'added', 'modified'):
+            state = props.get('state', None)
+            if eval_state == 'global' and \
+                    state not in ('clean', None):
+                # any modification means globally 'modified'
+                return 'modified'
+            if state in ('clean', 'added', 'modified'):
                 props['gitshasum'] = to_state_r['gitshasum']
-            if props['state'] in ('clean', 'modified', 'deleted'):
+                if 'bytesize' in to_state_r:
+                    # if we got this cheap, report it
+                    props['bytesize'] = to_state_r['bytesize']
+                elif props['state'] == 'clean' and 'bytesize' in from_state[f]:
+                    # no change, we can take this old size info
+                    props['bytesize'] = from_state[f]['bytesize']
+            if state in ('clean', 'modified', 'deleted'):
                 props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props
 
@@ -3154,44 +3276,66 @@ class GitRepo(RepoInterface):
                     # file
                     gitshasum=from_state_r['gitshasum'],
                 )
+                if eval_state == 'global':
+                    return 'modified'
 
-        if ignore_submodules == 'all':
-            return status
+        if to is not None or eval_state == 'no':
+            # if we have `to` we are specifically comparing against
+            # a recorded state, and this function only attempts
+            # to label the state of a subdataset, not investigate
+            # specifically what the changes in subdatasets are
+            # this is done by a high-level command like rev-diff
+            # so the comparison within this repo and the present
+            # `state` label are all we need, and they are done already
+            if eval_state == 'global':
+                return 'clean'
+            else:
+                return status
 
         # loop over all subdatasets and look for additional modifications
         for f, st in iteritems(status):
-            if not (st['type'] == 'dataset' and st['state'] == 'clean' and
-                    GitRepo.is_valid_repo(str(f))):
+            f = text_type(f)
+            if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
+            if not GitRepo.is_valid_repo(f):
+                # submodule is not present, no chance for a conflict
+                st['state'] = 'clean'
+                continue
             # we have to recurse into the dataset and get its status
-            subrepo = GitRepo(str(f))
+            subrepo = GitRepo(f)
+            subrepo_commit = subrepo.get_hexsha()
+            st['gitshasum'] = subrepo_commit
             # subdataset records must be labeled clean up to this point
-            if st['gitshasum'] != subrepo.get_hexsha():
-                # current commit in subdataset deviates from what is
-                # recorded in the dataset, cheap test
-                st['state'] = 'modified'
-            else:
-                # the recorded commit did not change, so we need to make
-                # a more expensive traversal
-                rstatus = subrepo.diffstatus(
-                    # we can use 'HEAD' because we know that the commit
-                    # did not change. using 'HEAD' will facilitate
-                    # caching the result
-                    fr='HEAD',
-                    to=None,
-                    paths=None,
-                    untracked=untracked,
-                    ignore_submodules='other',
-                    _cache=_cache)
-                if any(v['state'] != 'clean'
-                       for k, v in iteritems(rstatus)):
-                    st['state'] = 'modified'
-            if ignore_submodules == 'other' and st['state'] == 'modified':
-                # we know for sure that at least one subdataset is modified
-                # go home quick
-                break
-        return status
+            # test if current commit in subdataset deviates from what is
+            # recorded in the dataset
+            st['state'] = 'modified' \
+                if st['prev_gitshasum'] != subrepo_commit \
+                else 'clean'
+            if eval_state == 'global' and st['state'] == 'modified':
+                return 'modified'
+            if eval_state == 'commit':
+                continue
+            # the recorded commit did not change, so we need to make
+            # a more expensive traversal
+            st['state'] = subrepo._diffstatus(
+                # we can use 'HEAD' because we know that the commit
+                # did not change. using 'HEAD' will facilitate
+                # caching the result
+                fr='HEAD',
+                to=None,
+                paths=None,
+                untracked=untracked,
+                eval_state='global',
+                eval_file_type=False,
+                _cache=_cache) if st['state'] == 'clean' else 'modified'
+            if eval_state == 'global' and st['state'] == 'modified':
+                return 'modified'
+
+        if eval_state == 'global':
+            return 'clean'
+        else:
+            return status
 
     def _save_pre(self, paths, _status, **kwargs):
         # helper to get an actionable status report
@@ -3203,7 +3347,7 @@ class GitRepo(RepoInterface):
             status = self.status(
                 paths=paths,
                 **{k: kwargs[k] for k in kwargs
-                   if k in ('untracked', 'ignore_submodules')})
+                   if k in ('untracked', 'eval_submodule_state')})
         else:
             # we want to be able to add items down the line
             # make sure to detach from prev. owner
@@ -3244,7 +3388,7 @@ class GitRepo(RepoInterface):
 
         # TODO remove pathobj stringification when commit() can
         # handle it
-        to_commit = [str(f.relative_to(self.pathobj))
+        to_commit = [text_type(f.relative_to(self.pathobj))
                      for f, props in iteritems(status)] \
                     if partial_commit else None
         if not partial_commit or to_commit:
@@ -3277,12 +3421,6 @@ class GitRepo(RepoInterface):
           dataset status (GitRepo.status()), or a custom status provided
           via `_status`. If no paths are provided, ALL non-clean paths
           present in the repo status or `_status` will be saved.
-        ignore_submodules : {'no', 'all'}
-          If `_status` is not given, will be passed as an argument to
-          Repo.status(). With 'all' no submodule state will be saved in
-          the dataset. Note that submodule content will never be saved
-          in their respective datasets, as this function's scope is
-          limited to a single dataset.
         _status : dict or None
           If None, Repo.status() will be queried for the given `ds`. If
           a dict is given, its content will be used as a constraint.
@@ -3294,7 +3432,8 @@ class GitRepo(RepoInterface):
           Supported:
 
           - git : bool (passed to Repo.add()
-          - ignore_submodules : {'no', 'other', 'all'} passed to Repo.status()
+          - eval_submodule_state : {'full', 'commit', 'no'}
+            passed to Repo.status()
           - untracked : {'no', 'normal', 'all'} - passed to Repo.satus()
         """
         return list(
@@ -3329,7 +3468,7 @@ class GitRepo(RepoInterface):
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
-            str(f.relative_to(self.pathobj))
+            text_type(f.relative_to(self.pathobj))
             for f, props in iteritems(status)
             if props.get('state', None) == 'deleted' and
             # staged deletions have a gitshasum reported for them
@@ -3363,39 +3502,41 @@ class GitRepo(RepoInterface):
         # _status=None, we should be able to avoid this, because
         # status should have the full info already
         # looks for contained repositories
-        to_add_submodules = [sm for sm, sm_props in iteritems(
-            self.get_content_info(
-                # get content info for any untracked directory
-                [f.relative_to(self.pathobj) for f, props in iteritems(status)
-                 if props.get('state', None) == 'untracked' and
-                 props.get('type', None) == 'directory'],
-                ref=None,
-                # request exhaustive list, so that everything that is
-                # still reported as a directory must be its own repository
-                untracked='all'))
-            if sm_props.get('type', None) == 'directory']
         added_submodule = False
-        for cand_sm in to_add_submodules:
-            try:
-                self.add_submodule(
-                    str(cand_sm.relative_to(self.pathobj)),
-                    url=None, name=None)
-            except (CommandError, InvalidGitRepositoryError) as e:
-                yield get_status_dict(
-                    action='add_submodule',
-                    ds=self,
-                    path=self.pathobj / ut.PurePosixPath(cand_sm),
-                    status='error',
-                    message=e.stderr if hasattr(e, 'stderr')
-                    else ('not a Git repository: %s', exc_str(e)),
-                    logger=lgr)
-                continue
-            added_submodule = True
+        untracked_dirs = [f.relative_to(self.pathobj)
+                          for f, props in iteritems(status)
+                          if props.get('state', None) == 'untracked' and
+                          props.get('type', None) == 'directory']
+        if untracked_dirs:
+            to_add_submodules = [sm for sm, sm_props in iteritems(
+                self.get_content_info(
+                    untracked_dirs,
+                    ref=None,
+                    # request exhaustive list, so that everything that is
+                    # still reported as a directory must be its own repository
+                    untracked='all'))
+                if sm_props.get('type', None) == 'directory']
+            for cand_sm in to_add_submodules:
+                try:
+                    self.add_submodule(
+                        text_type(cand_sm.relative_to(self.pathobj)),
+                        url=None, name=None)
+                except (CommandError, InvalidGitRepositoryError) as e:
+                    yield get_status_dict(
+                        action='add_submodule',
+                        ds=self,
+                        path=self.pathobj / ut.PurePosixPath(cand_sm),
+                        status='error',
+                        message=e.stderr if hasattr(e, 'stderr')
+                        else ('not a Git repository: %s', exc_str(e)),
+                        logger=lgr)
+                    continue
+                added_submodule = True
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
-                str(f.relative_to(self.pathobj)): props
+                text_type(f.relative_to(self.pathobj)): props
                 for f, props in iteritems(status)
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
@@ -3424,15 +3565,32 @@ class GitRepo(RepoInterface):
             # need to include .gitmodules in what needs saving
             status[self.pathobj.joinpath('.gitmodules')] = dict(
                 type='file', state='modified')
+            if hasattr(self, 'annexstatus') and not kwargs.get('git', False):
+                # we cannot simply hook into the coming add-call
+                # as this would go to annex, so make a dedicted git-add
+                # call to ensure .gitmodules is not annexed
+                # in any normal DataLad dataset .gitattributes will
+                # prevent this, but in a plain repo it won't
+                # https://github.com/datalad/datalad/issues/3306
+                for r in GitRepo._save_add(
+                        self,
+                        {op.join(self.path, '.gitmodules'): None}):
+                    yield get_status_dict(
+                        action='add',
+                        refds=self.pathobj,
+                        type='file',
+                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
+                        status='ok' if r.get('success', None) else 'error',
+                        logger=lgr)
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
-            str(f.relative_to(self.pathobj)): props
+            text_type(f.relative_to(self.pathobj)): props
             for f, props in iteritems(status)
             if props.get('state', None) in ('modified', 'untracked')}
         if to_add:
             lgr.debug(
-                '%i path(s) to add to %r %s',
+                '%i path(s) to add to %s %s',
                 len(to_add), self, to_add if len(to_add) < 10 else '')
             for r in self._save_add(
                     to_add,

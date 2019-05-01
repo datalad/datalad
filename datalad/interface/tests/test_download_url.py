@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj
+from six.moves.urllib.parse import urljoin
 
 from ...api import download_url, Dataset
 from ...utils import chpwd
@@ -126,7 +127,7 @@ def test_download_url_dataset(toppath, topurl, path):
 @with_tempfile(mkdir=True)
 def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).rev_create()
-    ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)
+    ds.download_url([urljoin(topurl, "archive.tar.gz")], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))

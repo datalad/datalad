@@ -41,6 +41,7 @@ from weakref import WeakValueDictionary
 
 from six import string_types, PY2
 from six import iteritems
+from six import text_type
 from six.moves import filter
 from git import InvalidGitRepositoryError
 
@@ -63,6 +64,7 @@ from datalad.utils import make_tempfile
 from datalad.utils import unlink
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
+from datalad.cmd import BatchedCommand
 
 # imports from same module:
 from .repo import RepoInterface
@@ -178,9 +180,6 @@ class AnnexRepo(GitRepo, RepoInterface):
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
-        if self.git_annex_version is None:
-            self._check_git_annex_version()
-
         # initialize
         self._uuid = None
         self._annex_common_options = []
@@ -516,124 +515,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                         branch=self.get_corresponding_branch(branch)
                         if corresponding else branch)
 
-    def get_status(self, untracked=True, deleted=True, modified=True, added=True,
-                   type_changed=True, submodules=True, path=None):
-        """Return various aspects of the status of the annex repository
-
-        # TODO: RM DIRECT?
-        Note: Under certain circumstances newly added submodules might be
-        reported as 'modified' rather tha 'added'.
-        See `AnnexRepo._submodules_dirty_direct_mode` for details.
-
-        Parameters
-        ----------
-        untracked
-        deleted
-        modified
-        added
-        type_changed
-        submodules
-        path
-
-        Returns
-        -------
-
-        """
-
-        self.precommit()
-
-        options = assure_list(path) if path else []
-        if not submodules:
-            options.extend(to_options(ignore_submodules='all'))
-
-        # TODO: RM DIRECT? _submodules_dirty_direct_mode is now removed,
-        #   git-annex is >= 7
-        # BEGIN workaround bug (see self._submodules_dirty_direct_mode)
-        # internal call to 'git status' by 'git annex status' will fail
-        # in submodules without a working tree (direct mode)
-        # How to catch this case depends on annex version, since annex
-        # exits zero until version 6.20170307
-
-        def _fake_exception_wrapper(self, options_):
-            """generate a faked `CommandError` from logged stderr output"""
-
-            # this is for use with older annex, which didn't exit non-zero
-            # in case of the failure we are interested in
-
-            # TODO: If we are to keep this workaround (we probably rely on a
-            # newer annex anyway), we should not use swallow_logs, since we
-            # actually don't want to swallow it, but inspect it. Use a proper
-            # handler/filter for the logger instead to not create temp files via
-            # swallow_logs
-
-            old_log_state = self.cmd_call_wrapper.log_outputs
-            self.cmd_call_wrapper._log_opts['outputs'] = True
-
-            with swallow_logs(new_level=logging.ERROR) as cml:
-                # Note, that _run_annex_command_json returns a generator
-                json_list = \
-                    list(self._run_annex_command_json(
-                        'status', opts=options_, expect_stderr=False))
-            self.cmd_call_wrapper._log_opts['outputs'] = old_log_state
-            if "fatal:" in cml.out:
-                raise CommandError(cmd="git annex status",
-                                   msg=cml.out, stderr=cml.out)
-            return json_list
-
-        json_list = \
-            list(self._run_annex_command_json(
-                'status', opts=options, expect_stderr=False))
-
-        key_mapping = [(untracked, 'untracked', '?'),
-                       (deleted, 'deleted', 'D'),
-                       (modified, 'modified', 'M'),
-                       (added, 'added', 'A'),
-                       (type_changed, 'type_changed', 'T')]
-        from datalad.utils import with_pathsep
-        return {key: [with_pathsep(i['file'])
-                      if isdir(opj(self.path, i['file'])) else i['file']
-                      # for consistency with 'git status' return directories
-                      # with trailing path separator
-                      for i in json_list if i['status'] == st]
-                for cond, key, st in key_mapping if cond}
-
-    @borrowdoc(GitRepo)
-    def is_dirty(self, index=True, working_tree=False, untracked_files=True,
-                 submodules=True, path=None):
-        # TODO: Add doc on how this differs from GitRepo.is_dirty()
-        # Parameter working_tree exists to meet the signature of GitRepo.is_dirty()
-
-        # TODO: RM DIRECT?
-        if working_tree:
-            # Note: annex repos don't always have a git working tree and the
-            # behaviour in direct mode or V6+ repos is fundamentally different
-            # from that concept. There are no unstaged changes in direct mode
-            # for example. Therefore the need to call this method with
-            # 'working_tree=True' indicates invalid assumptions in the
-            # calling code.
-
-            # TODO: Better exception. InvalidArgumentError or sth ...
-            raise CommandNotAvailableError(
-                "Querying a git-annex repository for a clean/dirty "
-                "working tree is an invalid concept.")
-        # Again note, that 'annex status' isn't distinguishing staged and
-        # unstaged changes, since this makes little sense for an annex repo
-        # in general. Therefore we use only 'index' and 'untracked_files' to
-        # specify what kind of dirtyness we are interested in:
-        status = self.get_status(untracked=untracked_files, deleted=index,
-                                 modified=index, added=index,
-                                 type_changed=index, submodules=submodules,
-                                 path=path)
-        return any([bool(status[i]) for i in status])
-
-    @property
-    def untracked_files(self):
-        """Get a list of untracked files
-        """
-        return self.get_status(untracked=True, deleted=False, modified=False,
-                               added=False, type_changed=False, submodules=False,
-                               path=None)['untracked']
-
     @classmethod
     def _check_git_annex_version(cls):
         ver = external_versions['cmd:annex']
@@ -944,6 +825,9 @@ class AnnexRepo(GitRepo, RepoInterface):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
+        if self.git_annex_version is None:
+            self._check_git_annex_version()
+
         debug = ['--debug'] if lgr.getEffectiveLevel() <= 8 else []
         backend = ['--backend=%s' % backend] if backend else []
 
@@ -2569,20 +2453,22 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # files "jumped" between git/annex.  Then also preparing a
                 # custom index and calling "commit" without files resolves
                 # the issue
-                changed_files_staged = \
+                all_changed_staged = \
                     set(self.get_changed_files(staged=True))
-                changed_files_notstaged = \
-                    set(self.get_changed_files(staged=False))
 
-                files_set = {
+                files_normalized = [
                     _normalize_path(self.path, f) if isabs(f) else f
                     for f in files
-                }
-                # files_notstaged = files_set.difference(changed_files_staged)
-                files_changed_notstaged = files_set.intersection(changed_files_notstaged)
+                ]
+
+                files_changed_staged = \
+                    set(self.get_changed_files(staged=True, files=files_normalized))
+                files_changed_notstaged = \
+                    set(self.get_changed_files(staged=False, files=files_normalized))
 
                 # Files which were staged but not among files
-                staged_not_to_commit = changed_files_staged.difference(files_set)
+                staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
+
                 if staged_not_to_commit or files_changed_notstaged:
                     # Need an alternative index_file
                     with make_tempfile(dir=opj(self.path,
@@ -3084,9 +2970,17 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        generator
+        list
           JSON obj per modified file
         """
+        return list(self.set_metadata_(
+            files, reset=reset, add=add, init=init,
+            remove=remove, purge=purge, recursive=recursive))
+
+    def set_metadata_(
+            self, files, reset=None, add=None, init=None,
+            remove=None, purge=None, recursive=False):
+        """Like set_metadata() but returns a generator"""
 
         def _genspec(expr, d):
             return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
@@ -3158,7 +3052,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if testpath.exists():
                     r.pop('hashdirlower', None)
                     r.pop('hashdirmixed', None)
-                    r['objloc'] = str(testpath)
+                    r['objloc'] = text_type(testpath)
                     r['has_content'] = True
                     break
 
@@ -3172,7 +3066,7 @@ class AnnexRepo(GitRepo, RepoInterface):
           Specific paths to query info for. In none are given, info is
           reported for all content.
         init : 'git' or dict-like or None
-          If set to 'git' annex content info will ammend the output of
+          If set to 'git' annex content info will amend the output of
           GitRepo.get_content_info(), otherwise the dict-like object
           supplied will receive this information and the present keys will
           limit the report of annex properties. Alternatively, if `None`
@@ -3226,7 +3120,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             cmd = 'find'
             # stringify any pathobjs
-            opts.extend([str(p) for p in paths]
+            opts.extend([text_type(p) for p in paths]
                         if paths else ['--include', '*'])
         for j in self._run_annex_command_json(cmd, opts=opts):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
@@ -3258,7 +3152,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 eval_availability=False,
                 init=self.status(
                     paths=paths,
-                    ignore_submodules='other')
+                    eval_submodule_state='full')
             )
         )
         self._mark_content_availability(info)
@@ -3303,11 +3197,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if ui.is_interactive:
             # without an interactive UI there is little benefit from
             # progressbar info, hence save the stat calls
-            def _get_file_size(relpath):
-                path = op.join(self.path, relpath)
-                return 0 if not op.exists(path) else os.stat(path).st_size
-
-            expected_additions = {p: _get_file_size(p) for p in files}
+            expected_additions = {p: self.get_file_size(p) for p in files}
 
         for r in self._run_annex_command_json(
                 'add',
@@ -3378,11 +3268,6 @@ class BatchedAnnexes(dict):
         self.close()
 
 
-def readline_rstripped(stdout):
-    #return iter(stdout.readline, b'').next().rstrip()
-    return stdout.readline().rstrip()
-
-
 def readlines_until_ok_or_failed(stdout, maxlines=100):
     """Read stdout until line ends with ok or failed"""
     out = ''
@@ -3407,156 +3292,28 @@ def readline_json(stdout):
 
 
 @auto_repr
-class BatchedAnnex(object):
+class BatchedAnnex(BatchedCommand):
     """Container for an annex process which would allow for persistent communication
     """
 
     def __init__(self, annex_cmd, git_options=None, annex_options=None, path=None,
-                 json=False,
-                 output_proc=None):
+                 json=False, output_proc=None):
         if not isinstance(annex_cmd, list):
             annex_cmd = [annex_cmd]
-        self.annex_cmd = annex_cmd
-        self.git_options = git_options if git_options else []
-        annex_options = annex_options if annex_options else []
-        self.annex_options = annex_options + (['--json'] if json else [])
-        self.path = path
-        if output_proc is None:
-            output_proc = readline_json if json else readline_rstripped
-        self.output_proc = output_proc
-        self._process = None
-        self._stderr_out = None
-        self._stderr_out_fname = None
-
-    def _initialize(self):
-        # TODO -- should get all those options about --debug and --backend which are used/composed
-        # in AnnexRepo class
-        lgr.debug("Initiating a new process for %s" % repr(self))
-        cmd = ['git'] + self.git_options + \
-              ['annex'] + self.annex_cmd + self.annex_options + ['--batch']  # , '--debug']
-        lgr.log(5, "Command: %s" % cmd)
-        # TODO: look into _run_annex_command  to support default options such as --debug
-        #
-        # according to the internet wisdom there is no easy way with subprocess
-        # while avoid deadlocks etc.  We would need to start a thread/subprocess
-        # to timeout etc
-        # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
-        self._stderr_out, self._stderr_out_fname = tempfile.mkstemp()
-        self._process = Popen(
-            cmd, stdin=PIPE, stdout=PIPE,  stderr=self._stderr_out,
-            env=GitRunner.get_git_environ_adjusted(),
-            cwd=self.path,
-            bufsize=1,
-            universal_newlines=True  # **kwargs
-        )
-
-    def _check_process(self, restart=False):
-        """Check if the process was terminated and restart if restart
-
-        Returns
-        -------
-        bool
-          True if process was alive.
-        str
-          stderr if any recorded if was terminated
-        """
-        process = self._process
-        ret = True
-        ret_stderr = None
-        if process and process.poll():
-            lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
-            ret_stderr = self.close(return_stderr=True)
-            ret = False
-        if self._process is None and restart:
-            lgr.warning("Restarting the process due to previous failure")
-            self._initialize()
-        return ret, ret_stderr
-
-    def __call__(self, cmds):
-        """
-
-        Parameters
-        ----------
-        cmds : str or tuple or list of (str or tuple)
-
-        Returns
-        -------
-        str or list
-          Output received from annex.  list in case if cmds was a list
-        """
-        # TODO: add checks -- may be process died off and needs to be reinitiated
-        if not self._process:
-            self._initialize()
-
-        input_multiple = isinstance(cmds, list)
-        if not input_multiple:
-            cmds = [cmds]
-
-        output = []
-
-        for entry in cmds:
-            if not isinstance(entry, string_types):
-                entry = ' '.join(entry)
-            entry = entry + '\n'
-            lgr.log(5, "Sending %r to batched annex %s" % (entry, self))
-            # apparently communicate is just a one time show
-            # stdout, stderr = self._process.communicate(entry)
-            # according to the internet wisdom there is no easy way with subprocess
-            self._check_process(restart=True)
-            process = self._process  # _check_process might have restarted it
-            process.stdin.write(assure_bytes(entry) if PY2 else entry)
-            process.stdin.flush()
-            lgr.log(5, "Done sending.")
-            still_alive, stderr = self._check_process(restart=False)
-            # TODO: we might want to handle still_alive, e.g. to allow for
-            #       a number of restarts/resends, but it should be per command
-            #       since for some we cannot just resend the same query. But if
-            #       it is just a "get"er - we could resend it few times
-            # We are expecting a single line output
-            # TODO: timeouts etc
-            stdout = assure_unicode(self.output_proc(process.stdout)) \
-                if not process.stdout.closed else None
-            if stderr:
-                lgr.warning("Received output in stderr: %r", stderr)
-            lgr.log(5, "Received output: %r" % stdout)
-            output.append(stdout)
-
-        return output if input_multiple else output[0]
-
-    def __del__(self):
-        self.close()
-
-    def close(self, return_stderr=False):
-        """Close communication and wait for process to terminate
-
-        Returns
-        -------
-        str
-          stderr output if return_stderr and stderr file was there.
-          None otherwise
-        """
-        ret = None
-        if self._stderr_out:
-            # close possibly still open fd
-            os.fdopen(self._stderr_out).close()
-            self._stderr_out = None
-        if self._process:
-            process = self._process
-            lgr.debug(
-                "Closing stdin of %s and waiting process to finish", process)
-            process.stdin.close()
-            process.stdout.close()
-            process.wait()
-            self._process = None
-            lgr.debug("Process %s has finished", process)
-        if self._stderr_out_fname and os.path.exists(self._stderr_out_fname):
-            if return_stderr:
-                with open(self._stderr_out_fname, 'r') as f:
-                    ret = f.read()
-            # remove the file where we kept dumping stderr
-            unlink(self._stderr_out_fname)
-            self._stderr_out_fname = None
-        return ret
+        cmd = \
+            ['git'] + \
+            (git_options if git_options else []) + \
+            ['annex'] + \
+            annex_cmd + \
+            (annex_options if annex_options else []) + \
+            (['--json'] if json else []) + \
+            ['--batch']  # , '--debug']
+        output_proc = \
+            output_proc if output_proc else readline_json if json else None
+        super(BatchedAnnex, self).__init__(
+            cmd,
+            path=path,
+            output_proc=output_proc)
 
 
 def _get_size_from_perc_complete(count, perc):

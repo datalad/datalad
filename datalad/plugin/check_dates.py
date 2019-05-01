@@ -124,7 +124,6 @@ class CheckDates(Interface):
             CMD]"""),
         annex=Parameter(
             args=("--annex",),
-            metavar="all|tree|none",
             doc="""Mode for "git-annex" branch search. If 'all', all blobs
             within the branch are searched. 'tree' limits the search to blobs
             that are referenced by the tree at the tip of the branch. 'none'
