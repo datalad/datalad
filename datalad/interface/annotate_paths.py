@@ -177,6 +177,9 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
 
     # life is simple: we diff the base dataset
     modified = []
+    # Diff.__call__ is used to get access to the now obsolete interface.diff
+    # that exists merely for annotate_paths. (refds.diff corresponds to
+    # core.local.diff.)
     from datalad.interface.diff import Diff
     for r in Diff.__call__(
             dataset=refds,
