@@ -532,13 +532,13 @@ def diff_revision(dataset, revision="HEAD"):
     Generator that yields AnnotatePaths instances
     """
     if dataset.repo.commit_exists(revision + "^"):
-        revrange = "{rev}^..{rev}".format(rev=revision)
+        fr = revision + "^"
     else:
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
-        revrange = "{}..{}".format(PRE_INIT_COMMIT_SHA, revision)
+        fr = PRE_INIT_COMMIT_SHA
     diff = dataset.diff(recursive=True,
-                        revision=revrange,
+                        fr=fr, to=revision,
                         return_type='generator', result_renderer=None)
     for r in diff:
         yield r

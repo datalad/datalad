@@ -6,7 +6,11 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Plumbing command for reporting changes in datasets"""
+"""Plumbing command for reporting changes in datasets
+
+Note: This module is obsolete and will be removed once annotate_paths.py no
+longer needs it. Use core.local.diff instead.
+"""
 
 __docformat__ = 'restructuredtext'
 
@@ -203,6 +207,10 @@ def _parse_git_diff(dspath, diff_thingie=None, paths=None,
 class Diff(Interface):
     """Report changes of dataset components.
 
+    *Note*: This is an obsolete interface and will be removed once
+    annotate_paths.py no longer needs it. Use datalad.api.diff or Dataset.diff
+    instead.
+
     Reports can be generated for changes between recorded revisions, or
     between a revision and the state of a dataset's work tree.
 
@@ -291,7 +299,7 @@ class Diff(Interface):
         recursion_limit=recursion_limit)
 
     @staticmethod
-    @datasetmethod(name='diff')
+    @datasetmethod(name='_diff')
     @eval_results
     def __call__(
             path=None,
