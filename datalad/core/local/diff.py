@@ -228,7 +228,7 @@ def _diff_cmd(
 
 def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
              annexinfo, eval_file_type, cache):
-    if not ds.repo:
+    if not ds.is_installed():
         # asked to query a subdataset that is not available
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
         return
