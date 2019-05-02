@@ -87,7 +87,6 @@ class Diff(Interface):
             metavar="REVISION",
             doc="""original state to compare to, as given by any identifier
             that Git understands.""",
-            nargs=1,
             constraints=EnsureStr()),
         to=Parameter(
             args=("-t", "--to",),
@@ -95,7 +94,6 @@ class Diff(Interface):
             doc="""state to compare against the original state, as given by
             any identifier that Git understands. If none is specified,
             the state of the worktree will be used compared.""",
-            nargs=1,
             constraints=EnsureStr() | EnsureNone()),
     )
 
@@ -113,12 +111,6 @@ class Diff(Interface):
             recursion_limit=None):
         ds = require_dataset(
             dataset, check_installed=True, purpose='difference reporting')
-
-        # convert cmdline args into plain labels
-        if isinstance(fr, list):
-            fr = fr[0]
-        if isinstance(to, list):
-            to = to[0]
 
         for r in _diff_cmd(
                 ds=ds,
