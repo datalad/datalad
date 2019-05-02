@@ -262,6 +262,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 message=estr,
             )
             return
+        raise
 
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
         # this will ammend `status`
