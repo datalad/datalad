@@ -133,6 +133,17 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     pass
 
 
+class InvalidGitReferenceError(ValueError):
+    """Thrown if provided git reference is invalid
+    """
+    def __init__(self, ref, *args, **kwargs):
+        super(InvalidGitReferenceError, self).__init__(*args, **kwargs)
+        self.ref = ref
+
+    def __str__(self):
+        return "Git reference '{}' invalid".format(self.ref)
+
+
 class GitIgnoreError(CommandError):
     """Thrown if a path was ignored by a git command due to .gitignore file
 

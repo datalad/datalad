@@ -77,6 +77,7 @@ from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
+from .exceptions import InvalidGitReferenceError
 from .exceptions import MissingBranchError
 from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
@@ -2907,7 +2908,7 @@ class GitRepo(RepoInterface):
                 expect_fail=True)
         except CommandError as exc:
             if "fatal: Not a valid object name" in str(exc):
-                raise ValueError("Git reference '{}' invalid".format(ref))
+                raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
 

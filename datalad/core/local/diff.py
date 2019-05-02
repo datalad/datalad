@@ -47,6 +47,9 @@ from datalad.core.local.status import (
     Status,
     _common_diffstatus_params,
 )
+from datalad.support.exceptions import (
+    InvalidGitReferenceError,
+)
 
 lgr = logging.getLogger('datalad.core.local.diff')
 
@@ -251,15 +254,12 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             untracked=untracked,
             eval_file_type=eval_file_type,
             _cache=cache)
-    except ValueError as e:
-        msg_tmpl = "reference '{}' invalid"
-        # not looking for a debug repr of the exception, just the message
-        estr = text_type(e)
-        if msg_tmpl.format(fr) in estr or msg_tmpl.format(to) in estr:
+    except InvalidGitReferenceError as e:
+        if e.ref in (fr, to):
             yield dict(
                 path=ds.path,
                 status='impossible',
-                message=estr,
+                message=text_type(e),
             )
             return
         raise
