@@ -267,13 +267,13 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
         # this will ammend `status`
         ds.repo.get_content_annexinfo(
-            paths=paths if paths else None,
+            paths=paths.keys() if paths is not None else paths,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
         if fr != to:
             ds.repo.get_content_annexinfo(
-                paths=paths if paths else None,
+                paths=paths.keys() if paths is not None else paths,
                 init=diff_state,
                 eval_availability=annexinfo in ('availability', 'all'),
                 ref=fr,
