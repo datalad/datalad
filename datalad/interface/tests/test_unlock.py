@@ -16,7 +16,7 @@ import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-from datalad.api import create
+from datalad.api import rev_create as create
 from datalad.api import unlock
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import CommandError
@@ -57,6 +57,7 @@ def test_unlock_raises(path, path2, path3):
     ds.unlock()
 
     # make it annex, but call unlock with invalid path:
+    (ds.pathobj / ".noannex").unlink()
     AnnexRepo(path, create=True)
     res = ds.unlock(path="notexistent.txt", result_xfm=None,
                     on_failure='ignore', return_type='item-or-list')
