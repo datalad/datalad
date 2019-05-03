@@ -141,7 +141,7 @@ def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
         sub = ds.create('sub', save=False)
-        # subdataset saw another commit after becoming a submodule
+        # subdataset has staged changes.
         ok_clean_git(ds.path, index_modified=['sub'])
         return ds
     # attempt one
