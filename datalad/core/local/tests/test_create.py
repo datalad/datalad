@@ -62,7 +62,7 @@ raw = dict(return_type='list', result_filter=None, result_xfm=None, on_failure='
 def test_create_raises(path, outside_path):
     ds = Dataset(path)
     # incompatible arguments (annex only):
-    assert_raises(ValueError, ds.create, no_annex=True, description='some')
+    assert_raises(ValueError, ds.rev_create, no_annex=True, description='some')
 
     with open(op.join(path, "somefile.tst"), 'w') as f:
         f.write("some")

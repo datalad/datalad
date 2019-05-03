@@ -1715,7 +1715,7 @@ def get_deeply_nested_structure(path):
     # a subtree of datasets
     subds = ds.rev_create('subds_modified')
     # another dataset, plus an additional dir in it
-    ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
+    ds.rev_create(op.join('subds_modified', 'subds_lvl1_modified'))
     create_tree(
         ds.path,
         {

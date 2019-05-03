@@ -24,7 +24,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
-from datalad.api import create
+from datalad.api import rev_create as create
 from datalad.config import ConfigManager
 from datalad.cmd import CommandError
 

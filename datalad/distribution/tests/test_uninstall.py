@@ -223,7 +223,7 @@ def test_uninstall_subdataset(src, dst):
     'kill': 'kill2'})
 def test_uninstall_multiple_paths(path):
     ds = Dataset(path).rev_create(force=True)
-    subds = ds.create('deep', force=True)
+    subds = ds.rev_create('deep', force=True)
     subds.rev_save(recursive=True)
     ok_clean_git(subds.path)
     # needs to be able to add a combination of staged files, modified submodule,

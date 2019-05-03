@@ -463,7 +463,7 @@ def test_bf2043p2(path):
 })
 def test_save_directory(path):
     # Sequence of save invocations on subdirectories.
-    ds = Dataset(path).create(force=True)
+    ds = Dataset(path).rev_create(force=True)
     ds.save(path='sdir1')
     ok_clean_git(ds.path, untracked=['sdir2/foo', 'sdir3/sdir/subsub/foo'])
 

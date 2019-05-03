@@ -25,7 +25,7 @@ from ..main import (
 from datalad import __version__
 from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
-from datalad.api import create
+from datalad.api import rev_create as create
 from datalad.utils import chpwd
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith

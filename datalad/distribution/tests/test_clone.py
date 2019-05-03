@@ -27,7 +27,7 @@ from os import chmod
 
 from mock import patch
 
-from datalad.api import create
+from datalad.api import rev_create as create
 from datalad.api import clone
 from datalad.utils import chpwd
 from datalad.utils import _path_
