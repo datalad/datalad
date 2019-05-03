@@ -411,18 +411,28 @@ class Status(Interface):
         # fish out sizes of annexed files. those will only be present
         # with --annex ...
         annexed = [
-            (int(r['bytesize']), r.get('has_content', False))
+            (int(r['bytesize']), r.get('has_content', None))
             for r in results
             if r.get('action', None) == 'status' \
             and 'key' in r and 'bytesize' in r]
         if annexed:
+            have_availability = any(a[1] is not None for a in annexed)
+            total_size = bytes2human(sum(a[0] for a in annexed))
+            # we have availability info encoded in the results
             from datalad.ui import ui
-            ui.message(
-                "{} annex'd {} ({}/{} present/total size)".format(
-                    len(annexed),
-                    single_or_plural('file', 'files', len(annexed)),
-                    bytes2human(sum(a[0] for a in annexed if a[1])),
-                    bytes2human(sum(a[0] for a in annexed))))
+            if have_availability:
+                ui.message(
+                    "{} annex'd {} ({}/{} present/total size)".format(
+                        len(annexed),
+                        single_or_plural('file', 'files', len(annexed)),
+                        bytes2human(sum(a[0] for a in annexed if a[1])),
+                        total_size))
+            else:
+                ui.message(
+                    "{} annex'd {} ({} recorded total size)".format(
+                        len(annexed),
+                        single_or_plural('file', 'files', len(annexed)),
+                        total_size))
 
 
 # TODO move to datalad.utils eventually
