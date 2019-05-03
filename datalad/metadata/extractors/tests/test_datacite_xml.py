@@ -13,7 +13,7 @@ from datalad.metadata.extractors.datacite import MetadataExtractor
 from datalad.metadata.metadata import _get_metadatarelevant_paths
 from nose.tools import assert_equal
 from datalad.tests.utils import with_tree
-from datalad.api import rev_create as create
+from datalad.api import create
 
 
 xml_content = """\

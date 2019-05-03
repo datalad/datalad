@@ -39,7 +39,7 @@ target = {
 
 @with_tempfile(mkdir=True)
 def test_image(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'image', where='dataset')
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'exif.jpg'),

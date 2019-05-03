@@ -83,8 +83,8 @@ def test_ls_repos(toppath):
 @with_tempfile
 def test_ls_uninstalled(path):
     ds = Dataset(path)
-    ds.rev_create()
-    ds.rev_create('sub')
+    ds.create()
+    ds.create('sub')
     ds.uninstall('sub', check=False)
     with swallow_outputs() as cmo:
         ls([path], recursive=True)

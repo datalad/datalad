@@ -48,7 +48,7 @@ def test_magic_number():
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_diff(path, norepo):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     ok_clean_git(ds.path)
     # reports stupid revision input
     assert_result_count(
@@ -136,8 +136,8 @@ def test_diff(path, norepo):
 
 @with_tempfile(mkdir=True)
 def test_diff_recursive(path):
-    ds = Dataset(path).rev_create()
-    sub = ds.rev_create('sub')
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
     res = ds._diff(revision='HEAD~1..HEAD')
     assert_result_count(res, 1, action='diff', state='added', path=sub.path, type='dataset')
@@ -193,16 +193,16 @@ def test_diff_recursive(path):
 })
 def test_diff_helper(path):
     # make test dataset components of interesting states
-    ds = Dataset.rev_create(path, force=True)
+    ds = Dataset.create(path, force=True)
     # detached dataset, not a submodule
-    nosub = Dataset.rev_create(opj(path, 'nosub'))
+    nosub = Dataset.create(opj(path, 'nosub'))
     # unmodified, proper submodule
-    sub_clean = ds.rev_create('sub_clean', force=True)
+    sub_clean = ds.create('sub_clean', force=True)
     # proper submodule, but commited modifications not commited in parent
-    sub_modified = ds.rev_create('sub_modified', force=True)
+    sub_modified = ds.create('sub_modified', force=True)
     sub_modified.rev_save('modified')
     # proper submodule with untracked changes
-    sub_dirty = ds.rev_create('sub_dirty', force=True)
+    sub_dirty = ds.create('sub_dirty', force=True)
     ds.rev_save(['clean', 'modified'])
     ds.unlock('modified')
     with open(opj(ds.path, 'modified'), 'w') as f:

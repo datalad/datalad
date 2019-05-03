@@ -27,7 +27,7 @@ from nose.tools import eq_
 
 @with_tempfile(mkdir=True)
 def test_create(outdir):
-    from datalad.api import rev_create as create
+    from datalad.api import create
     assert_raises(ValueError, create, outdir, description='Precious data', no_annex=True)
 
 

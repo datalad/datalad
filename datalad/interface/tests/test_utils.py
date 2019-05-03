@@ -78,7 +78,7 @@ def test_dirty(path):
     handle_dirty_dataset(ds, 'ignore')
     assert_raises(RuntimeError, handle_dirty_dataset, ds, 'save-before')
     # should yield a clean repo
-    ds.rev_create()
+    ds.create()
     orig_state = ds.repo.get_hexsha()
     _check_all_clean(ds, orig_state)
     # tainted: untracked
@@ -91,7 +91,7 @@ def test_dirty(path):
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!
-    subds = ds.rev_create('subds')
+    subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
@@ -125,11 +125,11 @@ demo_hierarchy = {
 
 def make_demo_hierarchy_datasets(path, tree, parent=None):
     if parent is None:
-        parent = Dataset(path).rev_create(force=True)
+        parent = Dataset(path).create(force=True)
     for node, items in tree.items():
         if isinstance(items, dict):
             node_path = opj(path, node)
-            nodeds = parent.rev_create(node_path, force=True)
+            nodeds = parent.create(node_path, force=True)
             make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
     return parent
 

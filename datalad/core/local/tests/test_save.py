@@ -42,7 +42,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.api import (
     rev_save as save,
-    rev_create as create,
+    create as create,
     install,
 )
 
@@ -100,7 +100,7 @@ def test_save(path):
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
-    subds = ds.rev_create('subds')
+    subds = ds.create('subds')
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
     # modify subds
     with open(op.join(subds.path, "some_file.tst"), "w") as f:
@@ -112,7 +112,7 @@ def test_save(path):
     assert_repo_status(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # now introduce a change downstairs
-    subds.rev_create('someotherds')
+    subds.create('someotherds')
     assert_repo_status(subds.path, annex=isinstance(subds.repo, AnnexRepo))
     ok_(ds.repo.dirty)
     # and save via subdataset path
@@ -133,7 +133,7 @@ def test_save(path):
 
 @with_tempfile()
 def test_save_message_file(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     with assert_raises(ValueError):
         ds.rev_save("blah", message="me", message_file="and me")
 
@@ -148,7 +148,7 @@ def test_save_message_file(path):
 def test_renamed_file():
     @with_tempfile()
     def check_renamed_file(recursive, no_annex, path):
-        ds = Dataset(path).rev_create(no_annex=no_annex)
+        ds = Dataset(path).create(no_annex=no_annex)
         create_tree(path, {'old': ''})
         ds.repo.add('old')
         ds.repo._git_custom_command(['old', 'new'], ['git', 'mv'])
@@ -162,8 +162,8 @@ def test_renamed_file():
 
 @with_tempfile(mkdir=True)
 def test_subdataset_save(path):
-    parent = Dataset(path).rev_create()
-    sub = parent.rev_create('sub')
+    parent = Dataset(path).create()
+    sub = parent.create('sub')
     assert_repo_status(parent.path)
     create_tree(parent.path, {
         "untracked": 'ignore',
@@ -200,7 +200,7 @@ def test_symlinked_relpath(path):
     os.makedirs(op.join(path, "origin"))
     dspath = op.join(path, "linked")
     os.symlink('origin', dspath)
-    ds = Dataset(dspath).rev_create()
+    ds = Dataset(dspath).create()
     create_tree(dspath, {
         "mike1": 'mike1',  # will be added from topdir
         "later": "later",  # later from within subdir
@@ -229,8 +229,8 @@ def test_symlinked_relpath(path):
 @skip_wo_symlink_capability
 @with_tempfile(mkdir=True)
 def test_bf1886(path):
-    parent = Dataset(path).rev_create()
-    parent.rev_create('sub')
+    parent = Dataset(path).create()
+    parent.create('sub')
     assert_repo_status(parent.path)
     # create a symlink pointing down to the subdataset, and add it
     os.symlink('sub', op.join(parent.path, 'down'))
@@ -276,7 +276,7 @@ def test_bf1886(path):
 def test_gh2043p1(path):
     # this tests documents the interim agreement on what should happen
     # in the case documented in gh-2043
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.rev_save('1')
     assert_repo_status(ds.path, untracked=['2', '3'])
     ds.unlock('1')
@@ -307,7 +307,7 @@ def test_gh2043p1(path):
     'staged': 'staged',
     'untracked': 'untracked'})
 def test_bf2043p2(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.repo.add('staged')
     assert_repo_status(ds.path, added=['staged'], untracked=['untracked'])
     # save -u does not commit untracked content
@@ -323,7 +323,7 @@ def test_bf2043p2(path):
 def test_encoding(path):
     staged = OBSCURE_FILENAME + u'_staged'
     untracked = OBSCURE_FILENAME + u'_untracked'
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.repo.add(staged)
     assert_repo_status(ds.path, added=[staged], untracked=[untracked])
     ds.rev_save(updated=True)
@@ -332,7 +332,7 @@ def test_encoding(path):
 
 @with_tree(**tree_arg)
 def test_add_files(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
 
     test_list_1 = ['test_annex.txt']
     test_list_2 = ['test.txt']
@@ -404,7 +404,7 @@ def test_add_subdataset(path, other):
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
 def test_add_mimetypes(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.repo.add('.gitattributes')
     ds.repo.commit('added attributes to git explicitly')
     # now test that those files will go into git/annex correspondingly
@@ -437,8 +437,8 @@ def test_gh1597(path):
         # cannot be reproduced on a real windows box
         raise SkipTest(
             'this test causes appveyor to crash, reason unknown')
-    ds = Dataset(path).rev_create()
-    sub = ds.rev_create('sub')
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # now modify .gitmodules with another command
@@ -456,7 +456,7 @@ def test_gh1597(path):
 
 @with_tempfile(mkdir=True)
 def test_gh1597_simpler(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     # same goes for .gitattributes
     with open(op.join(ds.path, '.gitignore'), 'a') as f:
         f.write('*.swp\n')
@@ -479,7 +479,7 @@ def test_gh1597_simpler(path):
 @with_tempfile(mkdir=True)
 def test_update_known_submodule(path):
     def get_baseline(p):
-        ds = Dataset(p).rev_create()
+        ds = Dataset(p).create()
         sub = create(text_type(ds.pathobj / 'sub'))
         assert_repo_status(ds.path, untracked=['sub'])
         return ds
@@ -498,13 +498,13 @@ def test_update_known_submodule(path):
 @with_tempfile(mkdir=True)
 def test_add_recursive(path):
     # make simple hierarchy
-    parent = Dataset(path).rev_create()
+    parent = Dataset(path).create()
     assert_repo_status(parent.path)
-    sub1 = parent.rev_create(op.join('down', 'sub1'))
+    sub1 = parent.create(op.join('down', 'sub1'))
     assert_repo_status(parent.path)
-    sub2 = parent.rev_create('sub2')
+    sub2 = parent.create('sub2')
     # next one make the parent dirty
-    subsub = sub2.rev_create('subsub')
+    subsub = sub2.create('subsub')
     assert_repo_status(parent.path, modified=['sub2'])
     res = parent.rev_save()
     assert_repo_status(parent.path)
@@ -526,7 +526,7 @@ def test_add_recursive(path):
 
 @with_tree(**tree_arg)
 def test_relpath_add(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     with chpwd(op.join(path, 'dir')):
         eq_(save('testindir')[0]['path'],
             op.join(ds.path, 'dir', 'testindir'))
@@ -540,7 +540,7 @@ def test_relpath_add(path):
 @with_tempfile()
 def test_bf2541(path):
     ds = create(path)
-    subds = ds.rev_create('sub')
+    subds = ds.create('sub')
     assert_repo_status(ds.path)
     os.symlink('sub', op.join(ds.path, 'symlink'))
     with chpwd(ds.path):
@@ -551,8 +551,8 @@ def test_bf2541(path):
 @with_tempfile()
 def test_remove_subds(path):
     ds = create(path)
-    ds.rev_create('sub')
-    ds.rev_create(op.join('sub', 'subsub'))
+    ds.create('sub')
+    ds.create(op.join('sub', 'subsub'))
     assert_repo_status(ds.path)
     assert_result_count(
         ds.subdatasets(), 1,
@@ -646,7 +646,7 @@ def test_surprise_subds(path):
 
 @with_tree({"foo": ""})
 def test_bf3285(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     # Note: Using repo.pathobj matters in the "TMPDIR=/var/tmp/sym\ link" case
     # because assert_repo_status is based off of {Annex,Git}Repo.path, which is
     # the realpath'd path (from the processing in _flyweight_id_from_args).

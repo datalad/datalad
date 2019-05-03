@@ -16,7 +16,7 @@ import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
-from datalad.api import rev_create as create
+from datalad.api import create
 from datalad.api import unlock
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import CommandError

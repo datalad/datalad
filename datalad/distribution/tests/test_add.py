@@ -16,7 +16,7 @@ import os
 import os.path as op
 from os.path import join as opj
 
-from datalad.api import rev_create as create
+from datalad.api import create
 from datalad.api import add
 from datalad.api import install
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -54,7 +54,7 @@ def test_add_insufficient_args(path):
         res = add(path="some", on_failure='ignore')
         assert_status('impossible', res)
     ds = Dataset(opj(path, 'ds'))
-    ds.rev_create()
+    ds.create()
     # non-existing path outside
     assert_status('impossible', ds.add(opj(path, 'outside'), on_failure='ignore'))
     # existing path outside
@@ -65,7 +65,7 @@ def test_add_insufficient_args(path):
 
 @with_tempfile
 def test_add_message_file(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     with assert_raises(ValueError):
         ds.add("blah", message="me", message_file="and me")
 
@@ -89,7 +89,7 @@ tree_arg = dict(tree={'test.txt': 'some',
 @with_tree(**tree_arg)
 def test_add_files(path):
     ds = Dataset(path)
-    ds.rev_create(force=True)
+    ds.create(force=True)
     ok_(ds.repo.dirty)
 
     test_list_1 = ['test_annex.txt']
@@ -140,7 +140,7 @@ def test_add_files(path):
 @with_tempfile(mkdir=True)
 def test_update_known_submodule(path):
     def get_baseline(p):
-        ds = Dataset(p).rev_create()
+        ds = Dataset(p).create()
         with chpwd(ds.path):
             subds = create('sub')
         ds.add('sub', save=False)
@@ -164,13 +164,13 @@ def test_update_known_submodule(path):
 @with_tempfile(mkdir=True)
 def test_add_recursive(path):
     # make simple hierarchy
-    parent = Dataset(path).rev_create()
+    parent = Dataset(path).create()
     ok_clean_git(parent.path)
-    sub1 = parent.rev_create(opj('down', 'sub1'))
+    sub1 = parent.create(opj('down', 'sub1'))
     ok_clean_git(parent.path)
-    sub2 = parent.rev_create('sub2')
+    sub2 = parent.create('sub2')
     # next one make the parent dirty
-    subsub = sub2.rev_create('subsub')
+    subsub = sub2.create('subsub')
     ok_clean_git(parent.path, index_modified=['sub2'])
     res = parent.rev_save()
     ok_clean_git(parent.path)
@@ -195,8 +195,8 @@ def test_add_recursive(path):
 @with_tree(**tree_arg)
 def test_add_dirty_tree(path):
     ds = Dataset(path)
-    ds.rev_create(force=True)
-    subds = ds.rev_create('dir', force=True)
+    ds.create(force=True)
+    subds = ds.create('dir', force=True)
     ok_(subds.repo.dirty)
 
     # no subds without recursive:
@@ -232,7 +232,7 @@ def test_add_dirty_tree(path):
 
     # We used to fail to add to pure git repository, but now it should all be
     # just fine
-    subds = ds.rev_create('git-sub', no_annex=True)
+    subds = ds.create('git-sub', no_annex=True)
     with open(opj(subds.path, 'somefile.txt'), "w") as f:
         f.write("bla bla")
     result = ds.add(opj('git-sub', 'somefile.txt'), to_git=False)
@@ -248,7 +248,7 @@ def test_add_dirty_tree(path):
 
 @with_tree(**tree_arg)
 def test_relpath_add(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     with chpwd(opj(path, 'dir')):
         eq_(add('testindir')[0]['path'],
             opj(ds.path, 'dir', 'testindir'))
@@ -273,7 +273,7 @@ def test_add_source(path, url, ds_dir):
     from datalad.support.network import RI
 
     urls = [RI(url + f) for f in listdir(path)]
-    ds = Dataset(ds_dir).rev_create()
+    ds = Dataset(ds_dir).create()
     eq_(len(ds.repo.get_annexed_files()), 0)
 
     # add a remote source to git => fail:
@@ -390,7 +390,7 @@ def test_add_mimetypes(path):
     #    type there!!!! so can't use following invocation  -- TODO separately
     import os
     path = os.path.realpath(path)  # yoh gives up for now
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.repo.add('.gitattributes')
     ds.repo.commit('added attributes to git explicitly')
     # now test that those files will go into git/annex correspondingly
@@ -407,7 +407,7 @@ def test_add_mimetypes(path):
 
 @with_tempfile(mkdir=True)
 def test_gh1597_simpler(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     # same goes for .gitattributes
     with open(opj(ds.path, '.gitignore'), 'a') as f:
         f.write('*.swp\n')
@@ -427,7 +427,7 @@ def test_gh1597_simpler(path):
 # Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     with chpwd(ds.path):
         sub = create('sub')
     ds.add('sub', save=False)
@@ -453,7 +453,7 @@ def test_gh1597(path):
 @with_tempfile()
 def test_bf2541(path):
     ds = create(path)
-    subds = ds.rev_create('sub')
+    subds = ds.create('sub')
     ok_clean_git(ds.path)
     os.symlink('sub', op.join(ds.path, 'symlink'))
     with chpwd(ds.path):

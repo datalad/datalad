@@ -28,7 +28,7 @@ from datalad.tests.utils import (
 
 @with_tempfile
 def test_save_basics(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     # nothing happens
     eq_(list(ds.repo.save(paths=[], _status={})),
         [])
@@ -76,7 +76,7 @@ def test_annexrepo_save_all(path):
 
 @with_tempfile
 def test_save_to_git(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     create_tree(
         ds.path,
         {
