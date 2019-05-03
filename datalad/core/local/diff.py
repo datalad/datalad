@@ -255,14 +255,12 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             eval_file_type=eval_file_type,
             _cache=cache)
     except InvalidGitReferenceError as e:
-        if e.ref in (fr, to):
-            yield dict(
-                path=ds.path,
-                status='impossible',
-                message=text_type(e),
-            )
-            return
-        raise
+        yield dict(
+            path=ds.path,
+            status='impossible',
+            message=text_type(e),
+        )
+        return
 
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
         # this will ammend `status`
