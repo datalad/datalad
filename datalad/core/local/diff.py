@@ -20,6 +20,7 @@ from six import (
 from collections import OrderedDict
 from datalad.utils import (
     assure_list,
+    assure_unicode,
 )
 from datalad.interface.base import (
     Interface,
@@ -118,8 +119,8 @@ class Diff(Interface):
         for r in _diff_cmd(
                 ds=ds,
                 dataset=dataset,
-                fr=fr,
-                to=to,
+                fr=assure_unicode(fr),
+                to=assure_unicode(to),
                 constant_refs=False,
                 path=path,
                 annex=annex,
