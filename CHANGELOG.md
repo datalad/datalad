@@ -59,6 +59,43 @@ bet we will fix some bugs and make a world even a better place.
 - Imported various additional methods for the Repo classes to query
   information and save changes.
 
+## 0.11.5 (??? ??, 2019) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- [create-sibling][]  ([#3318][])
+  - Siblings are no longer configured with a post-update hook unless a
+    web interface requested with `--ui`.
+  - `git submodule update --init` is no longer called from the
+    post-update hook.
+  - If `--inherit` is given for a dataset without a superdataset, a
+    warning is now given instead of raising an error.
+- The internal command runner failed on Python 2 when its `env`
+  argument had unicode values.  ([#3332][])
+- The safeguard that prevents creating a dataset in a subdirectory
+  that already contains tracked files for another repository failed on
+  Git versions before 2.14.  For older Git versions, we now warn the
+  caller that the safeguard is not active.  ([#3347][])
+- A regression introduced in 0.11.1 prevented [save][] from committing
+  changes under a subdirectory when the subdirectory was specified as
+  a path argument.  ([#3106][])
+
+### Enhancements and new features
+
+- The internal command runner was too aggressive in its decision to
+  sleep.  ([#3322][])
+- The "INFO" label in log messages now retains the default text color
+  for the terminal rather than using white, which only worked well for
+  terminals with dark backgrounds.  ([#3334][])
+- A short flag `-R` is now available for the `--recursion-limit` flag,
+  a flag shared by several subcommands.  ([#3340][])
+
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
 Largely a bug fix release with a few enhancements
