@@ -19,12 +19,32 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- [create-sibling][]  ([#3318][])
+  - Siblings are no longer configured with a post-update hook unless a
+    web interface requested with `--ui`.
+  - `git submodule update --init` is no longer called from the
+    post-update hook.
+  - If `--inherit` is given for a dataset without a superdataset, a
+    warning is now given instead of raising an error.
+- The internal command runner failed on Python 2 when its `env`
+  argument had unicode values.  ([#3332][])
+- The safeguard that prevents creating a dataset in a subdirectory
+  that already contains tracked files for another repository failed on
+  Git versions before 2.14.  For older Git versions, we now warn the
+  caller that the safeguard is not active.  ([#3347][])
+- A regression introduced in 0.11.1 prevented [save][] from committing
+  changes under a subdirectory when the subdirectory was specified as
+  a path argument.  ([#3106][])
 
 ### Enhancements and new features
 
-?
-
+- The internal command runner was too aggressive in its decision to
+  sleep.  ([#3322][])
+- The "INFO" label in log messages now retains the default text color
+  for the terminal rather than using white, which only worked well for
+  terminals with dark backgrounds.  ([#3334][])
+- A short flag `-R` is now available for the `--recursion-limit` flag,
+  a flag shared by several subcommands.  ([#3340][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1238,6 +1258,7 @@ publishing
 [#3098]: https://github.com/datalad/datalad/issues/3098
 [#3099]: https://github.com/datalad/datalad/issues/3099
 [#3104]: https://github.com/datalad/datalad/issues/3104
+[#3106]: https://github.com/datalad/datalad/issues/3106
 [#3109]: https://github.com/datalad/datalad/issues/3109
 [#3115]: https://github.com/datalad/datalad/issues/3115
 [#3119]: https://github.com/datalad/datalad/issues/3119
@@ -1268,3 +1289,9 @@ publishing
 [#3250]: https://github.com/datalad/datalad/issues/3250
 [#3268]: https://github.com/datalad/datalad/issues/3268
 [#3281]: https://github.com/datalad/datalad/issues/3281
+[#3318]: https://github.com/datalad/datalad/issues/3318
+[#3322]: https://github.com/datalad/datalad/issues/3322
+[#3332]: https://github.com/datalad/datalad/issues/3332
+[#3334]: https://github.com/datalad/datalad/issues/3334
+[#3340]: https://github.com/datalad/datalad/issues/3340
+[#3347]: https://github.com/datalad/datalad/issues/3347
