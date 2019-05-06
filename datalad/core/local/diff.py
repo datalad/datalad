@@ -20,6 +20,7 @@ from six import (
 from collections import OrderedDict
 from datalad.utils import (
     assure_list,
+    assure_unicode,
 )
 from datalad.interface.base import (
     Interface,
@@ -46,6 +47,9 @@ from datalad.consts import PRE_INIT_COMMIT_SHA
 from datalad.core.local.status import (
     Status,
     _common_diffstatus_params,
+)
+from datalad.support.exceptions import (
+    InvalidGitReferenceError,
 )
 
 lgr = logging.getLogger('datalad.core.local.diff')
@@ -115,8 +119,8 @@ class Diff(Interface):
         for r in _diff_cmd(
                 ds=ds,
                 dataset=dataset,
-                fr=fr,
-                to=to,
+                fr=assure_unicode(fr),
+                to=assure_unicode(to),
                 constant_refs=False,
                 path=path,
                 annex=annex,
@@ -251,18 +255,13 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
             untracked=untracked,
             eval_file_type=eval_file_type,
             _cache=cache)
-    except ValueError as e:
-        msg_tmpl = "reference '{}' invalid"
-        # not looking for a debug repr of the exception, just the message
-        estr = text_type(e)
-        if msg_tmpl.format(fr) in estr or msg_tmpl.format(to) in estr:
-            yield dict(
-                path=ds.path,
-                status='impossible',
-                message=estr,
-            )
-            return
-        raise
+    except InvalidGitReferenceError as e:
+        yield dict(
+            path=ds.path,
+            status='impossible',
+            message=text_type(e),
+        )
+        return
 
     if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
         # this will ammend `status`

@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -439,3 +439,13 @@ def test_diff_rsync_syntax(path):
     # just for completeness, we get more when going full recursive
     rec = ds.diff(fr=PRE_INIT_COMMIT_SHA, recursive=True, path='sub' + os.sep)
     assert(len(inside) < len(rec))
+
+
+@with_tempfile(mkdir=True)
+def test_diff_nonexistent_ref_unicode(path):
+    ds = Dataset(path).create()
+    assert_result_count(
+        ds.diff(fr="HEAD", to=u"β", on_failure="ignore"),
+        1,
+        path=ds.path,
+        status="impossible")
