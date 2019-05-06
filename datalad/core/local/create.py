@@ -333,7 +333,7 @@ class Create(Interface):
             )
             # set the annex backend in .gitattributes as a staged change
             tbrepo.set_default_backend(
-                cfg.obtain('datalad.repo.backend', default='MD5E'),
+                cfg.obtain('datalad.repo.backend'),
                 persistent=True, commit=False)
             add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
                 'type': 'file',

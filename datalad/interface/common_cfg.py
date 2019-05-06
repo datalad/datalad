@@ -226,6 +226,12 @@ definitions = {
         'destination': 'global',
         'default': None,
     },
+    'datalad.repo.backend': {
+        'ui': ('question', {
+               'title': 'git-annex backend',
+               'text': 'Backend to use when creating git-annex repositories'}),
+        'default': 'MD5E',
+    },
     'datalad.repo.direct': {
         'ui': ('yesno', {
                'title': 'Direct Mode for git-annex repositories',
