@@ -117,7 +117,16 @@ class SilentConsoleLog(ConsoleLog):
 
     def get_progressbar(self, *args, **kwargs):
         from .progressbars import SilentProgressBar
-        return SilentProgressBar(*args, out=self.out, **kwargs)
+        return SilentProgressBar(*args, **kwargs)
+
+
+@auto_repr
+class QuietConsoleLog(ConsoleLog):
+    """A ConsoleLog with a LogProgressbar"""
+
+    def get_progressbar(self, *args, **kwargs):
+        from .progressbars import LogProgressBar
+        return LogProgressBar(*args, **kwargs)
 
 
 def getpass_echo(prompt='Password', stream=None):
