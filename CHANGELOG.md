@@ -21,7 +21,7 @@ bet we will fix some bugs and make a world even a better place.
 
 - [create-sibling][]  ([#3318][])
   - Siblings are no longer configured with a post-update hook unless a
-    web interface requested with `--ui`.
+    web interface is requested with `--ui`.
   - `git submodule update --init` is no longer called from the
     post-update hook.
   - If `--inherit` is given for a dataset without a superdataset, a
@@ -32,11 +32,11 @@ bet we will fix some bugs and make a world even a better place.
   that already contains tracked files for another repository failed on
   Git versions before 2.14.  For older Git versions, we now warn the
   caller that the safeguard is not active.  ([#3347][])
-- A regression introduced in 0.11.1 prevented [save][] from committing
+- A regression introduced in v0.11.1 prevented [save][] from committing
   changes under a subdirectory when the subdirectory was specified as
   a path argument.  ([#3106][])
-- A workaround introduced in 0.11.1 made it possible for [save][] do a
-  partial commit with an annex file that has gone below the
+- A workaround introduced in v0.11.1 made it possible for [save][] to
+  do a partial commit with an annex file that has gone below the
   `annex.largefiles` threshold.  The logic of this workaround was
   faulty, leading to files being displayed as typechanged in the index
   following the commit.  ([#3365][])
@@ -51,7 +51,7 @@ bet we will fix some bugs and make a world even a better place.
 - A short flag `-R` is now available for the `--recursion-limit` flag,
   a flag shared by several subcommands.  ([#3340][])
 - The authentication logic for [create-sibling-github][] has been
-  revamped and now support 2FA.  ([#3180][])
+  revamped and now supports 2FA.  ([#3180][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
