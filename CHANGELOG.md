@@ -9,9 +9,10 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.12.0rc3 (??? ??, 2019) -- will be better than ever
+## 0.12.0rc3 (May 07, 2019) -- the revolution continues
 ￼
-bet we will fix some bugs and make a world even a better place.
+Continues API consolidation and replaces the `create` and `diff` command
+with more performant implementations.
 
 ### Major refactoring and deprecations
 
