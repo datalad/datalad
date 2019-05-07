@@ -22,7 +22,7 @@ _group_dataset = (
     [
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
-        ('datalad.distribution.create', 'Create'),
+        ('datalad.core.local.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.get', 'Get'),
         ('datalad.distribution.add', 'Add'),
@@ -88,7 +88,6 @@ _group_plumbing = (
 _group_future = (
     'Commands of the future',
     [
-        ('datalad.core.local.create', 'Create', 'rev-create', 'rev_create'),
         ('datalad.core.local.run', 'Run', 'rev-run', 'rev_run'),
         ('datalad.core.local.save', 'Save', 'rev-save', 'rev_save'),
         ('datalad.core.local.status', 'Status', 'status'),

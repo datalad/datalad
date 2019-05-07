@@ -19,7 +19,7 @@ from six import text_type
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from ..dataset import rev_resolve_path
 from datalad import cfg
-from datalad.api import rev_create
+from datalad.api import create
 from datalad.api import get
 import datalad.utils as ut
 from datalad.utils import chpwd, getpwd, rmtree
@@ -109,12 +109,11 @@ def test_is_installed(src, path):
     # subdataset path.
     # Note: Unfortunately we would still be able to generate it under
     # subdirectory within submodule, e.g. `subm 1/subdir` but that is
-    # not checked here. `rev-create` will provide that protection
-    # when create/rev-create merge.
-    res = subds.rev_create(on_failure='ignore',
-                           return_type='list',
-                           result_filter=None,
-                           result_xfm=None)
+    # not checked here. `create` provides that protection though.
+    res = subds.create(on_failure='ignore',
+                       return_type='list',
+                       result_filter=None,
+                       result_xfm=None)
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, status='error', path=subds.path,
@@ -180,7 +179,7 @@ def test_subdatasets(path):
     ds = Dataset(path)
     assert_false(ds.is_installed())
     eq_(ds.subdatasets(), [])
-    ds = ds.rev_create()
+    ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.subdatasets(), [])
     # create some file and commit it
@@ -243,7 +242,7 @@ def test_require_dataset(path):
             InsufficientArgumentsError,
             require_dataset,
             None)
-        rev_create('.')
+        create('.')
         # in this folder by default
         assert_equal(
             require_dataset(None).path,
@@ -263,7 +262,7 @@ def test_require_dataset(path):
 def test_dataset_id(path):
     ds = Dataset(path)
     assert_equal(ds.id, None)
-    ds.rev_create()
+    ds.create()
     dsorigid = ds.id
     # ID is always a UUID
     assert_equal(ds.id.count('-'), 4)
@@ -286,7 +285,7 @@ def test_dataset_id(path):
     # TODO: Reconsider the actual intent of this assertion. Clearing the flyweight
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
-    ds.rev_create(no_annex=True, force=True)
+    ds.create(no_annex=True, force=True)
     assert_equal(ds.id, dsorigid)
     # even adding an annex doesn't
     #
@@ -296,7 +295,7 @@ def test_dataset_id(path):
     # dict isn't a nice approach. May be create needs a fix/RF?
     Dataset._unique_instances.clear()
     AnnexRepo._unique_instances.clear()
-    ds.rev_create(force=True)
+    ds.create(force=True)
     assert_equal(ds.id, dsorigid)
     # dataset ID and annex UUID have nothing to do with each other
     # if an ID was already generated
@@ -314,7 +313,7 @@ def test_dataset_id(path):
     assert_equal(ds.id, newds.id)
     # even if we generate a dataset from scratch with an annex UUID right away,
     # this is also not the ID
-    annexds = Dataset(opj(path, 'scratch')).rev_create()
+    annexds = Dataset(opj(path, 'scratch')).create()
     assert_true(annexds.id != annexds.repo.uuid)
 
 
@@ -359,7 +358,7 @@ def test_property_reevaluation(repo1):
     assert_false(ds._cfg_bound)
     assert_is_none(ds.id)
 
-    ds.rev_create()
+    ds.create()
     ok_clean_git(repo1)
     # after creation, we have `repo`, and `config` was reevaluated to point
     # to the repo's config:
@@ -383,7 +382,7 @@ def test_property_reevaluation(repo1):
     assert_is_not(second_config, third_config)
     assert_is_none(ds.id)
 
-    ds.rev_create()
+    ds.create()
     ok_clean_git(repo1)
     # after recreation everything is sane again:
     assert_is_not_none(ds.repo)
@@ -408,7 +407,7 @@ def test_property_reevaluation(repo1):
 @with_tempfile
 def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
-    ds = Dataset(repo1).rev_create()
+    ds = Dataset(repo1).create()
 
     # now, let ds be a symlink and change that symlink to point to different
     # things:
@@ -538,7 +537,7 @@ def test_hashable(path):
     eq_(len(tryme), 2)
     # test whether two different types of repo instances pointing
     # to the same repo on disk are considered different
-    Dataset(path).rev_create()
+    Dataset(path).create()
     tryme.add(GitRepo(path))
     eq_(len(tryme), 3)
     tryme.add(AnnexRepo(path))

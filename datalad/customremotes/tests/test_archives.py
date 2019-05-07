@@ -267,7 +267,8 @@ def test_interactions(tdir):
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import create, add_archive_content
+    from datalad.api import add_archive_content
+    from datalad.api import create
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):

@@ -94,7 +94,7 @@ def test_download_url_dataset(toppath, topurl, path):
     files_tosave = ['file1.txt', 'file2.txt']
     urls_tosave = [opj(topurl, f) for f in files_tosave]
 
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
 
     # By default, files are saved when called in a dataset.
     ds.download_url(urls_tosave)
@@ -126,7 +126,7 @@ def test_download_url_dataset(toppath, topurl, path):
 @serve_path_via_http
 @with_tempfile(mkdir=True)
 def test_download_url_archive(toppath, topurl, path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     ds.download_url([urljoin(topurl, "archive.tar.gz")], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),

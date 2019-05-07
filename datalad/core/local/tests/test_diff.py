@@ -41,7 +41,7 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
     rev_save as save,
-    rev_create as create,
+    create as create,
     diff,
 )
 from datalad.tests.utils import (
@@ -64,7 +64,7 @@ def test_magic_number():
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_repo_diff(path, norepo):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_repo_status(ds.path)
     assert_raises(ValueError, ds.repo.diff, fr='WTF', to='MIKE')
     # no diff
@@ -145,7 +145,7 @@ def _dirty_results(res):
 def test_diff(path, norepo):
     with chpwd(norepo):
         assert_raises(NoDatasetArgumentFound, diff)
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_repo_status(ds.path)
     # reports stupid revision input
     assert_result_count(
@@ -226,8 +226,8 @@ def test_diff(path, norepo):
 
 @with_tempfile(mkdir=True)
 def test_diff_recursive(path):
-    ds = Dataset(path).rev_create()
-    sub = ds.rev_create('sub')
+    ds = Dataset(path).create()
+    sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
     res = ds.diff(fr='HEAD~1', to='HEAD')
     assert_result_count(
@@ -401,13 +401,13 @@ def test_path_diff(_path, linkpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_diff_nods(path, otherpath):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_result_count(
         ds.diff(path=otherpath, on_failure='ignore'),
         1,
         status='error',
         message='path not underneath this dataset')
-    otherds = Dataset(otherpath).rev_create()
+    otherds = Dataset(otherpath).create()
     assert_result_count(
         ds.diff(path=otherpath, on_failure='ignore'),
         1,
@@ -422,9 +422,9 @@ def test_diff_nods(path, otherpath):
 @with_tempfile(mkdir=True)
 def test_diff_rsync_syntax(path):
     # three nested datasets
-    ds = Dataset(path).rev_create()
-    subds = ds.rev_create('sub')
-    subsubds = subds.rev_create('deep')
+    ds = Dataset(path).create()
+    subds = ds.create('sub')
+    subsubds = subds.create('deep')
     justtop = ds.diff(fr=PRE_INIT_COMMIT_SHA, path='sub')
     # we only get a single result, the subdataset in question
     assert_result_count(justtop, 1)

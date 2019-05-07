@@ -33,6 +33,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if_on_windows
@@ -140,8 +141,12 @@ def test_add_files(path):
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
-        sub = ds.create('sub', save=False)
-        # subdataset saw another commit after becoming a submodule
+        with chpwd(ds.path):
+            subds = create('sub')
+        ds.add('sub', save=False)
+        create_tree(subds.path, {"staged": ""})
+        subds.add("staged", save=False)
+        # subdataset has staged changes.
         ok_clean_git(ds.path, index_modified=['sub'])
         return ds
     # attempt one
@@ -190,7 +195,7 @@ def test_add_recursive(path):
 @with_tree(**tree_arg)
 def test_add_dirty_tree(path):
     ds = Dataset(path)
-    ds.create(force=True, save=False)
+    ds.create(force=True)
     subds = ds.create('dir', force=True)
     ok_(subds.repo.dirty)
 
@@ -423,18 +428,22 @@ def test_gh1597_simpler(path):
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
     ds = Dataset(path).create()
-    sub = ds.create('sub', save=False)
+    with chpwd(ds.path):
+        sub = create('sub')
+    ds.add('sub', save=False)
     # only staged at this point, but known, and not annexed
     ok_file_under_git(ds.path, '.gitmodules', annexed=False)
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # now modify .gitmodules with another command
     ds.subdatasets(contains=sub.path, set_property=[('this', 'that')])
-    ok_clean_git(ds.path, index_modified=['sub'])
+    assert_repo_status(ds.path, added=[sub.path])
     # now modify low-level
     with open(opj(ds.path, '.gitmodules'), 'a') as f:
         f.write('\n')
-    ok_clean_git(ds.path, index_modified=['.gitmodules', 'sub'])
+    assert_repo_status(ds.path,
+                       modified=[ds.pathobj / ".gitmodules"],
+                       added=[sub.path])
     ds.add('.gitmodules')
     # must not come under annex mangement
     ok_file_under_git(ds.path, '.gitmodules', annexed=False)

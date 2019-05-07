@@ -133,7 +133,7 @@ def test_update_simple(origin, src_path, dst_path):
 @with_tempfile
 def test_update_git_smoke(src_path, dst_path):
     # Apparently was just failing on git repos for basic lack of coverage, hence this quick test
-    ds = Dataset(src_path).rev_create(no_annex=True)
+    ds = Dataset(src_path).create(no_annex=True)
     target = install(
         dst_path, source=src_path,
         result_xfm='datasets', return_type='item-or-list')
@@ -269,13 +269,13 @@ def test_newthings_coming_down(originpath, destpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_update_volatile_subds(originpath, otherpath, destpath):
-    origin = Dataset(originpath).rev_create()
+    origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
     # as a submodule
     sname = 'subm 1'
-    osm1 = origin.rev_create(sname)
+    osm1 = origin.create(sname)
     assert_result_count(ds.update(), 1, status='ok', type='dataset')
     # nothing without a merge, no inappropriate magic
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
@@ -294,7 +294,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     assert_false(exists(opj(ds.path, sname)))
 
     # re-introduce at origin
-    osm1 = origin.rev_create(sname)
+    osm1 = origin.create(sname)
     create_tree(osm1.path, {'load.dat': 'heavy'})
     origin.rev_save(opj(osm1.path, 'load.dat'))
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
@@ -331,7 +331,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_clean_git(ds.path)
 
     # new separate subdataset, not within the origin dataset
-    otherds = Dataset(otherpath).rev_create()
+    otherds = Dataset(otherpath).create()
     # install separate dataset as a submodule
     ds.install(source=otherds.path, path='other')
     create_tree(otherds.path, {'brand': 'new'})
@@ -349,7 +349,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_reobtain_data(originpath, destpath):
-    origin = Dataset(originpath).rev_create()
+    origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -391,7 +391,7 @@ def test_reobtain_data(originpath, destpath):
 @with_tempfile(mkdir=True)
 def test_multiway_merge(path):
     # prepare ds with two siblings, but no tracking branch
-    ds = Dataset(op.join(path, 'ds_orig')).rev_create()
+    ds = Dataset(op.join(path, 'ds_orig')).create()
     r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
     r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
     ds.siblings(action='add', name='r1', url=r1.path)

@@ -164,7 +164,7 @@ class Create(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_create')
+    @datasetmethod(name='create')
     @eval_results
     def __call__(
             path=None,

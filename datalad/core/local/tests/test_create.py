@@ -21,7 +21,7 @@ from six import text_type
 from datalad.distribution.dataset import (
     Dataset
 )
-from datalad.api import rev_create as create
+from datalad.api import create
 from datalad.utils import (
     chpwd,
     _path_,
@@ -68,24 +68,24 @@ def test_create_raises(path, outside_path):
         f.write("some")
     # non-empty without `force`:
     assert_in_results(
-        ds.rev_create(force=False, **raw),
+        ds.create(force=False, **raw),
         status='error',
         message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # non-empty with `force`:
-    ds.rev_create(force=True)
+    ds.create(force=True)
     # create sub outside of super:
     assert_in_results(
-        ds.rev_create(outside_path, **raw),
+        ds.create(outside_path, **raw),
         status='error',
         message=(
             'dataset containing given paths is not underneath the reference '
             'dataset %s: %s', ds, outside_path))
     obscure_ds = u"ds-" + OBSCURE_FILENAME
     # create a sub:
-    ds.rev_create(obscure_ds)
+    ds.create(obscure_ds)
     # fail when doing it again
     assert_in_results(
-        ds.rev_create(obscure_ds, **raw),
+        ds.create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
@@ -98,14 +98,14 @@ def test_create_raises(path, outside_path):
     assert_in(obscure_ds, ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     # and now should fail to also create inplace or under
     assert_in_results(
-        ds.rev_create(obscure_ds, **raw),
+        ds.create(obscure_ds, **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
                  [text_type(ds.pathobj / obscure_ds)]),
     )
     assert_in_results(
-        ds.rev_create(op.join(obscure_ds, 'subsub'), **raw),
+        ds.create(op.join(obscure_ds, 'subsub'), **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
                  text_type(ds.pathobj / obscure_ds),
@@ -116,7 +116,7 @@ def test_create_raises(path, outside_path):
         f.write("someother")
     ds.rev_save()
     assert_in_results(
-        ds.rev_create('down', **raw),
+        ds.create('down', **raw),
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
@@ -144,7 +144,7 @@ def test_create_curdir(path, path2):
 @with_tempfile
 def test_create(path):
     ds = Dataset(path)
-    ds.rev_create(
+    ds.create(
         description="funny",
         # custom git init option
         initopts=dict(shared='world'))
@@ -168,10 +168,10 @@ def test_create(path):
 def test_create_sub(path):
 
     ds = Dataset(path)
-    ds.rev_create()
+    ds.create()
 
     # 1. create sub and add to super:
-    subds = ds.rev_create(op.join("some", "what", "deeper"))
+    subds = ds.create(op.join("some", "what", "deeper"))
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
     assert_repo_status(subds.path, annex=True)
@@ -193,7 +193,7 @@ def test_create_sub(path):
     ok_(subds.get_superdataset() == ds)
 
     # 2. create sub without adding to super:
-    subds2 = Dataset(op.join(path, "someother")).rev_create()
+    subds2 = Dataset(op.join(path, "someother")).create()
     ok_(isinstance(subds2, Dataset))
     ok_(subds2.is_installed())
     assert_repo_status(subds2.path, annex=True)
@@ -202,7 +202,7 @@ def test_create_sub(path):
     assert_not_in("someother", ds.subdatasets(result_xfm='relpaths'))
 
     # 3. create sub via super:
-    subds3 = ds.rev_create("third", no_annex=True)
+    subds3 = ds.create("third", no_annex=True)
     ok_(isinstance(subds3, Dataset))
     ok_(subds3.is_installed())
     assert_repo_status(subds3.path, annex=False)
@@ -218,15 +218,15 @@ def test_create_sub(path):
 def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
     # an existing directory tree
-    ds = Dataset(op.join(path, 'origin')).rev_create(force=True)
+    ds = Dataset(op.join(path, 'origin')).create(force=True)
     # we got a dataset ....
     ok_(ds.is_installed())
     # ... but it has untracked content
     ok_(ds.repo.dirty)
-    subds = ds.rev_create(u"ds-" + OBSCURE_FILENAME, force=True)
+    subds = ds.create(u"ds-" + OBSCURE_FILENAME, force=True)
     ok_(subds.is_installed())
     ok_(subds.repo.dirty)
-    subsubds = subds.rev_create('subsub', force=True)
+    subsubds = subds.create('subsub', force=True)
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
     ok_(ds.id != subds.id != subsubds.id)
@@ -251,7 +251,7 @@ def test_create_subdataset_hierarchy_from_top(path):
 @with_tempfile
 def test_nested_create(path):
     # to document some more organic usage pattern
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_repo_status(ds.path)
     lvl2relpath = op.join('lvl1', 'lvl2')
     lvl2path = op.join(ds.path, lvl2relpath)
@@ -264,16 +264,16 @@ def test_nested_create(path):
     assert_repo_status(ds.path, untracked=[])
     # later create subdataset in a fresh dir
     # WINDOWS FAILURE IS NEXT LINE
-    subds1 = ds.rev_create(op.join('lvl1', 'subds'))
+    subds1 = ds.create(op.join('lvl1', 'subds'))
     assert_repo_status(ds.path, untracked=[])
     eq_(ds.subdatasets(result_xfm='relpaths'), [op.join('lvl1', 'subds')])
     # later create subdataset in an existing empty dir
-    subds2 = ds.rev_create(op.join('lvl1', 'empty'))
+    subds2 = ds.create(op.join('lvl1', 'empty'))
     assert_repo_status(ds.path)
     # later try to wrap existing content into a new subdataset
     # but that won't work
     assert_in_results(
-        ds.rev_create(lvl2relpath, **raw),
+        ds.create(lvl2relpath, **raw),
         status='error',
         message=(
             'collision with content in parent dataset at %s: %s',
@@ -283,7 +283,7 @@ def test_nested_create(path):
     # MIH disable shaky test till proper dedicated upfront check is in-place in `create`
     # gh-1725
     #assert_in_results(
-    #    ds.rev_create(lvl2relpath, force=True,
+    #    ds.create(lvl2relpath, force=True,
     #              on_failure='ignore', result_xfm=None, result_filter=None),
     #    status='error', action='add')
     # only way to make it work is to unannex the content upfront
@@ -293,12 +293,12 @@ def test_nested_create(path):
     # still nothing without force
     # "err='lvl1/lvl2' already exists in the index"
     assert_in_results(
-        ds.rev_create(lvl2relpath, **raw),
+        ds.create(lvl2relpath, **raw),
         status='error',
         message='will not create a dataset in a non-empty directory, use `force` option to ignore')
     # XXX even force doesn't help, because (I assume) GitPython doesn't update
     # its representation of the Git index properly
-    ds.rev_create(lvl2relpath, force=True)
+    ds.create(lvl2relpath, force=True)
     assert_in(lvl2relpath, ds.subdatasets(result_xfm='relpaths'))
 
 
@@ -373,7 +373,7 @@ def test_cfg_passthrough(path):
         ['datalad',
          '-c', 'annex.tune.objecthash1=true',
          '-c', 'annex.tune.objecthashlower=true',
-         'rev-create', path])
+         'create', path])
     ds = Dataset(path)
     eq_(ds.config.get('annex.tune.objecthash1', None), 'true')
     eq_(ds.config.get('annex.tune.objecthashlower', None), 'true')

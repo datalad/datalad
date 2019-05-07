@@ -103,7 +103,6 @@ Commands of the future
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-rev-create
    generated/man/datalad-rev-run
    generated/man/datalad-rev-save
    generated/man/datalad-status
