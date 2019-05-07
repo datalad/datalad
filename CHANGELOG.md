@@ -35,6 +35,11 @@ bet we will fix some bugs and make a world even a better place.
 - A regression introduced in 0.11.1 prevented [save][] from committing
   changes under a subdirectory when the subdirectory was specified as
   a path argument.  ([#3106][])
+- A workaround introduced in 0.11.1 made it possible for [save][] do a
+  partial commit with an annex file that has gone below the
+  `annex.largefiles` threshold.  The logic of this workaround was
+  faulty, leading to files being displayed as typechanged in the index
+  following the commit.  ([#3365][])
 
 ### Enhancements and new features
 
@@ -45,6 +50,8 @@ bet we will fix some bugs and make a world even a better place.
   terminals with dark backgrounds.  ([#3334][])
 - A short flag `-R` is now available for the `--recursion-limit` flag,
   a flag shared by several subcommands.  ([#3340][])
+- The authentication logic for [create-sibling-github][] has been
+  revamped and now support 2FA.  ([#3180][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1274,6 +1281,7 @@ publishing
 [#3165]: https://github.com/datalad/datalad/issues/3165
 [#3168]: https://github.com/datalad/datalad/issues/3168
 [#3176]: https://github.com/datalad/datalad/issues/3176
+[#3180]: https://github.com/datalad/datalad/issues/3180
 [#3181]: https://github.com/datalad/datalad/issues/3181
 [#3184]: https://github.com/datalad/datalad/issues/3184
 [#3186]: https://github.com/datalad/datalad/issues/3186
@@ -1295,3 +1303,4 @@ publishing
 [#3334]: https://github.com/datalad/datalad/issues/3334
 [#3340]: https://github.com/datalad/datalad/issues/3340
 [#3347]: https://github.com/datalad/datalad/issues/3347
+[#3365]: https://github.com/datalad/datalad/issues/3365
