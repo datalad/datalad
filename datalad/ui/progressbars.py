@@ -26,10 +26,12 @@ from .. import lgr
 class ProgressBarBase(object):
     """Base class for any progress bar"""
 
-    def __init__(self, label=None, total=None, fill_text=None, out=None, unit='B', initial=0):
+    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B', initial=0):
         self.label = label
+        self.fill_test = fill_text
         self.total = total
         self.unit = unit
+        self.out = out
         self._current = initial
 
     def refresh(self):
