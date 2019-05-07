@@ -11,8 +11,11 @@
 Should not be imported until we know that interface needs it
 """
 
+import humanize
 import sys
+import time
 
+from .. import lgr
 
 #
 # Haven't found an ideal progress bar yet, so to make things modular etc
@@ -23,9 +26,11 @@ import sys
 class ProgressBarBase(object):
     """Base class for any progress bar"""
 
-    def __init__(self, total=None, fill_text=None, out=None, label=None, initial=0):
-        self._current = initial
+    def __init__(self, label=None, total=None, fill_text=None, out=None, unit='B', initial=0):
+        self.label = label
         self.total = total
+        self.unit = unit
+        self._current = initial
 
     def refresh(self):
         """Force update"""
@@ -51,7 +56,19 @@ class ProgressBarBase(object):
     def start(self, initial=0):
         self._current = initial
 
-    def finish(self):
+    def finish(self, partial=False):
+        """
+
+        Parameters
+        ----------
+        partial: bool
+          To signal that finish is called possibly before the activity properly
+          finished, so .total count might have not been reached
+
+        Returns
+        -------
+
+        """
         pass
 
     def clear(self):
@@ -66,7 +83,85 @@ class SilentProgressBar(ProgressBarBase):
         super(SilentProgressBar, self).__init__(total=total)
 
 
-progressbars = {'silent':  SilentProgressBar}
+class LogProgressBar(ProgressBarBase):
+    """A progress bar which logs upon completion of the item
+    """
+    def __init__(self, *args, **kwargs):
+        super(LogProgressBar, self).__init__(*args, **kwargs)
+        # I think we never generate progress bars unless we are the beginning
+        # of reporting something lengthy.  .start is not always invoked
+        self._start_time = time.time()
+
+    def _naturalsize(self, x):
+        if self.unit == 'B':
+            return humanize.naturalsize(x)
+        else:
+            # No need for precision in case of large numbers
+            return '%s%s' % (int(x) if x >= 100 else x, self.unit or '')
+
+    @staticmethod
+    def _naturaldelta(x):
+        # humanize is too human for little things
+        return humanize.naturaldelta(x) \
+            if x > 2 \
+            else ('%.3f' % x).rstrip('0').rstrip('.') + ' sec'
+
+    def finish(self, partial=False):
+        msg, args = ' %s ', [self.label]
+
+        if partial:
+            # that is the best we know so far:
+            amount = self.current
+            if self.total is not None:
+                if amount != self.total:
+                    perc_done = 100. * amount / self.total
+                    if perc_done <= 100:
+                        msg += "partially (%.2f%% of %s) "
+                        args += [
+                            perc_done,
+                            self._naturalsize(self.total)
+                        ]
+                    else:
+                        # well well -- we still probably have some issue with
+                        # over-reporting when getting data from datalad-archives
+                        # Instead of providing non-sense % here, j
+                        msg += "possibly partially "
+                else:
+                    # well -- that means that we did manage to get all of it
+                    pass
+            else:
+                msg += "possibly partially "
+            msg += "done"
+        else:
+            # Are we "finish"ed because interrupted or done?
+            amount = self.total
+            if amount:
+                msg += '%s done'
+                args += [self._naturalsize(amount)]
+            else:
+                msg += "done"
+
+        dt = float(time.time() - self._start_time)
+
+        if dt:
+            msg += ' in %s'
+            args += [self._naturaldelta(dt)]
+
+        if amount:
+            speed = amount / dt
+            msg += ' at %s/sec'
+            args += [self._naturalsize(speed)]
+
+        lgr.info(msg, *args)
+
+
+progressbars = {
+    # let for compatibility, use "none" instead
+    'silent':  SilentProgressBar,
+    'none':  SilentProgressBar,
+    'log': LogProgressBar,
+}
+
 
 try:
     from tqdm import tqdm
@@ -111,7 +206,7 @@ try:
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
             """
-            super(tqdmProgressBar, self).__init__(total=total)
+            super(tqdmProgressBar, self).__init__(label=label, total=total, unit=unit)
 
             if frontend not in self._frontends:
                 raise ValueError(
@@ -168,7 +263,7 @@ try:
             if hasattr(self._tqdm, 'refresh'):
                 self._pbar.refresh()
 
-        def finish(self, clear=False):
+        def finish(self, clear=False, partial=False):
             """
 
             Parameters
