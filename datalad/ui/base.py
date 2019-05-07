@@ -27,7 +27,8 @@ class InteractiveUI(object):
     def question(self, text,
                  title=None, choices=None,
                  default=None,
-                 hidden=False):
+                 hidden=False,
+                 repeat=None):
         pass
 
     def yesno(self, *args, **kwargs):

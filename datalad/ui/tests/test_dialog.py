@@ -102,6 +102,13 @@ def test_hidden_doubleentry():
         eq_(response, 'ab')
         gpcm.assert_has_calls([call('?: '), call('? (repeat): ')])
 
+    # explicitly request no repeats
+    with patch_getpass(return_value='ab') as gpcm:
+        response = ui.question(
+            "?", hidden=True, repeat=False)
+        eq_(response, 'ab')
+        gpcm.assert_has_calls([call('?: ')])
+
 
 def _test_progress_bar(backend, len, increment):
     out = StringIO()
