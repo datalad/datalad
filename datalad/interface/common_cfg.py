@@ -306,4 +306,11 @@ definitions = {
         'default': 256,
         'type': EnsureInt(),
     },
+    'datalad.ui.progressbar': {
+        'ui': ('question', {
+            'title': 'UI progress bars',
+            'text': 'Which backend for progress reporting to use unless specified otherwise?'}),
+        'default': None,
+        'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
+    },
 }

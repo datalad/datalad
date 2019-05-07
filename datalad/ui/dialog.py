@@ -93,6 +93,11 @@ class ConsoleLog(object):
             progressbars = ConsoleLog.progressbars
 
         if backend is None:
+            # Resort to the configuration
+            from .. import cfg
+            backend = cfg.get('datalad.ui.progressbar', None)
+
+        if backend is None:
             try:
                 pbar = progressbars['tqdm']
             except KeyError:
