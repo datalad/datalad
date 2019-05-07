@@ -41,7 +41,7 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
     rev_save as save,
-    create as create,
+    create,
     diff,
 )
 from datalad.tests.utils import (

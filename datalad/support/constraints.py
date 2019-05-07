@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six.moves import map as map
+from six.moves import map
 
 
 def _strip_typerepr(s):

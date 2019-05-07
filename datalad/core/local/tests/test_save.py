@@ -42,7 +42,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.api import (
     rev_save as save,
-    create as create,
+    create,
     install,
 )
 
