@@ -12,6 +12,7 @@ from mock import patch
 
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_true, assert_false
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import SkipTest
@@ -22,7 +23,11 @@ from ..credentials import CompositeCredential
 from ..credentials import AWS_S3
 
 
-@with_testsui(responses=['user1', 'password1'])
+@with_testsui(responses=[
+    'user1', 'password1',
+    # when we do provide user to enter_new
+    'newpassword',
+])
 def test_cred1_enter_new():
     keyring = MemoryKeyring()
     cred = UserPassword("name", keyring=keyring)
@@ -36,6 +41,16 @@ def test_cred1_enter_new():
     assert_raises(KeyError, keyring.delete, 'name')
     assert_equal(keyring.get('name', 'user'), None)
 
+    # Test it blowing up if we provide unknown field
+    with assert_raises(ValueError) as cme:
+        cred.enter_new(username='user')
+    assert_in('field(s): username.  Known but not specified: password, user',
+              str(cme.exception))
+
+    # Test that if user is provided, it is not asked
+    cred.enter_new(user='user2')
+    assert_equal(keyring.get('name', 'user'), 'user2')
+    assert_equal(keyring.get('name', 'password'), 'newpassword')
 
 @with_testsui(responses=['password1'])
 def test_cred1_call():

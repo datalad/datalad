@@ -123,6 +123,16 @@ class Credential(object):
           Any given key value pairs with non-None values are used to set the
           field `key` to the given value, without asking for user input
         """
+        if kwargs:
+            unknown_fields = set(kwargs).difference(self._FIELDS)
+            known_fields = set(self._FIELDS).difference(kwargs)
+            if unknown_fields:
+                raise ValueError(
+                    "Unknown to %s field(s): %s.  Known but not specified: %s"
+                    % (self,
+                       ', '.join(sorted(unknown_fields)),
+                       ', '.join(sorted(known_fields))
+                       ))
         # Use ui., request credential fields corresponding to the type
         for f in self._FIELDS:
             if kwargs.get(f, None):

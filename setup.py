@@ -226,6 +226,7 @@ setup(
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
     **setup_kwargs

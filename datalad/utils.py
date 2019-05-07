@@ -780,7 +780,7 @@ def as_unicode(val, cast_types=object):
             % (val, cast_types))
 
 
-def unique(seq, key=None):
+def unique(seq, key=None, reverse=False):
     """Given a sequence return a list only with unique elements while maintaining order
 
     This is the fastest solution.  See
@@ -797,15 +797,23 @@ def unique(seq, key=None):
     key: callable, optional
       Function to call on each element so we could decide not on a full
       element, but on its member etc
+    reverse: bool, optional
+      If True, uniqueness checked in the reverse order, so that the later ones
+      will take the order
     """
     seen = set()
     seen_add = seen.add
+
+    trans = reversed if reverse else lambda x: x
+
     if not key:
-        return [x for x in seq if not (x in seen or seen_add(x))]
+        out = [x for x in trans(seq) if not (x in seen or seen_add(x))]
     else:
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
-        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+        out = [x for x in trans(seq) if not (key(x) in seen or seen_add(key(x)))]
+
+    return out[::-1] if reverse else out
 
 
 def all_same(items):
