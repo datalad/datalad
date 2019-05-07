@@ -528,7 +528,8 @@ class GitPythonProgressBar(RemoteProgress):
 
                 self._pbar = self._ui.get_progressbar(
                     self._get_human_msg(op_code),
-                    total=max_count
+                    total=max_count,
+                    unit=' objects'
                 )
                 self._op_code = op_code
             if not self._pbar:
