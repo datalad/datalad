@@ -149,10 +149,10 @@ class LogProgressBar(ProgressBarBase):
             msg += ' in %s'
             args += [self._naturaldelta(dt)]
 
-        if amount:
-            speed = amount / dt
-            msg += ' at %s/sec'
-            args += [self._naturalsize(speed)]
+            if amount:
+                speed = amount / dt
+                msg += ' at %s/sec'
+                args += [self._naturalsize(speed)]
 
         lgr.info(msg, *args)
 
