@@ -261,7 +261,7 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       on the same line.
     update : int
       To which quantity to advance the progress.
-    incremental : bool
+    increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
     """
     d = dict(
