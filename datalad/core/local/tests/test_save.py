@@ -40,6 +40,7 @@ from datalad.distribution.tests.test_add import tree_arg
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import CommandError
 from datalad.api import (
     rev_save as save,
     create,
@@ -591,6 +592,32 @@ def test_partial_unlocked(path):
         ('*', {'annex.largefiles': 'nothing'})])
     ds.rev_save()
     assert_repo_status(ds.path)
+
+
+@with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
+            "foo": "in annex"})
+def test_save_partial_commit_shrinking_annex(path):
+    # This is a variation on the test above. The main difference is that there
+    # are other staged changes in addition to the unlocked filed.
+    ds = create(path, force=True)
+    ds.rev_save()
+    assert_repo_status(ds.path)
+    ds.unlock(path="foo")
+    create_tree(ds.path, tree={"foo": "a", "staged": ""},
+                remove_existing=True)
+    # Even without this staged change, a plain 'git commit -- foo' would fail
+    # with git-annex's partial index error, but rev-save (or more specifically
+    # GitRepo.save_) drops the pathspec if there are no staged changes.
+    ds.repo.add("staged", git=True)
+    if ds.repo.supports_unlocked_pointers:
+        ds.rev_save(path="foo")
+        assert_repo_status(ds.path, added=["staged"])
+    else:
+        # Unlike save, rev_save doesn't handle a partial commit if there were
+        # other staged changes.
+        with assert_raises(CommandError) as cm:
+            ds.rev_save(path="foo")
+        assert_in("partial commit", str(cm.exception))
 
 
 @with_tempfile()
