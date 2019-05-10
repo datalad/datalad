@@ -96,8 +96,9 @@ class LogProgressBar(ProgressBarBase):
 
     def __init__(self, *args, **kwargs):
         super(LogProgressBar, self).__init__(*args, **kwargs)
-        # I think we never generate progress bars unless we are the beginning
-        # of reporting something lengthy.  .start is not always invoked
+        # I think we never generate progress bars unless we are at the beginning
+        # of reporting something lengthy.  .start is not always invoked so
+        # we cannot reliably set it there instead of the constructor (here)
         self._start_time = time.time()
 
     @staticmethod
@@ -140,7 +141,8 @@ class LogProgressBar(ProgressBarBase):
                     else:
                         # well well -- we still probably have some issue with
                         # over-reporting when getting data from datalad-archives
-                        # Instead of providing non-sense % here, j
+                        # Instead of providing non-sense % here, just report
+                        # our best guess
                         msg += "possibly partially "
                 else:
                     # well -- that means that we did manage to get all of it
