@@ -87,7 +87,13 @@ class SilentProgressBar(ProgressBarBase):
 
 class LogProgressBar(ProgressBarBase):
     """A progress bar which logs upon completion of the item
+
+    Note that there is also :func:`~datalad.log.log_progress` which can be used
+    to get progress bars when attached to a tty but incremental log messages
+    otherwise (as opposed to just the final log message provided by
+    `LogProgressBar`).
     """
+
     def __init__(self, *args, **kwargs):
         super(LogProgressBar, self).__init__(*args, **kwargs)
         # I think we never generate progress bars unless we are the beginning
