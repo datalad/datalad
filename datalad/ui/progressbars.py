@@ -100,19 +100,27 @@ class LogProgressBar(ProgressBarBase):
         # of reporting something lengthy.  .start is not always invoked
         self._start_time = time.time()
 
+    @staticmethod
+    def _naturalfloat(x):
+        """Return string representation of a number for human consumption
+
+        For abs(x) <= 1000 would use 'scientific' (%g) notation, and for the
+        larger a regular int (after rounding)
+        """
+        return ('%g' % x) if abs(x) <= 1000 else '%i' % int(round(x))
+
     def _naturalsize(self, x):
         if self.unit == 'B':
             return humanize.naturalsize(x)
         else:
-            # No need for precision in case of large numbers
-            return '%s%s' % (int(x) if x >= 100 else x, self.unit or '')
+            return '%s%s' % (self._naturalfloat(x), self.unit or '')
 
     @staticmethod
     def _naturaldelta(x):
         # humanize is too human for little things
         return humanize.naturaldelta(x) \
             if x > 2 \
-            else ('%.3f' % x).rstrip('0').rstrip('.') + ' sec'
+            else LogProgressBar._naturalfloat(x) + ' sec'
 
     def finish(self, partial=False):
         msg, args = ' %s ', [self.label]
