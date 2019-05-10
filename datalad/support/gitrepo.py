@@ -3532,6 +3532,16 @@ class GitRepo(RepoInterface):
                         else ('not a Git repository: %s', exc_str(e)),
                         logger=lgr)
                     continue
+                # This mirrors the result structure yielded for
+                # to_stage_submodules below.
+                yield get_status_dict(
+                    action='add',
+                    refds=self.pathobj,
+                    type='file',
+                    key=None,
+                    path=self.pathobj / ut.PurePosixPath(cand_sm),
+                    status='ok',
+                    logger=lgr)
                 added_submodule = True
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule
