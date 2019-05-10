@@ -309,7 +309,7 @@ definitions = {
     'datalad.ui.progressbar': {
         'ui': ('question', {
             'title': 'UI progress bars',
-            'text': 'Which backend for progress reporting to use unless specified otherwise?'}),
+            'text': 'Default backend for progress reporting'}),
         'default': None,
         'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
     },
