@@ -180,7 +180,6 @@ class SSHConnection(object):
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
-        # TODO does not work on windows!
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
@@ -303,8 +302,8 @@ class SSHConnection(object):
         # more
         self._remote_props[key] = annex_install_dir
         try:
-            # TODO does not work on windows
             with tempfile.TemporaryFile() as tempf:
+                # TODO does not work on windows
                 annex_install_dir = self(
                     # use sh -e to be able to fail at each stage of the process
                     "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
