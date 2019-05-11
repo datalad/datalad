@@ -18,6 +18,7 @@ from mock import patch
 from nose import SkipTest
 
 from datalad.support.external_versions import external_versions
+from datalad.utils import Path
 
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import eq_
@@ -152,7 +153,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         def ctrl_path(self):
             with open(bogus_socket, "w") as f:
                 f.write("whatever")
-            return bogus_socket
+            return Path(bogus_socket)
 
     # since we are digging into protected area - should also set _prev_connections
     manager._prev_connections = {}
