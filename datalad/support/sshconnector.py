@@ -18,6 +18,7 @@ import logging
 from socket import gethostname
 from hashlib import md5
 from subprocess import Popen
+import tempfile
 # importing the quote function here so it can always be imported from this
 # module
 from six.moves import shlex_quote as sh_quote
@@ -28,10 +29,12 @@ from six.moves import shlex_quote as sh_quote
 
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
-from datalad.utils import assure_dir
-from datalad.utils import auto_repr
+from datalad.utils import (
+    assure_dir,
+    auto_repr,
+    Path,
+)
 from datalad.cmd import Runner
-from datalad.utils import Path
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
@@ -178,12 +181,12 @@ class SSHConnection(object):
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         # TODO does not work on windows!
-        null = open('/dev/null')
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
-            out, err = self.runner.run(cmd, stdin=null, expect_stderr=True)
+            with tempfile.TemporaryFile() as tempf:
+                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -192,8 +195,6 @@ class SSHConnection(object):
             # SSH died and left socket behind, or server closed connection
             self.close()
             res = False
-        finally:
-            null.close()
         lgr.debug(
             "Check of %s has %s",
             self,
@@ -303,11 +304,11 @@ class SSHConnection(object):
         self._remote_props[key] = annex_install_dir
         try:
             # TODO does not work on windows
-            with open('/dev/null') as null:
+            with tempfile.TemporaryFile() as tempf:
                 annex_install_dir = self(
                     # use sh -e to be able to fail at each stage of the process
                     "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
-                    , stdin=null
+                    , stdin=tempf
                 )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
