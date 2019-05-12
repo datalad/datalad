@@ -21,6 +21,7 @@ from subprocess import Popen
 import tempfile
 # importing the quote function here so it can always be imported from this
 # module
+from six.moves import shlex_quote as sh_quote
 from six import text_type
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
