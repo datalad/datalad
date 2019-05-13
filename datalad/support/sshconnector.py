@@ -264,32 +264,39 @@ class SSHConnection(object):
                 # not a "normal" SSH error
                 raise e
 
+    def _get_scp_command_spec(self, recursive, preserve_attrs):
+        """Internal helper for SCP interface methods"""
+        # Convert ssh's port flag (-p) to scp's (-P).
+        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
+        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
+        scp_options += ["-r"] if recursive else []
+        scp_options += ["-p"] if preserve_attrs else []
+        return ["scp"] + scp_options
+
     def copy_to_remote(self, source, destination,
                        recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
         Parameters
         ----------
-        source: str or list
+        source : str or list
           file/folder path(s) to copy from on local
-        destination: str
+        destination : str
           file/folder path to copy to on remote
+        recursive : bool
+          flag to enable recursive copying of given sources
+        preserve_attrs : bool
+          preserve modification times, access times, and modes from the
+          original file
 
         Returns
         -------
         str
           stdout, stderr of the copy operation.
         """
-        # Convert ssh's port flag (-p) to scp's (-P).
-        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
-        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options += ["-r"] if recursive else []
-        scp_options += ["-p"] if preserve_attrs else []
-        scp_cmd = ["scp"] + scp_options
-
+        scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
         scp_cmd += assure_list(source)
-
         # add destination path
         scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
         return self.runner.run(scp_cmd)
