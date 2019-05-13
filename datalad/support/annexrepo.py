@@ -2034,12 +2034,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             # opts might be the '--key' which should go last
             annex_options += opts
 
+        interrupted = True
         try:
             out, err = self._run_annex_command(
                     command,
                     files=files,
                     annex_options=annex_options,
                     **kwargs)
+            interrupted = False
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2137,7 +2139,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
         finally:
             if progress_indicators:
-                progress_indicators.finish()
+                progress_indicators.finish(partial=interrupted)
 
         json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
@@ -3541,15 +3543,15 @@ class ProcessAnnexProgressIndicators(object):
             int(j.get('byte-progress'))
         )
 
-    def finish(self):
-        if self.total_pbar:
-            self.total_pbar.finish()
-            self.total_pbar = None
+    def finish(self, partial=False):
         if self.pbars:
             lgr.warning("Still have %d active progress bars when stopping",
                         len(self.pbars))
+        if self.total_pbar:
+            self.total_pbar.finish(partial=partial)
+            self.total_pbar = None
         for pbar in self.pbars.values():
-            pbar.finish()
+            pbar.finish(partial=partial)
         self.pbars = {}
         self._failed = 0
         self._succeeded = 0

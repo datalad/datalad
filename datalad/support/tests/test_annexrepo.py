@@ -1583,10 +1583,10 @@ def test_ProcessAnnexProgressIndicators():
         out = cmo.out
 
     from datalad.ui import ui
-    from datalad.ui.dialog import SilentConsoleLog
+    from datalad.ui.dialog import QuietConsoleLog
 
     assert out \
-        if not isinstance(ui.ui, SilentConsoleLog) else not out
+        if not isinstance(ui.ui, QuietConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:
