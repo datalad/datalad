@@ -301,6 +301,35 @@ class SSHConnection(object):
         scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
         return self.runner.run(scp_cmd)
 
+    def copy_from_remote(self, source, destination,
+                         recursive=False, preserve_attrs=False):
+        """Copies source file/folder from remote to a local destination.
+
+        Parameters
+        ----------
+        source : str or list
+          file/folder path(s) to copy from the remote host
+        destination : str
+          file/folder path to copy to on the local host
+        recursive : bool
+          flag to enable recursive copying of given sources
+        preserve_attrs : bool
+          preserve modification times, access times, and modes from the
+          original file
+
+        Returns
+        -------
+        str
+          stdout, stderr of the copy operation.
+        """
+        scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
+        # add source filepath(s) to scp command, prefixed with the remote host
+        scp_cmd += ['%s:"%s"' % (self.sshri.hostname, s)
+                    for s in assure_list(source)]
+        # add destination path
+        scp_cmd += [destination]
+        return self.runner.run(scp_cmd)
+
     def get_annex_installdir(self):
         key = 'installdir:annex'
         if key in self._remote_props:
