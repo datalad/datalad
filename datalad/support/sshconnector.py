@@ -33,6 +33,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
     Path,
+    assure_list,
 )
 from datalad.cmd import Runner
 
@@ -263,7 +264,8 @@ class SSHConnection(object):
                 # not a "normal" SSH error
                 raise e
 
-    def copy(self, source, destination, recursive=False, preserve_attrs=False):
+    def copy_to_remote(self, source, destination,
+                       recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
         Parameters
@@ -286,8 +288,7 @@ class SSHConnection(object):
         scp_cmd = ["scp"] + scp_options
 
         # add source filepath(s) to scp command
-        scp_cmd += source if isinstance(source, list) \
-            else [source]
+        scp_cmd += assure_list(source)
 
         # add destination path
         scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
