@@ -52,6 +52,12 @@ bet we will fix some bugs and make a world even a better place.
   a flag shared by several subcommands.  ([#3340][])
 - The authentication logic for [create-sibling-github][] has been
   revamped and now supports 2FA.  ([#3180][])
+- New configuration option `datalad.ui.progressbar` can be used to
+  configure the default backend for progress reporting ("none", for
+  example, results in no progress bars being shown).  ([#3396][])
+- A new progress backend, available by setting datalad.ui.progressbar
+  to "log", replaces progress bars with a log message upon completion
+  of an action.  ([#3396][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1304,3 +1310,4 @@ publishing
 [#3340]: https://github.com/datalad/datalad/issues/3340
 [#3347]: https://github.com/datalad/datalad/issues/3347
 [#3365]: https://github.com/datalad/datalad/issues/3365
+[#3396]: https://github.com/datalad/datalad/issues/3396
