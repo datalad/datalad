@@ -243,6 +243,11 @@ class OnlyProgressLog(logging.Filter):
 def log_progress(lgrcall, pid, *args, **kwargs):
     """Helper to emit a log message on the progress of some process
 
+    Note: Whereas this helper reports on interim progress and is to be used
+    programmatically, :class:`~datalad.ui.progressbars.LogProgressBar` replaces
+    a progress bar with a single log message upon completion and can be chosen
+    by the user (config 'datalad.ui.progressbar' set to 'log').
+
     Parameters
     ----------
     lgrcall : callable

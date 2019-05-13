@@ -517,13 +517,19 @@ class GitPythonProgressBar(RemoteProgress):
                 # spotted used by GitPython tests, so may be at times it is not
                 # known and assumed to be a 100%...? TODO
                 max_count = 100.0
+            if op_code:
+                # Apparently those are composite and we care only about the ones
+                # we know, so to avoid switching the progress bar for no good
+                # reason - first & with the mask
+                op_code = op_code & self.OP_MASK
             if self._op_code is None or self._op_code != op_code:
                 # new type of operation
                 self._close_pbar()
 
                 self._pbar = self._ui.get_progressbar(
                     self._get_human_msg(op_code),
-                    total=max_count
+                    total=max_count,
+                    unit=' objects'
                 )
                 self._op_code = op_code
             if not self._pbar:
