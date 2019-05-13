@@ -17,7 +17,10 @@ from mock import patch
 
 from nose import SkipTest
 
+from six import text_type
+
 from datalad.support.external_versions import external_versions
+from datalad.utils import Path
 
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import eq_
@@ -76,7 +79,8 @@ def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
 
-    path = opj(manager.socket_dir, get_connection_hash('localhost'))
+    path = opj(text_type(manager.socket_dir),
+               get_connection_hash('localhost'))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
     print("%s existed: %s" % (path, existed_before))
@@ -112,9 +116,9 @@ def test_ssh_manager_close():
     manager = SSHManager()
 
     # check for previously existing sockets:
-    existed_before_1 = exists(opj(manager.socket_dir,
+    existed_before_1 = exists(opj(text_type(manager.socket_dir),
                                   get_connection_hash('localhost')))
-    existed_before_2 = exists(opj(manager.socket_dir,
+    existed_before_2 = exists(opj(text_type(manager.socket_dir),
                                   get_connection_hash('datalad-test')))
 
     manager.get_connection('ssh://localhost').open()
@@ -126,14 +130,16 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://localhost').close()
         manager.get_connection('ssh://localhost').open()
 
-    ok_(exists(opj(manager.socket_dir, get_connection_hash('localhost'))))
-    ok_(exists(opj(manager.socket_dir, get_connection_hash('datalad-test'))))
+    ok_(exists(opj(text_type(manager.socket_dir),
+                   get_connection_hash('localhost'))))
+    ok_(exists(opj(text_type(manager.socket_dir),
+                   get_connection_hash('datalad-test'))))
 
     manager.close()
 
-    still_exists_1 = exists(opj(manager.socket_dir,
+    still_exists_1 = exists(opj(text_type(manager.socket_dir),
                                 get_connection_hash('localhost')))
-    still_exists_2 = exists(opj(manager.socket_dir,
+    still_exists_2 = exists(opj(text_type(manager.socket_dir),
                                 get_connection_hash('datalad-test')))
 
     eq_(existed_before_1, still_exists_1)
@@ -152,7 +158,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         def ctrl_path(self):
             with open(bogus_socket, "w") as f:
                 f.write("whatever")
-            return bogus_socket
+            return Path(bogus_socket)
 
     # since we are digging into protected area - should also set _prev_connections
     manager._prev_connections = {}
@@ -235,7 +241,7 @@ def test_ssh_custom_identity_file():
                 ssh = manager.get_connection('ssh://localhost')
                 cmd_out, _ = ssh("echo blah")
                 expected_socket = op.join(
-                    manager.socket_dir,
+                    text_type(manager.socket_dir),
                     get_connection_hash("localhost", identity_file=ifile))
                 ok_(exists(expected_socket))
                 manager.close()

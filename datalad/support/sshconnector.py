@@ -13,16 +13,16 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
+import os
 import logging
 from socket import gethostname
 from hashlib import md5
-from os import remove
-from os.path import exists
-from os.path import join as opj
 from subprocess import Popen
+import tempfile
 # importing the quote function here so it can always be imported from this
 # module
 from six.moves import shlex_quote as sh_quote
+from six import text_type
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -30,8 +30,10 @@ from six.moves import shlex_quote as sh_quote
 
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
-from datalad.utils import assure_dir
-from datalad.utils import auto_repr
+from datalad.utils import (
+    auto_repr,
+    Path,
+)
 from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.support.sshconnector')
@@ -92,8 +94,8 @@ class SSHConnection(object):
                 "connections: {}".format(sshri))
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
-        self.ctrl_path = ctrl_path
-        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
+        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % ctrl_path]
+        self.ctrl_path = Path(ctrl_path)
         if self.sshri.port:
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
@@ -168,7 +170,7 @@ class SSHConnection(object):
         return self._runner
 
     def is_open(self):
-        if not exists(self.ctrl_path):
+        if not self.ctrl_path.exists():
             lgr.log(
                 5,
                 "Not opening %s for checking since %s does not exist",
@@ -178,12 +180,12 @@ class SSHConnection(object):
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
-        null = open('/dev/null')
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
-            out, err = self.runner.run(cmd, stdin=null, expect_stderr=True)
+            with tempfile.TemporaryFile() as tempf:
+                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -192,9 +194,10 @@ class SSHConnection(object):
             # SSH died and left socket behind, or server closed connection
             self.close()
             res = False
-        finally:
-            null.close()
-        lgr.debug("Check of %s has %s", self, {True: 'succeeded', False: 'failed'}[res])
+        lgr.debug(
+            "Check of %s has %s",
+            self,
+            {True: 'succeeded', False: 'failed'}[res])
         return res
 
     def open(self):
@@ -252,10 +255,10 @@ class SSHConnection(object):
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             lgr.debug("Failed to run close command")
-            if exists(self.ctrl_path):
+            if self.ctrl_path.exists():
                 lgr.debug("Removing existing control path %s", self.ctrl_path)
                 # socket need to go in any case
-                remove(self.ctrl_path)
+                self.ctrl_path.unlink()
             if e.code != 255:
                 # not a "normal" SSH error
                 raise e
@@ -299,11 +302,12 @@ class SSHConnection(object):
         # more
         self._remote_props[key] = annex_install_dir
         try:
-            with open('/dev/null') as null:
+            with tempfile.TemporaryFile() as tempf:
+                # TODO does not work on windows
                 annex_install_dir = self(
                     # use sh -e to be able to fail at each stage of the process
                     "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
-                    , stdin=null
+                    , stdin=tempf
                 )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
@@ -379,13 +383,12 @@ class SSHManager(object):
         if self._socket_dir is not None:
             return
         from ..config import ConfigManager
-        from os import chmod
         cfg = ConfigManager()
-        self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
-                               'sockets')
-        assure_dir(self._socket_dir)
+        self._socket_dir = \
+            Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
+        self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
-            chmod(self._socket_dir, 0o700)
+            os.chmod(text_type(self._socket_dir), 0o700)
         except OSError as exc:
             lgr.warning(
                 "Failed to (re)set permissions on the %s. "
@@ -394,12 +397,10 @@ class SSHManager(object):
                 self._socket_dir, exc_str(exc)
             )
 
-        from os import listdir
-        from os.path import isdir
         try:
-            self._prev_connections = [opj(self.socket_dir, p)
-                                      for p in listdir(self.socket_dir)
-                                      if not isdir(opj(self.socket_dir, p))]
+            self._prev_connections = [p
+                                      for p in self.socket_dir.iterdir()
+                                      if not p.is_dir()]
         except OSError as exc:
             self._prev_connections = []
             lgr.warning(
@@ -450,7 +451,7 @@ class SSHManager(object):
             identity_file=identity_file or "",
             username=sshri.username)
         # determine control master:
-        ctrl_path = "%s/%s" % (self.socket_dir, conhash)
+        ctrl_path = self.socket_dir / conhash
 
         # do we know it already?
         if ctrl_path in self._connections:
@@ -478,7 +479,7 @@ class SSHManager(object):
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
-                        exists(self._connections[c].ctrl_path)
+                        self._connections[c].ctrl_path.exists()
                         and (not ctrl_paths
                              or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
