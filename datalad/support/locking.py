@@ -98,6 +98,6 @@ def lock_if_check_fails(
     finally:
         if lock.acquired:
             lgr.debug("Releasing lock %s", lock_filename)
+            lock.release()
             if exists(lock_filename):
                 unlink(lock_filename)
-            lock.release()

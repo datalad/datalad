@@ -10,9 +10,6 @@ import os.path as op
 from datalad.distribution.dataset import require_dataset
 from datalad.utils import create_tree
 
-# bound dataset methods
-import datalad.distribution.add
-
 ds = require_dataset(
     sys.argv[1],
     check_installed=True,
@@ -37,8 +34,6 @@ README_top = """\
 tmpl = {
     'code': {
         'README.md': README_code,
-        # all code goes into Git
-        '.gitattributes': '** annex.largefiles=nothing',
     },
     'README.md': README_top,
     'CHANGELOG.md': '',  # TODO
@@ -56,15 +51,13 @@ force_in_git = [
 # actually dump everything into the dataset
 create_tree(ds.path, tmpl)
 
+# all code goes into Git
+ds.repo.set_gitattributes([('*', {'annex.largefiles': 'nothing'})],
+                          op.join('code', '.gitattributes'))
+
 # amend gitattributes
-for path in force_in_git:
-    abspath = op.join(ds.path, path)
-    d = op.dirname(abspath)
-    ga_path = op.join(d, '.gitattributes') \
-        if op.exists(d) else op.join(ds.path, '.gitattributes')
-    with open(ga_path, 'a') as gaf:
-        gaf.write('{} annex.largefiles=nothing\n'.format(
-            op.relpath(abspath, start=d) if op.exists(d) else path))
+ds.repo.set_gitattributes(
+    [(p, {'annex.largefiles': 'nothing'}) for p in force_in_git])
 
 # leave clean
 # TODO only commit actually changed/added files

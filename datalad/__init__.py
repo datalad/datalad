@@ -34,9 +34,7 @@ try:
     colorama.init()
     atexit.register(colorama.deinit)
 except ImportError as e:
-    # To not interfer with carefully crafted order of imports
-    # delay possibly issuing a warning until all needed imports are done
-    colorama = None
+    pass
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
@@ -53,21 +51,15 @@ from .config import ConfigManager
 cfg = ConfigManager()
 
 from .log import lgr
-from datalad.utils import on_windows, get_encoding_info, get_envvars_info
+from datalad.utils import get_encoding_info, get_envvars_info, getpwd
+
+# To analyze/initiate our decision making on what current directory to return
+getpwd()
 
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close, allow_fail=False)
-
-if on_windows and colorama is None:
-    from datalad.dochelpers import exc_str
-
-    lgr.warning(
-        "'colorama' Python module missing, terminal output may look garbled ["
-        "%s]",
-        exc_str(e))
-
 atexit.register(lgr.log, 5, "Exiting")
 
 from .version import __version__
@@ -173,6 +165,21 @@ def setup_package():
     # obtain() since that one consults for the default value
     ui.set_backend(cfg.obtain('datalad.tests.ui.backend'))
 
+    # Monkey patch nose so it does not ERROR out whenever code asks for fileno
+    # of the output. See https://github.com/nose-devs/nose/issues/6
+    from six.moves import StringIO as OrigStringIO
+
+    class StringIO(OrigStringIO):
+        fileno = lambda self: 1
+        encoding = None
+
+    from nose.ext import dtcompat
+    from nose.plugins import capture, multiprocess, plugintest
+    dtcompat.StringIO = StringIO
+    capture.StringIO = StringIO
+    multiprocess.StringIO = StringIO
+    plugintest.StringIO = StringIO
+
 
 def teardown_package():
     import os
@@ -220,6 +227,8 @@ def teardown_package():
         os.environ['DATALAD_DATASETS_TOPURL'] = _test_states['DATASETS_TOPURL_ENV']
     consts.DATASETS_TOPURL = _test_states['DATASETS_TOPURL']
 
+    from datalad.support.cookies import cookies_db
+    cookies_db.close()
     from datalad.support.annexrepo import AnnexRepo
     AnnexRepo._ALLOW_LOCAL_URLS = False  # stay safe!
 

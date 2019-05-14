@@ -7,6 +7,7 @@ DataLad |---| data management and publication multitool: Documentation
    gettingstarted
    changelog
    acknowledgements
+   publications
 
 Concepts and technologies
 =========================
@@ -41,7 +42,7 @@ extensions.  Each extension provides its own documentation:
 - `Crawling web resources and automated data distributions <http://docs.datalad.org/projects/crawler>`_
 - `Neuroimaging data and workflows <http://docs.datalad.org/projects/neuroimaging>`_
 - `Containerized computational environments <http://docs.datalad.org/projects/container>`_
-
+- `Alternative set of basic commands with improved cross-platform support <http://docs.datalad.org/projects/revolution>`_
 
 Indices and tables
 ==================

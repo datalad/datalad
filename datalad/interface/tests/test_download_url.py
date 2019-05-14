@@ -20,19 +20,21 @@ from ...utils import chpwd
 from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
     assert_in, assert_false, assert_message, assert_result_count, \
     with_tempfile
+from ...tests.utils import assert_not_in
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
-from ...tests.utils import known_failure_direct_mode
 
 
 def test_download_url_exceptions():
-    res0 = download_url(['url1', 'url2'], path=__file__, on_failure='ignore')
+    res0 = download_url(['url1', 'url2'], path=__file__,
+                        save=False, on_failure='ignore')
     assert_result_count(res0, 1, status='error')
     assert_message('When specifying multiple urls, --path should point to '
                    'an existing directory. Got %r',
                    res0)
 
-    res1 = download_url('http://example.com/bogus', on_failure='ignore')
+    res1 = download_url('http://example.com/bogus',
+                        save=False, on_failure='ignore')
     assert_result_count(res1, 1, status='error')
     msg = res1[0]['message']
     # when running under bogus proxy, on older systems we could get
@@ -126,3 +128,5 @@ def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).create()
     ds.download_url([opj(topurl, "archive.tar.gz")], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
+    assert_not_in(opj(ds.path, "archive.tar.gz"),
+                  ds.repo.format_commit("%B"))

@@ -224,7 +224,7 @@ def retry_urlopen(url, retries=3):
 
 
 def is_url_quoted(url):
-    """Return either URL looks being already quoted
+    """Return whether URL looks being already quoted
     """
     try:
         url_ = urlunquote(url)
@@ -235,7 +235,7 @@ def is_url_quoted(url):
 
 
 def same_website(url_rec, u_rec):
-    """Decide either a link leads to external site
+    """Decide whether a link leads to external site
 
     Parameters
     ----------
@@ -775,7 +775,7 @@ class SSHRI(RI, RegexBasedURLMixin):
 
 
 class DataLadRI(RI, RegexBasedURLMixin):
-    """RI pointing to datasets within central DataLad super-dataset"""
+    """RI pointing to datasets within default DataLad super-dataset"""
 
     _FIELDS = RI._FIELDS + (
         'remote',

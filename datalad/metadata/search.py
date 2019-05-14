@@ -23,8 +23,11 @@ from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
-from six import reraise
-from six import iteritems
+from six import (
+    reraise,
+    iteritems,
+    PY2,
+)
 from time import time
 
 from datalad import cfg
@@ -34,15 +37,18 @@ from datalad.interface.utils import eval_results
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     require_dataset
-from datalad.distribution.utils import get_git_dir
+from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureInt
 
-from datalad.consts import LOCAL_CENTRAL_PATH
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
-from datalad.utils import assure_list, assure_iter, unicode_srctypes, as_unicode
-from datalad.utils import assure_unicode
+from datalad.utils import (
+    assure_list, assure_iter, unicode_srctypes, as_unicode,
+    assure_unicode,
+    get_suggestions_msg,
+    unique,
+)
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.ui import ui
 from datalad.dochelpers import single_or_plural
@@ -54,14 +60,30 @@ from datalad.metadata.metadata import query_aggregated_metadata
 _any2unicode = partial(as_unicode, cast_types=(int, float, tuple, list, dict))
 
 
-def _listdict2dictlist(lst):
+def _listdict2dictlist(lst, strict=True):
+    """Helper to deal with DataLad's unique value reports
+
+    Parameters
+    ----------
+    lst : list
+      List of dicts
+    strict : bool
+      In strict mode any dictionary items that doesn't have a simple value
+      (but another container) is discarded. In non-strict mode, arbitrary
+      levels of nesting are preserved, and no unique-ification of values
+      is performed. The latter can be used when it is mostly (or merely)
+      interesting to get a list of metadata keys.
+    """
     # unique values that we got, always a list
     if all(not isinstance(uval, dict) for uval in lst):
         # no nested structures, take as is
         return lst
 
+    type_excluder = (tuple, list)
+    if strict:
+        type_excluder += (dict,)
     # we need to turn them inside out, instead of a list of
-    # dicts, we want a dict where keys are lists, because we
+    # dicts, we want a dict where values are lists, because we
     # cannot handle hierarchies in a tabular search index
     # if you came here to find that out, go ahead and use a graph
     # DB/search
@@ -72,7 +94,7 @@ def _listdict2dictlist(lst):
             # in favor of the structured metadata
             continue
         for k, v in uv.items():
-            if isinstance(v, (tuple, list, dict)):
+            if isinstance(v, type_excluder):
                 # this is where we draw the line, two levels of
                 # nesting. whoosh can only handle string values
                 # injecting a stringified blob of something doesn't
@@ -81,8 +103,14 @@ def _listdict2dictlist(lst):
             if v == "":
                 # no cruft
                 continue
-            uvals = udict.get(k, set())
-            uvals.add(v)
+            if strict:
+                # no duplicate values, only hashable stuff
+                uvals = udict.get(k, set())
+                uvals.add(v)
+            else:
+                # whatever it is, we'll take it
+                uvals = udict.get(k, [])
+                uvals.append(v)
             udict[k] = uvals
     return {
         # set not good for JSON, have plain list
@@ -111,7 +139,7 @@ def _meta2autofield_dict(meta, val2str=True, schema=None, consider_ucn=True):
                     # ignore any generated unique value list in favor of the
                     # tailored data
                     continue
-                srcmeta[uk] = _listdict2dictlist(umeta[uk]) if umeta[uk] is not None else None
+                srcmeta[uk] = _listdict2dictlist(umeta[uk], strict=False) if umeta[uk] is not None else None
             if src not in meta and srcmeta:
                 meta[src] = srcmeta  # assign the new one back
 
@@ -173,17 +201,18 @@ def _search_from_virgin_install(dataset, query):
                 "searched, or run interactively to get assistance "
                 "installing a queriable superdataset."
             )
-        # none was provided so we could ask user either he possibly wants
+        # none was provided so we could ask user whether he possibly wants
         # to install our beautiful mega-duper-super-dataset?
         # TODO: following logic could possibly benefit other actions.
-        if os.path.exists(LOCAL_CENTRAL_PATH):
-            central_ds = Dataset(LOCAL_CENTRAL_PATH)
-            if central_ds.is_installed():
+        DEFAULT_DATASET_PATH = cfg.obtain('datalad.locations.default-dataset')
+        if os.path.exists(DEFAULT_DATASET_PATH):
+            default_ds = Dataset(DEFAULT_DATASET_PATH)
+            if default_ds.is_installed():
                 if ui.yesno(
                     title="No DataLad dataset found at current location",
                     text="Would you like to search the DataLad "
                          "superdataset at %r?"
-                          % LOCAL_CENTRAL_PATH):
+                          % DEFAULT_DATASET_PATH):
                     pass
                 else:
                     reraise(*exc_info)
@@ -192,14 +221,14 @@ def _search_from_virgin_install(dataset, query):
                     "No DataLad dataset found at current location. "
                     "The DataLad superdataset location %r exists, "
                     "but does not contain an dataset."
-                    % LOCAL_CENTRAL_PATH)
+                    % DEFAULT_DATASET_PATH)
         elif ui.yesno(
                 title="No DataLad dataset found at current location",
                 text="Would you like to install the DataLad "
                      "superdataset at %r?"
-                     % LOCAL_CENTRAL_PATH):
+                     % DEFAULT_DATASET_PATH):
             from datalad.api import install
-            central_ds = install(LOCAL_CENTRAL_PATH, source='///')
+            default_ds = install(DEFAULT_DATASET_PATH, source='///')
             ui.message(
                 "From now on you can refer to this dataset using the "
                 "label '///'"
@@ -209,9 +238,9 @@ def _search_from_virgin_install(dataset, query):
 
         lgr.info(
             "Performing search using DataLad superdataset %r",
-            central_ds.path
+            default_ds.path
         )
-        for res in central_ds.search(query):
+        for res in default_ds.search(query):
             yield res
         return
     else:
@@ -232,7 +261,18 @@ class _Search(object):
         raise NotImplementedError(args)
 
     def get_query(self, query):
+        """Prepare query structure specific for a search backend.
+
+        It can also memorize within instance some parameters of the last query
+        which could be used to assist output formatting/structuring later on
+        """
         raise NotImplementedError
+
+    def get_nohits_msg(self):
+        """Given what it knows, provide recommendation in the case of no hits"""
+        return "No search hits, wrong query? " \
+               "See 'datalad search --show-keys name' for known keys " \
+               "and 'datalad search --help' on how to prepare your query."
 
 
 class _WhooshSearch(_Search):
@@ -241,7 +281,7 @@ class _WhooshSearch(_Search):
 
         self.idx_obj = None
         # where does the bunny have the eggs?
-        self.index_dir = opj(self.ds.path, get_git_dir(self.ds.path), SEARCH_INDEX_DOTGITDIR)
+        self.index_dir = opj(self.ds.path, GitRepo.get_git_dir(ds), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
     def show_keys(self, mode):
@@ -281,9 +321,10 @@ class _WhooshSearch(_Search):
         `meta2doc` - must return dict for index document from result input
         """
         from whoosh import index as widx
-        from .metadata import agginfo_relpath
+        from .metadata import get_ds_aggregate_db_locations
+        dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
         # what is the lastest state of aggregated metadata
-        metadata_state = self.ds.repo.get_last_commit_hash(agginfo_relpath)
+        metadata_state = self.ds.repo.get_last_commit_hash(relpath(dbloc, start=self.ds.path))
         # use location common to all index types, they would all invalidate
         # simultaneously
         stamp_fname = opj(self.index_dir, 'datalad_metadata_state')
@@ -644,6 +685,10 @@ class _EGrepCSSearch(_Search):
     _mode_label = 'egrepcs'
     _default_documenttype = 'datasets'
 
+    def __init__(self, ds, **kwargs):
+        super(_EGrepCSSearch, self).__init__(ds, **kwargs)
+        self._queried_keys = None  # to be memoized by get_query
+
     # If there were custom "per-search engine" options, we could expose
     # --consider_ucn - search through unique content properties of the dataset
     #    which might be more computationally demanding
@@ -717,6 +762,54 @@ class _EGrepCSSearch(_Search):
         # use a dict already, later we need to map to a definition
         # meanwhile map to the values
 
+        keys = self._get_keys(mode)
+
+        for k in sorted(keys):
+            if mode == 'name':
+                from datalad.utils import assure_bytes
+                # without assure_bytes UnicodeEncodeError in PY2 when
+                # output is piped into e.g. grep
+                print(assure_bytes(k) if PY2 else k)
+                continue
+
+            # do a bit more
+            stat = keys[k]
+            uvals = stat.uvals
+            if mode == 'short':
+                # show only up to X uvals
+                if len(stat.uvals) > 10:
+                    uvals = {v for i, v in enumerate(uvals) if i < 10}
+            # all unicode still scares yoh -- he will just use repr
+            # def conv(s):
+            #     try:
+            #         return '{}'.format(s)
+            #     except UnicodeEncodeError:
+            #         return assure_unicode(s).encode('utf-8')
+            stat.uvals_str = assure_unicode(
+                "{} unique values: {}".format(
+                    len(stat.uvals), ', '.join(map(repr, uvals))))
+            if mode == 'short':
+                if len(stat.uvals) > 10:
+                    stat.uvals_str += ', ...'
+                if len(stat.uvals_str) > maxl:
+                    stat.uvals_str = stat.uvals_str[:maxl-4] + ' ....'
+            elif mode == 'full':
+                pass
+            else:
+                raise ValueError(
+                    "Unknown value for stats. Know full and short")
+
+            print(
+                '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
+                k=k, stat=stat
+            ))
+        # After #2156 datasets may not necessarily carry all
+        # keys in the "unique" summary
+        lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
+
+
+    def _get_keys(self, mode=None):
+        """Return keys and their statistics if mode != 'name'."""
         class key_stat:
             def __init__(self):
                 self.ndatasets = 0  # how many datasets have this field
@@ -724,7 +817,6 @@ class _EGrepCSSearch(_Search):
 
         from collections import defaultdict
         keys = defaultdict(key_stat)
-
         for res in query_aggregated_metadata(
                 # XXX TODO After #2156 datasets may not necessarily carry all
                 # keys in the "unique" summary
@@ -761,69 +853,78 @@ class _EGrepCSSearch(_Search):
                         % (nunhashable, len(kvals))
                     }
                 keys[k].uvals |= kvals_set
-
-        for k in sorted(keys):
-            if mode == 'name':
-                print(k)
-                continue
-
-            # do a bit more
-            stat = keys[k]
-            uvals = stat.uvals
-            if mode == 'short':
-                # show only up to X uvals
-                if len(stat.uvals) > 10:
-                    uvals = {v for i, v in enumerate(uvals) if i < 10}
-            # all unicode still scares yoh -- he will just use repr
-            # def conv(s):
-            #     try:
-            #         return '{}'.format(s)
-            #     except UnicodeEncodeError:
-            #         return assure_unicode(s).encode('utf-8')
-            stat.uvals_str = assure_unicode(
-                "{} unique values: {}".format(
-                    len(stat.uvals), ', '.join(map(repr, uvals))))
-            if mode == 'short':
-                if len(stat.uvals) > 10:
-                    stat.uvals_str += ', ...'
-                if len(stat.uvals_str) > maxl:
-                    stat.uvals_str = stat.uvals_str[:maxl-4] + ' ....'
-            elif mode == 'full':
-                pass
-            else:
-                raise ValueError(
-                    "Unknown value for stats. Know full and short")
-
-            print(
-                '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
-                k=k, stat=stat
-            ))
+        return keys
 
     def get_query(self, query):
         query = assure_list(query)
         simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
         quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
-        query = [
+        query_rec_matches = [
             simple_fieldspec.match(q) or
             quoted_fieldspec.match(q) or
             q
             for q in query]
+        query_group_dicts_only = [
+            q.groupdict() for q in query_rec_matches if hasattr(q, 'groupdict')
+        ]
+        self._queried_keys = [
+            qgd['field']
+            for qgd in query_group_dicts_only
+            if ('field' in qgd and qgd['field'])
+        ]
+        if len(query_group_dicts_only) != len(query_rec_matches):
+            # we had a query element without field specification add
+            # None as an indicator of that
+            self._queried_keys.append(None)
         # expand matches, compile expressions
         query = [
             {k: re.compile(self._xfm_query(v)) for k, v in q.groupdict().items()}
             if hasattr(q, 'groupdict') else re.compile(self._xfm_query(q))
-            for q in query]
+            for q in query_rec_matches
+        ]
 
         # turn "empty" field specs into simple queries
         # this is used to forcibly disable field-based search
         # e.g. when searching for a value
-        query = [q['query'] if isinstance(q, dict) and q['field'].pattern == '' else q
+        query = [q['query']
+                 if isinstance(q, dict) and q['field'].pattern == '' else q
                  for q in query]
         return query
 
     def _xfm_query(self, q):
-        # implement potential transformations of regex before they get compiles
+        # implement potential transformations of regex before they get compiled
         return q
+
+    def get_nohits_msg(self):
+        """Given the query and performed search, provide recommendation
+
+        Quite often a key in the query is mistyped or I simply query for something
+        which is not actually known.  It requires --show-keys  run first, doing
+        visual search etc to mitigate.  Here we can analyze either all queried
+        keys are actually known, and if not known -- what would be the ones available.
+
+        Returns
+        -------
+        str
+          A sentence or a paragraph to be logged/output
+        """
+        #
+        queried_keys = self._queried_keys[:]
+        if queried_keys and None in queried_keys:
+            queried_keys.pop(queried_keys.index(None))
+        if not queried_keys:
+            return  # No keys were queried, we are of no use here
+        known_keys = self._get_keys(mode='name')
+        unknown_keys = sorted(list(set(queried_keys).difference(known_keys)))
+        if not unknown_keys:
+            return  # again we are of no help here
+        msg = super(_EGrepCSSearch, self).get_nohits_msg()
+        msg += " Following keys were not found in available metadata: %s. " \
+              % ", ".join(unknown_keys)
+        suggestions_msg = get_suggestions_msg(unknown_keys, known_keys)
+        if suggestions_msg:
+            msg += ' ' + suggestions_msg
+        return msg
 
 
 class _EGrepSearch(_EGrepCSSearch):
@@ -1066,8 +1167,7 @@ class Search(Interface):
             args=("--mode",),
             choices=('egrep', 'textblob', 'autofield'),
             doc="""Mode of search index structure and content. See section
-            SEARCH MODES for details.
-            """),
+            SEARCH MODES for details."""),
         full_record=Parameter(
             args=("--full-record", '-f'),
             action='store_true',
@@ -1153,8 +1253,12 @@ class Search(Interface):
             print(repr(searcher.get_query(query)))
             return
 
+        nhits = 0
         for r in searcher(
                 query,
                 max_nresults=max_nresults,
                 full_record=full_record):
+            nhits += 1
             yield r
+        if not nhits:
+            lgr.info(searcher.get_nohits_msg() or 'no hits')

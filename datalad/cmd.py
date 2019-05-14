@@ -16,24 +16,33 @@ import subprocess
 import sys
 import logging
 import os
-import shutil
 import shlex
 import atexit
 import functools
 import tempfile
 
 from collections import OrderedDict
-from six import PY3, PY2
-from six import string_types, binary_type, text_type
+from six import (
+    PY3,
+    PY2,
+    string_types,
+    binary_type,
+    text_type,
+)
 from .support import path as op
-
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol, DryRunProtocol, \
-    ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
+from .support.protocol import (
+    NullProtocol,
+    ExecutionTimeProtocol,
+    ExecutionTimeExternalsProtocol,
+)
 from .utils import (
-    on_windows, get_tempfile_kwargs, assure_unicode, assure_bytes,
+    on_windows,
+    get_tempfile_kwargs,
+    assure_unicode,
+    assure_bytes,
     unlink,
 )
 from .dochelpers import borrowdoc
@@ -91,7 +100,8 @@ def _get_output_stream(log_std, false_value):
 
 
 def _cleanup_output(stream, std):
-    if isinstance(stream, file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+    if isinstance(stream, file_class) and \
+        _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
         if not stream.closed:
             stream.close()
         if op.exists(stream.name):
@@ -130,7 +140,7 @@ class Runner(object):
         protocol: ProtocolInterface
              Protocol object to write to.
         log_outputs : bool, optional
-             Switch to instruct either outputs should be logged or not.  If not
+             Switch to instruct whether outputs should be logged or not.  If not
              set (default), config 'datalad.log.outputs' would be consulted
         """
 
@@ -156,7 +166,7 @@ class Runner(object):
         self.protocol = protocol
         # Various options for logging
         self._log_opts = {}
-        # we don't know yet either we need ot log every output or not
+        # we don't know yet whether we need to log every output or not
         if log_outputs is not None:
             self._log_opts['outputs'] = log_outputs
 
@@ -307,8 +317,8 @@ class Runner(object):
             if log_stderr_:
                 stderr_ = self._process_one_line(*stderr_args)
                 stderr += stderr_
-            if not (stdout_ or stderr_):
-                # no output was generated, so sleep a tiny bit
+            if stdout_ is None and stderr_ is None:
+                # no output was really produced, so sleep a tiny bit
                 time.sleep(0.001)
 
         # Handle possible remaining output
@@ -323,8 +333,8 @@ class Runner(object):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
         out = binary_type()
-        if isinstance(stream,
-                      file_class) and _MAGICAL_OUTPUT_MARKER in stream.name:
+        if isinstance(stream, file_class) and \
+                _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
             if not stream.closed:
                 stream.close()
@@ -394,7 +404,7 @@ class Runner(object):
             If True, stderr is logged. Goes to sys.stderr otherwise.
 
         log_online: bool, optional
-            Either to log as output comes in.  Setting to True is preferable
+            Whether to log as output comes in.  Setting to True is preferable
             for running user-invoked actions to provide timely output
 
         expect_stderr: bool, optional
@@ -439,6 +449,15 @@ class Runner(object):
         errstream = _get_output_stream(log_stderr, sys.stderr)
 
         popen_env = env or self.env
+        popen_cwd = cwd or self.cwd
+        if PY2:
+            popen_cwd = assure_bytes(popen_cwd)
+
+        if popen_cwd and popen_env and 'PWD' in popen_env:
+            # we must have inherited PWD, but cwd was provided, so we must
+            # adjust it
+            popen_env = popen_env.copy()  # to avoid side-effects
+            popen_env['PWD'] = popen_cwd
 
         # TODO: if outputstream is sys.stdout and that one is set to StringIO
         #       we have to "shim" it with something providing fileno().
@@ -452,7 +471,7 @@ class Runner(object):
         log_args = [cmd]
         if self.log_cwd:
             log_msgs += ['cwd=%r']
-            log_args += [cwd or self.cwd]
+            log_args += [popen_cwd]
         if self.log_stdin:
             log_msgs += ['stdin=%r']
             log_args += [stdin]
@@ -482,7 +501,7 @@ class Runner(object):
                                         stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
-                                        cwd=cwd or self.cwd,
+                                        cwd=popen_cwd,
                                         env=popen_env,
                                         stdin=stdin)
 
@@ -526,11 +545,11 @@ class Runner(object):
 
                 if status not in [0, None]:
                     msg = "Failed to run %r%s. Exit code=%d.%s%s" \
-                        % (cmd, " under %r" % (cwd or self.cwd), status,
+                        % (cmd, " under %r" % (popen_cwd), status,
                            "" if log_online else " out=%s" % out[0],
                            "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(str(cmd), msg, status, out[0], out[1])
+                    raise CommandError(text_type(cmd), msg, status, out[0], out[1])
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
@@ -665,6 +684,7 @@ class GitRunner(Runner):
 
         if 'GIT_SSH_COMMAND' not in git_env:
             git_env['GIT_SSH_COMMAND'] = GIT_SSH_COMMAND
+            git_env['GIT_SSH_VARIANT'] = 'ssh'
 
         return git_env
 
@@ -674,41 +694,3 @@ class GitRunner(Runner):
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
         return assure_unicode(out), assure_unicode(err)
-
-
-# ####
-# Preserve from previous version
-# TODO: document intention
-# ####
-# this one might get under Runner for better output/control
-def link_file_load(src, dst, dry_run=False):
-    """Just a little helper to hardlink files's load
-    """
-    dst_dir = op.dirname(dst)
-    if not op.exists(dst_dir):
-        os.makedirs(dst_dir)
-    if op.lexists(dst):
-        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
-        # TODO: how would it interact with git/git-annex
-        unlink(dst)
-    lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
-    src_realpath = op.realpath(src)
-
-    try:
-        os.link(src_realpath, dst)
-    except AttributeError as e:
-        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
-        shutil.copyfile(src_realpath, dst)
-        shutil.copystat(src_realpath, dst)
-    else:
-        lgr.log(2, "Hardlinking finished")
-
-
-def get_runner(*args, **kwargs):
-    # needs local import, because the ConfigManager itself needs the runner
-    from . import cfg
-    # TODO:  this is all crawl specific -- should be moved away
-    if cfg.obtain('datalad.crawl.dryrun', default=False):
-        kwargs = kwargs.copy()
-        kwargs['protocol'] = DryRunProtocol()
-    return Runner(*args, **kwargs)

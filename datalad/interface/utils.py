@@ -35,6 +35,7 @@ import json
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
+from datalad.utils import assure_unicode
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
@@ -178,7 +179,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
       Path to a start or top-level dataset. Really has to be a path to a
       dataset!
     targetpaths : list(path)
-      Any non-zero number of path that are termination points for the
+      Any non-zero number of paths that are termination points for the
       search algorithm. Can be paths to datasets, directories, or files
       (and any combination thereof).
     current_trace : list
@@ -217,7 +218,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = opj(basepath, p)
+            p = assure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True
@@ -330,6 +331,7 @@ def eval_results(func):
 
         # retrieve common options from kwargs, and fall back on the command
         # class attributes, or general defaults if needed
+        kwargs = kwargs.copy()  # we will pop, which might cause side-effect
         common_params = {
             p_name: kwargs.pop(
                 p_name,
@@ -413,6 +415,12 @@ def eval_results(func):
                             **_kwargs):
                         yield r
 
+            # if a custom summary is to be provided, collect the results
+            # of the command execution
+            results = []
+            do_custom_result_summary = result_renderer == 'tailored' \
+                and hasattr(_func_class, 'custom_result_summary_renderer')
+
             # process main results
             for r in _process_results(
                     wrapped(*_args, **_kwargs),
@@ -420,6 +428,9 @@ def eval_results(func):
                     on_failure, incomplete_results,
                     result_renderer, result_xfm, _result_filter, **_kwargs):
                 yield r
+                # collect if summary is desired
+                if do_custom_result_summary:
+                    results.append(r)
 
             if proc_post and cmdline_name != 'run-procedure':
                 from datalad.interface.run_procedure import RunProcedure
@@ -437,7 +448,10 @@ def eval_results(func):
                         yield r
 
             # result summary before a potential exception
-            if result_renderer == 'default' and action_summary and \
+            # custom first
+            if do_custom_result_summary:
+                _func_class.custom_result_summary_renderer(results)
+            elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
                 # action performed
@@ -478,6 +492,24 @@ def eval_results(func):
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
+
+
+def default_result_renderer(res):
+    if res.get('status', None) != 'notneeded':
+        ui.message('{action}({status}): {path}{type}{msg}'.format(
+                action=ac.color_word(res['action'], ac.BOLD),
+                status=ac.color_status(res['status']),
+                path=relpath(res['path'],
+                             res['refds']) if res.get('refds', None) else res[
+                    'path'],
+                type=' ({})'.format(
+                        ac.color_word(res['type'], ac.MAGENTA)
+                ) if 'type' in res else '',
+                msg=' [{}]'.format(
+                        res['message'][0] % res['message'][1:]
+                        if isinstance(res['message'], tuple) else res[
+                            'message'])
+                if 'message' in res else ''))
 
 
 def _process_results(
@@ -546,25 +578,14 @@ def _process_results(
         if result_renderer is None or result_renderer == 'disabled':
             pass
         elif result_renderer == 'default':
-            # TODO have a helper that can expand a result message
-            ui.message('{action}({status}): {path}{type}{msg}'.format(
-                action=ac.color_word(res['action'], ac.BOLD),
-                status=ac.color_status(res['status']),
-                path=relpath(res['path'],
-                             res['refds']) if res.get('refds', None) else res['path'],
-                type=' ({})'.format(
-                    ac.color_word(res['type'], ac.MAGENTA)
-                    ) if 'type' in res else '',
-                msg=' [{}]'.format(
-                    res['message'][0] % res['message'][1:]
-                    if isinstance(res['message'], tuple) else res['message'])
-                if 'message' in res else ''))
+            default_result_renderer(res)
         elif result_renderer in ('json', 'json_pp'):
             ui.message(json.dumps(
                 {k: v for k, v in res.items()
                  if k not in ('message', 'logger')},
                 sort_keys=True,
-                indent=2 if result_renderer.endswith('_pp') else None))
+                indent=2 if result_renderer.endswith('_pp') else None,
+                default=lambda x: str(x)))
         elif result_renderer == 'tailored':
             if hasattr(cmd_class, 'custom_result_renderer'):
                 cmd_class.custom_result_renderer(res, **kwargs)

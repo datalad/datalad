@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 from itertools import dropwhile
 import json
-import os
 import os.path as op
 import re
 import sys
@@ -23,8 +22,6 @@ from datalad.dochelpers import exc_str
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.interface.diff import Diff
-from datalad.interface.unlock import Unlock
 from datalad.interface.results import get_status_dict
 from datalad.interface.run import run_command
 from datalad.interface.run import format_command
@@ -33,7 +30,6 @@ from datalad.interface.run import _format_cmd_shorty
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
 from datalad.support.constraints import EnsureNone, EnsureStr
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.param import Parameter
 from datalad.support.json_py import load_stream
 
@@ -212,7 +208,7 @@ class Rerun(Interface):
                 message="branch '{}' already exists".format(branch))
             return
 
-        if not commit_exists(ds, revision + "^"):
+        if not ds.repo.commit_exists(revision + "^"):
             # Only a single commit is reachable from `revision`.  In
             # this case, --since has no effect on the range construction.
             revrange = revision
@@ -244,7 +240,7 @@ class Rerun(Interface):
 def _revs_as_results(dset, revs):
     for rev in revs:
         res = get_status_dict("run", ds=dset, commit=rev)
-        full_msg = dset.repo.repo.git.show(rev, "--format=%B", "--no-patch")
+        full_msg = dset.repo.format_commit("%B", rev)
         try:
             msg, info = get_run_info(dset, full_msg)
         except ValueError as exc:
@@ -294,14 +290,18 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         # that, regardless of if and how --since is specified, the effective
         # value for --since is the parent of the first revision.
         onto = results[0]["commit"] + "^"
-        if not commit_exists(dset, onto):
-            # This is unlikely to happen in the wild because it means that the
-            # first commit is a datalad run commit. Just abort rather than
-            # trying to checkout on orphan branch or something like that.
-            yield get_status_dict(
-                "run", ds=dset, status="error",
-                message="Commit for --onto does not exist.")
-            return
+
+    if onto and not dset.repo.commit_exists(onto):
+        # This happens either because the user specifies a value that doesn't
+        # exists or the results first parent doesn't exist. The latter is
+        # unlikely to happen in the wild because it means that the first commit
+        # is a datalad run commit. Just abort rather than trying to checkout an
+        # orphan branch or something like that.
+        yield get_status_dict(
+            "run", ds=dset, status="error",
+            message=("Revision specified for --onto (%s) does not exist.",
+                     onto))
+        return
 
     start_point = onto or "HEAD"
     if branch or onto:
@@ -314,12 +314,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
             status="ok")
 
     def rev_is_ancestor(rev):
-        try:
-            dset.repo.repo.git.merge_base("--is-ancestor", rev, start_point)
-        except GitCommandError:
-            # Revision is NOT an ancestor of the starting point.
-            return False
-        return True
+        return dset.repo.is_ancestor(rev, start_point)
 
     # We want to skip revs before the starting point and pick those after.
     to_pick = set(dropwhile(rev_is_ancestor, [r["commit"] for r in results]))
@@ -327,7 +322,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     def skip_or_pick(hexsha, result, msg):
         pick = hexsha in to_pick
         result["rerun_action"] = "pick" if pick else "skip"
-        shortrev = dset.repo.repo.git.rev_parse("--short", hexsha)
+        shortrev = dset.repo.get_hexsha(hexsha, short=True)
         result["message"] = (
             "%s %s; %s",
             shortrev, msg, "cherry picking" if pick else "skipping")
@@ -364,9 +359,7 @@ def _rerun(dset, results):
             dset.repo.checkout(res["commit"],
                                options=checkout_options)
         elif rerun_action == "pick":
-            dset.repo._git_custom_command(
-                None, ["git", "cherry-pick", res["commit"]],
-                check_fake_dates=True)
+            dset.repo.cherry_pick(res["commit"])
             yield res
         elif rerun_action == "run":
             hexsha = res["commit"]
@@ -393,6 +386,7 @@ def _rerun(dset, results):
             for r in run_command(run_info['cmd'],
                                  dataset=dset,
                                  inputs=run_info.get("inputs", []),
+                                 extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
                                  rerun_outputs=auto_outputs,
                                  message=message,
@@ -407,8 +401,7 @@ def _report(dset, results):
                 res["diff"] = list(res["diff"])
                 # Add extra information that is useful in the report but not
                 # needed for the rerun.
-                out = dset.repo.repo.git.show(
-                    "--no-patch", "--format=%an%x00%aI", res["commit"])
+                out = dset.repo.format_commit("%an%x00%aI", res["commit"])
                 res["author"], res["date"] = out.split("\0")
         yield res
 
@@ -428,7 +421,7 @@ def _get_script_handler(script, since, revision):
         ofh.write(header.format(
             script=script,
             since="" if since is None else " --since=" + since,
-            revision=dset.repo.repo.git.rev_parse(revision),
+            revision=dset.repo.get_hexsha(revision),
             ds='dataset {} at '.format(dset.id) if dset.id else '',
             path=dset.path))
 
@@ -442,14 +435,16 @@ def _get_script_handler(script, since, revision):
 
             run_info = res["run_info"]
             cmd = run_info["cmd"]
-            msg = res["run_message"]
-            if msg == _format_cmd_shorty(cmd):
-                msg = ''
 
             expanded_cmd = format_command(
-                cmd, **dict(run_info,
-                            dspath=dset.path,
-                            pwd=op.join(dset.path, run_info["pwd"])))
+                dset, cmd,
+                **dict(run_info,
+                       dspath=dset.path,
+                       pwd=op.join(dset.path, run_info["pwd"])))
+
+            msg = res["run_message"]
+            if msg == _format_cmd_shorty(expanded_cmd):
+                msg = ''
 
             ofh.write(
                 "\n" + "".join("# " + ln
@@ -513,7 +508,6 @@ def get_run_info(dset, message):
             default=op.join('.datalad', 'runinfo'))
         record_path = op.join(dset.path, record_dir, runinfo)
         if not op.lexists(record_path):
-            # too harsh IMHO, but same harshness as few lines further down
             raise ValueError("Run record sidecar file not found: {}".format(record_path))
         # TODO `get` the file
         recs = load_stream(record_path, compressed=True)
@@ -537,7 +531,7 @@ def diff_revision(dataset, revision="HEAD"):
     -------
     Generator that yields AnnotatePaths instances
     """
-    if commit_exists(dataset, revision + "^"):
+    if dataset.repo.commit_exists(revision + "^"):
         revrange = "{rev}^..{rev}".format(rev=revision)
     else:
         # No other commits are reachable from this revision.  Diff
@@ -557,11 +551,3 @@ def new_or_modified(diff_results):
         if r.get('type') == 'file' and r.get('state') in ['added', 'modified']:
             r.pop('status', None)
             yield r
-
-
-def commit_exists(dataset, commit):
-    try:
-        dataset.repo.repo.git.rev_parse("--verify", commit + "^{commit}")
-    except:
-        return False
-    return True

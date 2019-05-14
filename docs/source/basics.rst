@@ -22,6 +22,42 @@ A DataLad :term:`dataset` is a Git repository that may or may not have a data
 :term:`annex` that is used to manage data referenced in a dataset. In practice,
 most DataLad datasets will come with an annex.
 
+Types of IDs used in datasets
+-----------------------------
+
+Four types of unique identifiers are used by DataLad to enable identification
+of different aspects of datasets and their components.
+
+Dataset ID
+  A UUID that identifies a dataset as a whole across its entire history and
+  flavors. This ID is stored in a dataset's own configuration file
+  (``<dataset root>/.datalad/config``) under the configuration key
+  ``datalad.dataset.id``.
+  As this configuration is stored in a file that is part of the Git history of
+  a dataset, this ID is identical for all "clones" of a dataset and across all
+  its versions. If the purpose or scope of a dataset changes enough to warrant
+  a new dataset ID, it can be changed by altering the dataset configuration
+  setting.
+Annex ID
+  A UUID assigned to an annex of each individual clone of a dataset repository.
+  Git-annex uses this UUID to track file content availability information. The
+  UUID is available under the configuration key ``annex.uuid`` and is stored
+  in the configuration file of a local clone (``<dataset root>/.git/config``).
+  A single dataset instance (i.e. clone) can only have a single annex UUID,
+  but a dataset with multiple clones will have multiple annex UUIDs.
+Commit ID
+  A Git hexsha or tag that identifies a version of a dataset. This ID uniquely
+  identifies the content and history of a dataset up to its present state. As
+  the dataset history also includes the dataset ID, a commit ID of a DataLad
+  dataset is unique to a particular dataset.
+Content ID
+  Git-annex key (typically a checksum) assigned to the content of a file in
+  a dataset's annex. The checksum reflects the content of a file, not its name.
+  Hence the content of multiple identical files in a single (or across)
+  dataset(s) will have the same checksum. Content IDs are managed by Git-annex
+  in a dedicated ``annex`` branch of the dataset's Git repository.
+
+
 Dataset nesting
 ---------------
 
@@ -78,19 +114,21 @@ API principles
 
 You can use DataLad's ``install`` command to download datasets. The command accepts
 URLs of different protocols (``http``, ``ssh``) as an argument. Nevertheless, the easiest way
-to obtain a first dataset is downloading the canonical :term:`superdataset` from
+to obtain a first dataset is downloading the default :term:`superdataset` from
 http://datasets.datalad.org/ using a shortcut.
 
-Downloading DataLad's canonical superdataset
+Downloading DataLad's default superdataset
 --------------------------------------------
 
-DataLad's canonical :term:`superdataset` provides an automated collection of datasets
-from various portals and sites. The argument ``///`` can be used 
+http://datasets.datalad.org provides a super-dataset consisting of datasets
+from various portals and sites.  Many of them were crawled, and periodically
+updated, using `datalad-crawler <https://github.com/datalad/datalad-crawler>`__
+extension.  The argument ``///`` can be used
 as a shortcut that points to the superdataset located at http://datasets.datalad.org/. 
 Here are three common examples in command line notation:
 
 ``datalad install ///``
-    installs the canonical superdataset (metadata without subdatasets) in a
+    installs this superdataset (metadata without subdatasets) in a
     `datasets.datalad.org/` subdirectory under the current directory
 ``datalad install -r ///openfmri``
     installs the openfmri superdataset into an `openfmri/` subdirectory.
@@ -100,6 +138,11 @@ Here are three common examples in command line notation:
     installs the superdataset of datasets released by the lab of Dr. James V. Haxby
     and all subdatasets' metadata. The ``-g`` flag indicates getting the actual data, too.
     It does so by using 3 parallel download processes (``-J3`` flag).
+
+:ref:`datalad search <man_datalad-search>` command, if ran outside of any dataset,
+will install this default superdataset under a path specified in
+``datalad.locations.default-dataset`` :ref:`configuration <configuration>`
+variable (by default ``$HOME/datalad``).
 
 Downloading datasets via http
 -----------------------------
@@ -133,7 +176,7 @@ relative to the current directory.
 There are also some useful pre-defined "shortcut" values for dataset arguments:
 
 ``///``
-   refers to the "canonical" dataset located under `$HOME/datalad/`.
+   refers to the "default" dataset located under `$HOME/datalad/`.
    So running ``datalad install -d/// crcns`` will install the ``crcns`` subdataset
    under ``$HOME/datalad/crcns``.  This is the same as running
    ``datalad install $HOME/datalad/crcns``.

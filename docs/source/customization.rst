@@ -173,6 +173,8 @@ The following keys should exists if possible:
     expansion.
 
 
+.. _sec_extension_packages:
+
 Extension packages
 ^^^^^^^^^^^^^^^^^^
 

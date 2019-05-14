@@ -8,6 +8,7 @@
 
 import sys
 import platform
+import os
 from os.path import dirname
 from os.path import join as opj
 from os.path import sep as pathsep
@@ -48,17 +49,13 @@ keyring_requires = ['keyring>=8.0', 'keyrings.alt']
 pbar_requires = ['tqdm']
 
 dist = platform.dist()
+# Identical to definition in datalad.utils
+platform_system = platform.system().lower()
+on_windows = platform_system == 'windows'
+
 # on oldstable Debian let's ask for lower versions of keyring
 if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
     keyring_requires = ['keyring<8.0']
-
-# lzma is included in python since 3.3
-# We now support backports.lzma as well (besides AutomagicIO), but since
-# there is not way to define an alternative here (AFAIK, yoh), we will
-# use pyliblzma as the default for now.  Patch were you would prefer
-# backports.lzma instead
-req_lzma = ['pyliblzma'] if sys.version_info < (3, 3) else []
-
 
 requires = {
     'core': [
@@ -72,7 +69,9 @@ requires = {
         'patool>=1.7',
         'six>=1.8.0',
         'wrapt',
-    ] + pbar_requires,
+    ] +
+    pbar_requires +
+    (['colorama'] if on_windows else []),
     'downloaders': [
         'boto',
         'msgpack',
@@ -97,19 +96,28 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        # lzma is included in python since 3.3
+        # We now support backports.lzma as well (besides AutomagicIO), but since
+        # there is not way to define an alternative here (AFAIK, yoh), we will
+        # use pyliblzma as the default for now.  Patch were you would prefer
+        # backports.lzma instead
+        'pyliblzma; python_version < "3.3"',
         # was added in https://github.com/datalad/datalad/pull/1995 without
         # due investigation, should not be needed until we add duecredit support
         # 'duecredit',
         'simplejson',
         'whoosh',
-    ] + req_lzma,
+    ],
     'metadata-extra': [
         'PyYAML',  # very optional
         'mutagen>=1.36',  # audio metadata
         'exifread',  # EXIF metadata
         'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
         'Pillow',  # generic image metadata
-    ]
+    ],
+    'duecredit': [
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+    ],
 }
 
 requires['full'] = sum(list(requires.values()), [])
@@ -120,13 +128,14 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx',
+        'sphinx>=1.7.8',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
         'asv',
         'nose-timer',
         'psutil',
+        'coverage',
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
@@ -215,6 +224,7 @@ setup(
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
     **setup_kwargs

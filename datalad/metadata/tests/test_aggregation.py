@@ -10,10 +10,10 @@
 """Test metadata aggregation"""
 
 
+import os.path as op
 from os.path import join as opj
 
 from datalad.api import metadata
-from datalad.api import install
 from datalad.distribution.dataset import Dataset
 
 
@@ -160,8 +160,7 @@ def test_reaggregate_with_unavailable_objects(path):
     base.aggregate_metadata(recursive=True, update_mode='all')
     ok_clean_git(base.path)
     objpath = opj('.datalad', 'metadata', 'objects')
-    # weird that it comes out as a string...
-    objs = [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
+    objs = list(sorted(base.repo.find(objpath)))
     # we have 3x2 metadata sets (dataset/files) under annex
     eq_(len(objs), 6)
     eq_(all(base.repo.file_has_content(objs)), True)
@@ -176,7 +175,7 @@ def test_reaggregate_with_unavailable_objects(path):
     # and there are no new objects
     eq_(
         objs,
-        [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
+        list(sorted(base.repo.find(objpath)))
     )
 
 
@@ -240,7 +239,7 @@ def test_publish_aggregated(path):
     base.publish('.', to='local_target', transfer_data='all')
     remote = Dataset(spath)
     objpath = opj('.datalad', 'metadata', 'objects')
-    objs = [o for o in sorted(base.repo.find(objpath).split('\n')) if o]
+    objs = list(sorted(base.repo.find(objpath)))
     # all object files a present in both datasets
     eq_(all(base.repo.file_has_content(objs)), True)
     eq_(all(remote.repo.file_has_content(objs)), True)
@@ -259,9 +258,9 @@ def _get_contained_objs(ds):
 
 
 def _get_referenced_objs(ds):
-    return set([opj('.datalad', 'metadata', r[f])
-               for r in ds.metadata(get_aggregates=True)
-               for f in ('content_info', 'dataset_info')])
+    return set([op.relpath(r[f], start=ds.path)
+                for r in ds.metadata(get_aggregates=True)
+                for f in ('content_info', 'dataset_info')])
 
 
 @with_tree(tree=_dataset_hierarchy_template)
@@ -367,6 +366,16 @@ def test_partial_aggregation(path):
     sub1 = ds.create('sub1', force=True)
     sub2 = ds.create('sub2', force=True)
     ds.add('.', recursive=True)
+
+    # if we aggregate a path(s) and say to recurse, we must not recurse into
+    # the dataset itself and aggregate others
+    ds.aggregate_metadata(path='sub1', recursive=True)
+    res = ds.metadata(get_aggregates=True)
+    assert_result_count(res, 1, path=ds.path)
+    assert_result_count(res, 1, path=sub1.path)
+    # so no metadata aggregates for sub2 yet
+    assert_result_count(res, 0, path=sub2.path)
+
     ds.aggregate_metadata(recursive=True)
     # baseline, recursive aggregation gets us something for all three datasets
     res = ds.metadata(get_aggregates=True)
@@ -374,7 +383,7 @@ def test_partial_aggregation(path):
     # now let's do partial aggregation from just one subdataset
     # we should not loose information on the other datasets
     # as this would be a problem any time anything in a dataset
-    # subtree is missing: no installed, too expensive to reaggregate, ...
+    # subtree is missing: not installed, too expensive to reaggregate, ...
     ds.aggregate_metadata(path='sub1', incremental=True)
     res = ds.metadata(get_aggregates=True)
     assert_result_count(res, 3)

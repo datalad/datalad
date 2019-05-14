@@ -6,8 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Provide access to stuff (html, data files) via HTTP and HTTPS
-
+"""Provide access to Amazon S3 objects.
 """
 
 import re
@@ -29,7 +28,7 @@ from ..support.status import FileStatus
 
 import logging
 from logging import getLogger
-lgr = getLogger('datalad.http')
+lgr = getLogger('datalad.s3')
 boto_lgr = logging.getLogger('boto')
 # not in effect at all, probably those are setup later
 #boto_lgr.handlers = lgr.handlers  # Use our handlers
@@ -158,7 +157,7 @@ class S3Downloader(BaseDownloader):
         # We are often working with urlencoded URLs so we could safely interact
         # with git-annex via its text based protocol etc.  So, if URL looks like
         # it was urlencoded the filepath, we should revert back to an original key
-        # name.  Since we did not demarkate either it was urlencoded, we will do
+        # name.  Since we did not demarcate whether it was urlencoded, we will do
         # magical check, which would fail if someone had % followed by two digits
         filepath = rec.path.lstrip('/')
         if re.search('%[0-9a-fA-F]{2}', filepath):
@@ -175,7 +174,7 @@ class S3Downloader(BaseDownloader):
         ----------
         allow_old: bool, optional
           If a Downloader allows for persistent sessions by some means -- flag
-          instructs either to use previous session, or establish a new one
+          instructs whether to use previous session, or establish a new one
 
         Returns
         -------

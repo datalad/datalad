@@ -12,6 +12,7 @@ import os
 from mock import patch
 
 from ..s3 import S3Authenticator
+from ..s3 import S3Downloader
 from ..providers import Providers  # to test against crcns
 
 from ...tests.utils import swallow_outputs
@@ -22,8 +23,10 @@ from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import assert_raises
 from ...tests.utils import skip_if_no_network
+from ...tests.utils import with_testsui
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
+from ...support.exceptions import AccessDeniedError
 
 try:
     import boto
@@ -105,3 +108,15 @@ def test_parse_url():
     assert_equal(f("s3://b/f%20name"), ('b', 'f name', {}))
     assert_equal(f("s3://b/f%2Bname"), ('b', 'f+name', {}))
     assert_equal(f("s3://b/f%2bname?r=%20"), ('b', 'f+name', {'r': '%20'}))
+
+
+@with_testsui(interactive=True)
+def test_deny_access():
+    downloader = S3Downloader(authenticator=S3Authenticator())
+
+    def deny_access(*args, **kwargs):
+        raise AccessDeniedError
+
+    with assert_raises(DownloadError):
+        with patch.object(downloader, '_download', deny_access):
+            downloader.download("doesn't matter")

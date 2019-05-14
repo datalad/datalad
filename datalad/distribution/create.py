@@ -41,9 +41,6 @@ from datalad.support.gitrepo import GitRepo
 from datalad.utils import getpwd
 from datalad.utils import get_dataset_root
 
-# required to get the binding of `add` as a dataset method
-from datalad.distribution.add import Add
-
 from .dataset import Dataset
 from .dataset import datasetmethod
 from .dataset import EnsureDataset
@@ -360,8 +357,13 @@ class Create(Interface):
         # record an ID for this repo for the afterlife
         # to be able to track siblings and children
         id_var = 'datalad.dataset.id'
+
+        # Note, that Dataset property `id` will change when we unset the
+        # respective config. Therefore store it before:
+        tbds_id = tbds.id
         if id_var in tbds.config:
-            # make sure we reset this variable completely, in case of a re-create
+            # make sure we reset this variable completely, in case of a
+            # re-create
             tbds.config.unset(id_var, where='dataset')
 
         if _seed is None:
@@ -372,12 +374,12 @@ class Create(Interface):
             uuid_id = str(uuid.UUID(int=random.getrandbits(128)))
         tbds.config.add(
             id_var,
-            tbds.id if tbds.id is not None else uuid_id,
+            tbds_id if tbds_id is not None else uuid_id,
             where='dataset')
 
         add_to_git.append('.datalad')
 
-        # make sure that v6 annex repos never commit content under .datalad
+        # make sure that v6+ annex repos never commit content under .datalad
         attrs_cfg = (
             ('config', 'annex.largefiles', 'nothing'),
             ('metadata/aggregate*', 'annex.largefiles', 'nothing'),

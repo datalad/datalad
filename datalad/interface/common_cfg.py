@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
-from os.path import join as opj
+from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
 from datalad.support.constraints import EnsureNone
@@ -43,6 +43,14 @@ definitions = {
                'text': 'Where should datalad cache files?'}),
         'destination': 'global',
         'default': dirs.user_cache_dir,
+    },
+    'datalad.locations.default-dataset': {
+        'ui': ('question', {
+               'title': 'Default dataset path',
+               'text': 'Where should datalad should look for (or install) a '
+                       'default dataset?'}),
+        'destination': 'global',
+        'default': opj(expanduser('~'), 'datalad'),
     },
     'datalad.locations.system-plugins': {
         'ui': ('question', {
@@ -97,6 +105,12 @@ definitions = {
             'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.'}),
         'type': EnsureInt(),
         'default': 1112911993,
+    },
+    'datalad.github.token-note': {
+        'ui': ('question', {
+            'title': 'Github token note',
+            'text': 'Description for a Personal access token to generate.'}),
+        'default': 'DataLad',
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
@@ -192,7 +206,7 @@ definitions = {
     },
     'datalad.log.outputs': {
         'ui': ('question', {
-               'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+               'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
@@ -211,6 +225,12 @@ definitions = {
     'datalad.cmd.protocol.prefix': {
         'ui': ('question', {
                'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
+    },
+    'datalad.ssh.identityfile': {
+        'ui': ('question', {
+               'title': "If set, pass this file as ssh's -i option."}),
+        'destination': 'global',
+        'default': None,
     },
     'datalad.repo.direct': {
         'ui': ('yesno', {
@@ -263,7 +283,7 @@ definitions = {
         'ui': ('question', {
                'title': 'Limit configuration annexing aggregated metadata in new dataset',
                'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
-        'default': 'largerthan=20kb',
+        'default': 'anything',
     },
     'datalad.runtime.raiseonerror': {
         'ui': ('question', {
@@ -285,5 +305,12 @@ definitions = {
                'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
         'default': 256,
         'type': EnsureInt(),
+    },
+    'datalad.ui.progressbar': {
+        'ui': ('question', {
+            'title': 'UI progress bars',
+            'text': 'Default backend for progress reporting'}),
+        'default': None,
+        'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
     },
 }

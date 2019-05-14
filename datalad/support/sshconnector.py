@@ -22,12 +22,7 @@ from os.path import join as opj
 from subprocess import Popen
 # importing the quote function here so it can always be imported from this
 # module
-try:
-    # from Python 3.3 onwards
-    from shlex import quote as sh_quote
-except ImportError:
-    # deprecated since Python 2.7
-    from pipes import quote as sh_quote
+from six.moves import shlex_quote as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -42,13 +37,16 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username=''):
+def get_connection_hash(hostname, port='', username='', identity_file=''):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
     to a connection from and to a particular machine (with
     port and login username). The hash also contains the local
     host name.
+
+    Identity file corresponds to a file that will be passed via ssh's -i
+    option.
     """
     # returning only first 8 characters to minimize our chance
     # of hitting a limit on the max path length for the Unix socket.
@@ -57,10 +55,11 @@ def get_connection_hash(hostname, port='', username=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
+            identity_file=identity_file,
             username=username).encode('utf-8')).hexdigest()[:8]
 
 
@@ -69,7 +68,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri):
+    def __init__(self, ctrl_path, sshri, identity_file=None):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -81,6 +80,8 @@ class SSHConnection(object):
         sshri: SSHRI
           SSH resource identifier (contains all connection-relevant info),
           or another resource identifier that can be converted into an SSHRI.
+        identity_file : str or None
+          Value to pass to ssh's -i option.
         """
         self._runner = None
 
@@ -95,6 +96,8 @@ class SSHConnection(object):
         self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+
+        self._identity_file = identity_file
 
         # essential properties of the remote system
         self._remote_props = {}
@@ -212,6 +215,8 @@ class SSHConnection(object):
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
                         "-o", "ControlPersist=15m"] + self._ctrl_options
+        if self._identity_file:
+            ctrl_options.extend(["-i", self._identity_file])
         # create ssh control master command
         cmd = ["ssh"] + ctrl_options + [self.sshri.as_str()]
 
@@ -270,9 +275,10 @@ class SSHConnection(object):
         str
           stdout, stderr of the copy operation.
         """
-
+        # Convert ssh's port flag (-p) to scp's (-P).
+        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options = self._ctrl_options + ["-r"] if recursive else self._ctrl_options
+        scp_options += ["-r"] if recursive else []
         scp_options += ["-p"] if preserve_attrs else []
         scp_cmd = ["scp"] + scp_options
 
@@ -343,6 +349,10 @@ class SSHConnection(object):
 class SSHManager(object):
     """Keeps ssh connections to share. Serves singleton representation
     per connection.
+
+    A custom identity file can be specified via `datalad.ssh.identityfile`.
+    Callers are responsible for reloading `datalad.cfg` if they have changed
+    this value since loading datalad.
     """
 
     def __init__(self):
@@ -431,9 +441,13 @@ class SSHManager(object):
             raise ValueError("Unsupported SSH URL: '{0}', use "
                              "ssh://host/path or host:path syntax".format(url))
 
+        from datalad import cfg
+        identity_file = cfg.get("datalad.ssh.identityfile")
+
         conhash = get_connection_hash(
             sshri.hostname,
             port=sshri.port,
+            identity_file=identity_file or "",
             username=sshri.username)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
@@ -442,11 +456,11 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri)
+            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file)
             self._connections[ctrl_path] = c
             return c
 
-    def close(self, allow_fail=True):
+    def close(self, allow_fail=True, ctrl_path=None):
         """Closes all connections, known to this instance.
 
         Parameters
@@ -454,13 +468,19 @@ class SSHManager(object):
         allow_fail: bool, optional
           If True, swallow exceptions which might be thrown during
           connection.close, and just log them at DEBUG level
+        ctrl_path: str or list of str, optional
+          If specified, only the path(s) provided would be considered
         """
         if self._connections:
+            from datalad.utils import assure_list
+            ctrl_paths = assure_list(ctrl_path)
             to_close = [c for c in self._connections
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
-                        exists(self._connections[c].ctrl_path)]
+                        exists(self._connections[c].ctrl_path)
+                        and (not ctrl_paths
+                             or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
                 lgr.debug("Closing %d SSH connections..." % len(to_close))
             for cnct in to_close:

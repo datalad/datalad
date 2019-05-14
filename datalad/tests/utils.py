@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import gzip
 import inspect
 import shutil
 import stat
@@ -50,6 +51,7 @@ from nose.tools import assert_is_instance
 from nose import SkipTest
 
 from ..cmd import Runner
+from .. import utils
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
@@ -208,13 +210,14 @@ def ok_clean_git(path, annex=None, head_modified=[], index_modified=[],
                 eq_(head_diffs, [])
                 eq_(index_diffs, [])
             else:
+                # TODO: These names are confusing/non-descriptive.  REDO
                 if head_modified:
                     # we did ask for interrogating changes
                     head_modified_ = [d.a_path for d in repo.index.diff(repo.head.commit)]
-                    eq_(head_modified_, head_modified)
+                    eq_(sorted(head_modified_), sorted(head_modified))
                 if index_modified:
                     index_modified_ = [d.a_path for d in repo.index.diff(None)]
-                    eq_(index_modified_, index_modified)
+                    eq_(sorted(index_modified_), sorted(index_modified))
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
@@ -279,7 +282,10 @@ def _prep_file_under_git(path, filename):
             raise
 
     # path to the file within the repository
-    file_repo_dir = os.path.relpath(path, repo.path)
+    # repo.path is a "realpath" so to get relpath working correctly
+    # we need to realpath our path as well
+    path = op.realpath(path)  # intentional realpath to match GitRepo behavior
+    file_repo_dir = op.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
     return annex, file_repo_path, filename, path, repo
 
@@ -386,19 +392,37 @@ def ok_exists(path):
     assert exists(path), 'path %s does not exist' % path
 
 
-def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
+def ok_file_has_content(path, content, strip=False, re_=False,
+                        decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
     ok_exists(path)
-    with open(path, 'r') as f:
-        content_ = f.read()
-
-        if strip:
-            content_ = content_.strip()
-
-        if re_:
-            assert_re_in(content, content_, **kwargs)
+    if decompress:
+        if path.endswith('.gz'):
+            open_func = gzip.open
         else:
-            assert_equal(content, content_, **kwargs)
+            raise NotImplementedError("Don't know how to decompress %s" % path)
+    else:
+        open_func = open
+
+    with open_func(path, 'rb') as f:
+        file_content = f.read()
+
+    if isinstance(content, text_type):
+        file_content = assure_unicode(file_content)
+
+    if os.linesep != '\n':
+        # for consistent comparisons etc. Apparently when reading in `b` mode
+        # on Windows we would also get \r
+        # https://github.com/datalad/datalad/pull/3049#issuecomment-444128715
+        file_content = file_content.replace(os.linesep, '\n')
+
+    if strip:
+        file_content = file_content.strip()
+
+    if re_:
+        assert_re_in(content, file_content, **kwargs)
+    else:
+        assert_equal(content, file_content, **kwargs)
 
 
 #
@@ -798,11 +822,19 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
+def check_not_generatorfunction(func):
+    """Internal helper to verify that we are not decorating generator tests"""
+    if inspect.isgeneratorfunction(func):
+        raise RuntimeError("{}: must not be decorated, is a generator test"
+                           .format(func.__name__))
+
+
 def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
 
     If not used as a decorator, and just a function, could be used at the module level
     """
+    check_not_generatorfunction(func)
 
     def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
@@ -820,16 +852,24 @@ def skip_if_no_network(func=None):
         check_and_raise()
 
 
-def skip_if_on_windows(func):
+def skip_if_on_windows(func=None):
     """Skip test completely under Windows
     """
-    @wraps(func)
-    @attr('skip_if_on_windows')
-    def newfunc(*args, **kwargs):
+    check_not_generatorfunction(func)
+
+    def check_and_raise():
         if on_windows:
             raise SkipTest("Skipping on Windows")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        @attr('skip_if_on_windows')
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
 
 
 @optional_args
@@ -849,6 +889,9 @@ def skip_if(func, cond=True, msg=None, method='raise'):
       in a test with method='pass' in order to not skip the entire test, but
       just that assertion.
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
     def newfunc(*args, **kwargs):
         if cond:
@@ -865,6 +908,9 @@ def skip_ssh(func):
     """Skips SSH tests if on windows or if environment variable
     DATALAD_TESTS_SSH was not set
     """
+
+    check_not_generatorfunction(func)
+
     @wraps(func)
     @attr('skip_ssh')
     def newfunc(*args, **kwargs):
@@ -938,28 +984,32 @@ def known_failure(func):
     return newfunc
 
 
-def known_failure_v6(func):
-    """Test decorator marking a test as known to fail in a v6 test run
+def known_failure_v6_or_later(func):
+    """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 behaves like `known_failure`. Otherwise
-    the original (undecorated) function is returned.
+    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
     """
 
     from datalad import cfg
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version == 6:
+    if version and version >= 6:
 
         @known_failure
         @wraps(func)
-        @attr('known_failure_v6')
-        @attr('v6')
+        @attr('known_failure_v6_or_later')
+        @attr('v6_or_later')
         def v6_func(*args, **kwargs):
             return func(*args, **kwargs)
 
         return v6_func
 
     return func
+
+
+# TODO: Remove once the released version of datalad-crawler no longer uses it.
+known_failure_v6 = known_failure_v6_or_later
 
 
 def known_failure_direct_mode(func):
@@ -986,24 +1036,42 @@ def known_failure_direct_mode(func):
     return func
 
 
+def known_failure_windows(func):
+    """Test decorator marking a test as known to fail on windows
+
+    On Windows behaves like `known_failure`.
+    Otherwise the original (undecorated) function is returned.
+    """
+    if on_windows:
+
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_windows')
+        @attr('windows')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return dm_func
+    return func
+
 # ### ###
 # END known failure decorators
 # ### ###
 
 
 @optional_args
-def skip_v6(func, method='raise'):
-    """Skips tests if datalad is configured to use v6 mode
-    (DATALAD_REPO_VERSION=6)
+def skip_v6_or_later(func, method='raise'):
+    """Skips tests if datalad is configured to use v6 mode or later
+    (e.g., DATALAD_REPO_VERSION=6)
     """
 
     from datalad import cfg
     version = cfg.obtain("datalad.repo.version")
 
-    @skip_if(version == 6, msg="Skip test in v6 test run", method=method)
+    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
     @wraps(func)
-    @attr('skip_v6')
-    @attr('v6')
+    @attr('skip_v6_or_later')
+    @attr('v6_or_later')
     def newfunc(*args, **kwargs):
         return func(*args, **kwargs)
     return newfunc
@@ -1044,11 +1112,14 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
         exc_info = None
+        # record previous state of PWD handling
+        utils_pwd_mode = utils._pwd_mode
         try:
-            func(*args, **kwargs)
+            ret = func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
+            utils._pwd_mode = utils_pwd_mode
             try:
                 cwd_after = os.getcwd()
             except OSError as e:
@@ -1057,6 +1128,9 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if cwd_after != cwd_before:
             chpwd(pwd_before)
+            # Above chpwd could also trigger the change of _pwd_mode, so we
+            # would need to reset it again since we know that it is all kosher
+            utils._pwd_mode = utils_pwd_mode
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
@@ -1070,6 +1144,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
 
         if exc_info is not None:
             reraise(*exc_info)
+
+        return ret
 
     return newfunc
 
@@ -1171,7 +1247,7 @@ def assert_status(label, results):
                 i + 1,
                 len(results),
                 label,
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_message(message, results):
@@ -1202,7 +1278,7 @@ def assert_result_count(results, n, **kwargs):
                 n,
                 kwargs,
                 len(results),
-                dumps(results, indent=1, default=lambda x: "<not serializable>")))
+                dumps(results, indent=1, default=lambda x: str(x))))
 
 
 def assert_in_results(results, **kwargs):
@@ -1246,27 +1322,22 @@ def assert_result_values_cond(results, prop, cond):
 
 
 def ignore_nose_capturing_stdout(func):
-    """Decorator workaround for nose's behaviour with redirecting sys.stdout
+    """DEPRECATED and will be removed soon.  Does nothing!
 
-    Needed for tests involving the runner and nose redirecting stdout.
-    Counter-intuitively, that means it needed for nosetests without '-s'.
+    Originally was intended as a decorator workaround for nose's behaviour
+    with redirecting sys.stdout, but now we monkey patch nose now so no test
+    should no longer be skipped.
+
     See issue reported here:
     https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
-    """
 
-    @make_decorator(func)
-    def newfunc(*args, **kwargs):
-        import io
-        try:
-            func(*args, **kwargs)
-        except (AttributeError, io.UnsupportedOperation) as e:
-            # Use args instead of .message which is PY2 specific
-            message = e.args[0] if e.args else ""
-            if re.search('^(.*StringIO.*)?fileno', message):
-                raise SkipTest("Triggered nose defect in masking out real stdout")
-            else:
-                raise
-    return newfunc
+    """
+    lgr.warning(
+        "@ignore_nose_capturing_stdout no longer does anything - nose should "
+        "just be monkey patched in setup_package. {} still has it"
+        .format(func.__name__)
+    )
+    return func
 
 
 def skip_httpretty_on_problematic_pythons(func):

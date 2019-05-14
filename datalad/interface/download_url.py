@@ -21,7 +21,6 @@ from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
 from ..utils import get_dataset_pwds
-from ..distribution.add import Add
 from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
 from ..distribution.dataset import require_dataset
@@ -91,12 +90,14 @@ class DownloadURL(Interface):
 
         pwd, rel_pwd = get_dataset_pwds(dataset)
 
-        try:
-            ds = require_dataset(
-                dataset, check_installed=True,
-                purpose='downloading urls')
-        except NoDatasetArgumentFound:
-            ds = None
+        ds = None
+        if save or dataset:
+            try:
+                ds = require_dataset(
+                    dataset, check_installed=True,
+                    purpose='downloading urls')
+            except NoDatasetArgumentFound:
+                pass
 
         common_report = {"action": "download_url",
                          "ds": ds}
@@ -115,9 +116,9 @@ class DownloadURL(Interface):
             return
 
         if dataset:  # A dataset was explicitly given.
-            path = op.join(ds.path, path or op.curdir)
-        elif ds:
-            path = op.join(ds.path, rel_pwd, path or op.curdir)
+            path = op.normpath(op.join(ds.path, path or op.curdir))
+        elif save and ds:
+            path = op.normpath(op.join(ds.path, rel_pwd, path or op.curdir))
         elif not path:
             path = op.curdir
 

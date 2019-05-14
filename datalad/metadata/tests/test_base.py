@@ -10,17 +10,20 @@
 """Test metadata """
 
 import logging
-import os
 
 from os.path import join as opj
 from os.path import relpath
+import os.path as op
 
 from datalad.api import Dataset
 from datalad.api import aggregate_metadata
 from datalad.api import install
-from datalad.api import search
 from datalad.api import metadata
-from datalad.metadata.metadata import get_metadata_type, query_aggregated_metadata
+from datalad.metadata.metadata import (
+    get_metadata_type,
+    query_aggregated_metadata,
+    _get_containingds_from_agginfo,
+)
 from datalad.utils import chpwd
 from datalad.utils import assure_unicode
 from datalad.tests.utils import with_tree, with_tempfile
@@ -66,9 +69,9 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
+    Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(Dataset(path)), [])
-    os.makedirs(opj(path, '.datalad'))
     # got section, but no setting
     open(opj(path, '.datalad', 'config'), 'w').write('[datalad "metadata"]\n')
     assert_equal(get_metadata_type(Dataset(path)), [])
@@ -137,8 +140,9 @@ def test_aggregation(path):
     # store clean direct result
     origres = ds.metadata(recursive=True)
     # basic sanity check
-    assert_result_count(origres, 3)
+    assert_result_count(origres, 6)
     assert_result_count(origres, 3, type='dataset')
+    assert_result_count(origres, 3, type='file')  # Now that we have annex.key
     # three different IDs
     assert_equal(3, len(set([s['dsid'] for s in origres if s['type'] == 'dataset'])))
     # and we know about all three datasets
@@ -158,8 +162,9 @@ def test_aggregation(path):
     # get fresh metadata
     cloneres = clone.metadata()
     # basic sanity check
-    assert_result_count(cloneres, 1)
+    assert_result_count(cloneres, 2)
     assert_result_count(cloneres, 1, type='dataset')
+    assert_result_count(cloneres, 1, type='file')
 
     # now loop over the previous results from the direct metadata query of
     # origin and make sure we get the extact same stuff from the clone
@@ -246,3 +251,22 @@ def test_bf2458(src, dst):
     clone.metadata('.', on_failure='ignore')
     # XXX whereis says nothing in direct mode
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
+
+
+def test_get_containingds_from_agginfo():
+    eq_(None, _get_containingds_from_agginfo({}, 'any'))
+    # direct hit returns itself
+    eq_('match', _get_containingds_from_agginfo({'match': {}, 'other': {}}, 'match'))
+    # matches
+    down = op.join('match', 'down')
+    eq_('match', _get_containingds_from_agginfo({'match': {}}, down))
+    # closest match
+    down_under = op.join(down, 'under')
+    eq_(down, _get_containingds_from_agginfo({'match': {}, down: {}}, down_under))
+    # absolute works too
+    eq_(op.abspath(down),
+        _get_containingds_from_agginfo(
+            {op.abspath('match'): {}, op.abspath(down): {}}, op.abspath(down_under)))
+    # will not tollerate mix'n'match
+    assert_raises(ValueError, _get_containingds_from_agginfo, {'match': {}}, op.abspath(down))
+    assert_raises(ValueError, _get_containingds_from_agginfo, {op.abspath('match'): {}}, down)

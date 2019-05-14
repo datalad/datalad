@@ -40,7 +40,11 @@ Supported metadata sources
 ==========================
 
 This following sections provide an overview of included metadata extractors for
-particular types of data structures and file formats.
+particular types of data structures and file formats. Note that :ref:`DataLad
+extension packages <sec_extension_packages>`, such as the `neuroimaging extension
+<https://github.com/datalad/datalad-neuroimaging>`_, can provide additional
+extractors for particular domains and formats.
+
 Only :ref:`annex <metadata-annex>` and :ref:`datalad_core <metadata-datalad_core>`
 extractors are enabled by default.  Any additional metadata extractor should be
 enabled by setting the :term:`datalad.metadata.nativetype` :ref:`configuration <configuration>` variable
@@ -329,6 +333,156 @@ Besides full access to all aggregated metadata by path (via the :ref:`metadata
 entirety of the locally available metadata. Its capabilities include simple
 keyword searches as well as more complex queries using date ranges or logical
 conjunctions.
+
+Internal metadata representation
+================================
+
+.. warning::
+  The information in this section is meant to provide insight into how
+  DataLad structures extracted and aggregated metadata. However, this
+  representation is not considered stable or part of the public API,
+  hence these data should not be accessed directly. Instead, all
+  metadata access should happen via the :command:`metadata` API command.
+
+A dataset's metadata is stored in the `.datalad/metadata` directory. This
+directory contains two main elements:
+
+- a metadata inventory or catalog
+- a store for metadata "objects"
+
+The metadata inventory
+----------------------
+
+The inventory is kept in a JSON file, presently named ``aggregate_v1.json``.
+It contains a single top-level dictionary/object. Each element in this
+dictionary represents one subdataset from which metadata has been extracted
+and aggregated into the dataset at hand. Keys in this dictionary are
+paths to the respective (sub)datasets (relative to the root of the dataset).
+If a dataset has no subdataset and metadata extraction was performed, the
+dictionary will only have a single element under the key ``"."``.
+
+Here is an excerpt of an inventory dictionary showing the record of the
+root dataset itself.
+
+.. code-block:: json
+
+   {
+
+      ".": {
+         "content_info":
+            "objects/0c/cn-b046b2c3a5e2b9c5599c980c7b5fab.xz",
+         "datalad_version":
+            "0.10.0.rc4.dev191",
+         "dataset_info":
+            "objects/0c/ds-b046b2c3a5e2b9c5599c980c7b5fab",
+         "extractors": [
+            "datalad_core",
+            "annex",
+            "bids",
+            "nifti1"
+         ],
+         "id":
+            "00ce405e-6589-11e8-b749-a0369fb55db0",
+         "refcommit":
+            "d170979ef33a82c67e6fefe3084b9fe7391b422b"
+      },
+
+   }
+
+The record of each dataset contains the following elements:
+
+``id``
+  The DataLad dataset UUID of the dataset metadata was extracted and
+  aggregated from.
+``refcommit``
+  The SHA sum of the last metadata-relevant commit in the history of
+  the dataset metadata was extracted from. Metadata-relevant commits
+  are any commits that modify dataset content that is not exclusively
+  concerning DataLad's own internal status and configuration.
+``datalad_version``
+  The version string of the DataLad version that was used to perform
+  the metadata extraction (not necessarily the metadata aggregation,
+  as pre-extracted metadata can be aggregated from other superdatasets
+  for a dataset that is itself not available locally).
+``extractors``
+  A list with the names of all enabled metadata extractors for this
+  dataset. This list may include names for extractors that are provided
+  by extensions, and may not be available for any given DataLad
+  installation.
+``content_info``, ``dataset_info``
+  Path to the object files containing the actual metadata on the dataset
+  as a whole, and on individual files in a dataset (content). Paths
+  are to be interpreted relative to the inventory file, and point to
+  the metadata object store.
+
+Read-access to the metadata inventory is available via the ``metadata``
+command and its ``--get-aggregates`` option.
+
+The metadata object store
+-------------------------
+
+The object store holds the files containing dataset and content metadata for
+each aggregated dataset. The object store is located in
+`.datalad/metadata/objects`. However, this directory itself and the
+subdirectory structure within it have no significance, they are completely
+defined and exclusively discoverable via the ``content_info`` and
+``dataset_info`` values in the metadata inventory records.
+
+Metadata objects for datasets and content use a slightly different internal
+format. Both files could be either compressed (XZ) or uncompressed. Current
+practice uses compression for content metadata, but not for dataset metadata.
+Any metadata object file could be directly committed to Git, or it could be
+tracked via Git-annex. Reasons to choose one over the other could be file size,
+or privacy concerns.
+
+Read-access to the metadata objects of dataset and individual files is
+available via the ``metadata`` command. Importantly, metadata can be requested
+
+
+Metadata objects for datasets
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+These files have a single top-level JSON object/dictionary as content. A
+JSON-LD ``@content`` field is used to assign a semantic markup to allow for
+programmatic interpretation of metadata as linked data. Any other top-level key
+identifies the name of a metadata extractor, and the value stored under this
+key represents the output of the corresponding extractor.
+
+Structure and content of an extractor's output are unconstrained and completely
+up to the implementation of that particular extractor. Extractor can report
+additional JSON-LD context information (but there is no requirement).
+
+The output of one extractor does not interfere or collide with the output
+of any other extractor.
+
+Metadata objects for content/file
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+In contrast to metadata objects for entire datasets, these files use a JSON
+stream format, i.e. one JSON object/dictionary per line (no surrounding list).
+This makes it possible to process the content line-by-line instead of having
+to load an entire files (with potentially millions of records).
+
+The only other difference to dataset metadata objects is an additional top-level
+key ``path`` that identifies the relative path (relative to the root of its parent
+dataset) of the file the metadata record is associated with.
+
+Otherwise, the extractor-specific metadata structure and content is unconstrained.
+
+Content metadata objects tend to contain massively redundant information (e.g.
+a dataset with a thousand 12 megapixel images will report the identical resolution
+information a thousand times). Therefore, content metadata objects are by default
+XZ compressed -- as this compressor is particularly capable discovering such
+redundancy and yield a very compact file size.
+
+The reason for gathering all metadata into a single file across all content files and
+metadata extractors is to limit the impact on the performance of the underlying
+Git repository. Large superdataset could otherwise quickly grow into dimensions
+where tens of thousands of files would be required just to manage the metadata.
+Such a configuration would also limit the compatibility of DataLad datasets with
+constrained storage environments (think e.g. inode limits on super computers),
+as these files are tracked in Git and would therefore be present in any copy,
+regardless of whether metadata access is desired or not.
 
 
 Vocabulary

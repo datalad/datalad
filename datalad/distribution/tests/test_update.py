@@ -9,19 +9,23 @@
 
 """
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
+import os.path as op
 from os.path import join as opj, exists
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.api import update
+from datalad.api import remove
 from datalad.utils import knows_annex
 from datalad.utils import rmtree
 from datalad.utils import chpwd
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import (
+    GitRepo,
+    GitCommandError,
+)
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import eq_, assert_false, assert_is_instance, ok_
@@ -41,7 +45,6 @@ from datalad.tests.utils import slow
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-@known_failure_v6  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -49,6 +52,13 @@ def test_update_simple(origin, src_path, dst_path):
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.remove_remote("origin")
+
+    # dataset without sibling will not need updates
+    assert_status('notneeded', source.update())
+    # deprecation message doesn't ruin things
+    assert_status('notneeded', source.update(fetch_all=True))
+    # but error if unknown sibling is given
+    assert_status('impossible', source.update(sibling='funky', on_failure='ignore'))
 
     # get a clone to update later on:
     dest = install(dst_path, source=src_path, recursive=True)
@@ -67,6 +77,15 @@ def test_update_simple(origin, src_path, dst_path):
     source.add(path="update.txt")
     source.save("Added update.txt")
     ok_clean_git(src_path)
+
+    # fail when asked to update a non-dataset
+    assert_status(
+        'impossible',
+        source.update("update.txt", on_failure='ignore'))
+    # fail when asked to update a something non-existent
+    assert_status(
+        'impossible',
+        source.update("nothere", on_failure='ignore'))
 
     # update without `merge` only fetches:
     assert_status('ok', dest.update())
@@ -160,7 +179,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
             ['encryption=none', 'type=external', 'externaltype=datalad'])
     # fetch all remotes
     assert_result_count(
-        ds.update(fetch_all=True), 1, status='ok', type='dataset')
+        ds.update(), 1, status='ok', type='dataset')
 
     # no merge, so changes are not in active branch:
     assert_not_in("first.txt",
@@ -173,7 +192,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
     # no merge strategy for multiple remotes yet:
     # more clever now, there is a tracking branch that provides a remote
-    #assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
+    #assert_raises(NotImplementedError, ds.update, merge=True)
 
     # merge a certain remote:
     assert_result_count(
@@ -250,8 +269,9 @@ def test_newthings_coming_down(originpath, destpath):
 
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
 @known_failure_direct_mode  #FIXME
-def test_update_volatile_subds(originpath, destpath):
+def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
         source=originpath, path=destpath,
@@ -285,16 +305,47 @@ def test_update_volatile_subds(originpath, destpath):
     ds.get(opj(ds.path, sname, 'load.dat'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
 
+    # modify ds and subds at origin
+    create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
+    origin.add('.', recursive=True)
+    ok_clean_git(origin.path)
+
+    # updates for both datasets should come down the pipe
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        2, status='ok', type='dataset')
+    ok_clean_git(ds.path)
+
     # now remove just-installed subdataset from origin again
     origin.remove(sname, check=False)
     assert_not_in(sname, origin.subdatasets(result_xfm='relpaths'))
     assert_in(sname, ds.subdatasets(result_xfm='relpaths'))
     # merge should disconnect the installed subdataset, but leave the actual
     # ex-subdataset alone
-    assert_result_count(ds.update(merge=True, recursive=True), 1, type='dataset')
+    assert_result_count(ds.update(merge=True, recursive=True),
+                        1, type='dataset')
     assert_not_in(sname, ds.subdatasets(result_xfm='relpaths'))
     ok_file_has_content(opj(ds.path, sname, 'load.dat'), 'heavy')
     ok_(Dataset(opj(ds.path, sname)).is_installed())
+
+    # now remove the now disconnected subdataset for further tests
+    # not using a bound method, not giving a parentds, should
+    # not be needed to get a clean dataset
+    remove(op.join(ds.path, sname), check=False)
+    ok_clean_git(ds.path)
+
+    # new separate subdataset, not within the origin dataset
+    otherds = Dataset(otherpath).create()
+    # install separate dataset as a submodule
+    ds.install(source=otherds.path, path='other')
+    create_tree(otherds.path, {'brand': 'new'})
+    otherds.add('.')
+    ok_clean_git(otherds.path)
+    # pull in changes
+    res = ds.update(merge=True, recursive=True)
+    assert_result_count(
+        res, 2, status='ok', action='update', type='dataset')
+    # the next is to check for #2858
+    ok_clean_git(ds.path)
 
 
 @with_tempfile(mkdir=True)
@@ -338,3 +389,20 @@ def test_reobtain_data(originpath, destpath):
     assert_result_count(res, 1, status='ok', type='file', action='get')
     ok_file_has_content(opj(ds.path, 'load.dat'), 'light')
     assert_false(ds.repo.file_has_content('novel'))
+
+
+@with_tempfile(mkdir=True)
+@known_failure_direct_mode  # use of bare repos in the test
+def test_multiway_merge(path):
+    # prepare ds with two siblings, but no tracking branch
+    ds = Dataset(op.join(path, 'ds_orig')).create()
+    r1 = AnnexRepo(path=op.join(path, 'ds_r1'), git_opts={'bare': True})
+    r2 = GitRepo(path=op.join(path, 'ds_r2'), git_opts={'bare': True})
+    ds.siblings(action='add', name='r1', url=r1.path)
+    ds.siblings(action='add', name='r2', url=r2.path)
+    assert_status('ok', ds.publish(to='r1'))
+    assert_status('ok', ds.publish(to='r2'))
+    # just a fetch should be no issue
+    assert_status('ok', ds.update())
+    # ATM we do not support multi-way merges
+    assert_status('impossible', ds.update(merge=True, on_failure='ignore'))

@@ -558,8 +558,8 @@ class Interface(object):
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = alter_interface_docs_for_cmdline(param._doc)
-            if help and help[-1] != '.':
-                help += '.'
+            if help and help.rstrip()[-1] != '.':
+                help = help.rstrip() + '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value constraint description and default

@@ -59,18 +59,6 @@ AUTHENTICATION_TYPES = {
 
 from .credentials import CREDENTIAL_TYPES
 
-def resolve_url_to_name(d, url):
-    """Given a directory (e.g. of SiteInformation._items or Credential._items)
-    go through url_re and find the corresponding item and returns its key (i.e. name)
-    """
-
-    for k, rec in iteritems(d):
-        for url_re in rec.get('url_re', '').split('\n'):
-            if url_re:
-                if re.search(url_re, url):
-                    return k
-    return None
-
 
 @auto_repr
 class Provider(object):

@@ -34,6 +34,7 @@ from ..utils import getpwd, chpwd
 from ..utils import get_path_prefix
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import is_interactive
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -42,6 +43,7 @@ from ..utils import assure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
+from ..utils import all_same
 from ..utils import partition
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
@@ -61,9 +63,20 @@ from ..utils import import_modules, import_module_from_file
 from ..utils import get_open_files
 from ..utils import map_items
 from ..utils import unlink
+from ..utils import CMD_MAX_ARG
+from ..utils import create_tree
+from ..utils import never_fail
+
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+from nose.tools import (
+    assert_equal,
+    assert_false,
+    assert_greater,
+    assert_true,
+    eq_,
+    ok_,
+)
 from datalad.tests.utils import nok_, assert_re_in
 
 from .utils import with_tempfile, assert_in, with_tree
@@ -82,7 +95,8 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode, skip_if
+    known_failure_direct_mode, skip_if,
+    ok_file_has_content
 )
 
 
@@ -142,7 +156,7 @@ def test_rotree(d):
     # so explicit 'or'
     if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)          # OK to use os.unlink
-        assert_raises(OSError, unlink, f, ntimes=10)  # and even with waiting and trying!
+        assert_raises(OSError, unlink, f)   # and even with waiting and trying!
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
         with open(f) as f_:
@@ -332,6 +346,23 @@ def test_getpwd_basic():
         with chpwd(None):
             eq_(getpwd(), pwd)
         assert_false(oschdir.called)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tempfile(mkdir=True)
+def test_getpwd_change_mode(tdir):
+    from datalad import utils
+    if utils._pwd_mode != 'PWD':
+        raise SkipTest("Makes sense to be tested only in PWD mode, "
+                       "but we seems to be beyond that already")
+    # The evil plain chdir call
+    os.chdir(tdir)
+    # Just testing the logic of switching to cwd mode and issuing a warning
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        pwd = getpwd()
+        eq_(pwd, os.path.realpath(pwd))  # might have symlinks, thus realpath
+    assert_in("symlinks in the paths will be resolved", cml.out)
+    eq_(utils._pwd_mode, 'cwd')
 
 
 @skip_if_on_windows
@@ -571,15 +602,47 @@ def test_make_tempfile():
 
 def test_unique():
     eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique(range(3), reverse=True), [0, 1, 2])
     eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1), reverse=True), [3, 2, 0, 1])
     eq_(unique([]), [])
+    eq_(unique([], reverse=True), [])
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], reverse=True),
+        [(1,), (1, 2), (0, 3)])
 
     # with a key now
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)],
                key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)],
+               key=itemgetter(0), reverse=True), [(1, 2), (0, 3)])
+
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
                key=itemgetter(1)), [(1, 2), (1, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)],
+               key=itemgetter(1), reverse=True), [(1, 2), (0, 3)])
+
+
+def test_all_same():
+    ok_(all_same([0, 0, 0]))
+    ok_(not all_same([0, 0, '0']))
+    ok_(not all_same([]))
+
+    def never_get_to_not_needed():
+        yield 'a'
+        yield 'a'
+        yield 'b'
+        raise ValueError("Should not get here since on b should return")
+
+    ok_(not all_same(never_get_to_not_needed()))
+
+    def gen1(n):
+        for x in range(n):
+            yield 'a'
+    ok_(not all_same(gen1(0)))
+    ok_(all_same(gen1(1)))
+    ok_(all_same(gen1(2)))
+    ok_(all_same(gen1(10)))
 
 
 def test_partition():
@@ -1094,7 +1157,8 @@ def test_get_open_files(p):
         # since lsof does not care about PWD env var etc, paths
         # will not contain symlinks, we better realpath them
         # all before comparison
-        eq_(get_open_files(p, log_open=40), {op.realpath(f1): os.getpid()})
+        eq_(get_open_files(p, log_open=40)[op.realpath(f1)].pid,
+            os.getpid())
 
     assert not get_open_files(subd)
     # if we start a process within that directory, should get informed
@@ -1109,8 +1173,8 @@ def test_get_open_files(p):
     # Assure that it started and we read the OK
     eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
-    eq_(get_open_files(p), {op.realpath(subd): proc.pid})
-    eq_(get_open_files(subd), {op.realpath(subd): proc.pid})
+    eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
+    eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)
     proc.terminate()
     assert not get_open_files(subd)
 
@@ -1132,3 +1196,84 @@ def test_map_items():
     c_mapped = map_items(add10, c)
     assert type(c) is type(c_mapped)
     eq_(c_mapped.items(), [(11,), (12, 13), (14, 15, 16)])
+
+
+def test_CMD_MAX_ARG():
+    # 100 is arbitrarily large small integer ;)
+    # if fails -- we are unlikely to be able to work on this system
+    # and something went really wrong!
+    assert_greater(CMD_MAX_ARG, 100)
+
+
+@with_tempfile(mkdir=True)
+def test_create_tree(path):
+    content = u"мама мыла раму"
+    create_tree(path, OrderedDict([
+        ('1', content),
+        ('sd', OrderedDict(
+            [
+            # right away an obscure case where we have both 1 and 1.gz
+                ('1', content*2),
+                ('1.gz', content*3),
+            ]
+        )),
+    ]))
+    ok_file_has_content(op.join(path, '1'), content)
+    ok_file_has_content(op.join(path, 'sd', '1'), content*2)
+    ok_file_has_content(op.join(path, 'sd', '1.gz'), content*3, decompress=True)
+
+
+def test_never_fail():
+
+    @never_fail
+    def iamok(arg):
+        return arg
+    eq_(iamok(1), 1)
+
+    @never_fail
+    def ifail(arg):
+        raise ValueError
+    eq_(ifail(1), None)
+
+    with patch.dict('os.environ', {'DATALAD_ALLOW_FAIL': '1'}):
+        # decision to create failing or not failing function
+        # is done at the time of decoration
+        @never_fail
+        def ifail2(arg):
+            raise ValueError
+
+        assert_raises(ValueError, ifail2, 1)
+
+
+@with_tempfile
+def test_is_interactive(fout):
+    # must not fail if one of the streams is no longer open:
+    # https://github.com/datalad/datalad/issues/3267
+    from ..cmd import Runner
+
+    bools = ["False", "True"]
+
+    def get_interactive(py_pre="", **run_kwargs):
+        out, err = Runner().run(
+            [sys.executable,
+             "-c",
+             py_pre +
+             'from datalad.utils import is_interactive; '
+             'f = open(%r, "w"); '
+             'f.write(str(is_interactive())); '
+             'f.close()'
+             % fout
+             ],
+            **run_kwargs
+        )
+        with open(fout) as f:
+            out = f.read()
+        assert_in(out, bools)
+        return bool(bools.index(out))
+
+    # we never request for pty in our Runner, so can't be interactive
+    eq_(get_interactive(), False)
+    # and it must not crash if smth is closed
+    for o in ('stderr', 'stdin', 'stdout'):
+        eq_(get_interactive("import sys; sys.%s.close(); " % o), False)
+

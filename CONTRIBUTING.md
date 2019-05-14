@@ -186,7 +186,6 @@ For merge commits to have more informative description, add to your
 `.git/config` or `~/.gitconfig` following section:
 
     [merge]
-    summary = true
     log = true
 
 and if conflicts occur, provide short summary on how they were resolved
@@ -281,6 +280,8 @@ And now you should be in the same environment as the very last tested PR.
 Note that the same path/venv is reused for all the PRs, so you might want
 first to check using `git show` under the `build/` directory if it corresponds
 to the commit you are interested to troubleshoot.
+
+For developing on Windows you can use free [Windows VMs](https://developer.microsoft.com/en-us/microsoft-edge/tools/vms/).
 
 ### Coverage
 
@@ -429,6 +430,21 @@ without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
 
+Recognizing contributions
+-------------------------
+
+We welcome and recognize all contributions from documentation to testing to code development.
+
+You can see a list of current contributors in our [zenodo file][link_zenodo].
+If you are new to the project, don't forget to add your name and affiliation there!
+
+Thank you!
+----------
+
+You're awesome. :wave::smiley:
+
+
+
 Various hints for developers
 ----------------------------
 
@@ -464,9 +480,9 @@ Refer datalad/config.py for information on how to add these environment variable
   the Runner.run's popen call.  Otherwise could be a comma separated list
   of environment variables to log
 - *DATALAD_LOG_CMD_STDIN*:
-  Either to log stdin for the command
+  Whether to log stdin for the command
 - *DATALAD_LOG_CMD_CWD*:
-  Either to log cwd where command to be executed
+  Whether to log cwd where command to be executed
 - *DATALAD_LOG_PID*
   To instruct datalad to log PID of the process
 - *DATALAD_LOG_TARGET*
@@ -521,13 +537,15 @@ Refer datalad/config.py for information on how to add these environment variable
 - *DATALAD_USE_DEFAULT_GIT*:
   Instructs to use `git` as available in current environment, and not the one which possibly comes with git-annex (default behavior).
 - *DATALAD_ASSERT_NO_OPEN_FILES*:
-  Instructs internal tests for no open files under paths to be removed. If set to anything, it would log at ERROR level, and if set to "assert", it would raise AssertionError if any is
+  Instructs test helpers to check for open files at the end of a test. If set, remaining open files are logged at ERROR level. Alternative modes are: "assert" (raise AssertionError if any open file is found), "pdb"/"epdb" (drop into debugger when open files are found, info on files is provided in a "files" dictionary, mapping filenames to psutil process objects).
+- *DATALAD_ALLOW_FAIL*:
+  Instructs `@never_fail` decorator to allow to fail, e.g. to ease debugging.
 
 # Changelog section
 
 For the upcoming release use this template
 
-## 0.10.3 (??? ??, 2018) -- will be better than ever
+## 0.11.6 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -543,3 +561,5 @@ bet we will fix some bugs and make a world even a better place.
 
 ?
 
+
+[link_zenodo]: https://github.com/datalad/datalad/blob/master/.zenodo.json

@@ -237,7 +237,7 @@ class AnnexCustomRemote(object):
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
 
-        # To signal either we are in the loop and e.g. could correspond to annex
+        # To signal whether we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
         self._protocol = \
             AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \

@@ -20,13 +20,12 @@ from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
 from datalad.interface.ls_webui import machinesize, ignored, fs_traverse, \
-    _ls_json
+    _ls_json, UNKNOWN_SIZE
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import with_tree
 from datalad.utils import swallow_logs, swallow_outputs, _path_
-# needed below as bound dataset method
-from datalad.api import add
 
 from datalad.cmd import Runner
 
@@ -36,6 +35,7 @@ def test_machinesize():
     for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
         assert_equal(1.0*(1000**value), machinesize('1 ' + key))
     assert_raises(ValueError, machinesize, 't byte')
+    assert_equal(0, machinesize(UNKNOWN_SIZE))
 
 
 @with_tree(
@@ -75,7 +75,8 @@ def test_fs_traverse(topdir):
     for recursive in [True, False]:
         # test fs_traverse in display mode
         with swallow_logs(new_level=logging.INFO) as log, swallow_outputs() as cmo:
-            fs = fs_traverse(topdir, AnnexRepo(topdir), recurse_directories=recursive, json='display')
+            repo = AnnexRepo(topdir)
+            fs = fs_traverse(topdir, repo, recurse_directories=recursive, json='display')
             if recursive:
                 # fs_traverse logs should contain all not ignored subdirectories
                 for subdir in [opj(topdir, 'dir'), opj(topdir, 'dir', 'subdir')]:
@@ -89,10 +90,12 @@ def test_fs_traverse(topdir):
             # dir type child's size currently has no metadata file for traverser to pick its size from
             # and would require a recursive traversal w/ write to child metadata file mode
             assert_equal(child['size']['total'], {True: '6 Bytes', False: '0 Bytes'}[recursive])
+            repo.precommit()  # to possibly stop batch process occupying the stdout
 
     for recursive in [True, False]:
         # run fs_traverse in write to json 'file' mode
-        fs = fs_traverse(topdir, AnnexRepo(topdir), recurse_directories=recursive, json='file')
+        repo = AnnexRepo(topdir)
+        fs = fs_traverse(topdir, repo, recurse_directories=recursive, json='file')
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
         # not including git and annex folders
@@ -129,6 +132,7 @@ def test_fs_traverse(topdir):
             assert_equal(brokenlink['size']['total'], '3 Bytes')
 
 
+@known_failure_direct_mode  #FIXME
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '123',
@@ -187,6 +191,11 @@ def test_ls_json(topdir, topurl):
     def get_meta(dspath, *path):
         with open(get_metapath(dspath, *path)) as f:
             return js.load(f)
+
+    # Let's see that there is no crash if one of the files is available only
+    # in relaxed URL mode, so no size could be picked up
+    ds.repo.add_url_to_file(
+        'fromweb', topurl + '/noteventhere', options=['--relaxed'])
 
     for all_ in [True, False]:  # recurse directories
         for recursive in [True, False]:
@@ -261,3 +270,7 @@ def test_ls_json(topdir, topurl):
                         if item['name'] == ('subdsfile.txt' or 'subds')
                     ][0]
                     assert_equal(subds['size']['total'], '3 Bytes')
+
+                assert_equal(
+                    topds_nodes['fromweb']['size']['total'], UNKNOWN_SIZE
+                )

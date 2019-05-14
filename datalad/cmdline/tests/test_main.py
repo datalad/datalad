@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test functioning of the datalad main cmdline utility """
 
-from datalad.tests.utils import known_failure_v6
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import on_windows
 
@@ -47,7 +46,7 @@ def run_main(args, exit_code=0, expect_stderr=False):
     exit_code : int
         Expected exit code. Would raise AssertionError if differs
     expect_stderr : bool or string
-        Either to expect stderr output. If string -- match
+        Whether to expect stderr output. If string -- match
 
     Returns
     -------
@@ -269,7 +268,7 @@ def test_fail_with_short_help():
     assert_equal(out.getvalue(),
                  "error: Failed badly\n"
                  "datalad: Unknown parent 'muther'.  See 'datalad --help'.\n\n"
-                 "Did you mean one of these?\n"
+                 "Did you mean any of these?\n"
                  "        mutter\n"
                  "        mother\n"
                  "        father\n"

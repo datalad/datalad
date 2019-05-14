@@ -23,8 +23,9 @@ from .dialog import (
     IPythonUI,
     UnderAnnexUI,
     UnderTestsUI,
+    SilentConsoleLog,
+    QuietConsoleLog,
 )
-from .dialog import SilentConsoleLog
 from ..utils import (
     is_interactive,
     get_ipython_shell,
@@ -36,7 +37,8 @@ KNOWN_BACKENDS = {
     'ipython': IPythonUI,
     'annex': UnderAnnexUI,
     'tests': UnderTestsUI,
-    'tests-noninteractive': SilentConsoleLog,
+    'tests-noninteractive': QuietConsoleLog,
+    'no-progress': SilentConsoleLog,
 }
 
 
@@ -79,7 +81,7 @@ class _UI_Switcher(object):
                 else:
                     backend = 'dialog'
             else:
-                backend = 'console' if not is_interactive() else 'dialog'
+                backend = 'dialog' if is_interactive() else 'no-progress'
         self._ui = KNOWN_BACKENDS[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend

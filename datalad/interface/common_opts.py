@@ -33,7 +33,7 @@ recursion_flag = Parameter(
     doc="""if set, recurse into potential subdataset""")
 
 recursion_limit = Parameter(
-    args=("--recursion-limit",),
+    args=("-R", "--recursion-limit",),
     metavar="LEVELS",
     constraints=EnsureInt() | EnsureNone(),
     doc="""limit recursion into subdataset to the given number of levels""")
@@ -117,6 +117,12 @@ save_message_opt = Parameter(
     args=("-m", "--message",),
     metavar='MESSAGE',
     doc="""a description of the state or the changes made to a dataset.""",
+    constraints=EnsureStr() | EnsureNone())
+
+message_file_opt = Parameter(
+    args=("-F", "--message-file"),
+    doc="""take the commit message from this file. This flag is
+    mutually exclusive with -m.""",
     constraints=EnsureStr() | EnsureNone())
 
 reckless_opt = Parameter(

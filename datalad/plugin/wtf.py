@@ -20,6 +20,9 @@ from datalad.utils import assure_unicode
 from datalad.utils import unlink
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import InvalidGitRepositoryError
+
 
 lgr = logging.getLogger('datalad.plugin.wtf')
 
@@ -76,6 +79,30 @@ def _describe_datalad():
         'version': assure_unicode(__version__),
         'full_version': assure_unicode(__full_version__),
     }
+
+
+def _describe_annex():
+    from datalad.cmd import GitRunner
+
+    runner = GitRunner()
+    try:
+        out, err = runner.run(['git', 'annex', 'version'])
+    except CommandError as e:
+        return dict(
+            version='not available',
+            message=exc_str(e),
+        )
+    info = {}
+    for line in out.split(os.linesep):
+        key = line.split(':')[0]
+        if not key:
+            continue
+        value = line[len(key) + 2:].strip()
+        key = key.replace('git-annex ', '')
+        if key.endswith('s'):
+            value = value.split()
+        info[key] = value
+    return info
 
 
 def _describe_system():
@@ -280,6 +307,7 @@ class WTF(Interface):
             infos=infos,
         )
         infos['datalad'] = _describe_datalad()
+        infos['git-annex'] = _describe_annex()
         infos['system'] = _describe_system()
         infos['environment'] = _describe_environment()
         infos['configuration'] = _describe_configuration(cfg, sensitive)
@@ -287,7 +315,10 @@ class WTF(Interface):
         infos['metadata_extractors'] = _describe_metadata_extractors()
         infos['dependencies'] = _describe_dependencies()
         if ds:
-            infos['dataset'] = _describe_dataset(ds, sensitive)
+            try:
+                infos['dataset'] = _describe_dataset(ds, sensitive)
+            except InvalidGitRepositoryError as e:
+                infos['dataset'] = {"invalid": exc_str(e)}
 
         if clipboard:
             external_versions.check(
@@ -324,7 +355,7 @@ def _render_report(res):
                 text = _unwind(text, val[k], u'{}  '.format(top))
         elif isinstance(val, (list, tuple)):
             for i, v in enumerate(val):
-                text += u'\n{}{}. '.format(top, i + 1)
+                text += u'\n{}{} '.format(top, '-')
                 text = _unwind(text, v, u'{}  '.format(top))
         else:
             text += u'{}'.format(val)

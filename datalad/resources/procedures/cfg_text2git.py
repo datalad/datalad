@@ -5,18 +5,19 @@ import os.path as op
 
 from datalad.distribution.dataset import require_dataset
 
-# bound dataset methods
-import datalad.distribution.add
-
 ds = require_dataset(
     sys.argv[1],
     check_installed=True,
     purpose='configuration')
 
-git_attributes_file = op.join(ds.path, '.gitattributes')
-with open(git_attributes_file, 'a') as f:
-    f.write('* annex.largefiles=(not(mimetype=text/*))\n')
+annex_largefiles = '(not(mimetype=text/*))'
+attrs = ds.repo.get_gitattributes('*')
+if not attrs.get('*', {}).get(
+        'annex.largefiles', None) == annex_largefiles:
+    ds.repo.set_gitattributes([
+        ('*', {'annex.largefiles': annex_largefiles})])
 
+git_attributes_file = op.join(ds.path, '.gitattributes')
 ds.add([dict(
     path=git_attributes_file,
     type='file',

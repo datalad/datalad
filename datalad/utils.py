@@ -21,6 +21,7 @@ import tempfile
 import platform
 import gc
 import glob
+import gzip
 import string
 import wrapt
 
@@ -81,10 +82,37 @@ except:  # pragma: no cover
     linux_distribution_name = linux_distribution_release = None
 
 # Maximal length of cmdline string
-# Did not find anything in Python which could tell at run time and
+# Query the system and use hardcoded "knowledge" if None
 # probably   getconf ARG_MAX   might not be available
 # The last one would be the most conservative/Windows
-CMD_MAX_ARG = 2097152 if on_linux else 262144 if on_osx else 32767
+CMD_MAX_ARG_HARDCODED = 2097152 if on_linux else 262144 if on_osx else 32767
+try:
+    CMD_MAX_ARG = os.sysconf('SC_ARG_MAX')
+    assert CMD_MAX_ARG > 0
+    if sys.version_info[:2] == (3, 4):
+        # workaround for some kind of a bug which comes up with python 3.4
+        # see https://github.com/datalad/datalad/issues/3150
+        CMD_MAX_ARG = min(CMD_MAX_ARG, CMD_MAX_ARG_HARDCODED)
+except Exception as exc:
+    # ATM (20181005) SC_ARG_MAX available only on POSIX systems
+    # so exception would be thrown e.g. on Windows, or
+    # somehow during Debian build for nd14.04 it is coming up with -1:
+    # https://github.com/datalad/datalad/issues/3015
+    CMD_MAX_ARG = CMD_MAX_ARG_HARDCODED
+    lgr.debug(
+        "Failed to query or got useless SC_ARG_MAX sysconf, "
+        "will use hardcoded value: %s", exc)
+# Even with all careful computations we do, due to necessity to account for
+# environment and what not, we still could not figure out "exact" way to
+# estimate it, but it was shown that 300k safety margin on linux was sufficient.
+# https://github.com/datalad/datalad/pull/2977#issuecomment-436264710
+# 300k is ~15%, so to be safe, and for paranoid us we will just use up to 50%
+# of the length for "safety margin".  We might probably still blow due to
+# env vars, unicode, etc...  so any hard limit imho is not a proper solution
+CMD_MAX_ARG = int(0.5 * CMD_MAX_ARG)
+lgr.debug(
+    "Maximal length of cmdline string (adjusted for safety margin): %d",
+    CMD_MAX_ARG)
 
 #
 # Little helpers
@@ -175,11 +203,28 @@ def auto_repr(cls):
     return cls
 
 
+def _is_stream_tty(stream):
+    try:
+        # TODO: check on windows if hasattr check would work correctly and
+        # add value:
+        return stream.isatty()
+    except ValueError as exc:
+        # Who knows why it is a ValueError, but let's try to be specific
+        # If there is a problem with I/O - non-interactive, otherwise reraise
+        if "I/O" in str(exc):
+            return False
+        raise
+
+
 def is_interactive():
-    """Return True if all in/outs are tty"""
-    # TODO: check on windows if hasattr check would work correctly and add value:
-    #
-    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+    """Return True if all in/outs are open and tty.
+
+    Note that in a somewhat abnormal case where e.g. stdin is explicitly
+    closed, and any operation on it would raise a
+    `ValueError("I/O operation on closed file")` exception, this function
+    would just return False, since the session cannot be used interactively.
+    """
+    return all(_is_stream_tty(s) for s in (sys.stdin, sys.stdout, sys.stderr))
 
 
 def get_ipython_shell():
@@ -194,8 +239,10 @@ def get_ipython_shell():
 
 
 def md5sum(filename):
-    with open(filename, 'rb') as f:
-        return hashlib.md5(f.read()).hexdigest()
+    """Compute an MD5 sum for the given file
+    """
+    from datalad.support.digests import Digester
+    return Digester(digests=['md5'])(filename)['md5']
 
 
 def sorted_files(dout):
@@ -226,7 +273,7 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_dat
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
-      Either to match directories as well as files
+      Whether to match directories as well as files
     """
 
     for dirpath, dirnames, filenames in os.walk(topdir):
@@ -288,9 +335,9 @@ def rotree(path, ro=True, chmod_files=True):
     path : string
       Path to the tree/directory to chmod
     ro : bool, optional
-      Either to make it R/O (default) or RW
+      Whether to make it R/O (default) or RW
     chmod_files : bool, optional
-      Either to operate also on files (not just directories)
+      Whether to operate also on files (not just directories)
     """
     if ro:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
@@ -313,7 +360,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     Parameters
     ----------
     chmod_files : string or bool, optional
-       Either to make files writable also before removal.  Usually it is just
+       Whether to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
     children_only : bool, optional
@@ -326,7 +373,10 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-
+    # TODO:  yoh thinks that if we could quickly check our Flyweight for
+    #        repos if any of them is under the path, and could call .precommit
+    #        on those to possibly stop batched processes etc, we did not have
+    #        to do it on case by case
     # Check for open files
     assert_no_open_files(path)
 
@@ -338,7 +388,7 @@ def rmtree(path, chmod_files='auto', children_only=False, *args, **kwargs):
         return
     if not (os.path.islink(path) or not os.path.isdir(path)):
         rotree(path, ro=False, chmod_files=chmod_files)
-        shutil.rmtree(path, *args, **kwargs)
+        _rmtree(path, *args, **kwargs)
     else:
         # just remove the symlink
         unlink(path)
@@ -379,7 +429,7 @@ def get_open_files(path, log_open=False):
                 # note: could be done more efficiently so we do not
                 # renormalize path over and over again etc
                 if path_startswith(p, path):
-                    files[p] = proc.pid
+                    files[p] = proc
         # Catch a race condition where a process ends
         # before we can examine its files
         except psutil.NoSuchProcess:
@@ -430,34 +480,6 @@ def rmtemp(f, *args, **kwargs):
             unlink(f)
     else:
         lgr.info("Keeping temp file: %s" % f)
-
-
-def unlink(f, ntimes=None, sleep_duration=0.1):
-    """'Robust' unlink.  Would try multiple times
-
-    On windows boxes there is evidence for a latency of more than a second
-    until a file is considered no longer "in-use".
-    WindowsError is not known on Linux, and if IOError or any other exception
-    is thrown then if except statement has WindowsError in it -- NameError
-    also see gh-2533
-    """
-    exceptions = (OSError, WindowsError, PermissionError) \
-        if on_windows else OSError
-    if not ntimes:
-        # Life goes fast on proper systems, no need to delay it much
-        ntimes = 50 if on_windows else 3
-    # Check for open files
-    assert_no_open_files(f)
-    for i in range(ntimes):
-        try:
-            os.unlink(f)
-        except exceptions:
-            if i < ntimes - 1:
-                sleep(sleep_duration)
-                continue
-            else:
-                raise
-        break
 
 
 def file_basename(name, return_ext=False):
@@ -737,7 +759,7 @@ def as_unicode(val, cast_types=object):
             % (val, cast_types))
 
 
-def unique(seq, key=None):
+def unique(seq, key=None, reverse=False):
     """Given a sequence return a list only with unique elements while maintaining order
 
     This is the fastest solution.  See
@@ -754,15 +776,44 @@ def unique(seq, key=None):
     key: callable, optional
       Function to call on each element so we could decide not on a full
       element, but on its member etc
+    reverse: bool, optional
+      If True, uniqueness checked in the reverse order, so that the later ones
+      will take the order
     """
     seen = set()
     seen_add = seen.add
+
+    trans = reversed if reverse else lambda x: x
+
     if not key:
-        return [x for x in seq if not (x in seen or seen_add(x))]
+        out = [x for x in trans(seq) if not (x in seen or seen_add(x))]
     else:
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
-        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+        out = [x for x in trans(seq) if not (key(x) in seen or seen_add(key(x)))]
+
+    return out[::-1] if reverse else out
+
+
+def all_same(items):
+    """Quick check if all items are the same.
+
+    Identical to a check like len(set(items)) == 1 but
+    should be more efficient while working on generators, since would
+    return False as soon as any difference detected thus possibly avoiding
+    unnecessary evaluations
+    """
+    first = True
+    first_item = None
+    for item in items:
+        if first:
+            first = False
+            first_item = item
+        else:
+            if item != first_item:
+                return False
+    # So we return False if was empty
+    return not first
 
 
 def map_items(func, v):
@@ -814,6 +865,37 @@ def generate_chunks(container, size):
     while container:
         yield container[:size]
         container = container[size:]
+
+
+def generate_file_chunks(files, cmd=None):
+    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+
+    Parameters
+    ----------
+    files: list of str
+    cmd: str or list of str, optional
+      Command to account for as well
+    """
+    files = assure_list(files)
+    cmd = assure_list(cmd)
+
+    maxl = max(map(len, files)) if files else 0
+    chunk_size = max(
+        1,  # should at least be 1. If blows then - not our fault
+        (CMD_MAX_ARG
+         - sum((len(x) + 3) for x in cmd)
+         - 4  # for '--' below
+         ) // (maxl + 3)  # +3 for possible quotes and a space
+    )
+    # TODO: additional treatment for "too many arguments"? although
+    # as https://github.com/datalad/datalad/issues/1883#issuecomment
+    # -436272758
+    # shows there seems to be no hardcoded limit on # of arguments,
+    # but may be we decide to go for smth like follow to be on safe side
+    # chunk_size = min(10240 - len(cmd), chunk_size)
+    file_chunks = generate_chunks(files, chunk_size)
+    return file_chunks
+
 
 #
 # Generators helpers
@@ -927,6 +1009,30 @@ def line_profile(func):
         finally:
             prof.print_stats()
     return newfunc
+
+
+# Borrowed from duecredit to wrap duecredit-handling to guarantee failsafe
+def never_fail(f):
+    """Assure that function never fails -- all exceptions are caught
+
+    Returns `None` if function fails internally.
+    """
+    @wraps(f)
+    def wrapped_func(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            lgr.warning(
+                "DataLad internal failure while running %s: %r. "
+                "Please report at https://github.com/datalad/datalad/issues"
+                % (f, e)
+            )
+
+    if os.environ.get('DATALAD_ALLOW_FAIL', False):
+        return f
+    else:
+        return wrapped_func
+
 
 #
 # Context Managers
@@ -1089,7 +1195,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
                 rmtemp(out_name)
 
         def assert_logged(self, msg=None, level=None, regex=True, **kwargs):
-            """Provide assertion on either a msg was logged at a given level
+            """Provide assertion on whether a msg was logged at a given level
 
             If neither `msg` nor `level` provided, checks if anything was logged
             at all.
@@ -1241,25 +1347,99 @@ def updated(d, update):
     return d
 
 
+_pwd_mode = None
+
+
+def _switch_to_getcwd(msg, *args):
+    global _pwd_mode
+    _pwd_mode = 'cwd'
+    lgr.warning(
+        msg + ". From now on will be returning os.getcwd(). Directory"
+               " symlinks in the paths will be resolved",
+        *args
+    )
+    # TODO:  we might want to mitigate by going through all flywheighted
+    # repos and tuning up their .paths to be resolved?
+
+
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
 
-    If no PWD found in the env, output of getcwd() is returned
+    This function will try to use PWD environment variable to provide a current
+    working directory, possibly with some directories along the path being
+    symlinks to other directories.  Unfortunately, PWD is used/set only by the
+    shell and such functions as `os.chdir` and `os.getcwd` nohow use or modify
+    it, thus `os.getcwd()` returns path with links dereferenced.
+
+    While returning current working directory based on PWD env variable we
+    verify that the directory is the same as `os.getcwd()` after resolving all
+    symlinks.  If that verification fails, we fall back to always use
+    `os.getcwd()`.
+
+    Initial decision to either use PWD env variable or os.getcwd() is done upon
+    the first call of this function.
     """
-    try:
-        pwd = os.environ['PWD']
-        if on_windows and pwd and pwd.startswith('/'):
-            # It should be a path from MSYS.
-            # - it might start with a drive letter or not
-            # - it seems to be "illegal" to have a single letter directories
-            #   under / path, i.e. if created - they aren't found
-            # - 'ln -s' does not fail to create a "symlink" but it just copies!
-            #   so we are not likely to need original PWD purpose on those systems
-            # Verdict:
-            return os.getcwd()
-        return pwd
-    except KeyError:
+    global _pwd_mode
+    if _pwd_mode is None:
+        # we need to decide!
+        try:
+            pwd = os.environ['PWD']
+            if on_windows and pwd and pwd.startswith('/'):
+                # It should be a path from MSYS.
+                # - it might start with a drive letter or not
+                # - it seems to be "illegal" to have a single letter directories
+                #   under / path, i.e. if created - they aren't found
+                # - 'ln -s' does not fail to create a "symlink" but it just
+                # copies!
+                #   so we are not likely to need original PWD purpose on
+                # those systems
+                # Verdict:
+                _pwd_mode = 'cwd'
+            else:
+                _pwd_mode = 'PWD'
+        except KeyError:
+            _pwd_mode = 'cwd'
+
+    if _pwd_mode == 'cwd':
         return os.getcwd()
+    elif _pwd_mode == 'PWD':
+        try:
+            cwd = os.getcwd()
+        except OSError as exc:
+            if "o such file" in str(exc):
+                # directory was removed but we promised to be robust and
+                # still report the path we might know since we are still in PWD
+                # mode
+                cwd = None
+            else:
+                raise
+        try:
+            pwd = os.environ['PWD']
+            pwd_real = op.realpath(pwd)
+            # This logic would fail to catch the case where chdir did happen
+            # to the directory where current PWD is pointing to, e.g.
+            # $> ls -ld $PWD
+            # lrwxrwxrwx 1 yoh yoh 5 Oct 11 13:27 /home/yoh/.tmp/tmp -> /tmp//
+            # hopa:~/.tmp/tmp
+            # $> python -c 'import os; os.chdir("/tmp"); from datalad.utils import getpwd; print(getpwd(), os.getcwd())'
+            # ('/home/yoh/.tmp/tmp', '/tmp')
+            # but I guess that should not be too harmful
+            if cwd is not None and pwd_real != cwd:
+                _switch_to_getcwd(
+                    "realpath of PWD=%s is %s whenever os.getcwd()=%s",
+                    pwd, pwd_real, cwd
+                )
+                return cwd
+            return pwd
+        except KeyError:
+            _switch_to_getcwd("PWD env variable is no longer available")
+            return cwd  # Must not happen, but may be someone
+                        # evil purges PWD from environ?
+    else:
+        raise RuntimeError(
+            "Must have not got here. "
+            "pwd_mode must be either cwd or PWD. And it is now %r" % (_pwd_mode,)
+        )
 
 
 class chpwd(object):
@@ -1349,7 +1529,7 @@ def get_path_prefix(path, pwd=None):
 
 def _get_normalized_paths(path, prefix):
     if isabs(path) != isabs(prefix):
-        raise ValueError("Bot paths must either be absolute or relative. "
+        raise ValueError("Both paths must either be absolute or relative. "
                          "Got %r and %r" % (path, prefix))
     path = with_pathsep(path)
     prefix = with_pathsep(prefix)
@@ -1620,6 +1800,7 @@ def get_dataset_pwds(dataset):
     return pwd, rel_pwd
 
 
+# ATM used in datalad_crawler extension, so do not remove yet
 def try_multiple(ntrials, exception, base, f, *args, **kwargs):
     """Call f multiple times making exponentially growing delay between the calls"""
     from .dochelpers import exc_str
@@ -1633,6 +1814,82 @@ def try_multiple(ntrials, exception, base, f, *args, **kwargs):
             lgr.warning("Caught %s on trial #%d. Sleeping %f and retrying",
                         exc_str(exc), trial, t)
             sleep(t)
+
+
+@optional_args
+def try_multiple_dec(f, ntrials=None, duration=0.1, exceptions=None, increment_type=None):
+    """Decorator to try function multiple times.
+
+    Main purpose is to decorate functions dealing with removal of files/directories
+    and which might need a few seconds to work correctly on Windows which takes
+    its time to release files/directories.
+
+    Parameters
+    ----------
+    ntrials: int, optional
+    duration: float, optional
+      Seconds to sleep before retrying.
+    increment_type: {None, 'exponential'}
+      Note that if it is exponential, duration should typically be > 1.0
+      so it grows with higher power
+
+    """
+    from .dochelpers import exc_str
+    if not exceptions:
+        exceptions = (OSError, WindowsError, PermissionError) \
+            if on_windows else OSError
+    if not ntrials:
+        # Life goes fast on proper systems, no need to delay it much
+        ntrials = 50 if on_windows else 3
+
+    assert increment_type in {None, 'exponential'}
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        t = duration
+        for trial in range(ntrials):
+            try:
+                return f(*args, **kwargs)
+            except exceptions as exc:
+                if increment_type == 'exponential':
+                    t = duration ** (trial + 1)
+                lgr.log(
+                    5,
+                    "Caught %s on trial #%d. Sleeping %f and retrying",
+                    exc_str(exc), trial, t)
+                if trial < ntrials - 1:
+                    sleep(t)
+                else:
+                    raise
+
+    return wrapped
+
+
+@try_multiple_dec
+def unlink(f):
+    """'Robust' unlink.  Would try multiple times
+
+    On windows boxes there is evidence for a latency of more than a second
+    until a file is considered no longer "in-use".
+    WindowsError is not known on Linux, and if IOError or any other
+    exception
+    is thrown then if except statement has WindowsError in it -- NameError
+    also see gh-2533
+    """
+    # Check for open files
+    assert_no_open_files(f)
+    return os.unlink(f)
+
+
+@try_multiple_dec
+def _rmtree(*args, **kwargs):
+    """Just a helper to decorate shutil.rmtree.
+
+    rmtree defined above does more and ideally should not itself be decorated
+    since a recursive definition and does checks for open files inside etc -
+    might be too runtime expensive
+    """
+    return shutil.rmtree(*args, **kwargs)
 
 
 def slash_join(base, extension):
@@ -1925,10 +2182,10 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
                        path=op.join(path, dirname),
                        overwrite=overwrite)
     # remove original tree
-    shutil.rmtree(full_dirname)
+    rmtree(full_dirname)
 
 
-def create_tree(path, tree, archives_leading_dir=True):
+def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -1949,23 +2206,46 @@ def create_tree(path, tree, archives_leading_dir=True):
             executable = False
             name = file_
         full_name = op.join(path, name)
+        if remove_existing and op.lexists(full_name):
+            rmtree(full_name, chmod_files=True)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
-                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
+                create_tree_archive(
+                    path, name, load,
+                    archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
+                create_tree(
+                    full_name, load,
+                    archives_leading_dir=archives_leading_dir,
+                    remove_existing=remove_existing)
         else:
-            if PY2:
-                open_kwargs = {'mode': "w"}
-                if isinstance(load, text_type):
-                    load = load.encode('utf-8')
-            else:
-                open_kwargs = {'mode': "w", 'encoding': "utf-8"}
-
-            with open(full_name, **open_kwargs) as f:
-                f.write(load)
+            open_func = open
+            if full_name.endswith('.gz'):
+                open_func = gzip.open
+            with open_func(full_name, "wb") as f:
+                f.write(assure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
+
+
+def get_suggestions_msg(values, known, sep="\n        "):
+    """Return a formatted string with suggestions for values given the known ones
+    """
+    import difflib
+    suggestions = []
+    for value in assure_list(values):  # might not want to do it if we change presentation below
+        suggestions += difflib.get_close_matches(value, known)
+    suggestions = unique(suggestions)
+    msg = "Did you mean any of these?"
+    if suggestions:
+        if '\n' in sep:
+            # if separator includes new line - we add entire separator right away
+            msg += sep
+        else:
+            msg += ' '
+        return msg + "%s\n" % sep.join(suggestions)
+    return ''
+
 
 
 lgr.log(5, "Done importing datalad.utils")

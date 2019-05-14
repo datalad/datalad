@@ -255,7 +255,7 @@ class BaseDownloader(object):
         Raises
         ------
         DownloadError
-          If either no known credentials type, or user refuses to update
+          If no known credentials type or user refuses to update
         """
         title = "{msg} access to {url} has failed.".format(
             msg=denied_msg, url=url)
@@ -284,7 +284,7 @@ class BaseDownloader(object):
         else:
             action_msg = "enter other credentials in case they were updated?"
 
-            if ui.yesno(
+            if self.credential and ui.yesno(
                     title=title,
                     text="Do you want to %s" % action_msg):
                 self.credential.enter_new()
@@ -487,7 +487,7 @@ class BaseDownloader(object):
             atexit.register(self._cache.close)
         return self._cache
 
-    def _fetch(self, url, cache=None, size=None, allow_redirects=True):
+    def _fetch(self, url, cache=None, size=None, allow_redirects=True, decode=True):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management and decodes
@@ -498,9 +498,9 @@ class BaseDownloader(object):
         url: str
           URL to download
         cache: bool, optional
-          If None, config is consulted either results should be cached.
-          Cache is operating based on url, so no verification of any kind
-          is carried out
+          If None, config is consulted to determine whether results should be
+          cached. Cache is operating based on url, so no verification of any
+          kind is carried out
 
         Returns
         -------
@@ -541,7 +541,7 @@ class BaseDownloader(object):
             downloaded_size = len(content)
 
             # now that we know size based on encoded content, let's decode into string type
-            if PY3 and isinstance(content, binary_type):
+            if PY3 and isinstance(content, binary_type) and decode:
                 content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
@@ -615,7 +615,7 @@ class BaseDownloader(object):
             and self.authenticator.failure_re \
             else 0
 
-        _, headers = self._fetch(url, cache=False, size=download_size)
+        _, headers = self._fetch(url, cache=False, size=download_size, decode=False)
 
         # extract from headers information to depict the status of the url
         status = self.get_status_from_headers(headers)

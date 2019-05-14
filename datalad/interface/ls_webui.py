@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import hashlib
+import numbers
 import humanize
 import json as js
 import time
@@ -19,15 +20,21 @@ from os import makedirs, remove, listdir
 from os.path import split, abspath, basename, join as opj, realpath, relpath, \
     isabs, dirname
 
-from datalad.consts import METADATA_DIR, METADATA_FILENAME
+from datalad.consts import OLDMETADATA_DIR, OLDMETADATA_FILENAME
 from datalad.distribution.dataset import Dataset
 from datalad.interface.ls import FsModel, lgr, GitModel
 from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import safe_print, with_pathsep
 
+# A string to use to depict unknown size of the annexed dataset, e.g.
+# whenever all the keys are "relaxed" urls
+UNKNOWN_SIZE = "?"
+
 
 def machinesize(humansize):
     """convert human-size string to machine-size"""
+    if humansize == UNKNOWN_SIZE:
+        return 0
     try:
         size_str, size_unit = humansize.split(" ")
     except AttributeError:
@@ -112,8 +119,11 @@ def fs_extract(nodepath, repo, basepath='/'):
     """
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
-    pretty_size = {stype: humanize.naturalsize(svalue)
-                   for stype, svalue in node.size.items()}
+    pretty_size = {
+        stype: humanize.naturalsize(svalue)
+            if isinstance(svalue, numbers.Number) else UNKNOWN_SIZE
+        for stype, svalue in node.size.items()
+    }
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) \
         if leaf_name(node._path) != "" \
@@ -127,7 +137,7 @@ def fs_extract(nodepath, repo, basepath='/'):
     }
     # if there is meta-data for the dataset (done by aggregate-metadata)
     # we include it
-    metadata_path = opj(nodepath, METADATA_DIR, METADATA_FILENAME)
+    metadata_path = opj(nodepath, OLDMETADATA_DIR, OLDMETADATA_FILENAME)
     if exists(metadata_path):
         # might need flattening!  TODO: flatten when aggregating?  why wasn't done?
         with open(metadata_path) as t:

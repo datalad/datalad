@@ -286,9 +286,12 @@ def check_download_external_url(url, failed_str, success_str, d, url_final=None)
     # TODO -- more and more specific
 
 
-@skip_if_no_network
-@use_cassette('test_authenticate_external_portals', record_mode='once')
+# TODO: @use_cassette is not playing nice with generators, causing
+# troubles when trying to cause test skip if no network. So disabling for now
+# https://github.com/datalad/datalad/issues/3158
+# @use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
+    skip_if_no_network()
     yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
@@ -311,10 +314,16 @@ def test_download_ftp():
         import requests_ftp
     except ImportError:
         raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
-    yield check_download_external_url, \
-          "ftp://ftp.gnu.org/README", \
-          None, \
-          "This is ftp.gnu.org"
+    try:
+        check_download_external_url(
+                  "ftp://ftp.gnu.org/README",
+                  None,
+                  "This is ftp.gnu.org"
+        )
+    except AccessFailedError as exc:
+        if 'status code 503' in str(exc):
+            raise SkipTest("ftp.gnu.org throws 503 when on travis (only?)")
+        raise
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste

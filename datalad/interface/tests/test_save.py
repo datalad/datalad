@@ -1,4 +1,5 @@
 # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -41,8 +42,8 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
-from datalad.tests.utils import skip_v6
-from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import skip_v6_or_later
+from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
@@ -269,15 +270,15 @@ def test_recursive_save(path):
 @with_tempfile()
 def test_save_message_file(path):
     ds = Dataset(path).create()
-    with assert_raises(IncompleteResultsError):
+    with assert_raises(ValueError):
         ds.save("blah", message="me", message_file="and me")
 
     create_tree(path, {"foo": "x",
-                       "msg": "add foo"})
+                       "msg": u"add β"})
     ds.add("foo", save=False)
     ds.save(message_file=opj(ds.path, "msg"))
-    assert_equal(ds.repo.repo.git.show("--format=%s", "--no-patch"),
-                 "add foo")
+    assert_equal(ds.repo.format_commit("%s"),
+                 u"add β")
 
 
 def test_renamed_file():
@@ -338,7 +339,7 @@ def test_subdataset_save(path):
     ok_clean_git(parent.path, untracked=['untracked'])
 
 
-@skip_if_on_windows  # gh-2536
+@known_failure_windows  # gh-2536
 @with_tempfile(mkdir=True)
 def test_symlinked_relpath(path):
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
@@ -368,7 +369,7 @@ def test_symlinked_relpath(path):
         ds.repo.add(later, git=True)
         ds.save("committing", path=later)
 
-    skip_v6(method='pass')(ok_clean_git)(dspath)
+    ok_clean_git(dspath)
 
 
 # two subdatasets not possible in direct mode
@@ -437,14 +438,14 @@ def test_gh2043p1(path):
         save('.')  #  because the first arg is the dataset
     # state of the file (unlocked/locked) is committed as well, and the
     # test doesn't lock the file again
-    skip_v6(method='pass')(ok_clean_git)(ds.path, untracked=['2', '3'])
+    skip_v6_or_later(method='pass')(ok_clean_git)(ds.path, untracked=['2', '3'])
     with chpwd(path):
         # but when a path is given, anything that matches this path
         # untracked or not is added/saved
         save(path='.')
     # state of the file (unlocked/locked) is committed as well, and the
     # test doesn't lock the file again
-    skip_v6(method='pass')(ok_clean_git)(ds.path)
+    skip_v6_or_later(method='pass')(ok_clean_git)(ds.path)
 
 
 @with_tree({
@@ -459,3 +460,39 @@ def test_bf2043p2(path):
     with chpwd(path):
         save()
     ok_clean_git(ds.path, untracked=['untracked'])
+
+
+# https://github.com/datalad/datalad/issues/3087
+@with_tree({
+    'sdir1': {'foo': 'foo'},
+    'sdir2': {'foo': 'foo'},
+    'sdir3': {'sdir': {'subsub': {'foo': 'foo'}}},
+})
+def test_save_directory(path):
+    # Sequence of save invocations on subdirectories.
+    ds = Dataset(path).create(force=True)
+    ds.save(path='sdir1')
+    ok_clean_git(ds.path, untracked=['sdir2/foo', 'sdir3/sdir/subsub/foo'])
+
+    # There is also difference from
+    with chpwd(path):
+        save(path='sdir2')
+    ok_clean_git(ds.path, untracked=['sdir3/sdir/subsub/foo'])
+
+    with chpwd(opj(path, 'sdir3')):
+        save(path='sdir')
+    ok_clean_git(ds.path)
+
+
+@with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
+            "foo": "in annex"})
+def test_save_partial_index(path):
+    ds = Dataset(path).create(force=True)
+    ds.add("foo")
+    ok_clean_git(ds.path)
+    ds.unlock(path="foo")
+    create_tree(ds.path, tree={"foo": "a", "staged": ""},
+                remove_existing=True)
+    ds.repo.add("staged", git=True)
+    ds.save(path="foo")
+    ok_clean_git(ds.path, head_modified=["staged"])
