@@ -69,16 +69,16 @@ class Save(Interface):
       Save any content underneath the current directory, without altering
       any potential subdataset (use --recursive for that)::
 
-        % datalad rev-save .
+        % datalad save .
 
       Save any modification of known dataset content, but leave untracked
       files (e.g. temporary files) untouched::
 
-        % dataset rev-save -u -d <path_to_dataset>
+        % dataset save -u -d <path_to_dataset>
 
       Tag the most recent saved state of a dataset::
 
-        % dataset rev-save -d <path_to_dataset> --version-tag bestyet
+        % dataset save -d <path_to_dataset> --version-tag bestyet
 
     .. note::
       For performance reasons, any Git repository without an initial commit
