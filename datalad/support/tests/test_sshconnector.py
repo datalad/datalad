@@ -191,12 +191,12 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # copy tempfile list to remote_url:sourcedir
     sourcefiles = [sourcefile1, sourcefile2, obscure_file]
-    ssh.copy(sourcefiles, opj(remote_url, sourcedir))
+    ssh.put(sourcefiles, opj(remote_url, sourcedir))
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
-    ssh.copy(sourcedir, opj(remote_url, targetdir),
-             recursive=True, preserve_attrs=True)
+    ssh.put(sourcedir, opj(remote_url, targetdir),
+            recursive=True, preserve_attrs=True)
 
     # check if sourcedir copied to remote_url:targetdir
     ok_(isdir(targetdir))
