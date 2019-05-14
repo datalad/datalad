@@ -29,7 +29,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
 from datalad.api import create
-from datalad.api import rev_save
+from datalad.api import save as rev_save
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile

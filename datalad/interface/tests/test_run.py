@@ -241,7 +241,7 @@ def test_rerun(path, nodspath):
     # Make a non-run commit.
     with open(op.join(path, "nonrun-file"), "w") as f:
         f.write("foo")
-    ds.rev_save("nonrun-file")
+    ds.save("nonrun-file")
     # Now rerun the buried command.
     ds.rerun(revision="HEAD~", message="rerun buried")
     eq_('xxx\n', open(probe_path).read())
@@ -273,7 +273,7 @@ def test_rerun(path, nodspath):
     ds.repo.checkout("HEAD~3", options=["-b", "topic"])
     with open(op.join(path, "topic-file"), "w") as f:
         f.write("topic")
-    ds.rev_save("topic-file")
+    ds.save("topic-file")
     ds.repo.checkout("master")
     ds.repo.merge("topic")
     assert_repo_status(ds.path)
@@ -445,7 +445,7 @@ def test_run_failure(path):
     msgfile = op.join(path, ds.repo.get_git_dir(ds.repo), "COMMIT_EDITMSG")
     ok_exists(msgfile)
 
-    ds.rev_save(recursive=True, message_file=msgfile)
+    ds.save(recursive=True, message_file=msgfile)
     assert_repo_status(ds.path)
     neq_(hexsha_initial, ds.repo.get_hexsha())
 
@@ -478,7 +478,7 @@ def test_run_failure(path):
 @with_tree(tree={"to_remove": "abc"})
 def test_run_save_deletion(path):
     ds = Dataset(path).create(force=True)
-    ds.rev_save()
+    ds.save()
     ds.run("{} to_remove".format("del" if on_windows else "rm"))
     assert_repo_status(ds.path)
 
@@ -509,7 +509,7 @@ def test_rerun_branch(path):
 
     with open(op.join(path, "nonrun-file"), "w") as f:
         f.write("foo")
-    ds.rev_save("nonrun-file")
+    ds.save("nonrun-file")
 
     # Rerun the commands on a new branch that starts at the parent
     # commit of the first run.
@@ -555,7 +555,7 @@ def test_rerun_cherry_pick(path):
     ds.run('echo abc > runfile')
     with open(op.join(path, "nonrun-file"), "w") as f:
         f.write("foo")
-    ds.rev_save("nonrun-file")
+    ds.save("nonrun-file")
 
     for onto, action in [("HEAD", "skip"), ("prerun", "pick")]:
         results = ds.rerun(since="prerun", onto=onto)
@@ -570,7 +570,7 @@ def test_rerun_outofdate_tree(path):
     output_file = op.join(path, "out")
     with open(input_file, "w") as f:
         f.write("abc\ndef")
-    ds.rev_save("foo", to_git=True)
+    ds.save("foo", to_git=True)
     # Create inital run.
     ds.run('grep def foo > out')
     eq_('def\n', open(output_file).read())
@@ -649,7 +649,7 @@ def test_new_or_modified(path):
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
-    ds.rev_save()
+    ds.save()
     assert_false(ds.repo.dirty)
     assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
     # Diffing doesn't fail when the branch contains a single commit.
@@ -672,7 +672,7 @@ def test_new_or_modified(path):
         f.write("updated 1")
     with open(op.join(path, "d/to_modify"), "w") as f:
         f.write("updated 2")
-    ds.rev_save(["to_modify", "d/to_modify"])
+    ds.save(["to_modify", "d/to_modify"])
 
     eq_(set(get_new_or_modified(ds, "HEAD")),
         {"to_modify", op.join("d", "to_modify")})
@@ -744,9 +744,9 @@ def test_run_inputs_outputs(src, path):
                   ("s0", "s1_1"),
                   ("s0", "ss"),
                   ("s0",)]:
-        Dataset(op.join(*((src,) + subds))).create(force=True).rev_save()
+        Dataset(op.join(*((src,) + subds))).create(force=True).save()
     src_ds = Dataset(src).create(force=True)
-    src_ds.rev_save()
+    src_ds.save()
 
     ds = install(path, source=src,
                  result_xfm='datasets', return_type='item-or-list')
@@ -785,7 +785,7 @@ def test_run_inputs_outputs(src, path):
     inputs = ["a.dat", "b.dat", "c.txt", "d.txt"]
     create_tree(ds.path, {i: i for i in inputs})
 
-    ds.rev_save()
+    ds.save()
     ds.repo.copy_to(inputs, remote="origin")
     ds.repo.drop(inputs, options=["--force"])
 
@@ -805,7 +805,7 @@ def test_run_inputs_outputs(src, path):
     # --input can be passed a subdirectory.
     create_tree(ds.path, {"subdir": {"a": "subdir a",
                                      "b": "subdir b"}})
-    ds.rev_save("subdir")
+    ds.save("subdir")
     ds.repo.copy_to(["subdir/a", "subdir/b"], remote="origin")
     ds.repo.drop("subdir", options=["--force"])
     ds.run("cd .> subdir-dummy", inputs=[op.join(ds.path, "subdir")])
@@ -824,7 +824,7 @@ def test_run_inputs_outputs(src, path):
     # On rerun, we get all files, even those that weren't in the tree at the
     # time of the run.
     create_tree(ds.path, {"after-dot-run": "after-dot-run content"})
-    ds.rev_save()
+    ds.save()
     ds.repo.copy_to(["after-dot-run"], remote="origin")
     ds.repo.drop(["after-dot-run"], options=["--force"])
     ds.rerun("HEAD^")
@@ -912,7 +912,7 @@ def test_run_explicit(path):
 
     create_tree(ds.path, {"dirt_untracked": "untracked",
                           "dirt_modified": "modified"})
-    ds.rev_save("dirt_modified", to_git=True)
+    ds.save("dirt_modified", to_git=True)
     with open(op.join(path, "dirt_modified"), "a") as ofh:
         ofh.write(", more")
 
@@ -960,7 +960,7 @@ def test_run_explicit(path):
                  "subdir": {}})
 def test_placeholders(path):
     ds = Dataset(path).create(force=True)
-    ds.rev_save()
+    ds.save()
     assert_repo_status(ds.path)
     # ATTN windows is sensitive to spaces before redirect symbol
     ds.run("echo {inputs}>{outputs}", inputs=[".", "*.in"], outputs=["c.out"])
@@ -1028,7 +1028,7 @@ def test_placeholders(path):
                  "foo blah.txt": "f"})
 def test_inputs_quotes_needed(path):
     ds = Dataset(path).create(force=True)
-    ds.rev_save()
+    ds.save()
     cmd = "import sys; open(sys.argv[-1], 'w').write('!'.join(sys.argv[1:]))"
     # The string form of a command works fine when the inputs/outputs have
     # spaces ...

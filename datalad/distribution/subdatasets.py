@@ -321,7 +321,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                     val)
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
-            Dataset(dspath).rev_save(
+            Dataset(dspath).save(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties')
             # let go of resources, locks, ...

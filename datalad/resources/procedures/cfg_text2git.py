@@ -18,7 +18,7 @@ if not attrs.get('*', {}).get(
         ('*', {'annex.largefiles': annex_largefiles})])
 
 git_attributes_file = op.join(ds.path, '.gitattributes')
-ds.rev_save(
+ds.save(
     git_attributes_file,
     message="Instruct annex to add text files to Git",
 )

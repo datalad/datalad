@@ -172,7 +172,7 @@ def test_subds_path(path):
     assert_repo_status(path)
     with (subds.pathobj / 'some.txt').open('w') as f:
         f.write(u'test')
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     assert_repo_status(path)
 
     # querying the toplevel dataset repo for a subdspath should
@@ -191,7 +191,7 @@ def test_report_absent_keys(path):
     # create an annexed file
     testfile = ds.pathobj / 'dummy'
     testfile.write_text(u'nothing')
-    ds.rev_save()
+    ds.save()
     # present in a full report and in a partial report
     # based on worktree of HEAD ref
     for ai in (

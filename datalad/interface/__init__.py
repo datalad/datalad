@@ -40,6 +40,7 @@ _group_dataset = (
          'CreateSiblingGithub',
          'create-sibling-github'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
+        ('datalad.core.local.save', 'Save', 'save'),
     ])
 
 _group_metadata = (
@@ -88,7 +89,6 @@ _group_future = (
     'Commands of the future',
     [
         ('datalad.core.local.run', 'Run', 'rev-run', 'rev_run'),
-        ('datalad.core.local.save', 'Save', 'rev-save', 'rev_save'),
         ('datalad.core.local.status', 'Status', 'status'),
     ])
 

@@ -426,7 +426,7 @@ class Create(Interface):
         if isinstance(dataset, Dataset) and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.rev_save(
+            for r in dataset.save(
                     path=tbds.path,
             ):
                 yield r

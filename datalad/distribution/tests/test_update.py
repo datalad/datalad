@@ -73,7 +73,7 @@ def test_update_simple(origin, src_path, dst_path):
     # modify origin:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
-    source.rev_save(path="update.txt", message="Added update.txt")
+    source.save(path="update.txt", message="Added update.txt")
     ok_clean_git(src_path)
 
     # fail when asked to update a non-dataset
@@ -118,9 +118,9 @@ def test_update_simple(origin, src_path, dst_path):
 
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, '2'), {'load.dat': 'heavy'})
-    source.rev_save(opj('2', 'load.dat'),
-               message="saving changes within subm2",
-               recursive=True)
+    source.save(opj('2', 'load.dat'),
+                message="saving changes within subm2",
+                recursive=True)
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
         status='ok', type='dataset')
@@ -138,7 +138,7 @@ def test_update_git_smoke(src_path, dst_path):
         dst_path, source=src_path,
         result_xfm='datasets', return_type='item-or-list')
     create_tree(ds.path, {'file.dat': '123'})
-    ds.rev_save('file.dat')
+    ds.save('file.dat')
     assert_result_count(
         target.update(recursive=True, merge=True), 1,
         status='ok', type='dataset')
@@ -213,7 +213,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
 def test_newthings_coming_down(originpath, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
-    Dataset(originpath).rev_save('load.dat')
+    Dataset(originpath).save('load.dat')
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -296,7 +296,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # re-introduce at origin
     osm1 = origin.create(sname)
     create_tree(osm1.path, {'load.dat': 'heavy'})
-    origin.rev_save(opj(osm1.path, 'load.dat'))
+    origin.save(opj(osm1.path, 'load.dat'))
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
     # grab new content of uninstall subdataset, right away
     ds.get(opj(ds.path, sname, 'load.dat'))
@@ -304,7 +304,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
 
     # modify ds and subds at origin
     create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
-    origin.rev_save(recursive=True)
+    origin.save(recursive=True)
     ok_clean_git(origin.path)
 
     # updates for both datasets should come down the pipe
@@ -335,7 +335,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # install separate dataset as a submodule
     ds.install(source=otherds.path, path='other')
     create_tree(otherds.path, {'brand': 'new'})
-    otherds.rev_save()
+    otherds.save()
     ok_clean_git(otherds.path)
     # pull in changes
     res = ds.update(merge=True, recursive=True)
@@ -357,7 +357,7 @@ def test_reobtain_data(originpath, destpath):
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     # content
     create_tree(origin.path, {'load.dat': 'heavy'})
-    origin.rev_save(opj(origin.path, 'load.dat'))
+    origin.save(opj(origin.path, 'load.dat'))
     # update does not bring data automatically
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     assert_in('load.dat', ds.repo.get_annexed_files())
@@ -367,7 +367,7 @@ def test_reobtain_data(originpath, destpath):
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
     # new content at origin
     create_tree(origin.path, {'novel': 'but boring'})
-    origin.rev_save()
+    origin.save()
     # update must not bring in data for new file
     result = ds.update(merge=True, reobtain_data=True)
     assert_in_results(result, action='get', status='notneeded')
@@ -378,7 +378,7 @@ def test_reobtain_data(originpath, destpath):
     # modify content at origin
     os.remove(opj(origin.path, 'load.dat'))
     create_tree(origin.path, {'load.dat': 'light'})
-    origin.rev_save()
+    origin.save()
     # update must update file with existing data, but leave empty one alone
     res = ds.update(merge=True, reobtain_data=True)
     assert_result_count(res, 2)

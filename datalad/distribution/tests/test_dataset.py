@@ -184,7 +184,7 @@ def test_subdatasets(path):
     eq_(ds.subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
-    ds.rev_save(path='test', message="Hello!", version_tag=1)
+    ds.save(path='test', message="Hello!", version_tag=1)
     assert_true(ds.is_installed())
     # Assuming that tmp location was not under a super-dataset
     eq_(ds.get_superdataset(), None)
@@ -202,7 +202,7 @@ def test_subdatasets(path):
     eq_(subds.path, ds.subdatasets(result_xfm='paths')[0])
     eq_(subdss, ds.subdatasets(recursive=True))
     eq_(subdss, ds.subdatasets(fulfilled=True))
-    ds.rev_save(message="with subds", version_tag=2)
+    ds.save(message="with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
     eq_(ds.subdatasets(), [])
