@@ -289,7 +289,7 @@ install:
   - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
   # In this version we will troubleshoot wrapt crash
   # https://github.com/GrahamDumpleton/wrapt/issues/98
-  - tools/ci/install_wrapt
+  #- tools/ci/install_wrapt
 
 script:
   # Test installation system-wide
