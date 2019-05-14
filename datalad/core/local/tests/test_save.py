@@ -22,6 +22,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_result_count,
     assert_in,
+    assert_in_results,
     assert_not_in,
     assert_raises,
     create_tree,
@@ -376,7 +377,8 @@ def test_add_subdataset(path, other):
     assert_not_in('dir', ds.subdatasets(result_xfm='relpaths'))
     # but with a base directory we add the dataset subds as a subdataset
     # to ds
-    ds.rev_save(subds.path)
+    res = ds.rev_save(subds.path)
+    assert_in_results(res, action="add", path=subds.path, refds=ds.path)
     assert_in('dir', ds.subdatasets(result_xfm='relpaths'))
     #  create another one
     other = create(other)
