@@ -182,7 +182,6 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     remote_url = 'ssh://localhost:22'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
-    ssh.open()
 
     # write to obscurely named file in sourcedir
     obscure_file = opj(sourcedir, get_most_obscure_supported_name())
@@ -192,6 +191,8 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     # copy tempfile list to remote_url:sourcedir
     sourcefiles = [sourcefile1, sourcefile2, obscure_file]
     ssh.put(sourcefiles, opj(remote_url, sourcedir))
+    # docs promise that connection is auto-opened
+    assert(ssh.is_open())
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
