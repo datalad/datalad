@@ -128,11 +128,9 @@ class SSHConnection(object):
         # TODO: check for annex location once, check for open socket once
         #       and provide roll back if fails to run and was not explicitly
         #       checked first
-        if not self.is_open():
-            if not self.open():
-                raise RuntimeError(
-                    'Cannot open SSH connection to {}'.format(
-                        self.sshri))
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
 
         # locate annex and set the bundled vs. system Git machinery in motion
         remote_annex_installdir = self.get_annex_installdir()
@@ -293,6 +291,9 @@ class SSHConnection(object):
         str
           stdout, stderr of the copy operation.
         """
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
         scp_cmd += assure_list(source)
@@ -320,6 +321,9 @@ class SSHConnection(object):
         str
           stdout, stderr of the copy operation.
         """
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
         scp_cmd += ['%s:"%s"' % (self.sshri.hostname, s)
