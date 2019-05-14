@@ -6,6 +6,8 @@ python:
   - 2.7
   - 3.5
 ##1  - 3.6
+##1  - 3.7
+##1  - 3.8-dev
 
 cache:
   - apt
@@ -35,7 +37,14 @@ env:
 matrix:
   include:
   # Additional custom ones
-  - python: 3.7-dev
+  - python: 3.8-dev
+    # Single run for Python 3.8
+    env:
+    # Run all tests in a single whoop here
+    # We cannot have empty -A selector, so the one which always will be fulfilled
+    - NOSE_SELECTION=
+    - NOSE_SELECTION_OP=not
+  - python: 3.7
     # Single run for Python 3.7
     env:
     # Run all tests in a single whoop here
