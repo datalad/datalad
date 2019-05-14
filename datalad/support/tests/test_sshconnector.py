@@ -243,7 +243,8 @@ def test_ssh_custom_identity_file():
                 cmd_out, _ = ssh("echo blah")
                 expected_socket = op.join(
                     text_type(manager.socket_dir),
-                    get_connection_hash("localhost", identity_file=ifile))
+                    get_connection_hash("localhost", identity_file=ifile,
+                                        bundled=True))
                 ok_(exists(expected_socket))
                 manager.close()
                 assert_in("-i", cml.out)
