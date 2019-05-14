@@ -103,5 +103,4 @@ Commands of the future
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-rev-run
    generated/man/datalad-status

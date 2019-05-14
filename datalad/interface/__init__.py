@@ -88,7 +88,6 @@ _group_plumbing = (
 _group_future = (
     'Commands of the future',
     [
-        ('datalad.core.local.run', 'Run', 'rev-run', 'rev_run'),
         ('datalad.core.local.status', 'Status', 'status'),
     ])
 
