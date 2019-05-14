@@ -125,7 +125,7 @@ class SSHConnection(object):
         """
 
         # TODO:  do not do all those checks for every invocation!!
-        # TODO: check for annex location once, check for open socket once
+        # TODO: check for open socket once
         #       and provide roll back if fails to run and was not explicitly
         #       checked first
         # make sure we have an open connection, will test if action is needed
