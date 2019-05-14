@@ -266,3 +266,21 @@ def test_ssh_git_props():
     # how annex was installed
     ok_(ssh.get_git_version())
     manager.close()  # close possibly still present connections
+
+
+# situation on our test windows boxes is complicated
+# login shell is a POSIX one, path handling and equivalence between
+# local and "remote" needs more research
+@skip_if_on_windows
+@skip_ssh
+@with_tempfile(mkdir=True)
+def test_bundle_invariance(path):
+    remote_url = 'ssh://localhost'
+    manager = SSHManager()
+    testfile = Path(path) / 'dummy'
+    for flag in (True, False):
+        assert(not testfile.exists())
+        ssh = manager.get_connection(remote_url, use_remote_annex_bundle=flag)
+        ssh('cd .>{}'.format(text_type(testfile)))
+        assert(testfile.exists())
+        testfile.unlink()
