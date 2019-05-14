@@ -40,7 +40,8 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username='', identity_file=''):
+def get_connection_hash(hostname, port='', username='', identity_file='',
+                        bundled=''):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -58,12 +59,14 @@ def get_connection_hash(hostname, port='', username='', identity_file=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{bundled}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
-            username=username).encode('utf-8')).hexdigest()[:8]
+            username=username,
+            bundled=bundled,
+        ).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
@@ -71,7 +74,8 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri, identity_file=None):
+    def __init__(self, ctrl_path, sshri, identity_file=None,
+                 use_remote_annex_bundle=True):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -85,6 +89,10 @@ class SSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
+        use_remote_annex_bundle : bool
+          If set, look for a git-annex installation on the remote and
+          prefer its binaries in the search path (i.e. prefer a bundled
+          Git over a system package).
         """
         self._runner = None
 
@@ -101,6 +109,7 @@ class SSHConnection(object):
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
         self._identity_file = identity_file
+        self._use_remote_annex_bundle = use_remote_annex_bundle
 
         # essential properties of the remote system
         self._remote_props = {}
@@ -137,12 +146,13 @@ class SSHConnection(object):
         self.open()
 
         # locate annex and set the bundled vs. system Git machinery in motion
-        remote_annex_installdir = self.get_annex_installdir()
-        if remote_annex_installdir:
-            # make sure to use the bundled git version if any exists
-            cmd = '{}; {}'.format(
-                'export "PATH={}:$PATH"'.format(remote_annex_installdir),
-                cmd)
+        if self._use_remote_annex_bundle:
+            remote_annex_installdir = self.get_annex_installdir()
+            if remote_annex_installdir:
+                # make sure to use the bundled git version if any exists
+                cmd = '{}; {}'.format(
+                    'export "PATH={}:$PATH"'.format(remote_annex_installdir),
+                    cmd)
 
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
@@ -457,7 +467,7 @@ class SSHManager(object):
                 "Found %d previous connections",
                 len(self._prev_connections))
 
-    def get_connection(self, url):
+    def get_connection(self, url, use_remote_annex_bundle=True):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
@@ -492,7 +502,9 @@ class SSHManager(object):
             sshri.hostname,
             port=sshri.port,
             identity_file=identity_file or "",
-            username=sshri.username)
+            username=sshri.username,
+            bundled=use_remote_annex_bundle,
+        )
         # determine control master:
         ctrl_path = self.socket_dir / conhash
 

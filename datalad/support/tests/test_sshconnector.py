@@ -80,7 +80,7 @@ def test_ssh_open_close(tfile1):
     manager = SSHManager()
 
     path = opj(text_type(manager.socket_dir),
-               get_connection_hash('localhost'))
+               get_connection_hash('localhost', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
     print("%s existed: %s" % (path, existed_before))
@@ -131,9 +131,9 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://localhost').open()
 
     ok_(exists(opj(text_type(manager.socket_dir),
-                   get_connection_hash('localhost'))))
+                   get_connection_hash('localhost', bundled=True))))
     ok_(exists(opj(text_type(manager.socket_dir),
-                   get_connection_hash('datalad-test'))))
+                   get_connection_hash('datalad-test', bundled=True))))
 
     manager.close()
 
