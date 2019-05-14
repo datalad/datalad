@@ -124,10 +124,14 @@ class SSHConnection(object):
           stdout, stderr of the command run.
         """
 
-        # TODO:  do not do all those checks for every invocation!!
-        # TODO: check for open socket once
-        #       and provide roll back if fails to run and was not explicitly
-        #       checked first
+        # XXX: check for open socket once
+        #      and provide roll back if fails to run and was not explicitly
+        #      checked first
+        # MIH: this would mean that we would have to distinguish failure
+        #      of a payload command from failure of SSH itself. SSH however,
+        #      only distinguishes success and failure of the entire operation
+        #      Increase in fragility from introspection makes a potential
+        #      performance benefit a questionable improvement.
         # make sure we have an open connection, will test if action is needed
         # by itself
         self.open()
