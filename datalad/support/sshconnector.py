@@ -273,8 +273,7 @@ class SSHConnection(object):
         scp_options += ["-p"] if preserve_attrs else []
         return ["scp"] + scp_options
 
-    def copy_to_remote(self, source, destination,
-                       recursive=False, preserve_attrs=False):
+    def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
         Parameters
@@ -301,8 +300,7 @@ class SSHConnection(object):
         scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
         return self.runner.run(scp_cmd)
 
-    def copy_from_remote(self, source, destination,
-                         recursive=False, preserve_attrs=False):
+    def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
 
         Parameters
