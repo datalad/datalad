@@ -71,7 +71,7 @@ def test_ssh_get_connection():
     manager.close()
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
@@ -109,7 +109,7 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path) == existed_before)
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_manager_close():
 
@@ -172,7 +172,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
-@skip_if_on_windows  # our test setup has no `scp` command
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
@@ -216,7 +216,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     ssh.close()
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
@@ -253,7 +253,7 @@ def test_ssh_custom_identity_file():
         cfg.reload(force=True)
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_git_props():
     remote_url = 'ssh://localhost'
