@@ -8,6 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Definitions for ansi colors etc"""
 
+import os
+from .. import cfg
 from ..ui import ui
 
 BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(30, 38)
@@ -39,9 +41,34 @@ DATASET = UNDERLINE
 FIELD = BOLD
 
 
+def color_enabled():
+    """Check for whether color output is enabled
+
+    Color is only enabled if the terminal is interactive.
+    If the datalad.ui.color configuration setting is 'on' or 'off', then
+    respect that.
+    If the datalad.ui.color setting is 'auto' (default), then color is
+    enabled unless the environment variable NO_COLOR is defined.
+    """
+    if not ui.is_interactive:
+        return False
+
+    UIC = cfg.get_value('datalad', 'ui.color', 'auto')
+    if UIC == 'off':
+        return False
+    elif UIC not in ('auto', 'on'):
+        raise ValueError("Unknown value for datalad.ui.color: '%s'; "
+                         "Must be one of 'on', 'off', 'auto'" % UIC)
+
+    if UIC == 'auto' and os.getenv('NO_COLOR') is not None:
+        return False
+
+    return True
+
+
 def format_msg(fmt, use_color=False):
     """Replace $RESET and $BOLD with corresponding ANSI entries"""
-    if use_color:
+    if color_enabled() and use_color:
         return fmt.replace("$RESET", RESET_SEQ).replace("$BOLD", BOLD_SEQ)
     else:
         return fmt.replace("$RESET", "").replace("$BOLD", "")
@@ -63,7 +90,7 @@ def color_word(s, color, force=False):
     -------
     str
     """
-    if color and (force or ui.is_interactive):
+    if color and (force or color_enabled()):
         return "%s%s%s" % (COLOR_SEQ % color, s, RESET_SEQ)
     return s
 
