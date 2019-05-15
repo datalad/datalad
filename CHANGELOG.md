@@ -58,6 +58,10 @@ bet we will fix some bugs and make a world even a better place.
 - A new progress backend, available by setting datalad.ui.progressbar
   to "log", replaces progress bars with a log message upon completion
   of an action.  ([#3396][])
+- DataLad learned to consult the [NO_COLOR][] environment variable and
+  the new `datalad.ui.color` configuration option when deciding to
+  color output.  The default value, "auto", retains the current
+  behavior of coloring output if attached to a TTY ([#3407][]).
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1170,6 +1174,7 @@ publishing
 [wtf]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-wtf.html
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
+[NO_COLOR]: https://no-color.org/
 
 [#2992]: https://github.com/datalad/datalad/issues/2992
 [#3196]: https://github.com/datalad/datalad/issues/3196
@@ -1311,3 +1316,4 @@ publishing
 [#3347]: https://github.com/datalad/datalad/issues/3347
 [#3365]: https://github.com/datalad/datalad/issues/3365
 [#3396]: https://github.com/datalad/datalad/issues/3396
+[#3407]: https://github.com/datalad/datalad/issues/3407
