@@ -22,17 +22,19 @@ from six import text_type
 from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import eq_
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import skip_if_on_windows
-
+from datalad.tests.utils import (
+    assert_raises,
+    eq_,
+    skip_ssh,
+    with_tempfile,
+    get_most_obscure_supported_name,
+    swallow_logs,
+    assert_in,
+    assert_false,
+    ok_,
+    assert_is_instance,
+    skip_if_on_windows,
+)
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
 
@@ -192,7 +194,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     sourcefiles = [sourcefile1, sourcefile2, obscure_file]
     ssh.put(sourcefiles, opj(remote_url, sourcedir))
     # docs promise that connection is auto-opened
-    assert(ssh.is_open())
+    ok_(ssh.is_open())
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
@@ -216,8 +218,8 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     # and now a quick smoke test for get
     togetfile = Path(targetdir) / '2get.txt'
     togetfile.write_text(text_type('something'))
-    ssh.get(opj(remote_url, togetfile), sourcedir)
-    (Path(sourcedir) / '2get.txt').exists()
+    ssh.get(opj(remote_url, text_type(togetfile)), sourcedir)
+    ok_((Path(sourcedir) / '2get.txt').exists())
 
     ssh.close()
 
@@ -285,8 +287,8 @@ def test_bundle_invariance(path):
     manager = SSHManager()
     testfile = Path(path) / 'dummy'
     for flag in (True, False):
-        assert(not testfile.exists())
+        assert_false(testfile.exists())
         ssh = manager.get_connection(remote_url, use_remote_annex_bundle=flag)
         ssh('cd .>{}'.format(text_type(testfile)))
-        assert(testfile.exists())
+        ok_(testfile.exists())
         testfile.unlink()
