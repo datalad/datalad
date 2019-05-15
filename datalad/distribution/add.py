@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """High-level interface for adding dataset components
 
+Note: This module is obsolete. Use core.local.save instead.
 """
 
 import logging
@@ -101,6 +102,10 @@ def _discover_subdatasets_recursively(
 @build_doc
 class Add(Interface):
     """Add files/directories to an existing dataset.
+
+
+    *Note*: This is an obsolete interface. Use datalad.api.save or Dataset.save
+     instead.
 
     Typically, files and directories to be added to a dataset would be placed
     into a directory of a dataset, and subsequently this command can be used to

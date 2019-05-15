@@ -1580,7 +1580,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_dropped_clean': 'file_dropped_clean',
             }
         )
-    ds.rev_save()
+    ds.save()
     if isinstance(ds.repo, AnnexRepo):
         # some files straight in git
         create_tree(
@@ -1594,7 +1594,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_ingit_modified': 'file_ingit_clean',
             }
         )
-        ds.rev_save(to_git=True)
+        ds.save(to_git=True)
         ds.drop([
             'file_dropped_clean',
             op.join('subdir', 'file_dropped_clean')],
@@ -1622,7 +1622,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         pdspath,
         {'file_clean': 'file_ingit_clean'}
     )
-    Dataset(pdspath).rev_save()
+    Dataset(pdspath).save()
     assert_repo_status(pdspath)
     # staged subds, and files
     create(op.join(ds.path, 'subds_added'))
@@ -1709,9 +1709,9 @@ def get_deeply_nested_structure(path):
     ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
     (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
-    ds.rev_save()
+    ds.save()
     (ds.pathobj / 'subdir' / 'git_file.txt').write_text(u'dummy')
-    ds.rev_save(to_git=True)
+    ds.save(to_git=True)
     # a subtree of datasets
     subds = ds.create('subds_modified')
     # another dataset, plus an additional dir in it
@@ -1731,7 +1731,7 @@ def get_deeply_nested_structure(path):
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
-    subds.rev_save()
+    subds.save()
     (ds.pathobj / 'directory_untracked').mkdir()
     # symlink farm #1
     # symlink to annexed file

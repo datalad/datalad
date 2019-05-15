@@ -289,8 +289,8 @@ class Clone(Interface):
         if dataset is not None:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.add(
-                    dest_path, save=True, ds2super=True,
+            for r in dataset.save(
+                    dest_path,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,

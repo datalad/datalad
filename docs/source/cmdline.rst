@@ -104,5 +104,4 @@ Commands of the future
    :maxdepth: 1
 
    generated/man/datalad-rev-run
-   generated/man/datalad-rev-save
    generated/man/datalad-status

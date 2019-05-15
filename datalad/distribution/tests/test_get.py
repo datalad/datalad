@@ -57,7 +57,7 @@ def _make_dataset_hierarchy(path):
     with open(opj(origin_sub3.path, 'file_in_annex.txt'), "w") as f:
         f.write('content3')
     origin_sub4 = origin_sub3.create('sub4')
-    origin.rev_save(recursive=True)
+    origin.save(recursive=True)
     return origin, origin_sub1, origin_sub2, origin_sub3, origin_sub4
 
 
@@ -108,7 +108,7 @@ def test_get_invalid_call(path, file_outside):
     ds.create(no_annex=True)
     with open(opj(path, "some.txt"), "w") as f:
         f.write("whatever")
-    ds.rev_save("some.txt", to_git=True, message="Initial commit.")
+    ds.save("some.txt", to_git=True, message="Initial commit.")
 
     # make it an annex (remove indicator file that create has placed
     # in the dataset to make it possible):
@@ -122,7 +122,7 @@ def test_get_invalid_call(path, file_outside):
     # yoh:  but now we would need to add it to annex since clever code first
     # checks what needs to be fetched at all
     create_tree(path, {'annexed.dat': 'some'})
-    ds.rev_save("annexed.dat")
+    ds.save("annexed.dat")
     ds.repo.drop("annexed.dat", options=['--force'])
     with assert_raises(RemoteNotAvailableError) as ce:
         ds.get("annexed.dat", source='MysteriousRemote')
@@ -169,7 +169,7 @@ def test_get_multiple_files(path, url, ds_dir):
 
     # prepare origin
     origin = Dataset(path).create(force=True)
-    origin.rev_save(file_list, message="initial")
+    origin.save(file_list, message="initial")
 
     ds = install(
         ds_dir, source=path,
@@ -208,7 +208,7 @@ def test_get_recurse_dirs(o_path, c_path):
 
     # prepare source:
     origin = Dataset(o_path).create(force=True)
-    origin.rev_save()
+    origin.save()
 
     ds = install(
         c_path, source=o_path,
@@ -376,9 +376,9 @@ def test_get_mixed_hierarchy(src, path):
         f.write('no idea')
     with open(opj(origin_sub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.rev_save('file_in_git.txt', to_git=True)
-    origin_sub.rev_save('file_in_annex.txt')
-    origin.rev_save()
+    origin.save('file_in_git.txt', to_git=True)
+    origin_sub.save('file_in_annex.txt')
+    origin.save()
 
     # now, install that thing:
     ds, subds = install(
@@ -422,7 +422,7 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
     origin_subsub = origin_sub.create('subsub')
     with open(opj(origin_subsub.path, 'file_in_annex.txt'), "w") as f:
         f.write('content')
-    origin.rev_save(recursive=True)
+    origin.save(recursive=True)
 
     ds = install(
         path, source=src,

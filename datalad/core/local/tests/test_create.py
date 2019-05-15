@@ -114,7 +114,7 @@ def test_create_raises(path, outside_path):
     os.makedirs(op.join(ds.path, 'down'))
     with open(op.join(ds.path, 'down', "someotherfile.tst"), 'w') as f:
         f.write("someother")
-    ds.rev_save()
+    ds.save()
     assert_in_results(
         ds.create('down', **raw),
         status='error',
@@ -230,14 +230,14 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(subsubds.is_installed())
     ok_(subsubds.repo.dirty)
     ok_(ds.id != subds.id != subsubds.id)
-    ds.rev_save(updated=True, recursive=True)
+    ds.save(updated=True, recursive=True)
     # 'file*' in each repo was untracked before and should remain as such
     # (we don't want a #1419 resurrection
     ok_(ds.repo.dirty)
     ok_(subds.repo.dirty)
     ok_(subsubds.repo.dirty)
     # if we add these three, we should get clean
-    ds.rev_save([
+    ds.save([
         'file1',
         op.join(subds.path, 'file2'),
         op.join(subsubds.path, 'file3')])
@@ -259,7 +259,7 @@ def test_nested_create(path):
     os.makedirs(op.join(ds.path, 'lvl1', 'empty'))
     with open(op.join(lvl2path, 'file'), 'w') as f:
         f.write('some')
-    ok_(ds.rev_save())
+    ok_(ds.save())
     # Empty directories are filtered out.
     assert_repo_status(ds.path, untracked=[])
     # later create subdataset in a fresh dir

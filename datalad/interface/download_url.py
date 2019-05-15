@@ -156,7 +156,7 @@ class DownloadURL(Interface):
 URLs:
   {}""".format("\n  ".join(urls))
 
-            for r in ds.rev_save(downloaded_paths, message=msg):
+            for r in ds.save(downloaded_paths, message=msg):
                 yield r
 
             if isinstance(ds.repo, AnnexRepo):

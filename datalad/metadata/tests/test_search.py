@@ -197,7 +197,7 @@ def test_within_ds_file_search(path):
         copy(
             opj(dirname(dirname(__file__)), 'tests', 'data', src),
             opj(path, dst))
-    ds.rev_save()
+    ds.save()
     ok_file_under_git(path, opj('stim', 'stim1.mp3'), annexed=True)
     # If it is not under annex, below addition of metadata silently does
     # not do anything

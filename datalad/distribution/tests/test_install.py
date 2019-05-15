@@ -442,7 +442,7 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(subds.path, annex=None)
     # top is too:
     ok_clean_git(ds.path, annex=None)
-    ds.rev_save(message='addsub')
+    ds.save(message='addsub')
     # now it is:
     ok_clean_git(ds.path, annex=None)
 
@@ -459,7 +459,7 @@ def test_install_into_dataset(source, top_path):
     # and then decide to add it
     create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
-    ds.rev_save('sub3')
+    ds.save('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
@@ -482,7 +482,7 @@ def test_failed_install_multiple(top_path):
 
     # install doesn't add existing submodules -- add does that
     ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
-    ds.rev_save(['ds1', 'ds3'])
+    ds.save(['ds1', 'ds3'])
     ok_clean_git(ds.path, annex=None)
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
@@ -532,14 +532,14 @@ def test_implicit_install(src, dst):
     origin_subsub = origin_sub.create("subsub")
     with open(opj(origin_top.path, "file1.txt"), "w") as f:
         f.write("content1")
-    origin_top.rev_save("file1.txt")
+    origin_top.save("file1.txt")
     with open(opj(origin_sub.path, "file2.txt"), "w") as f:
         f.write("content2")
-    origin_sub.rev_save("file2.txt")
+    origin_sub.save("file2.txt")
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
-    origin_subsub.rev_save("file3.txt")
-    origin_top.rev_save(recursive=True)
+    origin_subsub.save("file3.txt")
+    origin_top.save(recursive=True)
 
     # first, install toplevel:
     ds = install(dst, source=src)
@@ -647,7 +647,7 @@ def test_install_recursive_repeat(src, path):
     sub1_src = top_src.create('sub 1', force=True)
     sub2_src = top_src.create('sub 2', force=True)
     subsub_src = sub1_src.create('subsub', force=True)
-    top_src.rev_save(recursive=True)
+    top_src.save(recursive=True)
     ok_clean_git(top_src.path)
 
     # install top level:
@@ -761,7 +761,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.rev_save(recursive=True)
+    top_src.save(recursive=True)
 
     # install top level:
     # don't filter implicitly installed subdataset to check them for content
@@ -815,7 +815,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     # and progress subsub2 forward to stay really thorough
     put_file_under_git(subsub2.path, 'file.dat', content="data")
-    subsub2.rev_save(message="added a file")  # above function does not commit
+    subsub2.save(message="added a file")  # above function does not commit
 
     # just installing a submodule -- apparently different code/logic
     # but also the same story should hold - we should install the version pointed

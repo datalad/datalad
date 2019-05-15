@@ -40,7 +40,7 @@ from datalad.tests.utils import (
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.api import (
-    rev_save as save,
+    save,
     create,
     diff,
 )
@@ -73,7 +73,7 @@ def test_repo_diff(path, norepo):
     eq_(ds.repo.diff('HEAD', None, paths=['THIS']), {})
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
-    ds.rev_save(to_git=True)
+    ds.save(to_git=True)
     assert_repo_status(ds.path)
     eq_(ds.repo.diff(fr='HEAD~1', to='HEAD'),
         {ut.Path(ds.repo.pathobj / 'new'): {
@@ -100,7 +100,7 @@ def test_repo_diff(path, norepo):
     eq_(ds.repo.diff(fr='HEAD', to=None, paths=['other']), {})
 
     # make clean
-    ds.rev_save()
+    ds.save()
     assert_repo_status(ds.path)
 
     # untracked stuff
@@ -160,7 +160,7 @@ def test_diff(path, norepo):
     assert_result_count(_dirty_results(ds.diff(path='THIS', fr='HEAD')), 0)
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
-    ds.rev_save(to_git=True)
+    ds.save(to_git=True)
     assert_repo_status(ds.path)
     res = _dirty_results(ds.diff(fr='HEAD~1'))
     assert_result_count(res, 1)
@@ -190,7 +190,7 @@ def test_diff(path, norepo):
     ds.repo.add('.', git=True)
     # no change in diff, staged is not commited
     assert_result_count(_dirty_results(ds.diff()), 1)
-    ds.rev_save()
+    ds.save()
     assert_repo_status(ds.path)
     assert_result_count(_dirty_results(ds.diff()), 0)
 
@@ -260,8 +260,8 @@ def test_diff_recursive(path):
         action='diff', state='untracked', path=op.join(sub.path, 'twofile'),
         type='file')
     # intentional save in two steps to make check below easier
-    ds.rev_save('sub', recursive=True)
-    ds.rev_save()
+    ds.save('sub', recursive=True)
+    ds.save()
     assert_repo_status(ds.path)
     # look at the last change, only one file was added
     res = ds.diff(fr='HEAD~1', to='HEAD')

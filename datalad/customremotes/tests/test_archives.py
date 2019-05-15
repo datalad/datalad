@@ -273,7 +273,7 @@ def check_observe_tqdm(topdir, topurl, outdir):
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):
             ds.repo.add_url_to_file(f, topurl + f)
-            ds.rev_save(f)
+            ds.save(f)
             add_archive_content(f, delete=True, drop_after=True)
     files = glob.glob(op.join(outdir, '*'))
     ds.drop(files) # will not drop tarballs

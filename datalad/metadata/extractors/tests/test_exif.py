@@ -81,7 +81,7 @@ def test_exif(path):
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'exif.jpg'),
         path)
-    ds.rev_save()
+    ds.save()
     ok_clean_git(ds.path)
     res = ds.aggregate_metadata()
     assert_status('ok', res)

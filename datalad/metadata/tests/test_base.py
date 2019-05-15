@@ -114,7 +114,7 @@ def test_aggregation(path):
     subsubds = subds.create('subsub', force=True)
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
@@ -218,7 +218,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
-        ds.rev_save(subpath)
+        ds.save(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
@@ -237,7 +237,7 @@ def test_get_aggregates_fails(path):
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):
     ds = Dataset(src).create(force=True)
-    ds.rev_save(to_git=False)
+    ds.save(to_git=False)
 
     # no clone (empty) into new dst
     clone = install(source=ds.path, path=dst)
