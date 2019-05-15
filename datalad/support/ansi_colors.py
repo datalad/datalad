@@ -49,21 +49,19 @@ def color_enabled():
     respect that.
     If the datalad.ui.color setting is 'auto' (default), then color is
     enabled unless the environment variable NO_COLOR is defined.
+
+    Returns
+    -------
+    bool
     """
     if not ui.is_interactive:
         return False
 
-    UIC = cfg.get_value('datalad', 'ui.color', 'auto')
-    if UIC == 'off':
-        return False
-    elif UIC not in ('auto', 'on'):
-        raise ValueError("Unknown value for datalad.ui.color: '%s'; "
-                         "Must be one of 'on', 'off', 'auto'" % UIC)
-
-    if UIC == 'auto' and os.getenv('NO_COLOR') is not None:
+    ui_color = cfg.obtain('datalad.ui.color')
+    if ui_color == 'off':
         return False
 
-    return True
+    return ui_color == 'on' or os.getenv('NO_COLOR') is None
 
 
 def format_msg(fmt, use_color=False):
