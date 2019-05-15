@@ -78,19 +78,13 @@ _group_plumbing = (
         ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.core.local.status', 'Status', 'status'),
         ('datalad.core.local.diff', 'Diff', 'diff'),
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
         ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
 
-# Avoid _group_revolution to prevent confusing interface commands.
-_group_future = (
-    'Commands of the future',
-    [
-        ('datalad.core.local.run', 'Run', 'rev-run', 'rev_run'),
-        ('datalad.core.local.status', 'Status', 'status'),
-    ])
 
 # Some known extensions and their commands to suggest whenever lookup fails
 _known_extension_commands = {

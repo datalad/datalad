@@ -42,7 +42,7 @@ from datalad.support.exceptions import (
 )
 from datalad.api import (
     install,
-    rev_run as run,
+    run,
 )
 from datalad.interface.run import (
     format_command,
