@@ -512,7 +512,9 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file)
+            c = SSHConnection(
+                ctrl_path, sshri, identity_file=identity_file,
+                use_remote_annex_bundle=use_remote_annex_bundle)
             self._connections[ctrl_path] = c
             return c
 
