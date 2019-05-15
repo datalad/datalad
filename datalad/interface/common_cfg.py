@@ -319,4 +319,11 @@ definitions = {
         'default': None,
         'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
     },
+    'datalad.ui.color': {
+        'ui': ('question', {
+            'title': 'Colored terminal output',
+            'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
+        'default': 'auto',
+        'type': EnsureChoice('on', 'off', 'auto'),
+    },
 }

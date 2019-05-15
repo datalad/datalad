@@ -366,16 +366,6 @@ class FsModel(AnnexModel):
 
 
 class LsFormatter(string.Formatter):
-    # condition by interactive
-    if is_interactive():
-        BLUE = ansi_colors.COLOR_SEQ % ansi_colors.BLUE
-        RED = ansi_colors.COLOR_SEQ % ansi_colors.RED
-        GREEN = ansi_colors.COLOR_SEQ % ansi_colors.GREEN
-        RESET = ansi_colors.RESET_SEQ
-        DATASET = ansi_colors.COLOR_SEQ % ansi_colors.UNDERLINE
-    else:
-        BLUE = RED = GREEN = RESET = DATASET = u""
-
     # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
     # unicode versions which look better but which blow during tests etc
     # Those might be reset by the constructor
@@ -415,15 +405,22 @@ class LsFormatter(string.Formatter):
             else:
                 return u'-'
         elif conversion == 'X':  # colored bool
-            chr, col = (self.OK, self.GREEN) if value else (self.NOK, self.RED)
-            return u"%s%s%s" % (col, chr, self.RESET)
+            if value:
+                mark, col = self.OK, ansi_colors.GREEN
+            else:
+                mark, col = self.NOK, ansi_colors.RED
+            return ansi_colors.color_word(mark, col)
         elif conversion == 'N':  # colored Red - if None
             if value is None:
                 # return "%s✖%s" % (self.RED, self.RESET)
-                return u"%s%s%s" % (self.RED, self.NONE, self.RESET)
+                return ansi_colors.color_word(self.NONE, ansi_colors.RED)
             return value
         elif conversion in {'B', 'R', 'U'}:
-            return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED, 'U': self.DATASET}[conversion], value, self.RESET)
+            return ansi_colors.color_word(
+                value,
+                {'B': ansi_colors.BLUE,
+                 'R': ansi_colors.RED,
+                 'U': ansi_colors.DATASET}[conversion])
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
