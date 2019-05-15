@@ -44,24 +44,19 @@ FIELD = BOLD
 def color_enabled():
     """Check for whether color output is enabled
 
-    Color is only enabled if the terminal is interactive.
-    If the datalad.ui.color configuration setting is 'on' or 'off', then
-    respect that.
-    If the datalad.ui.color setting is 'auto' (default), then color is
-    enabled unless the environment variable NO_COLOR is defined.
+    If the configuration value ``datalad.ui.color`` is ``'on'`` or ``'off'``,
+    that takes precedence.
+    If ``datalad.ui.color`` is ``'auto'``, and the environment variable
+    ``NO_COLOR`` is defined (see https://no-color.org), then color is disabled.
+    Otherwise, enable colors if a TTY is detected by ``datalad.ui.ui.is_interactive``.
 
     Returns
     -------
     bool
     """
-    if not ui.is_interactive:
-        return False
-
     ui_color = cfg.obtain('datalad.ui.color')
-    if ui_color == 'off':
-        return False
-
-    return ui_color == 'on' or os.getenv('NO_COLOR') is None
+    return (ui_color == 'on' or
+            ui_color == 'auto' and os.getenv('NO_COLOR') is None and ui.is_interactive)
 
 
 def format_msg(fmt, use_color=False):

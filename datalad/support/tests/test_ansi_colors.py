@@ -17,35 +17,26 @@ from datalad.support import ansi_colors as colors
 
 
 def test_color_enabled():
-    # In the absence of NO_COLOR, default to enable, failing if non-interactive terminal
-    # or ui.color is off
-    with patch.dict(os.environ):
+    # In the absence of NO_COLOR, follow ui.color, or ui.is_interactive if 'auto'
+    with patch.dict(os.environ), \
+         patch('datalad.support.ansi_colors.ui'):
         os.environ.pop('NO_COLOR', None)
-        with patch('datalad.support.ansi_colors.ui'):
-            colors.ui.is_interactive = False
-            for ui_color in ('on', 'off', 'auto'):
-                with patch_config({'datalad.ui.color': ui_color}):
-                    assert_equal(colors.color_enabled(), False)
-        with patch('datalad.support.ansi_colors.ui'):
-            colors.ui.is_interactive = True
+        for is_interactive in (True, False):
+            colors.ui.is_interactive = is_interactive
             with patch_config({'datalad.ui.color': 'off'}):
                 assert_equal(colors.color_enabled(), False)
-            for ui_color in ('on', 'auto'):
-                with patch_config({'datalad.ui.color': ui_color}):
-                    assert_equal(colors.color_enabled(), True)
+            with patch_config({'datalad.ui.color': 'on'}):
+                assert_equal(colors.color_enabled(), True)
+            with patch_config({'datalad.ui.color': 'auto'}):
+                assert_equal(colors.color_enabled(), is_interactive)
 
-    # In the presence of NO_COLOR, default to disable, unless terminal is interactive
-    # and ui.color is on
-    # The value of NO_COLOR should have no effect
+    # In the presence of NO_COLOR, default to disable, unless ui.color is "on"
+    # The value of NO_COLOR should have no effect, so try true-ish and false-ish values
     for NO_COLOR in ("", "1", "0"):
-        with patch.dict(os.environ, {'NO_COLOR': NO_COLOR}):
-            with patch('datalad.support.ansi_colors.ui'):
-                colors.ui.is_interactive = False
-                for ui_color in ('on', 'off', 'auto'):
-                    with patch_config({'datalad.ui.color': ui_color}):
-                        assert_equal(colors.color_enabled(), False)
-            with patch('datalad.support.ansi_colors.ui'):
-                colors.ui.is_interactive = True
+        with patch.dict(os.environ, {'NO_COLOR': NO_COLOR}), \
+             patch('datalad.support.ansi_colors.ui'):
+            for is_interactive in (True, False):
+                colors.ui.is_interactive = is_interactive
                 with patch_config({'datalad.ui.color': 'on'}):
                     assert_equal(colors.color_enabled(), True)
                 for ui_color in ('off', 'auto'):
