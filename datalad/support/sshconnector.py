@@ -224,7 +224,13 @@ class SSHConnection(object):
         bool
           Whether SSH reports success opening the connection
         """
-        if self.is_open():
+        # the socket should vanish almost instantly when the connection closes
+        # sending explicit 'check' commands to the control master is expensive
+        # (needs tempfile to shield stdin, Runner overhead, etc...)
+        # as we do not use any advanced features (forwarding, stop[ing the
+        # master without exiting) it should be relatively safe to just perform
+        # the much cheaper check of an existing control path
+        if self.ctrl_path.exists():
             return
 
         # set control options
