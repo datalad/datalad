@@ -294,7 +294,7 @@ class SSHConnection(object):
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
-        Note: this method perform escaping of filenames to an extend that
+        Note: this method performs escaping of filenames to an extent that
         moderately weird ones should work (spaces, quotes, pipes, other
         characters with special shell meaning), but more complicated cases
         might require appropriate external preprocessing of filenames.
@@ -332,7 +332,7 @@ class SSHConnection(object):
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
 
-        Note: this method perform escaping of filenames to an extend that
+        Note: this method performs escaping of filenames to an extent that
         moderately weird ones should work (spaces, quotes, pipes, other
         characters with special shell meaning), but more complicated cases
         might require appropriate external preprocessing of filenames.
