@@ -1198,7 +1198,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        list of dict
+        list of dict or dict
         """
 
         return list(self.add_(
