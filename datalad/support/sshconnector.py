@@ -294,6 +294,11 @@ class SSHConnection(object):
     def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
+        Note: this method perform escaping of filenames to an extend that
+        moderately weird ones should work (spaces, quotes, pipes, other
+        characters with special shell meaning), but more complicated cases
+        might require appropriate external preprocessing of filenames.
+
         Parameters
         ----------
         source : str or list
@@ -318,11 +323,19 @@ class SSHConnection(object):
         # add source filepath(s) to scp command
         scp_cmd += assure_list(source)
         # add destination path
-        scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
+        scp_cmd += ['%s:%s' % (
+            self.sshri.hostname,
+            _quote_filename_for_scp(destination),
+        )]
         return self.runner.run(scp_cmd)
 
     def get(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder from remote to a local destination.
+
+        Note: this method perform escaping of filenames to an extend that
+        moderately weird ones should work (spaces, quotes, pipes, other
+        characters with special shell meaning), but more complicated cases
+        might require appropriate external preprocessing of filenames.
 
         Parameters
         ----------
@@ -346,7 +359,7 @@ class SSHConnection(object):
         self.open()
         scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command, prefixed with the remote host
-        scp_cmd += ['%s:"%s"' % (self.sshri.hostname, s)
+        scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
                     for s in assure_list(source)]
         # add destination path
         scp_cmd += [destination]
@@ -558,3 +571,25 @@ class SSHManager(object):
                         lgr.debug("Failed to close a connection: "
                                   "%s", exc_str(exc))
             self._connections = dict()
+
+
+def _quote_filename_for_scp(name):
+    """Manually escape shell goodies in a file name.
+
+    Why manual? Because the author couldn't find a better way, and
+    simply quoting the entire filename does not work with SCP's overly
+    strict file matching criteria (likely a bug on their side).
+
+    Hence this beauty:
+    """
+    for s, t in (
+            (' ', '\\ '),
+            ('"', '\\"'),
+            ("'", "\\'"),
+            ("&", "\\&"),
+            ("|", "\\|"),
+            (">", "\\>"),
+            ("<", "\\<"),
+            (";", "\\;")):
+        name = name.replace(s, t)
+    return name

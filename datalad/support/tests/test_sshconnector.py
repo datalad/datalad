@@ -216,10 +216,10 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
             eq_(content, fp.read())
 
     # and now a quick smoke test for get
-    togetfile = Path(targetdir) / '2get.txt'
+    togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
     togetfile.write_text(text_type('something'))
     ssh.get(opj(remote_url, text_type(togetfile)), sourcedir)
-    ok_((Path(sourcedir) / '2get.txt').exists())
+    ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
 
     ssh.close()
 
