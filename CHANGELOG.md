@@ -9,21 +9,34 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.12.0rc4 (??? ??, 2019) -- will be better than ever
-￼
-bet we will fix some bugs and make a world even a better place.
+## 0.12.0rc4 (May 15, 2019) -- the revolution is over
 
+With the replacement of the `save` command implementation with `rev-save`
+the revolution effort is now over, and the set of key commands for
+local dataset operations (`create`, `run`, `save`, `status`, `diff`) is
+ now complete. This new core API is available from `datalad.core.local`
+(and also via `datalad.api`, as any other command).
+￼
 ### Major refactoring and deprecations
 
-- hopefully none
+- The `add` command is now deprecated. It will be removed in a future
+  release.
 
 ### Fixes
 
-?
+- Remove hard-coded dependencies on POSIX path conventions in SSH support
+  code ([#3400][])
+
+- Emit an `add` result when adding a new subdataset during [save][] ([#3398][])
+
+- SSH file transfer now actually opens a shared connection, if none exists
+  yet ([#3403][])
 
 ### Enhancements and new features
 
-?
+- `SSHConnection` now offers methods for file upload and dowload (`get()`,
+  `put()`. The previous `copy()` method only supported upload and was
+  discontinued ([#3401][])
 
 
 ## 0.12.0rc3 (May 07, 2019) -- the revolution continues
@@ -1497,4 +1510,8 @@ publishing
 [#3378]: https://github.com/datalad/datalad/issues/3378
 [#3383]: https://github.com/datalad/datalad/issues/3383
 [#3396]: https://github.com/datalad/datalad/issues/3396
+[#3398]: https://github.com/datalad/datalad/issues/3398
+[#3400]: https://github.com/datalad/datalad/issues/3400
+[#3401]: https://github.com/datalad/datalad/issues/3401
+[#3403]: https://github.com/datalad/datalad/issues/3403
 [#3407]: https://github.com/datalad/datalad/issues/3407
