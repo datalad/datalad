@@ -43,6 +43,7 @@ DATALAD_SPECIAL_REMOTES_UUIDS = {
 
 ARCHIVES_TEMP_DIR = join(DATALAD_GIT_DIR, 'tmp', 'archives')
 ANNEX_TEMP_DIR = join('.git', 'annex', 'tmp')
+ANNEX_TRANSFER_DIR = join('.git', 'annex', 'transfer')
 
 SEARCH_INDEX_DOTGITDIR = join('datalad', 'search_index')
 
