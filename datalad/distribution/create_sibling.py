@@ -824,7 +824,7 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
         with make_tempfile(content=hook_content) as tempf:
             # create post_update hook script
             # upload hook to dataset
-            ssh.copy(tempf, hook_remote_target)
+            ssh.put(tempf, hook_remote_target)
         # and make it executable
         ssh('chmod +x {}'.format(sh_quote(hook_remote_target)))
 
@@ -840,13 +840,13 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
         html_target = opj(path, html_targetname)
 
         # upload ui html to target
-        ssh.copy(html_local, html_target)
+        ssh.put(html_local, html_target)
 
         # upload assets to the dataset
         webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, WEB_HTML_DIR)
         ssh('mkdir -p {}'.format(sh_quote(webresources_remote)))
-        ssh.copy(webresources_local, webresources_remote, recursive=True)
+        ssh.put(webresources_local, webresources_remote, recursive=True)
 
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
@@ -861,7 +861,7 @@ mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
                     minified = asset.read()                             # no minify available
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
-                    ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
+                    ssh.put(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
 
         # explicitly make web+metadata dir of dataset world-readable, if shared set to 'all'
         mode = None

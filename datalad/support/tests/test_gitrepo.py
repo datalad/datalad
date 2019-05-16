@@ -527,7 +527,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     remote_repo = GitRepo(remote_path, create=False)
     url = "ssh://localhost" + op.abspath(remote_path)
     socket_path = op.join(text_type(ssh_manager.socket_dir),
-                          get_connection_hash('localhost'))
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -556,7 +556,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + op.abspath(remote_path)
     socket_path = op.join(text_type(ssh_manager.socket_dir),
-                          get_connection_hash('localhost'))
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -592,7 +592,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + op.abspath(remote_path)
     socket_path = op.join(text_type(ssh_manager.socket_dir),
-                          get_connection_hash('localhost'))
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 

@@ -22,17 +22,19 @@ from six import text_type
 from datalad.support.external_versions import external_versions
 from datalad.utils import Path
 
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import eq_
-from datalad.tests.utils import skip_ssh
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_is_instance
-from datalad.tests.utils import skip_if_on_windows
-
+from datalad.tests.utils import (
+    assert_raises,
+    eq_,
+    skip_ssh,
+    with_tempfile,
+    get_most_obscure_supported_name,
+    swallow_logs,
+    assert_in,
+    assert_false,
+    ok_,
+    assert_is_instance,
+    skip_if_on_windows,
+)
 from ..sshconnector import SSHConnection, SSHManager, sh_quote
 from ..sshconnector import get_connection_hash
 
@@ -71,7 +73,7 @@ def test_ssh_get_connection():
     manager.close()
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(suffix=' "`suffix:;& ',  # get_most_obscure_supported_name(),
                content="1")
@@ -80,7 +82,7 @@ def test_ssh_open_close(tfile1):
     manager = SSHManager()
 
     path = opj(text_type(manager.socket_dir),
-               get_connection_hash('localhost'))
+               get_connection_hash('localhost', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
     print("%s existed: %s" % (path, existed_before))
@@ -109,7 +111,7 @@ def test_ssh_open_close(tfile1):
     ok_(exists(path) == existed_before)
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_manager_close():
 
@@ -131,9 +133,9 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://localhost').open()
 
     ok_(exists(opj(text_type(manager.socket_dir),
-                   get_connection_hash('localhost'))))
+                   get_connection_hash('localhost', bundled=True))))
     ok_(exists(opj(text_type(manager.socket_dir),
-                   get_connection_hash('datalad-test'))))
+                   get_connection_hash('datalad-test', bundled=True))))
 
     manager.close()
 
@@ -172,7 +174,7 @@ def test_ssh_manager_close_no_throw(bogus_socket):
         assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
-@skip_if_on_windows  # our test setup has no `scp` command
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
@@ -182,7 +184,6 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     remote_url = 'ssh://localhost:22'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
-    ssh.open()
 
     # write to obscurely named file in sourcedir
     obscure_file = opj(sourcedir, get_most_obscure_supported_name())
@@ -191,12 +192,14 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # copy tempfile list to remote_url:sourcedir
     sourcefiles = [sourcefile1, sourcefile2, obscure_file]
-    ssh.copy(sourcefiles, opj(remote_url, sourcedir))
+    ssh.put(sourcefiles, opj(remote_url, sourcedir))
+    # docs promise that connection is auto-opened
+    ok_(ssh.is_open())
 
     # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.c opy'
-    ssh.copy(sourcedir, opj(remote_url, targetdir),
-             recursive=True, preserve_attrs=True)
+    ssh.put(sourcedir, opj(remote_url, targetdir),
+            recursive=True, preserve_attrs=True)
 
     # check if sourcedir copied to remote_url:targetdir
     ok_(isdir(targetdir))
@@ -212,10 +215,16 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
         with open(targetpath, 'r') as fp:
             eq_(content, fp.read())
 
+    # and now a quick smoke test for get
+    togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
+    togetfile.write_text(text_type('something'))
+    ssh.get(opj(remote_url, text_type(togetfile)), sourcedir)
+    ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
+
     ssh.close()
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_compound_cmds():
     ssh = SSHManager().get_connection('ssh://localhost')
@@ -242,7 +251,8 @@ def test_ssh_custom_identity_file():
                 cmd_out, _ = ssh("echo blah")
                 expected_socket = op.join(
                     text_type(manager.socket_dir),
-                    get_connection_hash("localhost", identity_file=ifile))
+                    get_connection_hash("localhost", identity_file=ifile,
+                                        bundled=True))
                 ok_(exists(expected_socket))
                 manager.close()
                 assert_in("-i", cml.out)
@@ -252,7 +262,7 @@ def test_ssh_custom_identity_file():
         cfg.reload(force=True)
 
 
-@skip_if_on_windows  # our test setup has no SSH server running
+@skip_if_on_windows
 @skip_ssh
 def test_ssh_git_props():
     remote_url = 'ssh://localhost'
@@ -264,3 +274,21 @@ def test_ssh_git_props():
     # how annex was installed
     ok_(ssh.get_git_version())
     manager.close()  # close possibly still present connections
+
+
+# situation on our test windows boxes is complicated
+# login shell is a POSIX one, path handling and equivalence between
+# local and "remote" needs more research
+@skip_if_on_windows
+@skip_ssh
+@with_tempfile(mkdir=True)
+def test_bundle_invariance(path):
+    remote_url = 'ssh://localhost'
+    manager = SSHManager()
+    testfile = Path(path) / 'dummy'
+    for flag in (True, False):
+        assert_false(testfile.exists())
+        ssh = manager.get_connection(remote_url, use_remote_annex_bundle=flag)
+        ssh('cd .>{}'.format(text_type(testfile)))
+        ok_(testfile.exists())
+        testfile.unlink()

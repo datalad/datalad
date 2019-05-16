@@ -1077,9 +1077,9 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # check whether we are the first to use these sockets:
     socket_1 = opj(text_type(ssh_manager.socket_dir),
-                   get_connection_hash('datalad-test'))
+                   get_connection_hash('datalad-test', bundled=True))
     socket_2 = opj(text_type(ssh_manager.socket_dir),
-                   get_connection_hash('localhost'))
+                   get_connection_hash('localhost', bundled=True))
     datalad_test_was_open = exists(socket_1)
     localhost_was_open = exists(socket_2)
 
