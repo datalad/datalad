@@ -62,6 +62,8 @@ bet we will fix some bugs and make a world even a better place.
   the new `datalad.ui.color` configuration option when deciding to
   color output.  The default value, "auto", retains the current
   behavior of coloring output if attached to a TTY ([#3407][]).
+- [clean][] now removes annex transfer directories, which is useful
+  for cleaning up failed downloads. ([#3374][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1315,5 +1317,6 @@ publishing
 [#3340]: https://github.com/datalad/datalad/issues/3340
 [#3347]: https://github.com/datalad/datalad/issues/3347
 [#3365]: https://github.com/datalad/datalad/issues/3365
+[#3374]: https://github.com/datalad/datalad/issues/3374
 [#3396]: https://github.com/datalad/datalad/issues/3396
 [#3407]: https://github.com/datalad/datalad/issues/3407
