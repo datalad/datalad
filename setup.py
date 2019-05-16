@@ -6,19 +6,27 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import dirname
-from os.path import join as opj
-from os.path import sep as pathsep
-from os.path import splitext
+from os.path import (
+    dirname,
+    join as opj,
+    sep as pathsep,
+    splitext,
+)
 
-from setuptools import findall
-from setuptools import setup, find_packages
+from setuptools import (
+    findall,
+    find_packages,
+    setup,
+)
 
-from setup_support import BuildConfigInfo
-from setup_support import BuildSchema
-from setup_support import BuildManPage, setup_entry_points
-from setup_support import BuildRSTExamplesFromScripts
-from setup_support import get_version
+from setup_support import (
+    BuildConfigInfo,
+    BuildManPage,
+    BuildRSTExamplesFromScripts,
+    BuildSchema,
+    get_version,
+    setup_entry_points,
+)
 
 
 def findsome(subdir, extensions):
