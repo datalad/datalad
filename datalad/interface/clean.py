@@ -61,7 +61,7 @@ class Clean(Interface):
         what=Parameter(
             args=("--what",),
             dest='what',
-            choices=('cached-archives', 'annex-tmp', 'search-index'),
+            choices=('cached-archives', 'annex-tmp', 'annex-transfer', 'search-index'),
             nargs="*",
             doc="""What to clean.  If none specified -- all known targets are
             cleaned"""),
