@@ -16,7 +16,6 @@ import re
 import os
 from os.path import (
     join as opj,
-    normpath,
     relpath,
     exists,
 )
@@ -25,7 +24,7 @@ from six import (
     text_type,
 )
 
-from git import GitConfigParser
+from datalad.config import _parse_gitconfig_dump
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -48,6 +47,7 @@ from datalad.distribution.dataset import (
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import (
     assure_list,
+    PurePosixPath,
 )
 
 # API commands
@@ -66,28 +66,40 @@ submodule_full_props = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
-def _parse_gitmodules(dspath):
-    gitmodule_path = opj(dspath, ".gitmodules")
-    parser = GitConfigParser(gitmodule_path)
+def _parse_gitmodules(ds):
+    gitmodules = ds.pathobj / '.gitmodules'
+    if not gitmodules.exists():
+        return {}
+    # pull out file content
+    out, err = ds.repo._git_custom_command(
+        '',
+        ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
+    # abuse our config parser
+    db, _ = _parse_gitconfig_dump(out, {}, None, True)
     mods = {}
-    for sec in parser.sections():
-        try:
-            modpath = parser.get(sec, 'path')
-        except Exception:
-            lgr.debug("Failed to get '%s.path', skipping section", sec)
+    for k, v in iteritems(db):
+        if not k.startswith('submodule.'):
+            # we don't know what this is
             continue
-        if not modpath or not sec.startswith('submodule '):
+        k_l = k.split('.')
+        mod_name = k_l[1]
+        mod = mods.get(mod_name, {})
+        mod['.'.join(k_l[2:])] = v
+        mods[mod_name] = mod
+
+    out = {}
+    # bring into traditional shape
+    for name, props in iteritems(mods):
+        if 'path' not in props:
+            lgr.debug("Failed to get '%s.path', skipping section", name)
             continue
-        modpath = normpath(opj(dspath, modpath))
-        modprops = {'gitmodule_{}'.format(opt): parser.get_value(sec, opt)
-                    for opt in parser.options(sec)
-                    if not (opt.startswith('__') or opt == 'path')}
-        modprops['gitmodule_name'] = sec[11:-1]
-        mods[modpath] = modprops
-    # make sure we let go of any resources held be the parser
-    # we cannot rely on __del__
-    parser.release()
-    return mods
+        modprops = {'gitmodule_{}'.format(k): v
+                    for k, v in iteritems(props)
+                    if not (k.startswith('__') or k == 'path')}
+        modpath = ds.pathobj / PurePosixPath(props['path'])
+        modprops['gitmodule_name'] = name
+        out[modpath] = modprops
+    return out
 
 
 def _parse_git_submodules(ds):
@@ -282,7 +294,7 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
     dspath = ds.path
     if not GitRepo.is_valid_repo(dspath):
         return
-    modinfo = _parse_gitmodules(dspath)
+    modinfo = _parse_gitmodules(ds)
     # write access parser
     parser = None
     # TODO bring back in more global scope from below once segfaults are
@@ -299,7 +311,7 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
-        sm.update(modinfo.get(text_type(sm['path']), {}))
+        sm.update(modinfo.get(sm['path'], {}))
         if set_property or delete_property:
             gitmodule_path = opj(dspath, ".gitmodules")
             parser = GitConfigParser(
