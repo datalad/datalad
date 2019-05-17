@@ -189,9 +189,13 @@ class Subdatasets(Interface):
         contains=Parameter(
             args=('--contains',),
             metavar='PATH',
+            action='append',
             doc="""limit report to the subdatasets containing the
             given path. If a root path of a subdataset is given the last
-            reported dataset will be the subdataset itself.""",
+            reported dataset will be the subdataset itself.[CMD:  This
+            option can be given multiple times CMD][PY:  Can be a list with
+            multiple paths PY], in which case datasets will be reported that
+            contain any of the given paths.""",
             constraints=EnsureStr() | EnsureNone()),
         bottomup=Parameter(
             args=("--bottomup",),
@@ -257,7 +261,7 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
                         k)
         if contains:
-            contains = resolve_path(contains, dataset)
+            contains = [resolve_path(c, dataset) for c in assure_list(contains)]
         for r in _get_submodules(
                 dataset.path, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
@@ -287,7 +291,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(dspath):
-        if contains and not path_startswith(contains, sm['path']):
+        if contains and not any(path_startswith(c, sm['path']) for c in contains):
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue

@@ -166,6 +166,15 @@ def test_get_subdatasets(path):
                        contains=opj(pardir, 'errrr_nope'),
                        result_xfm='paths'),
         [])
+    eq_(subdatasets(
+        ds, recursive=True,
+        contains=[target_sub, 'sub dataset1/2'],
+        result_xfm='relpaths'), [
+        'sub dataset1',
+        'sub dataset1/2',
+        'sub dataset1/sub sub dataset1',
+        'sub dataset1/sub sub dataset1/subm 1',
+    ])
 
 
 @with_tempfile
