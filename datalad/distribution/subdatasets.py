@@ -14,10 +14,12 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 import os
-from os.path import join as opj
-from os.path import normpath
-from os.path import relpath
-from os.path import exists
+from os.path import (
+    join as opj,
+    normpath,
+    relpath,
+    exists,
+)
 
 from git import GitConfigParser
 
@@ -25,29 +27,40 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.support.constraints import EnsureBool
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureBool,
+    EnsureStr,
+    EnsureNone,
+)
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.exceptions import CommandError
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
-from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import require_dataset
+from datalad.interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+)
+from datalad.distribution.dataset import (
+    Dataset,
+    require_dataset,
+)
 from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
-from datalad.utils import _path_
-from datalad.utils import path_startswith
-from datalad.utils import assure_list
+from datalad.utils import (
+    # the next two need to die, sorry
+    _path_,
+    path_startswith,
+    assure_list,
+)
 from datalad.dochelpers import exc_str
 
 # API commands
 import datalad.core.local.save
 
-from .dataset import EnsureDataset
-from .dataset import datasetmethod
-from .dataset import resolve_path
+from .dataset import (
+    EnsureDataset,
+    datasetmethod,
+    resolve_path,
+)
 
 lgr = logging.getLogger('datalad.distribution.subdatasets')
 
