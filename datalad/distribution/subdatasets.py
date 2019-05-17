@@ -20,6 +20,10 @@ from os.path import (
     relpath,
     exists,
 )
+from six import (
+    iteritems,
+    text_type,
+)
 
 from git import GitConfigParser
 
@@ -33,8 +37,6 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
@@ -43,15 +45,10 @@ from datalad.distribution.dataset import (
     Dataset,
     require_dataset,
 )
-from datalad.cmd import GitRunner
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import (
-    # the next two need to die, sorry
-    _path_,
-    path_startswith,
     assure_list,
 )
-from datalad.dochelpers import exc_str
 
 # API commands
 import datalad.core.local.save
@@ -59,7 +56,7 @@ import datalad.core.local.save
 from .dataset import (
     EnsureDataset,
     datasetmethod,
-    resolve_path,
+    rev_resolve_path,
 )
 
 lgr = logging.getLogger('datalad.distribution.subdatasets')
@@ -93,43 +90,32 @@ def _parse_gitmodules(dspath):
     return mods
 
 
-def _parse_git_submodules(dspath):
+def _parse_git_submodules(ds):
     """All known ones with some properties"""
+    dspath = ds.path
     if not exists(opj(dspath, ".gitmodules")):
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
         return
 
-    # this will not work in direct mode, need better way #1422
-    cmd = ['git', 'ls-files', '--stage', '-z']
-
-    # need to go rogue  and cannot use proper helper in GitRepo
-    # as they also pull in all of GitPython's magic
-    try:
-        stdout, stderr = GitRunner(cwd=dspath).run(
-            cmd,
-            log_stderr=True,
-            log_stdout=True,
-            # not sure why exactly, but log_online has to be false!
-            log_online=False,
-            expect_stderr=False,
-            shell=False,
-            # we don't want it to scream on stdout
-            expect_fail=True)
-    except CommandError as e:
-        raise InvalidGitRepositoryError(exc_str(e))
-
-    for line in stdout.split('\0'):
-        if not line or not line.startswith('160000'):
+    # TODO support path matching here
+    for path, props in iteritems(ds.repo.get_content_info(
+            ref=None,
+            untracked='no',
+            eval_file_type=False)):
+        if props.get('type', None) != 'dataset':
             continue
-        sm = {}
-        props = submodule_full_props.match(line)
-        sm['revision'] = props.group(2)
-        subpath = _path_(dspath, props.group(4))
-        sm['path'] = subpath
-        if not exists(subpath) or not GitRepo.is_valid_repo(subpath):
-            sm['state'] = 'absent'
-        yield sm
+        if ds.pathobj != ds.repo.pathobj:
+            props['path'] = ds.pathobj / path.relative_to(ds.repo.pathobj)
+        else:
+            props['path'] = path
+        if not path.exists() or not GitRepo.is_valid_repo(text_type(path)):
+            props['state'] = 'absent'
+        # TODO kill this after some time. We used to do custom things here
+        # and gitshasum was called revision. Be nice and duplicate for a bit
+        # wipe out when patience is gone
+        props['revision'] = props['gitshasum']
+        yield props
 
 
 @build_doc
@@ -274,11 +260,14 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
                         k)
         if contains:
-            contains = [resolve_path(c, dataset) for c in assure_list(contains)]
+            contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
         for r in _get_submodules(
-                dataset.path, fulfilled, recursive, recursion_limit,
+                dataset, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
                 refds_path):
+            # a boat-load of ancient code consumes this and is ignorant of
+            # Path objetcs
+            r['path'] = text_type(r['path'])
             # without the refds_path cannot be rendered/converted relative
             # in the eval_results decorator
             r['refds'] = refds_path
@@ -287,9 +276,10 @@ class Subdatasets(Interface):
 
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
-def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
+def _get_submodules(ds, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
                     refds_path):
+    dspath = ds.path
     if not GitRepo.is_valid_repo(dspath):
         return
     modinfo = _parse_gitmodules(dspath)
@@ -303,12 +293,13 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
     #        gitmodule_path, read_only=False, merge_includes=False)
     #    parser.read()
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(dspath):
-        if contains and not any(path_startswith(c, sm['path']) for c in contains):
+    for sm in _parse_git_submodules(ds):
+        if contains and not any(
+                sm['path'] == c or sm['path'] in c.parents for c in contains):
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
-        sm.update(modinfo.get(sm['path'], {}))
+        sm.update(modinfo.get(text_type(sm['path']), {}))
         if set_property or delete_property:
             gitmodule_path = opj(dspath, ".gitmodules")
             parser = GitConfigParser(
@@ -366,7 +357,7 @@ def _get_submodules(dspath, fulfilled, recursive, recursion_limit,
                  (isinstance(recursion_limit, int) and
                   recursion_limit > 1)):
             for r in _get_submodules(
-                    sm['path'],
+                    Dataset(sm['path']),
                     fulfilled, recursive,
                     (recursion_limit - 1)
                     if isinstance(recursion_limit, int)
