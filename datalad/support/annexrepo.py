@@ -1121,7 +1121,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         lines_ = [
             l for l in lines
             if not re.search(
-                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
         assert(len(lines_) <= 1)

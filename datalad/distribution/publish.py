@@ -432,7 +432,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                     # we want to publish the underlying branch
                     current_branch = current_branch[12:]
                 match_adjusted = re.match(
-                    'adjusted/(.*)\([a-z]*\)',
+                    r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
                 if match_adjusted:
                     # adjusted/master(...)

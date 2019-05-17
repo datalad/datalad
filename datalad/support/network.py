@@ -626,7 +626,7 @@ class URL(RI):
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
         if is_ipv6:
-            rem = re.match('\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
+            rem = re.match(r'\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
             if rem:
                 hostname, port = rem.groups()
                 port = int(port)

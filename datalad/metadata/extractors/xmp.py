@@ -23,7 +23,7 @@ from datalad.metadata.extractors.base import BaseMetadataExtractor
 from datalad.utils import assure_unicode
 
 
-xmp_field_re = re.compile('^([^\[\]]+)(\[\d+\]|)(/?.*|)')
+xmp_field_re = re.compile(r'^([^\[\]]+)(\[\d+\]|)(/?.*|)')
 
 
 class MetadataExtractor(BaseMetadataExtractor):
