@@ -113,16 +113,16 @@ def test_get_subdatasets(path):
         eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
 
     # and remove again
-    res = ds.subdatasets(recursive=True, delete_property=('mike', 'something'))
+    res = ds.subdatasets(recursive=True, delete_property='mike')
     assert_status('ok', res)
     for r in res:
-        for prop in ('gitmodule_mike', 'gitmodule_something'):
+        for prop in ('gitmodule_mike'):
             assert_not_in(prop, r)
     # and again, because above yields on the fly edit
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('gitmodule_mike', 'gitmodule_something'):
+        for prop in ('gitmodule_mike'):
             assert_not_in(prop, r)
 
     #

@@ -14,11 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 import os
-from os.path import (
-    join as opj,
-    relpath,
-    exists,
-)
+from os.path import relpath
 from six import (
     iteritems,
     text_type,
@@ -36,6 +32,7 @@ from datalad.support.constraints import (
     EnsureNone,
 )
 from datalad.support.param import Parameter
+from datalad.support.exceptions import CommandError
 from datalad.interface.common_opts import (
     recursion_flag,
     recursion_limit,
@@ -45,6 +42,7 @@ from datalad.distribution.dataset import (
     require_dataset,
 )
 from datalad.support.gitrepo import GitRepo
+from datalad.dochelpers import exc_str
 from datalad.utils import (
     assure_list,
     PurePosixPath,
@@ -62,11 +60,11 @@ from .dataset import (
 lgr = logging.getLogger('datalad.distribution.subdatasets')
 
 
-submodule_full_props = re.compile(r'([0-9]+) (.*) (.*)\t(.*)$')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
 def _parse_gitmodules(ds):
+    # TODO read .gitconfig from Git blob?
     gitmodules = ds.pathobj / '.gitmodules'
     if not gitmodules.exists():
         return {}
@@ -108,8 +106,7 @@ def _parse_gitmodules(ds):
 
 def _parse_git_submodules(ds):
     """All known ones with some properties"""
-    dspath = ds.path
-    if not exists(opj(dspath, ".gitmodules")):
+    if not (ds.pathobj / ".gitmodules").exists():
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
         return
@@ -151,18 +148,18 @@ class Subdatasets(Interface):
     "parentds"
         Absolute path to the parent dataset
 
-    "revision"
+    "gitshasum"
         SHA1 of the subdataset commit recorded in the parent dataset
 
     "state"
         Condition of the subdataset: 'clean', 'modified', 'absent', 'conflict'
         as reported by `git submodule`
 
-    "revision_descr"
-        Output of `git describe` for the subdataset
-
     "gitmodule_url"
         URL of the subdataset recorded in the parent
+
+    "gitmodule_name"
+        Name of the subdataset recorded in the parent
 
     "gitmodule_<label>"
         Any additional configuration property on record.
@@ -181,9 +178,6 @@ class Subdatasets(Interface):
         is recursively installing its superdataset. However, the subdataset
         remains installable when explicitly requested, and no other features
         are impaired.
-
-
-
     """
     _params_ = dict(
         dataset=Parameter(
@@ -273,8 +267,8 @@ class Subdatasets(Interface):
             for k, v in set_property:
                 if valid_key.match(k) is None:
                     raise ValueError(
-                        "key '%s' is invalid (alphanumeric plus '-' only, must start with a letter)",
-                        k)
+                        "key '%s' is invalid (alphanumeric plus '-' only, must "
+                        "start with a letter)" % k)
         if contains:
             contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
         for r in _get_submodules(
@@ -299,15 +293,6 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
     if not GitRepo.is_valid_repo(dspath):
         return
     modinfo = _parse_gitmodules(ds)
-    # write access parser
-    parser = None
-    # TODO bring back in more global scope from below once segfaults are
-    # figured out
-    #if set_property or delete_property:
-    #    gitmodule_path = opj(dspath, ".gitmodules")
-    #    parser = GitConfigParser(
-    #        gitmodule_path, read_only=False, merge_includes=False)
-    #    parser.read()
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(ds):
         if contains and not any(
@@ -317,16 +302,26 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
             continue
         sm.update(modinfo.get(sm['path'], {}))
         if set_property or delete_property:
-            gitmodule_path = opj(dspath, ".gitmodules")
-            parser = GitConfigParser(
-                gitmodule_path, read_only=False, merge_includes=False)
-            parser.read()
-            # do modifications now before we read the info out for reporting
-            # use 'submodule "NAME"' section ID style as this seems to be the default
-            submodule_section = 'submodule "{}"'.format(sm['gitmodule_name'])
             # first deletions
             for dprop in assure_list(delete_property):
-                parser.remove_option(submodule_section, dprop)
+                try:
+                    out, err = ds.repo._git_custom_command(
+                        '', ['git', 'config', '--file', '.gitmodules',
+                             '--unset-all',
+                             'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
+                            ]
+                    )
+                except CommandError as e:
+                    yield get_status_dict(
+                        'subdataset',
+                        status='impossible',
+                        message=(
+                            "Deleting subdataset property '%s' failed for "
+                            "subdataset '%s', possibly did "
+                            "not exist",
+                            dprop, sm['gitmodule_name']),
+                        logger=lgr,
+                        **sm)
                 # also kick from the info we just read above
                 sm.pop('gitmodule_{}'.format(dprop), None)
             # and now setting values
@@ -339,17 +334,36 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
                             sm,
                             refds_relpath=relpath(sm['path'], refds_path),
                             refds_relname=relpath(sm['path'], refds_path).replace(os.sep, '-')))
-                parser.set_value(
-                    submodule_section,
-                    prop,
-                    val)
+                try:
+                    out, err = ds.repo._git_custom_command(
+                        '', ['git', 'config', '--file', '.gitmodules',
+                             '--replace-all',
+                             'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
+                             text_type(val),
+                            ]
+                    )
+                except CommandError as e:  # pragma: no cover
+                    # this conditional may not be possible to reach, as
+                    # variable name validity is checked before and Git
+                    # replaces the file completely, resolving any permission
+                    # issues, if the file could be read (already done above)
+                    yield get_status_dict(
+                        'subdataset',
+                        status='error',
+                        message=(
+                            "Failed to set property '%s': %s",
+                            prop, exc_str(e)),
+                        type='dataset',
+                        logger=lgr,
+                        **sm)
+                    # it is up to parent code to decide whether we would continue
+                    # after this
+
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
             Dataset(dspath).save(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties')
-            # let go of resources, locks, ...
-            parser.release()
 
         #common = commonprefix((with_pathsep(subds), with_pathsep(path)))
         #if common.endswith(sep) and common == with_pathsep(subds):
@@ -388,6 +402,3 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm['path']) == fulfilled):
             yield subdsres
-    if parser is not None:
-        # release parser lock manually, auto-cleanup is not reliable in PY3
-        parser.release()
