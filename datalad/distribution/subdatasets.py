@@ -80,11 +80,15 @@ def _parse_gitmodules(ds):
     for k, v in iteritems(db):
         if not k.startswith('submodule.'):
             # we don't know what this is
+            lgr.debug("Skip unrecognized .gitmodule specification: %s=%s", k, v)
             continue
         k_l = k.split('.')
-        mod_name = k_l[1]
+        # module name is everything after 'submodule.' that is not the variable
+        # name
+        mod_name = '.'.join(k_l[1:-1])
         mod = mods.get(mod_name, {})
-        mod['.'.join(k_l[2:])] = v
+        # variable name is the last 'dot-free' segment in the key
+        mod[k_l[-1]] = v
         mods[mod_name] = mod
 
     out = {}
