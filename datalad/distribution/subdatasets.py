@@ -104,15 +104,16 @@ def _parse_gitmodules(ds):
     return out
 
 
-def _parse_git_submodules(ds):
+def _parse_git_submodules(ds, paths):
     """All known ones with some properties"""
     if not (ds.pathobj / ".gitmodules").exists():
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
         return
 
-    # TODO support path matching here
     for path, props in iteritems(ds.repo.get_content_info(
+            paths=[p.relative_to(ds.pathobj) for p in paths]
+            if paths else None,
             ref=None,
             untracked='no',
             eval_file_type=False)):
@@ -186,6 +187,14 @@ class Subdatasets(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
+        path=Parameter(
+            args=("path",),
+            metavar='PATH',
+            doc="""path/name to query for subdatasets. Defaults to the
+            current directory[PY: , or the entire dataset if called as
+            a dataset method PY].""",
+            nargs='*',
+            constraints=EnsureStr() | EnsureNone()),
         fulfilled=Parameter(
             args=("--fulfilled",),
             doc="""if given, must be a boolean flag indicating whether
@@ -242,6 +251,7 @@ class Subdatasets(Interface):
     @datasetmethod(name='subdatasets')
     @eval_results
     def __call__(
+            path=None,
             dataset=None,
             fulfilled=None,
             recursive=False,
@@ -250,6 +260,10 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
+        # any limiting paths given?
+        paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
+            if path else None
+
         dataset = require_dataset(
             dataset, check_installed=False, purpose='subdataset reporting/modification')
         refds_path = dataset.path
@@ -272,7 +286,7 @@ class Subdatasets(Interface):
         if contains:
             contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
         for r in _get_submodules(
-                dataset, fulfilled, recursive, recursion_limit,
+                dataset, paths, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
@@ -286,7 +300,7 @@ class Subdatasets(Interface):
 
 # internal helper that needs all switches, simply to avoid going through
 # the main command interface with all its decorators again
-def _get_submodules(ds, fulfilled, recursive, recursion_limit,
+def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
                     refds_path):
     dspath = ds.path
@@ -294,7 +308,7 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
         return
     modinfo = _parse_gitmodules(ds)
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds):
+    for sm in _parse_git_submodules(ds, paths):
         if contains and not any(
                 sm['path'] == c or sm['path'] in c.parents for c in contains):
             # we are not looking for this subds, because it doesn't
@@ -390,6 +404,7 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
                   recursion_limit > 1)):
             for r in _get_submodules(
                     Dataset(sm['path']),
+                    paths,
                     fulfilled, recursive,
                     (recursion_limit - 1)
                     if isinstance(recursion_limit, int)
