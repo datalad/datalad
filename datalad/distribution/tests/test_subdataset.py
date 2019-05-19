@@ -9,21 +9,28 @@
 
 
 import os
-from os.path import join as opj
-from os.path import relpath
-from os.path import pardir
+from os.path import (
+    join as opj,
+    relpath,
+    pardir,
+)
 
 from ..dataset import Dataset
-from datalad.api import subdatasets
+from datalad.api import (
+    subdatasets,
+    create,
+)
 
-from nose.tools import eq_
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_status
+from datalad.tests.utils import (
+    eq_,
+    with_testrepos,
+    with_tempfile,
+    assert_result_count,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_status,
+)
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
@@ -212,7 +219,6 @@ def test_state(path):
 
 @with_tempfile
 def test_get_subdatasets_types(path):
-    from datalad.api import create
     ds = create(path)
     ds.create('1')
     ds.create('true')
