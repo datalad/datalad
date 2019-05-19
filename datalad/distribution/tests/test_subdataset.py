@@ -29,6 +29,9 @@ from datalad.tests.utils import assert_status
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
+    # one more subdataset with a name that could ruin config option parsing
+    dots = '.lots.of.dots.'
+    ds.create(dots)
     eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1'
     ])
@@ -40,10 +43,12 @@ def test_get_subdatasets(path):
     ])
     # obtain key subdataset, so all leave subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
-    eq_(ds.subdatasets(result_xfm='relpaths'), ['sub dataset1'])
+    eq_(ds.subdatasets(result_xfm='relpaths'), [dots, 'sub dataset1'])
     eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
-        [(path, opj(path, 'sub dataset1'))])
+        [(path, opj(path, dots)),
+         (path, opj(path, 'sub dataset1'))])
     eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
+        dots,
         'sub dataset1',
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
@@ -53,6 +58,7 @@ def test_get_subdatasets(path):
     ])
     # uses slow, flexible query
     eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
+        dots,
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1/2',
         'sub dataset1/sub sub dataset1/subm 1',
@@ -61,11 +67,13 @@ def test_get_subdatasets(path):
         'sub dataset1',
     ])
     eq_(subdatasets(ds, recursive=True, fulfilled=True, result_xfm='relpaths'), [
+        dots,
         'sub dataset1',
         'sub dataset1/sub sub dataset1',
     ])
     eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
+        (os.curdir, dots),
         (os.curdir, 'sub dataset1'),
         ('sub dataset1', 'sub dataset1/2'),
         ('sub dataset1', 'sub dataset1/sub sub dataset1'),
@@ -78,10 +86,11 @@ def test_get_subdatasets(path):
         [])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=1, result_xfm='relpaths'),
-        ['sub dataset1'])
+        [dots, 'sub dataset1'])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
+        dots,
         'sub dataset1',
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
