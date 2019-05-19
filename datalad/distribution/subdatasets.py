@@ -332,8 +332,10 @@ def _get_submodules(ds, fulfilled, recursive, recursion_limit,
                     val = val[1:-1].format(
                         **dict(
                             sm,
-                            refds_relpath=relpath(sm['path'], refds_path),
-                            refds_relname=relpath(sm['path'], refds_path).replace(os.sep, '-')))
+                            refds_relpath=sm['path'].relative_to(refds_path),
+                            refds_relname=text_type(
+                                sm['path'].relative_to(refds_path)
+                            ).replace(os.sep, '-')))
                 try:
                     out, err = ds.repo._git_custom_command(
                         '', ['git', 'config', '--file', '.gitmodules',
