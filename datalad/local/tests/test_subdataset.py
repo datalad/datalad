@@ -16,7 +16,7 @@ from os.path import (
     pardir,
 )
 
-from ..dataset import Dataset
+from datalad.distribution.dataset import Dataset
 from datalad.api import (
     subdatasets,
     create,
