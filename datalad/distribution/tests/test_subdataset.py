@@ -39,22 +39,22 @@ def test_get_subdatasets(path):
     # one more subdataset with a name that could ruin config option parsing
     dots = '.lots.of.dots.'
     ds.create(dots)
-    eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1'
     ])
     ds.get('sub dataset1')
-    eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
     ])
-    # obtain key subdataset, so all leave subdatasets are discoverable
+    # obtain key subdataset, so all leaf subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
     eq_(ds.subdatasets(result_xfm='relpaths'), [dots, 'sub dataset1'])
     eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
         [(path, opj(path, dots)),
          (path, opj(path, 'sub dataset1'))])
-    eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), [
         dots,
         'sub dataset1',
         'sub dataset1/2',
@@ -64,7 +64,7 @@ def test_get_subdatasets(path):
         'sub dataset1/subm 1',
     ])
     # uses slow, flexible query
-    eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, bottomup=True, result_xfm='relpaths'), [
         dots,
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1/2',
@@ -73,7 +73,7 @@ def test_get_subdatasets(path):
         'sub dataset1/subm 1',
         'sub dataset1',
     ])
-    eq_(subdatasets(ds, recursive=True, fulfilled=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, fulfilled=True, result_xfm='relpaths'), [
         dots,
         'sub dataset1',
         'sub dataset1/sub sub dataset1',
@@ -89,7 +89,7 @@ def test_get_subdatasets(path):
         ('sub dataset1', 'sub dataset1/subm 1'),
     ])
     # uses slow, flexible query
-    eq_(subdatasets(ds, recursive=True, recursion_limit=0),
+    eq_(ds.subdatasets(recursive=True, recursion_limit=0),
         [])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=1, result_xfm='relpaths'),
@@ -182,8 +182,8 @@ def test_get_subdatasets(path):
                        contains=opj(pardir, 'errrr_nope'),
                        result_xfm='paths'),
         [])
-    eq_(subdatasets(
-        ds, recursive=True,
+    eq_(ds.subdatasets(
+        recursive=True,
         contains=[target_sub, 'sub dataset1/2'],
         result_xfm='relpaths'), [
         'sub dataset1',
