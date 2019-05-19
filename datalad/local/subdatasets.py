@@ -51,13 +51,13 @@ from datalad.utils import (
 # API commands
 import datalad.core.local.save
 
-from .dataset import (
+from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     rev_resolve_path,
 )
 
-lgr = logging.getLogger('datalad.distribution.subdatasets')
+lgr = logging.getLogger('datalad.local.subdatasets')
 
 
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
