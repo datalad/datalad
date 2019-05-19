@@ -111,9 +111,16 @@ def _parse_git_submodules(ds, paths):
         # we cannot have (functional) subdatasets
         return
 
+    if paths:
+        paths = [
+            p.relative_to(ds.pathobj)
+            for p in paths
+            if ds.pathobj == p or ds.pathobj in p.parents]
+        if not paths:
+            # we had path contraints, but none matched this dataset
+            return
     for path, props in iteritems(ds.repo.get_content_info(
-            paths=[p.relative_to(ds.pathobj) for p in paths]
-            if paths else None,
+            paths=paths,
             ref=None,
             untracked='no',
             eval_file_type=False)):
@@ -260,7 +267,9 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
-        # any limiting paths given?
+        # no conststraints given -> query subdatasets under curdir
+        if path is None and dataset is None:
+            path = os.curdir
         paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
             if path else None
 
@@ -314,8 +323,13 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             # we are not looking for this subds, because it doesn't
             # match the target path
             continue
+        # do we just need this to recurse into subdatasets, or is this a
+        # real results?
+        to_report = paths is None \
+            or any(p == sm['path'] or p in sm['path'].parents
+                   for p in paths)
         sm.update(modinfo.get(sm['path'], {}))
-        if set_property or delete_property:
+        if to_report and (set_property or delete_property):
             # first deletions
             for dprop in assure_list(delete_property):
                 try:
@@ -391,9 +405,9 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             logger=lgr)
         subdsres.update(sm)
         subdsres['parentds'] = dspath
-        if not bottomup and \
+        if to_report and (not bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled):
+                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
             yield subdsres
 
         # expand list with child submodules. keep all paths relative to parent
@@ -415,7 +429,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     delete_property,
                     refds_path):
                 yield r
-        if bottomup and \
+        if to_report and (bottomup and \
                 (fulfilled is None or
-                 GitRepo.is_valid_repo(sm['path']) == fulfilled):
+                 GitRepo.is_valid_repo(sm['path']) == fulfilled)):
             yield subdsres
