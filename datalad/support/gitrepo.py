@@ -988,7 +988,7 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return exists(opj(path, '.git'))
+        return (Path(path) / '.git').exists()
 
     @staticmethod
     def get_git_dir(repo):
