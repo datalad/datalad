@@ -83,7 +83,7 @@ def test_get_subdatasets(path):
         # imitate cmdline invocation w/ no dataset argument
         # -> curdir limits the query, when no info is given
         eq_(subdatasets(dataset=None,
-                        path=None,
+                        path=[],
                         recursive=True,
                         result_xfm='paths'),
             [text_type(ds.pathobj / dots)]

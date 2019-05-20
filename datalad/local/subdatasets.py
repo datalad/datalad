@@ -268,7 +268,7 @@ class Subdatasets(Interface):
             set_property=None,
             delete_property=None):
         # no constraints given -> query subdatasets under curdir
-        if path is None and dataset is None:
+        if not path and dataset is None:
             path = os.curdir
         paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
             if path else None
