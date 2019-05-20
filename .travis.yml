@@ -35,6 +35,15 @@ env:
 matrix:
   include:
   # Additional custom ones
+  - python: 3.8-dev
+    dist: xenial
+    # Single run for Python 3.8
+    env:
+    # Run all tests in a single whoop here
+    # We cannot have empty -A selector, so the one which always will be fulfilled
+    - NOSE_SELECTION=
+    - NOSE_SELECTION_OP=not
+  # Additional custom ones
   - python: 3.7-dev
     # Single run for Python 3.7
     env:
