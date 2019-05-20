@@ -302,7 +302,7 @@ class Subdatasets(Interface):
                 contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
-            # Path objetcs
+            # Path objects
             r['path'] = text_type(r['path'])
             # without the refds_path cannot be rendered/converted relative
             # in the eval_results decorator
