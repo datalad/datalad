@@ -216,14 +216,17 @@ def test_symlinked_relpath(path):
         ds.repo.add("mike1", git=True)
         ds.save(message="committing", path="./mike1")
 
-    # Let's also do in subdirectory
+    # Let's also do in subdirectory as CWD, check that relative path
+    # given to a plain command (not dataset method) are treated as
+    # relative to CWD
     with chpwd(op.join(dspath, 'd')):
-        ds.save(
-            message="committing", path=op.join(op.curdir, "mike2"))
+        save(dataset=ds.path,
+             message="committing",
+             path=op.join(op.curdir, "mike2"))
 
         later = op.join(op.pardir, "later")
         ds.repo.add(later, git=True)
-        ds.save(message="committing", path=later)
+        save(dataset=ds.path, message="committing", path=later)
 
     assert_repo_status(dspath)
 
@@ -629,7 +632,10 @@ def test_path_arg_call(path):
             ds.pathobj / 'abs.txt',
             ds.pathobj / 'rel.txt'):
         testfile.write_text(u'123')
-        save(dataset=ds.path, path=[testfile.name], to_git=True)
+        # we used to resolve relative paths against a dataset just given by
+        # a path, but we no longer do that
+        #save(dataset=ds.path, path=[testfile.name], to_git=True)
+        save(dataset=ds, path=[testfile.name], to_git=True)
 
 
 @with_tree(tree={
