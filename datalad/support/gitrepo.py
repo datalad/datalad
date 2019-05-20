@@ -2274,14 +2274,6 @@ class GitRepo(RepoInterface):
         self._git_custom_command("", ["git", "cherry-pick", commit],
                                  check_fake_dates=True)
 
-    def ls_remote(self, remote, options=None):
-        if options is None:
-            options = []
-        self._git_custom_command(
-            '', ['git', 'ls-remote'] + options + [remote]
-        )
-        # TODO: Return values?
-
     # run() needs this ATM, but should eventually be RF'ed to a
     # status(recursive=True) call
     @property
