@@ -48,6 +48,7 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
 from datalad.utils import dlabspath
+from datalad.utils import Path
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -601,12 +602,10 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 def rev_resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
-    Any explicit path (absolute or relative) is returned as an absolute path.
-    In case of an explicit relative path (e.g. "./some", or ".\\some" on
-    windows), the current working directory is used as reference. Any
-    non-explicit relative path is resolved against as dataset location, i.e.
-    considered relative to the location of the dataset. If no dataset is
-    provided, the current working directory is used.
+    Any path is returned as an absolute path. If, and only if, a dataset
+    object instance is given as `ds`, relative paths are interpreted as
+    relative to the given dataset. In all other cases, relative paths are
+    treated as relative to the current working directory.
 
     Note however, that this function is not able to resolve arbitrarily
     obfuscated path specifications. All operations are purely lexical, and no
@@ -621,28 +620,25 @@ def rev_resolve_path(path, ds=None):
     path : str or PathLike
       Platform-specific path specific path specification.
     ds : Dataset or None
-      Dataset instance to resolve non-explicit relative paths against.
+      Dataset instance to resolve relative paths against.
 
     Returns
     -------
     `pathlib.Path` object
     """
-    if ds is not None and not isinstance(ds, Dataset):
-        ds = require_dataset(ds, check_installed=False, purpose='path resolution')
-    if ds is None:
-        # CWD is the reference
+    got_ds_instance = isinstance(ds, Dataset)
+    if ds is not None and not got_ds_instance:
+        ds = require_dataset(
+            ds, check_installed=False, purpose='path resolution')
+    if ds is None or not got_ds_instance:
+        # no dataset at all or no instance provided -> CWD is always the reference
         path = ut.Path(path)
-    # we have a dataset
+    # we have a given datasets instance
     # stringify in case a pathobj came in
-    elif not op.isabs(text_type(path)) and \
-            not (text_type(path).startswith(os.curdir + os.sep) or
-                 text_type(path).startswith(os.pardir + os.sep)):
+    elif not Path(path).is_absolute():
         # we have a dataset and no abspath nor an explicit relative path ->
         # resolve it against the dataset
         path = ds.pathobj / path
-    else:
-        # CWD is the reference
-        path = ut.Path(path)
 
     # make sure we return an absolute path, but without actually
     # resolving anything
