@@ -222,7 +222,7 @@ def test_symlinked_relpath(path):
     with chpwd(op.join(dspath, 'd')):
         save(dataset=ds.path,
              message="committing",
-             path=op.join(op.curdir, "mike2"))
+             path="mike2")
 
         later = op.join(op.pardir, "later")
         ds.repo.add(later, git=True)
