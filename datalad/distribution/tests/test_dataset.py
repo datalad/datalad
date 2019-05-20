@@ -55,11 +55,10 @@ def test_EnsureDataset():
     assert_raises(ValueError, c, (1, 2, 3))
     assert_raises(ValueError, c, {"what": "ever"})
 
-    # returns Dataset, when string or Dataset passed
-    res = c(opj("some", "path"))
-    ok_(isinstance(res, Dataset))
-    ok_(isinstance(c(res), Dataset))
-    ok_(c(res) is res)
+    # let's a Dataset instance pass, but leaves a path untouched
+    test_path = opj("some", "path")
+    ok_(isinstance(c(test_path), type(test_path)))
+    ok_(isinstance(Dataset(test_path), Dataset))
 
     # Note: Ensuring that string is valid path is not
     # part of the constraint itself, so not explicitly tested here.
