@@ -653,7 +653,6 @@ def rev_resolve_path(path, ds=None):
             # are done next
             pass
         # we have a given datasets instance
-        # stringify in case a pathobj came in
         elif not Path(p).is_absolute():
             # we have a dataset and no abspath nor an explicit relative path ->
             # resolve it against the dataset
