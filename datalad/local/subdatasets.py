@@ -273,12 +273,12 @@ class Subdatasets(Interface):
         paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
             if path else None
 
-        dataset = require_dataset(
+        ds = require_dataset(
             dataset, check_installed=False, purpose='subdataset reporting/modification')
         lgr.debug('Query subdatasets of %s', dataset)
         if paths is not None:
             lgr.debug('Query subdatasets underneath paths: %s', paths)
-        refds_path = dataset.path
+        refds_path = ds.path
 
         # XXX this seems strange, but is tested to be the case -- I'd rather set
         # `check_installed` to true above and fail
@@ -298,7 +298,7 @@ class Subdatasets(Interface):
         if contains:
             contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
         for r in _get_submodules(
-                dataset, paths, fulfilled, recursive, recursion_limit,
+                ds, paths, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
