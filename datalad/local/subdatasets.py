@@ -342,7 +342,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                              'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
                             ]
                     )
-                except CommandError as e:
+                except CommandError:
                     yield get_status_dict(
                         'subdataset',
                         status='impossible',
