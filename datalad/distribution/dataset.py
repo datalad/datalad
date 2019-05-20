@@ -537,6 +537,10 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
+    """Despite its name, this constraint does not actually ensure that the
+    argument is a valid dataset, because for procedural reasons this would
+    typically duplicate subsequent checks and processing. However, it can
+    be used to achieve uniform documentation of `dataset` arguments."""
 
     def __call__(self, value):
         if isinstance(value, Dataset):
