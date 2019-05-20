@@ -13,6 +13,8 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
+from functools import partial
+
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import getpwd
@@ -211,25 +213,43 @@ def _describe_dataset(ds, sensitive):
     from datalad.interface.results import success_status_map
     from datalad.api import metadata
 
-    infos = {
-        'path': ds.path,
-        'repo': ds.repo.__class__.__name__ if ds.repo else None,
-    }
-    if not sensitive:
-        infos['metadata'] = _HIDDEN
-    elif ds.id:
-        ds_meta = metadata(
-            dataset=ds, reporton='datasets', return_type='list',
-            result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
-            result_renderer='disabled', on_failure='ignore')
-        if ds_meta:
-            ds_meta = [dm['metadata'] for dm in ds_meta]
-            if len(ds_meta) == 1:
-                ds_meta = ds_meta.pop()
-            infos['metadata'] = ds_meta
-        else:
-            infos['metadata'] = None
-    return infos
+    try:
+        infos = {
+            'path': ds.path,
+            'repo': ds.repo.__class__.__name__ if ds.repo else None,
+        }
+        if not sensitive:
+            infos['metadata'] = _HIDDEN
+        elif ds.id:
+            ds_meta = metadata(
+                dataset=ds, reporton='datasets', return_type='list',
+                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
+                result_renderer='disabled', on_failure='ignore')
+            if ds_meta:
+                ds_meta = [dm['metadata'] for dm in ds_meta]
+                if len(ds_meta) == 1:
+                    ds_meta = ds_meta.pop()
+                infos['metadata'] = ds_meta
+            else:
+                infos['metadata'] = None
+        return infos
+    except InvalidGitRepositoryError as e:
+        return {"invalid": exc_str(e)}
+
+
+# Actuall callables for WTF. If None -- should be bound later since depend on
+# the context
+SECTION_CALLABLES = {
+    'datalad': _describe_datalad,
+    'git-annex': _describe_annex,
+    'system': _describe_system,
+    'environment': _describe_environment,
+    'configuration': None,
+    'extensions': _describe_extensions,
+    'metadata_extractors': _describe_metadata_extractors,
+    'dependencies': _describe_dependencies,
+    'dataset': None,
+}
 
 
 @build_doc
@@ -262,6 +282,12 @@ class WTF(Interface):
             config and metadata which could potentially contain sensitive 
             information (credentials, names, etc.).  If 'some', the fields
             which are known to be sensitive will still be masked out"""),
+        sections=Parameter(
+            args=("-S", "--sections"),
+            metavar="SECTION",
+            nargs="*",
+            constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
+            doc="""sections to include.  If not set, all sections."""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),
             action="store_true",
@@ -272,7 +298,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, clipboard=None):
+    def __call__(dataset=None, sensitive=None, sections=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         from datalad.interface.results import get_status_dict
@@ -297,6 +323,22 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.support.external_versions import external_versions
 
+        # Define section callables which require variables.
+        # so there is no side-effect on module level original
+        section_callables = SECTION_CALLABLES.copy()
+        section_callables['configuration'] = \
+            partial(_describe_configuration, cfg, sensitive)
+        if ds:
+            section_callables['dataset'] = \
+                partial(_describe_dataset, ds, sensitive)
+        else:
+            section_callables.pop('dataset')
+        assert all(section_callables.values())  # check if none was missed
+
+        if sections is None:
+            sections = list(section_callables)
+
+        # Populate infos
         infos = {}
         res = get_status_dict(
             action='wtf',
@@ -306,19 +348,8 @@ class WTF(Interface):
             logger=lgr,
             infos=infos,
         )
-        infos['datalad'] = _describe_datalad()
-        infos['git-annex'] = _describe_annex()
-        infos['system'] = _describe_system()
-        infos['environment'] = _describe_environment()
-        infos['configuration'] = _describe_configuration(cfg, sensitive)
-        infos['extentions'] = _describe_extensions()
-        infos['metadata_extractors'] = _describe_metadata_extractors()
-        infos['dependencies'] = _describe_dependencies()
-        if ds:
-            try:
-                infos['dataset'] = _describe_dataset(ds, sensitive)
-            except InvalidGitRepositoryError as e:
-                infos['dataset'] = {"invalid": exc_str(e)}
+        for s in sections:
+            infos[s] = section_callables[s]()
 
         if clipboard:
             external_versions.check(

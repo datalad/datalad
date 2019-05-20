@@ -21,6 +21,8 @@ from datalad.api import wtf
 from datalad.api import no_annex
 from datalad.plugin.wtf import _HIDDEN
 
+from ..wtf import SECTION_CALLABLES
+
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -92,6 +94,26 @@ def test_wtf(path):
         wtf(dataset=ds.path, sensitive='all')
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
+
+    # Sections selection
+    #
+    # If we ask for no sections and there is no dataset
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            assert_not_in('## dataset', cmo.out)
+            for s in SECTION_CALLABLES:
+                assert_not_in('## %s' % s.lower(), cmo.out.lower())
+
+    # ask for a selected set
+    secs = ['configuration', 'git-annex']
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=secs)
+            for s in SECTION_CALLABLES:
+                (assert_in if s in secs else assert_not_in)(
+                    '## %s' % s.lower(), cmo.out.lower()
+                )
 
     skip_if_no_module('pyperclip')
 
