@@ -473,6 +473,11 @@ def test_rev_resolve_path(path):
         ds_local = Dataset(d)
         # no symlink resolution
         eq_(text_type(rev_resolve_path(d)), d)
+        # list comes out as a list
+        eq_(rev_resolve_path([d]), [Path(d)])
+        # multiple OK
+        eq_(rev_resolve_path([d, d]), [Path(d), Path(d)])
+
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
             eq_(text_type(rev_resolve_path(d).cwd()), opath)
