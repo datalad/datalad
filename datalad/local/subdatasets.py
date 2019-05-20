@@ -267,7 +267,7 @@ class Subdatasets(Interface):
             bottomup=False,
             set_property=None,
             delete_property=None):
-        # no conststraints given -> query subdatasets under curdir
+        # no constraints given -> query subdatasets under curdir
         if path is None and dataset is None:
             path = os.curdir
         paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
@@ -275,6 +275,9 @@ class Subdatasets(Interface):
 
         dataset = require_dataset(
             dataset, check_installed=False, purpose='subdataset reporting/modification')
+        lgr.debug('Query subdatasets of %s', dataset)
+        if paths is not None:
+            lgr.debug('Query subdatasets underneath paths: %s', paths)
         refds_path = dataset.path
 
         # XXX this seems strange, but is tested to be the case -- I'd rather set
