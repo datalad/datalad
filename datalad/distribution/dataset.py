@@ -542,7 +542,13 @@ class EnsureDataset(Constraint):
         if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return Dataset(path=value)
+            # we cannot convert to a Dataset class right here
+            # - duplicates require_dataset() later on
+            # - we need to be able to distinguish between a bound
+            #   dataset method call and a standalone call for
+            #   relative path argument disambiguation
+            #return Dataset(path=value)
+            return value
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
