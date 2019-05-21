@@ -6,19 +6,27 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import platform
-from os.path import dirname
-from os.path import join as opj
-from os.path import sep as pathsep
-from os.path import splitext
+from os.path import (
+    dirname,
+    join as opj,
+    sep as pathsep,
+    splitext,
+)
 
-from setuptools import findall
-from setuptools import setup, find_packages
+from setuptools import (
+    findall,
+    find_packages,
+    setup,
+)
 
-from setup_support import BuildConfigInfo
-from setup_support import BuildManPage, setup_entry_points
-from setup_support import BuildRSTExamplesFromScripts
-from setup_support import get_version
+from setup_support import (
+    BuildConfigInfo,
+    BuildManPage,
+    BuildRSTExamplesFromScripts,
+    BuildSchema,
+    get_version,
+    setup_entry_points,
+)
 
 
 def findsome(subdir, extensions):
@@ -39,44 +47,40 @@ version = get_version()
 # so we will filter manually for maximal compatibility
 datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 
-# keyring is a tricky one since it got split into two as of 8.0 and on older
-# systems there is a problem installing via pip (e.g. on wheezy) so for those we
-# would just ask for keyring
-keyring_requires = ['keyring>=8.0', 'keyrings.alt']
-pbar_requires = ['tqdm']
-
-dist = platform.dist()
-# on oldstable Debian let's ask for lower versions of keyring
-if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
-    keyring_requires = ['keyring<8.0']
-
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.1.0',
+        'chardet>=3.0.4',      # rarely used but small/omnipresent
+        'colorama; platform_system=="Windows"',
+        'GitPython>=2.1.8',
         'iso8601',
         'humanize',
+        'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
-    ] + pbar_requires,
+        'tqdm',
+        'wrapt',
+    ],
     'downloaders': [
         'boto',
-        'msgpack-python',
+        'keyring>=8.0', 'keyrings.alt',
+        'msgpack',
         'requests>=1.2',
-    ] + keyring_requires,
+    ],
     'zenodo': [
         'requests',
-    ] + keyring_requires,
+    ],
     'downloaders-extra': [
         'requests_ftp',
-    ],
-    'crawl': [
-        'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],
     'publish': [
         'jsmin',             # nice to have, and actually also involved in `install`
         'PyGithub',          # nice to have
+    ],
+    'misc': [
+        'pyperclip',         # clipboard manipulations
+        'python-dateutil',   # add support for more date formats to check_dates
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -86,12 +90,28 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
+        # lzma is included in python since 3.3
+        # We now support backports.lzma as well (besides AutomagicIO), but since
+        # there is not way to define an alternative here (AFAIK, yoh), we will
+        # use pyliblzma as the default for now.  Patch were you would prefer
+        # backports.lzma instead
+        'pyliblzma; python_version < "3.3"',
+        # was added in https://github.com/datalad/datalad/pull/1995 without
+        # due investigation, should not be needed until we add duecredit support
+        # 'duecredit',
         'simplejson',
-        'pyld',
+        'whoosh',
     ],
     'metadata-extra': [
         'PyYAML',  # very optional
-    ]
+        'mutagen>=1.36',  # audio metadata
+        'exifread',  # EXIF metadata
+        'python-xmp-toolkit',  # XMP metadata, also requires 'exempi' to be available locally
+        'Pillow',  # generic image metadata
+    ],
+    'duecredit': [
+        'duecredit',  # needs >= 0.6.6 to be usable, but should be "safe" with prior ones
+    ],
 }
 
 requires['full'] = sum(list(requires.values()), [])
@@ -102,11 +122,14 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx',
+        'sphinx>=1.7.8',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
+        'asv',
         'nose-timer',
+        'psutil',
+        'coverage',
         # disable for now, as it pulls in ipython 6, which is PY3 only
         #'line-profiler',
         # necessary for accessing SecretStorage keyring (system wide Gnome
@@ -115,10 +138,6 @@ requires.update({
         # but you might need it
         # 'dbus-python',
     ],
-    'devel-neuroimaging': [
-        # Specifically needed for tests here (e.g. example scripts testing)
-        'nibabel',
-    ]
 })
 requires['devel'] = sum(list(requires.values()), [])
 
@@ -135,6 +154,7 @@ cmdclass = {
     'build_manpage': BuildManPage,
     'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
+    'build_schema': BuildSchema,
     # 'build_py': DataladBuild
 }
 
@@ -144,7 +164,13 @@ README = opj(dirname(__file__), 'README.md')
 try:
     import pypandoc
     long_description = pypandoc.convert(README, 'rst')
-except ImportError:
+except (ImportError, OSError) as exc:
+    # attempting to install pandoc via brew on OSX currently hangs and
+    # pypandoc imports but throws OSError demanding pandoc
+    print(
+        "WARNING: pypandoc failed to import or thrown an error while converting"
+        " README.md to RST: %r   .md version will be used as is" % exc
+    )
     long_description = open(README).read()
 
 
@@ -158,6 +184,23 @@ setup_kwargs = setup_entry_points(
         'git-annex-remote-datalad': 'datalad.customremotes.datalad',
         'git-annex-remote-datalad-zenodo': 'datalad.customremotes.zenodo',
     })
+
+# normal entrypoints for the rest
+# a bit of a dance needed, as on windows the situation is different
+entry_points = setup_kwargs.get('entry_points', {})
+entry_points.update({
+    'datalad.metadata.extractors': [
+        'annex=datalad.metadata.extractors.annex:MetadataExtractor',
+        'audio=datalad.metadata.extractors.audio:MetadataExtractor',
+        'datacite=datalad.metadata.extractors.datacite:MetadataExtractor',
+        'datalad_core=datalad.metadata.extractors.datalad_core:MetadataExtractor',
+        'datalad_rfc822=datalad.metadata.extractors.datalad_rfc822:MetadataExtractor',
+        'exif=datalad.metadata.extractors.exif:MetadataExtractor',
+        'frictionless_datapackage=datalad.metadata.extractors.frictionless_datapackage:MetadataExtractor',
+        'image=datalad.metadata.extractors.image:MetadataExtractor',
+        'xmp=datalad.metadata.extractors.xmp:MetadataExtractor',
+    ]})
+setup_kwargs['entry_points'] = entry_points
 
 setup(
     name="datalad",
@@ -174,8 +217,10 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg'}) +
-            findsome('downloaders/configs', {'cfg'})
+            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
+            findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('distribution', 'tests'), {'yaml'}) +
+            findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
     **setup_kwargs
 )

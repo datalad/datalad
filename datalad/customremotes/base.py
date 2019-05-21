@@ -12,11 +12,12 @@ from __future__ import absolute_import
 
 __docformat__ = 'restructuredtext'
 
+import inspect
 import errno
 import os
 import sys
 
-from os.path import exists, join as opj, realpath, dirname, lexists
+from ..support.path import exists, join as opj, realpath, dirname, lexists
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse
@@ -28,21 +29,39 @@ lgr.log(5, "Importing datalad.customremotes.main")
 from ..dochelpers import exc_str
 from ..ui import ui
 from ..support.protocol import ProtocolInterface
+from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
+from ..dochelpers import exc_str
+from ..utils import assure_unicode
 
 
 URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
 
 DEFAULT_COST = 100
-DEFAULT_AVAILABILITY = "local"
+DEFAULT_AVAILABILITY = "LOCAL"
 
 from datalad.ui.progressbars import ProgressBarBase
 
 
 class AnnexRemoteQuit(Exception):
     pass
+
+
+def get_function_nargs(f):
+    while hasattr(f, 'wrapped'):
+        f = f.wrapped
+    argspec = inspect.getargspec(f)
+    assert not argspec.keywords, \
+        "ATM we have none defined with keywords, so disabling having them"
+    if argspec.varargs:
+        # Variable number of arguments
+        return -1
+    else:
+        assert argspec.args, "ATM no static methods"
+        assert argspec.args[0] == "self"
+        return len(argspec.args) - 1
 
 
 class AnnexExchangeProtocol(ProtocolInterface):
@@ -98,14 +117,14 @@ send () {
         if exists(_file):
             lgr.debug("Commenting out previous entries")
             # comment out all the past entries
-            with open(_file) as f:
-                entries = f.readlines()
+            with open(_file, 'rb') as f:
+                entries = list(map(assure_unicode, f.readlines()))
             for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
-            with open(_file, 'w') as f:
-                f.write(''.join(entries))
+            with open(_file, 'wb') as f:
+                f.write(u''.join(entries).encode('utf-8'))
             return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
@@ -177,14 +196,13 @@ class AnnexCustomRemote(object):
     # Must be defined in subclasses.  There is no classlevel properties, so leaving as this for now
 
     CUSTOM_REMOTE_NAME = None  # if None -- no additional custom remote name
-    # SUPPORTED_SCHEMES = ()
-    # Could also support "STORE"
+    SUPPORTED_SCHEMES = ()
     SUPPORTED_TRANSFERS = ("RETRIEVE",)
 
     COST = DEFAULT_COST
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path=None, cost=None):  # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=None, fin=None, fout=None):  # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -193,6 +211,9 @@ class AnnexCustomRemote(object):
             Usually this class is instantiated by a script which runs already
             within that directory, so the default is to point to current
             directory, i.e. '.'
+        fin:
+        fout:
+            input/output streams.  If not specified, stdin, stdout used
         """
         # TODO: probably we shouldn't have runner here but rather delegate
         # to AnnexRepo's functionality
@@ -202,8 +223,8 @@ class AnnexCustomRemote(object):
         self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
-        self.fin = sys.stdin
-        self.fout = sys.stdout
+        self.fin = fin or sys.stdin
+        self.fout = fout or sys.stdout
 
         self.repo = get_repo_instance(class_=AnnexRepo) \
             if not path \
@@ -218,7 +239,7 @@ class AnnexCustomRemote(object):
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
 
-        # To signal either we are in the loop and e.g. could correspond to annex
+        # To signal whether we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
         self._protocol = \
             AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
@@ -229,6 +250,27 @@ class AnnexCustomRemote(object):
         # instruct annex backend UI to use this remote
         if ui.backend == 'annex':
             ui.set_specialremote(self)
+
+        # Delay introspection until the first instance gets born
+        # could in principle be done once in the metaclass I guess
+        self.__class__._introspect_req_signatures()
+        self._annex_supports_info = \
+            external_versions['cmd:annex'] >= '6.20180206'
+
+    @classmethod
+    def _introspect_req_signatures(cls):
+        """
+        Check req_ methods to figure out expected number of arguments
+        See https://github.com/datalad/datalad/issues/1727
+        """
+        if hasattr(cls, '_req_nargs'):
+            # We have already figured it out for this class
+            return
+        cls._req_nargs = {
+            m[4:]: get_function_nargs(getattr(cls, m))
+            for m in dir(cls)
+            if m.startswith('req_')
+        }
 
     @classmethod
     def _get_custom_scheme(cls, prefix):
@@ -296,7 +338,11 @@ class AnnexCustomRemote(object):
             else:
                 raise exc
 
-    def send_unsupported(self):
+    def send_unsupported(self, msg=None):
+        """Send UNSUPPORTED-REQUEST to annex and log optional message in our log
+        """
+        if msg:
+            lgr.debug(msg)
         self.send("UNSUPPORTED-REQUEST")
 
     def read(self, req=None, n=1):
@@ -317,9 +363,11 @@ class AnnexCustomRemote(object):
         if self._protocol is not None:
             self._protocol += "recv %s" % l
         msg = l.split(None, n)
-        if req and (req != msg[0]):
+        if req and ((not msg) or (req != msg[0])):
             # verify correct response was given
-            self.error("Expected %r, got %r.  Ignoring" % (req, msg[0]))
+            self.send_unsupported(
+                "Expected %r, got a line %r.  Ignoring" % (req, l)
+            )
             return None
         self.heavydebug("Received %r" % (msg,))
         return msg
@@ -337,6 +385,11 @@ class AnnexCustomRemote(object):
     def error(self, msg, annex_err="ERROR"):
         lgr.error(msg)
         self.send(annex_err, msg)
+
+    def info(self, msg):
+        lgr.info(msg)
+        if self._annex_supports_info:
+            self.send('INFO', msg)
 
     def progress(self, bytes):
         bytes = int(bytes)
@@ -370,7 +423,7 @@ class AnnexCustomRemote(object):
         self.send("VERSION", SUPPORTED_PROTOCOL)
 
         while True:
-            l = self.read(n=-1)
+            l = self.read(n=1)
 
             if l is not None and not l:
                 # empty line: exit
@@ -378,19 +431,28 @@ class AnnexCustomRemote(object):
                 return
 
             req, req_load = l[0], l[1:]
-
             method = getattr(self, "req_%s" % req, None)
             if not method:
-                self.error("We have no support for %s request, part of %s response"
-                           % (req, l))
-                self.send("UNSUPPORTED-REQUEST")
+                self.send_unsupported(
+                    "We have no support for %s request, part of %s response"
+                    % (req, l)
+                )
                 continue
+
+            req_nargs = self._req_nargs[req]
+            if req_load and req_nargs > 1:
+                assert len(req_load) == 1, "Could be only one due to n=1"
+                # but now we need to slice it according to the respective req
+                # We assume that at least it shouldn't start with a space
+                # since str.split would get rid of it as well, and then we should
+                # have used re.split(" ", ...)
+                req_load = req_load[0].split(None, req_nargs - 1)
 
             try:
                 method(*req_load)
             except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
-                           % (req, req_load, e))
+                           % (req, req_load, exc_str(e)))
                 from traceback import format_exc
                 lgr.error("Caught exception detail: %s" % format_exc())
 
@@ -421,6 +483,20 @@ class AnnexCustomRemote(object):
         else:
             self.send("PREPARE-SUCCESS")
 
+        self.debug("Encodings: filesystem %s, default %s"
+                   % (sys.getfilesystemencoding(), sys.getdefaultencoding()))
+
+    def req_EXPORTSUPPORTED(self):
+        self.send(
+            'EXPORTSUPPORTED-SUCCESS'
+            if hasattr(self, 'req_EXPORT')
+            else 'EXPORTSUPPORTED-FAILURE'
+        )
+
+    ## define in subclass if EXPORT is supported
+    # def req_EXPORT(self, name):
+    #   pass
+
     def req_GETCOST(self):
         self.send("COST", self.cost)
 
@@ -446,10 +522,13 @@ class AnnexCustomRemote(object):
             try:
                 self._transfer(cmd, key, file)
             except Exception as exc:
-                self.send('TRANSFER-FAILURE', cmd, key, exc_str(exc))
+                self.send(
+                    "TRANSFER-FAILURE %s %s %s" % (cmd, key, exc_str(exc))
+                )
         else:
-            self.error("Retrieved unsupported for TRANSFER command %s" % cmd)
-            self.send_unsupported()
+            self.send_unsupported(
+                "Received unsupported by our TRANSFER command %s" % cmd
+            )
 
     # Specific implementations to be provided in derived classes when necessary
 

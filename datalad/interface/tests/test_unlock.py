@@ -12,8 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
-import logging
-from os import geteuid
+import os
 from os.path import join as opj
 
 from datalad.distribution.dataset import Dataset
@@ -29,9 +28,8 @@ from datalad.tests.utils import getpwd
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import assert_in
 from datalad.tests.utils import on_windows, skip_if
-from datalad.utils import swallow_logs
+from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
 
 
 @assert_cwd_unchanged
@@ -48,10 +46,10 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(InsufficientArgumentsError,
                   unlock, dataset=None, path=None)
     # no dataset and path not within a dataset:
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        unlock(dataset=None, path=path2)
-        assert_in("ignored paths that do not belong to any dataset: ['{0}'".format(path2),
-                  cml.out)
+    res = unlock(dataset=None, path=path2, result_xfm=None,
+                 on_failure='ignore', return_type='item-or-list')
+    eq_(res['message'], "path not associated with any dataset")
+    eq_(res['path'], path2)
 
     create(path=path, no_annex=True)
     ds = Dataset(path)
@@ -60,16 +58,16 @@ def test_unlock_raises(path, path2, path3):
 
     # make it annex, but call unlock with invalid path:
     AnnexRepo(path, create=True)
-    with swallow_logs(new_level=logging.WARNING) as cml:
-        ds.unlock(path="notexistent.txt")
-        assert_in("ignored non-existing paths", cml.out)
+    res = ds.unlock(path="notexistent.txt", result_xfm=None,
+                    on_failure='ignore', return_type='item-or-list')
+    eq_(res['message'], "path does not exist")
 
     chpwd(_cwd)
 
 
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
-@skip_if(cond=not on_windows and geteuid() == 0)  # uid not available on windows
+@skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):
 
@@ -79,22 +77,46 @@ def test_unlock(path):
     # TODO: use get_annexed_files instead of hardcoded filename
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
-    # cannot unlock without content (annex get wasn't called):
-    assert_raises(CommandError, ds.unlock)
+    # in direct mode there is no unlock:
+    if ds.repo.is_direct_mode():
+        res = ds.unlock()
+        assert_result_count(res, 1)
+        assert_status('notneeded', res)
+
+    # in V6+ we can unlock even if the file's content isn't present:
+    elif ds.repo.supports_unlocked_pointers:
+        res = ds.unlock()
+        assert_result_count(res, 1)
+        assert_status('ok', res)
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
+    else:
+        # cannot unlock without content (annex get wasn't called)
+        assert_raises(CommandError, ds.unlock)  # FIXME
 
     ds.repo.get('test-annex.dat')
     result = ds.unlock()
-    assert len(result) >= 1
-    assert_in('test-annex.dat', result)
+    assert_result_count(result, 1)
+    if ds.repo.is_direct_mode():
+        assert_status('notneeded', result)
+    else:
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content")
 
     ds.repo.add('test-annex.dat')
+    # in V6+ we need to explicitly re-lock it:
+    if ds.repo.supports_unlocked_pointers:
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    if not ds.repo.is_direct_mode():
+        # after commit, file is locked again:
+        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:
@@ -102,16 +124,33 @@ def test_unlock(path):
 
     # unlock again, this time more specific:
     result = ds.unlock(path='test-annex.dat')
-    eq_(['test-annex.dat'], result)
+    assert_result_count(result, 1)
+
+    if ds.repo.is_direct_mode():
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='notneeded')
+    else:
+        assert_in_results(result, path=opj(ds.path, 'test-annex.dat'), status='ok')
 
     with open(opj(path, 'test-annex.dat'), "w") as f:
         f.write("change content again")
 
     ds.repo.add('test-annex.dat')
+    # in V6+ we need to explicitly re-lock it:
+    if ds.repo.supports_unlocked_pointers:
+        # TODO: RF: make 'lock' a command as well
+        # re-lock to further on have a consistent situation with V5:
+        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
     ds.repo.commit("edit 'test-annex.dat' via unlock and lock it again")
 
-    # after commit, file is locked again:
-    assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
+    # TODO:
+    # BOOOM: test-annex.dat writeable in V6!
+    # Why the hell is this different than the first time we wrote to the file
+    # and locked it again?
+    # Also: After opening the file is empty.
+
+    if not ds.repo.is_direct_mode():
+        # after commit, file is locked again:
+        assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
     # content was changed:
     with open(opj(path, 'test-annex.dat'), "r") as f:

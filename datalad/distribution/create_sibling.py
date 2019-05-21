@@ -12,7 +12,6 @@
 __docformat__ = 'restructuredtext'
 
 from six import text_type
-from collections import OrderedDict
 from distutils.version import LooseVersion
 from glob import glob
 import logging
@@ -23,15 +22,16 @@ from datalad import ssh_manager
 from datalad.cmd import CommandError
 from datalad.consts import WEB_HTML_DIR, WEB_META_LOG
 from datalad.consts import TIMESTAMP_FMT
-from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
-from datalad.distribution.add_sibling import AddSibling
-from datalad.distribution.add_sibling import _DelayedSuper
+from datalad.distribution.siblings import Siblings
+from datalad.distribution.siblings import _DelayedSuper
 from datalad.distribution.add_sibling import _check_deps
-from datalad.distribution.add_sibling import _urljoin
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
+from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
+from datalad.interface.utils import eval_results
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import as_common_datasrc
 from datalad.interface.common_opts import publish_by_default
@@ -40,8 +40,6 @@ from datalad.interface.common_opts import inherit_opt
 from datalad.interface.common_opts import annex_wanted_opt
 from datalad.interface.common_opts import annex_group_opt
 from datalad.interface.common_opts import annex_groupwanted_opt
-from datalad.interface.utils import filter_unmodified
-from datalad.support.network import SSHRI
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -52,8 +50,10 @@ from datalad.support.network import is_ssh
 from datalad.support.sshconnector import sh_quote
 from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
-from datalad.utils import not_supported_on_windows
 from datalad.utils import _path_
+from datalad.utils import slash_join
+from datalad.utils import assure_list
+
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
 
@@ -70,8 +70,10 @@ def _create_dataset_sibling(
         target_pushurl,
         existing,
         shared,
+        group,
         publish_depends,
         publish_by_default,
+        install_postupdate_hook,
         as_common_datasrc,
         annex_wanted,
         annex_group,
@@ -170,6 +172,20 @@ def _create_dataset_sibling(
                 ssh("rm -rf {}".format(sh_quote(remoteds_path)))
                 # if we succeeded in removing it
                 path_exists = False
+                # Since it is gone now, git-annex also should forget about it
+                remotes = ds.repo.get_remotes()
+                if name in remotes:
+                    # so we had this remote already, we should announce it dead
+                    # XXX what if there was some kind of mismatch and this name
+                    # isn't matching the actual remote UUID?  should have we
+                    # checked more carefully?
+                    lgr.info(
+                        "Announcing existing remote %s dead to annex and removing",
+                        name
+                    )
+                    if isinstance(ds.repo, AnnexRepo):
+                        ds.repo.set_remote_dead(name)
+                    ds.repo.remove_remote(name)
             elif existing == 'reconfigure':
                 lgr.info(_msg + " Will only reconfigure")
                 only_reconfigure = True
@@ -181,13 +197,29 @@ def _create_dataset_sibling(
         if not path_exists:
             ssh("mkdir -p {}".format(sh_quote(remoteds_path)))
 
-    if inherit and shared is None:
-        # here we must analyze current_ds's super, not the super_ds
-        delayed_super = _DelayedSuper(ds)
-        # inherit from the setting on remote end
-        shared = CreateSibling._get_ds_remote_shared_setting(
-            delayed_super, name, ssh)
+    delayed_super = _DelayedSuper(ds)
+    if inherit and delayed_super.super:
+        if shared is None:
+            # here we must analyze current_ds's super, not the super_ds
+            # inherit from the setting on remote end
+            shared = CreateSibling._get_ds_remote_shared_setting(
+                delayed_super, name, ssh)
 
+        if not install_postupdate_hook:
+            # Even though directive from above was False due to no UI explicitly
+            # requested, we were asked to inherit the setup, so we might need
+            # to install the hook, if super has it on remote
+            install_postupdate_hook = CreateSibling._has_active_postupdate(
+                delayed_super, name, ssh)
+
+
+
+    if group:
+        # Either repository existed before or a new directory was created for it,
+        # set its group to a desired one if was provided with the same chgrp
+        ssh("chgrp -R {} {}".format(
+            sh_quote(text_type(group)),
+            sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:
         # init git and possibly annex repo
@@ -207,14 +239,15 @@ def _create_dataset_sibling(
     # at this point we have a remote sibling in some shape or form
     # -> add as remote
     lgr.debug("Adding the siblings")
-    AddSibling.__call__(
+    # TODO generator, yield the now swallowed results
+    Siblings.__call__(
+        'configure',
         dataset=ds,
         name=name,
         url=ds_target_url,
         pushurl=ds_target_pushurl,
         recursive=False,
         fetch=True,
-        force=existing in {'reconfigure', 'replace'},
         as_common_datasrc=as_common_datasrc,
         publish_by_default=publish_by_default,
         publish_depends=publish_depends,
@@ -243,18 +276,20 @@ def _create_dataset_sibling(
                   " and run with --existing=reconfigure",
                   ssh.get_git_version())
 
-    # enable metadata refresh on dataset updates to publication server
-    lgr.info("Enabling git post-update hook ...")
-    try:
-        CreateSibling.create_postupdate_hook(
-            remoteds_path, ssh, ds)
-    except CommandError as e:
-        lgr.error("Failed to add json creation command to post update "
-                  "hook.\nError: %s" % exc_str(e))
+    if install_postupdate_hook:
+        # enable metadata refresh on dataset updates to publication server
+        lgr.info("Enabling git post-update hook ...")
+        try:
+            CreateSibling.create_postupdate_hook(
+                remoteds_path, ssh, ds)
+        except CommandError as e:
+            lgr.error("Failed to add json creation command to post update "
+                      "hook.\nError: %s" % exc_str(e))
 
     return remoteds_path
 
 
+@build_doc
 class CreateSibling(Interface):
     """Create a dataset sibling on a UNIX-like SSH-accessible machine
 
@@ -276,6 +311,8 @@ class CreateSibling(Interface):
     mechanism is provided to produce a flat list of datasets (see
     --target-dir).
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         # TODO: Figure out, whether (and when) to use `sshurl` as push url
@@ -361,6 +398,14 @@ class CreateSibling(Interface):
             Possible values for this option are identical to those of
             `git init --shared` and are described in its documentation.""",
             constraints=EnsureStr() | EnsureBool() | EnsureNone()),
+        group=Parameter(
+            args=("--group",),
+            metavar="GROUP",
+            doc="""Filesystem group for the repository. Specifying the group is
+            particularly important when [CMD: --shared=group CMD][PY:
+            shared="group" PY]""",
+            constraints=EnsureStr() | EnsureNone()
+        ),
         ui=Parameter(
             args=("--ui",),
             metavar='false|true|html_filename',
@@ -384,60 +429,34 @@ class CreateSibling(Interface):
 
     @staticmethod
     @datasetmethod(name='create_sibling')
+    @eval_results
     def __call__(sshurl, name=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None,
                  recursive=False,
                  recursion_limit=None,
-                 existing='error', shared=None, ui=False,
+                 existing='error',
+                 shared=None,
+                 group=None,
+                 ui=False,
                  as_common_datasrc=None,
                  publish_by_default=None,
                  publish_depends=None,
                  annex_wanted=None, annex_group=None, annex_groupwanted=None,
                  inherit=False,
                  since=None):
-
-        # there is no point in doing anything further
-        not_supported_on_windows(
-            "Support for SSH connections is not yet implemented in Windows")
-
+        #
+        # nothing without a base dataset
+        #
         ds = require_dataset(dataset, check_installed=True,
                              purpose='creating a sibling')
+        refds_path = ds.path
 
-        # use common sorting implementation to discover all subdatasets
-        content_by_ds, unavailable_paths = Interface._prep(
-            # the base data set is the only path
-            path=ds.path,
-            dataset=ds,
-            recursive=recursive,
-            recursion_limit=recursion_limit)
-        # dataset arg was tested before, only existing dataset should be reported
-        assert(not unavailable_paths)
+        #
+        # all checks that are possible before we start parsing the dataset
+        #
 
-        # anal verification
-        assert(ds is not None and ds.repo is not None)
-
-        if since:
-            mod_subs = []
-            content_by_ds = filter_unmodified(content_by_ds, ds, since)
-            # look for those subdatasets that are listed as modified
-            # together with a .gitmodules change
-            for d, paths in content_by_ds.items():
-                if any(p.endswith('.gitmodules') for p in paths):
-                    mod_subs.extend(p for p in paths if p in content_by_ds)
-            content_by_ds = mod_subs
-
-        # dataset instances
-        datasets = {p: Dataset(p) for p in content_by_ds}
-
-        # make sure dependencies are valid
-        for d in datasets.values():
-            # TODO: inherit -- we might want to automagically create
-            # those dependents as well???
-            _check_deps(d.repo, publish_depends)
-
-        # Finally we get to the point where sshurl is possibly used  to
-        # get the name in case if not specified
+        # possibly use sshurl to get the name in case if not specified
         if not sshurl:
             if not inherit:
                 raise InsufficientArgumentsError(
@@ -472,8 +491,7 @@ class CreateSibling(Interface):
             # for now assuming hierarchical setup
             # (TODO: to be able to destinguish between the two, probably
             # needs storing datalad.*.target_dir to have %RELNAME in there)
-            sshurl = _urljoin(super_url, relpath(ds.path, super_ds.path))
-
+            sshurl = slash_join(super_url, relpath(ds.path, super_ds.path))
 
         # check the login URL
         sshri = RI(sshurl)
@@ -489,31 +507,65 @@ class CreateSibling(Interface):
                 "No sibling name given, use URL hostname '%s' as sibling name",
                 name)
 
-        # find datasets with existing remotes with the target name
-        remote_existing = [p for p in datasets
-                           if name in datasets[p].repo.get_remotes()]
+        if since == '':
+            # consider creating siblings only since the point of
+            # the last update
+            # XXX here we assume one to one mapping of names from local branches
+            # to the remote
+            active_branch = ds.repo.get_active_branch()
+            since = '%s/%s' % (name, active_branch)
 
-        if remote_existing:
-            if existing == 'error':
-                raise ValueError(
-                    "sibling '{name}' already configured for dataset{plural}: "
-                    "{existing}. Specify alternative sibling name, or force "
-                    "reconfiguration via --existing".format(
-                        name=name,
-                        existing=remote_existing,
-                        plural='s' if len(remote_existing) > 1 else ''))
-            if existing == 'skip':
-                # no need to process already configured datasets
-                lgr.info(
-                    "Skipping dataset{plural} with an already configured "
-                    "sibling '{name}': {existing}".format(
-                        name=name,
-                        existing=remote_existing,
-                        plural='s' if len(remote_existing) > 1 else ''))
-                datasets = {p: d for p, d in datasets.items()
-                            if p not in remote_existing}
+        #
+        # parse the base dataset to find all subdatasets that need processing
+        #
+        to_process = []
+        for ap in AnnotatePaths.__call__(
+                dataset=refds_path,
+                # only a single path!
+                path=refds_path,
+                recursive=recursive,
+                recursion_limit=recursion_limit,
+                action='create_sibling',
+                # both next should not happen anyways
+                unavailable_path_status='impossible',
+                nondataset_path_status='error',
+                modified=since,
+                return_type='generator',
+                on_failure='ignore'):
+            if ap.get('status', None):
+                # this is done
+                yield ap
+                continue
+            if ap.get('type', None) != 'dataset' or ap.get('state', None) == 'absent':
+                # this can happen when there is `since`, but we have no
+                # use for anything but datasets here
+                continue
+            checkds_remotes = Dataset(ap['path']).repo.get_remotes() \
+                if ap.get('state', None) != 'absent' \
+                else []
+            if publish_depends:
+                # make sure dependencies are valid
+                # TODO: inherit -- we might want to automagically create
+                # those dependents as well???
+                unknown_deps = set(assure_list(publish_depends)).difference(checkds_remotes)
+                if unknown_deps:
+                    ap['status'] = 'error'
+                    ap['message'] = (
+                        'unknown sibling(s) specified as publication dependency: %s',
+                        unknown_deps)
+                    yield ap
+                    continue
+            if name in checkds_remotes and existing in ('error', 'skip'):
+                ap['status'] = 'error' if existing == 'error' else 'notneeded'
+                ap['message'] = (
+                    "sibling '%s' already configured (specify alternative name, or force "
+                    "reconfiguration via --existing",
+                    name)
+                yield ap
+                continue
+            to_process.append(ap)
 
-        if not datasets:
+        if not to_process:
             # we ruled out all possibilities
             # TODO wait for gh-1218 and make better return values
             lgr.info("No datasets qualify for sibling creation. "
@@ -539,14 +591,19 @@ class CreateSibling(Interface):
                 'git-annex',
                 msg='on the remote system')
 
+        #
+        # all checks done and we have a connection, now do something
+        #
+
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         # But we need to run post-update hook in depth-first fashion, so
         # would only collect first and then run (see gh #790)
+        yielded = set()
         remote_repos_to_run_hook_for = []
-        for current_dspath in \
-                sorted(datasets.keys(), key=lambda x: x.count('/')):
-            current_ds = datasets[current_dspath]
+        for currentds_ap in \
+                sorted(to_process, key=lambda x: x['path'].count('/')):
+            current_ds = Dataset(currentds_ap['path'])
 
             path = _create_dataset_sibling(
                 name,
@@ -560,8 +617,10 @@ class CreateSibling(Interface):
                 target_pushurl,
                 existing,
                 shared,
+                group,
                 publish_depends,
                 publish_by_default,
+                ui,
                 as_common_datasrc,
                 annex_wanted,
                 annex_group,
@@ -570,51 +629,87 @@ class CreateSibling(Interface):
             )
             if not path:
                 # nothing new was created
+                # TODO is 'notneeded' appropriate in this case?
+                currentds_ap['status'] = 'notneeded'
+                # TODO explain status in 'message'
+                yield currentds_ap
+                yielded.add(currentds_ap['path'])
                 continue
-            remote_repos_to_run_hook_for.append(path)
+            remote_repos_to_run_hook_for.append((path, currentds_ap))
 
             # publish web-interface to root dataset on publication server
-            if current_dspath == ds.path and ui:
+            if current_ds.path == ds.path and ui:
                 lgr.info("Uploading web interface to %s" % path)
                 try:
                     CreateSibling.upload_web_interface(path, ssh, shared, ui)
                 except CommandError as e:
-                    lgr.error("Failed to push web interface to the remote "
-                              "datalad repository.\nError: %s" % exc_str(e))
+                    currentds_ap['status'] = 'error'
+                    currentds_ap['message'] = (
+                        "failed to push web interface to the remote datalad repository (%s)",
+                        exc_str(e))
+                    yield currentds_ap
+                    yielded.add(currentds_ap['path'])
+                    continue
 
         # in reverse order would be depth first
         lgr.info("Running post-update hooks in all created siblings")
         # TODO: add progressbar
-        for path in remote_repos_to_run_hook_for[::-1]:
+        for path, currentds_ap in remote_repos_to_run_hook_for[::-1]:
             # Trigger the hook
-            lgr.debug("Running hook for %s", path)
+            lgr.debug("Running hook for %s (if exists and executable)", path)
             try:
-                ssh("cd {} && hooks/post-update".format(
-                    sh_quote(_path_(path, ".git")))
-                )
+                ssh("cd {} "
+                    "&& ( [ -x hooks/post-update ] && hooks/post-update || : )"
+                    "".format(sh_quote(_path_(path, ".git"))))
             except CommandError as e:
-                lgr.error("Failed to run post-update hook under path %s. "
-                          "Error: %s" % (path, exc_str(e)))
+                currentds_ap['status'] = 'error'
+                currentds_ap['message'] = (
+                    "failed to run post-update hook under remote path %s (%s)",
+                    path, exc_str(e))
+                yield currentds_ap
+                yielded.add(currentds_ap['path'])
+                continue
+            if not currentds_ap['path'] in yielded:
+                # if we were silent until now everything is just splendid
+                currentds_ap['status'] = 'ok'
+                yield currentds_ap
 
-        # TODO: Return value!?
-        #       => [(Dataset, fetch_url)]
+    @staticmethod
+    def _run_on_ds_ssh_remote(ds, name, ssh, cmd):
+        """Given a dataset, and name of the remote, run command via ssh
+
+        Parameters
+        ----------
+        cmd: str
+          Will be .format()'ed given the `path` to the dataset on remote
+
+        Returns
+        -------
+        out
+
+        Raises
+        ------
+        CommandError
+        """
+        remote_url = CreateSibling._get_remote_url(ds, name)
+        remote_ri = RI(remote_url)
+        out, err = ssh(cmd.format(path=sh_quote(remote_ri.path)))
+        if err:
+            lgr.warning("Got stderr while calling ssh: %s", err)
+        return out
 
     @staticmethod
     def _get_ds_remote_shared_setting(ds, name, ssh):
         """Figure out setting of sharedrepository for dataset's `name` remote"""
         shared = None
         try:
-            current_super_url = CreateSibling._get_remote_url(
-                ds, name)
-            current_super_ri = RI(current_super_url)
-            out, err = ssh('git -C {} config --get core.sharedrepository'.format(
-                # TODO -- we might need to expanduser taking .user into account
-                # but then it must be done also on remote side
-                sh_quote(current_super_ri.path))
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'git -C {path} config --get core.sharedrepository'
             )
             shared = out.strip()
-            if err:
-                lgr.warning("Got stderr while calling ssh: %s", err)
         except CommandError as e:
             lgr.debug(
                 "Could not figure out remote shared setting of %s for %s due "
@@ -624,6 +719,34 @@ class CreateSibling(Interface):
             # could well be ok if e.g. not shared
             # TODO: more detailed analysis may be?
         return shared
+
+    @staticmethod
+    def _has_active_postupdate(ds, name, ssh):
+        """Figure out either has active post-update hook
+
+        Returns
+        -------
+        bool or None
+          None if something went wrong and we could not figure out
+        """
+        has_active_post_update = None
+        try:
+            # TODO -- we might need to expanduser taking .user into account
+            # but then it must be done also on remote side
+            out = CreateSibling._run_on_ds_ssh_remote(
+                ds, name, ssh,
+                'cd {path} && [ -x .git/hooks/post-update ] && echo yes || echo no'
+            )
+            out = out.strip()
+            assert out in ('yes', 'no')
+            has_active_post_update = out == "yes"
+        except CommandError as e:
+            lgr.debug(
+                "Could not figure out either %s on remote %s has active "
+                "post_update hook due to %s",
+                ds, name, exc_str(e)
+            )
+        return has_active_post_update
 
     @staticmethod
     def _get_remote_url(ds, name):
@@ -682,18 +805,20 @@ git update-server-info
 # DataLad
 #
 # (Re)generate meta-data for DataLad Web UI and possibly init new submodules
-dsdir={path}
-logfile=$dsdir/{WEB_META_LOG}/{log_filename}
+dsdir="$(dirname $0)/../.."
+logfile="$dsdir/{WEB_META_LOG}/{log_filename}"
+
+if [ ! -e "$dsdir/.git" ]; then
+  echo Assumption of being under .git has failed >&2
+  exit 1
+fi
 
 mkdir -p "$dsdir/{WEB_META_LOG}"  # assure logs directory exists
 
 ( which datalad > /dev/null \
-  && ( cd ..; GIT_DIR=$PWD/.git datalad ls -a --json file "$dsdir"; ) \
+  && ( cd "$dsdir"; GIT_DIR="$PWD/.git" datalad ls -a --json file .; ) \
   || echo "E: no datalad found - skipping generation of indexes for web frontend"; \
 ) &> "$logfile"
-
-# Some submodules might have been added and thus we better init them
-( cd ..; git submodule update --init >> "$logfile" 2>&1 || : ; )
 '''.format(WEB_META_LOG=WEB_META_LOG, **locals())
 
         with make_tempfile(content=hook_content) as tempf:

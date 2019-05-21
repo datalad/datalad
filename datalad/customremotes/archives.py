@@ -11,22 +11,55 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import exists, join as opj
+from os.path import join as opj
+import os.path as op
 from collections import OrderedDict
 from operator import itemgetter
+import shutil
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 lgr.log(5, "Importing datalad.customremotes.archive")
 
 from ..dochelpers import exc_str
-from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
+from ..support.locking import lock_if_check_fails
+from ..support.path import exists
 from ..utils import getpwd
 from ..utils import unique
+from ..utils import assure_bytes
+from ..utils import unlink
 from .base import AnnexCustomRemote
 from .main import main as super_main
+
+
+# ####
+# Preserve from previous version
+# TODO: document intention
+# ####
+# this one might get under Runner for better output/control
+def link_file_load(src, dst, dry_run=False):
+    """Just a little helper to hardlink files's load
+    """
+    dst_dir = op.dirname(dst)
+    if not op.exists(dst_dir):
+        os.makedirs(dst_dir)
+    if op.lexists(dst):
+        lgr.log(9, "Destination file %(dst)s exists. Removing it first", locals())
+        # TODO: how would it interact with git/git-annex
+        unlink(dst)
+    lgr.log(9, "Hardlinking %(src)s under %(dst)s", locals())
+    src_realpath = op.realpath(src)
+
+    try:
+        os.link(src_realpath, dst)
+    except AttributeError as e:
+        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        shutil.copyfile(src_realpath, dst)
+        shutil.copystat(src_realpath, dst)
+    else:
+        lgr.log(2, "Hardlinking finished")
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -224,6 +257,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 # if for testing we want to force getting the archive extracted
                 # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
                 efile = self.cache[akey_path].get_extracted_filename(afile)
+                efile = assure_bytes(efile)
 
                 if exists(efile):
                     size = os.stat(efile).st_size
@@ -325,20 +359,27 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # May be whenever we support extraction directly from the tarballs
         # we should go through all and choose the one easiest to get or smth.
         for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
+            if not akey:
+                lgr.warning("Got an empty archive key %r for key %s. Skipping",
+                            akey, key)
+                continue
             akeys_tried.append(akey)
             try:
-                akey_fpath = self.get_contentlocation(akey)
-                if not akey_fpath:
-                    # TODO: make it more stringent?
-                    # Command could have fail to run if key was not present locally yet
-                    # Thus retrieve the key using annex
-                    # TODO: we need to report user somehow about this happening and progress on the download
-                    self.runner(["git-annex", "get", "--key", akey],
-                                cwd=self.path, expect_stderr=True)
+                with lock_if_check_fails(
+                    check=(self.get_contentlocation, (akey,)),
+                    lock_path=(lambda k: opj(self.repo.path, '.git', 'datalad-archives-%s' % k), (akey,)),
+                    operation="annex-get"
+                ) as (akey_fpath, lock):
+                    if lock:
+                        assert not akey_fpath
+                        self._annex_get_archive_by_key(akey)
+                        akey_fpath = self.get_contentlocation(akey)
 
-                    akey_fpath = self.get_contentlocation(akey)
-                    if not akey_fpath:
-                        raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+                if not akey_fpath:
+                    raise RuntimeError(
+                        "We were reported to fetch it alright but now can't "
+                        "get its location.  Check logic"
+                )
 
                 akey_path = opj(self.repo.path, akey_fpath)
                 assert exists(akey_path), "Key file %s is not present" % akey_path
@@ -349,7 +390,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 #  https://github.com/wummel/patool/issues/20
                 # so
                 pwd = getpwd()
-                lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+                lgr.debug(u"Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
                 apath = self.cache[akey_path].get_extracted_file(afile)
                 link_file_load(apath, path)
                 self.send('TRANSFER-SUCCESS', cmd, key)
@@ -361,7 +402,37 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
                 continue
 
-        self.error("Failed to fetch any archive containing {key}. Tried: {akeys_tried}".format(**locals()))
+        raise RuntimeError(
+            "Failed to fetch any archive containing {key}. "
+            "Tried: {akeys_tried}".format(**locals())
+        )
+
+    def _annex_get_archive_by_key(self, akey):
+        # TODO: make it more stringent?
+        # Command could have fail to run if key was not present locally yet
+        # Thus retrieve the key using annex
+        # TODO: we need to report user somehow about this happening and
+        # progress on the download
+        from humanize import naturalsize
+        akey_size = self.repo.get_size_from_key(akey)
+        self.info(
+            "To obtain some keys we need to fetch an archive "
+            "of size %s"
+            % (naturalsize(akey_size) if akey_size else "unknown")
+        )
+
+        def progress_indicators(l):
+            self.info("PROGRESS-JSON: " + l.rstrip(os.linesep))
+
+        self.runner(["git-annex", "get",
+                     "--json", "--json-progress",
+                     "--key", akey
+                     ],
+                    log_stdout=progress_indicators,
+                    log_stderr='offline',
+                    # False, # to avoid lock down
+                    log_online=True,
+                    cwd=self.path, expect_stderr=True)
 
 
 def main():

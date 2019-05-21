@@ -12,8 +12,12 @@
 import sys
 from os.path import lexists, dirname, join as opj, curdir
 
-# Hard coded version, to be done by release process
-__version__ = '0.5.1.dev1'
+# Hard coded version, to be done by release process,
+# it is also "parsed" (not imported) by setup.py, that is why assigned as
+# __hardcoded_version__ later and not vise versa
+__version__ = '0.11.4'
+__hardcoded_version__ = __version__
+__full_version__ = __version__
 
 # NOTE: might cause problems with "python setup.py develop" deployments
 #  so I have even changed buildbot to use  pip install -e .
@@ -23,9 +27,13 @@ if lexists(opj(projdir, '.git')):
     # If under git -- attempt to deduce a better "dynamic" version following git
     try:
         from subprocess import Popen, PIPE
-        git = Popen(['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
-                    stdout=PIPE, stderr=PIPE,
-                    cwd=projdir)
+        # Note: Popen does not support `with` way correctly in 2.7
+        #
+        git = Popen(
+            ['git', 'describe', '--abbrev=4', '--dirty', '--match', r'[0-9]*\.*'],
+            stdout=PIPE, stderr=PIPE,
+            cwd=projdir
+        )
         if git.wait() != 0:
             raise OSError("Could not run git describe")
         line = git.stdout.readlines()[0]
@@ -39,6 +47,8 @@ if lexists(opj(projdir, '.git')):
         # awkward version specific handling :-/
         if sys.version_info[0] >= 3:
             __version__ = __version__.decode()
-    except:  # MIH: OSError, IndexError
+    except (SyntaxError, AttributeError, IndexError):
+        raise
+    except:
         # just stick to the hard-coded
-        __full_version__ = __version__
+        pass

@@ -17,7 +17,7 @@ from inspect import getargspec
 
 from .constraints import expand_constraint_spec
 
-_whitespace_re = re.compile('\n\s+|^\s+')
+_whitespace_re = re.compile(r'\n\s+|^\s+')
 
 
 class Parameter(object):
@@ -98,8 +98,14 @@ class Parameter(object):
         if sdoc is not None:
             if sdoc[0] == '(' and sdoc[-1] == ')':
                 sdoc = sdoc[1:-1]
-            if self.cmd_kwargs.get('nargs', None) == '?' \
-                    or self.cmd_kwargs.get('action', None) == 'append':
+            nargs = self.cmd_kwargs.get('nargs', '')
+            if isinstance(nargs, int):
+                sdoc = '{}-item sequence of {}'.format(nargs, sdoc)
+            elif nargs == '+':
+                sdoc = 'non-empty sequence of {}'.format(sdoc)
+            elif nargs == '*':
+                sdoc = 'sequence of {}'.format(sdoc)
+            if self.cmd_kwargs.get('action', None) == 'append':
                 sdoc = 'list of {}'.format(sdoc)
             paramsdoc += " : %s" % sdoc
             if has_default:
@@ -109,18 +115,9 @@ class Parameter(object):
         doc = self._doc
         if doc is None:
             doc = ''
-        doc.strip()
+        doc = doc.strip()
         if len(doc) and not doc.endswith('.'):
             doc += '.'
-        if self.constraints is not None:
-            cdoc = self.constraints.long_description()
-            if cdoc[0] == '(' and cdoc[-1] == ')':
-                cdoc = cdoc[1:-1]
-            addinfo = ''
-            if self.cmd_kwargs.get('nargs', None) == '?' \
-                    or self.cmd_kwargs.get('action', None) == 'append':
-                addinfo = 'list expected, each '
-            doc += ' Constraints: %s%s.' % (addinfo, cdoc)
         if has_default:
             doc += " [Default: %r]" % (default,)
         # Explicitly deal with multiple spaces, for some reason

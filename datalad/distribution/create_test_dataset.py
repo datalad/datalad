@@ -26,6 +26,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureInt
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.interface.base import Interface
+from datalad.interface.base import build_doc
 
 lgr = logging.getLogger('datalad.distribution.tests')
 
@@ -95,7 +96,8 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.add(fn, git=True, commit=True, msg="Added %s" % fn, _datalad_msg=True)
+    repo.add(fn, git=True)
+    repo.commit(msg="Added %s" % fn)
 
     yield path
 
@@ -123,9 +125,12 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
         )
 
 
+@build_doc
 class CreateTestDataset(Interface):
     """Create test (meta-)dataset.
     """
+    # XXX prevent common args from being added to the docstring
+    _no_eval_results = True
 
     _params_ = dict(
         path=Parameter(

@@ -43,12 +43,12 @@ def get_replacement_dict(rules):
 
 
 def apply_replacement_rules(rules, s):
-    """Apply replacement rules specified as a single string
+    r"""Apply replacement rules specified as a single string
 
     Examples
     --------
 
-    >>> apply_replacement_rules(r'/my_(.*)\.dat/your_\\1.dat.gz', 'd/my_pony.dat')
+    >>> apply_replacement_rules(r'/my_(.*)\.dat/your_\1.dat.gz', 'd/my_pony.dat')
     'd/your_pony.dat.gz'
 
     Parameters

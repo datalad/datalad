@@ -51,8 +51,8 @@ class Demo(Interface):
 
 
 def test_param():
-    # having a parametr with no information is fine
-    # it doesn't need a name, because it comes from the signatur
+    # having a parameter with no information is fine
+    # it doesn't need a name, because it comes from the signature
     # of the actual implementation that is described
     p = Parameter()
     pname = 'testname'
@@ -64,8 +64,6 @@ def test_param():
     # constraints
     p = Parameter(doc=doc, constraints=cnstr.EnsureInt() | cnstr.EnsureStr())
     autodoc = p.get_autodoc('testname')
-    assert_true("convertible to type 'int'" in autodoc)
-    assert_true('must be a string' in autodoc)
     assert_true('int or str' in autodoc)
 
     with assert_raises(ValueError) as cmr:

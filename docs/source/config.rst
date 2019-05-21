@@ -1,7 +1,9 @@
+.. _configuration:
+
 Configuration
 *************
 
-Datalad uses the same configuration mechanism and syntax as Git itself.
+DataLad uses the same configuration mechanism and syntax as Git itself.
 Consequently, datalad can be configured using the :command:`git config`
 command. Both a *global* user configuration (typically at
 :file:`~/.gitconfig`), and a *local* repository-specific configuration
@@ -18,8 +20,9 @@ All datalad-specific configuration variables are prefixed with ``datalad.``.
 It is possible to override or amend the configuration using environment
 variables. Any variable with a name that starts with ``DATALAD_`` will
 be available as the corresponding ``datalad.`` configuration variable,
-replacing any ``_`` in the name with a dot, and all letters converted
-to lower case. Values from environment variables take precedence over
+replacing any ``__`` (two underscores) with a hyphen, then any ``_``
+(single underscore) with a dot, and finally converting all letters to
+lower case. Values from environment variables take precedence over
 configuration file settings.
 
 The following sections provide a (non-exhaustive) list of settings honored

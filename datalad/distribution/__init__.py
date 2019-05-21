@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Datalad distribution components: dataset, metadata handling, ...
+"""DataLad distribution components: dataset, metadata handling, ...
 
 """
 

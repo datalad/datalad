@@ -16,6 +16,7 @@ import email.utils
 import os
 import pickle
 import re
+import sys
 import time
 import iso8601
 
@@ -24,12 +25,13 @@ from collections import OrderedDict
 from os.path import abspath, isabs
 from os.path import join as opj
 from os.path import dirname
+from ntpath import splitdrive as win_splitdrive
 
 from six import string_types
 from six import iteritems
 from six.moves.urllib.parse import urlsplit
 from six.moves.urllib.request import Request
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
+from six.moves.urllib.parse import unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
 from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
@@ -37,13 +39,43 @@ from six.moves.urllib.error import URLError
 
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
-from datalad.utils import assure_dir
-from datalad.consts import DATASETS_TOPURL
+from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
+from datalad import consts
 from datalad import cfg
+from datalad.support.cache import lru_cache
 
 # TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
+
+# Change introduced in 3.7: Moved from RFC 2396 to RFC 3986 for quoting URL
+# strings. "~" is now included in the set of reserved characters.
+# For consistency we will provide urlquote
+if sys.version_info >= (3, 7):
+    from six.moves.urllib.parse import quote as urlquote
+else:
+    from six.moves.urllib.parse import quote as _urlquote
+
+    def urlquote(url, safe='/', **kwargs):
+        safe += '~'
+        return _urlquote(url, safe=safe, **kwargs)
+
+    urlquote.__doc__ = _urlquote.__doc__ + """
+
+This DataLad version of the function assumes ~ to be a safe character to be
+consistent with Python >= 3.7
+"""
+
+
+def is_windows_path(path):
+    win_split = win_splitdrive(path)
+    # Note, that ntpath.splitdrive also deals with UNC paths. In that case
+    # the "drive" wouldn't be a windows drive letter followed by a colon
+    if win_split[0] and win_split[1] and \
+            win_split[0].endswith(":") and len(win_split[0]) == 2:
+        # seems to be a windows path
+        return True
+    return False
 
 
 def get_response_disposition_filename(s):
@@ -177,7 +209,7 @@ def __urlopen_requests(url):
     if isinstance(url, Request):
         url = url.get_full_url()
     from requests import Session
-    return Session().get(url)
+    return Session().get(url, stream=True)
 
 
 def retry_urlopen(url, retries=3):
@@ -192,7 +224,7 @@ def retry_urlopen(url, retries=3):
 
 
 def is_url_quoted(url):
-    """Return either URL looks being already quoted
+    """Return whether URL looks being already quoted
     """
     try:
         url_ = urlunquote(url)
@@ -203,7 +235,7 @@ def is_url_quoted(url):
 
 
 def same_website(url_rec, u_rec):
-    """Decide either a link leads to external site
+    """Decide whether a link leads to external site
 
     Parameters
     ----------
@@ -280,13 +312,24 @@ class SimpleURLStamper(object):
 #  PreparedRequest().prepare_url(url, params) -- nicely cares about url encodings etc
 #
 
+@lru_cache(maxsize=100)
 def _guess_ri_cls(ri):
     """Factory function which would determine which type of a ri a provided string is"""
+    TYPES = {
+        'url': URL,
+        'ssh':  SSHRI,
+        'file': PathRI,
+        'datalad': DataLadRI
+    }
+    if is_windows_path(ri):
+        # OMG we got something from windows
+        lgr.log(5, "Detected file ri")
+        return TYPES['file']
+
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
     fields = URL._pr_to_fields(urlparse(ri))
     lgr.log(5, "Parsed ri %s into fields %s" % (ri, fields))
-
     type_ = 'url'
     # Special treatments
     # file:///path should stay file:
@@ -299,7 +342,13 @@ def _guess_ri_cls(ri):
 
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
-        if fields['path'] and '@' in fields['path'] or len(parts) > 1:
+        # if no illegal for username@hostname characters in the first part and
+        # we either had username@hostname or multiple :-separated parts
+        if not set(parts[0]).intersection(set('/\\#')) and (
+                fields['path'] and
+                '@' in fields['path'] or
+                len(parts) > 1
+        ):
             # user@host:path/sp1
             # or host_name: (hence parts check)
             # TODO: we need a regex to catch those really, parts check is not suff
@@ -314,12 +363,6 @@ def _guess_ri_cls(ri):
         # e.g. //a/path
         type_ = 'datalad'
 
-    TYPES = {
-        'url': URL,
-        'ssh':  SSHRI,
-        'file': PathRI,
-        'datalad': DataLadRI
-    }
     cls = TYPES[type_]
     # just parse the ri according to regex matchint ssh "ri" specs
     lgr.log(5, "Detected %s ri" % type_)
@@ -474,7 +517,7 @@ class RI(object):
             v = fields.get(f)
             if isinstance(v, dict):
 
-                ev = urlencode(v)
+                ev = urlencode(map_items(assure_bytes, v))
                 # / is reserved char within query
                 if f == 'fragment' and '%2F' not in str(v):
                     # but seems to be ok'ish within the fragment which is
@@ -589,7 +632,7 @@ class URL(RI):
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
         if is_ipv6:
-            rem = re.match('\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
+            rem = re.match(r'\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
             if rem:
                 hostname, port = rem.groups()
                 port = int(port)
@@ -619,7 +662,7 @@ class URL(RI):
         """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
         if not s:
             return {}
-        out = OrderedDict(parse_qsl(s, 1))
+        out = map_items(assure_unicode, OrderedDict(parse_qsl(s, 1)))
         if not auto_delist:
             return out
         for k in out:
@@ -662,6 +705,14 @@ class PathRI(RI):
     def localpath(self):
         return self.path
 
+    @property
+    def posixpath(self):
+        if is_windows_path(self.path):
+            win_split = win_splitdrive(self.path)
+            return "/" + win_split[0][0] + win_split[1].replace('\\', '/')
+        else:
+            return self.path
+
 
 class RegexBasedURLMixin(object):
     """Base class for URLs which we could simple parse using regular expressions"""
@@ -679,9 +730,10 @@ class RegexBasedURLMixin(object):
         if not re_match:
             # TODO: custom error?
             raise ValueError(
-                "Possibly incorrectly determined string %r correspond to %s address"
-                " -- it failed matching regex. Dunno how to handle. Contact developers"
-                % (cls, url_str,)
+                "Cannot handle URL '%s': categorized as %r, but does not match syntax.%s"
+                % (url_str,
+                   cls,
+                   " Did you intent to use '///'?" if url_str.startswith('//') else '')
             )
         fields = cls._get_blank_fields()
         fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})
@@ -703,7 +755,7 @@ class SSHRI(RI, RegexBasedURLMixin):
         'port',
     )
 
-    _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$')
+    _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^#/\\:]+)(\:(?P<path>.*))?$')
 
     @classmethod
     def _normalize_fields(cls, fields):
@@ -729,7 +781,7 @@ class SSHRI(RI, RegexBasedURLMixin):
 
 
 class DataLadRI(RI, RegexBasedURLMixin):
-    """RI pointing to datasets within central DataLad super-dataset"""
+    """RI pointing to datasets within default DataLad super-dataset"""
 
     _FIELDS = RI._FIELDS + (
         'remote',
@@ -753,7 +805,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
         """
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
-        return "{}{}".format(DATASETS_TOPURL, urlquote(self.path))
+        return "{}{}".format(consts.DATASETS_TOPURL, urlquote(self.path))
 
 
 def _split_colon(s, maxsplit=1):

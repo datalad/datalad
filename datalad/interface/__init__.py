@@ -28,8 +28,8 @@ _group_dataset = (
         ('datalad.distribution.add', 'Add'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall', 'uninstall', 'uninstall'),
-        ('datalad.distribution.uninstall', 'Drop', 'drop', 'drop'),
-        ('datalad.distribution.uninstall', 'Remove', 'remove', 'remove'),
+        ('datalad.distribution.drop', 'Drop', 'drop', 'drop'),
+        ('datalad.distribution.remove', 'Remove', 'remove', 'remove'),
         # N/I ATM
         # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
@@ -39,40 +39,53 @@ _group_dataset = (
         ('datalad.distribution.create_sibling_github',
          'CreateSiblingGithub',
          'create-sibling-github'),
-        ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.rewrite_urls', 'RewriteURLs',
-         'rewrite-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
-        ('datalad.export', 'Export', 'export'),
     ])
 
 _group_metadata = (
-    'Commands for meta data handling',
+    'Commands for metadata handling',
     [
         ('datalad.metadata.search', 'Search',
          'search', 'search'),
+        ('datalad.metadata.metadata', 'Metadata',
+         'metadata'),
         ('datalad.metadata.aggregate', 'AggregateMetaData',
          'aggregate-metadata', 'aggregate_metadata'),
+        ('datalad.metadata.extract_metadata', 'ExtractMetadata',
+         'extract-metadata', 'extract_metadata'),
     ])
 
 _group_misc = (
     'Miscellaneous commands',
     [
+        ('datalad.plugin.wtf', 'WTF'),
         ('datalad.interface.test', 'Test'),
-        ('datalad.interface.crawl', 'Crawl'),
-        ('datalad.interface.crawl_init', 'CrawlInit', 'crawl-init'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
+        ('datalad.interface.run', 'Run', 'run'),
+        ('datalad.interface.rerun', 'Rerun', 'rerun'),
+        ('datalad.interface.run_procedure', 'RunProcedure', 'run-procedure'),
     ])
 
 _group_plumbing = (
     'Plumbing commands',
     [
+        ('datalad.interface.annotate_paths', 'AnnotatePaths', 'annotate-paths'),
+        ('datalad.distribution.clone', 'Clone'),
         ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
+        ('datalad.interface.diff', 'Diff', 'diff'),
+        ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
+        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
+
+# Some known extensions and their commands to suggest whenever lookup fails
+_known_extension_commands = {
+    'datalad-crawler': ('crawl', 'crawl-init'),
+    'datalad-neuroimaging': ('bids2scidata',)
+}

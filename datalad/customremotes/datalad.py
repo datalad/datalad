@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import logging
 lgr = logging.getLogger('datalad.customremotes.datalad')
 
-from ..utils import swallow_logs
+from ..utils import disable_logger
 from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 
@@ -32,7 +32,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     AVAILABILITY = "global"
 
-    def __init__(self, persistent_cache=True, **kwargs):
+    def __init__(self, **kwargs):
         super(DataladAnnexCustomRemote, self).__init__(**kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
@@ -67,7 +67,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
 
         try:
-            with swallow_logs():
+            with disable_logger():
                 status = self._providers.get_status(url)
             size = str(status.size) if status.size is not None else 'UNKNOWN'
             resp = ["CHECKURL-CONTENTS", size] \
@@ -97,7 +97,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in self.get_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
-                with swallow_logs():
+                with disable_logger():
                     status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     resp = "CHECKPRESENT-SUCCESS"
@@ -163,10 +163,12 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
-                self.debug("Failed to download url %s for key %s: %s" % (url, key, exc_str(exc)))
+                self.debug("Failed to download url %s for key %s: %s"
+                           % (url, key, exc_str(exc)))
 
-        self.send('TRANSFER-FAILURE', cmd, key,
-                  "Failed to download from any of %d locations" % len(urls))
+        raise RuntimeError(
+            "Failed to download from any of %d locations" % len(urls)
+        )
 
 
 def main():

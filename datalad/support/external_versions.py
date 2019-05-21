@@ -44,6 +44,10 @@ class UnknownVersion:
 #
 from datalad.cmd import Runner
 from datalad.cmd import GitRunner
+from datalad.support.exceptions import (
+    MissingExternalDependency,
+    OutdatedExternalDependency,
+)
 _runner = Runner()
 _git_runner = GitRunner()
 
@@ -79,14 +83,15 @@ def _get_system_ssh_version():
     if installed
     """
     try:
-        out, err = _runner.run('ssh -V'.split())
+        out, err = _runner.run('ssh -V'.split(),
+                               expect_fail=True, expect_stderr=True)
         # apparently spits out to err but I wouldn't trust it blindly
         if err.startswith('OpenSSH'):
             out = err
         assert out.startswith('OpenSSH')  # that is the only one we care about atm
         return out.split(' ', 1)[0].rstrip(',.').split('_')[1]
     except CommandError as exc:
-        lgr.warn("Could not determine version of ssh available: %s", exc_str(exc))
+        lgr.debug("Could not determine version of ssh available: %s", exc_str(exc))
         return None
 
 
@@ -112,6 +117,24 @@ class ExternalVersions(object):
         'cmd:system-git': _get_system_git_version,
         'cmd:system-ssh': _get_system_ssh_version,
     }
+    INTERESTING = (
+        'appdirs',
+        'boto',
+        'exifread',
+        'git',
+        'gitdb',
+        'humanize',
+        'iso8601',
+        'keyring',
+        'keyrings.alt',
+        'msgpack',
+        'mutagen',
+        'patool',
+        'requests',
+        'scrapy',
+        'six',
+        'wrapt',
+    )
 
     def __init__(self):
         self._versions = {}
@@ -125,6 +148,14 @@ class ExternalVersions(object):
             if hasattr(value, attr):
                 version = getattr(value, attr)
                 break
+
+        # try pkg_resources
+        if version is None and hasattr(value, '__name__'):
+            try:
+                import pkg_resources
+                version = pkg_resources.get_distribution(value.__name__).version
+            except Exception:
+                pass
 
         # assume that value is the version
         if version is None:
@@ -177,6 +208,10 @@ class ExternalVersions(object):
                         except ImportError:
                             lgr.debug("Module %s seems to be not present" % modname)
                             return None
+                        except Exception as exc:
+                            lgr.warning("Failed to import module %s due to %s",
+                                        modname, exc_str(exc))
+                            return None
                     else:
                         module = sys.modules[modname]
                 if module:
@@ -190,14 +225,14 @@ class ExternalVersions(object):
         return self._versions.keys()
 
     def __contains__(self, item):
-        return item in self._versions
+        return bool(self[item])
 
     @property
     def versions(self):
         """Return dictionary (copy) of versions"""
         return self._versions.copy()
 
-    def dumps(self, indent=False, preamble="Versions:", query=False):
+    def dumps(self, indent=None, preamble="Versions:", query=False):
         """Return listing of versions as a string
 
         Parameters
@@ -212,16 +247,46 @@ class ExternalVersions(object):
           get those which weren't queried for yet
         """
         if query:
-            [self[k] for k in self.CUSTOM]
+            [self[k] for k in tuple(self.CUSTOM) + self.INTERESTING]
         if indent and (indent is True):
             indent = ' '
         items = ["%s=%s" % (k, self._versions[k]) for k in sorted(self._versions)]
-        out = "%s" % preamble
-        if indent:
-            out += (linesep + indent).join([''] + items) + linesep
+        out = "%s" % preamble if preamble else ''
+        if indent is not None:
+            if preamble:
+                preamble += linesep
+            indent = ' ' if indent is True else str(indent)
+            out += (linesep + indent).join(items) + linesep
         else:
             out += " " + ' '.join(items)
         return out
+
+    def check(self, name, min_version=None, msg=""):
+        """Check if an external (optionally of specified min version) present
+
+        Parameters
+        ----------
+        name: str
+          Name of the external (typically a Python module)
+        min_version: str or version, optional
+          Minimal version to satisfy
+        msg: str, optional
+          An additional message to include into the exception message
+
+        Raises
+        ------
+        MissingExternalDependency
+          if the external is completely missing
+        OutdatedExternalDependency
+          if the external is present but does not satisfy the min_version
+        """
+        ver_present = self[name]
+        if ver_present is None:
+            raise MissingExternalDependency(
+                name, ver=min_version, msg=msg)
+        elif min_version and ver_present < min_version:
+            raise OutdatedExternalDependency(
+                name, ver=min_version, ver_present=ver_present, msg=msg)
 
 
 external_versions = ExternalVersions()

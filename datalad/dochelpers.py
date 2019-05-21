@@ -106,7 +106,7 @@ def _indent(text, istr=_rst_indentstr):
     return '\n'.join(istr + s for s in text.split('\n'))
 
 
-__parameters_str_re = re.compile("[\n^]\s*:?Parameters?:?\s*\n(:?\s*-+\s*\n)?")
+__parameters_str_re = re.compile(r"[\n^]\s*:?Parameters?:?\s*\n(:?\s*-+\s*\n)?")
 """regexp to match :Parameter: and :Parameters: stand alone in a line
 or
 Parameters
@@ -154,8 +154,8 @@ def _split_out_parameters(initdoc):
            textwrap.dedent(result[2]).strip('\n')
 
 
-__re_params = re.compile('(?:\n\S.*?)+$')
-__re_spliter1 = re.compile('\n(?=\S)')
+__re_params = re.compile(r'(?:\n\S.*?)+$')
+__re_spliter1 = re.compile(r'\n(?=\S)')
 __re_spliter2 = re.compile('[\n:]')
 
 
@@ -331,6 +331,8 @@ def exc_str(exc=None, limit=None):
         if not exc:
             exc = value
             out = str(exc)
+        if not out:
+            out = repr(exc)
         # verify that it seems to be the exception we were passed
         #assert(isinstance(exc, exctype))
         if exc:

@@ -1,0 +1,7 @@
+say "All of DataLad's functionality is available through a single command: \`datalad\`"
+say "Running the datalad command without any arguments, gives a summary of basic options, and a list of available sub-commands."
+run "datalad"
+say "More comprehensive information is available via the --help long-option (we will truncate the output here)"
+run "datalad --help       | head -n10"
+say "Getting information on any of the available sub commands works in the same way -- just pass --help AFTER the sub-command (output again truncated)"
+run "datalad create --help       | head -n20"

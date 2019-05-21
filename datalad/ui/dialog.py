@@ -27,10 +27,12 @@ import getpass
 # from mock import patch
 from collections import deque
 from copy import copy
+from six import PY2
 
 from ..utils import auto_repr
 from ..utils import on_windows
 from .base import InteractiveUI
+from ..dochelpers import exc_str
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
@@ -91,6 +93,11 @@ class ConsoleLog(object):
             progressbars = ConsoleLog.progressbars
 
         if backend is None:
+            # Resort to the configuration
+            from .. import cfg
+            backend = cfg.get('datalad.ui.progressbar', None)
+
+        if backend is None:
             try:
                 pbar = progressbars['tqdm']
             except KeyError:
@@ -110,10 +117,19 @@ class SilentConsoleLog(ConsoleLog):
 
     def get_progressbar(self, *args, **kwargs):
         from .progressbars import SilentProgressBar
-        return SilentProgressBar(*args, out=self.out, **kwargs)
+        return SilentProgressBar(*args, **kwargs)
 
 
-def getpass_echo(prompt='Password: ', stream=None):
+@auto_repr
+class QuietConsoleLog(ConsoleLog):
+    """A ConsoleLog with a LogProgressbar"""
+
+    def get_progressbar(self, *args, **kwargs):
+        from .progressbars import LogProgressBar
+        return LogProgressBar(*args, **kwargs)
+
+
+def getpass_echo(prompt='Password', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
     """
     if on_windows:
@@ -135,6 +151,10 @@ def getpass_echo(prompt='Password: ', stream=None):
             return getpass.getpass(prompt=prompt, stream=stream)
 
 
+def _get_value(value, hidden):
+    return "<hidden>" if hidden else value
+
+
 @auto_repr
 class DialogUI(ConsoleLog, InteractiveUI):
 
@@ -146,14 +166,35 @@ class DialogUI(ConsoleLog, InteractiveUI):
         self._prev_title = None
         self._prev_title_time = 0
 
+    def input(self, prompt, hidden=False):
+        """Request user input
+
+        Parameters
+        ----------
+        prompt: str
+          Prompt for the entry
+        """
+        # if not hidden:
+        #     self.out.write(msg + ": ")
+        #     self.out.flush()  # not effective for stderr for some reason under annex
+        #
+        #     # TODO: raw_input works only if stdin was not controlled by
+        #     # (e.g. if coming from annex).  So we might need to do the
+        #     # same trick as get_pass() does while directly dealing with /dev/pty
+        #     # and provide per-OS handling with stdin being override
+        #     response = (raw_input if PY2 else input)()
+        # else:
+        return (getpass.getpass if hidden else getpass_echo)(prompt)
+
     def question(self, text,
                  title=None, choices=None,
                  default=None,
-                 hidden=False):
+                 hidden=False,
+                 repeat=None):
         # Do initial checks first
         if default and choices and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
-                             % (default, choices))
+                             % (_get_value(default, hidden), choices))
 
         msg = ''
         if title and not (title == self._prev_title and time.time() - self._prev_title_time < 5):
@@ -183,17 +224,23 @@ class DialogUI(ConsoleLog, InteractiveUI):
             attempt += 1
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
-            # if not hidden:
-            #     self.out.write(msg + ": ")
-            #     self.out.flush()  # not effective for stderr for some reason under annex
-            #
-            #     # TODO: raw_input works only if stdin was not controlled by
-            #     # (e.g. if coming from annex).  So we might need to do the
-            #     # same trick as get_pass() does while directly dealing with /dev/pty
-            #     # and provide per-OS handling with stdin being override
-            #     response = (raw_input if PY2 else input)()
-            # else:
-            response = (getpass.getpass if hidden else getpass_echo)(msg + ": ")
+
+            response = self.input("{}: ".format(msg), hidden=hidden)
+            # TODO: dedicated option?  got annoyed by this one
+            # multiple times already, typically we are not defining
+            # new credentials where repetition would be needed.
+            if hidden and repeat is None:
+                repeat = hidden and choices is None
+
+            if repeat:
+                response_r = self.input('{} (repeat): '.format(msg), hidden=hidden)
+                if response != response_r:
+                    self.error("input mismatch, please start over")
+                    continue
+
+            if response and '\x03' in response:
+                # Ctrl-C is part of the response -> clearly we should not pretend it's all good
+                raise KeyboardInterrupt
 
             if not response and default:
                 response = default
@@ -201,7 +248,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
 
             if choices and response not in choices:
                 self.error("%r is not among choices: %s. Repeat your answer"
-                           % (response, choices))
+                           % (_get_value(response, hidden), choices))
                 continue
             break
 
@@ -209,6 +256,53 @@ class DialogUI(ConsoleLog, InteractiveUI):
         self._prev_title_time = time.time()
 
         return response
+
+
+class IPythonUI(DialogUI):
+    """Custom to IPython frontend UI implementation
+
+    There is no way to discriminate between web notebook or qt console,
+    so we have just a single class for all.
+
+    TODO: investigate how to provide 'proper' displays for
+    IPython of progress bars so backend could choose the
+    appropriate one
+
+    """
+
+    _tqdm_frontend = "unknown"
+
+    def input(self, prompt, hidden=False):
+        # We cannot and probably do not need to "abuse" termios
+        if not hidden:
+            self.out.write(prompt)
+            self.out.flush()
+            return (raw_input if PY2 else input)()
+        else:
+            return getpass.getpass(prompt=prompt)
+
+    def get_progressbar(self, *args, **kwargs):
+        """Return a progressbar.  See e.g. `tqdmProgressBar` about the
+        interface
+
+        Additional parameter is backend to choose among available
+        """
+        backend = kwargs.pop('backend', None)
+        if self._tqdm_frontend == "unknown":
+            from .progressbars import tqdmProgressBar
+            try:
+                from tqdm import tqdm_notebook  # check if available etc
+                self.__class__._tqdm_frontend = 'ipython'
+            except Exception as exc:
+                lgr.warning(
+                    "Regular progressbar will be used -- cannot import tqdm_notebook: %s",
+                    exc_str(exc)
+                )
+                self.__class__._tqdm_frontend = None
+        if self._tqdm_frontend:
+            kwargs.update()
+        return super(IPythonUI, self).get_progressbar(
+                *args, frontend=self._tqdm_frontend, **kwargs)
 
 
 # poor man thingie for now

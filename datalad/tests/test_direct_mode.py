@@ -11,11 +11,13 @@
 """
 
 
+
 import logging
 
 # Please do ignore possible unused marking.
 # This is used via Dataset class:
 import datalad.api
+from datalad import cfg
 
 from nose.tools import ok_
 from mock import patch
@@ -34,6 +36,11 @@ from .utils import SkipTest
 if on_windows:
     raise SkipTest("Can't test direct mode switch, "
                    "if direct mode is forced by OS anyway.")
+
+repo_version = cfg.get("datalad.repo.version", None)
+if repo_version and int(repo_version) >= 6:
+    raise SkipTest("Can't test direct mode switch, "
+                   "if repository version 6 or later is enforced.")
 
 
 @with_tempfile
@@ -91,6 +98,8 @@ def test_direct_create(path):
 def test_direct_install(url, path):
 
     with patch.dict('os.environ', {'DATALAD_REPO_DIRECT': 'True'}):
-        ds = datalad.api.install(path=path, source=url)
+        ds = datalad.api.install(
+            path=path, source=url,
+            result_xfm='datasets', return_type='item-or-list')
         if not ds.repo.is_crippled_fs():  # otherwise forced direct mode
             ok_(ds.repo.is_direct_mode(), "Not in direct mode: %s" % ds)

@@ -16,14 +16,102 @@ functions it provides.
 High-level user interface
 =========================
 
+Dataset operations
+------------------
+
 .. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
-   api
+   api.Dataset
+   api.add
+   api.create
+   api.create_sibling
+   api.create_sibling_github
+   api.drop
+   api.get
+   api.install
+   api.publish
+   api.remove
+   api.save
+   api.update
+   api.uninstall
+   api.unlock
 
-Plumbing
-========
+Metadata handling
+-----------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.search
+   api.metadata
+   api.aggregate_metadata
+   api.extract_metadata
+
+
+Reproducible execution
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.run
+   api.rerun
+   api.run_procedure
+
+
+Plumbing commands
+-----------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.annotate_paths
+   api.clean
+   api.clone
+   api.create_test_dataset
+   api.diff
+   api.download_url
+   api.ls
+   api.sshrun
+   api.siblings
+   api.subdatasets
+
+Miscellaneous commands
+----------------------
+
+.. currentmodule:: datalad
+.. autosummary::
+   :toctree: generated
+
+   api.add_archive_content
+   api.test
+
+Plugins
+-------
+
+DataLad can be customized by plugins. The following plugins are shipped
+with DataLad.
+
+.. currentmodule:: datalad.plugin
+.. autosummary::
+   :toctree: generated
+
+   add_readme
+   addurls
+   check_dates
+   export_archive
+   export_to_figshare
+   no_annex
+   wtf
+
+
+Support functionality
+=====================
 
 .. currentmodule:: datalad
 .. autosummary::
@@ -50,16 +138,6 @@ Configuration management
    :toctree: generated
 
    config
-
-Crawler
-=======
-
-.. currentmodule:: datalad
-.. autosummary::
-   :toctree: generated
-
-   crawler.base
-   crawler.pipeline
 
 Test infrastructure
 ===================

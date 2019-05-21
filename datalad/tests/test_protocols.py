@@ -93,10 +93,9 @@ def test_ExecutionTimeProtocol(path1, path2):
 
     # test callable:
     new_runner = Runner(cwd=path2, protocol=timer_protocol)
-    git_repo = GitRepo(path2, runner=new_runner)
+    new_runner(os.mkdir, path2)
     assert_equal(len(timer_protocol), 3)
-    assert_in('init', timer_protocol[2]['command'][0])
-    assert_in('git.repo.base.Repo', timer_protocol[2]['command'][0])
+    assert_in('mkdir', timer_protocol[2]['command'][0])
 
     # extract path from args and compare
     # note: simple string concatenation for comparison doesn't work
@@ -106,11 +105,7 @@ def test_ExecutionTimeProtocol(path1, path2):
     assert_equal(normpath(extracted_path), normpath(path2))
 
     # kwargs needs to be in protocol, but order isn't relevant:
-    ok_(("kwargs={'odbt': <class 'git.db.GitCmdObjectDB'>, 'mkdir': True}"
-        in timer_protocol[2]['command'][2]) or
-        ("kwargs={'mkdir': True, 'odbt': <class 'git.db.GitCmdObjectDB'>}"
-        in timer_protocol[2]['command'][2]))
-
+    ok_("kwargs={}" in timer_protocol[2]['command'][2])
     ok_(timer_protocol[2]['end'] >= timer_protocol[2]['start'])
     ok_(timer_protocol[2]['duration'] >= 0)
 
@@ -147,7 +142,8 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
 
     # test callable (no entry added):
     new_runner = Runner(cwd=path2, protocol=timer_protocol)
-    git_repo = GitRepo(path2, runner=new_runner)
+    new_runner(os.mkdir, path2)
+    assert_true(os.path.exists(path2))
     assert_equal(len(timer_protocol), 2)
 
 
@@ -165,7 +161,7 @@ def test_DryRunProtocol(path):
     assert_equal(len(protocol), 1)
 
     # callable is also not executed, but recorded in the protocol:
-    git_repo = GitRepo(path, runner=runner)
+    runner(os.mkdir, path)
     assert_false(os.path.exists(path))
     assert_false(os.path.exists(os.path.join(path, '.git')))
     assert_equal(len(protocol), 2)
@@ -182,9 +178,9 @@ def test_DryRunExternalsProtocol(path):
     # but a dry run wouldn't:
     assert_raises(AssertionError, assert_raises, Exception, runner.run, cmd)
     assert_equal(len(protocol), 1)
+    assert_false(os.path.exists(path))
 
     # callable is executed and not recorded in the protocol:
-    git_repo = GitRepo(path, runner=runner)
+    runner(os.mkdir, path)
     assert_true(os.path.exists(path))
-    assert_true(os.path.exists(os.path.join(path, '.git')))
     assert_equal(len(protocol), 1)

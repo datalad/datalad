@@ -45,6 +45,10 @@ def test_decorator():
     # raises proper TypeError:
     assert_raises(TypeError, ds.func, 1, 2, ds, False)
 
+    # keyword argument 'dataset' is invalidated in Dataset-bound function:
+    # raises proper TypeError:
+    assert_raises(TypeError, ds.func, 1, 2, dataset='whatever')
+
     # test name parameter:
     @datasetmethod(name="new_name")
     def another(some, dataset=None):

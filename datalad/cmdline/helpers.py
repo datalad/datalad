@@ -20,7 +20,10 @@ from tempfile import NamedTemporaryFile
 
 from ..cmd import Runner
 from ..log import is_interactive
-from ..utils import getpwd
+from ..utils import (
+    getpwd,
+    unlink,
+)
 from ..version import __version__
 from ..dochelpers import exc_str
 
@@ -30,8 +33,15 @@ lgr = getLogger('datalad.cmdline')
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if is_interactive() and option_string == '--help':
-            # lets use the manpage on mature systems ...
+        # Lets use the manpage on mature systems but only for subcommands --
+        # --help should behave similar to how git does it:
+        # regular --help for "git" but man pages for specific commands.
+        # It is important since we do discover all subcommands from entry
+        # points at run time and thus any static manpage would like be out of
+        # date
+        if is_interactive() \
+                and option_string == '--help' \
+                and ' ' in parser.prog:  # subcommand
             try:
                 import subprocess
                 # get the datalad manpage to use
@@ -66,7 +76,7 @@ class HelpAction(argparse.Action):
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
             # tune up usage -- default one is way too heavy
-            helpstr = re.sub('^[uU]sage: .*?\n\s*\n',
+            helpstr = re.sub(r'^[uU]sage: .*?\n\s*\n',
                              'Usage: datalad [global-opts] command [command-opts]\n\n',
                              helpstr,
                              flags=re.MULTILINE | re.DOTALL)
@@ -165,20 +175,7 @@ queue
         Runner().run(['condor_submit', f.name])
         lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
     finally:
-        os.unlink(f.name)
-
-
-class RegexpType(object):
-    """Factory for creating regular expression types for argparse
-
-    DEPRECATED AFAIK -- now things are in the config file,
-    but we might provide a mode where we operate solely from cmdline
-    """
-    def __call__(self, string):
-        if string:
-            return re.compile(string)
-        else:
-            return None
+        unlink(f.name)
 
 
 # TODO: useful also outside of cmdline, move to support/

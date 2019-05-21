@@ -41,3 +41,4 @@ authors if you are to use corresponding parts.
    - [BlueImp-MD5](https://github.com/blueimp/JavaScript-MD5) - MIT License - Copyright (c) 2016-
    - [QUnit](https://qunitjs.com/) - MIT License - Copyright (c)
    - [Sinon-QUnit Plugin](http://sinonjs.org/qunit/) - BSD License - Copyright (c) 2010-2011
+   - [NumPy Testing](http://numpy.org) - BSD license - Copyright (c) 2005- NumPy Developers <numpy-dev@numpy.org>

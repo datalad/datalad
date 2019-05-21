@@ -13,8 +13,11 @@
 __docformat__ = 'restructuredtext'
 
 from appdirs import AppDirs
+from os.path import join as opj, expanduser
 from datalad.support.constraints import EnsureBool
 from datalad.support.constraints import EnsureInt
+from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureChoice
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -27,33 +30,6 @@ definitions = {
                'text': 'Should the crawler cache downloaded files?'}),
         'destination': 'local',
         'type': bool,
-    },
-    'datalad.crawl.default_backend': {
-        'ui': ('question', {
-               'title': 'Default annex backend',
-               # XXX we could add choices... but might get out of sync
-               'text': 'Content hashing method to be used by git-annex'}),
-        'destination': 'dataset',
-    },
-    'datalad.crawl.dryrun': {
-        'ui': ('yesno', {
-               'title': 'Crawler dry-run',
-               'text': 'Should the crawler ... I AM NOT QUITE SURE WHAT?'}),
-        'destination': 'local',
-        'type': EnsureBool(),
-    },
-    'datalad.crawl.init_direct': {
-        'ui': ('question', {
-               'title': 'Default annex repository mode',
-               'text': 'Should dataset be initialized in direct mode?'}),
-        'destination': 'global',
-    },
-    'datalad.crawl.pipeline.housekeeping': {
-        'ui': ('yesno', {
-               'title': 'Crawler pipeline house keeping',
-               'text': 'Should the crawler tidy up datasets (git gc, repack, clean)?'}),
-        'destination': 'global',
-        'type': EnsureBool(),
     },
     'datalad.externals.nda.dbserver': {
         'ui': ('question', {
@@ -68,9 +44,73 @@ definitions = {
         'destination': 'global',
         'default': dirs.user_cache_dir,
     },
+    'datalad.locations.default-dataset': {
+        'ui': ('question', {
+               'title': 'Default dataset path',
+               'text': 'Where should datalad should look for (or install) a '
+                       'default dataset?'}),
+        'destination': 'global',
+        'default': opj(expanduser('~'), 'datalad'),
+    },
+    'datalad.locations.system-plugins': {
+        'ui': ('question', {
+               'title': 'System plugin directory',
+               'text': 'Where should datalad search for system plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'plugins'),
+    },
+    'datalad.locations.user-plugins': {
+        'ui': ('question', {
+               'title': 'User plugin directory',
+               'text': 'Where should datalad search for user plugins?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'plugins'),
+    },
+    'datalad.locations.system-procedures': {
+        'ui': ('question', {
+               'title': 'System procedure directory',
+               'text': 'Where should datalad search for system procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.site_config_dir, 'procedures'),
+    },
+    'datalad.locations.user-procedures': {
+        'ui': ('question', {
+               'title': 'User procedure directory',
+               'text': 'Where should datalad search for user procedures?'}),
+        'destination': 'global',
+        'default': opj(dirs.user_config_dir, 'procedures'),
+    },
+    'datalad.locations.dataset-procedures': {
+        'ui': ('question', {
+               'title': 'Dataset procedure directory',
+               'text': 'Where should datalad search for dataset procedures (relative to a dataset root)?'}),
+        'destination': 'dataset',
+        'default': opj('.datalad', 'procedures'),
+    },
     'datalad.exc.str.tblimit': {
         'ui': ('question', {
                'title': 'This flag is used by the datalad extract_tb function which extracts and formats stack-traces. It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.'}),
+    },
+    'datalad.fake-dates': {
+        'ui': ('yesno', {
+               'title': 'Fake (anonymize) dates',
+               'text': 'Should the dates in the logs be faked?'}),
+        'destination': 'local',
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.fake-dates-start': {
+        'ui': ('question', {
+            'title': 'Initial fake date',
+            'text': 'When faking dates and there are no commits in any local branches, generate the date by adding one second to this value (Unix epoch time). The value must be positive.'}),
+        'type': EnsureInt(),
+        'default': 1112911993,
+    },
+    'datalad.github.token-note': {
+        'ui': ('question', {
+            'title': 'Github token note',
+            'text': 'Description for a Personal access token to generate.'}),
+        'default': 'DataLad',
     },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
@@ -107,6 +147,18 @@ definitions = {
                'title': 'Skips SSH tests if this flag is **not** set'}),
         'type': EnsureBool(),
     },
+    'datalad.tests.knownfailures.skip': {
+        'ui': ('yesno', {
+               'title': 'Skips tests that are known to currently fail'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
+    'datalad.tests.knownfailures.probe': {
+        'ui': ('yesno', {
+               'title': 'Probes tests that are known to fail on whether or not they are actually still failing'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
     'datalad.tests.temp.dir': {
         'ui': ('question', {
                'title': 'Create a temporary directory at location specified by this flag. It is used by tests to create a temporary git directory while testing git annex archives etc'}),
@@ -135,13 +187,6 @@ definitions = {
         'ui': ('question', {
                'title': 'Specifies the location of the file to record network transactions by the VCR module. Currently used by when testing custom special remotes'}),
     },
-    'datalad.api.alwaysrender': {
-        'ui': ('yesno', {
-               'title': 'Python API output rendering',
-               'text': 'Should the high-level API functions be altered to render output like the command line interface would do, in order to make interactive use less cumbersome?'}),
-        'default': False,
-        'type': EnsureBool(),
-    },
     'datalad.log.level': {
         'ui': ('question', {
             'title': 'Used for control the verbosity of logs printed to '
@@ -161,7 +206,7 @@ definitions = {
     },
     'datalad.log.outputs': {
         'ui': ('question', {
-               'title': 'Used to control either both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
+               'title': 'Used to control whether both stdout and stderr of external commands execution are logged in detail (at DEBUG level)'}),
     },
     'datalad.log.timestamp': {
         'ui': ('yesno', {
@@ -181,16 +226,98 @@ definitions = {
         'ui': ('question', {
                'title': 'Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.'}),
     },
+    'datalad.ssh.identityfile': {
+        'ui': ('question', {
+               'title': "If set, pass this file as ssh's -i option."}),
+        'destination': 'global',
+        'default': None,
+    },
     'datalad.repo.direct': {
         'ui': ('yesno', {
                'title': 'Direct Mode for git-annex repositories',
                'text': 'Set this flag to create annex repositories in direct mode by default'}),
         'type': EnsureBool(),
+        'default': False,
     },
     'datalad.repo.version': {
         'ui': ('question', {
                'title': 'git-annex repository version',
                'text': 'Specifies the repository version for git-annex to be used by default'}),
         'type': EnsureInt(),
+        'default': 5,
+    },
+    'datalad.metadata.maxfieldsize': {
+        'ui': ('question', {
+               'title': 'Maximum metadata field size',
+               'text': 'Metadata fields exceeding this size (in bytes/chars) are excluded from metadata extractio'}),
+        'default': 100000,
+        'type': EnsureInt(),
+    },
+    'datalad.metadata.nativetype': {
+        'ui': ('question', {
+               'title': 'Native dataset metadata scheme',
+               'text': 'Set this label to engage a particular metadata extraction parser'}),
+    },
+    'datalad.metadata.store-aggregate-content': {
+        'ui': ('question', {
+               'title': 'Aggregated content metadata storage',
+               'text': 'If this flag is enabled, content metadata is aggregated into superdataset to allow for discovery of individual files. If disable unique content metadata values are still aggregated to enable dataset discovery'}),
+        'type': EnsureBool(),
+        'default': True,
+    },
+    'datalad.search.default-mode': {
+        'ui': ('question', {
+               'title': 'Default search mode',
+               'text': 'Label of the mode to be used by default'}),
+        'type': EnsureChoice('egrep', 'textblob', 'autofield'),  # graph,...
+        'default': 'egrep',
+    },
+    'datalad.search.index-default-documenttype': {
+        'ui': ('question', {
+               'title': 'Type of search index documents',
+               'text': 'Labels of document types to include in a default search index'}),
+        'type': EnsureChoice('all', 'datasets', 'files'),
+        'default': 'datasets',
+    },
+    'datalad.metadata.create-aggregate-annex-limit': {
+        'ui': ('question', {
+               'title': 'Limit configuration annexing aggregated metadata in new dataset',
+               'text': 'Git-annex large files expression (see https://git-annex.branchable.com/tips/largefiles; given expression will be wrapped in parentheses)'}),
+        'default': 'anything',
+    },
+    'datalad.runtime.raiseonerror': {
+        'ui': ('question', {
+               'title': 'Error behavior',
+               'text': 'Set this flag to cause DataLad to raise an exception on errors that would have otherwise just get logged'}),
+        'type': EnsureBool(),
+        'default': False,
+    },
+    'datalad.runtime.report-status': {
+        'ui': ('question', {
+               'title': 'Command line result reporting behavior',
+               'text': "If set (to other than 'all'), constrains command result report to records matching the given status. 'success' is a synonym for 'ok' OR 'notneeded', 'failure' stands for 'impossible' OR 'error'"}),
+        'type': EnsureChoice('all', 'success', 'failure', 'ok', 'notneeded', 'impossible', 'error'),
+        'default': None,
+    },
+    'datalad.search.indexercachesize': {
+        'ui': ('question', {
+               'title': 'Maximum cache size for search index (per process)',
+               'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
+        'default': 256,
+        'type': EnsureInt(),
+    },
+    'datalad.ui.progressbar': {
+        'ui': ('question', {
+            'title': 'UI progress bars',
+            'text': 'Default backend for progress reporting'}),
+        'default': None,
+        'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
+    },
+    'datalad.ui.color': {
+        'ui': ('question', {
+            'title': 'Colored terminal output',
+            'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
+        'default': 'auto',
+        'type': EnsureChoice('on', 'off', 'auto'),
     },
 }

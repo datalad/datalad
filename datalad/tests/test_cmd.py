@@ -1,4 +1,4 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -9,29 +9,43 @@
 """Test command call wrapper
 """
 
-from mock import patch
 import os
-from os.path import dirname, join as opj
+import os.path as op
 import sys
 import logging
 import shlex
 
-from .utils import ok_, eq_, assert_is, assert_equal, assert_false, \
-    assert_true, assert_greater, assert_raises, assert_in, SkipTest
+from .utils import (
+    ok_,
+    ok_exists,
+    eq_,
+    assert_is,
+    assert_equal,
+    assert_false,
+    assert_true,
+    assert_greater,
+    assert_raises,
+    assert_in,
+    SkipTest,
+    skip_if_on_windows,
+    with_tempfile,
+    assert_cwd_unchanged,
+    swallow_outputs,
+    swallow_logs,
+    ok_file_has_content,
+    on_windows,
+    lgr,
+    OBSCURE_FILENAME,
+)
 
-from ..cmd import Runner, link_file_load
-from ..cmd import GitRunner
+from ..cmd import (
+    Runner,
+    GitRunner,
+)
 from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
-from .utils import with_tempfile, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
-    on_linux, on_osx, on_windows, with_testrepos
-from .utils import lgr
-
-from .utils import local_testrepo_flavors
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -40,8 +54,8 @@ def test_runner_dry(tempfile):
     runner = Runner(protocol=dry)
 
     # test dry command call
-    cmd = 'echo Testing dry run > %s' % tempfile
-    with swallow_logs(new_level=logging.DEBUG) as cml:
+    cmd = 'echo Testing äöü東 dry run > %s' % tempfile
+    with swallow_logs(new_level=9) as cml:
         ret = runner.run(cmd)
         cml.assert_logged("{DryRunProtocol} Running: %s" % cmd, regex=False)
     assert_equal(("DRY", "DRY"), ret,
@@ -57,18 +71,40 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
-@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
 
     # test non-dry command call
     runner = Runner()
-    cmd = 'echo Testing real run > %r' % tempfile
+    content = 'Testing äöü東 real run'
+    cmd = 'echo %s > %r' % (content, tempfile)
     ret = runner.run(cmd)
-    assert_true(os.path.exists(tempfile),
-                "Run of: %s resulted with non-existing file %s" %
-                (cmd, tempfile))
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Run with shell
+    ret = runner.run(cmd, shell=True)
+    assert_equal(ret, ('', ''))  # no out or err
+    ok_file_has_content(tempfile, content, strip=True)
+    os.unlink(tempfile)
+
+    # Pass as a list and with shell - "not exactly what we expect"
+    # Initial suspicion came from incorrect behavior of Runner as a runner
+    # for patool.  Apparently (docs for 2.7):
+    #   If args is a sequence, the first item specifies the command string,
+    #   and any additional items will be treated as additional arguments to
+    #   the shell itself.
+    # which is what it ruins it for us!  So, for now we are not testing/using
+    # this form
+    # ret = runner.run(shlex.split(cmd, posix=not on_windows), shell=True)
+    # # ?! for some reason there is an empty line in stdout
+    # # TODO: figure out.  It shouldn't though be of critical effect
+    # ret = (ret[0].rstrip(), ret[1])
+    # assert_equal(ret, ('', ''))  # no out or err
+    # # And here we get kaboom ATM!
+    # ok_file_has_content(tempfile, content, strip=True)
 
     # test non-dry python function call
     output = runner.call(os.path.join, 'foo', 'bar')
@@ -76,7 +112,6 @@ def test_runner(tempfile):
                  "Call of: os.path.join, 'foo', 'bar' returned %s" % output)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_dry():
 
     cmd_ = ['echo', 'Testing', '__call__', 'with', 'string']
@@ -101,7 +136,6 @@ def test_runner_instance_callable_dry():
                  "Buffer: %s" % dry)
 
 
-@ignore_nose_capturing_stdout
 def test_runner_instance_callable_wet():
 
     runner = Runner()
@@ -115,70 +149,76 @@ def test_runner_instance_callable_wet():
     eq_(ret, os.path.join('foo', 'bar'))
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stderr():
-    # TODO: no idea of how to check correct logging via any kind of
-    # assertion yet.
 
-    runner = Runner()
+    runner = Runner(log_outputs=True)
     cmd = 'echo stderr-Message should be logged >&2'
-    ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
+    with swallow_outputs() as cmo:
+        with swallow_logs(new_level=9) as cml:
+            ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
+            cml.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            if not on_windows:
+                # we can just count on sanity
+                cml.assert_logged("stderr| stderr-"
+                                  "Message should be logged", regex=False)
+            else:
+                # echo outputs quoted lines for some reason, so relax check
+                ok_("stdout-Message should be logged" in cml.lines[1])
 
     cmd = 'echo stderr-Message should not be logged >&2'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=logging.INFO) as cml:
+        with swallow_logs(new_level=9) as cml:
             ret = runner.run(cmd, log_stderr=False)
             eq_(cmo.err.rstrip(), "stderr-Message should not be logged")
-            eq_(cml.out, "")
+            assert_raises(AssertionError, cml.assert_logged,
+                          "stderr| stderr-Message should not be logged")
 
 
-@ignore_nose_capturing_stdout
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
     # assertion yet.
 
-    runner = Runner()
-    cmd_ = ['echo', 'stdout-Message should be logged']
+    runner = Runner(log_outputs=True)
+    cmd_ = ['echo', 'stdout-Message äöü東 should be logged']
     for cmd in [cmd_, ' '.join(cmd_)]:
         # should be identical runs, either as a string or as a list
         kw = {}
         # on Windows it can't find echo if ran outside the shell
         if on_windows and isinstance(cmd, list):
             kw['shell'] = True
-        with swallow_logs(logging.DEBUG) as cm:
+        with swallow_logs(9) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
-            cm.assert_logged("Running: %s" % cmd, level='DEBUG', regex=False)
-            from datalad import cfg
-            if cfg.getbool('datalad.log', 'outputs', default=False):
-                if not on_windows:
-                    # we can just count on sanity
-                    cm.assert_logged("stdout| stdout-"
-                                     "Message should be logged", regex=False)
-                else:
-                    # echo outputs quoted lines for some reason, so relax check
-                    ok_("stdout-Message should be logged" in cm.lines[1])
+            cm.assert_logged("Running: %s" % cmd, level='Level 9', regex=False)
+            if not on_windows:
+                # we can just count on sanity
+                cm.assert_logged("stdout| stdout-"
+                                 "Message äöü東 should be logged", regex=False)
+            else:
+                # echo outputs quoted lines for some reason, so relax check
+                ok_("stdout-Message äöü東 should be logged" in cm.lines[1])
 
-    cmd = 'echo stdout-Message should not be logged'
+    cmd = 'echo stdout-Message äöü東 should not be logged'
     with swallow_outputs() as cmo:
-        with swallow_logs(new_level=logging.INFO) as cml:
+        with swallow_logs(new_level=11) as cml:
             ret = runner.run(cmd, log_stdout=False)
-            eq_(cmo.out, "stdout-Message should not be logged\n")
+            eq_(cmo.out, "stdout-Message äöü東 should not be logged\n")
             eq_(cml.out, "")
 
 
-@ignore_nose_capturing_stdout
 def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being
     # stucked yet.
 
     runner = Runner()
-    cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
+    cmd = '%s %s' % (sys.executable, op.join(op.dirname(__file__), "heavyoutput.py"))
 
     with swallow_outputs() as cm, swallow_logs():
-        ret = runner.run(cmd, log_stderr=False, log_stdout=False,
+        ret = runner.run(cmd,
+                         log_online=log_online,
+                         log_stderr=False, log_stdout=False,
                          expect_stderr=True)
         eq_(cm.err, cm.out)  # they are identical in that script
-        eq_(cm.out[:10], "[0, 1, 2, ")
+        eq_(cm.out[:10], "0 [0, 1, 2")
         eq_(cm.out[-15:], "997, 998, 999]\n")
 
     # for some reason swallow_logs is not effective, so we just skip altogether
@@ -188,75 +228,33 @@ def check_runner_heavy_output(log_online):
 
     #do it again with capturing:
     with swallow_logs():
-        ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
+        ret = runner.run(cmd,
+                         log_online=True, log_stderr=True, log_stdout=True,
+                         expect_stderr=True)
 
-    return
-    # and now original problematic command with a massive single line
-    if not log_online:
-        # We know it would get stuck in online mode
-        cmd = '%s -c "import sys; x=str(list(range(1000))); ' \
-              '[(sys.stdout.write(x), sys.stderr.write(x)) ' \
-              'for i in range(100)];"' % sys.executable
+    if log_online:
+        # halting case of datalad add and other batch commands #2116
+        logged = []
         with swallow_logs():
-            ret = runner.run(cmd, log_stderr=True, log_stdout=True,
-                             expect_stderr=True)
+            def process_stdout(l):
+                assert l
+                logged.append(l)
+            ret = runner.run(
+                cmd,
+                log_online=log_online,
+                log_stdout=process_stdout,
+                log_stderr='offline',
+                expect_stderr=True
+            )
+        assert_equal(len(logged), 100)
+        assert_greater(len(ret[1]), 1000)  # stderr all here
+        assert not ret[0], "all messages went into `logged`"
 
 
 def test_runner_heavy_output():
-    for log_online in [True, False]:
+    skip_if_on_windows()
+    for log_online in [False, True]:
         yield check_runner_heavy_output, log_online
-
-
-@with_tempfile
-def test_link_file_load(tempfile):
-    tempfile2 = tempfile + '_'
-
-    with open(tempfile, 'w') as f:
-        f.write("LOAD")
-
-    link_file_load(tempfile, tempfile2)  # this should work in general
-
-    ok_(os.path.exists(tempfile2))
-
-    with open(tempfile2, 'r') as f:
-        assert_equal(f.read(), "LOAD")
-
-    def inode(fname):
-        with open(fname) as fd:
-            return os.fstat(fd.fileno()).st_ino
-
-    def stats(fname, times=True):
-        """Return stats on the file which should have been preserved"""
-        with open(fname) as fd:
-            st = os.fstat(fd.fileno())
-            stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
-            if times:
-                return stats + (st.st_atime, st.st_mtime)
-            else:
-                return stats
-            # despite copystat mtime is not copied. TODO
-            #        st.st_mtime)
-
-    if on_linux or on_osx:
-        # above call should result in the hardlink
-        assert_equal(inode(tempfile), inode(tempfile2))
-        assert_equal(stats(tempfile), stats(tempfile2))
-
-        # and if we mock absence of .link
-        def raise_AttributeError(*args):
-            raise AttributeError("TEST")
-
-        with patch('os.link', raise_AttributeError):
-            with swallow_logs(logging.WARNING) as cm:
-                link_file_load(tempfile, tempfile2)  # should still work
-                ok_("failed (TEST), copying file" in cm.out)
-
-    # should be a copy (either originally for windows, or after mocked call)
-    ok_(inode(tempfile) != inode(tempfile2))
-    with open(tempfile2, 'r') as f:
-        assert_equal(f.read(), "LOAD")
-    assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
-    os.unlink(tempfile2)  # TODO: next two with_tempfile
 
 
 @with_tempfile(mkdir=True)
@@ -274,6 +272,42 @@ def test_runner_failure(dir_):
 
 
 @with_tempfile(mkdir=True)
+def test_runner_failure_unicode(path):
+    # Avoid OBSCURE_FILENAME in hopes of windows-compatibility (gh-2929).
+    runner = Runner()
+    with assert_raises(CommandError), swallow_logs():
+        runner.run(u"β-command-doesnt-exist", cwd=path)
+
+
+@skip_if_on_windows  # likely would fail
+@with_tempfile(mkdir=True)
+def test_runner_fix_PWD(path):
+    env = os.environ.copy()
+    env['PWD'] = orig_cwd = os.getcwd()
+    runner = Runner(cwd=path, env=env)
+    out, err = runner.run(
+        [sys.executable, '-c', 'import os; print(os.environ["PWD"])'],
+        cwd=path,
+        shell=False
+    )
+    eq_(err, '')
+    eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
+    eq_(env['PWD'], orig_cwd)  # no side-effect
+
+
+@with_tempfile(mkdir=True)
+def test_runner_cwd_encoding(path):
+    env = os.environ.copy()
+    # Add PWD to env so that runner will temporarily adjust it to point to cwd.
+    env['PWD'] = os.getcwd()
+    cwd = op.join(path, OBSCURE_FILENAME)
+    os.mkdir(cwd)
+    # Running doesn't fail if cwd or env has unicode value.
+    Runner().run("cd .> foo", cwd=cwd, env=env)
+    ok_exists(op.join(cwd, "foo"))
+
+
+@with_tempfile(mkdir=True)
 def test_git_path(dir_):
     from ..support.gitrepo import GitRepo
     # As soon as we use any GitRepo we should get _GIT_PATH set in the Runner
@@ -284,9 +318,23 @@ def test_git_path(dir_):
 @with_tempfile(mkdir=True)
 def test_runner_stdin(path):
     runner = Runner()
-    with open(opj(path, "test_input.txt"), "w") as f:
+    with open(op.join(path, "test_input.txt"), "w") as f:
         f.write("whatever")
 
-    with swallow_outputs() as cmo, open(opj(path, "test_input.txt"), "r") as fake_input:
+    with swallow_outputs() as cmo, open(op.join(path, "test_input.txt"), "r") as fake_input:
         runner.run(['cat'], log_stdout=False, stdin=fake_input)
         assert_in("whatever", cmo.out)
+
+
+def test_process_remaining_output():
+    runner = Runner()
+    out = u"""\
+s
+п
+"""
+    out_bytes = out.encode('utf-8')
+    target = u"s{ls}п{ls}".format(ls=os.linesep).encode('utf-8')
+    args = ['stdout', None, False, False]
+    #  probably #2185
+    eq_(runner._process_remaining_output(None, out_bytes, *args), target)
+    eq_(runner._process_remaining_output(None, out, *args), target)

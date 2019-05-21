@@ -1,0 +1,140 @@
+#!/bin/bash
+#
+set -u -e
+
+# reduce confusion with xdotool
+setxkbmap us
+
+test ! -e $1 && echo "input file does not exist" && exit 1
+title="$(echo $(basename $1) | sed -e 's/.sh$//')"
+
+outdir=$2
+[ ! -d "$outdir" ] && mkdir -p "$outdir" || true
+
+# shortcut for making xdotool find the right window
+xdt="xdotool search --classname xterm windowactivate"
+
+# make sure the target xterm is up and running
+# Sizes
+# "small"
+width=80
+height=24
+# "big"
+#width=120
+#height=36
+text_width=$(($width - 8))
+
+geometry=${width}x${height}
+xterm -geometry $geometry -e bash &
+xterm_pid=$!
+sleep 1
+$xdt --sync sleep 0.5
+
+function check_asciinema () {
+    if [ ! -z "${asciinema_pid:-}" ] && [ ! -e "/proc/$asciinema_pid" ]; then
+        echo "Asciinema stopped unexpectedly. Exiting. Check output in the xterm" >&2
+        # Do not kill xterm so we could see what went wrong!
+        ## [ -z "${xterm_pid:-}" ] || kill $xterm_pid
+        exit 1
+    fi
+}
+
+function type () {
+    check_asciinema
+	$xdt type --clearmodifiers --delay 40 --window %@ "$1"
+}
+function key () {
+    check_asciinema
+	$xdt key --clearmodifiers --window %@ $*
+}
+function sleep () {
+    check_asciinema
+	xdotool sleep $1
+}
+function execute () {
+    check_asciinema
+	$xdt sleep 0.5 key --window %@ Return
+	while [ x"$xterm_pstree" != x"$(pstree -p $xterm_pid)" ]; do
+		sleep 0.01
+	done
+}
+function say()
+{
+	type "$(printf "#\n# $1" | fmt -w ${text_width} --prefix '# ')"
+	key Return
+	sleep 3
+}
+function show () {
+    check_asciinema
+    $xdt type --clearmodifiers --delay 0 --window %@ "$(printf "\n$1\n\n" | sed -e 's/^/# /g')"
+    key Return
+    sleep 3
+}
+function run () {
+    type "$1"
+    t1=$(date +%s.%N)
+    execute
+    t2=$(date +%s.%N)
+    # Subtracting 0.5 imposed by execute before hitting Return
+    dt=$(python -c "print('%.2f' % ($t2 - $t1 - 0.5))")
+    echo "$@" "    # $dt sec" >> "$cmds_log"
+    sleep 2
+}
+function run_expfail () {
+	# TODO we could announce or visualize the expected failure
+	run "$1"
+}
+
+# Take .cmds file and make them into .md file with detected datalad commands
+# invocations accompanied with a [help] url
+
+function cmds2md() {
+    [ $# = 1 ] || exit 1  # one file at a time
+    infile="$1"
+    mdfile="$1.md"
+    echo -e "## List of the commands (with timing after #) executed in the asciinema:\n" >| "$mdfile"
+    sed -e 's,\(^.*[^ ]\)\( *#.*\)$,```\1``` \2\n,g' "$infile" >> "$mdfile"
+    # let's make used datalad commands in the descriptions to point to our manpages
+    # collect all known commands (sorry -- we need datalad available)
+    commands_re=$(datalad -h | sed -n -e '/^ *{/s/ *[{}]//gp' | sed -e 's/,/\\|/g' -e 's,^,\\(,g' -e 's,$,\\),g')
+    sed -i -e 's,\(\<datalad .*'"${commands_re}"'\( \|$\).*\),\1 [help](http://docs.datalad.org/en/latest/generated/man/datalad-\2.html),g' "$mdfile"
+}
+
+cmds_log="$outdir/$title.cmds"
+rm -f "$cmds_log"
+echo "Recording to $(readlink -f "$outdir/$title.json") with commands log in $cmds_log"
+bashrc_file="$(dirname $0)/cast_bash.rc"
+type "asciinema rec \"$outdir/$title.json\" -c 'bash --rcfile $bashrc_file' -i 2"
+# XXX cannot use execute here, idle detection not yet functional
+key Return
+sleep 1.0
+
+# now get the process tree attached to the terminal so we can
+# figure out when it is idle, and when it is not
+# XXX must happen after asciinema is running
+xterm_pstree="$(pstree -p -A $xterm_pid)"
+asciinema_pid="$(pstree -p $xterm_pid -A -h | head -n1 | sed -e 's/.*asciinema(\([0-9]\+\)).*/\1/')"
+
+. $1
+
+sleep 4
+
+show "$(cowsay "Demo was using $(datalad --version 2>&1 | head -n1). Discover more at http://datalad.org")"
+
+sleep 1
+
+key Control_L+d
+# let it finish
+while test -d "/proc/$asciinema_pid"; do sleep 1; echo "wait for asciinema"; done
+
+# kill the xterm we opened
+kill $xterm_pid
+
+# adjust title if was specified
+full_title="${full_title:-$title} [$geometry]"
+sed -i -e "s/^\( *.command.\): \".*/\1: \"$full_title\",/" "$outdir/$title.json"
+
+# Pre-create description with the list of commands annotated in .md
+# ATM those cannot be uploaded automagically to the asciinema but the clip
+# description could be changed online, just cut/paste
+cmds2md "$outdir/$title.cmds"

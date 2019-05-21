@@ -8,15 +8,58 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from ..archives import ArchiveAnnexCustomRemote
+from mock import patch
+import os
+import os.path as op
+import sys
+import re
+import logging
+import glob
+from time import sleep
+
+from datalad.tests.utils import known_failure_direct_mode
+
+
+from ..archives import (
+    ArchiveAnnexCustomRemote,
+    link_file_load,
+)
 from ..base import AnnexExchangeProtocol
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
-from ...tests.utils import *
+from .test_base import (
+    BASE_INTERACTION_SCENARIOS,
+    check_interaction_scenario,
+)
+from ...tests.utils import (
+    abspath,
+    chpwd,
+    get_most_obscure_supported_name,
+    with_direct,
+    with_tempfile,
+    with_tree,
+    eq_,
+    ok_,
+    assert_false,
+    assert_true,
+    assert_is_instance,
+    assert_not_in,
+    assert_equal,
+    in_,
+    ok_file_has_content,
+    swallow_outputs,
+    swallow_logs,
+    serve_path_via_http,
+)
 from ...cmd import Runner, GitRunner
-from ...utils import _path_
-
+from ...utils import (
+    _path_,
+    unlink,
+    on_linux,
+    on_osx,
+)
 from . import _get_custom_runner
+
 
 # both files will have the same content
 # fn_inarchive_obscure = 'test.dat'
@@ -28,25 +71,31 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 #import line_profiler
 #prof = line_profiler.LineProfiler()
 
+
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
+@with_direct
 @with_tree(
     tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
           ('simple.txt', '123'),
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
 @with_tempfile()
-def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
+def test_basic_scenario(direct, d, d2):
+    fn_archive, fn_extracted = fn_archive_obscure, fn_extracted_obscure
     annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
+    assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
-    annex.add(fn_archive, commit=True, msg="Added tarball")
-    annex.add(fn_extracted, commit=True, msg="Added the load file")
+    annex.add(fn_archive)
+    annex.commit(msg="Added tarball")
+    annex.add(fn_extracted)
+    annex.commit(msg="Added the load file")
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)
@@ -65,7 +114,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 
     file_url = annexcr.get_file_url(
         archive_file=fn_archive,
-        file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
+        file=fn_archive.replace('.tar.gz', '') + '/d/' + fn_inarchive_obscure)
 
     annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
     annex.drop(fn_extracted)
@@ -78,9 +127,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
-    with swallow_logs(new_level=logging.WARN) as cm:
-        assert_raises(RuntimeError, annex.drop, fn_extracted)
-        in_("git-annex: drop: 1 failed", cm.out)
+    assert_false(annex.drop(fn_extracted)['success'])
 
     annex.add_url_to_file(fn_extracted, file_url)
     annex.drop(fn_extracted)
@@ -120,18 +167,20 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
+@known_failure_direct_mode  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
-    annex.add('a.tar.gz', commit=True)
+    annex.add('a.tar.gz')
+    annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
-    fpath = opj(topdir, 'a', 'd', fn_inarchive_obscure)
+    fpath = op.join(topdir, 'a', 'd', fn_inarchive_obscure)
 
-    with chpwd(opj(topdir, 'a', 'd')):
+    with chpwd(op.join(topdir, 'a', 'd')):
         runner = Runner()
-        runner(['git', 'annex', 'drop', fn_inarchive_obscure])  # run git annex drop
+        runner(['git', 'annex', 'drop', '--', fn_inarchive_obscure])  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', fn_inarchive_obscure])   # run git annex get
+        runner(['git', 'annex', 'get', '--', fn_inarchive_obscure])   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
@@ -152,23 +201,146 @@ def test_get_git_environ_adjusted():
     assert_equal(sys_env["PWD"], os.environ.get("PWD"))
 
 
-def test_basic_scenario():
-    yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
-    if not on_windows:
-        yield check_basic_scenario, 'a.tar.gz', 'simple.txt', True
-    #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure, False
-    #yield check_basic_scenario, fn_archive_obscure, 'simple.txt', False
-    yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure, False
-
-
 def test_no_rdflib_loaded():
     # rely on rdflib polluting stdout to see that it is not loaded whenever we load this remote
     # since that adds 300ms delay for no immediate use
     from ...cmd import Runner
     runner = Runner()
     with swallow_outputs() as cmo:
-        runner.run([sys.executable, '-c', 'import datalad.customremotes.archives, sys; print([k for k in sys.modules if k.startswith("rdflib")])'],
-               log_stdout=False, log_stderr=False)
+        runner.run(
+            [sys.executable,
+             '-c',
+             'import datalad.customremotes.archives, sys; '
+             'print([k for k in sys.modules if k.startswith("rdflib")])'],
+            log_stdout=False,
+            log_stderr=False)
         # print cmo.out
         assert_not_in("rdflib", cmo.out)
         assert_not_in("rdflib", cmo.err)
+
+
+@with_tree(tree={'archive.tar.gz': {'f1.txt': 'content'}})
+def test_interactions(tdir):
+    # Just a placeholder since constructor expects a repo
+    repo = AnnexRepo(tdir, create=True, init=True)
+    repo.add('archive.tar.gz')
+    repo.commit('added')
+    for scenario in BASE_INTERACTION_SCENARIOS + [
+        [
+            ('GETCOST', 'COST %d' % ArchiveAnnexCustomRemote.COST),
+        ],
+        [
+            # by default we do not require any fancy init
+            # no urls supported by default
+            ('CLAIMURL http://example.com', 'CLAIMURL-FAILURE'),
+            # we know that is just a single option, url, is expected so full
+            # one would be passed
+            ('CLAIMURL http://example.com roguearg', 'CLAIMURL-FAILURE'),
+        ],
+        # basic interaction failing to fetch content from archive
+        [
+            ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
+            ('VALUE dl+archive://somekey2#path', None),
+            ('VALUE dl+archive://somekey3#path', None),
+            ('VALUE',
+             re.compile(
+                 'TRANSFER-FAILURE RETRIEVE somekey Failed to fetch any '
+                 'archive containing somekey. Tried: \[\]')
+             )
+        ],
+        # # incorrect response received from annex -- something isn't right but ... later
+        # [
+        #     ('TRANSFER RETRIEVE somekey somefile', 'GETURLS somekey dl+archive:'),
+        #     # We reply with UNSUPPORTED-REQUEST in these cases
+        #     ('GETCOST', 'UNSUPPORTED-REQUEST'),
+        # ],
+    ]:
+        check_interaction_scenario(ArchiveAnnexCustomRemote, tdir, scenario)
+
+
+@with_tree(tree=
+    {'1.tar.gz':
+         {
+             'bu.dat': '52055957098986598349795121365535' * 10000,
+             'bu3.dat': '8236397048205454767887168342849275422' * 10000
+          },
+    '2.tar.gz':
+         {
+             'bu2.dat': '17470674346319559612580175475351973007892815102' * 10000
+          },
+    }
+)
+@serve_path_via_http()
+@with_tempfile
+def check_observe_tqdm(topdir, topurl, outdir):
+    # just a helper to enable/use when want quickly to get some
+    # repository with archives and observe tqdm
+    from datalad.api import create, add_archive_content
+    ds = create(outdir)
+    for f in '1.tar.gz', '2.tar.gz':
+        with chpwd(outdir):
+            ds.repo.add_url_to_file(f, topurl + f)
+            ds.add(f)
+            add_archive_content(f, delete=True, drop_after=True)
+    files = glob.glob(op.join(outdir, '*'))
+    ds.drop(files) # will not drop tarballs
+    ds.repo.drop([], options=['--all', '--fast'])
+    ds.get(files)
+    ds.repo.drop([], options=['--all', '--fast'])
+    # now loop so we could play with it outside
+    print(outdir)
+    # import pdb; pdb.set_trace()
+    while True:
+        sleep(0.1)
+
+
+@with_tempfile
+def test_link_file_load(tempfile):
+    tempfile2 = tempfile + '_'
+
+    with open(tempfile, 'w') as f:
+        f.write("LOAD")
+
+    link_file_load(tempfile, tempfile2)  # this should work in general
+
+    ok_(os.path.exists(tempfile2))
+
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+
+    def inode(fname):
+        with open(fname) as fd:
+            return os.fstat(fd.fileno()).st_ino
+
+    def stats(fname, times=True):
+        """Return stats on the file which should have been preserved"""
+        with open(fname) as fd:
+            st = os.fstat(fd.fileno())
+            stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
+            if times:
+                return stats + (st.st_atime, st.st_mtime)
+            else:
+                return stats
+            # despite copystat mtime is not copied. TODO
+            #        st.st_mtime)
+
+    if on_linux or on_osx:
+        # above call should result in the hardlink
+        assert_equal(inode(tempfile), inode(tempfile2))
+        assert_equal(stats(tempfile), stats(tempfile2))
+
+        # and if we mock absence of .link
+        def raise_AttributeError(*args):
+            raise AttributeError("TEST")
+
+        with patch('os.link', raise_AttributeError):
+            with swallow_logs(logging.WARNING) as cm:
+                link_file_load(tempfile, tempfile2)  # should still work
+                ok_("failed (TEST), copying file" in cm.out)
+
+    # should be a copy (either originally for windows, or after mocked call)
+    ok_(inode(tempfile) != inode(tempfile2))
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+    assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
+    unlink(tempfile2)  # TODO: next two with_tempfile
