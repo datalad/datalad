@@ -117,6 +117,13 @@ def test_wtf(path):
             # order should match our desired one, not alphabetical
             assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
 
+    # not achievable from cmdline is to pass an empty list of sections.
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            eq_(cmo.out.rstrip(), '# WTF')
+
+    # should result only in '# WTF'
     skip_if_no_module('pyperclip')
 
     # verify that it works correctly in the env/platform

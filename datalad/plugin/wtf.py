@@ -14,6 +14,7 @@ import logging
 import os
 import os.path as op
 from functools import partial
+from collections import OrderedDict
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
@@ -237,6 +238,13 @@ def _describe_dataset(ds, sensitive):
         return {"invalid": exc_str(e)}
 
 
+def _describe_location(res):
+    return {
+        'path': res['path'],
+        'type': res['type'],
+    }
+
+
 # Actuall callables for WTF. If None -- should be bound later since depend on
 # the context
 SECTION_CALLABLES = {
@@ -245,6 +253,7 @@ SECTION_CALLABLES = {
     'system': _describe_system,
     'environment': _describe_environment,
     'configuration': None,
+    'location': None,
     'extensions': _describe_extensions,
     'metadata_extractors': _describe_metadata_extractors,
     'dependencies': _describe_dependencies,
@@ -325,9 +334,20 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.support.external_versions import external_versions
 
+        infos = OrderedDict()
+        res = get_status_dict(
+            action='wtf',
+            path=ds.path if ds else op.abspath(op.curdir),
+            type='dataset' if ds else 'directory',
+            status='ok',
+            logger=lgr,
+            infos=infos,
+        )
+
         # Define section callables which require variables.
         # so there is no side-effect on module level original
         section_callables = SECTION_CALLABLES.copy()
+        section_callables['location'] = partial(_describe_location, res)
         section_callables['configuration'] = \
             partial(_describe_configuration, cfg, sensitive)
         if ds:
@@ -338,18 +358,8 @@ class WTF(Interface):
         assert all(section_callables.values())  # check if none was missed
 
         if sections is None:
-            sections = list(section_callables)
+            sections = sorted(list(section_callables))
 
-        # Populate infos
-        infos = {}
-        res = get_status_dict(
-            action='wtf',
-            path=ds.path if ds else op.abspath(op.curdir),
-            type='dataset' if ds else 'directory',
-            status='ok',
-            logger=lgr,
-            infos=infos,
-        )
         for s in sections:
             infos[s] = section_callables[s]()
 
@@ -371,15 +381,11 @@ class WTF(Interface):
 
 
 def _render_report(res):
-    report = u'# WTF\n'
-    report += u'\n'.join(
-        u'- {}: {}'.format(k, v) for k, v in res.items()
-        if k not in ('action', 'infos', 'status')
-    )
+    report = u'# WTF'
 
     def _unwind(text, val, top):
         if isinstance(val, dict):
-            for k in sorted(val):
+            for k in val:
                 text += u'\n{}{} {}{} '.format(
                     '##' if not top else top,
                     '-' if top else '',
