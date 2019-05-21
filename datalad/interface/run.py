@@ -394,7 +394,7 @@ def _save_outputs(ds, to_save, msg):
     """Helper to save results after command execution is completed"""
     return Save.__call__(
         to_save,
-        dataset=ds.path,
+        dataset=ds,
         recursive=True,
         message=msg,
         return_type='generator')
@@ -437,7 +437,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
     saver : callable, optional
-        Must take a dataset instance, a list of paths to save, and a
+        Must take the value given as `dataset`, a list of paths to save, and a
         message string as arguments and must record any changes done
         to any content matching an entry in the path list. Must yield
         result dictionaries as a generator.
@@ -608,5 +608,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      msg_path)
         raise exc
     elif outputs_to_save:
-        for r in saver(ds, outputs_to_save, msg):
+        # pass `dataset` not the resolved `ds` instance in order to
+        # keep any relative-path semantics intact for saving
+        for r in saver(dataset, outputs_to_save, msg):
             yield r

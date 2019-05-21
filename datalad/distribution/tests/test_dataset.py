@@ -26,6 +26,7 @@ from datalad.utils import chpwd, getpwd, rmtree
 from datalad.utils import _path_
 from datalad.utils import get_dataset_root
 from datalad.utils import on_windows
+from datalad.utils import Path
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -54,11 +55,10 @@ def test_EnsureDataset():
     assert_raises(ValueError, c, (1, 2, 3))
     assert_raises(ValueError, c, {"what": "ever"})
 
-    # returns Dataset, when string or Dataset passed
-    res = c(opj("some", "path"))
-    ok_(isinstance(res, Dataset))
-    ok_(isinstance(c(res), Dataset))
-    ok_(c(res) is res)
+    # let's a Dataset instance pass, but leaves a path untouched
+    test_path = opj("some", "path")
+    ok_(isinstance(c(test_path), type(test_path)))
+    ok_(isinstance(Dataset(test_path), Dataset))
 
     # Note: Ensuring that string is valid path is not
     # part of the constraint itself, so not explicitly tested here.
@@ -472,6 +472,11 @@ def test_rev_resolve_path(path):
         ds_local = Dataset(d)
         # no symlink resolution
         eq_(text_type(rev_resolve_path(d)), d)
+        # list comes out as a list
+        eq_(rev_resolve_path([d]), [Path(d)])
+        # multiple OK
+        eq_(rev_resolve_path([d, d]), [Path(d), Path(d)])
+
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
             eq_(text_type(rev_resolve_path(d).cwd()), opath)
@@ -485,19 +490,28 @@ def test_rev_resolve_path(path):
             eq_(rev_resolve_path('.'), ut.Path(d))
             eq_(text_type(rev_resolve_path('.')), d)
 
-            eq_(text_type(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
-                op.join(d, 'bu'))
+            # there is no concept of an "explicit" relative path anymore
+            # relative is relative, regardless of the specific syntax
+            eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+                ds_global.pathobj / 'bu')
+            # there is no full normpath-ing or other funky resolution of
+            # parent directory back-reference
             eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
-                op.join(ds_global.path, 'bu'))
+                op.join(ds_global.path, os.pardir, 'bu'))
 
-        # resolve against a dataset
-        eq_(text_type(rev_resolve_path('bu', ds=ds_local)), op.join(d, 'bu'))
-        eq_(text_type(rev_resolve_path('bu', ds=ds_global)), op.join(path, 'bu'))
-        # but paths outside the dataset are left untouched
-        eq_(text_type(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global)),
-            op.join(getpwd(), 'bu'))
+        # resolve against a dataset given as a path/str
+        # (cmdline input scenario)
+        eq_(rev_resolve_path('bu', ds=ds_local.path), Path.cwd() / 'bu')
+        eq_(rev_resolve_path('bu', ds=ds_global.path), Path.cwd() / 'bu')
+        # resolve against a dataset given as a dataset instance
+        # (object method scenario)
+        eq_(rev_resolve_path('bu', ds=ds_local), ds_local.pathobj / 'bu')
+        eq_(rev_resolve_path('bu', ds=ds_global), ds_global.pathobj / 'bu')
+        # not being inside a dataset doesn't change the resolution result
+        eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+            ds_global.pathobj / 'bu')
         eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
-            op.normpath(op.join(getpwd(), os.pardir, 'bu')))
+            op.join(ds_global.path, os.pardir, 'bu'))
 
 
 # little brother of the test above, but actually (must) run
