@@ -15,6 +15,9 @@ From an interactive Python session, import `datalad.api` and inspect its
 documentation with `help`.
 """
 
+import warnings
+warnings.simplefilter('default')
+
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
