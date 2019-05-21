@@ -507,7 +507,10 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 
         kwargs = kwargs.copy()
         from inspect import getargspec
-        orig_pos = getargspec(f).args
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            orig_pos = getargspec(f).args
 
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead

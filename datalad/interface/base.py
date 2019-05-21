@@ -696,7 +696,10 @@ def get_allargs_as_kwargs(call, args, kwargs):
     dict
     """
     from inspect import getargspec
-    argspec = getargspec(call)
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        argspec = getargspec(call)
     defaults = argspec.defaults
     nargs = len(argspec.args)
     assert (nargs >= len(defaults))
