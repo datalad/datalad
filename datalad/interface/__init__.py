@@ -82,7 +82,7 @@ _group_plumbing = (
         ('datalad.core.local.diff', 'Diff', 'diff'),
         ('datalad.distribution.siblings', 'Siblings', 'siblings'),
         ('datalad.support.sshrun', 'SSHRun', 'sshrun'),
-        ('datalad.distribution.subdatasets', 'Subdatasets', 'subdatasets'),
+        ('datalad.local.subdatasets', 'Subdatasets', 'subdatasets'),
     ])
 
 

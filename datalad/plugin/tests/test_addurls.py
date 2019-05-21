@@ -450,7 +450,7 @@ class TestAddurls(object):
             # Now save the "--nosave" changes and check that we have
             # all the subdatasets.
             ds.save()
-            eq_(set(subdatasets(ds, recursive=True,
+            eq_(set(subdatasets(dataset=ds, recursive=True,
                                 result_xfm="relpaths")),
                 {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})
 

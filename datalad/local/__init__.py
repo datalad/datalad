@@ -6,8 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Obsolete module: moved to `local.subdatasets`
+"""Extended set of commands for local dataset operations.
+
+**NOTE**
+
+Actually, the above isn't true at the moment. But that is the plan:
+<https://github.com/datalad/datalad/issues/3192>
 """
 
-# Import command class to ease 3rd-party transitions
-from datalad.local.subdatasets import Subdatasets
+__docformat__ = 'restructuredtext'
