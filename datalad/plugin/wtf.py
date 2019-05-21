@@ -283,11 +283,13 @@ class WTF(Interface):
             information (credentials, names, etc.).  If 'some', the fields
             which are known to be sensitive will still be masked out"""),
         sections=Parameter(
-            args=("-S", "--sections"),
+            args=("-S", "--section"),
+            action='append',
+            dest='sections',
             metavar="SECTION",
-            nargs="*",
             constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
-            doc="""sections to include.  If not set, all sections."""),
+            doc="""section to include.  If not set, all sections. This option
+            can be given more than once to include multiple sections."""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),
             action="store_true",

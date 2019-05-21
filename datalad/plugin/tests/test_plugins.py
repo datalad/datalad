@@ -106,7 +106,7 @@ def test_wtf(path):
                 assert_not_in('## %s' % s.lower(), cmo.out.lower())
 
     # ask for a selected set
-    secs = ['configuration', 'git-annex']
+    secs = ['git-annex', 'configuration']
     with chpwd(path):
         with swallow_outputs() as cmo:
             wtf(sections=secs)
@@ -114,6 +114,8 @@ def test_wtf(path):
                 (assert_in if s in secs else assert_not_in)(
                     '## %s' % s.lower(), cmo.out.lower()
                 )
+            # order should match our desired one, not alphabetical
+            assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
 
     skip_if_no_module('pyperclip')
 
