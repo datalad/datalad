@@ -44,7 +44,7 @@ from datalad.api import (
     install,
     run,
 )
-from datalad.interface.run import (
+from datalad.core.local.run import (
     format_command,
     run_command,
 )
@@ -1124,7 +1124,7 @@ def test_run_cmdline_disambiguation(path):
         # Without a positional argument starting a command, any option is
         # treated as an option to 'datalad run'.
         with swallow_outputs() as cmo:
-            with patch("datalad.interface.run._execute_command") as exec_cmd:
+            with patch("datalad.core.local.run._execute_command") as exec_cmd:
                 with assert_raises(SystemExit):
                     main(["datalad", "run", "--message"])
                 exec_cmd.assert_not_called()
@@ -1132,7 +1132,7 @@ def test_run_cmdline_disambiguation(path):
         # If we want to pass an option as the first value of a command (e.g.,
         # because we are using a runscript with containers-run), we can do this
         # with "--".
-        with patch("datalad.interface.run._execute_command") as exec_cmd:
+        with patch("datalad.core.local.run._execute_command") as exec_cmd:
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "--message"])
             exec_cmd.assert_called_once_with(
@@ -1154,7 +1154,7 @@ def test_run_cmdline_disambiguation(path):
         eq_(version_out, out)
         # We can work around that (i.e., make "--version" get passed as
         # command) with "--".
-        with patch("datalad.interface.run._execute_command") as exec_cmd:
+        with patch("datalad.core.local.run._execute_command") as exec_cmd:
             with assert_raises(SystemExit):
                 main(["datalad", "run", "--", "echo", "--version"])
             exec_cmd.assert_called_once_with(

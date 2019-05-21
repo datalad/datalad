@@ -23,9 +23,9 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.run import run_command
-from datalad.interface.run import format_command
-from datalad.interface.run import _format_cmd_shorty
+from datalad.core.local.run import run_command
+from datalad.core.local.run import format_command
+from datalad.core.local.run import _format_cmd_shorty
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
