@@ -18,14 +18,17 @@ from collections import OrderedDict
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.utils import getpwd
-from datalad.utils import assure_unicode
-from datalad.utils import unlink
+from datalad.utils import (
+    assure_unicode,
+    assure_bytes,
+    getpwd,
+    unlink,
+)
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import InvalidGitRepositoryError
-
+from datalad.version import __version__, __full_version__
 
 lgr = logging.getLogger('datalad.plugin.wtf')
 
@@ -76,7 +79,6 @@ def get_max_path_length(top_path=None, maxl=1000):
 
 
 def _describe_datalad():
-    from datalad.version import __version__, __full_version__
 
     return {
         'version': assure_unicode(__version__),
@@ -297,8 +299,14 @@ class WTF(Interface):
             dest='sections',
             metavar="SECTION",
             constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
-            doc="""section to include.  If not set, all sections. This option
-            can be given more than once to include multiple sections."""),
+            doc="""section to include.  If not set, all sections.
+            [CMD: This option can be given multiple times. CMD]."""),
+        decor=Parameter(
+            args=("-D", "--decor"),
+            constraints=EnsureChoice('html_details') | EnsureNone(),
+            doc="""decoration around the rendering to facilitate embedding into
+            issues etc, e.g. use 'html_details' for posting collapsable entry
+            to GitHub issues."""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),
             action="store_true",
@@ -309,7 +317,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, sections=None, clipboard=None):
+    def __call__(dataset=None, sensitive=None, sections=None, decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         from datalad.interface.results import get_status_dict
@@ -341,6 +349,7 @@ class WTF(Interface):
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,
+            decor=decor,
             infos=infos,
         )
 
@@ -401,4 +410,19 @@ def _render_report(res):
         return text
 
     report = _unwind(report, res.get('infos', {}), '')
+
+    decor = res.get('decor', None)
+
+    if not decor:
+        return report
+
+    if decor == 'html_details':
+        report = """\
+<details><summary>DataLad %s WTF (%s)</summary>
+
+%s
+</details>
+        """ % (__version__, ', '.join(res.get('infos', {})), report)
+    else:
+        raise ValueError("Unknown value of decor=%s" % decor)
     return report

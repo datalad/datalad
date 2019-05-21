@@ -20,6 +20,7 @@ from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
 from datalad.plugin.wtf import _HIDDEN
+from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
 
@@ -31,6 +32,7 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
@@ -122,6 +124,12 @@ def test_wtf(path):
         with swallow_outputs() as cmo:
             wtf(sections=[])
             eq_(cmo.out.rstrip(), '# WTF')
+
+    # and we could decorate it nicely for embedding e.g. into github issues
+    with swallow_outputs() as cmo:
+        wtf(sections=['dependencies'], decor='html_details')
+        ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
+        assert_in('## dependencies', cmo.out)
 
     # should result only in '# WTF'
     skip_if_no_module('pyperclip')
