@@ -368,7 +368,7 @@ class WTF(Interface):
                 'pyperclip', msg="It is needed to be able to use clipboard")
             import pyperclip
             report = _render_report(res)
-            pyperclip.copy(report)
+            pyperclip.copy(assure_bytes(report))
             ui.message("WTF information of length %s copied to clipboard"
                        % len(report))
         yield res
