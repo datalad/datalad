@@ -300,7 +300,7 @@ class WTF(Interface):
             metavar="SECTION",
             constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
             doc="""section to include.  If not set, all sections.
-            [CMD: This option can be given multiple times. CMD]."""),
+            [CMD: This option can be given multiple times. CMD]"""),
         decor=Parameter(
             args=("-D", "--decor"),
             constraints=EnsureChoice('html_details') | EnsureNone(),
