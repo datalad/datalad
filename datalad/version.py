@@ -30,7 +30,7 @@ if lexists(opj(projdir, '.git')):
         # Note: Popen does not support `with` way correctly in 2.7
         #
         git = Popen(
-            ['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
+            ['git', 'describe', '--abbrev=4', '--dirty', '--match', r'[0-9]*\.*'],
             stdout=PIPE, stderr=PIPE,
             cwd=projdir
         )

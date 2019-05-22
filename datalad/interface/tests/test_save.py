@@ -492,3 +492,15 @@ def test_save_partial_index(path):
     ds.repo.add("staged", git=True)
     ds._save(path="foo")
     ok_clean_git(ds.path, head_modified=["staged"])
+
+
+@with_tree({
+    'top:file': 'data',
+    'd': {'sub:file': 'data'}
+})
+def test_gh3421(path):
+    # failed to add d/sub:file
+    ds = Dataset(path).create(force=True)
+    ds.add('top:file')
+    ds.add(opj('d', 'sub:file'))
+    ok_clean_git(ds.path)

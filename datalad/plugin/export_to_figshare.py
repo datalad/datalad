@@ -55,7 +55,7 @@ class FigshareRESTLaison(object):
 
         r = m(url_, data=data, headers=headers)
         status_code = r.status_code
-        if (success is not "donotcheck") and \
+        if (success != "donotcheck") and \
                 ((success and status_code not in success)
                  or (not success and status_code >= 400)):
             msg = "Got return code %(status_code)s for %(m)s(%(url_)s." \

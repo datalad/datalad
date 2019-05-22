@@ -252,8 +252,8 @@ def sorted_files(dout):
                        for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
-_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
@@ -509,7 +509,7 @@ def file_basename(name, return_ext=False):
     not a digit, so we could get rid of .tar.gz etc
     """
     bname = basename(name)
-    fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
+    fbname = re.sub(r'(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
     if return_ext:
         return fbname, bname[len(fbname) + 1:]
     else:
@@ -1237,7 +1237,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
             from datalad.tests.utils import assert_in
 
             if regex:
-                match = '\[%s\] ' % level if level else "\[\S+\] "
+                match = r'\[%s\] ' % level if level else r"\[\S+\] "
             else:
                 match = '[%s] ' % level if level else ''
 
