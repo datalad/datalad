@@ -55,7 +55,6 @@ def get_max_path_length(top_path=None, maxl=1000):
     """
     if not top_path:
         top_path = getpwd()
-    import os
     import random
     from datalad import lgr
     from datalad.dochelpers import exc_str
