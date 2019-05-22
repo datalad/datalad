@@ -20,6 +20,9 @@ from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
 from datalad.plugin.wtf import _HIDDEN
+from datalad.version import __version__
+
+from ..wtf import SECTION_CALLABLES
 
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
@@ -29,6 +32,7 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
@@ -93,6 +97,41 @@ def test_wtf(path):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
 
+    # Sections selection
+    #
+    # If we ask for no sections and there is no dataset
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            assert_not_in('## dataset', cmo.out)
+            for s in SECTION_CALLABLES:
+                assert_not_in('## %s' % s.lower(), cmo.out.lower())
+
+    # ask for a selected set
+    secs = ['git-annex', 'configuration']
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=secs)
+            for s in SECTION_CALLABLES:
+                (assert_in if s in secs else assert_not_in)(
+                    '## %s' % s.lower(), cmo.out.lower()
+                )
+            # order should match our desired one, not alphabetical
+            assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
+
+    # not achievable from cmdline is to pass an empty list of sections.
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            eq_(cmo.out.rstrip(), '# WTF')
+
+    # and we could decorate it nicely for embedding e.g. into github issues
+    with swallow_outputs() as cmo:
+        wtf(sections=['dependencies'], decor='html_details')
+        ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
+        assert_in('## dependencies', cmo.out)
+
+    # should result only in '# WTF'
     skip_if_no_module('pyperclip')
 
     # verify that it works correctly in the env/platform
