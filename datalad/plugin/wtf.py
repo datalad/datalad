@@ -125,12 +125,14 @@ def _describe_environment():
     from datalad import get_envvars_info
     return get_envvars_info()
 
+
 def _describe_python():
     import platform
     return {
         'version': platform.python_version(),
         'implementation': platform.python_implementation(),
     }
+
 
 def _describe_configuration(cfg, sensitive):
     if not cfg:
