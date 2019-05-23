@@ -507,15 +507,18 @@ class GitLabSite(object):
                       '/'.join(path_l[:-1]), namespace_id)
         except self.gitlab.GitlabGetError as e:
             try:
-                parent_group = self.site.groups.get(
-                    '/'.join(path_l[:-2]))
+                if len(path_l) > 2:
+                    parent_group = self.site.groups.get(
+                        '/'.join(path_l[:-2]))
+                else:
+                    parent_group = None
             except self.gitlab.GitlabGetError as e:
                 raise ValueError(
                     "No parent group {} for project {} found, "
                     "and a group {} also does not exist. At most one "
                     "parent group would be created.".format(
                         '/'.join(path_l[:-1]),
-                        path,
+                        '/'.join(path_l),
                         '/'.join(path_l[:-2]),
                     ))
             # create the group for the target project
@@ -523,14 +526,12 @@ class GitLabSite(object):
                 namespace_id = self.site.groups.create(dict(
                     name=path_l[-2],
                     path=path_l[-2],
-                    parent_id=parent_group.get_id())).get_id()
+                    parent_id=parent_group.get_id() if parent_group else None)
+                ).get_id()
             except self.gitlab.GitlabCreateError as e:
-                return dict(
-                    res_kwargs,
-                    status='error',
-                    message=(
-                        "Failed to create parent group '%s' under '%s': %s",
-                        project_path_l[-2],
+                raise RuntimeError(
+                    "Failed to create parent group '{}' under '{}': {}".format(
+                        path_l[-2],
                         parent_group.attributes['full_path'],
                         str(e)),
                 )
