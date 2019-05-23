@@ -129,7 +129,7 @@ class CreateSiblingGitlab(Interface):
         dryrun=Parameter(
             args=("--dryrun",),
             action="store_true",
-            doc="""If this flag is set, no communication with Github is
+            doc="""If this flag is set, no communication with GitLab is
             performed, and no repositories will be created. Instead
             would-be repository names are reported for all relevant datasets
             """),
