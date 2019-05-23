@@ -1,23 +1,26 @@
 From: Yaroslav Halchenko <debian@onerussian.com>
-Subject: comment out msgpack and duecredit in setup.py
-
-  duecredit is absent on some elderly releases, and anyways
-  not clear yet even why it was needed 
+Subject: comment out msgpack and keyring in setup.py
 
   msgpack -- for some reason on older systems even if installed
   system-wide from debian package, still attempts to pip install it
   for no good reason afaik
 
+  keyring -- there is older keyring vs newer keyring, keyrings.alt bundle
+  Will be prescribed in debian/control
+
 Last-Update: 2018-03-03
 
 --- a/setup.py
 +++ b/setup.py
-@@ -74,7 +74,7 @@ requires = {
-     (['colorama'] if on_windows else []),
+@@ -65,8 +65,9 @@ requires = {
+     ],
      'downloaders': [
          'boto',
+-        'keyring>=8.0', 'keyrings.alt',
 -        'msgpack',
-+        #'msgpack',
++        # disabled for Debian - dependencies are specified in debian/control
++        # 'keyring>=8.0', 'keyrings.alt',
++        # 'msgpack',
          'requests>=1.2',
-     ] + keyring_requires,
+     ],
      'downloaders-extra': [
