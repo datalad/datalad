@@ -1121,7 +1121,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         lines_ = [
             l for l in lines
             if not re.search(
-                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
         assert(len(lines_) <= 1)
@@ -2408,12 +2408,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             # opts might be the '--key' which should go last
             annex_options += opts
 
+        interrupted = True
         try:
             out, err = self._run_annex_command(
                     command,
                     files=files,
                     annex_options=annex_options,
                     **kwargs)
+            interrupted = False
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2511,7 +2513,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
         finally:
             if progress_indicators:
-                progress_indicators.finish()
+                progress_indicators.finish(partial=interrupted)
 
         json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
@@ -2919,31 +2921,33 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # files "jumped" between git/annex.  Then also preparing a
                     # custom index and calling "commit" without files resolves
                     # the issue
-                    changed_files_staged = \
+                    all_changed_staged = \
                         set(self.get_changed_files(staged=True))
-                    changed_files_notstaged = \
-                        set() \
-                        if direct_mode \
-                        else set(self.get_changed_files(staged=False))
 
-                    files_set = {
+                    files_normalized = [
                         _normalize_path(self.path, f) if isabs(f) else f
                         for f in files
-                    }
-                    # files_notstaged = files_set.difference(changed_files_staged)
-                    files_changed_notstaged = files_set.intersection(changed_files_notstaged)
+                    ]
+
+                    files_changed_staged = \
+                        set(self.get_changed_files(staged=True, files=files_normalized))
+                    files_changed_notstaged = \
+                        set() \
+                        if direct_mode \
+                        else set(self.get_changed_files(staged=False, files=files_normalized))
 
                     # Files which were staged but not among files
-                    staged_not_to_commit = changed_files_staged.difference(files_set)
-                    if staged_not_to_commit or files_changed_notstaged:
+                    staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
+
+                    if files_changed_notstaged:
+                        self.add(files=list(files_changed_notstaged))
+
+                    if staged_not_to_commit:
                         # Need an alternative index_file
                         with make_tempfile(dir=opj(self.path,
                                                    GitRepo.get_git_dir(self)),
                                            prefix="datalad-",
                                            suffix=".index") as index_file:
-                            # First add those which were changed but not staged yet
-                            if files_changed_notstaged:
-                                self.add(files=list(files_changed_notstaged))
 
                             alt_index_file = index_file
                             index_tree = self.repo.git.write_tree()
@@ -2962,12 +2966,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 careless=careless,
                                 index_file=alt_index_file)
 
-                            if files_changed_notstaged:
-                                # reset current index to reflect the changes annex might have done
-                                self._git_custom_command(
-                                    list(files_changed_notstaged),
-                                    ['git', 'reset']
-                                )
+                            # reset current index to reflect the changes annex might have done
+                            self._git_custom_command(
+                                list(files_changed_notstaged |
+                                     files_changed_staged),
+                                ['git', 'reset']
+                            )
 
                     # in any case we will not specify files explicitly
                     files_to_commit = None
@@ -3929,15 +3933,15 @@ class ProcessAnnexProgressIndicators(object):
             int(j.get('byte-progress'))
         )
 
-    def finish(self):
-        if self.total_pbar:
-            self.total_pbar.finish()
-            self.total_pbar = None
+    def finish(self, partial=False):
         if self.pbars:
             lgr.warning("Still have %d active progress bars when stopping",
                         len(self.pbars))
+        if self.total_pbar:
+            self.total_pbar.finish(partial=partial)
+            self.total_pbar = None
         for pbar in self.pbars.values():
-            pbar.finish()
+            pbar.finish(partial=partial)
         self.pbars = {}
         self._failed = 0
         self._succeeded = 0

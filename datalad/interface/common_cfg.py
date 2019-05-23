@@ -106,6 +106,12 @@ definitions = {
         'type': EnsureInt(),
         'default': 1112911993,
     },
+    'datalad.github.token-note': {
+        'ui': ('question', {
+            'title': 'Github token note',
+            'text': 'Description for a Personal access token to generate.'}),
+        'default': 'DataLad',
+    },
     'datalad.tests.nonetwork': {
         'ui': ('yesno', {
                'title': 'Skips network tests completely if this flag is set Examples include test for s3, git_repositories, openfmri etc'}),
@@ -299,5 +305,19 @@ definitions = {
                'text': 'Actual memory consumption can be twice as high as this value in MB (one process per CPU is used)'}),
         'default': 256,
         'type': EnsureInt(),
+    },
+    'datalad.ui.progressbar': {
+        'ui': ('question', {
+            'title': 'UI progress bars',
+            'text': 'Default backend for progress reporting'}),
+        'default': None,
+        'type': EnsureChoice('tqdm', 'tqdm-ipython', 'log', 'none'),
+    },
+    'datalad.ui.color': {
+        'ui': ('question', {
+            'title': 'Colored terminal output',
+            'text': 'Enable or disable ANSI color codes in outputs; "on" overrides NO_COLOR environment variable'}),
+        'default': 'auto',
+        'type': EnsureChoice('on', 'off', 'auto'),
     },
 }

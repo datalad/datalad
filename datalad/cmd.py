@@ -317,8 +317,8 @@ class Runner(object):
             if log_stderr_:
                 stderr_ = self._process_one_line(*stderr_args)
                 stderr += stderr_
-            if not (stdout_ or stderr_):
-                # no output was generated, so sleep a tiny bit
+            if stdout_ is None and stderr_ is None:
+                # no output was really produced, so sleep a tiny bit
                 time.sleep(0.001)
 
         # Handle possible remaining output
@@ -450,6 +450,8 @@ class Runner(object):
 
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
+        if PY2:
+            popen_cwd = assure_bytes(popen_cwd)
 
         if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must

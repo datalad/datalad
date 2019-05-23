@@ -118,7 +118,7 @@ def _parse_git_submodules(dspath):
 
 @build_doc
 class Subdatasets(Interface):
-    """Report subdatasets and their properties.
+    r"""Report subdatasets and their properties.
 
     The following properties are reported (if possible) for each matching
     subdataset record.

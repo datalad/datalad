@@ -1,0 +1,446 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [Basic XXX==]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body: {string: !!python/unicode '{"message":"Must specify two-factor authentication
+        OTP code.","documentation_url":"https://developer.github.com/v3/auth#working-with-two-factor-authentication"}'}
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      content-length: ['160']
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:43:45 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [401 Unauthorized]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-otp: [required; app]
+      x-github-request-id: ['B470:108F:352213:68BDA2:5CBE7BE1']
+      x-ratelimit-limit: ['60']
+      x-ratelimit-remaining: ['58']
+      x-ratelimit-reset: ['1555991025']
+      x-xss-protection: [1; mode=block]
+    status: {code: 401, message: Unauthorized}
+- request:
+    body: !!python/unicode '{"note": "DataLad", "scopes": ["user", "repo"]}'
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [Basic XXX==]
+      Connection: [keep-alive]
+      Content-Length: ['47']
+      Content-Type: [application/json]
+      User-Agent: [PyGithub/Python]
+      X-GitHub-OTP: ['686273']
+    method: POST
+    uri: https://api.github.com/authorizations
+  response:
+    body: {string: !!python/unicode '{"id":282583716,"url":"https://api.github.com/authorizations/282583716","app":{"name":"DataLad","url":"https://developer.github.com/v3/oauth_authorizations/","client_id":"00000000000000000000"},"token":"token","hashed_token":"XXX","token_last_eight":"3e6cde8a","note":"DataLad","note_url":null,"created_at":"2019-04-23T02:43:58Z","updated_at":"2019-04-23T02:43:58Z","scopes":["user","repo"],"fingerprint":null}'}
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-length: ['506']
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:43:58 GMT']
+      etag: ['"48764ef7692db900147b1e18699d7507"']
+      location: ['https://api.github.com/authorizations/282583716']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [201 Created]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['B470:108F:3525DB:68BDAA:5CBE7BE1']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4999']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 201, message: Created}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA51UTY/aMBD9Lz4D+SBlm0jVHraXHtrVSrSqeokcxwS3jm3ZDpSN+O99TsLSsitV
+        ChfweObN85t59ETqRihSkJp6Kmm99Nx5bsmCiJoUaZpn6/x9siBK17wMIfL549Pm2/cvkv38dHrc
+        Pj0/bpvfSKcHANiysxI5e++NK6JoDLpk1Qi/76rOccu08lz5FdNt1EWXBveHDxlAGjvBDJ0QuIEz
+        YkIaywHnolfE976VNzzG9kPRq/SdllIfgXTL/f/NopdaUB1/C9XMxkFtH2m/55ARTzsHQYTzc4gN
+        dX0UvjC1gOQwHcvrGeSmSlA7KrDqI8uNHiC7yjErjBdazSH5Tz3wtG2oEs90Lh7qHWACvTl0hjrU
+        8wP2cw7AWNhHxooDZacgkeWMiwNknw16gwBMfzIc7viKFQlDEJ6XtG6DiXdUOg6v0hYJqpNyQbDy
+        hqrT5VjB7pM/Yc/JCysIBySp2SA97h9OFQxhKONBj5YKmHrE2wvLaSVf8CuhL1emq6Rg5ShjkcQL
+        MkWGZSQFAle/XE/Y+uGOAdhDKepBII2TzTKJl0m+TfJiHRfr9Q9Q6Qwo/5WTL+P1Ms62cVakSLsL
+        OYP60OTa1Wv8tZWX+MQPHcM+12/Ea+F+wYG0wSuTNGgoJa20pV7b8R3+qMsdZTiXtINhlRcX7bzt
+        MAIjKXTsp1GQneVByVHRIr/bvNukWZ6/BX1DM4nxOZ//AM0PTWioBQAA
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:05 GMT']
+      etag: [W/"27d5cdd87627495e3c3f2702d8cf37ef"]
+      last-modified: ['Mon, 04 Mar 2019 04:29:37 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['CB28:7199:B3E7B:1F236C:5CBE7BF5']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4998']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/datalad-tester/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAw3JMQ6AIAwAwK+Yuho6uPEAR79gEBogAUqgsBj/rrfeA5l6N55Aw8myHDyKgw0c
+        25GpiJHI5Rot/R9EateIjiYlrtSUjxLGrSxnnDs2qtxx9STwfutuZdhYAAAA
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:05 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [404 Not Found]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['CB28:7199:B3E81:1F2374:5CBE7BF5']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4997']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 404, message: Not Found}
+- request:
+    body: !!python/unicode '{"has_issues": false, "auto_init": false, "has_wiki":
+      false, "name": "test_integration1", "has_downloads": false}'
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      Content-Length: ['113']
+      Content-Type: [application/json]
+      User-Agent: [PyGithub/Python]
+    method: POST
+    uri: https://api.github.com/user/repos
+  response:
+    body: {string: !!python/unicode '{"id":182912407,"node_id":"MDEwOlJlcG9zaXRvcnkxODI5MTI0MDc=","name":"test_integration1","full_name":"datalad-tester/test_integration1","private":false,"owner":{"login":"datalad-tester","id":22943981,"node_id":"MDQ6VXNlcjIyOTQzOTgx","avatar_url":"https://avatars1.githubusercontent.com/u/22943981?v=4","gravatar_id":"","url":"https://api.github.com/users/datalad-tester","html_url":"https://github.com/datalad-tester","followers_url":"https://api.github.com/users/datalad-tester/followers","following_url":"https://api.github.com/users/datalad-tester/following{/other_user}","gists_url":"https://api.github.com/users/datalad-tester/gists{/gist_id}","starred_url":"https://api.github.com/users/datalad-tester/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/datalad-tester/subscriptions","organizations_url":"https://api.github.com/users/datalad-tester/orgs","repos_url":"https://api.github.com/users/datalad-tester/repos","events_url":"https://api.github.com/users/datalad-tester/events{/privacy}","received_events_url":"https://api.github.com/users/datalad-tester/received_events","type":"User","site_admin":false},"html_url":"https://github.com/datalad-tester/test_integration1","description":null,"fork":false,"url":"https://api.github.com/repos/datalad-tester/test_integration1","forks_url":"https://api.github.com/repos/datalad-tester/test_integration1/forks","keys_url":"https://api.github.com/repos/datalad-tester/test_integration1/keys{/key_id}","collaborators_url":"https://api.github.com/repos/datalad-tester/test_integration1/collaborators{/collaborator}","teams_url":"https://api.github.com/repos/datalad-tester/test_integration1/teams","hooks_url":"https://api.github.com/repos/datalad-tester/test_integration1/hooks","issue_events_url":"https://api.github.com/repos/datalad-tester/test_integration1/issues/events{/number}","events_url":"https://api.github.com/repos/datalad-tester/test_integration1/events","assignees_url":"https://api.github.com/repos/datalad-tester/test_integration1/assignees{/user}","branches_url":"https://api.github.com/repos/datalad-tester/test_integration1/branches{/branch}","tags_url":"https://api.github.com/repos/datalad-tester/test_integration1/tags","blobs_url":"https://api.github.com/repos/datalad-tester/test_integration1/git/blobs{/sha}","git_tags_url":"https://api.github.com/repos/datalad-tester/test_integration1/git/tags{/sha}","git_refs_url":"https://api.github.com/repos/datalad-tester/test_integration1/git/refs{/sha}","trees_url":"https://api.github.com/repos/datalad-tester/test_integration1/git/trees{/sha}","statuses_url":"https://api.github.com/repos/datalad-tester/test_integration1/statuses/{sha}","languages_url":"https://api.github.com/repos/datalad-tester/test_integration1/languages","stargazers_url":"https://api.github.com/repos/datalad-tester/test_integration1/stargazers","contributors_url":"https://api.github.com/repos/datalad-tester/test_integration1/contributors","subscribers_url":"https://api.github.com/repos/datalad-tester/test_integration1/subscribers","subscription_url":"https://api.github.com/repos/datalad-tester/test_integration1/subscription","commits_url":"https://api.github.com/repos/datalad-tester/test_integration1/commits{/sha}","git_commits_url":"https://api.github.com/repos/datalad-tester/test_integration1/git/commits{/sha}","comments_url":"https://api.github.com/repos/datalad-tester/test_integration1/comments{/number}","issue_comment_url":"https://api.github.com/repos/datalad-tester/test_integration1/issues/comments{/number}","contents_url":"https://api.github.com/repos/datalad-tester/test_integration1/contents/{+path}","compare_url":"https://api.github.com/repos/datalad-tester/test_integration1/compare/{base}...{head}","merges_url":"https://api.github.com/repos/datalad-tester/test_integration1/merges","archive_url":"https://api.github.com/repos/datalad-tester/test_integration1/{archive_format}{/ref}","downloads_url":"https://api.github.com/repos/datalad-tester/test_integration1/downloads","issues_url":"https://api.github.com/repos/datalad-tester/test_integration1/issues{/number}","pulls_url":"https://api.github.com/repos/datalad-tester/test_integration1/pulls{/number}","milestones_url":"https://api.github.com/repos/datalad-tester/test_integration1/milestones{/number}","notifications_url":"https://api.github.com/repos/datalad-tester/test_integration1/notifications{?since,all,participating}","labels_url":"https://api.github.com/repos/datalad-tester/test_integration1/labels{/name}","releases_url":"https://api.github.com/repos/datalad-tester/test_integration1/releases{/id}","deployments_url":"https://api.github.com/repos/datalad-tester/test_integration1/deployments","created_at":"2019-04-23T02:44:05Z","updated_at":"2019-04-23T02:44:05Z","pushed_at":"2019-04-23T02:44:06Z","git_url":"git://github.com/datalad-tester/test_integration1.git","ssh_url":"git@github.com:datalad-tester/test_integration1.git","clone_url":"https://github.com/datalad-tester/test_integration1.git","svn_url":"https://github.com/datalad-tester/test_integration1","homepage":null,"size":0,"stargazers_count":0,"watchers_count":0,"language":null,"has_issues":false,"has_projects":true,"has_downloads":false,"has_wiki":false,"has_pages":false,"forks_count":0,"mirror_url":null,"archived":false,"disabled":false,"open_issues_count":0,"license":null,"forks":0,"open_issues":0,"watchers":0,"default_branch":"master","permissions":{"admin":true,"push":true,"pull":true},"allow_squash_merge":true,"allow_merge_commit":true,"allow_rebase_merge":true,"network_count":0,"subscribers_count":0}'}
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-length: ['5600']
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:06 GMT']
+      etag: ['"3fd6b0aed40288407d4a2faee0442b28"']
+      location: ['https://api.github.com/repos/datalad-tester/test_integration1']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [201 Created]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['public_repo, repo']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['CB28:7199:B3E84:1F237B:5CBE7BF5']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4996']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 201, message: Created}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA51UTY/TMBT8Lz63zUdDl0RCHODCAVYrFYS4RI7jpgbXtmynpRv1vzPOx7JkV0JK
+        L61f38ybjN+kI1I3QpGC1NRTSeu1585zS1ZE1KRI0zzb5m+TFVG65mUokc8fH3bfvn+R7Oen6/3+
+        4fF+3/xGOz2DwJatleg5em9cEUVD0SWbRvhjW7WOW6aV58pvmD5FbTQNeH9+l4GksSNNPwmFGZ0R
+        I9MAB52LXgg/+pOc6RjG96AX7Qctpb6Aaa79/8OiJyykDr+FahbzANtF2h85bMSj3YIhwvklwnpc
+        F4Uv3Fpgcrgdy+sF4kYkpF0UVHWR5Ub3lG3lmBXGC62WiPwHDz5tG6rEI13KB7wDTZC3RE6PA56f
+        sZ9LCAZgFxkrzpRdg0WWMy7OsH0x6YwBnP5qONLxFSsSLkF4XtL6FEJ8oNJxZJWe0KBaKVcEK2+o
+        uk7HCnEf84l4jlnYwDgwSc166/H/h2uFQBjKePDjRAVCPfAdheW0kk/8ldDTX6atpGDlYGOR4KUx
+        VvplJEU8ZQTUz07Y+v7EQOzhFPUQkMbJbp3E6yTfJ3mxjYvt9gektAaSn/Xk63i7jrN9nBUp2u5C
+        T+8+PPk71Wu82sqpPurDxLDP9Sv1WrhfSCBt8JRJGjyUklbaUq9H5f6iywNlOJe0RWCVF5N33ra4
+        AiMpfOzGqyAHy4OTg6NFfrd7s0uzPH+NeiYzifG53f4A1Qbwz6gFAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:06 GMT']
+      etag: [W/"0f52a22cfaf01ad706ad86ee9b4a4b89"]
+      last-modified: ['Mon, 04 Mar 2019 04:29:37 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['B474:69D5:2C6B51:60599F:5CBE7BF6']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4995']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/datalad-tester/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA62Y32/bNhDH/xe/Lglt1+1qA0X3kGHIgCzokA3FXgxaoi02kqiRlN1EyP/e75H6
+        6aS1avAlsWnyw+Px7nh31UTGk9Xs/Xw5my+mv15MchWLNY1Nbq9/P9ylf6bRH8sn/vnvfZQ/fL27
+        vnl7e38zvb2OPkwwmWcCM60wdi1zK3aaW6nyGX7almm6rn+PueUpjy9pntDstemFlntuAdvy1IiL
+        iTrkQk9W1SRVO5ljjyEDG5CM8/ly8Wb5fjYU+9O7fz//lUZfbh7v7j893d3vvmI6B57rdalTwBJr
+        C7NizA+a2dVO2qTclEboSOEcub2KVMZK1mzwcf9hAQjO5zFOQRg4whWyJvnlwBn2QvDEZumRHH57
+        t+jF9K1KU3UA6Vj205uxdi1diOPIfHc2B2srpmwioEYc7ZkUIo09RzC3rmL0D8ZGJIPb0SI+Q7h6
+        JUQjm3mumBaFcshyYyItCzLJc4QcrAdP6R3P5ZMz8XN4WG+AIfHOWe7WYb3Ywz7PAfiFFXO+Fj2S
+        irSIhNxD7WdDjwhg2seCgsI/MBG6BGnFmscZObHz7ecLuN94D3g1WsSivdjJKkekIfPWD230+KFb
+        Oj0e+dmruxDyhJ7HseCHIEEZD+IxDJBAFcPf2nsiODffKIRfdSpQjBR5QKxY/ysZjhU8C3MURwIx
+        USqQth0JRGlMKUZZ9kidOKBhjR/lZbbxYXCM94zcw6MgPTdG7nIhwmi5pVWsid0bzfMoCcRvYBXz
+        n5yN8F0Y4QkE3iZVmzBAvLfM0SpmEu4fMrsOJi/hCTaga7ENJzzBWrrVoazECU60lo3H1cJgwkje
+        wFhVaz3l+a7ku0D4lkbPDtKJHX86mTaN9MoOBzaliFpuyoCxtgOS7D5vQWwJpPaO19FdVvTjbGus
+        bnppltNOlslT+clIdM0a+FFIPtn78R70/XSC9RMHIFjFusfCP0v1NkFuoH6XGsn7m9XlTBhDamCs
+        +qXgNqG4iT0LrkWQY9QsVm040sSrq6sqEdwVB5nQoYKER4HJdZQg9Q0iedXAkOhl3LoaZEuCx6hJ
+        UsXjMPpvaSD7Ow8ivUf1raZASh1GZEfqozOZogug8kAxv8P1N8mVlVsZjanURjrygFh9NDKPxAVH
+        4QHrtzKS8AeUx3TlyMNFIOV5FA6GNouv1lIB1whzM1p4WMV8AR6LIlWP4UJfj0dxQgu0d+I1tygN
+        59PZ8nK6uJy/uZ/OV4vFavr2P8wpCzQ/TswpSpN8f8o7wiCo126BT2jyfLe58rLoo+4NCMYkHeG3
+        bv3qVCOrXh+lsO8j1zxDiv3x+/wTDJwiUZkokFw1FbKRT/g8HeRGkSpz3AgGD9yiGEDG0Q01+VQD
+        SLhZ+1jRFto0VGj1RUTWTFZWl2jd0VgXqZqGHo0e5IMcLqXcrx3x9Xa3fya1VnXLzhf5dZhF861u
+        E8bS8E0qugFViLwWsn8SGYnctJrw5Tidujd9oAX3JRZbXqZ27Ssa2G3GqX8J1RZCZ9AE9YGoR1m3
+        N/zxyUIbVVD085/R9UC0UIe1+b/kMC/3DDXT/C9uCEJT+jT8RQt6EYdrcmEP6Cr0DtlPGxslPn8D
+        mCRPDuAVAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:06 GMT']
+      etag: [W/"3fd6b0aed40288407d4a2faee0442b28"]
+      last-modified: ['Tue, 23 Apr 2019 02:44:05 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['B474:69D5:2C6B58:6059AC:5CBE7BF6']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4994']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA51UTY/TMBT8Lz63zUdDl0RCHODCAVYrFYS4RI7jpgbXtmynpRv1vzPOx7JkV0JK
+        L61f38ybjN+kI1I3QpGC1NRTSeu1585zS1ZE1KRI0zzb5m+TFVG65mUokc8fH3bfvn+R7Oen6/3+
+        4fF+3/xGOz2DwJatleg5em9cEUVD0SWbRvhjW7WOW6aV58pvmD5FbTQNeH9+l4GksSNNPwmFGZ0R
+        I9MAB52LXgg/+pOc6RjG96AX7Qctpb6Aaa79/8OiJyykDr+FahbzANtF2h85bMSj3YIhwvklwnpc
+        F4Uv3Fpgcrgdy+sF4kYkpF0UVHWR5Ub3lG3lmBXGC62WiPwHDz5tG6rEI13KB7wDTZC3RE6PA56f
+        sZ9LCAZgFxkrzpRdg0WWMy7OsH0x6YwBnP5qONLxFSsSLkF4XtL6FEJ8oNJxZJWe0KBaKVcEK2+o
+        uk7HCnEf84l4jlnYwDgwSc166/H/h2uFQBjKePDjRAVCPfAdheW0kk/8ldDTX6atpGDlYGOR4KUx
+        VvplJEU8ZQTUz07Y+v7EQOzhFPUQkMbJbp3E6yTfJ3mxjYvt9gektAaSn/Xk63i7jrN9nBUp2u5C
+        T+8+PPk71Wu82sqpPurDxLDP9Sv1WrhfSCBt8JRJGjyUklbaUq9H5f6iywNlOJe0RWCVF5N33ra4
+        AiMpfOzGqyAHy4OTg6NFfrd7s0uzPH+NeiYzifG53f4A1Qbwz6gFAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:07 GMT']
+      etag: [W/"0f52a22cfaf01ad706ad86ee9b4a4b89"]
+      last-modified: ['Mon, 04 Mar 2019 04:29:37 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['CB2C:69D2:3A9C4B:75291C:5CBE7BF7']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4993']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token token]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/datalad-tester/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA62Y32/bNhDH/xe/Lglt1+1qA0X3kGHIgCzokA3FXgxaoi02kqiRlN1EyP/e75H6
+        6aS1avAlsWnyw+Px7nh31UTGk9Xs/Xw5my+mv15MchWLNY1Nbq9/P9ylf6bRH8sn/vnvfZQ/fL27
+        vnl7e38zvb2OPkwwmWcCM60wdi1zK3aaW6nyGX7almm6rn+PueUpjy9pntDstemFlntuAdvy1IiL
+        iTrkQk9W1SRVO5ljjyEDG5CM8/ly8Wb5fjYU+9O7fz//lUZfbh7v7j893d3vvmI6B57rdalTwBJr
+        C7NizA+a2dVO2qTclEboSOEcub2KVMZK1mzwcf9hAQjO5zFOQRg4whWyJvnlwBn2QvDEZumRHH57
+        t+jF9K1KU3UA6Vj205uxdi1diOPIfHc2B2srpmwioEYc7ZkUIo09RzC3rmL0D8ZGJIPb0SI+Q7h6
+        JUQjm3mumBaFcshyYyItCzLJc4QcrAdP6R3P5ZMz8XN4WG+AIfHOWe7WYb3Ywz7PAfiFFXO+Fj2S
+        irSIhNxD7WdDjwhg2seCgsI/MBG6BGnFmscZObHz7ecLuN94D3g1WsSivdjJKkekIfPWD230+KFb
+        Oj0e+dmruxDyhJ7HseCHIEEZD+IxDJBAFcPf2nsiODffKIRfdSpQjBR5QKxY/ysZjhU8C3MURwIx
+        USqQth0JRGlMKUZZ9kidOKBhjR/lZbbxYXCM94zcw6MgPTdG7nIhwmi5pVWsid0bzfMoCcRvYBXz
+        n5yN8F0Y4QkE3iZVmzBAvLfM0SpmEu4fMrsOJi/hCTaga7ENJzzBWrrVoazECU60lo3H1cJgwkje
+        wFhVaz3l+a7ku0D4lkbPDtKJHX86mTaN9MoOBzaliFpuyoCxtgOS7D5vQWwJpPaO19FdVvTjbGus
+        bnppltNOlslT+clIdM0a+FFIPtn78R70/XSC9RMHIFjFusfCP0v1NkFuoH6XGsn7m9XlTBhDamCs
+        +qXgNqG4iT0LrkWQY9QsVm040sSrq6sqEdwVB5nQoYKER4HJdZQg9Q0iedXAkOhl3LoaZEuCx6hJ
+        UsXjMPpvaSD7Ow8ivUf1raZASh1GZEfqozOZogug8kAxv8P1N8mVlVsZjanURjrygFh9NDKPxAVH
+        4QHrtzKS8AeUx3TlyMNFIOV5FA6GNouv1lIB1whzM1p4WMV8AR6LIlWP4UJfj0dxQgu0d+I1tygN
+        59PZ8nK6uJy/uZ/OV4vFavr2P8wpCzQ/TswpSpN8f8o7wiCo126BT2jyfLe58rLoo+4NCMYkHeG3
+        bv3qVCOrXh+lsO8j1zxDiv3x+/wTDJwiUZkokFw1FbKRT/g8HeRGkSpz3AgGD9yiGEDG0Q01+VQD
+        SLhZ+1jRFto0VGj1RUTWTFZWl2jd0VgXqZqGHo0e5IMcLqXcrx3x9Xa3fya1VnXLzhf5dZhF861u
+        E8bS8E0qugFViLwWsn8SGYnctJrw5Tidujd9oAX3JRZbXqZ27Ssa2G3GqX8J1RZCZ9AE9YGoR1m3
+        N/zxyUIbVVD085/R9UC0UIe1+b/kMC/3DDXT/C9uCEJT+jT8RQt6EYdrcmEP6Cr0DtlPGxslPn8D
+        mCRPDuAVAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Tue, 23 Apr 2019 02:44:07 GMT']
+      etag: [W/"3fd6b0aed40288407d4a2faee0442b28"]
+      last-modified: ['Tue, 23 Apr 2019 02:44:05 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['CB2C:69D2:3A9C56:75292C:5CBE7BF7']
+      x-oauth-scopes: ['user, repo']
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4992']
+      x-ratelimit-reset: ['1555991038']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+version: 1

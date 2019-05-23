@@ -460,3 +460,51 @@ def test_bf2043p2(path):
     with chpwd(path):
         save()
     ok_clean_git(ds.path, untracked=['untracked'])
+
+
+# https://github.com/datalad/datalad/issues/3087
+@with_tree({
+    'sdir1': {'foo': 'foo'},
+    'sdir2': {'foo': 'foo'},
+    'sdir3': {'sdir': {'subsub': {'foo': 'foo'}}},
+})
+def test_save_directory(path):
+    # Sequence of save invocations on subdirectories.
+    ds = Dataset(path).create(force=True)
+    ds.save(path='sdir1')
+    ok_clean_git(ds.path, untracked=['sdir2/foo', 'sdir3/sdir/subsub/foo'])
+
+    # There is also difference from
+    with chpwd(path):
+        save(path='sdir2')
+    ok_clean_git(ds.path, untracked=['sdir3/sdir/subsub/foo'])
+
+    with chpwd(opj(path, 'sdir3')):
+        save(path='sdir')
+    ok_clean_git(ds.path)
+
+
+@with_tree({'.gitattributes': "* annex.largefiles=(largerthan=4b)",
+            "foo": "in annex"})
+def test_save_partial_index(path):
+    ds = Dataset(path).create(force=True)
+    ds.add("foo")
+    ok_clean_git(ds.path)
+    ds.unlock(path="foo")
+    create_tree(ds.path, tree={"foo": "a", "staged": ""},
+                remove_existing=True)
+    ds.repo.add("staged", git=True)
+    ds.save(path="foo")
+    ok_clean_git(ds.path, head_modified=["staged"])
+
+
+@with_tree({
+    'top:file': 'data',
+    'd': {'sub:file': 'data'}
+})
+def test_gh3421(path):
+    # failed to add d/sub:file
+    ds = Dataset(path).create(force=True)
+    ds.add('top:file')
+    ds.add(opj('d', 'sub:file'))
+    ok_clean_git(ds.path)

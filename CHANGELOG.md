@@ -9,6 +9,70 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.11.5 (May 23, 2019) -- stability is not overrated
+
+Should be faster and less buggy, with a few enhancements.
+
+### Fixes
+
+- [create-sibling][]  ([#3318][])
+  - Siblings are no longer configured with a post-update hook unless a
+    web interface is requested with `--ui`.
+  - `git submodule update --init` is no longer called from the
+    post-update hook.
+  - If `--inherit` is given for a dataset without a superdataset, a
+    warning is now given instead of raising an error.
+- The internal command runner failed on Python 2 when its `env`
+  argument had unicode values.  ([#3332][])
+- The safeguard that prevents creating a dataset in a subdirectory
+  that already contains tracked files for another repository failed on
+  Git versions before 2.14.  For older Git versions, we now warn the
+  caller that the safeguard is not active.  ([#3347][])
+- A regression introduced in v0.11.1 prevented [save][] from committing
+  changes under a subdirectory when the subdirectory was specified as
+  a path argument.  ([#3106][])
+- A workaround introduced in v0.11.1 made it possible for [save][] to
+  do a partial commit with an annex file that has gone below the
+  `annex.largefiles` threshold.  The logic of this workaround was
+  faulty, leading to files being displayed as typechanged in the index
+  following the commit.  ([#3365][])
+- The resolve_path() helper confused paths that had a semicolon for
+  SSH RIs.  ([#3425][])
+- The detection of SSH RIs has been improved.  ([#3425][])
+
+### Enhancements and new features
+
+- The internal command runner was too aggressive in its decision to
+  sleep.  ([#3322][])
+- The "INFO" label in log messages now retains the default text color
+  for the terminal rather than using white, which only worked well for
+  terminals with dark backgrounds.  ([#3334][])
+- A short flag `-R` is now available for the `--recursion-limit` flag,
+  a flag shared by several subcommands.  ([#3340][])
+- The authentication logic for [create-sibling-github][] has been
+  revamped and now supports 2FA.  ([#3180][])
+- New configuration option `datalad.ui.progressbar` can be used to
+  configure the default backend for progress reporting ("none", for
+  example, results in no progress bars being shown).  ([#3396][])
+- A new progress backend, available by setting datalad.ui.progressbar
+  to "log", replaces progress bars with a log message upon completion
+  of an action.  ([#3396][])
+- DataLad learned to consult the [NO_COLOR][] environment variable and
+  the new `datalad.ui.color` configuration option when deciding to
+  color output.  The default value, "auto", retains the current
+  behavior of coloring output if attached to a TTY ([#3407][]).
+- [clean][] now removes annex transfer directories, which is useful
+  for cleaning up failed downloads. ([#3374][])
+- [clone][] no longer refuses to clone into a local path that looks
+  like a URL, making its behavior consistent with `git clone`.
+  ([#3425][])
+- [wtf][]
+  - Learned to fall back to the `dist` package if `platform.dist`,
+    which has been removed in the yet-to-be-release Python 3.8, does
+    not exist.  ([#3439][])
+  - Gained a `--section` option for limiting the output to specific
+    sections and a `--decor` option, which currently knows how to
+    format the output as GitHub's `<details>` section.  ([#3440][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1121,6 +1185,7 @@ publishing
 [wtf]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-wtf.html
 
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
+[NO_COLOR]: https://no-color.org/
 
 [#2992]: https://github.com/datalad/datalad/issues/2992
 [#3196]: https://github.com/datalad/datalad/issues/3196
@@ -1222,6 +1287,7 @@ publishing
 [#3098]: https://github.com/datalad/datalad/issues/3098
 [#3099]: https://github.com/datalad/datalad/issues/3099
 [#3104]: https://github.com/datalad/datalad/issues/3104
+[#3106]: https://github.com/datalad/datalad/issues/3106
 [#3109]: https://github.com/datalad/datalad/issues/3109
 [#3115]: https://github.com/datalad/datalad/issues/3115
 [#3119]: https://github.com/datalad/datalad/issues/3119
@@ -1237,6 +1303,7 @@ publishing
 [#3165]: https://github.com/datalad/datalad/issues/3165
 [#3168]: https://github.com/datalad/datalad/issues/3168
 [#3176]: https://github.com/datalad/datalad/issues/3176
+[#3180]: https://github.com/datalad/datalad/issues/3180
 [#3181]: https://github.com/datalad/datalad/issues/3181
 [#3184]: https://github.com/datalad/datalad/issues/3184
 [#3186]: https://github.com/datalad/datalad/issues/3186
@@ -1252,3 +1319,16 @@ publishing
 [#3250]: https://github.com/datalad/datalad/issues/3250
 [#3268]: https://github.com/datalad/datalad/issues/3268
 [#3281]: https://github.com/datalad/datalad/issues/3281
+[#3318]: https://github.com/datalad/datalad/issues/3318
+[#3322]: https://github.com/datalad/datalad/issues/3322
+[#3332]: https://github.com/datalad/datalad/issues/3332
+[#3334]: https://github.com/datalad/datalad/issues/3334
+[#3340]: https://github.com/datalad/datalad/issues/3340
+[#3347]: https://github.com/datalad/datalad/issues/3347
+[#3365]: https://github.com/datalad/datalad/issues/3365
+[#3374]: https://github.com/datalad/datalad/issues/3374
+[#3396]: https://github.com/datalad/datalad/issues/3396
+[#3407]: https://github.com/datalad/datalad/issues/3407
+[#3425]: https://github.com/datalad/datalad/issues/3425
+[#3439]: https://github.com/datalad/datalad/issues/3439
+[#3440]: https://github.com/datalad/datalad/issues/3440

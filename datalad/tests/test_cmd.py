@@ -17,6 +17,7 @@ import shlex
 
 from .utils import (
     ok_,
+    ok_exists,
     eq_,
     assert_is,
     assert_equal,
@@ -34,6 +35,7 @@ from .utils import (
     ok_file_has_content,
     on_windows,
     lgr,
+    OBSCURE_FILENAME,
 )
 
 from ..cmd import (
@@ -291,6 +293,18 @@ def test_runner_fix_PWD(path):
     eq_(err, '')
     eq_(out.rstrip(os.linesep), path)  # was fixed up to point to point to cwd's path
     eq_(env['PWD'], orig_cwd)  # no side-effect
+
+
+@with_tempfile(mkdir=True)
+def test_runner_cwd_encoding(path):
+    env = os.environ.copy()
+    # Add PWD to env so that runner will temporarily adjust it to point to cwd.
+    env['PWD'] = os.getcwd()
+    cwd = op.join(path, OBSCURE_FILENAME)
+    os.mkdir(cwd)
+    # Running doesn't fail if cwd or env has unicode value.
+    Runner().run("cd .> foo", cwd=cwd, env=env)
+    ok_exists(op.join(cwd, "foo"))
 
 
 @with_tempfile(mkdir=True)

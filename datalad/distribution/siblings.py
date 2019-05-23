@@ -439,9 +439,9 @@ def _configure_remote(
                 r.update(res_kwargs)
                 yield r
 
-        if inherit:
+        delayed_super = _DelayedSuper(ds.repo)
+        if inherit and delayed_super.super is not None:
             # Adjust variables which we should inherit
-            delayed_super = _DelayedSuper(ds.repo)
             publish_depends = _inherit_config_var(
                 delayed_super, depvar, publish_depends)
             publish_by_default = _inherit_config_var(
@@ -812,33 +812,36 @@ def _inherit_config_var(ds, cfgvar, var):
 class _DelayedSuper(object):
     """A helper to delay deduction on super dataset until needed
 
-    But if asked and not found -- blow up
+    But if asked and not found -- would return None for everything
     """
 
     def __init__(self, repo):
         self._child_dataset = Dataset(repo.path)
         self._super = None
+        self._super_tried = False
 
     def __str__(self):
         return str(self.super)
 
     @property
     def super(self):
-        if self._super is None:
+        if not self._super_tried:
+            self._super_tried = True
             # here we must analyze current_ds's super, not the super_ds
             self._super = self._child_dataset.get_superdataset()
             if not self._super:
-                raise RuntimeError(
+                lgr.warning(
                     "Cannot determine super dataset for %s, thus "
-                    "cannot inherit anything" % self._child_dataset
+                    "probably nothing would be inherited where desired"
+                    % self._child_dataset
                 )
         return self._super
 
     # Lean proxies going through .super
     @property
     def config(self):
-        return self.super.config
+        return self.super.config if self.super else None
 
     @property
     def repo(self):
-        return self.super.repo
+        return self.super.repo if self.super else None

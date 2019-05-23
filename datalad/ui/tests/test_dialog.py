@@ -102,6 +102,13 @@ def test_hidden_doubleentry():
         eq_(response, 'ab')
         gpcm.assert_has_calls([call('?: '), call('? (repeat): ')])
 
+    # explicitly request no repeats
+    with patch_getpass(return_value='ab') as gpcm:
+        response = ui.question(
+            "?", hidden=True, repeat=False)
+        eq_(response, 'ab')
+        gpcm.assert_has_calls([call('?: ')])
+
 
 def _test_progress_bar(backend, len, increment):
     out = StringIO()
@@ -110,6 +117,8 @@ def _test_progress_bar(backend, len, increment):
         'label', fill_str, total=10, backend=backend)
     pb.start()
     # we can't increment 11 times
+    SILENT_BACKENDS = ('annex-remote', 'silent', 'none')
+    ONLY_THE_END_BACKENDS = ('log',)
     for x in range(11):
         if not (increment and x == 0):
             # do not increment on 0
@@ -121,15 +130,17 @@ def _test_progress_bar(backend, len, increment):
         # or just force the refresh
         pb.refresh()
         pstr = out.getvalue()
-        if backend not in ('annex-remote', 'silent'):  # no str repr
+        if backend not in SILENT_BACKENDS + ONLY_THE_END_BACKENDS:  # no str repr
             ok_startswith(pstr.lstrip('\r'), 'label:')
             assert_re_in(r'.*\b%d%%.*' % (10*x), pstr)
         if backend == 'progressbar':
             assert_in('ETA', pstr)
     pb.finish()
-    if backend not in ('annex-remote', 'silent'):
+    output = out.getvalue()
+    if backend not in SILENT_BACKENDS:
         # returns back and there is no spurious newline
-        ok_endswith(out.getvalue(), '\r')
+        if output:
+            ok_endswith(output, '\r')
 
 
 def test_progress_bar():

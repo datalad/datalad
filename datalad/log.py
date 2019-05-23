@@ -177,10 +177,10 @@ class ColorFormatter(logging.Formatter):
         levelname = record.levelname
 
         if self.use_color and levelname in colors.LOG_LEVEL_COLORS:
-            fore_color = colors.LOG_LEVEL_COLORS[levelname]
-            levelname_color = (colors.COLOR_SEQ % fore_color) + \
-                              ("%-7s" % levelname) + colors.RESET_SEQ
-            record.levelname = levelname_color
+            record.levelname = colors.color_word(
+                "{:7}".format(levelname),
+                colors.LOG_LEVEL_COLORS[levelname],
+                force=True)
         record.msg = record.msg.replace("\n", "\n| ")
         if self._tb:
             if not getattr(record, 'notraceback', False):
@@ -243,6 +243,11 @@ class OnlyProgressLog(logging.Filter):
 def log_progress(lgrcall, pid, *args, **kwargs):
     """Helper to emit a log message on the progress of some process
 
+    Note: Whereas this helper reports on interim progress and is to be used
+    programmatically, :class:`~datalad.ui.progressbars.LogProgressBar` replaces
+    a progress bar with a single log message upon completion and can be chosen
+    by the user (config 'datalad.ui.progressbar' set to 'log').
+
     Parameters
     ----------
     lgrcall : callable
@@ -261,7 +266,7 @@ def log_progress(lgrcall, pid, *args, **kwargs):
       on the same line.
     update : int
       To which quantity to advance the progress.
-    incremental : bool
+    increment : bool
       If set, `update` is interpreted as an incremental value, not absolute.
     """
     d = dict(

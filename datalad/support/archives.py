@@ -112,15 +112,15 @@ patoolib.util.run = _patool_run
 # patool
 
 DECOMPRESSORS = {
-    '\.(tar\.bz|tbz)$': 'tar -xjvf %(file)s -C %(dir)s',
-    '\.(tar\.xz)$': 'tar -xJvf %(file)s -C %(dir)s',
-    '\.(tar\.gz|tgz)$': 'tar -xzvf %(file)s -C %(dir)s',
-    '\.(zip)$': 'unzip %(file)s -d %(dir)s',
+    r'\.(tar\.bz|tbz)$': 'tar -xjvf %(file)s -C %(dir)s',
+    r'\.(tar\.xz)$': 'tar -xJvf %(file)s -C %(dir)s',
+    r'\.(tar\.gz|tgz)$': 'tar -xzvf %(file)s -C %(dir)s',
+    r'\.(zip)$': 'unzip %(file)s -d %(dir)s',
 }
 
 
 def unixify_path(path):
-    """On windows convert paths from drive:\d\file to /drive/d/file
+    r"""On windows convert paths from drive:\d\file to /drive/d/file
 
     This overcomes problems with various cmdline tools we are to use,
     such as tar etc
