@@ -94,9 +94,6 @@ requires = {
         # use pyliblzma as the default for now.  Patch were you would prefer
         # backports.lzma instead
         'pyliblzma; python_version < "3.3"',
-        # was added in https://github.com/datalad/datalad/pull/1995 without
-        # due investigation, should not be needed until we add duecredit support
-        # 'duecredit',
         'simplejson',
         'whoosh',
     ],
