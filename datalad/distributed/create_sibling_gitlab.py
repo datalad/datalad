@@ -523,6 +523,17 @@ class GitLabSite(object):
                     ))
             # create the group for the target project
             try:
+                # prevent failure due to specification of a users personal
+                # group, always exists, cannot and must not be created
+                self.site.auth()
+                if len(path_l) == 2 \
+                        and path_l[0] == self.site.user.attributes.get(
+                            'username', None):
+                    # attempt to create a personal project in the users
+                    # top-level personal group-- this is the same as
+                    # having no parent namespace, don't attempt to
+                    # create the group
+                    return None
                 namespace_id = self.site.groups.create(dict(
                     name=path_l[-2],
                     path=path_l[-2],
