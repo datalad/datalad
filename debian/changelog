@@ -4,6 +4,8 @@ datalad (0.11.5-1) experimental; urgency=medium
   * debian/rules
     - set http*_proxy to empty value so VCR based tests (github) would
       work (otherwise mismatch from proxy IP)
+  * debian/control
+    - added python{,3}-vcr to build-depends for github vcr tests
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 24 May 2019 07:31:33 -0400
 

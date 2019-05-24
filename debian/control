@@ -42,6 +42,7 @@ Build-Depends:
  python-six (>= 1.8.0~),
  python-tqdm,
  python-whoosh,
+ python-vcr,
  python-wrapt,
  python3-all,
  python3-appdirs,
@@ -73,6 +74,7 @@ Build-Depends:
  python3-simplejson,
  python3-six (>= 1.8.0~),
  python3-tqdm,
+ python3-vcr,
  python3-whoosh,
  python3-wrapt,
 Standards-Version: 4.1.4
