@@ -530,9 +530,10 @@ class GitLabSite(object):
                 ).get_id()
             except self.gitlab.GitlabCreateError as e:
                 raise RuntimeError(
-                    "Failed to create parent group '{}' under '{}': {}".format(
+                    "Failed to create parent group '{}' under {}: {}".format(
                         path_l[-2],
-                        parent_group.attributes['full_path'],
+                        repr(parent_group.attributes['full_path'])
+                        if parent_group else 'the account root',
                         str(e)),
                 )
         return namespace_id
