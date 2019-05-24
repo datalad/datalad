@@ -1,8 +1,11 @@
 datalad (0.11.5-1) experimental; urgency=medium
 
   * Fresh upstream bugfix/minor release
+  * debian/rules
+    - set http*_proxy to empty value so VCR based tests (github) would
+      work (otherwise mismatch from proxy IP)
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 23 May 2019 16:17:35 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Fri, 24 May 2019 07:31:33 -0400
 
 datalad (0.11.4-1) experimental; urgency=medium
 
