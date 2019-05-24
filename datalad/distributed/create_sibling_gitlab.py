@@ -54,75 +54,138 @@ known_access_labels = ('http', 'ssh', 'ssh+http')
 
 @build_doc
 class CreateSiblingGitlab(Interface):
-    """Gimme some docs...
+    """Create dataset sibling at a GitLab site
 
-    But the basic idea is to leave the GitLab access configuration to
-    python-gitlab and its config files, e.g.::
+    A Git repository can be created at any location/path a given user has
+    appropriate permissions for. API access and authentication are implemented
+    via python-gitlab, and all its features are supported. A particular GitLab
+    site must be configured in a named section of a python-gitlab.cfg file
+    (see https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration
+    for details), such as::
 
       [mygit]
       url = https://git.example.com
       api_version = 4
       private_token = abcdefghijklmnopqrst
 
-    and subsequently refer to such a configuration by its label only.
-    This way any future changes to access methods and API versions
-    are dealt with at the level of python-gitlab, and not in here.
+    Subsequently, this site is identified by its name ('mygit' in the example
+    above).
+
+    (Recursive) sibling creation for all, or a selected subset of subdatasets
+    is supported. Three different project layouts for nested datasets are
+    supported (see --layout):
+
+    "hierarchy"
+      Each dataset is placed into its own group, and the actual GitLab
+      project for a dataset is put in a project named "_repo_" inside
+      this group. Using this layout, arbitrarily deep hierarchies of
+      nested datasets can be represented, while the hierarchical structure
+      is reflected in the project path. This is the default layout, if
+      no project path is specified.
+    "flat"
+      All datasets are placed in the same group. The name of a project
+      is its relative path within the root dataset, with all path separator
+      characters replaced by '--'.
+    "collection"
+      This is a hybrid layout, where the root dataset is placed in a "_repo_"
+      project inside a group, and all nested subdatasets are represented
+      inside the group using a "flat" layout.
+
+    GitLab cannot host dataset content. However, in combination with
+    other data sources (and siblings), publishing a dataset to GitLab can
+    facilitate distribution and exchange, while still allowing any dataset
+    consumer to obtain actual data content from alternative sources.
+
+    *Configuration*
+
+    All configuration switches and options for GitLab sibling creation can
+    be provided arguments to the command. However, it is also possible to
+    specify a particular setup in a dataset's configuration. This is
+    particularly important when managing large collections of datasets.
+    Configuration options are:
+
+    "datalad.gitlab-default-site"
+        Name of the default GitLab site (see --site)
+    "datalad.gitlab-SITENAME-siblingname"
+        Name of the sibling configured for the local dataset that points
+        to the GitLab instance SITENAME (see --name)
+    "datalad.gitlab-SITENAME-layout"
+        Project layout used at the GitLab instance SITENAME (see --layout)
+    "datalad.gitlab-SITENAME-access"
+        Access method used for the GitLab instance SITENAME (see --access)
+    "datalad.gitlab-SITENAME-project"
+        Project location/path used for a datasets at GitLab instance
+        SITENAME (see --project). Configuring this is useful for deriving
+        project paths for subdatasets, relative to superdataset.
     """
     _params_ = dict(
         path=Parameter(
             args=('path',),
             metavar='PATH',
             nargs='*',
-            doc=""""""),
+            doc="""selectively create siblings for any datasets underneath a given
+            path. By default only the root dataset is considered."""),
         dataset=Parameter(
             args=("--dataset", "-d",),
-            doc="""specify the dataset to create the publication target for. If
-                no dataset is given, an attempt is made to identify the dataset
-                based on the current working directory""",
+            doc="""reference or root dataset. If no path constraints are given,
+            a sibling for this dataset will be created. In this and all other
+            cases, the reference dataset is also consulted for the GitLab
+            configuration, and desired project layout. If no dataset is given,
+            an attempt is made to identify the dataset based on the current
+            working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         site=Parameter(
             args=('--site',),
             metavar='SITENAME',
-            doc="""Name of the GitLab site to create a sibling at. Must match an
+            doc="""name of the GitLab site to create a sibling at. Must match an
             existing python-gitlab configuration section with location and
-            authentication settings.
-            (see https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration)
+            authentication settings (see
+            https://python-gitlab.readthedocs.io/en/stable/cli.html#configuration).
+            By default the dataset configuration is consulted.
             """,
             constraints=EnsureNone() | EnsureStr()),
         project=Parameter(
             args=('--project',),
             metavar='NAME/LOCATION',
-            doc="""""",
+            doc="""project path at the GitLab site. If a subdataset of the
+            reference dataset is processed, its project path is automatically
+            determined by the `layout` configuration, by default.
+            """,
             constraints=EnsureNone() | EnsureStr()),
         layout=Parameter(
             args=('--layout',),
-            metavar='Layout of projects on the GitLab site',
-            doc="""""",
-            constraints=EnsureChoice(None, *known_layout_labels)),
+            constraints=EnsureChoice(None, *known_layout_labels),
+            doc="""layout of projects at the GitLab site, if a collection, or
+            a hierarchy of datasets and subdatasets is to be created.
+            By default the dataset configuration is consulted.
+            """),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
         name=Parameter(
             args=('-s', '--name',),
             metavar='NAME',
             doc="""name to represent the GitLab sibling remote in the local
-            dataset installation, defaults to the `site` name""",
+            dataset installation. If not specified a name is looked up in the
+            dataset configuration, or defaults to the `site` name""",
             constraints=EnsureStr() | EnsureNone()),
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'error', 'reconfigure'),
-            metavar='MODE',
             doc="""desired behavior when already existing or configured
-            siblings are discovered. 'skip': ignore; 'error': fail immediately;
-            'reconfigure': use the existing repository and reconfigure the
-            local dataset to use it as a sibling""",),
+            siblings are discovered. 'skip': ignore; 'error': fail, if access
+            URLs differ; 'reconfigure': use the existing repository and
+            reconfigure the local dataset to use it as a sibling""",),
         access=Parameter(
             args=("--access",),
             constraints=EnsureChoice(None, *known_access_labels),
-            metavar='MODE',
-            doc="""""",),
+            doc="""access method used for data transfer to and from the sibling.
+            'ssh': read and write access used the SSH protocol; 'http': read and
+            write access use HTTP requests; 'ssh+http': read access is done via
+            HTTP and write access performed with SSH. Dataset configuration is
+            consulted for a default, 'http' is used otherwise.""",),
         description=Parameter(
             args=("--description",),
-            doc="""short description for the GitLab project (displayed on the
+            doc="""brief description for the GitLab project (displayed on the
             site)""",
             constraints=EnsureStr() | EnsureNone()),
         publish_depends=publish_depends,
@@ -131,7 +194,8 @@ class CreateSiblingGitlab(Interface):
             action="store_true",
             doc="""If this flag is set, no communication with GitLab is
             performed, and no repositories will be created. Instead
-            would-be repository names are reported for all relevant datasets
+            would-be repository names and configurations are reported for all
+            relevant datasets
             """),
     )
 
@@ -195,22 +259,6 @@ class CreateSiblingGitlab(Interface):
                     yield r
 
         return
-#    @staticmethod
-#    def result_renderer_cmdline(res, args):
-#        from datalad.ui import ui
-#        res = assure_list(res)
-#        if args.dryrun:
-#            ui.message('DRYRUN -- Anticipated results:')
-#        if not len(res):
-#            ui.message("Nothing done")
-#        else:
-#            for d, url, existed in res:
-#                ui.message(
-#                    "'{}'{} configured as sibling '{}' for {}".format(
-#                        url,
-#                        " (existing repository)" if existed else '',
-#                        args.name,
-#                        d))
 
 
 def _proc_dataset(refds, ds, site, project, remotename, layout, existing,
