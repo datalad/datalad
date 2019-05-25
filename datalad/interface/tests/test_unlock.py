@@ -15,21 +15,32 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
+from six import text_type
+
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
 from datalad.api import unlock
+from datalad.utils import Path
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import eq_
 from datalad.tests.utils import getpwd
 from datalad.tests.utils import chpwd
 from datalad.tests.utils import assert_cwd_unchanged
 from datalad.tests.utils import with_testrepos
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import on_windows, skip_if
-from datalad.tests.utils import assert_status, assert_result_count, assert_in_results
+from datalad.tests.utils import (
+    assert_in_results,
+    assert_not_in_results,
+    assert_result_count,
+    assert_status,
+)
 
 
 @assert_cwd_unchanged
@@ -46,10 +57,8 @@ def test_unlock_raises(path, path2, path3):
     assert_raises(InsufficientArgumentsError,
                   unlock, dataset=None, path=None)
     # no dataset and path not within a dataset:
-    res = unlock(dataset=None, path=path2, result_xfm=None,
-                 on_failure='ignore', return_type='item-or-list')
-    eq_(res['message'], "path not associated with any dataset")
-    eq_(res['path'], path2)
+    assert_raises(NoDatasetArgumentFound,
+                  unlock, dataset=None, path=path2)
 
     create(path=path, no_annex=True)
     ds = Dataset(path)
@@ -59,9 +68,17 @@ def test_unlock_raises(path, path2, path3):
     # make it annex, but call unlock with invalid path:
     (ds.pathobj / ".noannex").unlink()
     AnnexRepo(path, create=True)
+
+    # One that doesn't exist.
     res = ds.unlock(path="notexistent.txt", result_xfm=None,
                     on_failure='ignore', return_type='item-or-list')
     eq_(res['message'], "path does not exist")
+
+    # And one that isn't associated with a dataset.
+    assert_in_results(
+        ds.unlock(path=path2, on_failure="ignore"),
+        status="error",
+        message="path not underneath this dataset")
 
     chpwd(_cwd)
 
@@ -78,17 +95,20 @@ def test_unlock(path):
     # TODO: use get_annexed_files instead of hardcoded filename
     assert_raises(IOError, open, opj(path, 'test-annex.dat'), "w")
 
-    # in V6+ we can unlock even if the file's content isn't present:
-    if ds.repo.supports_unlocked_pointers:
-        res = ds.unlock()
-        assert_result_count(res, 1)
-        assert_status('ok', res)
-        # TODO: RF: make 'lock' a command as well
-        # re-lock to further on have a consistent situation with V5:
-        ds.repo._git_custom_command('test-annex.dat', ['git', 'annex', 'lock'])
-    else:
-        # cannot unlock without content (annex get wasn't called)
-        assert_raises(CommandError, ds.unlock)  # FIXME
+    # Note: In V6+ we can unlock even if the file's content isn't present, but
+    # doing so when unlock() is called with no paths isn't consistent with the
+    # current behavior when an explicit path is given (it doesn't unlock) or
+    # with the behavior in V5, so we don't do it.
+
+    # Unlocking the dataset without an explicit path does not fail if there
+    # are files without content.
+    eq_(ds.unlock(path=None, on_failure="ignore"), [])
+    eq_(ds.unlock(path=[], on_failure="ignore"), [])
+    # cannot unlock without content (annex get wasn't called)
+    assert_in_results(
+        ds.unlock(path="test-annex.dat", on_failure="ignore"),
+        path=opj(path, "test-annex.dat"),
+        status="impossible")
 
     ds.repo.get('test-annex.dat')
     result = ds.unlock()
@@ -144,3 +164,69 @@ def test_unlock(path):
         eq_("change content again", f.read())
 
 
+@with_tree(tree={"dir": {"a": "a", "b": "b"}})
+def test_unlock_directory(path):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    ds.unlock(path="dir")
+    dirpath = Path("dir")
+    dirpath_abs = Path(ds.pathobj / "dir")
+
+    # On adjusted branches (for the purposes of this test, crippled
+    # filesystems), the files were already unlocked and the committed state is
+    # the unlocked pointer file.
+    is_managed_branch = ds.repo.is_managed_branch()
+    if is_managed_branch:
+        assert_repo_status(ds.path)
+    else:
+        assert_repo_status(ds.path, modified=[dirpath / "a", dirpath / "b"])
+    ds.save()
+    ds.drop(text_type(dirpath / "a"), check=False)
+    assert_false(ds.repo.file_has_content(text_type(dirpath / "a")))
+
+    # Unlocking without an explicit non-directory path doesn't fail if one of
+    # the directory's files doesn't have content.
+    res = ds.unlock(path="dir")
+    assert_not_in_results(res, action="unlock",
+                          path=text_type(dirpath_abs / "a"))
+    if is_managed_branch:
+        assert_not_in_results(res, action="unlock",
+                              path=text_type(dirpath_abs / "b"))
+    else:
+        assert_in_results(res, action="unlock", status="ok",
+                          path=text_type(dirpath_abs / "b"))
+        assert_repo_status(ds.path, modified=[dirpath / "b"])
+
+    # If we explicitly provide a path that lacks content, we get a result
+    # for it.
+    assert_in_results(ds.unlock(path=dirpath / "a", on_failure="ignore"),
+                      action="unlock", status="impossible",
+                      path=text_type(dirpath_abs / "a"))
+
+
+@with_tree(tree={"untracked": "untracked",
+                 "regular_git": "regular_git",
+                 "already_unlocked": "already_unlocked"})
+def test_unlock_cant_unlock(path):
+    ds = Dataset(path).create(force=True)
+    ds.save(path="regular_git", to_git=True)
+    ds.save(path="already_unlocked")
+    ds.unlock(path="already_unlocked")
+    assert_repo_status(
+        ds.path,
+        # See managed branch note in previous test_unlock_directory.
+        modified=[] if ds.repo.is_managed_branch() else ["already_unlocked"],
+        untracked=["untracked"])
+    files = ["regular_git", "untracked"]
+    if not ds.repo.supports_unlocked_pointers:
+        # Don't add "already_unlocked" in v6+ because unlocked are still
+        # reported as having content and still passed to unlock. If we can
+        # reliably distinguish unlocked files status's output, we should
+        # consider report a "notneeded" result.
+        files.append("already_unlocked")
+    for f in files:
+        assert_in_results(
+            ds.unlock(path=f, on_failure="ignore"),
+            action="unlock",
+            status="impossible",
+            path=text_type(ds.pathobj / f))
