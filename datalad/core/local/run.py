@@ -477,8 +477,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'run',
                 ds=ds,
                 status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
+                message=(
+                    'clean dataset required to detect changes from command; '
+                    'use `datalad status` to inspect unsaved changes'))
             return
 
     cmd = normalize_command(cmd)

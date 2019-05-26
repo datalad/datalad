@@ -191,8 +191,9 @@ class Rerun(Interface):
                 'run',
                 ds=ds,
                 status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
+                message=(
+                    'clean dataset required to detect changes from command; '
+                    'use `datalad status` to inspect unsaved changes'))
             return
 
         if not ds.repo.get_hexsha():
