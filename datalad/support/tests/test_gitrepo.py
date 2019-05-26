@@ -836,7 +836,17 @@ def test_GitRepo_dirty(path):
     os.mkdir(op.join(path, "empty", "empty-again"))
     ok_(not repo.dirty)
 
-    # TODO: submodules
+    subm = GitRepo(repo.pathobj / "subm", create=True)
+    (subm.pathobj / "subfile").write_text(u"")
+    subm.save()
+    repo.save()
+    ok_(not repo.dirty)
+    (subm.pathobj / "subfile").write_text(u"changed")
+    ok_(repo.dirty)
+
+    # User configuration doesn't affect .dirty's answer.
+    repo.config.set("diff.ignoreSubmodules", "all", where="local")
+    ok_(repo.dirty)
 
 
 @with_tempfile(mkdir=True)
