@@ -2274,16 +2274,21 @@ class GitRepo(RepoInterface):
         self._git_custom_command("", ["git", "cherry-pick", commit],
                                  check_fake_dates=True)
 
-    # run() needs this ATM, but should eventually be RF'ed to a
-    # status(recursive=True) call
     @property
     def dirty(self):
-        return len([
-            p for p, props in iteritems(self.status(
-                untracked='all', eval_submodule_state='full'))
-            if props.get('state', None) != 'clean' and
-            # -core ignores empty untracked directories, so shall we
-            not (p.is_dir() and len(list(p.iterdir())) == 0)]) > 0
+        """Is the repository dirty?
+
+        Note: This provides a quick answer when you simply want to know if
+        there are any untracked changes or modifications in this repository or
+        its submodules. For finer-grained control and more detailed reporting,
+        use status() instead.
+        """
+        stdout, _ = self._git_custom_command(
+            [],
+            ["git", "status", "--porcelain",
+             # Ensure the result isn't influenced by diff.ignoreSubmodules.
+             "--ignore-submodules=none"])
+        return bool(stdout.strip())
 
     @property
     def untracked_files(self):
