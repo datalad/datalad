@@ -128,8 +128,8 @@ class Unlock(Interface):
                 elif res["state"] == "untracked":
                     msg = "untracked"
                 else:
-                    # TODO: Anyway to distinguish between a regular git file
-                    # and an unlocked annex file?
+                    # This is either a regular git file or an unlocked annex
+                    # file.
                     msg = "non-annex file"
                 yield get_status_dict(
                     status="impossible",
