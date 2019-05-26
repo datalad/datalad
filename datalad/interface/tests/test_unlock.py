@@ -217,16 +217,17 @@ def test_unlock_cant_unlock(path):
         # See managed branch note in previous test_unlock_directory.
         modified=[] if ds.repo.is_managed_branch() else ["already_unlocked"],
         untracked=["untracked"])
-    files = ["regular_git", "untracked"]
+    expected = {"regular_git": "notneeded",
+                "untracked": "impossible"}
     if not ds.repo.supports_unlocked_pointers:
         # Don't add "already_unlocked" in v6+ because unlocked files are still
         # reported as having content and still passed to unlock. If we can
         # reliably distinguish v6+ unlocked files in status's output, we should
         # consider reporting a "notneeded" result.
-        files.append("already_unlocked")
-    for f in files:
+        expected["already_unlocked"] = "notneeded"
+    for f, status in expected.items():
         assert_in_results(
             ds.unlock(path=f, on_failure="ignore"),
             action="unlock",
-            status="impossible",
+            status=status,
             path=text_type(ds.pathobj / f))

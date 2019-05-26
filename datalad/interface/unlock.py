@@ -126,14 +126,17 @@ class Unlock(Interface):
             elif paths_nondir and Path(res["path"]) in paths_nondir:
                 if has_content is False:
                     msg = "no content present"
+                    status = "impossible"
                 elif res["state"] == "untracked":
                     msg = "untracked"
+                    status = "impossible"
                 else:
                     # This is either a regular git file or an unlocked annex
                     # file.
                     msg = "non-annex file"
+                    status = "notneeded"
                 yield get_status_dict(
-                    status="impossible",
+                    status=status,
                     path=res["path"],
                     type="file",
                     message="{}; cannot unlock".format(msg),
