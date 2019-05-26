@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 from collections import defaultdict
 import logging
 
-from os.path import join as opj
+import os.path as op
 
 from six import text_type
 
@@ -143,7 +143,7 @@ class Unlock(Interface):
             ds = Dataset(ds_path)
             for r in ds.repo.unlock(files):
                 yield get_status_dict(
-                    path=opj(ds.path, r),
+                    path=op.join(ds.path, r),
                     status='ok',
                     type='file',
                     **res_kwargs)
