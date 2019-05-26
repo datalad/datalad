@@ -103,7 +103,7 @@ class Unlock(Interface):
             return
 
         # Collect information on the paths to unlock.
-        to_unlock = defaultdict(list)  # ds => paths
+        to_unlock = defaultdict(list)  # ds => paths (relative to ds)
         for res in Status()(
                 # ATTN: it is vital to pass the `dataset` argument as it,
                 # and not a dataset instance in order to maintain the path
@@ -121,7 +121,8 @@ class Unlock(Interface):
                 continue
             has_content = res.get("has_content")
             if has_content:
-                to_unlock[res["parentds"]].append(res["path"])
+                parentds = res["parentds"]
+                to_unlock[parentds].append(op.relpath(res["path"], parentds))
             elif paths_nondir and Path(res["path"]) in paths_nondir:
                 if has_content is False:
                     msg = "no content present"
