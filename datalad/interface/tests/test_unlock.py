@@ -219,10 +219,10 @@ def test_unlock_cant_unlock(path):
         untracked=["untracked"])
     files = ["regular_git", "untracked"]
     if not ds.repo.supports_unlocked_pointers:
-        # Don't add "already_unlocked" in v6+ because unlocked are still
+        # Don't add "already_unlocked" in v6+ because unlocked files are still
         # reported as having content and still passed to unlock. If we can
-        # reliably distinguish unlocked files status's output, we should
-        # consider report a "notneeded" result.
+        # reliably distinguish v6+ unlocked files in status's output, we should
+        # consider reporting a "notneeded" result.
         files.append("already_unlocked")
     for f in files:
         assert_in_results(
