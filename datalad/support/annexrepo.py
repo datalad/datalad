@@ -1381,6 +1381,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     def unlock(self, files):
         """unlock files for modification
 
+        Note: This method is silent about errors in unlocking a file (e.g, the
+        file has not content). Use the higher-level interface.unlock to get
+        more informative reporting.
+
         Parameters
         ----------
         files: list of str
@@ -1390,15 +1394,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         list of str
           successfully unlocked files
         """
-        # TODO: catch and parse output if failed (missing content ...)
-        std_out, std_err = \
-            self._run_annex_command(
-                'unlock', files=files
-            )
-
-        return [line.split()[1]
-                for line in std_out.splitlines()
-                if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
+        if not files:
+            return
+        return [j["file"] for j in
+                self._run_annex_command_json("unlock", files=files)
+                if j["success"]]
 
     def adjust(self, options=None):
         """enter an adjusted branch
