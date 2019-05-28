@@ -1378,26 +1378,22 @@ class AnnexRepo(GitRepo, RepoInterface):
             return entries[0]
 
     @normalize_paths
-    def unlock(self, files, options=None):
+    def unlock(self, files):
         """unlock files for modification
 
         Parameters
         ----------
         files: list of str
-        options: list of str
 
         Returns
         -------
         list of str
           successfully unlocked files
         """
-
-        options = options[:] if options else []
-
         # TODO: catch and parse output if failed (missing content ...)
         std_out, std_err = \
             self._run_annex_command(
-                'unlock', annex_options=options, files=files
+                'unlock', files=files
             )
 
         return [line.split()[1]
