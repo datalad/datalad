@@ -28,6 +28,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_true,
     eq_,
+    skip_if_no_network,
     SkipTest,
     use_cassette as use_cassette_,
     with_memory_keyring,
@@ -108,6 +109,7 @@ def test_dont_trip_over_missing_subds(path):
 
 
 # Ran on Yarik's laptop, so would use his available token
+@skip_if_no_network
 @use_cassette('github_yarikoptic')
 def test_integration1_yarikoptic():
     # use case 1 - oauthtoken is known to git config, no 2FA (although irrelevant)
@@ -117,6 +119,7 @@ def test_integration1_yarikoptic():
     )
 
 
+@skip_if_no_network
 @use_cassette('github_datalad_tester')
 @with_testsui(responses=[
     'datalad-tester',
@@ -130,6 +133,7 @@ def test_integration1_datalad_tester():
     check_integration1('datalad-tester')
 
 
+@skip_if_no_network
 @use_cassette('github_datalad_tester_org')
 @with_testsui(responses=[
      'secret-password',
