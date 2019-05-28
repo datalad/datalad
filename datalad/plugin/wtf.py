@@ -112,12 +112,33 @@ def _describe_annex():
 def _describe_system():
     import platform as pl
     from datalad import get_encoding_info
+
+    if hasattr(pl, 'dist'):
+        dist = pl.dist()
+    else:
+        # Python 3.8 removed .dist but recommended "distro" is slow, so we
+        # try it only if needed
+        try:
+            import distro
+            dist = distro.linux_distribution(full_distribution_name=False)
+        except ImportError:
+            lgr.info(
+                "Please install 'distro' package to obtain distribution information"
+            )
+            dist = tuple()
+        except Exception as exc:
+            lgr.warning(
+                "No distribution information will be provided since 'distro' "
+                "fails to import/run: %s", exc_str(exc)
+            )
+            dist = tuple()
+
     return {
         'type': os.name,
         'name': pl.system(),
         'release': pl.release(),
         'version': pl.version(),
-        'distribution': ' '.join([_t2s(pl.dist()),
+        'distribution': ' '.join([_t2s(dist),
                                   _t2s(pl.mac_ver()),
                                   _t2s(pl.win32_ver())]).rstrip(),
         'max_path_length': get_max_path_length(getpwd()),

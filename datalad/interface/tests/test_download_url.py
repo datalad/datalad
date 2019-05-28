@@ -40,7 +40,11 @@ def test_download_url_exceptions():
     msg = res1[0]['message']
     # when running under bogus proxy, on older systems we could get
     # no URL reported in the message
-    if 'Cannot connect to proxy.' not in msg:
+    if not (
+        'Cannot connect to proxy.' in msg
+        or
+        'Temporary failure in name resolution' in msg
+    ):
         assert_in('http://example.com/bogus', msg)
 
 

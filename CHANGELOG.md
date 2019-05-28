@@ -194,13 +194,9 @@ with more performant implementations.
 - Imported various additional methods for the Repo classes to query
   information and save changes.
 
-## 0.11.5 (??? ??, 2019) -- will be better than ever
+## 0.11.5 (May 23, 2019) -- stability is not overrated
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+Should be faster and less buggy, with a few enhancements.
 
 ### Fixes
 
@@ -225,6 +221,9 @@ bet we will fix some bugs and make a world even a better place.
   `annex.largefiles` threshold.  The logic of this workaround was
   faulty, leading to files being displayed as typechanged in the index
   following the commit.  ([#3365][])
+- The resolve_path() helper confused paths that had a semicolon for
+  SSH RIs.  ([#3425][])
+- The detection of SSH RIs has been improved.  ([#3425][])
 
 ### Enhancements and new features
 
@@ -249,6 +248,16 @@ bet we will fix some bugs and make a world even a better place.
   behavior of coloring output if attached to a TTY ([#3407][]).
 - [clean][] now removes annex transfer directories, which is useful
   for cleaning up failed downloads. ([#3374][])
+- [clone][] no longer refuses to clone into a local path that looks
+  like a URL, making its behavior consistent with `git clone`.
+  ([#3425][])
+- [wtf][]
+  - Learned to fall back to the `dist` package if `platform.dist`,
+    which has been removed in the yet-to-be-release Python 3.8, does
+    not exist.  ([#3439][])
+  - Gained a `--section` option for limiting the output to specific
+    sections and a `--decor` option, which currently knows how to
+    format the output as GitHub's `<details>` section.  ([#3440][])
 
 ## 0.11.4 (Mar 18, 2019) -- get-ready
 
@@ -1534,3 +1543,6 @@ publishing
 [#3401]: https://github.com/datalad/datalad/issues/3401
 [#3403]: https://github.com/datalad/datalad/issues/3403
 [#3407]: https://github.com/datalad/datalad/issues/3407
+[#3425]: https://github.com/datalad/datalad/issues/3425
+[#3439]: https://github.com/datalad/datalad/issues/3439
+[#3440]: https://github.com/datalad/datalad/issues/3440

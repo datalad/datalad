@@ -52,6 +52,7 @@ requires = {
         'appdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
         'colorama; platform_system=="Windows"',
+        'distro; python_version >= "3.8"',
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
@@ -94,9 +95,6 @@ requires = {
         # use pyliblzma as the default for now.  Patch were you would prefer
         # backports.lzma instead
         'pyliblzma; python_version < "3.3"',
-        # was added in https://github.com/datalad/datalad/pull/1995 without
-        # due investigation, should not be needed until we add duecredit support
-        # 'duecredit',
         'simplejson',
         'whoosh',
     ],
