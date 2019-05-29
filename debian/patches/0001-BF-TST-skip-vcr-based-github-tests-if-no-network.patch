@@ -1,0 +1,51 @@
+From d977cc661304405362c704e0fa1561d71dbe7b60 Mon Sep 17 00:00:00 2001
+From: Yaroslav Halchenko <debian@onerussian.com>
+Date: Tue, 28 May 2019 09:42:42 -0400
+Subject: [PATCH] BF(TST): skip vcr based github tests if no network
+
+Even though they should work without network connection, they do cause troubles
+if either fake http_proxy setup or for some other reasons e.g. on nd18.10 so
+the easiest is just to skip ATM if no network
+---
+ datalad/distribution/tests/test_create_github.py | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/datalad/distribution/tests/test_create_github.py b/datalad/distribution/tests/test_create_github.py
+index 67ed78962..ae37de29a 100644
+--- a/datalad/distribution/tests/test_create_github.py
++++ b/datalad/distribution/tests/test_create_github.py
+@@ -28,6 +28,7 @@ from datalad.tests.utils import (
+     assert_raises,
+     assert_true,
+     eq_,
++    skip_if_no_network,
+     SkipTest,
+     use_cassette as use_cassette_,
+     with_memory_keyring,
+@@ -108,6 +109,7 @@ def test_dont_trip_over_missing_subds(path):
+ 
+ 
+ # Ran on Yarik's laptop, so would use his available token
++@skip_if_no_network
+ @use_cassette('github_yarikoptic')
+ def test_integration1_yarikoptic():
+     # use case 1 - oauthtoken is known to git config, no 2FA (although irrelevant)
+@@ -117,6 +119,7 @@ def test_integration1_yarikoptic():
+     )
+ 
+ 
++@skip_if_no_network
+ @use_cassette('github_datalad_tester')
+ @with_testsui(responses=[
+     'datalad-tester',
+@@ -130,6 +133,7 @@ def test_integration1_datalad_tester():
+     check_integration1('datalad-tester')
+ 
+ 
++@skip_if_no_network
+ @use_cassette('github_datalad_tester_org')
+ @with_testsui(responses=[
+      'secret-password',
+-- 
+2.21.0.593.g511ec345e18
+
