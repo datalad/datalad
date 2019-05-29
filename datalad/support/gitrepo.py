@@ -2286,6 +2286,8 @@ class GitRepo(RepoInterface):
         stdout, _ = self._git_custom_command(
             [],
             ["git", "status", "--porcelain",
+             # Ensure the result isn't influenced by status.showUntrackedFiles.
+             "--untracked-files=normal",
              # Ensure the result isn't influenced by diff.ignoreSubmodules.
              "--ignore-submodules=none"])
         return bool(stdout.strip())
