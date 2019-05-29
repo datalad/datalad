@@ -331,7 +331,7 @@ class WTF(Interface):
             args=("-c", "--clipboard",),
             action="store_true",
             doc="""if set, do not print but copy to clipboard (requires pyperclip
-            module"""),
+            module)"""),
     )
 
     @staticmethod
