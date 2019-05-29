@@ -615,8 +615,10 @@ A number of fixes did not make it into the 0.9.x series:
   included in the output by passing `--senstive=some` or `--senstive=all`.
 - Reduced startup latency by only importing commands necessary for a particular
   command line call.
-- `datalad create -d <parent> --nosave` now registers subdatasets, when possible.
-- `datalad run` now provides a way for the caller to save the result when a
+- [create]:
+  - `-d <parent> --nosave` now registers subdatasets, when possible.
+  - `--fake-dates` configures dataset to use fake-dates
+- [run] now provides a way for the caller to save the result when a
   command has a non-zero exit status.
 - `datalad rerun` now has a `--script` option that can be used to extract
   previous commands into a file.
@@ -1170,6 +1172,7 @@ publishing
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
 [configuration]: http://docs.datalad.org/en/latest/config.html
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
+[create]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
