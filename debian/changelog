@@ -1,3 +1,10 @@
+datalad (0.11.5-3) neurodebian; urgency=medium
+
+  * For NeuroDebian jessie (nd80) needed one more patch
+    debian/patches/0001-ENH-TST-adding-one-more-condition-for-nd80-to-skip-t.patch
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 30 May 2019 09:23:45 -0400
+
 datalad (0.11.5-2) neurodebian; urgency=medium
 
   * debian/patches/0001-BF-TST-skip-vcr-based-github-tests-if-no-network.patch
