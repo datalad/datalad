@@ -97,7 +97,7 @@ def test_search_outside1_install_default_ds(tdir, default_dspath):
                 list(search("."))
 
             # and if path exists and is a valid dataset and we say "no"
-            Dataset(default_dspath).rev_create()
+            Dataset(default_dspath).create()
             ui.add_responses('no')
             mock_install.reset_mock()
             with assert_raises(NoDatasetArgumentFound):
@@ -184,7 +184,7 @@ def test_within_ds_file_search(path):
         import mutagen
     except ImportError:
         raise SkipTest
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     # override default and search for datasets and files for this test
     for m in ('egrep', 'textblob', 'autofield'):
         ds.config.add(
@@ -197,7 +197,7 @@ def test_within_ds_file_search(path):
         copy(
             opj(dirname(dirname(__file__)), 'tests', 'data', src),
             opj(path, dst))
-    ds.rev_save()
+    ds.save()
     ok_file_under_git(path, opj('stim', 'stim1.mp3'), annexed=True)
     # If it is not under annex, below addition of metadata silently does
     # not do anything

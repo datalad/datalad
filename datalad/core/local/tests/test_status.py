@@ -62,7 +62,7 @@ def test_status_basics(path, linkpath, otherdir):
 
     with chpwd(path):
         assert_raises(NoDatasetArgumentFound, status)
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     # outcome identical between ds= and auto-discovery
     with chpwd(path):
         assert_raises(IncompleteResultsError, status, path=otherdir)
@@ -85,13 +85,13 @@ def test_status_basics(path, linkpath, otherdir):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_status_nods(path, otherpath):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore'),
         1,
         status='error',
         message='path not underneath this dataset')
-    otherds = Dataset(otherpath).rev_create()
+    otherds = Dataset(otherpath).create()
     assert_result_count(
         ds.status(path=otherpath, on_failure='ignore'),
         1,
@@ -220,10 +220,10 @@ def test_status(_path, linkpath):
 # breaks when the tempdir is a symlink
 @with_tempfile(mkdir=True)
 def test_subds_status(path):
-    ds = Dataset(path).rev_create()
-    subds = ds.rev_create('subds')
+    ds = Dataset(path).create()
+    subds = ds.create('subds')
     assert_repo_status(ds.path)
-    subds.rev_create('someotherds')
+    subds.create('someotherds')
     assert_repo_status(subds.path)
     assert_repo_status(ds.path, modified=['subds'])
     assert_result_count(

@@ -9,60 +9,113 @@
 
 
 import os
-from os.path import join as opj
-from os.path import relpath
-from os.path import pardir
+from six import text_type
+from os.path import (
+    join as opj,
+    relpath,
+    pardir,
+)
 
-from ..dataset import Dataset
-from datalad.api import subdatasets
-
-from nose.tools import eq_
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_status
+from datalad.distribution.dataset import Dataset
+from datalad.api import (
+    subdatasets,
+    create,
+)
+from datalad.utils import (
+    chpwd,
+    Path,
+)
+from datalad.tests.utils import (
+    eq_,
+    with_testrepos,
+    with_tempfile,
+    assert_result_count,
+    assert_false,
+    assert_in,
+    assert_not_in,
+    assert_status,
+)
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
-    eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    # one more subdataset with a name that could ruin config option parsing
+    dots = text_type(Path('subdir') / '.lots.of.dots.')
+    ds.create(dots)
+    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1'
     ])
     ds.get('sub dataset1')
-    eq_(subdatasets(ds, recursive=True, fulfilled=False, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
     ])
-    # obtain key subdataset, so all leave subdatasets are discoverable
+    # obtain key subdataset, so all leaf subdatasets are discoverable
     ds.get(opj('sub dataset1', 'sub sub dataset1'))
-    eq_(ds.subdatasets(result_xfm='relpaths'), ['sub dataset1'])
+    eq_(ds.subdatasets(result_xfm='relpaths'), ['sub dataset1', dots])
     eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
-        [(path, opj(path, 'sub dataset1'))])
-    eq_(subdatasets(ds, recursive=True, result_xfm='relpaths'), [
+        [(path, opj(path, 'sub dataset1')),
+         (path, opj(path, dots))])
+    eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), [
         'sub dataset1',
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/sub sub dataset1/2',
         'sub dataset1/sub sub dataset1/subm 1',
         'sub dataset1/subm 1',
+        dots,
     ])
+    # redo, but limit to specific paths
+    eq_(
+        ds.subdatasets(
+            path=['sub dataset1/2', 'sub dataset1/sub sub dataset1'],
+            recursive=True, result_xfm='relpaths'),
+        [
+            'sub dataset1/2',
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/sub sub dataset1/2',
+            'sub dataset1/sub sub dataset1/subm 1',
+        ]
+    )
+    with chpwd(text_type(ds.pathobj / 'subdir')):
+        # imitate cmdline invocation w/ no dataset argument
+        # -> curdir limits the query, when no info is given
+        eq_(subdatasets(dataset=None,
+                        path=[],
+                        recursive=True,
+                        result_xfm='paths'),
+            [text_type(ds.pathobj / dots)]
+        )
+        # but with a dataset explicitly given, even if just as a path,
+        # curdir does no limit the query
+        eq_(subdatasets(dataset=os.pardir,
+                        path=None,
+                        recursive=True,
+                        result_xfm='relpaths'),
+            ['sub dataset1',
+             'sub dataset1/2',
+             'sub dataset1/sub sub dataset1',
+             'sub dataset1/sub sub dataset1/2',
+             'sub dataset1/sub sub dataset1/subm 1',
+             'sub dataset1/subm 1',
+             dots]
+        )
     # uses slow, flexible query
-    eq_(subdatasets(ds, recursive=True, bottomup=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, bottomup=True, result_xfm='relpaths'), [
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1/2',
         'sub dataset1/sub sub dataset1/subm 1',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
         'sub dataset1',
+        dots,
     ])
-    eq_(subdatasets(ds, recursive=True, fulfilled=True, result_xfm='relpaths'), [
+    eq_(ds.subdatasets(recursive=True, fulfilled=True, result_xfm='relpaths'), [
         'sub dataset1',
         'sub dataset1/sub sub dataset1',
+        dots,
     ])
     eq_([(relpath(r['parentds'], start=ds.path), relpath(r['path'], start=ds.path))
          for r in ds.subdatasets(recursive=True)], [
@@ -72,13 +125,14 @@ def test_get_subdatasets(path):
         ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/2'),
         ('sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1'),
         ('sub dataset1', 'sub dataset1/subm 1'),
+        (os.curdir, dots),
     ])
     # uses slow, flexible query
-    eq_(subdatasets(ds, recursive=True, recursion_limit=0),
+    eq_(ds.subdatasets(recursive=True, recursion_limit=0),
         [])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=1, result_xfm='relpaths'),
-        ['sub dataset1'])
+        ['sub dataset1', dots])
     # uses slow, flexible query
     eq_(ds.subdatasets(recursive=True, recursion_limit=2, result_xfm='relpaths'),
         [
@@ -86,6 +140,7 @@ def test_get_subdatasets(path):
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
         'sub dataset1/subm 1',
+        dots,
     ])
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
@@ -113,16 +168,16 @@ def test_get_subdatasets(path):
         eq_(r['gitmodule_expansion'], relpath(r['path'], r['refds']).replace(os.sep, '-'))
 
     # and remove again
-    res = ds.subdatasets(recursive=True, delete_property=('mike', 'something'))
+    res = ds.subdatasets(recursive=True, delete_property='mike')
     assert_status('ok', res)
     for r in res:
-        for prop in ('gitmodule_mike', 'gitmodule_something'):
+        for prop in ('gitmodule_mike'):
             assert_not_in(prop, r)
     # and again, because above yields on the fly edit
     res = ds.subdatasets(recursive=True)
     assert_status('ok', res)
     for r in res:
-        for prop in ('gitmodule_mike', 'gitmodule_something'):
+        for prop in ('gitmodule_mike'):
             assert_not_in(prop, r)
 
     #
@@ -166,12 +221,21 @@ def test_get_subdatasets(path):
                        contains=opj(pardir, 'errrr_nope'),
                        result_xfm='paths'),
         [])
+    eq_(ds.subdatasets(
+        recursive=True,
+        contains=[target_sub, 'sub dataset1/2'],
+        result_xfm='relpaths'), [
+        'sub dataset1',
+        'sub dataset1/2',
+        'sub dataset1/sub sub dataset1',
+        'sub dataset1/sub sub dataset1/subm 1',
+    ])
 
 
 @with_tempfile
 def test_state(path):
-    ds = Dataset.rev_create(path)
-    sub = ds.rev_create('sub')
+    ds = Dataset.create(path)
+    sub = ds.create('sub')
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # by default we are not reporting any state info
@@ -194,9 +258,8 @@ def test_state(path):
 
 @with_tempfile
 def test_get_subdatasets_types(path):
-    from datalad.api import rev_create
-    ds = rev_create(path)
-    ds.rev_create('1')
-    ds.rev_create('true')
+    ds = create(path)
+    ds.create('1')
+    ds.create('true')
     # no types casting should happen
     eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])

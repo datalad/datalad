@@ -27,6 +27,8 @@ from os.path import exists
 from shutil import copyfile
 from nose.tools import assert_not_is_instance
 
+from six import text_type
+
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
 
@@ -1074,8 +1076,10 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     rm2 = AnnexRepo(remote_2_path, create=False)
 
     # check whether we are the first to use these sockets:
-    socket_1 = opj(ssh_manager.socket_dir, get_connection_hash('datalad-test'))
-    socket_2 = opj(ssh_manager.socket_dir, get_connection_hash('localhost'))
+    socket_1 = opj(text_type(ssh_manager.socket_dir),
+                   get_connection_hash('datalad-test', bundled=True))
+    socket_2 = opj(text_type(ssh_manager.socket_dir),
+                   get_connection_hash('localhost', bundled=True))
     datalad_test_was_open = exists(socket_1)
     localhost_was_open = exists(socket_2)
 
@@ -1090,7 +1094,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     ar = AnnexRepo(repo_path, create=False)
 
     # connection to 'datalad-test' should be known to ssh manager:
-    assert_in(socket_1, ssh_manager._connections)
+    assert_in(socket_1, list(map(text_type, ssh_manager._connections)))
     # but socket was not touched:
     if datalad_test_was_open:
         ok_(exists(socket_1))
@@ -1127,7 +1131,7 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     ar.add_remote('ssh-remote-2', "ssh://localhost" + remote_2_path)
 
     # now, this connection to localhost was requested:
-    assert_in(socket_2, ssh_manager._connections)
+    assert_in(socket_2, list(map(text_type, ssh_manager._connections)))
     # but socket was not touched:
     if localhost_was_open:
         # FIXME: occasionally(?) fails in V6:
@@ -1579,10 +1583,10 @@ def test_ProcessAnnexProgressIndicators():
         out = cmo.out
 
     from datalad.ui import ui
-    from datalad.ui.dialog import SilentConsoleLog
+    from datalad.ui.dialog import QuietConsoleLog
 
     assert out \
-        if not isinstance(ui.ui, SilentConsoleLog) else not out
+        if not isinstance(ui.ui, QuietConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:
@@ -1851,6 +1855,9 @@ def test_AnnexRepo_metadata(path):
         playfile: {
             'tag': ['one and= ']}}
     deq_(target, dict(ar.get_metadata('.')))
+    for batch in (True, False):
+        # no difference in reporting between modes
+        deq_(target, dict(ar.get_metadata(['up.dat', playfile], batch=batch)))
     # incremental work like a set
     ar.set_metadata(playfile, add={'tag': 'one and= '})
     deq_(target, dict(ar.get_metadata('.')))

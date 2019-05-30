@@ -11,8 +11,11 @@
 Should not be imported until we know that interface needs it
 """
 
+import humanize
 import sys
+import time
 
+from .. import lgr
 
 #
 # Haven't found an ideal progress bar yet, so to make things modular etc
@@ -23,9 +26,13 @@ import sys
 class ProgressBarBase(object):
     """Base class for any progress bar"""
 
-    def __init__(self, total=None, fill_text=None, out=None, label=None, initial=0):
-        self._current = initial
+    def __init__(self, label=None, fill_text=None, total=None, out=None, unit='B', initial=0):
+        self.label = label
+        self.fill_test = fill_text
         self.total = total
+        self.unit = unit
+        self.out = out
+        self._current = initial
 
     def refresh(self):
         """Force update"""
@@ -51,7 +58,19 @@ class ProgressBarBase(object):
     def start(self, initial=0):
         self._current = initial
 
-    def finish(self):
+    def finish(self, partial=False):
+        """
+
+        Parameters
+        ----------
+        partial: bool
+          To signal that finish is called possibly before the activity properly
+          finished, so .total count might have not been reached
+
+        Returns
+        -------
+
+        """
         pass
 
     def clear(self):
@@ -66,7 +85,101 @@ class SilentProgressBar(ProgressBarBase):
         super(SilentProgressBar, self).__init__(total=total)
 
 
-progressbars = {'silent':  SilentProgressBar}
+class LogProgressBar(ProgressBarBase):
+    """A progress bar which logs upon completion of the item
+
+    Note that there is also :func:`~datalad.log.log_progress` which can be used
+    to get progress bars when attached to a tty but incremental log messages
+    otherwise (as opposed to just the final log message provided by
+    `LogProgressBar`).
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(LogProgressBar, self).__init__(*args, **kwargs)
+        # I think we never generate progress bars unless we are at the beginning
+        # of reporting something lengthy.  .start is not always invoked so
+        # we cannot reliably set it there instead of the constructor (here)
+        self._start_time = time.time()
+
+    @staticmethod
+    def _naturalfloat(x):
+        """Return string representation of a number for human consumption
+
+        For abs(x) <= 1000 would use 'scientific' (%g) notation, and for the
+        larger a regular int (after rounding)
+        """
+        return ('%g' % x) if abs(x) <= 1000 else '%i' % int(round(x))
+
+    def _naturalsize(self, x):
+        if self.unit == 'B':
+            return humanize.naturalsize(x)
+        else:
+            return '%s%s' % (self._naturalfloat(x), self.unit or '')
+
+    @staticmethod
+    def _naturaldelta(x):
+        # humanize is too human for little things
+        return humanize.naturaldelta(x) \
+            if x > 2 \
+            else LogProgressBar._naturalfloat(x) + ' sec'
+
+    def finish(self, partial=False):
+        msg, args = ' %s ', [self.label]
+
+        if partial:
+            # that is the best we know so far:
+            amount = self.current
+            if self.total is not None:
+                if amount != self.total:
+                    perc_done = 100. * amount / self.total
+                    if perc_done <= 100:
+                        msg += "partially (%.2f%% of %s) "
+                        args += [
+                            perc_done,
+                            self._naturalsize(self.total)
+                        ]
+                    else:
+                        # well well -- we still probably have some issue with
+                        # over-reporting when getting data from datalad-archives
+                        # Instead of providing non-sense % here, just report
+                        # our best guess
+                        msg += "possibly partially "
+                else:
+                    # well -- that means that we did manage to get all of it
+                    pass
+            else:
+                msg += "possibly partially "
+            msg += "done"
+        else:
+            # Are we "finish"ed because interrupted or done?
+            amount = self.total
+            if amount:
+                msg += '%s done'
+                args += [self._naturalsize(amount)]
+            else:
+                msg += "done"
+
+        dt = float(time.time() - self._start_time)
+
+        if dt:
+            msg += ' in %s'
+            args += [self._naturaldelta(dt)]
+
+            if amount:
+                speed = amount / dt
+                msg += ' at %s/sec'
+                args += [self._naturalsize(speed)]
+
+        lgr.info(msg, *args)
+
+
+progressbars = {
+    # let for compatibility, use "none" instead
+    'silent':  SilentProgressBar,
+    'none':  SilentProgressBar,
+    'log': LogProgressBar,
+}
+
 
 try:
     from tqdm import tqdm
@@ -111,7 +224,7 @@ try:
             frontend: (None, 'ipython'), optional
               tqdm module to use.  Could be tqdm_notebook if under IPython
             """
-            super(tqdmProgressBar, self).__init__(total=total)
+            super(tqdmProgressBar, self).__init__(label=label, total=total, unit=unit)
 
             if frontend not in self._frontends:
                 raise ValueError(
@@ -168,7 +281,7 @@ try:
             if hasattr(self._tqdm, 'refresh'):
                 self._pbar.refresh()
 
-        def finish(self, clear=False):
+        def finish(self, clear=False, partial=False):
             """
 
             Parameters

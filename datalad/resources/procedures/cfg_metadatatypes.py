@@ -26,7 +26,7 @@ for nt in sys.argv[2:]:
         where='dataset',
         reload=False)
 
-ds.rev_save(
+ds.save(
     path=op.join(ds.path, DATASET_CONFIG_FILE),
     message="Configure metadata type(s)",
 )

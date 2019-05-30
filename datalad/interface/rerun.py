@@ -23,9 +23,9 @@ from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.run import run_command
-from datalad.interface.run import format_command
-from datalad.interface.run import _format_cmd_shorty
+from datalad.core.local.run import run_command
+from datalad.core.local.run import format_command
+from datalad.core.local.run import _format_cmd_shorty
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
@@ -532,13 +532,13 @@ def diff_revision(dataset, revision="HEAD"):
     Generator that yields AnnotatePaths instances
     """
     if dataset.repo.commit_exists(revision + "^"):
-        revrange = "{rev}^..{rev}".format(rev=revision)
+        fr = revision + "^"
     else:
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
-        revrange = "{}..{}".format(PRE_INIT_COMMIT_SHA, revision)
+        fr = PRE_INIT_COMMIT_SHA
     diff = dataset.diff(recursive=True,
-                        revision=revrange,
+                        fr=fr, to=revision,
                         return_type='generator', result_renderer=None)
     for r in diff:
         yield r

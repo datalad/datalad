@@ -93,6 +93,11 @@ class ConsoleLog(object):
             progressbars = ConsoleLog.progressbars
 
         if backend is None:
+            # Resort to the configuration
+            from .. import cfg
+            backend = cfg.get('datalad.ui.progressbar', None)
+
+        if backend is None:
             try:
                 pbar = progressbars['tqdm']
             except KeyError:
@@ -112,7 +117,16 @@ class SilentConsoleLog(ConsoleLog):
 
     def get_progressbar(self, *args, **kwargs):
         from .progressbars import SilentProgressBar
-        return SilentProgressBar(*args, out=self.out, **kwargs)
+        return SilentProgressBar(*args, **kwargs)
+
+
+@auto_repr
+class QuietConsoleLog(ConsoleLog):
+    """A ConsoleLog with a LogProgressbar"""
+
+    def get_progressbar(self, *args, **kwargs):
+        from .progressbars import LogProgressBar
+        return LogProgressBar(*args, **kwargs)
 
 
 def getpass_echo(prompt='Password', stream=None):
@@ -175,7 +189,8 @@ class DialogUI(ConsoleLog, InteractiveUI):
     def question(self, text,
                  title=None, choices=None,
                  default=None,
-                 hidden=False):
+                 hidden=False,
+                 repeat=None):
         # Do initial checks first
         if default and choices and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
@@ -214,7 +229,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
             # TODO: dedicated option?  got annoyed by this one
             # multiple times already, typically we are not defining
             # new credentials where repetition would be needed.
-            repeat = hidden and choices is None
+            if hidden and repeat is None:
+                repeat = hidden and choices is None
+
             if repeat:
                 response_r = self.input('{} (repeat): '.format(msg), hidden=hidden)
                 if response != response_r:

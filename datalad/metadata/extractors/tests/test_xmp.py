@@ -44,12 +44,12 @@ target = {
 
 @with_tempfile(mkdir=True)
 def test_xmp(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     ds.config.add('datalad.metadata.nativetype', 'xmp', where='dataset')
     copy(
         opj(dirname(dirname(dirname(__file__))), 'tests', 'data', 'xmp.pdf'),
         path)
-    ds.rev_save()
+    ds.save()
     ok_clean_git(ds.path)
     res = ds.aggregate_metadata()
     assert_status('ok', res)

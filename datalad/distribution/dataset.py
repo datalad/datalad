@@ -48,6 +48,9 @@ from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
 from datalad.utils import dlabspath
+from datalad.utils import Path
+from datalad.utils import PurePath
+from datalad.utils import assure_list
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -70,11 +73,6 @@ def resolve_path(path, ds=None):
     -------
     Absolute path
     """
-    # first make sure it's actually a valid path:
-    from datalad.support.network import PathRI
-    if not isinstance(RI(path), PathRI):
-        raise ValueError("%s is not a valid path" % path)
-
     path = expandpath(path, force_absolute=False)
     if is_explicit_path(path):
         # normalize path consistently between two (explicit and implicit) cases
@@ -534,12 +532,22 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
 class EnsureDataset(Constraint):
+    """Despite its name, this constraint does not actually ensure that the
+    argument is a valid dataset, because for procedural reasons this would
+    typically duplicate subsequent checks and processing. However, it can
+    be used to achieve uniform documentation of `dataset` arguments."""
 
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return Dataset(path=value)
+            # we cannot convert to a Dataset class right here
+            # - duplicates require_dataset() later on
+            # - we need to be able to distinguish between a bound
+            #   dataset method call and a standalone call for
+            #   relative path argument disambiguation
+            #return Dataset(path=value)
+            return value
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
@@ -601,12 +609,10 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 def rev_resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
-    Any explicit path (absolute or relative) is returned as an absolute path.
-    In case of an explicit relative path (e.g. "./some", or ".\\some" on
-    windows), the current working directory is used as reference. Any
-    non-explicit relative path is resolved against as dataset location, i.e.
-    considered relative to the location of the dataset. If no dataset is
-    provided, the current working directory is used.
+    Any path is returned as an absolute path. If, and only if, a dataset
+    object instance is given as `ds`, relative paths are interpreted as
+    relative to the given dataset. In all other cases, relative paths are
+    treated as relative to the current working directory.
 
     Note however, that this function is not able to resolve arbitrarily
     obfuscated path specifications. All operations are purely lexical, and no
@@ -618,70 +624,76 @@ def rev_resolve_path(path, ds=None):
 
     Parameters
     ----------
-    path : str or PathLike
-      Platform-specific path specific path specification.
+    path : str or PathLike or list
+      Platform-specific path specific path specification. Multiple path
+      specifications can be given as a list
     ds : Dataset or None
-      Dataset instance to resolve non-explicit relative paths against.
+      Dataset instance to resolve relative paths against.
 
     Returns
     -------
-    `pathlib.Path` object
+    `pathlib.Path` object or list(Path)
+      When a list was given as input a list is returned, a Path instance
+      otherwise.
     """
-    if ds is not None and not isinstance(ds, Dataset):
-        ds = require_dataset(ds, check_installed=False, purpose='path resolution')
-    if ds is None:
-        # CWD is the reference
-        path = ut.Path(path)
-    # we have a dataset
-    # stringify in case a pathobj came in
-    elif not op.isabs(text_type(path)) and \
-            not (text_type(path).startswith(os.curdir + os.sep) or
-                 text_type(path).startswith(os.pardir + os.sep)):
-        # we have a dataset and no abspath nor an explicit relative path ->
-        # resolve it against the dataset
-        path = ds.pathobj / path
-    else:
-        # CWD is the reference
-        path = ut.Path(path)
+    got_ds_instance = isinstance(ds, Dataset)
+    if ds is not None and not got_ds_instance:
+        ds = require_dataset(
+            ds, check_installed=False, purpose='path resolution')
+    out = []
+    for p in assure_list(path):
+        if ds is None or not got_ds_instance:
+            # no dataset at all or no instance provided -> CWD is always the reference
+            # nothing needs to be done here. Path-conversion and absolutification
+            # are done next
+            pass
+        # we have a given datasets instance
+        elif not Path(p).is_absolute():
+            # we have a dataset and no abspath nor an explicit relative path ->
+            # resolve it against the dataset
+            p = ds.pathobj / p
 
-    # make sure we return an absolute path, but without actually
-    # resolving anything
-    if not path.is_absolute():
-        # in general it is almost impossible to use resolve() when
-        # we can have symlinks in the root path of a dataset
-        # (that we don't want to resolve here), symlinks to annex'ed
-        # files (that we never want to resolve), and other within-repo
-        # symlinks that we (sometimes) want to resolve (i.e. symlinked
-        # paths for addressing content vs adding content)
-        # CONCEPT: do the minimal thing to catch most real-world inputs
-        # ASSUMPTION: the only sane relative path input that needs
-        # handling and can be handled are upward references like
-        # '../../some/that', wherease stuff like 'down/../someotherdown'
-        # are intellectual excercises
-        # ALGORITHM: match any number of leading '..' path components
-        # and shorten the PWD by that number
-        # NOT using ut.Path.cwd(), because it has symlinks resolved!!
-        pwd_parts = ut.Path(getpwd()).parts
-        path_parts = path.parts
-        leading_parents = 0
-        for p in path.parts:
-            if p == op.pardir:
-                leading_parents += 1
-                path_parts = path_parts[1:]
-            elif p == op.curdir:
-                # we want to discard that, but without stripping
-                # a corresponding parent
-                path_parts = path_parts[1:]
-            else:
-                break
-        path = ut.Path(
-            op.join(
-                *(pwd_parts[:-leading_parents if leading_parents else None]
-                  + path_parts)))
-    # note that we will not "normpath()" the result, check the
-    # pathlib docs for why this is the only sane choice in the
-    # face of the possibility of symlinks in the path
-    return path
+        p = ut.Path(p)
+
+        # make sure we return an absolute path, but without actually
+        # resolving anything
+        if not p.is_absolute():
+            # in general it is almost impossible to use resolve() when
+            # we can have symlinks in the root path of a dataset
+            # (that we don't want to resolve here), symlinks to annex'ed
+            # files (that we never want to resolve), and other within-repo
+            # symlinks that we (sometimes) want to resolve (i.e. symlinked
+            # paths for addressing content vs adding content)
+            # CONCEPT: do the minimal thing to catch most real-world inputs
+            # ASSUMPTION: the only sane relative path input that needs
+            # handling and can be handled are upward references like
+            # '../../some/that', wherease stuff like 'down/../someotherdown'
+            # are intellectual excercises
+            # ALGORITHM: match any number of leading '..' path components
+            # and shorten the PWD by that number
+            # NOT using ut.Path.cwd(), because it has symlinks resolved!!
+            pwd_parts = ut.Path(getpwd()).parts
+            path_parts = p.parts
+            leading_parents = 0
+            for pp in p.parts:
+                if pp == op.pardir:
+                    leading_parents += 1
+                    path_parts = path_parts[1:]
+                elif pp == op.curdir:
+                    # we want to discard that, but without stripping
+                    # a corresponding parent
+                    path_parts = path_parts[1:]
+                else:
+                    break
+            p = ut.Path(
+                op.join(
+                    *(pwd_parts[:-leading_parents if leading_parents else None]
+                      + path_parts)))
+        # note that we will not "normpath()" the result, check the
+        # pathlib docs for why this is the only sane choice in the
+        # face of the possibility of symlinks in the path
+        out.append(p)
+    return out[0] if isinstance(path, (string_types, PurePath)) else out
 
 
 def path_under_rev_dataset(ds, path):

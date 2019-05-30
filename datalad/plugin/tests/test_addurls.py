@@ -290,7 +290,7 @@ def test_extract_wrong_input_type():
 
 @with_tempfile(mkdir=True)
 def test_addurls_nonannex_repo(path):
-    ds = Dataset(path).rev_create(force=True, no_annex=True)
+    ds = Dataset(path).create(force=True, no_annex=True)
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
@@ -298,7 +298,7 @@ def test_addurls_nonannex_repo(path):
 
 @with_tempfile(mkdir=True)
 def test_addurls_dry_run(path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
 
     with chpwd(path):
         json_file = "links.json"
@@ -308,7 +308,7 @@ def test_addurls_dry_run(path):
                        {"url": "URL/c.dat", "name": "c", "subdir": "foo"}],
                       jfh)
 
-        ds.rev_save(message="setup")
+        ds.save(message="setup")
 
         with swallow_logs(new_level=logging.INFO) as cml:
             ds.addurls(json_file,
@@ -359,7 +359,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
 
         def get_annex_commit_counts():
             return int(
@@ -407,7 +407,7 @@ class TestAddurls(object):
             ds.unlock("a")
             with open("a", "w") as ofh:
                 ofh.write("changed")
-            ds.rev_save("a")
+            ds.save("a")
 
             assert_raises(IncompleteResultsError,
                           ds.addurls,
@@ -422,7 +422,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_subdataset(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
 
         with chpwd(path):
             for save in True, False:
@@ -449,8 +449,8 @@ class TestAddurls(object):
 
             # Now save the "--nosave" changes and check that we have
             # all the subdatasets.
-            ds.rev_save()
-            eq_(set(subdatasets(ds, recursive=True,
+            ds.save()
+            eq_(set(subdatasets(dataset=ds, recursive=True,
                                 result_xfm="relpaths")),
                 {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})
 
@@ -461,7 +461,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_repindex(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
 
         with chpwd(path):
             with assert_raises(IncompleteResultsError) as raised:
@@ -475,7 +475,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_parts(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
 
@@ -484,7 +484,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
         with chpwd(path):
             ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}")
             for fname in ["a.dat", "b.dat", "c.dat"]:
@@ -492,7 +492,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename_fail(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
         with chpwd(path):
             assert_raises(IncompleteResultsError,
                           ds.addurls,
@@ -502,7 +502,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_metafail(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
 
         # Force failure by passing a non-existent file name to annex.
         fn = ds.repo.set_metadata_
@@ -517,7 +517,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_dropped_urls(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
         with chpwd(path), swallow_logs(new_level=logging.WARNING) as cml:
             ds.addurls(self.json_file, "", "{subdir}//{name}")
             assert_re_in(r".*Dropped [0-9]+ row\(s\) that had an empty URL",
@@ -525,7 +525,7 @@ class TestAddurls(object):
 
     @with_tempfile(mkdir=True)
     def test_addurls_version(self, path):
-        ds = Dataset(path).rev_create(force=True)
+        ds = Dataset(path).create(force=True)
 
         def version_fn(url):
             if url.endswith("b.dat"):

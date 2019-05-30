@@ -11,13 +11,13 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six.moves import map as map
+from six.moves import map
 
 
 def _strip_typerepr(s):
     """Strip away <class '...'> and <type '...'> decorations for docstrings
     """
-    return re.sub("<(class|type) '(\S+)'>", r'\2', s)
+    return re.sub(r"<(class|type) '(\S+)'>", r'\2', s)
 
 
 def _type_str(t):

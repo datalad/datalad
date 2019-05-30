@@ -77,6 +77,7 @@ from .exceptions import CommandError
 from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
+from .exceptions import InvalidGitReferenceError
 from .exceptions import MissingBranchError
 from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
@@ -523,13 +524,19 @@ class GitPythonProgressBar(RemoteProgress):
                 # spotted used by GitPython tests, so may be at times it is not
                 # known and assumed to be a 100%...? TODO
                 max_count = 100.0
+            if op_code:
+                # Apparently those are composite and we care only about the ones
+                # we know, so to avoid switching the progress bar for no good
+                # reason - first & with the mask
+                op_code = op_code & self.OP_MASK
             if self._op_code is None or self._op_code != op_code:
                 # new type of operation
                 self._close_pbar()
 
                 self._pbar = self._ui.get_progressbar(
                     self._get_human_msg(op_code),
-                    total=max_count
+                    total=max_count,
+                    unit=' objects'
                 )
                 self._op_code = op_code
             if not self._pbar:
@@ -981,7 +988,7 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return exists(opj(path, '.git'))
+        return (Path(path) / '.git').exists()
 
     @staticmethod
     def get_git_dir(repo):
@@ -2267,14 +2274,6 @@ class GitRepo(RepoInterface):
         self._git_custom_command("", ["git", "cherry-pick", commit],
                                  check_fake_dates=True)
 
-    def ls_remote(self, remote, options=None):
-        if options is None:
-            options = []
-        self._git_custom_command(
-            '', ['git', 'ls-remote'] + options + [remote]
-        )
-        # TODO: Return values?
-
     # run() needs this ATM, but should eventually be RF'ed to a
     # status(recursive=True) call
     @property
@@ -2906,8 +2905,8 @@ class GitRepo(RepoInterface):
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in str(exc):
-                raise ValueError("Git reference '{}' invalid".format(ref))
+            if "fatal: Not a valid object name" in text_type(exc):
+                raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
 
@@ -3531,6 +3530,16 @@ class GitRepo(RepoInterface):
                         else ('not a Git repository: %s', exc_str(e)),
                         logger=lgr)
                     continue
+                # This mirrors the result structure yielded for
+                # to_stage_submodules below.
+                yield get_status_dict(
+                    action='add',
+                    refds=self.pathobj,
+                    type='file',
+                    key=None,
+                    path=self.pathobj / ut.PurePosixPath(cand_sm),
+                    status='ok',
+                    logger=lgr)
                 added_submodule = True
         if not need_partial_commit:
             # without a partial commit an AnnexRepo would ignore any submodule

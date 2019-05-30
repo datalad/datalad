@@ -12,6 +12,8 @@
 import re
 from os import linesep
 
+import six
+
 
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
@@ -131,6 +133,18 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not under control of the repository at all.
     """
     pass
+
+
+@six.python_2_unicode_compatible
+class InvalidGitReferenceError(ValueError):
+    """Thrown if provided git reference is invalid
+    """
+    def __init__(self, ref, *args, **kwargs):
+        super(InvalidGitReferenceError, self).__init__(*args, **kwargs)
+        self.ref = ref
+
+    def __str__(self):
+        return u"Git reference '{}' invalid".format(self.ref)
 
 
 class GitIgnoreError(CommandError):

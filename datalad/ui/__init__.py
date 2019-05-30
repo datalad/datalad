@@ -23,8 +23,9 @@ from .dialog import (
     IPythonUI,
     UnderAnnexUI,
     UnderTestsUI,
+    SilentConsoleLog,
+    QuietConsoleLog,
 )
-from .dialog import SilentConsoleLog
 from ..utils import (
     is_interactive,
     get_ipython_shell,
@@ -36,7 +37,7 @@ KNOWN_BACKENDS = {
     'ipython': IPythonUI,
     'annex': UnderAnnexUI,
     'tests': UnderTestsUI,
-    'tests-noninteractive': SilentConsoleLog,
+    'tests-noninteractive': QuietConsoleLog,
     'no-progress': SilentConsoleLog,
 }
 

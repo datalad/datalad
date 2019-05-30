@@ -164,7 +164,7 @@ class Create(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='rev_create')
+    @datasetmethod(name='create')
     @eval_results
     def __call__(
             path=None,
@@ -333,7 +333,7 @@ class Create(Interface):
             )
             # set the annex backend in .gitattributes as a staged change
             tbrepo.set_default_backend(
-                cfg.obtain('datalad.repo.backend', default='MD5E'),
+                cfg.obtain('datalad.repo.backend'),
                 persistent=True, commit=False)
             add_to_git[tbds.repo.pathobj / '.gitattributes'] = {
                 'type': 'file',
@@ -426,7 +426,7 @@ class Create(Interface):
         if isinstance(dataset, Dataset) and dataset.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.rev_save(
+            for r in dataset.save(
                     path=tbds.path,
             ):
                 yield r

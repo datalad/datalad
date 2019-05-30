@@ -13,16 +13,22 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
+from functools import partial
+from collections import OrderedDict
+
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
-from datalad.utils import getpwd
-from datalad.utils import assure_unicode
-from datalad.utils import unlink
+from datalad.utils import (
+    assure_unicode,
+    assure_bytes,
+    getpwd,
+    unlink,
+)
 from datalad.dochelpers import exc_str
 from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import InvalidGitRepositoryError
-
+from datalad.version import __version__, __full_version__
 
 lgr = logging.getLogger('datalad.plugin.wtf')
 
@@ -49,7 +55,6 @@ def get_max_path_length(top_path=None, maxl=1000):
     """
     if not top_path:
         top_path = getpwd()
-    import os
     import random
     from datalad import lgr
     from datalad.dochelpers import exc_str
@@ -73,7 +78,6 @@ def get_max_path_length(top_path=None, maxl=1000):
 
 
 def _describe_datalad():
-    from datalad.version import __version__, __full_version__
 
     return {
         'version': assure_unicode(__version__),
@@ -108,12 +112,33 @@ def _describe_annex():
 def _describe_system():
     import platform as pl
     from datalad import get_encoding_info
+
+    if hasattr(pl, 'dist'):
+        dist = pl.dist()
+    else:
+        # Python 3.8 removed .dist but recommended "distro" is slow, so we
+        # try it only if needed
+        try:
+            import distro
+            dist = distro.linux_distribution(full_distribution_name=False)
+        except ImportError:
+            lgr.info(
+                "Please install 'distro' package to obtain distribution information"
+            )
+            dist = tuple()
+        except Exception as exc:
+            lgr.warning(
+                "No distribution information will be provided since 'distro' "
+                "fails to import/run: %s", exc_str(exc)
+            )
+            dist = tuple()
+
     return {
         'type': os.name,
         'name': pl.system(),
         'release': pl.release(),
         'version': pl.version(),
-        'distribution': ' '.join([_t2s(pl.dist()),
+        'distribution': ' '.join([_t2s(dist),
                                   _t2s(pl.mac_ver()),
                                   _t2s(pl.win32_ver())]).rstrip(),
         'max_path_length': get_max_path_length(getpwd()),
@@ -125,12 +150,14 @@ def _describe_environment():
     from datalad import get_envvars_info
     return get_envvars_info()
 
+
 def _describe_python():
     import platform
     return {
         'version': platform.python_version(),
         'implementation': platform.python_implementation(),
     }
+
 
 def _describe_configuration(cfg, sensitive):
     if not cfg:
@@ -217,25 +244,52 @@ def _describe_dataset(ds, sensitive):
     from datalad.interface.results import success_status_map
     from datalad.api import metadata
 
-    infos = {
-        'path': ds.path,
-        'repo': ds.repo.__class__.__name__ if ds.repo else None,
+    try:
+        infos = {
+            'path': ds.path,
+            'repo': ds.repo.__class__.__name__ if ds.repo else None,
+        }
+        if not sensitive:
+            infos['metadata'] = _HIDDEN
+        elif ds.id:
+            ds_meta = metadata(
+                dataset=ds, reporton='datasets', return_type='list',
+                result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
+                result_renderer='disabled', on_failure='ignore')
+            if ds_meta:
+                ds_meta = [dm['metadata'] for dm in ds_meta]
+                if len(ds_meta) == 1:
+                    ds_meta = ds_meta.pop()
+                infos['metadata'] = ds_meta
+            else:
+                infos['metadata'] = None
+        return infos
+    except InvalidGitRepositoryError as e:
+        return {"invalid": exc_str(e)}
+
+
+def _describe_location(res):
+    return {
+        'path': res['path'],
+        'type': res['type'],
     }
-    if not sensitive:
-        infos['metadata'] = _HIDDEN
-    elif ds.id:
-        ds_meta = metadata(
-            dataset=ds, reporton='datasets', return_type='list',
-            result_filter=lambda x: x['action'] == 'metadata' and success_status_map[x['status']] == 'success',
-            result_renderer='disabled', on_failure='ignore')
-        if ds_meta:
-            ds_meta = [dm['metadata'] for dm in ds_meta]
-            if len(ds_meta) == 1:
-                ds_meta = ds_meta.pop()
-            infos['metadata'] = ds_meta
-        else:
-            infos['metadata'] = None
-    return infos
+
+
+# Actuall callables for WTF. If None -- should be bound later since depend on
+# the context
+SECTION_CALLABLES = {
+    'datalad': _describe_datalad,
+    'python': _describe_python,
+    'git-annex': _describe_annex,
+    'system': _describe_system,
+    'environment': _describe_environment,
+    'configuration': None,
+    'location': None,
+    'extensions': _describe_extensions,
+    'metadata_extractors': _describe_metadata_extractors,
+    'dependencies': _describe_dependencies,
+    'dataset': None,
+}
 
 
 @build_doc
@@ -268,6 +322,20 @@ class WTF(Interface):
             config and metadata which could potentially contain sensitive 
             information (credentials, names, etc.).  If 'some', the fields
             which are known to be sensitive will still be masked out"""),
+        sections=Parameter(
+            args=("-S", "--section"),
+            action='append',
+            dest='sections',
+            metavar="SECTION",
+            constraints=EnsureChoice(*sorted(SECTION_CALLABLES)) | EnsureNone(),
+            doc="""section to include.  If not set, all sections.
+            [CMD: This option can be given multiple times. CMD]"""),
+        decor=Parameter(
+            args=("-D", "--decor"),
+            constraints=EnsureChoice('html_details') | EnsureNone(),
+            doc="""decoration around the rendering to facilitate embedding into
+            issues etc, e.g. use 'html_details' for posting collapsable entry
+            to GitHub issues."""),
         clipboard=Parameter(
             args=("-c", "--clipboard",),
             action="store_true",
@@ -278,7 +346,7 @@ class WTF(Interface):
     @staticmethod
     @datasetmethod(name='wtf')
     @eval_results
-    def __call__(dataset=None, sensitive=None, clipboard=None):
+    def __call__(dataset=None, sensitive=None, sections=None, decor=None, clipboard=None):
         from datalad.distribution.dataset import require_dataset
         from datalad.support.exceptions import NoDatasetArgumentFound
         from datalad.interface.results import get_status_dict
@@ -303,36 +371,42 @@ class WTF(Interface):
         from datalad.ui import ui
         from datalad.support.external_versions import external_versions
 
-        infos = {}
+        infos = OrderedDict()
         res = get_status_dict(
             action='wtf',
             path=ds.path if ds else op.abspath(op.curdir),
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,
+            decor=decor,
             infos=infos,
         )
-        infos['datalad'] = _describe_datalad()
-        infos['python'] = _describe_python()
-        infos['git-annex'] = _describe_annex()
-        infos['system'] = _describe_system()
-        infos['environment'] = _describe_environment()
-        infos['configuration'] = _describe_configuration(cfg, sensitive)
-        infos['extentions'] = _describe_extensions()
-        infos['metadata_extractors'] = _describe_metadata_extractors()
-        infos['dependencies'] = _describe_dependencies()
+
+        # Define section callables which require variables.
+        # so there is no side-effect on module level original
+        section_callables = SECTION_CALLABLES.copy()
+        section_callables['location'] = partial(_describe_location, res)
+        section_callables['configuration'] = \
+            partial(_describe_configuration, cfg, sensitive)
         if ds:
-            try:
-                infos['dataset'] = _describe_dataset(ds, sensitive)
-            except InvalidGitRepositoryError as e:
-                infos['dataset'] = {"invalid": exc_str(e)}
+            section_callables['dataset'] = \
+                partial(_describe_dataset, ds, sensitive)
+        else:
+            section_callables.pop('dataset')
+        assert all(section_callables.values())  # check if none was missed
+
+        if sections is None:
+            sections = sorted(list(section_callables))
+
+        for s in sections:
+            infos[s] = section_callables[s]()
 
         if clipboard:
             external_versions.check(
                 'pyperclip', msg="It is needed to be able to use clipboard")
             import pyperclip
             report = _render_report(res)
-            pyperclip.copy(report)
+            pyperclip.copy(assure_bytes(report))
             ui.message("WTF information of length %s copied to clipboard"
                        % len(report))
         yield res
@@ -345,15 +419,11 @@ class WTF(Interface):
 
 
 def _render_report(res):
-    report = u'# WTF\n'
-    report += u'\n'.join(
-        u'- {}: {}'.format(k, v) for k, v in res.items()
-        if k not in ('action', 'infos', 'status')
-    )
+    report = u'# WTF'
 
     def _unwind(text, val, top):
         if isinstance(val, dict):
-            for k in sorted(val):
+            for k in val:
                 text += u'\n{}{} {}{} '.format(
                     '##' if not top else top,
                     '-' if top else '',
@@ -369,4 +439,19 @@ def _render_report(res):
         return text
 
     report = _unwind(report, res.get('infos', {}), '')
+
+    decor = res.get('decor', None)
+
+    if not decor:
+        return report
+
+    if decor == 'html_details':
+        report = """\
+<details><summary>DataLad %s WTF (%s)</summary>
+
+%s
+</details>
+        """ % (__version__, ', '.join(res.get('infos', {})), report)
+    else:
+        raise ValueError("Unknown value of decor=%s" % decor)
     return report

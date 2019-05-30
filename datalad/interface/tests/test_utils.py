@@ -78,7 +78,7 @@ def test_dirty(path):
     handle_dirty_dataset(ds, 'ignore')
     assert_raises(RuntimeError, handle_dirty_dataset, ds, 'save-before')
     # should yield a clean repo
-    ds.rev_create()
+    ds.create()
     orig_state = ds.repo.get_hexsha()
     _check_all_clean(ds, orig_state)
     # tainted: untracked
@@ -91,7 +91,7 @@ def test_dirty(path):
     orig_state = _check_auto_save(ds, orig_state)
     # tainted: submodule
     # not added to super on purpose!
-    subds = ds.rev_create('subds')
+    subds = ds.create('subds')
     _check_all_clean(subds, subds.repo.get_hexsha())
     ok_clean_git(ds.path)
     # subdataset must be added as a submodule!
@@ -125,11 +125,11 @@ demo_hierarchy = {
 
 def make_demo_hierarchy_datasets(path, tree, parent=None):
     if parent is None:
-        parent = Dataset(path).rev_create(force=True)
+        parent = Dataset(path).create(force=True)
     for node, items in tree.items():
         if isinstance(items, dict):
             node_path = opj(path, node)
-            nodeds = parent.rev_create(node_path, force=True)
+            nodeds = parent.create(node_path, force=True)
             make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
     return parent
 
@@ -139,7 +139,7 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
@@ -150,7 +150,7 @@ def test_save_hierarchy(path):
         ok_(d.repo.dirty)
     # need to give file specifically, otherwise it will simply just preserve
     # staged changes
-    ds_bb.rev_save(path=opj(ds_bbaa.path, 'file_bbaa'))
+    ds_bb.save(path=opj(ds_bbaa.path, 'file_bbaa'))
     # it has saved all changes in the subtrees spanned
     # by the given datasets, but nothing else
     for d in (ds_bb, ds_bba, ds_bbaa):
@@ -163,7 +163,7 @@ def test_save_hierarchy(path):
     db = Dataset(opj(d.path, 'db'))
     db.repo.remove('file_db')
     # generator
-    d.rev_save(recursive=True)
+    d.save(recursive=True)
     for d in (d, da, db):
         ok_clean_git(d.path)
     ok_(ds.repo.dirty)
@@ -181,7 +181,7 @@ def test_save_hierarchy(path):
     ca.repo.remove('file_ca')
     d = Dataset(opj(ds.path, 'd'))
     d.repo.remove('file_d')
-    ds.rev_save(
+    ds.save(
         # append trailing slashes to the path to indicate that we want to
         # have the staged content in the dataset saved, rather than only the
         # subdataset state in the respective superds.
@@ -317,7 +317,7 @@ def test_discover_ds_trace(path, otherdir):
     # we have to check whether we get the correct hierarchy, as the test
     # subject is also involved in this
     assert_true(exists(opj(db, 'file_db')))
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # now two datasets which are not available locally, but we
     # know about them (e.g. from metadata)

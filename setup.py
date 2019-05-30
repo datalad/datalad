@@ -6,22 +6,27 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import sys
-import platform
-import os
-from os.path import dirname
-from os.path import join as opj
-from os.path import sep as pathsep
-from os.path import splitext
+from os.path import (
+    dirname,
+    join as opj,
+    sep as pathsep,
+    splitext,
+)
 
-from setuptools import findall
-from setuptools import setup, find_packages
+from setuptools import (
+    findall,
+    find_packages,
+    setup,
+)
 
-from setup_support import BuildConfigInfo
-from setup_support import BuildSchema
-from setup_support import BuildManPage, setup_entry_points
-from setup_support import BuildRSTExamplesFromScripts
-from setup_support import get_version
+from setup_support import (
+    BuildConfigInfo,
+    BuildManPage,
+    BuildRSTExamplesFromScripts,
+    BuildSchema,
+    get_version,
+    setup_entry_points,
+)
 
 
 def findsome(subdir, extensions):
@@ -42,25 +47,12 @@ version = get_version()
 # so we will filter manually for maximal compatibility
 datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 
-# keyring is a tricky one since it got split into two as of 8.0 and on older
-# systems there is a problem installing via pip (e.g. on wheezy) so for those we
-# would just ask for keyring
-keyring_requires = ['keyring>=8.0', 'keyrings.alt']
-pbar_requires = ['tqdm']
-
-dist = platform.dist()
-# Identical to definition in datalad.utils
-platform_system = platform.system().lower()
-on_windows = platform_system == 'windows'
-
-# on oldstable Debian let's ask for lower versions of keyring
-if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
-    keyring_requires = ['keyring<8.0']
-
 requires = {
     'core': [
         'appdirs',
         'chardet>=3.0.4',      # rarely used but small/omnipresent
+        'colorama; platform_system=="Windows"',
+        'distro; python_version >= "3.8"',
         'GitPython>=2.1.8',
         'iso8601',
         'humanize',
@@ -68,16 +60,16 @@ requires = {
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'six>=1.8.0',
+        'tqdm',
         'wrapt',
         'pathlib2; python_version < "3.0"',  # brought to you by revolution1
-    ] +
-    pbar_requires +
-    (['colorama'] if on_windows else []),
+    ],
     'downloaders': [
         'boto',
+        'keyring>=8.0', 'keyrings.alt',
         'msgpack',
         'requests>=1.2',
-    ] + keyring_requires,
+    ],
     'downloaders-extra': [
         'requests_ftp',
     ],
@@ -103,9 +95,6 @@ requires = {
         # use pyliblzma as the default for now.  Patch were you would prefer
         # backports.lzma instead
         'pyliblzma; python_version < "3.3"',
-        # was added in https://github.com/datalad/datalad/pull/1995 without
-        # due investigation, should not be needed until we add duecredit support
-        # 'duecredit',
         'simplejson',
         'whoosh',
     ],
@@ -129,7 +118,7 @@ requires.update({
         # used for converting README.md -> .rst for long_description
         'pypandoc',
         # Documentation
-        'sphinx',
+        'sphinx>=1.7.8',
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
@@ -226,6 +215,7 @@ setup(
         'datalad':
             findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
+            findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
     **setup_kwargs

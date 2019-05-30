@@ -96,7 +96,7 @@ def has_diff(ds, refspec, remote, paths):
     lgr.debug("Testing for changes with respect to '%s' of remote '%s'",
               remote_branch_name, remote)
     current_commit = ds.repo.get_hexsha()
-    within_ds_paths = [p for p in paths if p['path'] != ds.path]
+    within_ds_paths = [p['path'] for p in paths if p['path'] != ds.path]
     commit_differ = current_commit != ds.repo.get_hexsha(remote_ref)
     # yoh: not sure what "logic" was intended here for comparing only
     # some files.  By now we get a list of files, if any were changed,
@@ -110,13 +110,11 @@ def has_diff(ds, refspec, remote, paths):
         # in which case we can do the same muuuch cheaper (see below)
         # if there were custom paths, we will look at the diff
         lgr.debug("Since paths provided, looking at diff")
-        return any(ds.diff(
-            path=within_ds_paths,
-            revision=remote_ref,
-            # only commited changes in this dataset
-            staged=False,
-            # consider only commited changes in subdataset
-            ignore_subdatasets='dirty')) > 0
+        return any(r["state"] != "clean"
+                   for r in ds.diff(path=within_ds_paths,
+                                    fr="HEAD",
+                                    to=remote_ref,
+                                    untracked="no"))
     else:
         # if commits differ at all
         lgr.debug("Since no paths provided, comparing commits")
@@ -432,7 +430,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
                     # we want to publish the underlying branch
                     current_branch = current_branch[12:]
                 match_adjusted = re.match(
-                    'adjusted/(.*)\([a-z]*\)',
+                    r'adjusted/(.*)\([a-z]*\)',
                     current_branch)
                 if match_adjusted:
                     # adjusted/master(...)

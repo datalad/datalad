@@ -13,12 +13,15 @@
 
 from os.path import join as opj
 
-from datalad.api import rev_create
+from datalad.api import create
 from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
 from datalad.api import wtf
 from datalad.api import no_annex
 from datalad.plugin.wtf import _HIDDEN
+from datalad.version import __version__
+
+from ..wtf import SECTION_CALLABLES
 
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
@@ -28,6 +31,7 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
+from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
@@ -72,7 +76,7 @@ def test_wtf(path):
             assert_not_in('## dataset', cmo.out)
             assert_in('## configuration', cmo.out)
     # now with a dataset
-    ds = rev_create(path)
+    ds = create(path)
     with swallow_outputs() as cmo:
         wtf(dataset=ds.path)
         assert_in('## configuration', cmo.out)
@@ -92,6 +96,41 @@ def test_wtf(path):
         assert_not_in(_HIDDEN, cmo.out)  # all is shown
         assert_in('user.name: ', cmo.out)
 
+    # Sections selection
+    #
+    # If we ask for no sections and there is no dataset
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            assert_not_in('## dataset', cmo.out)
+            for s in SECTION_CALLABLES:
+                assert_not_in('## %s' % s.lower(), cmo.out.lower())
+
+    # ask for a selected set
+    secs = ['git-annex', 'configuration']
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=secs)
+            for s in SECTION_CALLABLES:
+                (assert_in if s in secs else assert_not_in)(
+                    '## %s' % s.lower(), cmo.out.lower()
+                )
+            # order should match our desired one, not alphabetical
+            assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
+
+    # not achievable from cmdline is to pass an empty list of sections.
+    with chpwd(path):
+        with swallow_outputs() as cmo:
+            wtf(sections=[])
+            eq_(cmo.out.rstrip(), '# WTF')
+
+    # and we could decorate it nicely for embedding e.g. into github issues
+    with swallow_outputs() as cmo:
+        wtf(sections=['dependencies'], decor='html_details')
+        ok_startswith(cmo.out, '<details><summary>DataLad %s WTF' % __version__)
+        assert_in('## dependencies', cmo.out)
+
+    # should result only in '# WTF'
     skip_if_no_module('pyperclip')
 
     # verify that it works correctly in the env/platform
@@ -117,7 +156,7 @@ def test_wtf(path):
 
 @with_tempfile(mkdir=True)
 def test_no_annex(path):
-    ds = rev_create(path)
+    ds = create(path)
     ok_clean_git(ds.path)
     create_tree(
         ds.path,
@@ -126,10 +165,10 @@ def test_no_annex(path):
             'notinannex': 'othercontent'},
          'README': 'please'})
     # add inannex pre configuration
-    ds.rev_save(opj('code', 'inannex'))
+    ds.save(opj('code', 'inannex'))
     no_annex(pattern=['code/**', 'README'], dataset=ds)
     # add inannex and README post configuration
-    ds.rev_save([opj('code', 'notinannex'), 'README'])
+    ds.save([opj('code', 'notinannex'), 'README'])
     ok_clean_git(ds.path)
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
@@ -158,8 +197,8 @@ _ds_template = {
 
 @with_tree(_ds_template)
 def test_add_readme(path):
-    ds = Dataset(path).rev_create(force=True)
-    ds.rev_save()
+    ds = Dataset(path).create(force=True)
+    ds.save()
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     assert_status('ok', ds.add_readme())

@@ -53,15 +53,15 @@ def test_invalid_call(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import rev_save, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
-rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_basics(path, super_path):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     assert_false(ds.repo.is_under_annex("README.md"))
@@ -71,7 +71,7 @@ def test_basics(path, super_path):
         'code',
         where='dataset')
     # commit this procedure config for later use in a clone:
-    ds.rev_save(op.join('.datalad', 'config'))
+    ds.save(op.join('.datalad', 'config'))
     # configure dataset to run the demo procedure prior to the clean command
     ds.config.add(
         'datalad.clean.proc-pre',
@@ -84,7 +84,7 @@ def test_basics(path, super_path):
     ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
 
     # make a fresh dataset:
-    super = Dataset(super_path).rev_create()
+    super = Dataset(super_path).create()
     # configure dataset to run the demo procedure prior to the clean command
     super.config.add(
         'datalad.clean.proc-pre',
@@ -129,7 +129,7 @@ def test_procedure_discovery(path, super_path):
             len(ps))
 
     # set up dataset with registered procedure (c&p from test_basics):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
@@ -142,7 +142,7 @@ def test_procedure_discovery(path, super_path):
         'datalad.clean.proc-pre',
         'datalad_test_proc',
         where='dataset')
-    ds.rev_save(op.join('.datalad', 'config'))
+    ds.save(op.join('.datalad', 'config'))
 
     # run discovery on the dataset:
     ps = ds.run_procedure(discover=True)
@@ -160,7 +160,7 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
 
     # make it a subdataset and try again:
-    super = Dataset(super_path).rev_create()
+    super = Dataset(super_path).create()
     super.install('sub', source=ds.path)
 
     ps = super.run_procedure(discover=True)
@@ -204,16 +204,16 @@ def test_procedure_discovery(path, super_path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import rev_save, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('{}\\n'.format(sys.argv[2]))
-rev_save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 def test_configs(path):
 
     # set up dataset with registered procedure (c&p from test_basics):
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
     ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder

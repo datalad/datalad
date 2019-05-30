@@ -15,194 +15,34 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 
-from os.path import join as opj
 from os.path import relpath
-from datalad import cfg
 
-from datalad.interface.common_opts import recursion_flag, recursion_limit
-from datalad.interface.common_opts import publish_depends
-from datalad.downloaders.credentials import UserPassword
-from datalad.dochelpers import exc_str
-from datalad.utils import assure_list
-from datalad.support.param import Parameter
-from datalad.support.network import URL
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.constraints import EnsureChoice
-from datalad.support.exceptions import MissingExternalDependency
-from ..interface.base import Interface
-from datalad.interface.base import build_doc
-from datalad.distribution.dataset import EnsureDataset, datasetmethod, \
-    require_dataset, Dataset
-from datalad.distribution.siblings import Siblings
+from ..interface.base import (
+    build_doc,
+    Interface,
+)
+from ..interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+    publish_depends,
+)
+from ..support.param import Parameter
+from ..support.constraints import (
+    EnsureChoice,
+    EnsureNone,
+    EnsureStr,
+)
+from ..utils import (
+    assure_list,
+)
+from .dataset import (
+    datasetmethod,
+    EnsureDataset,
+    require_dataset,
+)
+from .siblings import Siblings
 
 lgr = logging.getLogger('datalad.distribution.create_sibling_github')
-
-
-def get_repo_url(repo, access_protocol, github_login):
-    """Report the repository access URL for Git matching the protocol"""
-    prop = {
-        'https': repo.clone_url,
-        'ssh': repo.ssh_url
-    }[access_protocol]
-    if access_protocol == 'https' and github_login:
-        # we were provided explicit github login.  For ssh access it is
-        # impossible to specify different login within ssh RI, but it is
-        # possible to do so for https logins
-        url = URL(prop)
-        assert url.scheme in ('http', 'https')
-        url.username = github_login
-        prop = url.as_str()
-    return prop
-
-
-def _get_github_entity(gh, cred, github_login, github_passwd, github_organization):
-    if github_login == 'disabledloginfortesting':
-        raise gh.BadCredentialsException(403, 'no login specified')
-    if not (github_login and github_passwd):
-        # we don't have both
-        # check if there is an oauth token from
-        # https://github.com/sociomantic/git-hub
-        token = False
-        if not cred.is_known:
-            if not github_login:
-                # try find a token as login
-                github_login = cfg.get('hub.oauthtoken', None)
-                token = True
-            if not (github_login and (github_passwd or token)):
-                # still at least one missing, utilize the credential store
-                # to get auth info, pass potential passwd value along
-                cred.enter_new(
-                    user=github_login,
-                    password=github_passwd)
-        # now we should really have it
-        creds = cred()
-        github_login = creds['user']
-        github_passwd = creds['password']
-
-    if not github_login:
-        raise gh.BadCredentialsException(403, 'no login specified')
-
-    # this will always succeed, but it might later throw an exception
-    # if the credentials were wrong
-    # and this case, known credentials are wiped out again below
-    authed_gh = gh.Github(
-        github_login,
-        password=github_passwd)
-
-    try:
-        if github_organization:
-            try:
-                entity = authed_gh.get_organization(github_organization)
-            except gh.UnknownObjectException as e:
-                raise ValueError('unknown organization "{}" [{}]'.format(
-                                 github_organization,
-                                 exc_str(e)))
-        else:
-            entity = authed_gh.get_user()
-    except gh.BadCredentialsException as e:
-        # things blew up, wipe out cred store, if anything is in it
-        if cred.is_known:
-            cred.delete()
-        raise e
-
-    return entity
-
-
-def _make_github_repos(
-        gh, github_login, github_passwd, github_organization, rinfo, existing,
-        access_protocol, dryrun):
-    # make it per user if github_login was provided. People might want to use
-    # different credentials etc
-    cred_identity = "%s@github" % github_login if github_login else "github"
-    cred = UserPassword(cred_identity, 'https://github.com/login')
-
-    # determine the entity under which to create the repos
-    entity = _get_github_entity(
-        gh,
-        cred,
-        github_login,
-        github_passwd,
-        github_organization)
-
-    res = []
-    for ds, reponame in rinfo:
-        try:
-            access_url, existed = _make_github_repo(
-                gh,
-                github_login,
-                entity,
-                reponame,
-                existing,
-                access_protocol,
-                dryrun)
-            res.append((ds, access_url, existed))
-        except gh.BadCredentialsException as e:
-            # things blew up, wipe out cred store, if anything is in it
-            if cred.is_known:
-                # to avoid surprises "who ate my creds?", warn the user
-                lgr.warning(
-                    "Authentication failed, deleting stored credential %s",
-                    cred_identity
-                )
-                cred.delete()
-            raise e
-    return res
-
-
-def _make_github_repo(gh, github_login, entity, reponame, existing, access_protocol, dryrun):
-    repo = None
-    try:
-        repo = entity.get_repo(reponame)
-    except gh.GithubException as e:
-        if e.status != 404:
-            # this is not a not found message, raise
-            raise e
-        lgr.debug(
-            'To be created repository "%s" does not yet exist on Github',
-            reponame)
-
-    if repo is not None:
-        if existing in ('skip', 'reconfigure'):
-            access_url = get_repo_url(repo, access_protocol, github_login)
-            return access_url, existing == 'skip'
-        elif existing == 'error':
-            msg = 'repository "{}" already exists on Github'.format(reponame)
-            if dryrun:
-                lgr.error(msg)
-            else:
-                raise ValueError(msg)
-        else:
-            RuntimeError('to must not happen')
-
-    if repo is None and not dryrun:
-        try:
-            repo = entity.create_repo(
-                reponame,
-                # TODO description='',
-                # TODO homepage='',
-                # TODO private=False,
-                has_issues=False,
-                has_wiki=False,
-                has_downloads=False,
-                auto_init=False)
-        except gh.GithubException as e:
-            msg = "Github {}: {}".format(
-                e.data.get('message', 'unknown'),
-                ', '.join([err.get('message')
-                           for err in e.data.get('errors', [])
-                           if 'message' in err]))
-            raise RuntimeError(msg)
-
-    if repo is None and not dryrun:
-        raise RuntimeError(
-            'something went wrong, we got no Github repository')
-
-    if dryrun:
-        return '{}:github/.../{}'.format(access_protocol, reponame), False
-    else:
-        # report URL for given access protocol
-        return get_repo_url(repo, access_protocol, github_login), False
-
 
 # presently only implemented method to turn subdataset paths into Github
 # compliant repository name suffixes
@@ -230,7 +70,7 @@ class CreateSiblingGithub(Interface):
     configuration under variable *hub.oauthtoken* will be used automatically.
     Such a token can be obtained, for example, using the commandline Github
     interface (https://github.com/sociomantic/git-hub) by running:
-    :kbd:`git hub setup`.
+    :kbd:`git hub setup` (if no 2FA is used).
     """
     # XXX prevent common args from being added to the docstring
     _no_eval_results = True
@@ -310,14 +150,9 @@ class CreateSiblingGithub(Interface):
             access_protocol='https',
             publish_depends=None,
             dryrun=False):
-        try:
-            # this is an absolute leaf package, import locally to avoid
-            # unnecessary dependencies
-            import github as gh
-        except ImportError:
-            raise MissingExternalDependency(
-                'PyGitHub',
-                msg='GitHub-related functionality is unavailable without this package')
+        # this is an absolute leaf package, import locally to avoid
+        # unnecessary dependencies
+        from datalad.support.github_ import _make_github_repos
 
         # what to operate on
         ds = require_dataset(
@@ -341,7 +176,7 @@ class CreateSiblingGithub(Interface):
         for d, mp in toprocess:
             if name in d.repo.get_remotes():
                 if existing == 'error':
-                    msg = '{} already had a configured sibling "{}"'.format(
+                    msg = '{} already has a configured sibling "{}"'.format(
                         d, name)
                     if dryrun:
                         lgr.error(msg)
@@ -361,7 +196,7 @@ class CreateSiblingGithub(Interface):
 
         # actually make it happen on Github
         rinfo = _make_github_repos(
-            gh, github_login, github_passwd, github_organization, filtered,
+            github_login, github_passwd, github_organization, filtered,
             existing, access_protocol, dryrun)
 
         # lastly configure the local datasets

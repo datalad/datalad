@@ -15,7 +15,7 @@ from os.path import lexists, dirname, join as opj, curdir
 # Hard coded version, to be done by release process,
 # it is also "parsed" (not imported) by setup.py, that is why assigned as
 # __hardcoded_version__ later and not vise versa
-__version__ = '0.12.0rc2'
+__version__ = '0.12.0rc4'
 __hardcoded_version__ = __version__
 __full_version__ = __version__
 
@@ -30,7 +30,7 @@ if lexists(opj(projdir, '.git')):
         # Note: Popen does not support `with` way correctly in 2.7
         #
         git = Popen(
-            ['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
+            ['git', 'describe', '--abbrev=4', '--dirty', '--match', r'[0-9]*\.*'],
             stdout=PIPE, stderr=PIPE,
             cwd=projdir
         )

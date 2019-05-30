@@ -891,7 +891,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         lines_ = [
             l for l in lines
             if not re.search(
-                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
         assert(len(lines_) <= 1)
@@ -1198,7 +1198,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         Returns
         -------
-        list of dict
+        list of dict or dict
         """
 
         return list(self.add_(
@@ -2034,12 +2034,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             # opts might be the '--key' which should go last
             annex_options += opts
 
+        interrupted = True
         try:
             out, err = self._run_annex_command(
                     command,
                     files=files,
                     annex_options=annex_options,
                     **kwargs)
+            interrupted = False
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2137,7 +2139,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
         finally:
             if progress_indicators:
-                progress_indicators.finish()
+                progress_indicators.finish(partial=interrupted)
 
         json_objects = (json_loads(line)
                         for line in out.splitlines() if line.startswith('{'))
@@ -2469,15 +2471,15 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # Files which were staged but not among files
                 staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
 
-                if staged_not_to_commit or files_changed_notstaged:
+                if files_changed_notstaged:
+                    self.add(files=list(files_changed_notstaged))
+
+                if staged_not_to_commit:
                     # Need an alternative index_file
                     with make_tempfile(dir=opj(self.path,
                                                GitRepo.get_git_dir(self)),
                                        prefix="datalad-",
                                        suffix=".index") as index_file:
-                        # First add those which were changed but not staged yet
-                        if files_changed_notstaged:
-                            self.add(files=list(files_changed_notstaged))
 
                         alt_index_file = index_file
                         index_tree = self.repo.git.write_tree()
@@ -2496,12 +2498,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                             careless=careless,
                             index_file=alt_index_file)
 
-                        if files_changed_notstaged:
-                            # reset current index to reflect the changes annex might have done
-                            self._git_custom_command(
-                                list(files_changed_notstaged),
-                                ['git', 'reset']
-                            )
+                        # reset current index to reflect the changes annex might have done
+                        self._git_custom_command(
+                            list(files_changed_notstaged |
+                                 files_changed_staged),
+                            ['git', 'reset']
+                        )
 
                 # in any case we will not specify files explicitly
                 files_to_commit = None
@@ -2900,18 +2902,26 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set(var, url, where='local', reload=True)
         super(AnnexRepo, self).set_remote_url(name, url, push)
 
-    def get_metadata(self, files, timestamps=False):
+    def get_metadata(self, files, timestamps=False, batch=False):
         """Query git-annex file metadata
 
         Parameters
         ----------
-        files : str or list(str)
-          One or more paths for which metadata is to be queried.
+        files : str or iterable(str)
+          One or more paths for which metadata is to be queried. If one
+          or more paths could be directories, `batch=False` must be given
+          to prevent git-annex given an error. Due to technical limitations,
+          such error will lead to a hanging process.
         timestamps: bool, optional
           If True, the output contains a '<metadatakey>-lastchanged'
           key for every metadata item, reflecting the modification
           time, as well as a 'lastchanged' key with the most recent
           modification time of any metadata item.
+        batch: bool, optional
+          If True, a `metadata --batch` process will be used, and only
+          confirmed annex'ed files can be queried (else query will hang
+          indefinitely). If False, invokes without --batch, and gives all files
+          as arguments (this can be problematic with a large number of files).
 
         Returns
         -------
@@ -2922,17 +2932,33 @@ class AnnexRepo(GitRepo, RepoInterface):
           metadata tags are stored under the key 'tag', which is a
           regular metadata item that can be manipulated like any other.
         """
-        if not files:
-            return
-        files = assure_list(files)
-        opts = ['--json']
-        for res in self._run_annex_command_json(
-                'metadata', opts=opts, files=files):
-            yield (
+        def _format_response(res):
+            return (
                 res['file'],
                 res['fields'] if timestamps else \
                 {k: v for k, v in res['fields'].items()
-                 if not k.endswith('lastchanged')})
+                 if not k.endswith('lastchanged')}
+            )
+
+        if not files:
+            return
+        if batch is False:
+            # we can be lazy
+            files = assure_list(files)
+        else:
+            if isinstance(files, text_type):
+                files = [files]
+            # anything else is assumed to be an iterable (e.g. a generator)
+        if batch is False:
+            for res in self._run_annex_command_json(
+                    'metadata', opts=['--json'], files=files):
+                yield _format_response(res)
+        else:
+            # batch mode is different: we need to compose a JSON request object
+            batched = self._batched.get('metadata', json=True, path=self.path)
+            for f in files:
+                res = batched.proc1(json.dumps({'file': f}))
+                yield _format_response(res)
 
     def set_metadata(
             self, files, reset=None, add=None, init=None,
@@ -3517,15 +3543,15 @@ class ProcessAnnexProgressIndicators(object):
             int(j.get('byte-progress'))
         )
 
-    def finish(self):
-        if self.total_pbar:
-            self.total_pbar.finish()
-            self.total_pbar = None
+    def finish(self, partial=False):
         if self.pbars:
             lgr.warning("Still have %d active progress bars when stopping",
                         len(self.pbars))
+        if self.total_pbar:
+            self.total_pbar.finish(partial=partial)
+            self.total_pbar = None
         for pbar in self.pbars.values():
-            pbar.finish()
+            pbar.finish(partial=partial)
         self.pbars = {}
         self._failed = 0
         self._succeeded = 0

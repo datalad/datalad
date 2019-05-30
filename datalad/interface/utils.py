@@ -101,8 +101,8 @@ def handle_dirty_dataset(ds, mode, msg=None):
     elif mode == 'save-before':
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
-        from datalad.interface.save import Save
-        Save.__call__(dataset=ds, message=msg)
+        from datalad.core.local.save import Save
+        Save.__call__(dataset=ds, message=msg, updated=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 

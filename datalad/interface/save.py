@@ -8,6 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """For now just a wrapper for Dataset.save()
 
+
+Note: This module is obsolete and will be removed once internal code no longer
+uses it. Use core.local.save instead.
 """
 
 __docformat__ = 'restructuredtext'
@@ -152,6 +155,9 @@ def save_dataset(
 class Save(Interface):
     """Save the current state of a dataset
 
+    *Note*: This is an obsolete interface and will be removed once internal
+     code no longer uses it. Use datalad.api.save or Dataset.save instead.
+
     Saving the state of a dataset records changes that have been made to it.
     This change record is annotated with a user-provided description.
     Optionally, an additional tag, such as a version, can be assigned to the
@@ -207,7 +213,7 @@ class Save(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='save')
+    @datasetmethod(name='_save')
     @eval_results
     def __call__(message=None, path=None, dataset=None,
                  all_updated=True, version_tag=None,

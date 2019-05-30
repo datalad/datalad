@@ -150,7 +150,7 @@ def test_get_content_info(path):
 @with_tempfile
 def test_compare_content_info(path):
     # TODO remove when `create` is RF to return the new Dataset
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     assert_repo_status(path)
 
     # for a clean repo HEAD and worktree query should yield identical results
@@ -167,12 +167,12 @@ def test_compare_content_info(path):
 @with_tempfile
 def test_subds_path(path):
     # a dataset with a subdataset with a file, all neatly tracked
-    ds = Dataset(path).rev_create()
-    subds = ds.rev_create('sub')
+    ds = Dataset(path).create()
+    subds = ds.create('sub')
     assert_repo_status(path)
     with (subds.pathobj / 'some.txt').open('w') as f:
         f.write(u'test')
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     assert_repo_status(path)
 
     # querying the toplevel dataset repo for a subdspath should
@@ -187,11 +187,11 @@ def test_subds_path(path):
 
 @with_tempfile
 def test_report_absent_keys(path):
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     # create an annexed file
     testfile = ds.pathobj / 'dummy'
     testfile.write_text(u'nothing')
-    ds.rev_save()
+    ds.save()
     # present in a full report and in a partial report
     # based on worktree of HEAD ref
     for ai in (

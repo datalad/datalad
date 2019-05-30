@@ -254,6 +254,9 @@ def test_url_samples():
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
+    # colons are problematic and might cause confusion into SSHRI
+    _check_ri("f/s:1", PathRI, localpath='f/s:1', path='f/s:1')
+    _check_ri("f/s:", PathRI, localpath='f/s:', path='f/s:')
     _check_ri("/f", PathRI, localpath='/f', path='/f')
     _check_ri("/f/s1", PathRI, localpath='/f/s1', path='/f/s1')
 
@@ -272,8 +275,14 @@ def test_url_samples():
     """
     $> ssh example.com/path/sp1:fname
     ssh: Could not resolve hostname example.com/path/sp1:fname: Name or service not known
+
+    edit 20190516 yoh: but this looks like a perfectly valid path.
+    SSH knows that it is not a path but its SSHRI so it can stay dumb.
+    We are trying to be smart and choose between RIs (even when we know that
+    it is e.g. a file).
     """
-    _check_ri('example.com/path/sp1:fname', SSHRI, hostname='example.com/path/sp1', path='fname')
+    _check_ri('e.com/p/sp:f', PathRI, localpath='e.com/p/sp:f', path='e.com/p/sp:f')
+    _check_ri('user@someho.st/mydir', PathRI, localpath='user@someho.st/mydir', path='user@someho.st/mydir')
 
     # SSHRIs have .port, but it is empty
     eq_(SSHRI(hostname='example.com').port, '')

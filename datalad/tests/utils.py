@@ -1540,7 +1540,7 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
 
 
 def get_convoluted_situation(path, repocls=AnnexRepo):
-    from datalad.api import rev_create as create
+    from datalad.api import create
 
     if 'APPVEYOR' in os.environ:
         # issue only happens on appveyor, Python itself implodes
@@ -1550,7 +1550,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
             'reason unknown')
     repo = repocls(path, create=True)
     # use create(force) to get an ID and config into the empty repo
-    ds = Dataset(path).rev_create(force=True)
+    ds = Dataset(path).create(force=True)
     # base content
     create_tree(
         ds.path,
@@ -1580,7 +1580,7 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_dropped_clean': 'file_dropped_clean',
             }
         )
-    ds.rev_save()
+    ds.save()
     if isinstance(ds.repo, AnnexRepo):
         # some files straight in git
         create_tree(
@@ -1594,16 +1594,16 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
                 'file_ingit_modified': 'file_ingit_clean',
             }
         )
-        ds.rev_save(to_git=True)
+        ds.save(to_git=True)
         ds.drop([
             'file_dropped_clean',
             op.join('subdir', 'file_dropped_clean')],
             check=False)
     # clean and proper subdatasets
-    ds.rev_create('subds_clean')
-    ds.rev_create(op.join('subdir', 'subds_clean'))
-    ds.rev_create('subds_unavailable_clean')
-    ds.rev_create(op.join('subdir', 'subds_unavailable_clean'))
+    ds.create('subds_clean')
+    ds.create(op.join('subdir', 'subds_clean'))
+    ds.create('subds_unavailable_clean')
+    ds.create(op.join('subdir', 'subds_unavailable_clean'))
     # uninstall some subdatasets (still clean)
     ds.uninstall([
         'subds_unavailable_clean',
@@ -1611,18 +1611,18 @@ def get_convoluted_situation(path, repocls=AnnexRepo):
         check=False)
     assert_repo_status(ds.path)
     # make a dirty subdataset
-    ds.rev_create('subds_modified')
-    ds.rev_create(op.join('subds_modified', 'someds'))
-    ds.rev_create(op.join('subds_modified', 'someds', 'dirtyds'))
+    ds.create('subds_modified')
+    ds.create(op.join('subds_modified', 'someds'))
+    ds.create(op.join('subds_modified', 'someds', 'dirtyds'))
     # make a subdataset with additional commits
-    ds.rev_create(op.join('subdir', 'subds_modified'))
+    ds.create(op.join('subdir', 'subds_modified'))
     pdspath = op.join(ds.path, 'subdir', 'subds_modified', 'progressedds')
-    ds.rev_create(pdspath)
+    ds.create(pdspath)
     create_tree(
         pdspath,
         {'file_clean': 'file_ingit_clean'}
     )
-    Dataset(pdspath).rev_save()
+    Dataset(pdspath).save()
     assert_repo_status(pdspath)
     # staged subds, and files
     create(op.join(ds.path, 'subds_added'))
@@ -1706,14 +1706,14 @@ def get_deeply_nested_structure(path):
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
     """
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
     (ds.pathobj / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
-    ds.rev_save()
+    ds.save()
     (ds.pathobj / 'subdir' / 'git_file.txt').write_text(u'dummy')
-    ds.rev_save(to_git=True)
+    ds.save(to_git=True)
     # a subtree of datasets
-    subds = ds.rev_create('subds_modified')
+    subds = ds.create('subds_modified')
     # another dataset, plus an additional dir in it
     ds.create(op.join('subds_modified', 'subds_lvl1_modified'))
     create_tree(
@@ -1731,7 +1731,7 @@ def get_deeply_nested_structure(path):
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
-    subds.rev_save()
+    subds.save()
     (ds.pathobj / 'directory_untracked').mkdir()
     # symlink farm #1
     # symlink to annexed file

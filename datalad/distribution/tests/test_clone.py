@@ -65,11 +65,25 @@ from ..dataset import Dataset
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_invalid_args(path, otherpath, alienpath):
+    # source == path
     assert_raises(ValueError, clone, 'Zoidberg', path='Zoidberg')
-    # install to an invalid URL
-    assert_raises(ValueError, clone, 'Zoidberg', path='ssh://mars:Zoidberg')
-    # install to a remote location
-    assert_raises(ValueError, clone, 'Zoidberg', path='ssh://mars/Zoidberg')
+    assert_raises(ValueError, clone, 'ssh://mars/Zoidberg', path='ssh://mars/Zoidberg')
+
+    # "invalid URL" is a valid filepath... and since no clone to remote
+    # is possible - we can just assume that it is the (legit) file path
+    # which is provided, not a URL.  So both below should fail as any
+    # other clone from a non-existing source and not for the reason of
+    # "invalid something".  Behavior is similar to how Git performs - can
+    # clone into a URL-like path.
+
+    # install to an "invalid URL" path
+    res = clone('Zoidberg', path='ssh://mars:Zoidberg', on_failure='ignore')
+    assert_status('error', res)
+
+    # install to a "remote location" path
+    res = clone('Zoidberg', path='ssh://mars/Zoidberg', on_failure='ignore')
+    assert_status('error', res)
+
     # make fake dataset
     ds = create(path)
     assert_raises(IncompleteResultsError, ds.clone, '/higherup.', 'Zoidberg')

@@ -146,13 +146,13 @@ def test_ls_json(topdir, topurl):
     # create some file and commit it
     with open(opj(ds.path, 'subdsfile.txt'), 'w') as f:
         f.write('123')
-    ds.rev_save(path='subdsfile.txt', message="Hello!", version_tag=1)
+    ds.save(path='subdsfile.txt', message="Hello!", version_tag=1)
 
     # add a subdataset
     ds.install('subds', source=topdir)
 
-    subdirds = ds.rev_create(_path_('dir/subds2'), force=True)
-    subdirds.rev_save('file')
+    subdirds = ds.create(_path_('dir/subds2'), force=True)
+    subdirds.save('file')
 
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
     git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'))                           # commit to git to init git repo
@@ -165,8 +165,8 @@ def test_ls_json(topdir, topurl):
     git.add('fgit.txt')              # commit to git to init git repo
     git.commit()
     # annex.add doesn't add submodule, so using ds.add
-    ds.rev_save(opj('dir', 'subgit'))                        # add the non-dataset git repo to annex
-    ds.rev_save('dir')                                  # add to annex (links)
+    ds.save(opj('dir', 'subgit'))                   # add the non-dataset git repo to annex
+    ds.save('dir')                                  # add to annex (links)
     ds.drop(opj('dir', 'subdir', 'file2.txt'), check=False)  # broken-link
 
     # register "external" submodule  by installing and uninstalling it

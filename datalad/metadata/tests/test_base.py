@@ -67,7 +67,7 @@ _dataset_hierarchy_template = {
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
-    Dataset(path).rev_create()
+    Dataset(path).create()
     # nothing set, nothing found
     assert_equal(get_metadata_type(Dataset(path)), [])
     # got section, but no setting
@@ -101,20 +101,20 @@ def test_aggregation(path):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
-    ds = Dataset(opj(path, 'origin')).rev_create(force=True)
+    ds = Dataset(opj(path, 'origin')).create(force=True)
     # before anything aggregated we would get nothing and only a log warning
     with swallow_logs(new_level=logging.WARNING) as cml:
         assert_equal(list(query_aggregated_metadata('all', ds, [])), [])
     assert_re_in('.*Found no aggregated metadata.*update', cml.out)
     ds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                   where='dataset')
-    subds = ds.rev_create('sub', force=True)
+    subds = ds.create('sub', force=True)
     subds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                      where='dataset')
-    subsubds = subds.rev_create('subsub', force=True)
+    subsubds = subds.create('subsub', force=True)
     subsubds.config.add('datalad.metadata.nativetype', 'frictionless_datapackage',
                         where='dataset')
-    ds.rev_save(recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # aggregate metadata from all subdatasets into any superdataset, including
     # intermediate ones
@@ -204,7 +204,7 @@ def test_ignore_nondatasets(path):
                     del m[k]
         return meta
 
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     meta = _kill_time(ds.metadata(reporton='datasets', on_failure='ignore'))
     n_subm = 0
     # placing another repo in the dataset has no effect on metadata
@@ -218,7 +218,7 @@ def test_ignore_nondatasets(path):
         assert_true(Dataset(subm_path).is_installed())
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         # making it a submodule has no effect either
-        ds.rev_save(subpath)
+        ds.save(subpath)
         assert_equal(len(ds.subdatasets()), n_subm + 1)
         assert_equal(meta, _kill_time(ds.metadata(reporton='datasets', on_failure='ignore')))
         n_subm += 1
@@ -228,7 +228,7 @@ def test_ignore_nondatasets(path):
 def test_get_aggregates_fails(path):
     with chpwd(path), assert_raises(NoDatasetArgumentFound):
         metadata(get_aggregates=True)
-    ds = Dataset(path).rev_create()
+    ds = Dataset(path).create()
     res = ds.metadata(get_aggregates=True, on_failure='ignore')
     assert_result_count(res, 1, path=ds.path, status='impossible')
 
@@ -236,8 +236,8 @@ def test_get_aggregates_fails(path):
 @with_tree({'dummy': 'content'})
 @with_tempfile(mkdir=True)
 def test_bf2458(src, dst):
-    ds = Dataset(src).rev_create(force=True)
-    ds.rev_save(to_git=False)
+    ds = Dataset(src).create(force=True)
+    ds.save(to_git=False)
 
     # no clone (empty) into new dst
     clone = install(source=ds.path, path=dst)

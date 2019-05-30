@@ -57,6 +57,7 @@ def test_unlock_raises(path, path2, path3):
     ds.unlock()
 
     # make it annex, but call unlock with invalid path:
+    (ds.pathobj / ".noannex").unlink()
     AnnexRepo(path, create=True)
     res = ds.unlock(path="notexistent.txt", result_xfm=None,
                     on_failure='ignore', return_type='item-or-list')

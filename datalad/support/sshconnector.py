@@ -13,16 +13,16 @@ Allows for connecting via ssh and keeping the connection open
 git calls to a ssh remote without the need to reauthenticate.
 """
 
+import os
 import logging
 from socket import gethostname
 from hashlib import md5
-from os import remove
-from os.path import exists
-from os.path import join as opj
 from subprocess import Popen
+import tempfile
 # importing the quote function here so it can always be imported from this
 # module
 from six.moves import shlex_quote as sh_quote
+from six import text_type
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -30,14 +30,18 @@ from six.moves import shlex_quote as sh_quote
 
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
-from datalad.utils import assure_dir
-from datalad.utils import auto_repr
+from datalad.utils import (
+    auto_repr,
+    Path,
+    assure_list,
+)
 from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username='', identity_file=''):
+def get_connection_hash(hostname, port='', username='', identity_file='',
+                        bundled=''):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -55,12 +59,14 @@ def get_connection_hash(hostname, port='', username='', identity_file=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{bundled}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
-            username=username).encode('utf-8')).hexdigest()[:8]
+            username=username,
+            bundled=bundled,
+        ).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
@@ -68,7 +74,8 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri, identity_file=None):
+    def __init__(self, ctrl_path, sshri, identity_file=None,
+                 use_remote_annex_bundle=True):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -82,6 +89,10 @@ class SSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
+        use_remote_annex_bundle : bool
+          If set, look for a git-annex installation on the remote and
+          prefer its binaries in the search path (i.e. prefer a bundled
+          Git over a system package).
         """
         self._runner = None
 
@@ -92,12 +103,13 @@ class SSHConnection(object):
                 "connections: {}".format(sshri))
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
-        self.ctrl_path = ctrl_path
-        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
+        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % ctrl_path]
+        self.ctrl_path = Path(ctrl_path)
         if self.sshri.port:
             self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
 
         self._identity_file = identity_file
+        self._use_remote_annex_bundle = use_remote_annex_bundle
 
         # essential properties of the remote system
         self._remote_props = {}
@@ -121,23 +133,26 @@ class SSHConnection(object):
           stdout, stderr of the command run.
         """
 
-        # TODO:  do not do all those checks for every invocation!!
-        # TODO: check for annex location once, check for open socket once
-        #       and provide roll back if fails to run and was not explicitly
-        #       checked first
-        if not self.is_open():
-            if not self.open():
-                raise RuntimeError(
-                    'Cannot open SSH connection to {}'.format(
-                        self.sshri))
+        # XXX: check for open socket once
+        #      and provide roll back if fails to run and was not explicitly
+        #      checked first
+        # MIH: this would mean that we would have to distinguish failure
+        #      of a payload command from failure of SSH itself. SSH however,
+        #      only distinguishes success and failure of the entire operation
+        #      Increase in fragility from introspection makes a potential
+        #      performance benefit a questionable improvement.
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
 
         # locate annex and set the bundled vs. system Git machinery in motion
-        remote_annex_installdir = self.get_annex_installdir()
-        if remote_annex_installdir:
-            # make sure to use the bundled git version if any exists
-            cmd = '{}; {}'.format(
-                'export "PATH={}:$PATH"'.format(remote_annex_installdir),
-                cmd)
+        if self._use_remote_annex_bundle:
+            remote_annex_installdir = self.get_annex_installdir()
+            if remote_annex_installdir:
+                # make sure to use the bundled git version if any exists
+                cmd = '{}; {}'.format(
+                    'export "PATH={}:$PATH"'.format(remote_annex_installdir),
+                    cmd)
 
         # build SSH call, feed remote command as a single last argument
         # whatever it contains will go to the remote machine for execution
@@ -168,7 +183,7 @@ class SSHConnection(object):
         return self._runner
 
     def is_open(self):
-        if not exists(self.ctrl_path):
+        if not self.ctrl_path.exists():
             lgr.log(
                 5,
                 "Not opening %s for checking since %s does not exist",
@@ -178,12 +193,12 @@ class SSHConnection(object):
         # check whether controlmaster is still running:
         cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
-        null = open('/dev/null')
         try:
             # expect_stderr since ssh would announce to stderr
             # "Master is running" and that is normal, not worthy warning about
             # etc -- we are doing the check here for successful operation
-            out, err = self.runner.run(cmd, stdin=null, expect_stderr=True)
+            with tempfile.TemporaryFile() as tempf:
+                out, err = self.runner.run(cmd, stdin=tempf, expect_stderr=True)
             res = True
         except CommandError as e:
             if e.code != 255:
@@ -192,9 +207,10 @@ class SSHConnection(object):
             # SSH died and left socket behind, or server closed connection
             self.close()
             res = False
-        finally:
-            null.close()
-        lgr.debug("Check of %s has %s", self, {True: 'succeeded', False: 'failed'}[res])
+        lgr.debug(
+            "Check of %s has %s",
+            self,
+            {True: 'succeeded', False: 'failed'}[res])
         return res
 
     def open(self):
@@ -208,7 +224,13 @@ class SSHConnection(object):
         bool
           Whether SSH reports success opening the connection
         """
-        if self.is_open():
+        # the socket should vanish almost instantly when the connection closes
+        # sending explicit 'check' commands to the control master is expensive
+        # (needs tempfile to shield stdin, Runner overhead, etc...)
+        # as we do not use any advanced features (forwarding, stop[ing the
+        # master without exiting) it should be relatively safe to just perform
+        # the much cheaper check of an existing control path
+        if self.ctrl_path.exists():
             return
 
         # set control options
@@ -252,42 +274,95 @@ class SSHConnection(object):
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
         except CommandError as e:
             lgr.debug("Failed to run close command")
-            if exists(self.ctrl_path):
+            if self.ctrl_path.exists():
                 lgr.debug("Removing existing control path %s", self.ctrl_path)
                 # socket need to go in any case
-                remove(self.ctrl_path)
+                self.ctrl_path.unlink()
             if e.code != 255:
                 # not a "normal" SSH error
                 raise e
 
-    def copy(self, source, destination, recursive=False, preserve_attrs=False):
+    def _get_scp_command_spec(self, recursive, preserve_attrs):
+        """Internal helper for SCP interface methods"""
+        # Convert ssh's port flag (-p) to scp's (-P).
+        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
+        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
+        scp_options += ["-r"] if recursive else []
+        scp_options += ["-p"] if preserve_attrs else []
+        return ["scp"] + scp_options
+
+    def put(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
+
+        Note: this method performs escaping of filenames to an extent that
+        moderately weird ones should work (spaces, quotes, pipes, other
+        characters with special shell meaning), but more complicated cases
+        might require appropriate external preprocessing of filenames.
 
         Parameters
         ----------
-        source: str or list
+        source : str or list
           file/folder path(s) to copy from on local
-        destination: str
+        destination : str
           file/folder path to copy to on remote
+        recursive : bool
+          flag to enable recursive copying of given sources
+        preserve_attrs : bool
+          preserve modification times, access times, and modes from the
+          original file
 
         Returns
         -------
         str
           stdout, stderr of the copy operation.
         """
-        # Convert ssh's port flag (-p) to scp's (-P).
-        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
-        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
-        scp_options += ["-r"] if recursive else []
-        scp_options += ["-p"] if preserve_attrs else []
-        scp_cmd = ["scp"] + scp_options
-
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
+        scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
         # add source filepath(s) to scp command
-        scp_cmd += source if isinstance(source, list) \
-            else [source]
-
+        scp_cmd += assure_list(source)
         # add destination path
-        scp_cmd += ['%s:"%s"' % (self.sshri.hostname, destination)]
+        scp_cmd += ['%s:%s' % (
+            self.sshri.hostname,
+            _quote_filename_for_scp(destination),
+        )]
+        return self.runner.run(scp_cmd)
+
+    def get(self, source, destination, recursive=False, preserve_attrs=False):
+        """Copies source file/folder from remote to a local destination.
+
+        Note: this method performs escaping of filenames to an extent that
+        moderately weird ones should work (spaces, quotes, pipes, other
+        characters with special shell meaning), but more complicated cases
+        might require appropriate external preprocessing of filenames.
+
+        Parameters
+        ----------
+        source : str or list
+          file/folder path(s) to copy from the remote host
+        destination : str
+          file/folder path to copy to on the local host
+        recursive : bool
+          flag to enable recursive copying of given sources
+        preserve_attrs : bool
+          preserve modification times, access times, and modes from the
+          original file
+
+        Returns
+        -------
+        str
+          stdout, stderr of the copy operation.
+        """
+        # make sure we have an open connection, will test if action is needed
+        # by itself
+        self.open()
+        scp_cmd = self._get_scp_command_spec(recursive, preserve_attrs)
+        # add source filepath(s) to scp command, prefixed with the remote host
+        scp_cmd += ["%s:%s" % (self.sshri.hostname, _quote_filename_for_scp(s))
+                    for s in assure_list(source)]
+        # add destination path
+        scp_cmd += [destination]
         return self.runner.run(scp_cmd)
 
     def get_annex_installdir(self):
@@ -299,11 +374,12 @@ class SSHConnection(object):
         # more
         self._remote_props[key] = annex_install_dir
         try:
-            with open('/dev/null') as null:
+            with tempfile.TemporaryFile() as tempf:
+                # TODO does not work on windows
                 annex_install_dir = self(
                     # use sh -e to be able to fail at each stage of the process
                     "sh -e -c 'dirname $(readlink -f $(which git-annex-shell))'"
-                    , stdin=null
+                    , stdin=tempf
                 )[0].strip()
         except CommandError as e:
             lgr.debug('Failed to locate remote git-annex installation: %s',
@@ -379,13 +455,12 @@ class SSHManager(object):
         if self._socket_dir is not None:
             return
         from ..config import ConfigManager
-        from os import chmod
         cfg = ConfigManager()
-        self._socket_dir = opj(cfg.obtain('datalad.locations.cache'),
-                               'sockets')
-        assure_dir(self._socket_dir)
+        self._socket_dir = \
+            Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
+        self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
-            chmod(self._socket_dir, 0o700)
+            os.chmod(text_type(self._socket_dir), 0o700)
         except OSError as exc:
             lgr.warning(
                 "Failed to (re)set permissions on the %s. "
@@ -394,12 +469,10 @@ class SSHManager(object):
                 self._socket_dir, exc_str(exc)
             )
 
-        from os import listdir
-        from os.path import isdir
         try:
-            self._prev_connections = [opj(self.socket_dir, p)
-                                      for p in listdir(self.socket_dir)
-                                      if not isdir(opj(self.socket_dir, p))]
+            self._prev_connections = [p
+                                      for p in self.socket_dir.iterdir()
+                                      if not p.is_dir()]
         except OSError as exc:
             self._prev_connections = []
             lgr.warning(
@@ -413,7 +486,7 @@ class SSHManager(object):
                 "Found %d previous connections",
                 len(self._prev_connections))
 
-    def get_connection(self, url):
+    def get_connection(self, url, use_remote_annex_bundle=True):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
@@ -448,15 +521,19 @@ class SSHManager(object):
             sshri.hostname,
             port=sshri.port,
             identity_file=identity_file or "",
-            username=sshri.username)
+            username=sshri.username,
+            bundled=use_remote_annex_bundle,
+        )
         # determine control master:
-        ctrl_path = "%s/%s" % (self.socket_dir, conhash)
+        ctrl_path = self.socket_dir / conhash
 
         # do we know it already?
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file)
+            c = SSHConnection(
+                ctrl_path, sshri, identity_file=identity_file,
+                use_remote_annex_bundle=use_remote_annex_bundle)
             self._connections[ctrl_path] = c
             return c
 
@@ -478,7 +555,7 @@ class SSHManager(object):
                         # don't close if connection wasn't opened by SSHManager
                         if self._connections[c].ctrl_path
                         not in self._prev_connections and
-                        exists(self._connections[c].ctrl_path)
+                        self._connections[c].ctrl_path.exists()
                         and (not ctrl_paths
                              or self._connections[c].ctrl_path in ctrl_paths)]
             if to_close:
@@ -494,3 +571,25 @@ class SSHManager(object):
                         lgr.debug("Failed to close a connection: "
                                   "%s", exc_str(exc))
             self._connections = dict()
+
+
+def _quote_filename_for_scp(name):
+    """Manually escape shell goodies in a file name.
+
+    Why manual? Because the author couldn't find a better way, and
+    simply quoting the entire filename does not work with SCP's overly
+    strict file matching criteria (likely a bug on their side).
+
+    Hence this beauty:
+    """
+    for s, t in (
+            (' ', '\\ '),
+            ('"', '\\"'),
+            ("'", "\\'"),
+            ("&", "\\&"),
+            ("|", "\\|"),
+            (">", "\\>"),
+            ("<", "\\<"),
+            (";", "\\;")):
+        name = name.replace(s, t)
+    return name

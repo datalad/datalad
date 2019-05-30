@@ -20,6 +20,7 @@ import os.path as op
 
 import sys
 
+from six import text_type
 
 from datalad import get_encoding_info
 from datalad.cmd import Runner
@@ -525,7 +526,8 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
     remote_repo = GitRepo(remote_path, create=False)
     url = "ssh://localhost" + op.abspath(remote_path)
-    socket_path = op.join(ssh_manager.socket_dir, get_connection_hash('localhost'))
+    socket_path = op.join(text_type(ssh_manager.socket_dir),
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -537,7 +539,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     ok_clean_git(repo)
 
     # the connection is known to the SSH manager, since fetch() requested it:
-    assert_in(socket_path, ssh_manager._connections)
+    assert_in(socket_path, list(map(text_type, ssh_manager._connections)))
     # and socket was created:
     ok_(op.exists(socket_path))
 
@@ -553,7 +555,8 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + op.abspath(remote_path)
-    socket_path = op.join(ssh_manager.socket_dir, get_connection_hash('localhost'))
+    socket_path = op.join(text_type(ssh_manager.socket_dir),
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -572,7 +575,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     ok_clean_git(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
-    assert_in(socket_path, ssh_manager._connections)
+    assert_in(socket_path, list(map(text_type, ssh_manager._connections)))
     # and socket was created:
     ok_(op.exists(socket_path))
 
@@ -588,7 +591,8 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
 
     remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + op.abspath(remote_path)
-    socket_path = op.join(ssh_manager.socket_dir, get_connection_hash('localhost'))
+    socket_path = op.join(text_type(ssh_manager.socket_dir),
+                          get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
     repo.add_remote("ssh-remote", url)
 
@@ -608,7 +612,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     assert_in("ssh-remote/ssh-test", [commit.remote_ref.name for commit in pushed])
 
     # the connection is known to the SSH manager, since fetch() requested it:
-    assert_in(socket_path, ssh_manager._connections)
+    assert_in(socket_path, list(map(text_type, ssh_manager._connections)))
     # and socket was created:
     ok_(op.exists(socket_path))
 

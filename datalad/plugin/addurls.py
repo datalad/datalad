@@ -16,7 +16,10 @@ import os
 import re
 import string
 
-from six import string_types
+from six import (
+    string_types,
+    text_type,
+)
 from six.moves.urllib.parse import urlparse
 
 from datalad.dochelpers import exc_str
@@ -493,8 +496,21 @@ def add_meta(rows):
 
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]
-
         with patch.object(ds.repo, "always_commit", False):
+            res = ds.repo.add(filename)
+            res_status = 'notneeded' if not res \
+                else 'ok' if res.get('success', False) \
+                else 'error'
+
+            yield dict(
+                action='add',
+                # decorator dies with Path()
+                path=text_type(ds.pathobj / filename),
+                type='file',
+                status=res_status,
+                parentds=ds.path,
+            )
+
             lgr.debug("Adding metadata to %s in %s", filename, ds.path)
             for a in ds.repo.set_metadata_(filename, add=row["meta_args"]):
                 res = annexjson2result(a, ds, type="file", logger=lgr)
@@ -749,8 +765,8 @@ class Addurls(Interface):
 
         if not dataset.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.rev_create(result_xfm=None,
-                                        return_type='generator'):
+            for r in dataset.create(result_xfm=None,
+                                    return_type='generator'):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -761,8 +777,8 @@ class Addurls(Interface):
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                for r in dataset.rev_create(spath, result_xfm=None,
-                                            return_type='generator'):
+                for r in dataset.create(spath, result_xfm=None,
+                                        return_type='generator'):
                     yield r
 
         for row in rows:
@@ -816,17 +832,12 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, save=False):
-                yield r
-
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
             for r in add_meta(meta_rows):
                 yield r
 
-            # Save here rather than the add call above to trigger a metadata
-            # commit on the git-annex branch.
             if save:
-                for r in dataset.save(message=msg, recursive=True):
+                for r in dataset.save(path=files_to_add, message=msg, recursive=True):
                     yield r
 
 
