@@ -43,6 +43,8 @@ def test_download_url_exceptions():
         'Cannot connect to proxy.' in msg
         or
         'Temporary failure in name resolution' in msg
+        or
+        'Name or service not known' in msg  # nd80
     ):
         assert_in('http://example.com/bogus', msg)
 
