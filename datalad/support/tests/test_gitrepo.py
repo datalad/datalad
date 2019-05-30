@@ -836,7 +836,27 @@ def test_GitRepo_dirty(path):
     os.mkdir(op.join(path, "empty", "empty-again"))
     ok_(not repo.dirty)
 
-    # TODO: submodules
+    subm = GitRepo(repo.pathobj / "subm", create=True)
+    (subm.pathobj / "subfile").write_text(u"")
+    subm.save()
+    repo.save()
+    ok_(not repo.dirty)
+    (subm.pathobj / "subfile").write_text(u"changed")
+    ok_(repo.dirty)
+
+    # User configuration doesn't affect .dirty's answer.
+    repo.config.set("diff.ignoreSubmodules", "all", where="local")
+    ok_(repo.dirty)
+    # GitRepo.commit currently can't handle this setting, so remove it for the
+    # save() calls below.
+    repo.config.unset("diff.ignoreSubmodules", where="local")
+    subm.save()
+    repo.save()
+    ok_(not repo.dirty)
+
+    repo.config.set("status.showUntrackedFiles", "no", where="local")
+    create_tree(repo.path, {"untracked_dir": {"a": "a"}})
+    ok_(repo.dirty)
 
 
 @with_tempfile(mkdir=True)
