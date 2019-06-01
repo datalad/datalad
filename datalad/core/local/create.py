@@ -423,10 +423,10 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if isinstance(dataset, Dataset) and dataset.path != tbds.path:
+        if isinstance(refds, Dataset) and refds.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.save(
+            for r in refds.save(
                     path=tbds.path,
             ):
                 yield r

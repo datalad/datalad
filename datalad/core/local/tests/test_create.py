@@ -209,6 +209,21 @@ def test_create_sub(path):
     assert_in("third", ds.subdatasets(result_xfm='relpaths'))
 
 
+@with_tempfile
+def test_create_sub_gh3463(path):
+    ds = Dataset(path)
+    ds.create()
+
+    # Test non-bound call.
+    with chpwd(ds.path):
+        create("subds0", dataset=".")
+    assert_repo_status(ds.path)
+
+    # Test command-line invocation directly.
+    Runner(cwd=ds.path)(["datalad", "create", "-d.", "subds1"])
+    assert_repo_status(ds.path)
+
+
 # windows failure triggered by
 # File "C:\Miniconda35\envs\test-environment\lib\site-packages\datalad\tests\utils.py", line 421, in newfunc
 #    rmtemp(d)
