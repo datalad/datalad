@@ -12,25 +12,29 @@
 
 __docformat__ = 'restructuredtext'
 
+from collections import defaultdict
 import logging
 
-from os.path import join as opj
+import os.path as op
 
+from six import text_type
+
+from datalad.core.local.status import Status
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.annotate_paths import annotated2content_by_ds
+from datalad.distribution.dataset import require_dataset
+from datalad.distribution.dataset import rev_resolve_path
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
+from datalad.utils import assure_list
+from datalad.utils import Path
 
 from .base import Interface
 
@@ -54,8 +58,7 @@ class Unlock(Interface):
             args=("-d", "--dataset"),
             doc=""""specify the dataset to unlock files in. If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory. If the latter fails, an
-            attempt is made to identify the dataset based on `path` """,
+            based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
@@ -69,99 +72,82 @@ class Unlock(Interface):
             dataset=None,
             recursive=False,
             recursion_limit=None):
+        refds = require_dataset(dataset, check_installed=True,
+                                purpose="unlocking")
 
-        if path is None and dataset is None:
-            raise InsufficientArgumentsError(
-                "insufficient arguments for unlocking: needs at least "
-                "a dataset or a path to unlock.")
+        # Before passing the results to status()
+        #   * record explicitly specified non-directory paths so that we can
+        #     decide whether to yield a result for reported paths
+        #   * filter out and yield results for paths that don't exist
+        paths_nondir = set()
+        paths_lexist = None
+        if path:
+            path = rev_resolve_path(assure_list(path), ds=dataset)
+            paths_lexist = []
+            for p in path:
+                if p.exists() or p.is_symlink():
+                    paths_lexist.append(p)
+                if not p.is_dir():
+                    paths_nondir.add(p)
 
-        refds_path = Interface.get_refds_path(dataset)
-        res_kwargs = dict(action='unlock', logger=lgr, refds=refds_path)
+        res_kwargs = dict(action='unlock', logger=lgr, refds=refds.path)
+        if path:
+            for p in set(path).difference(set(paths_lexist)):
+                yield get_status_dict(
+                    status="impossible",
+                    path=text_type(p),
+                    type="file",
+                    message="path does not exist",
+                    **res_kwargs)
+        if not (paths_lexist or paths_lexist is None):
+            return
 
-        to_process = []
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
-                path=path,
+        # Collect information on the paths to unlock.
+        to_unlock = defaultdict(list)  # ds => paths (relative to ds)
+        for res in Status()(
+                # ATTN: it is vital to pass the `dataset` argument as it,
+                # and not a dataset instance in order to maintain the path
+                # semantics between here and the status() call
+                dataset=dataset,
+                path=paths_lexist,
+                untracked="normal" if paths_nondir else "no",
+                annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                action='unlock',
-                unavailable_path_status='impossible',
-                unavailable_path_msg="path does not exist",
-                nondataset_path_status='impossible',
-                modified=None,
-                return_type='generator',
-                on_failure='ignore'):
-            if ap.get('status', None):
-                # this is done
-                yield ap
+                result_renderer='disabled',
+                on_failure="ignore"):
+            if res["action"] != "status" or res["status"] != "ok":
+                yield res
                 continue
-            if ap.get('type', 'dataset') == 'dataset':
-                # this is a dataset
-                ap['process_content'] = True
-            to_process.append(ap)
-
-        content_by_ds, ds_props, completed, nondataset_paths = \
-            annotated2content_by_ds(
-                to_process,
-                refds_path=refds_path)
-        assert(not completed)
-
-        for ds_path in sorted(content_by_ds.keys()):
-            ds = Dataset(ds_path)
-            content = content_by_ds[ds_path]
-
-            # no annex, no unlock:
-            if not isinstance(ds.repo, AnnexRepo):
-                for ap in content:
-                    ap['status'] = 'notneeded'
-                    ap['message'] = "not annex'ed, nothing to unlock"
-                    ap.update(res_kwargs)
-                    yield ap
-                continue
-
-            # only files in annex with their content present:
-            files = [ap['path'] for ap in content]
-            to_unlock = []
-            for ap, under_annex, has_content in \
-                zip(content,
-                    ds.repo.is_under_annex(files),
-                    ds.repo.file_has_content(files)):
-
-                # TODO: what about directories? Make sure, there is no
-                # situation like no file beneath with content or everything in
-                # git, that leads to a CommandError
-                # For now pass to annex:
-                from os.path import isdir
-                if isdir(ap['path']):
-                    to_unlock.append(ap)
-                    continue
-
-                # Note, that `file_has_content` is (planned to report) True on
-                # files in git. Therefore order matters: First check for annex!
-                if under_annex:
-                    if has_content:
-                        to_unlock.append(ap)
-                    # no content, no unlock:
-                    else:
-                        ap['status'] = 'impossible'
-                        ap['message'] = "no content present, can't unlock"
-                        ap.update(res_kwargs)
-                        yield ap
-                # file in git, no unlock:
+            has_content = res.get("has_content")
+            if has_content:
+                parentds = res["parentds"]
+                to_unlock[parentds].append(op.relpath(res["path"], parentds))
+            elif paths_nondir and Path(res["path"]) in paths_nondir:
+                if has_content is False:
+                    msg = "no content present"
+                    status = "impossible"
+                elif res["state"] == "untracked":
+                    msg = "untracked"
+                    status = "impossible"
                 else:
-                    ap['status'] = 'notneeded'
-                    ap['message'] = "not controlled by annex, nothing to unlock"
-                    ap.update(res_kwargs)
-                    yield ap
-
-            # don't call annex-unlock with no path, if this is this case because
-            # nothing survived the filtering above
-            if content and not to_unlock:
-                continue
-
-            for r in ds.repo.unlock([ap['path'] for ap in to_unlock]):
+                    # This is either a regular git file or an unlocked annex
+                    # file.
+                    msg = "non-annex file"
+                    status = "notneeded"
                 yield get_status_dict(
-                    path=opj(ds.path, r),
+                    status=status,
+                    path=res["path"],
+                    type="file",
+                    message="{}; cannot unlock".format(msg),
+                    **res_kwargs)
+
+        # Do the actual unlocking.
+        for ds_path, files in to_unlock.items():
+            ds = Dataset(ds_path)
+            for r in ds.repo.unlock(files):
+                yield get_status_dict(
+                    path=op.join(ds.path, r),
                     status='ok',
                     type='file',
                     **res_kwargs)

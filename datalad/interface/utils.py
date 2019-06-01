@@ -28,6 +28,7 @@ from os.path import sep
 from os.path import split as psplit
 from itertools import chain
 from six import PY2
+from six import text_type
 
 import json
 
@@ -494,12 +495,11 @@ def eval_results(func):
 
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
+        path = text_type(res['path'])
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
-                path=relpath(res['path'],
-                             res['refds']) if res.get('refds', None) else res[
-                    'path'],
+                path=relpath(path, res['refds']) if res.get('refds') else path,
                 type=' ({})'.format(
                         ac.color_word(res['type'], ac.MAGENTA)
                 ) if 'type' in res else '',
