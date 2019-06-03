@@ -196,7 +196,14 @@ class Save(Interface):
                 untracked=untracked_mode,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                on_failure='ignore',
                 result_renderer='disabled'):
+            if s['status'] == 'error':
+                # Downstream code can't do anything with these. Let the caller
+                # decide their fate.
+                yield s
+                continue
+
             # fish out status dict for this parent dataset
             ds_status = paths_by_ds.get(s['parentds'], {})
             # reassemble path status info as repo.status() would have made it
