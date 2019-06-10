@@ -668,7 +668,14 @@ def test_surprise_subds(path):
     assert_repo_status(subds.path, untracked=['subfile'])
     assert_repo_status(somerepo.path, untracked=['subfile'])
 
-    if not adjusted:  # adjusted branch: #datalad/3178 (that would have a commit)
+    if adjusted:
+        # adjusted branch: #datalad/3178 (that would have a commit)
+        modified = [subds.pathobj, somerepo.pathobj]
+        untracked = []
+        assert_repo_status(ds.path, modified=modified, untracked=untracked)
+        assert_not_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
+                      ds.repo.get_content_info())
+    else:
         # however, while the subdataset is added (and reported as modified
         # because it content is still untracked) the subrepo
         # cannot be added (it has no commit)
