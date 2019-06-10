@@ -656,19 +656,23 @@ def test_surprise_subds(path):
     somerepo = AnnexRepo(path=op.join(path, 'd1', 'subrepo'), create=True)
     # a proper subdataset
     subds = create(op.join(path, 'd2', 'subds'), force=True)
+
+    # If subrepo is an adjusted branch, it would have a commit, making most of
+    # this test irrelevant because it is about the unborn branch edge case.
+    adjusted = somerepo.is_managed_branch()
+
     # save non-recursive
     ds.save(recursive=False)
     # the content of both subds and subrepo are not added to their
     # respective parent as no --recursive was given
     assert_repo_status(subds.path, untracked=['subfile'])
     assert_repo_status(somerepo.path, untracked=['subfile'])
-    # however, while the subdataset is added (and reported as modified
-    # because it content is still untracked) the subrepo
-    # cannot be added (it has no commit)
-    # worse: its untracked file add been added to the superdataset
-    # XXX the next conditional really says: if the subrepo is not in an
-    # adjusted branch: #datalad/3178 (that would have a commit)
-    if not on_windows:
+
+    if not adjusted:  # adjusted branch: #datalad/3178 (that would have a commit)
+        # however, while the subdataset is added (and reported as modified
+        # because it content is still untracked) the subrepo
+        # cannot be added (it has no commit)
+        # worse: its untracked file add been added to the superdataset
         assert_repo_status(ds.path, modified=['d2/subds'])
         assert_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
                   ds.repo.get_content_info())
