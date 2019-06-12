@@ -988,7 +988,15 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return (Path(path) / '.git').exists()
+        path = Path(path) / '.git'
+        # the aim here is to have this test as cheap as possible, because
+        # it is performed a lot
+        # recognize two things as good-enough indicators of a present
+        # repo: 1) a non-empty .git directory (#3473) and 2) a pointer
+        # file or symlink
+        return path.exists() and (
+            not path.is_dir() or \
+            any(path.iterdir()))
 
     @staticmethod
     def get_git_dir(repo):

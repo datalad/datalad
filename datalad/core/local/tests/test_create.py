@@ -22,6 +22,7 @@ from datalad.distribution.dataset import (
     Dataset
 )
 from datalad.api import create
+from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
     _path_,
@@ -392,3 +393,16 @@ def test_cfg_passthrough(path):
     ds = Dataset(path)
     eq_(ds.config.get('annex.tune.objecthash1', None), 'true')
     eq_(ds.config.get('annex.tune.objecthashlower', None), 'true')
+
+
+@with_tree({"empty": {".git": {}, "ds": {}},
+            "nonempty": {".git": {"bogus": "content"}, "ds": {}}})
+def test_empty_git_upstairs(topdir):
+    # create() doesn't get confused by an empty .git/ upstairs (gh-3473)
+    assert_in_results(
+        create(op.join(topdir, "empty", "ds"), **raw),
+        status="ok", type="dataset", action="create")
+    # ... but it will stop short of checking that a directory with a .git path
+    # is a valid repo.
+    with assert_raises(CommandError):
+        create(op.join(topdir, "nonempty", "ds"), **raw)
