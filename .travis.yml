@@ -35,7 +35,7 @@ env:
 matrix:
   include:
   # Additional custom ones
-  - python: 3.7-dev
+  - python: 3.7
     # Single run for Python 3.7
     env:
     # Run all tests in a single whoop here
