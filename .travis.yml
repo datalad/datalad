@@ -192,9 +192,9 @@ matrix:
     - NOSE_SELECTION_OP=not
     - NOSE_SELECTION=
 
-  # TODO: The current release of datalad-revolution (0.9.0) is
-  # incompatible with the current DataLad.  Uncomment this after the
-  # next -revolution release, which will include 1a7c21b.
+  # TODO: The current release of datalad-revolution (0.10.0) is
+  # incompatible with the current DataLad.  Uncomment this onnce a
+  # -revolution release has 13b01c2 and PR 128.
   #
   # - python: 3.5
   #   # test with extension datalad-revolution
