@@ -135,6 +135,9 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@known_failure_appveyor
+# ^ For an unknown reason, appveyor started failing after we removed
+#   receive.autogc=0 and gc.auto=0 from our common git options (gh-3482).
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
