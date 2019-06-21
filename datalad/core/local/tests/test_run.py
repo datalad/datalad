@@ -63,11 +63,11 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure_appveyor,
     known_failure_windows,
     slow,
     with_testrepos,
     OBSCURE_FILENAME,
-    SkipTest,
 )
 
 
@@ -135,6 +135,9 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@known_failure_appveyor
+# ^ For an unknown reason, appveyor started failing after we removed
+#   receive.autogc=0 and gc.auto=0 from our common git options (gh-3482).
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
@@ -194,11 +197,9 @@ def test_run_save_deletion(path):
     assert_repo_status(ds.path)
 
 
+@known_failure_appveyor  # causes appveyor (only) to crash, reason unknown
 @with_tempfile(mkdir=True)
 def test_run_from_subds(path):
-    if 'APPVEYOR' in os.environ:
-        raise SkipTest('test causes appveyor (only) to crash, reason unknown')
-
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)

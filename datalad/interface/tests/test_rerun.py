@@ -67,9 +67,9 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure_appveyor,
     known_failure_windows,
     slow,
-    SkipTest,
 )
 
 
@@ -581,6 +581,9 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
+@known_failure_appveyor
+# ^ Issue only happens on appveyor, Python itself implodes. Cannot be
+#   reproduced on a real win7 box
 @with_tree(tree={"input.dat": "input",
                  "extra-input.dat": "extra input",
                  "s0": {"s1_0": {"s2": {"a.dat": "a",
@@ -590,12 +593,6 @@ def test_rerun_script(path):
                         "ss": {"e.dat": "e"}}})
 @with_tempfile(mkdir=True)
 def test_run_inputs_outputs(src, path):
-    if 'APPVEYOR' in os.environ:
-        # issue only happens on appveyor, Python itself implodes
-        # cannot be reproduced on a real win7 box
-        raise SkipTest(
-            'test causes appveyor (only) to crash, reason unknown')
-
     for subds in [("s0", "s1_0", "s2"),
                   ("s0", "s1_1", "s2"),
                   ("s0", "s1_0"),

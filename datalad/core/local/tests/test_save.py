@@ -32,9 +32,9 @@ from datalad.tests.utils import (
     eq_,
     ok_,
     chpwd,
+    known_failure_appveyor,
     known_failure_windows,
     OBSCURE_FILENAME,
-    SkipTest,
 )
 from datalad.distribution.tests.test_add import tree_arg
 
@@ -436,13 +436,11 @@ def test_add_mimetypes(path):
             assert_not_in('key', annexinfo[p], p)
 
 
+@known_failure_appveyor
+# ^ Issue only happens on appveyor, Python itself implodes. Cannot be
+#   reproduced on a real windows box.
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
-    if 'APPVEYOR' in os.environ:
-        # issue only happens on appveyor, Python itself implodes
-        # cannot be reproduced on a real windows box
-        raise SkipTest(
-            'this test causes appveyor to crash, reason unknown')
     ds = Dataset(path).create()
     sub = ds.create('sub')
     res = ds.subdatasets()
