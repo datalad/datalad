@@ -63,11 +63,11 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure_appveyor,
     known_failure_windows,
     slow,
     with_testrepos,
     OBSCURE_FILENAME,
-    SkipTest,
 )
 
 
@@ -194,11 +194,9 @@ def test_run_save_deletion(path):
     assert_repo_status(ds.path)
 
 
+@known_failure_appveyor  # causes appveyor (only) to crash, reason unknown
 @with_tempfile(mkdir=True)
 def test_run_from_subds(path):
-    if 'APPVEYOR' in os.environ:
-        raise SkipTest('test causes appveyor (only) to crash, reason unknown')
-
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)
