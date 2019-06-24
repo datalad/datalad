@@ -225,6 +225,13 @@ def test_create_sub_gh3463(path):
     assert_repo_status(ds.path)
 
 
+@with_tempfile(mkdir=True)
+def test_create_dataset_same_as_path(path):
+    with chpwd(path):
+        ds = create(dataset=".", path=".")
+    assert_repo_status(ds.path)
+
+
 @with_tempfile
 def test_create_sub_dataset_dot_no_path(path):
     ds = Dataset(path)

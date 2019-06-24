@@ -211,7 +211,7 @@ class Create(Interface):
                    refds=refds_path)
 
         refds = None
-        if refds_path and refds_path != path:
+        if refds_path and refds_path != text_type(path):
             refds = require_dataset(
                 refds_path, check_installed=True,
                 purpose='creating a subdataset')
