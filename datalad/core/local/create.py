@@ -176,6 +176,9 @@ class Create(Interface):
             fake_dates=False,
             cfg_proc=None
     ):
+        if dataset and not isinstance(dataset, Dataset):
+            dataset = Dataset(dataset)
+            refds_path = dataset.path
         refds_path = dataset.path if hasattr(dataset, 'path') else dataset
 
         # two major cases
