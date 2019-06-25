@@ -688,3 +688,18 @@ def test_bf3285(path):
     # subdataset.
     ds.save("foo")
     assert_repo_status(ds.path, untracked=[subds.path])
+
+
+@with_tree({"outside": "",
+            "ds": {"within": ""}})
+def test_on_failure_continue(path):
+    ds = Dataset(op.join(path, "ds")).create(force=True)
+    # save() calls status() in a way that respects on_failure.
+    assert_in_results(
+        ds.save(path=[op.join(path, "outside"),
+                      op.join(path, "ds", "within")],
+                on_failure="ignore"),
+        action="status",
+        status="error")
+    # save() continued despite the failure and saved ds/within.
+    assert_repo_status(ds.path)
