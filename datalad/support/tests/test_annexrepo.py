@@ -1989,27 +1989,48 @@ def _test_status(ar):
 
     # create a subrepo:
     sub = AnnexRepo(opj(ar.path, 'submod'), create=True)
-    # nothing changed, it's empty besides .git, which is ignored
+
+    # Git v2.22.0 changed the way it treats sub-repositories without a commit
+    # checked out, so we need to condition the checks on that.
+    # ATTN: We look at the bundled git rather than "cmd:git" because `git annex
+    # status` will use it regardless of DATALAD_USE_DEFAULT_GIT.
+    bundled = external_versions['cmd:bundled-git']
+    if bundled is external_versions.UNKNOWN:
+        git_version = external_versions['cmd:git']
+    else:
+        git_version = bundled
+    fixed_git = git_version >= '2.22.0'
+
+    if fixed_git:
+        # Newer Git versions consider a repo without a commit a repository, not
+        # a directory.
+        stat["untracked"].append("submod/")
     eq_(stat, ar.get_status())
 
     # file in subrepo
     with open(opj(ar.path, 'submod', 'fourth'), 'w') as f:
         f.write("this is a birth certificate")
-    stat['untracked'].append(opj('submod', 'fourth'))
+
+    if not fixed_git:
+        # In the fixed case, nothing changes, since the empty repo is still
+        # seen as a repo.
+        stat['untracked'].append(opj('submod', 'fourth'))
     eq_(stat, ar.get_status())
 
     # add to subrepo
     sub.add('fourth')
     sub.commit(msg="birther mod init'ed")
-    stat['untracked'].remove(opj('submod', 'fourth'))
+    if not fixed_git:
+        stat['untracked'].remove(opj('submod', 'fourth'))
 
     if ar.get_active_branch().endswith('(unlocked)') and \
        'adjusted' in ar.get_active_branch():
         # we are running on adjusted branch => do it in submodule, too
         sub.adjust()
 
-    # Note, that now the non-empty repo is untracked
-    stat['untracked'].append('submod/')
+    if not fixed_git:
+        # Note, that now the non-empty repo is untracked
+        stat['untracked'].append('submod/')
     eq_(stat, ar.get_status())
 
     # add the submodule
