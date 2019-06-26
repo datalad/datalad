@@ -125,6 +125,10 @@ matrix:
     - _DL_CRON=1
   # Run with latest git rather than the bundled one.
   - python: 3.5
+    addons:
+      apt:
+        sources:
+          - sourceline: 'ppa:git-core/ppa'
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
