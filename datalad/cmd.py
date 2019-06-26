@@ -650,18 +650,22 @@ class GitRunner(Runner):
                     lgr.log(9, "Will use default git %s", git_fpath)
                     return  # we are done - there is a default git avail.
                 # if not -- we will look for a bundled one
-
-            annex_fpath = find_executable("git-annex")
-            if not annex_fpath:
-                # not sure how to live further anyways! ;)
-                alongside = False
-            else:
-                annex_path = op.dirname(op.realpath(annex_fpath))
-                alongside = op.lexists(op.join(annex_path, 'git'))
-            GitRunner._GIT_PATH = annex_path if alongside else ''
+            GitRunner._GIT_PATH = GitRunner._get_bundled_path()
             lgr.log(9, "Will use git under %r (no adjustments to PATH if empty "
                        "string)", GitRunner._GIT_PATH)
             assert(GitRunner._GIT_PATH is not None)  # we made the decision!
+
+    @staticmethod
+    def _get_bundled_path():
+        from distutils.spawn import find_executable
+        annex_fpath = find_executable("git-annex")
+        if not annex_fpath:
+            # not sure how to live further anyways! ;)
+            alongside = False
+        else:
+            annex_path = op.dirname(op.realpath(annex_fpath))
+            alongside = op.lexists(op.join(annex_path, 'git'))
+        return annex_path if alongside else ''
 
     @staticmethod
     def get_git_environ_adjusted(env=None):
