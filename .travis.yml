@@ -132,7 +132,6 @@ matrix:
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
-    - _DL_CRON=1
   - python: 3.5
     env:
     # to test operation under root since also would consider FS "crippled" due to
