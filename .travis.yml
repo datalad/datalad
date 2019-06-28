@@ -124,6 +124,10 @@ matrix:
     - _DL_CRON=1
   # Run with latest git rather than the bundled one.
   - python: 3.5
+    addons:
+      apt:
+        sources:
+          - sourceline: 'ppa:git-core/ppa'
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
@@ -253,7 +257,9 @@ before_install:
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
-  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then sudo tools/ci/install-latest-git.sh || [ $? -eq 100 ] && exit 0; fi
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
+      sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
+    fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
