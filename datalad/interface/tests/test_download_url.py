@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import join as opj
-from six.moves.urllib.parse import urljoin
 
 from ...api import download_url, Dataset
 from ...utils import chpwd
@@ -22,6 +21,7 @@ from ...tests.utils import ok_, ok_exists, eq_, assert_cwd_unchanged, \
     assert_in, assert_false, assert_message, assert_result_count, \
     with_tempfile
 from ...tests.utils import assert_not_in
+from ...tests.utils import assert_in_results
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
 
@@ -59,7 +59,7 @@ def test_download_url_exceptions():
 @with_tempfile(mkdir=True)
 def test_download_url_return(toppath, topurl, outdir):
     files = ['file1.txt', 'file2.txt']
-    urls = [opj(topurl, f) for f in files]
+    urls = [topurl + f for f in files]
     outfiles = [opj(outdir, f) for f in files]
 
     out1 = download_url(urls[0], path=outdir, save=False)
@@ -86,6 +86,8 @@ def test_download_url_return(toppath, topurl, outdir):
     ('file4.txt', 'jkl'),
     ('file5.txt', 'mno'),
     ('file6.txt', 'pqr'),
+    ('file7.txt', 'stu'),
+    ('file8.txt', 'vwx'),
 ])
 @serve_path_via_http
 @with_tempfile(mkdir=True)
@@ -93,14 +95,14 @@ def test_download_url_dataset(toppath, topurl, path):
     # Non-dataset directory.
     file1_fullpath = opj(path, "file1.txt")
     with chpwd(path):
-        download_url(opj(topurl, "file1.txt"))
+        download_url(topurl + "file1.txt")
         ok_exists(file1_fullpath)
     os.remove(file1_fullpath)
 
     files_tosave = ['file1.txt', 'file2.txt']
-    urls_tosave = [opj(topurl, f) for f in files_tosave]
+    urls_tosave = [topurl + f for f in files_tosave]
 
-    ds = Dataset(path).create()
+    ds = Dataset(opj(path, "ds")).create()
 
     # By default, files are saved when called in a dataset.
     ds.download_url(urls_tosave)
@@ -112,20 +114,35 @@ def test_download_url_dataset(toppath, topurl, path):
     eq_(ds.repo.get_urls("file2.txt"),
         [urls_tosave[1]])
 
-    ds.download_url([opj(topurl, "file3.txt")], save=False)
+    ds.download_url([topurl + "file3.txt"], save=False)
     assert_false(ds.repo.file_has_content("file3.txt"))
 
-    subdir_path = opj(path, "subdir")
+    subdir_path = opj(ds.path, "subdir")
     os.mkdir(subdir_path)
     with chpwd(subdir_path):
-        download_url(opj(topurl, "file4.txt"))
-        download_url(opj(topurl, "file5.txt"), path="five.txt")
-        ds.download_url(opj(topurl, "file6.txt"))
+        download_url(topurl + "file4.txt")
+        download_url(topurl + "file5.txt", path="five.txt")
+        ds.download_url(topurl + "file6.txt")
+        download_url(topurl + "file7.txt", dataset=ds.path)
     # download_url calls within a subdirectory save the file there
     ok_(ds.repo.file_has_content(opj("subdir", "file4.txt")))
     ok_(ds.repo.file_has_content(opj("subdir", "five.txt")))
-    # ... unless the dataset is provided.
+    # ... unless the dataset instance is provided
     ok_(ds.repo.file_has_content("file6.txt"))
+    # ... but a string for the dataset (as it would be from the command line)
+    # still uses CWD semantics
+    ok_(ds.repo.file_has_content(opj("subdir", "file7.txt")))
+
+    with chpwd(path):
+        # We're in a non-dataset path and pass in a string as the dataset. The
+        # path is taken as relative to the current working directory, so we get
+        # an error when trying to save it.
+        assert_in_results(
+            download_url(topurl + "file8.txt", dataset=ds.path,
+                         on_failure="ignore"),
+            status="error",
+            action="status")
+    assert_false((ds.pathobj / "file8.txt").exists())
 
 
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
@@ -133,7 +150,7 @@ def test_download_url_dataset(toppath, topurl, path):
 @with_tempfile(mkdir=True)
 def test_download_url_archive(toppath, topurl, path):
     ds = Dataset(path).create()
-    ds.download_url([urljoin(topurl, "archive.tar.gz")], archive=True)
+    ds.download_url([topurl + "archive.tar.gz"], archive=True)
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))
