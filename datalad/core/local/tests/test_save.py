@@ -42,6 +42,7 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
+from datalad.support.external_versions import external_versions
 from datalad.api import (
     save,
     create,
@@ -656,19 +657,42 @@ def test_surprise_subds(path):
     somerepo = AnnexRepo(path=op.join(path, 'd1', 'subrepo'), create=True)
     # a proper subdataset
     subds = create(op.join(path, 'd2', 'subds'), force=True)
+
+    # If subrepo is an adjusted branch, it would have a commit, making most of
+    # this test irrelevant because it is about the unborn branch edge case.
+    adjusted = somerepo.is_managed_branch()
+    # This edge case goes away with Git v2.22.0.
+    fixed_git = external_versions['cmd:git'] >= '2.22.0'
+
     # save non-recursive
-    ds.save(recursive=False)
+    res = ds.save(recursive=False, on_failure='ignore')
+    if not adjusted and fixed_git:
+        # We get an appropriate error about no commit being checked out.
+        assert_in_results(res, action='add_submodule', status='error')
+
     # the content of both subds and subrepo are not added to their
     # respective parent as no --recursive was given
     assert_repo_status(subds.path, untracked=['subfile'])
     assert_repo_status(somerepo.path, untracked=['subfile'])
-    # however, while the subdataset is added (and reported as modified
-    # because it content is still untracked) the subrepo
-    # cannot be added (it has no commit)
-    # worse: its untracked file add been added to the superdataset
-    # XXX the next conditional really says: if the subrepo is not in an
-    # adjusted branch: #datalad/3178 (that would have a commit)
-    if not on_windows:
+
+    if adjusted or fixed_git:
+        if adjusted:
+            # adjusted branch: #datalad/3178 (that would have a commit)
+            modified = [subds.pathobj, somerepo.pathobj]
+            untracked = []
+        else:
+            # Newer Git versions refuse to add a sub-repository with no commits
+            # checked out.
+            modified = [subds.pathobj]
+            untracked = ['d1']
+        assert_repo_status(ds.path, modified=modified, untracked=untracked)
+        assert_not_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
+                      ds.repo.get_content_info())
+    else:
+        # however, while the subdataset is added (and reported as modified
+        # because it content is still untracked) the subrepo
+        # cannot be added (it has no commit)
+        # worse: its untracked file add been added to the superdataset
         assert_repo_status(ds.path, modified=['d2/subds'])
         assert_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
                   ds.repo.get_content_info())
