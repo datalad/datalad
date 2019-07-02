@@ -19,11 +19,24 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- Our tests needed various adjustments to keep up with upstream
+  changes in Travis and Git. ([#3479][]) ([#3492][]) ([#3493][])
+
+- `AnnexRepo.is_special_annex_remote` was too selective in what it
+  considered to be a special remote.  ([#3499][])
 
 ### Enhancements and new features
 
-?
+- For calls to git and git-annex, we disable automatic garbage
+  collection due to past issues with GitPython's state becoming stale,
+  but doing so results in a larger .git/objects/ directory that isn't
+  cleaned up until garbage collection is triggered outside of DataLad.
+  Tests with the latest GitPython didn't reveal any state issues, so
+  we've re-enabled automatic garbage collection.  ([#3458][])
+
+- [rerun][] learned an `--explicit` flag, which it relays to its calls
+  to [run][[]].  This makes it possible to call `rerun` in a dirty
+  working tree ([#3498][]).
 
 
 ## 0.11.5 (May 23, 2019) -- stability is not overrated
@@ -1352,3 +1365,9 @@ publishing
 [#3425]: https://github.com/datalad/datalad/issues/3425
 [#3439]: https://github.com/datalad/datalad/issues/3439
 [#3440]: https://github.com/datalad/datalad/issues/3440
+[#3458]: https://github.com/datalad/datalad/issues/3458
+[#3479]: https://github.com/datalad/datalad/issues/3479
+[#3492]: https://github.com/datalad/datalad/issues/3492
+[#3493]: https://github.com/datalad/datalad/issues/3493
+[#3498]: https://github.com/datalad/datalad/issues/3498
+[#3499]: https://github.com/datalad/datalad/issues/3499
