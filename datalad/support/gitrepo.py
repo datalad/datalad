@@ -3047,11 +3047,7 @@ class GitRepo(RepoInterface):
         lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
-                # specifically always ask for a full report and
-                # filter out matching path later on to
-                # homogenize wrt subdataset content paths across
-                # ls-files and ls-tree
-                None,
+                list(map(text_type, paths)) if paths else None,
                 cmd,
                 log_stderr=True,
                 log_stdout=True,
@@ -3098,7 +3094,6 @@ class GitRepo(RepoInterface):
 
         try:
             self._get_content_info_line_helper(
-                paths,
                 ref,
                 info,
                 stdout.split('\0'),
@@ -3112,7 +3107,7 @@ class GitRepo(RepoInterface):
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, paths, ref, info, lines,
+    def _get_content_info_line_helper(self, ref, info, lines,
                                       props_re, get_link_target):
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
@@ -3133,24 +3128,6 @@ class GitRepo(RepoInterface):
             else:
                 # again Git reports always in POSIX
                 path = ut.PurePosixPath(props.group('fname'))
-
-            # rejects paths as early as possible
-
-            # the function assumes that any `path` is a relative path lib
-            # instance if there were path constraints given, we need to reject
-            # paths now
-            # reject anything that is:
-            # - not a direct match with a constraint
-            # - has no constraint as a parent
-            #   (relevant to find matches of regular files in a repository)
-            # - is not a parent of a constraint
-            #   (relevant for finding the matching subds entry for
-            #    subds-content paths)
-            if paths \
-                and not any(
-                    path == c or path in c.parents or c in path.parents
-                    for c in paths):
-                continue
 
             # revisit the file props after this path has not been rejected
             if props:
