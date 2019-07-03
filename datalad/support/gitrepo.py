@@ -86,6 +86,7 @@ from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
+from .path import get_parent_paths
 from .repo import Flyweight
 from .repo import RepoInterface
 
@@ -3015,6 +3016,8 @@ class GitRepo(RepoInterface):
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
 
+        path_strs = list(map(text_type, paths)) if paths else None
+
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
@@ -3039,6 +3042,13 @@ class GitRepo(RepoInterface):
                     'unknown value for `untracked`: %s', untracked)
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
+
+            if path_strs:
+                # we need to get their within repo elements since ls-tree
+                # for paths within submodules returns nothing!
+                # see https://www.spinics.net/lists/git/msg362459.html
+                submodules = [s.path for s in self.get_submodules()]
+                path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
@@ -3047,7 +3057,7 @@ class GitRepo(RepoInterface):
         lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
-                list(map(text_type, paths)) if paths else None,
+                path_strs,
                 cmd,
                 log_stderr=True,
                 log_stdout=True,
