@@ -145,9 +145,9 @@ def get_parent_paths(paths, parents, only_with_parents=False):
 
     Returns
     -------
-    A sorted list of paths where some entries replaced with their "parents"
-    without duplicates.  So for 'a/b' and 'a/c' with a being among parents, there
-    will be a single 'a'
+    A list of paths (without duplicates), where some entries replaced with
+    their "parents" without duplicates.  So for 'a/b' and 'a/c' with a being
+    among parents, there will be a single 'a'
     """
     # Let's do an early check even though then we would skip the checks on paths
     # being relative etc
@@ -173,7 +173,8 @@ def get_parent_paths(paths, parents, only_with_parents=False):
     # Could be an ordered dict but no need
     parent_lengths = [(l, parent_lengths[l]) for l in sorted(parent_lengths, reverse=True)]
 
-    res = set()
+    res = []
+    seen = set()
 
     for path in paths:  # O(len(paths)) - unavoidable but could be parallelized!
         # Sanity check -- should not be too expensive
@@ -183,13 +184,17 @@ def get_parent_paths(paths, parents, only_with_parents=False):
                 continue  # no directory deep enough
             candidate_parent = path[:parent_length]
             if candidate_parent in parents_:  # O(log(len(parents))) but expected one less due to per length handling
-                res.add(candidate_parent)
+                if candidate_parent not in seen:
+                    res.append(candidate_parent)
+                    seen.add(candidate_parent)
                 break  # it is!
         else:  # no hits
             if not only_with_parents:
-                res.add(path)
+                if path not in seen:
+                    res.append(path)
+                    seen.add(path)
 
-    return sorted(res)  # TODO: keep it as set?  should we retain original order?
+    return res
 
 
 def _get_parent_paths_check(path):
