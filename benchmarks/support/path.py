@@ -14,7 +14,7 @@ class get_parent_paths(SuprocBenchmarks):
         # and some hierarchy of submodules
         self.nfiles = 40  # per each construct
         self.nsubmod = 30  # at two levels
-        self.toplevel_submods = sorted(['submod%d' % i for i in range(self.nsubmod)])
+        self.toplevel_submods = ['submod%d' % i for i in range(self.nsubmod)]
         self.posixpaths = \
             ['file%d' % i for i in range(self.nfiles)] + \
             ['subdir/anotherfile%d' % i for i in range(self.nfiles)]
