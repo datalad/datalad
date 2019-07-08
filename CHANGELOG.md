@@ -25,6 +25,9 @@ bet we will fix some bugs and make a world even a better place.
 - `AnnexRepo.is_special_annex_remote` was too selective in what it
   considered to be a special remote.  ([#3499][])
 
+- We now provide information about unexpected output when git-annex is
+  called with `--json`.  ([#3516][])
+
 ### Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
@@ -1371,3 +1374,4 @@ publishing
 [#3493]: https://github.com/datalad/datalad/issues/3493
 [#3498]: https://github.com/datalad/datalad/issues/3498
 [#3499]: https://github.com/datalad/datalad/issues/3499
+[#3516]: https://github.com/datalad/datalad/issues/3516
