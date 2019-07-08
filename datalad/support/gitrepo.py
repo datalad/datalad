@@ -410,7 +410,7 @@ def Repo(*args, **kwargs):
     # TODO: This probably doesn't work as intended (or at least not as
     #       consistently as intended). gitpy.Repo could be instantiated by
     #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a paramter to these methods instead of the
+    #       would be needed as a parameter to these methods instead of the
     #       constructor.
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
@@ -706,8 +706,9 @@ class GitRepo(RepoInterface):
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
-        # Disable automatic garbage and autopacking
-        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # Could be used to e.g. disable automatic garbage and autopacking
+        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        self._GIT_COMMON_OPTIONS = []
         # actually no need with default GitPython db backend not in memory
         # default_git_odbt but still allows for faster testing etc.
         # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
@@ -988,7 +989,15 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return (Path(path) / '.git').exists()
+        path = Path(path) / '.git'
+        # the aim here is to have this test as cheap as possible, because
+        # it is performed a lot
+        # recognize two things as good-enough indicators of a present
+        # repo: 1) a non-empty .git directory (#3473) and 2) a pointer
+        # file or symlink
+        return path.exists() and (
+            not path.is_dir() or \
+            any(path.iterdir()))
 
     @staticmethod
     def get_git_dir(repo):
@@ -2274,16 +2283,23 @@ class GitRepo(RepoInterface):
         self._git_custom_command("", ["git", "cherry-pick", commit],
                                  check_fake_dates=True)
 
-    # run() needs this ATM, but should eventually be RF'ed to a
-    # status(recursive=True) call
     @property
     def dirty(self):
-        return len([
-            p for p, props in iteritems(self.status(
-                untracked='all', eval_submodule_state='full'))
-            if props.get('state', None) != 'clean' and
-            # -core ignores empty untracked directories, so shall we
-            not (p.is_dir() and len(list(p.iterdir())) == 0)]) > 0
+        """Is the repository dirty?
+
+        Note: This provides a quick answer when you simply want to know if
+        there are any untracked changes or modifications in this repository or
+        its submodules. For finer-grained control and more detailed reporting,
+        use status() instead.
+        """
+        stdout, _ = self._git_custom_command(
+            [],
+            ["git", "status", "--porcelain",
+             # Ensure the result isn't influenced by status.showUntrackedFiles.
+             "--untracked-files=normal",
+             # Ensure the result isn't influenced by diff.ignoreSubmodules.
+             "--ignore-submodules=none"])
+        return bool(stdout.strip())
 
     @property
     def untracked_files(self):
@@ -3506,6 +3522,7 @@ class GitRepo(RepoInterface):
                           for f, props in iteritems(status)
                           if props.get('state', None) == 'untracked' and
                           props.get('type', None) == 'directory']
+        to_add_submodules = []
         if untracked_dirs:
             to_add_submodules = [sm for sm, sm_props in iteritems(
                 self.get_content_info(
@@ -3596,7 +3613,8 @@ class GitRepo(RepoInterface):
             # handle it
             text_type(f.relative_to(self.pathobj)): props
             for f, props in iteritems(status)
-            if props.get('state', None) in ('modified', 'untracked')}
+            if (props.get('state', None) in ('modified', 'untracked') and
+                f not in to_add_submodules)}
         if to_add:
             lgr.debug(
                 '%i path(s) to add to %s %s',

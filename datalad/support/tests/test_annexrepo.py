@@ -1739,13 +1739,15 @@ def test_AnnexRepo_dirty(path):
     repo.commit("file2.txt annexed")
     ok_(not repo.dirty)
 
-    # TODO: unlock/modify
+    repo.unlock("file2.txt")
+    # Unlocking the file is seen as a modification when we're not already in an
+    # adjusted branch (for this test, that would be the case if we're on a
+    # crippled filesystem).
+    ok_(repo.dirty ^ repo.is_managed_branch())
+    repo.save()
+    ok_(not repo.dirty)
 
-    # TODO: submodules
 
-
-# TODO: test dirty
-# TODO: GitRep.dirty
 # TODO: test/utils ok_clean_git
 
 

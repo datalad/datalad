@@ -176,7 +176,11 @@ class Create(Interface):
             fake_dates=False,
             cfg_proc=None
     ):
-        refds_path = dataset.path if hasattr(dataset, 'path') else dataset
+        if dataset:
+            ds = dataset if isinstance(dataset, Dataset) else Dataset(dataset)
+            refds_path = ds.path
+        else:
+            ds = refds_path = None
 
         # two major cases
         # 1. we got a `dataset` -> we either want to create it (path is None),
@@ -192,10 +196,10 @@ class Create(Interface):
                                  "no annex repo.")
 
         if path:
-            path = rev_resolve_path(path, dataset)
+            path = rev_resolve_path(path, ds)
 
         path = path if path \
-            else getpwd() if dataset is None \
+            else getpwd() if ds is None \
             else refds_path
 
         # we know that we need to create a dataset at `path`
@@ -207,7 +211,7 @@ class Create(Interface):
                    refds=refds_path)
 
         refds = None
-        if refds_path and refds_path != path:
+        if refds_path and refds_path != text_type(path):
             refds = require_dataset(
                 refds_path, check_installed=True,
                 purpose='creating a subdataset')
@@ -220,7 +224,7 @@ class Create(Interface):
                     message=(
                         "dataset containing given paths is not underneath "
                         "the reference dataset %s: %s",
-                        dataset, text_type(path)),
+                        ds, text_type(path)),
                 )
                 return
 
@@ -280,8 +284,8 @@ class Create(Interface):
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
-        tbds = dataset if isinstance(dataset, Dataset) and \
-            dataset.path == path else Dataset(text_type(path))
+        tbds = ds if isinstance(ds, Dataset) and \
+            ds.path == path else Dataset(text_type(path))
 
         # don't create in non-empty directory without `force`:
         if op.isdir(tbds.path) and listdir(tbds.path) != [] and not force:
@@ -423,10 +427,10 @@ class Create(Interface):
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
-        if isinstance(dataset, Dataset) and dataset.path != tbds.path:
+        if isinstance(refds, Dataset) and refds.path != tbds.path:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.save(
+            for r in refds.save(
                     path=tbds.path,
             ):
                 yield r

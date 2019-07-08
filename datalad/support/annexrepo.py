@@ -1378,48 +1378,27 @@ class AnnexRepo(GitRepo, RepoInterface):
             return entries[0]
 
     @normalize_paths
-    def lock(self, files, options=None):
-        """undo unlock
-
-        Use  this to undo an unlock command if you don't want to modify the
-        files any longer, or have made modifications you want to discard.
-
-        Parameters
-        ----------
-        files: list of str
-        options: list of str
-        """
-
-        options = options[:] if options else []
-        self._run_annex_command('lock', annex_options=options, files=files)
-        # note: there seems to be no output by annex if success.
-
-    @normalize_paths
-    def unlock(self, files, options=None):
+    def unlock(self, files):
         """unlock files for modification
 
+        Note: This method is silent about errors in unlocking a file (e.g, the
+        file has not content). Use the higher-level interface.unlock to get
+        more informative reporting.
+
         Parameters
         ----------
         files: list of str
-        options: list of str
 
         Returns
         -------
         list of str
           successfully unlocked files
         """
-
-        options = options[:] if options else []
-
-        # TODO: catch and parse output if failed (missing content ...)
-        std_out, std_err = \
-            self._run_annex_command(
-                'unlock', annex_options=options, files=files
-            )
-
-        return [line.split()[1]
-                for line in std_out.splitlines()
-                if line.split()[0] == 'unlock' and line.split()[-1] == 'ok']
+        if not files:
+            return
+        return [j["file"] for j in
+                self._run_annex_command_json("unlock", files=files)
+                if j["success"]]
 
     def adjust(self, options=None):
         """enter an adjusted branch

@@ -10,8 +10,6 @@ Please go through the following checklist before submitting the PR:
 
   Consider using a task list (e.g., `- [ ] add tests ...`) to indicate remaining to-do items.
 
-  The Travis tests aren't triggered for draft PRs.  If the PR is in a state where running the tests would be useful, instead submit a regular PR marked with the "WiP" label.
-
 - [ ] If you would like to list yourself as a DataLad contributor and your name is not mentioned please modify .zenodo.json file.
 
 - [ ] Choose a base branch for your PR's topic branch.

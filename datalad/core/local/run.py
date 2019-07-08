@@ -285,7 +285,7 @@ def _unlock_or_remove(dset, paths):
     if existing:
         for res in dset.unlock(existing, on_failure="ignore"):
             if res["status"] == "impossible":
-                if "no content" in res["message"]:
+                if "cannot unlock" in res["message"]:
                     for rem_res in dset.remove(res["path"],
                                                check=False, save=False):
                         yield rem_res
@@ -477,8 +477,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 'run',
                 ds=ds,
                 status='impossible',
-                message=('unsaved modifications present, '
-                         'cannot detect changes by command'))
+                message=(
+                    'clean dataset required to detect changes from command; '
+                    'use `datalad status` to inspect unsaved changes'))
             return
 
     cmd = normalize_command(cmd)
