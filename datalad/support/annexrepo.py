@@ -56,6 +56,7 @@ from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
 from datalad.utils import make_tempfile
+from datalad.utils import partition
 from datalad.utils import unlink
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
@@ -2525,10 +2526,24 @@ class AnnexRepo(GitRepo, RepoInterface):
             if progress_indicators:
                 progress_indicators.finish(partial=interrupted)
 
-        json_objects = (json_loads(line)
-                        for line in out.splitlines() if line.startswith('{'))
+        others, json_strs = partition((ln for ln in out.splitlines()),
+                                      lambda ln: ln.startswith('{'))
+
+        json_objects = (json_loads(line) for line in json_strs)
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
+
+        others = [ln for ln in others if ln.strip()]
+        if others:
+            if json_objects:
+                # We at least received some valid json output, so warn about
+                # non-json output and continue.
+                lgr.warning("Received non-json lines for --json command: %s",
+                            others)
+            else:
+                raise RuntimeError(
+                    "Received no json output for --json command, only:\n{}"
+                    .format("  ".join(others)))
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
