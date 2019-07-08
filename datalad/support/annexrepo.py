@@ -81,6 +81,7 @@ from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
+from .exceptions import BrokenExternalDependency
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
@@ -2541,9 +2542,17 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.warning("Received non-json lines for --json command: %s",
                             others)
             else:
-                raise RuntimeError(
-                    "Received no json output for --json command, only:\n{}"
-                    .format("  ".join(others)))
+                annex_ver = external_versions['cmd:annex']
+                if annex_ver == "7.20190626" and command == "find":
+                    # TODO: Drop this once GIT_ANNEX_MIN_VERSION is over
+                    # 7.20190626.
+                    exc = BrokenExternalDependency(
+                        "find --json output is broken on git-annex 7.20190626")
+                else:
+                    exc = RuntimeError(
+                        "Received no json output for --json command, only:\n{}"
+                        .format("  ".join(others)))
+                raise exc
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
