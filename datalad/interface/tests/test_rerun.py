@@ -757,6 +757,49 @@ def test_run_inputs_no_annex_repo(path):
     ds.rerun()
 
 
+@known_failure_windows
+@with_tree(tree={"to_modify": "to_modify"})
+def test_rerun_explicit(path):
+    ds = Dataset(path).create(force=True)
+
+    ds.run("echo o >> foo", explicit=True, outputs=["foo"])
+    with open(op.join(ds.path, "foo")) as ifh:
+        orig_content = ifh.read()
+        orig_head = ds.repo.get_hexsha()
+
+    # Explicit rerun is allowed in a dirty tree.
+    ok_(ds.repo.dirty)
+    ds.rerun(explicit=True)
+    eq_(orig_head, ds.repo.get_hexsha("master~1"))
+    with open(op.join(ds.path, "foo")) as ifh:
+        eq_(orig_content * 2, ifh.read())
+
+    # --since also works.
+    ds.rerun(since="", explicit=True)
+    eq_(orig_head,
+        # Added two rerun commits.
+        ds.repo.get_hexsha("master~3"))
+
+    # With just untracked changes, we can rerun with --onto.
+    ds.rerun(since="", onto="", explicit=True)
+    eq_(ds.repo.get_hexsha(orig_head + "^"),
+        # Reran the four run commits from above on the initial base.
+        ds.repo.get_hexsha("HEAD~4"))
+
+    # But checking out a new HEAD can fail when there are modifications.
+    ds.repo.checkout("master")
+    ok_(ds.repo.dirty)
+    ds.repo.add(["to_modify"], git=True)
+    ds.save()
+    assert_false(ds.repo.dirty)
+    with open(op.join(ds.path, "to_modify"), "a") as ofh:
+        ofh.write("more")
+    ok_(ds.repo.dirty)
+
+    with assert_raises(CommandError):
+        ds.rerun(onto="", since="", explicit=True)
+
+
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):

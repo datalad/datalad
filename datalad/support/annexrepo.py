@@ -710,17 +710,27 @@ class AnnexRepo(GitRepo, RepoInterface):
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return whether remote is a special annex remote
 
-        Decides based on the presence of diagnostic annex- options
-        for the remote
+        Decides based on the presence of an annex- option and lack of a
+        configured URL for the remote.
         """
         if check_if_known:
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(remote)
-        sec = 'remote.{}'.format(remote)
-        for opt in ('annex-externaltype', 'annex-webdav'):
-            if self.config.has_option(sec, opt):
-                return True
-        return False
+        opts = self.config.options('remote.{}'.format(remote))
+        if "url" in opts:
+            is_special = False
+        elif any(o.startswith("annex-") for o in opts
+                 if o not in ["annex-uuid", "annex-ignore"]):
+            # It's possible that there isn't a special-remote related option
+            # (we only filter out a few common ones), but given that there is
+            # no URL it should be a good bet that this is a special remote.
+            is_special = True
+        else:
+            is_special = False
+            lgr.warning("Remote '%s' has no URL or annex- option. "
+                        "Is it mis-configured?",
+                        remote)
+        return is_special
 
     @borrowkwargs(GitRepo)
     def get_remotes(self,

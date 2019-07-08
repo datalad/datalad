@@ -1960,6 +1960,32 @@ def test_fake_is_not_special(path):
     assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
 
 
+@with_tree(tree={"remote": {}, "main": {}, "special": {}})
+def test_is_special(path):
+    rem = AnnexRepo(op.join(path, "remote"), create=True)
+    dir_arg = "directory={}".format(op.join(path, "special"))
+    rem.init_remote("imspecial",
+                    ["type=directory", "encryption=none", dir_arg])
+    ok_(rem.is_special_annex_remote("imspecial"))
+
+    ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
+    assert_false(ar.is_special_annex_remote("origin"))
+
+    assert_false(ar.is_special_annex_remote("imspecial",
+                                            check_if_known=False))
+    # FIXME: ar.enable_remote() doesn't support specifying options, but we need
+    # to specify directory= here.
+    ar._run_annex_command("enableremote",
+                          annex_options=["imspecial", dir_arg])
+    ok_(ar.is_special_annex_remote("imspecial"))
+
+    # With a mis-configured remote, give warning and return false.
+    ar.config.unset("remote.origin.url", where="local")
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_false(ar.is_special_annex_remote("origin"))
+        cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
+
+
 @with_tempfile(mkdir=True)
 def test_fake_dates(path):
     ar = AnnexRepo(path, create=True, fake_dates=True)
