@@ -2254,7 +2254,3 @@ def test_annex_cmd_expect_fail(path):
         repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
         # message shows up at WARNING level
         assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
-    with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_fail=None)
-        # message shows up at WARNING level
-        assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
