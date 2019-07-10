@@ -2125,7 +2125,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 # else just warn about present errors
                 shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
 
-                _log = lgr.debug if kwargs.get('expect_stderr', False) else lgr.warning
+                _log = lgr.debug if kwargs.get('expect_fail', False) else lgr.warning
                 _log(
                     "Running %s resulted in stderr output: %s",
                     command, shorten(e.stderr)

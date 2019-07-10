@@ -2238,8 +2238,8 @@ def test_ro_operations(path):
 
 
 @with_tempfile
-def test_annex_cmd_expect_stderr(path):
-    # test, that log message about stderr is logged on debug level if expect_stderr was set to True,
+def test_annex_cmd_expect_fail(path):
+    # test, that log message about stderr on non-zero exit is logged on debug level if expect_fail was set to True,
     # warning level else
 
     from re import DOTALL
@@ -2247,14 +2247,14 @@ def test_annex_cmd_expect_stderr(path):
     repo = AnnexRepo(path)
 
     with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_stderr=True)
+        repo._run_annex_command_json('add', ['non-existing'], expect_fail=True)
         # message shows up at DEBUG level:
         assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
     with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_stderr=False)
+        repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
         # message shows up at WARNING level
         assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
     with swallow_logs(logging.DEBUG) as cml:
-        repo._run_annex_command_json('add', ['non-existing'], expect_stderr=None)
+        repo._run_annex_command_json('add', ['non-existing'], expect_fail=None)
         # message shows up at WARNING level
         assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
