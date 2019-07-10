@@ -45,6 +45,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.dochelpers import exc_str
 from datalad.utils import (
     assure_list,
+    partition,
     PurePosixPath,
 )
 
@@ -112,13 +113,18 @@ def _parse_git_submodules(ds, paths):
         return
 
     if paths:
-        paths = [
-            p.relative_to(ds.pathobj)
-            for p in paths
-            if ds.pathobj == p or ds.pathobj in p.parents]
+        paths_outside, paths_at_or_in = partition(
+            paths,
+            lambda p: ds.pathobj == p or ds.pathobj in p.parents)
+        paths = [p.relative_to(ds.pathobj) for p in paths_at_or_in]
         if not paths:
-            # we had path contraints, but none matched this dataset
-            return
+            if any(p for p in paths_outside if p in ds.pathobj.parents):
+                # The dataset is directly under some specified path, so include
+                # it.
+                paths = None
+            else:
+                # we had path contraints, but none matched this dataset
+                return
     for path, props in iteritems(ds.repo.get_content_info(
             paths=paths,
             ref=None,
