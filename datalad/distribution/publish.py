@@ -668,10 +668,10 @@ class Publish(Interface):
         #    # act on the whole dataset if nothing else was specified
         #    path = dataset.path if isinstance(dataset, Dataset) else dataset
 
-        if not dataset and not path:
+        if not (isinstance(dataset, Dataset) or (dataset is None and path)):
             # try to find a dataset in PWD
             dataset = require_dataset(
-                None, check_installed=True, purpose='publishing')
+                dataset, check_installed=True, purpose='publishing')
 
         if since and not dataset:
             raise InsufficientArgumentsError(

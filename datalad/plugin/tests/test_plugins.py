@@ -166,7 +166,7 @@ def test_no_annex(path):
          'README': 'please'})
     # add inannex pre configuration
     ds.save(opj('code', 'inannex'))
-    no_annex(pattern=['code/**', 'README'], dataset=ds)
+    no_annex(pattern=['code/**', 'README'], dataset=ds.path)
     # add inannex and README post configuration
     ds.save([opj('code', 'notinannex'), 'README'])
     ok_clean_git(ds.path)
