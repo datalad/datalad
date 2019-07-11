@@ -520,9 +520,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
-                "broken dataset configuration (%s)?: %s",
-                mtype, ds, exc_str(e))
-            continue
+                "broken dataset configuration (%s)?: %s" %
+                (mtype, ds, exc_str(e)))
         try:
             dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
