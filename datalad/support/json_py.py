@@ -137,8 +137,17 @@ def load_stream(fname, compressed=None):
 
     with _open(fname, mode='rb') as f:
         jreader = codecs.getreader('utf-8')(f)
+        cont_line = u''
         for line in jreader:
-            yield loads(line)
+            if not line.endswith('\n'):
+                cont_line += line
+                continue
+            if cont_line:
+                cont_line += line
+            else:
+                cont_line = line
+            yield loads(cont_line)
+            cont_line = u''
 
 
 def load_xzstream(fname):
