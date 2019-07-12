@@ -459,3 +459,13 @@ def test_bf2541(path):
     with chpwd(ds.path):
         res = add('.', recursive=True)
     ok_clean_git(ds.path)
+
+
+@with_tree(tree={'foobert': ''})
+def test_add_string_dataset_arg(path):
+    ds = create(path, force=True)
+    assert_repo_status(ds.path, untracked=["foobert"])
+    # We don't fail if a string, rather than dataset instance, is passed.
+    with chpwd(ds.path):
+        add(dataset=".", path=".")
+    assert_repo_status(ds.path)

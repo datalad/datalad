@@ -42,14 +42,15 @@ from datalad.support.globbedpaths import GlobbedPaths
 from datalad.support.param import Parameter
 from datalad.support.json_py import dump2stream
 
+from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import require_dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import assure_bytes
 from datalad.utils import assure_unicode
-# Rename get_dataset_pwds for the benefit of containers_run.
-from datalad.utils import get_dataset_pwds as get_command_pwds
+from datalad.utils import get_dataset_root
+from datalad.utils import getpwd
 from datalad.utils import SequenceFormatter
 
 lgr = logging.getLogger('datalad.core.local.run')
@@ -201,6 +202,37 @@ class Run(Interface):
                              message=message,
                              sidecar=sidecar):
             yield r
+
+
+def get_command_pwds(dataset):
+    """Return the current directory for the dataset.
+
+    Parameters
+    ----------
+    dataset : Dataset
+
+    Returns
+    -------
+    A tuple, where the first item is the absolute path of the pwd and the
+    second is the pwd relative to the dataset's path.
+    """
+    # Follow path resolution logic describe in gh-3435.
+    if isinstance(dataset, Dataset):  # Paths relative to dataset.
+        pwd = dataset.path
+        rel_pwd = op.curdir
+    else:                             # Paths relative to current directory.
+        pwd = getpwd()
+        # Pass pwd to get_dataset_root instead of os.path.curdir to handle
+        # repos whose leading paths have a symlinked directory (see the
+        # TMPDIR="/var/tmp/sym link" test case).
+        if not dataset:
+            dataset = get_dataset_root(pwd)
+
+        if dataset:
+            rel_pwd = relpath(pwd, dataset)
+        else:
+            rel_pwd = pwd  # and leave handling to caller
+    return pwd, rel_pwd
 
 
 def _install_and_reglob(dset, gpaths):
@@ -609,7 +641,9 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      msg_path)
         raise exc
     elif outputs_to_save:
-        # pass `dataset` not the resolved `ds` instance in order to
-        # keep any relative-path semantics intact for saving
-        for r in saver(dataset, outputs_to_save, msg):
+        # Note: Passing the resolved `ds` instead of `dataset` isn't breaking
+        # path semantics because outputs_to_save is either a list of full paths
+        # or ".". In the second case, we _need_ to pass an instance so that "."
+        # resolves to the dataset and not the current working directory.
+        for r in saver(ds, outputs_to_save, msg):
             yield r
