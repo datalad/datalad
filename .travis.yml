@@ -187,14 +187,15 @@ matrix:
     - NOSE_SELECTION_OP=not
     - NOSE_SELECTION=
 
-  - python: 3.5
-    # test with extension datalad-container
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-container
-    - TESTS_TO_PERFORM=datalad_container
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
+# Disable until singularity-hub is back online
+#  - python: 3.5
+#    # test with extension datalad-container
+#    env:
+#    - BUILD_DATALAD_EXTENSION=datalad-container
+#    - TESTS_TO_PERFORM=datalad_container
+#    # Use a selector that will always be true.
+#    - NOSE_SELECTION_OP=not
+#    - NOSE_SELECTION=
 
   # TODO: The current release of datalad-revolution (0.10.0) is
   # incompatible with the current DataLad.  Uncomment this onnce a
