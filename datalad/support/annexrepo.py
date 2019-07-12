@@ -350,6 +350,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set('annex.backends', backend, where='local')
 
     def __del__(self):
+
+        def safe__del__debug(e):
+            """We might be too late in the game and either .debug or exc_str
+            are no longer bound"""
+            try:
+                return lgr.debug(exc_str(e))
+            except AttributeError:
+                return
+
         try:
             if hasattr(self, '_batched') and self._batched is not None:
                 self._batched.close()
@@ -362,12 +371,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
         try:
             super(AnnexRepo, self).__del__()
         except TypeError as e:
             # see above
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.
