@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -37,6 +37,16 @@ def test_load_screwy_unicode(fname):
     with swallow_logs(new_level=logging.WARNING) as cml:
         eq_(load(fname), {'Authors': ['A1', 'A2']})
         assert_in('Failed to decode content', cml.out)
+
+
+@with_tempfile(content=u"""\
+{"key0": "a b"}
+{"key1": "plain"}""".encode("utf-8"))
+def test_load_unicode_line_separator(fname):
+    # See gh-3523.
+    result = list(load_stream(fname))
+    eq_(len(result), 2)
+    eq_(result[0]["key0"], u"a b")
 
 
 def test_loads():
