@@ -148,6 +148,8 @@ def load_stream(fname, compressed=None):
                 cont_line = line
             yield loads(cont_line)
             cont_line = u''
+        if cont_line:  # The last line didn't end with a new line.
+            yield cont_line
 
 
 def load_xzstream(fname):
