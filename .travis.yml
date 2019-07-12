@@ -216,6 +216,14 @@ matrix:
     env:
     - TMPDIR="/tmp/nfsmount"
     - _DL_CRON=1
+  # Allow -container to fail until singularity hub comes back online.
+  - python: 3.5
+    env:
+    - BUILD_DATALAD_EXTENSION=datalad-container
+    - TESTS_TO_PERFORM=datalad_container
+    - NOSE_SELECTION_OP=not
+    - NOSE_SELECTION=
+
 #  # test whether known v6 failures still fail
 #  - env:
 #    - DATALAD_REPO_VERSION=6
