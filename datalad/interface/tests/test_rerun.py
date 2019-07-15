@@ -269,7 +269,7 @@ def test_rerun_just_one_commit(path):
     # Check out an orphan branch so that we can test the "one commit
     # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
-    ds.repo.repo.git.reset("--hard")
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard"])
     ds.repo.config.reload()
 
     ds.run('echo static-content > static')
@@ -695,7 +695,7 @@ def test_run_inputs_outputs(src, path):
             eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
-    ds.repo.repo.git.reset("--hard", "HEAD~2")
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard", "HEAD~2"])
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
     if not on_windows:
         # MIH doesn't yet understand how to port this
