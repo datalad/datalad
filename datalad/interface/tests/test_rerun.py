@@ -99,7 +99,7 @@ def test_rerun(path, nodspath):
     eq_('xx\n', open(probe_path).read())
 
     # Rerunning from a subdataset skips the command.
-    _, sub_info = get_run_info(ds, sub.repo.repo.head.commit.message)
+    _, sub_info = get_run_info(ds, sub.repo.format_commit("%B"))
     eq_(ds.id, sub_info["dsid"])
     assert_result_count(
         sub.rerun(return_type="list", on_failure="ignore"),
