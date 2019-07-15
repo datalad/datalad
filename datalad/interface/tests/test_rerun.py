@@ -203,8 +203,7 @@ def test_rerun_onto(path):
          ds.repo.get_hexsha("static"))
     ok_(all(r["state"] == "clean" for r in ds.diff(fr="HEAD", to="static")))
     for revrange in ["..static", "static.."]:
-        assert_result_count(
-            ds.repo.repo.git.rev_list(revrange).split(), 1)
+        eq_(len(ds.repo.repo.git.rev_list(revrange).split()), 1)
 
     # Unlike the static change, if we run the ever-growing change on
     # top of itself, we end up with a new commit.
@@ -220,8 +219,7 @@ def test_rerun_onto(path):
         ds.rerun(since="static^", onto="")
     ok_(ds.repo.get_active_branch() is None)
     for revrange in ["..master", "master.."]:
-        assert_result_count(
-            ds.repo.repo.git.rev_list(revrange).split(), 3)
+        eq_(len(ds.repo.repo.git.rev_list(revrange).split()), 3)
 
     # An empty `onto` means use the parent of the first revision that
     # has a run command.
@@ -275,13 +273,13 @@ def test_rerun_just_one_commit(path):
     ds.repo.config.reload()
 
     ds.run('echo static-content > static')
-    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+    eq_(len(ds.repo.repo.git.rev_list("HEAD").split()), 1)
 
     # Rerunning with just one commit doesn't raise an error ...
     ds.rerun()
     # ... but we're still at one commit because the content didn't
     # change.
-    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+    eq_(len(ds.repo.repo.git.rev_list("HEAD").split()), 1)
 
     # We abort rather than trying to do anything when --onto='' and
     # --since='' are given together and the first commit contains a
@@ -382,8 +380,7 @@ def test_rerun_branch(path):
     # parent commit that is used to generate the commit ID may be set when
     # running the tests, which would result in two commits rather than three.
     for revrange in ["rerun..master", "master..rerun"]:
-        assert_result_count(
-            ds.repo.repo.git.rev_list(revrange).split(), 3)
+        eq_(len(ds.repo.repo.git.rev_list(revrange).split()), 3)
     eq_(ds.repo.get_merge_base(["master", "rerun"]),
         ds.repo.get_hexsha("prerun"))
 
@@ -393,10 +390,8 @@ def test_rerun_branch(path):
     eq_(ds.repo.get_active_branch(), "rerun2")
     eq_('xxxx\n', open(outfile).read())
 
-    assert_result_count(
-        ds.repo.repo.git.rev_list("master..rerun2").split(), 2)
-    assert_result_count(
-        ds.repo.repo.git.rev_list("rerun2..master").split(), 0)
+    eq_(len(ds.repo.repo.git.rev_list("master..rerun2").split()), 2)
+    eq_(len(ds.repo.repo.git.rev_list("rerun2..master").split()), 0)
 
     # Using an existing branch name fails.
     ds.repo.checkout("master")
@@ -509,7 +504,7 @@ def test_new_or_modified(path):
     ds.repo.checkout("orph", options=["--orphan"])
     ds.save()
     assert_false(ds.repo.dirty)
-    assert_result_count(ds.repo.repo.git.rev_list("HEAD").split(), 1)
+    eq_(len(ds.repo.repo.git.rev_list("HEAD").split()), 1)
     # Diffing doesn't fail when the branch contains a single commit.
     assert_in("to_modify", get_new_or_modified(ds, "HEAD"))
 
