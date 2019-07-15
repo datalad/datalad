@@ -356,7 +356,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             are no longer bound"""
             try:
                 return lgr.debug(exc_str(e))
-            except AttributeError:
+            except (AttributeError, NameError):
                 return
 
         try:
