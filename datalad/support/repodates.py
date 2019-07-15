@@ -188,12 +188,12 @@ def log_dates(repo, revs=None):
     A generator object that returns a tuple with the commit hexsha, author
     timestamp, and committer timestamp.
     """
-    revs = revs or ["--branches"]
+    opts = [] if revs else ["--branches"]
     try:
-        for line in repo.repo.git.log(*revs, format="%H %at %ct").splitlines():
+        for line in repo.get_revisions(revs, fmt="%H %at %ct", options=opts):
             hexsha, author_timestamp, committer_timestamp = line.split()
             yield hexsha, int(author_timestamp), int(committer_timestamp)
-    except GitCommandError as e:
+    except CommandError as e:
         # With some Git versions, calling `git log --{all,branches,remotes}` in
         # a repo with no commits may signal an error.
         if "does not have any commits yet" not in e.stderr:
