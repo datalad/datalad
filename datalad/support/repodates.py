@@ -112,8 +112,8 @@ def branch_blobs_in_tree(repo, branch):
     entry per blob is yielded).
     """
     seen_blobs = set()
-    git = repo.repo.git
-    out = git.ls_tree(branch, z=True, r=True)
+    out, _ = repo._git_custom_command(
+        None, ["git", "ls-tree", "-z", "-r", branch])
     if out:
         lines = out.strip("\0").split("\0")
         num_lines = len(lines)
