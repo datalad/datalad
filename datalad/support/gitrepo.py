@@ -1511,6 +1511,40 @@ class GitRepo(RepoInterface):
                 return None
             raise
 
+    def get_revisions(self, revrange=None, fmt="%H", options=None):
+        """Return list of revisions in `revrange`.
+
+        Parameters
+        ----------
+        revrange : str or list of str or None, optional
+            Revisions or revision ranges to walk. If None, revision defaults to
+            HEAD unless a revision-modifying option like `--all` or
+            `--branches` is included in `options`.
+        fmt : string, optional
+            Format accepted by `--format` option of `git log`. This should not
+            contain new lines because the output is split on new lines.
+        options : list of str, optional
+            Options to pass to `git log`.  This should not include `--format`.
+
+        Returns
+        -------
+        List of revisions (str), formatted according to `fmt`.
+        """
+        if revrange is None:
+            revrange = []
+        elif isinstance(revrange, string_types):
+            revrange = [revrange]
+
+        cmd = ["git", "log", "--format={}".format(fmt)]
+        cmd.extend((options or []) + revrange + ["--"])
+        try:
+            stdout, _ = self._git_custom_command(None, cmd, expect_fail=True)
+        except CommandError as e:
+            if "does not have any commits" in e.stderr:
+                return []
+            raise
+        return stdout.splitlines()
+
     def commit_exists(self, commitish):
         """Does `commitish` exist in the repo?
 
