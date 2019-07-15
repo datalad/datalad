@@ -39,9 +39,10 @@ def branch_blobs(repo, branch):
     git = repo.repo.git
     # Note: This might be nicer with rev-list's --filter and
     # --filter-print-omitted, but those aren't available until Git v2.16.
-    lines = git.rev_list(branch, objects=True).splitlines()
+    out_rev, _ = repo._git_custom_command(
+        None, ["git", "rev-list", "--objects"] + [branch])
     # Trees and blobs have an associated path printed.
-    objects = (ln.split() for ln in lines)
+    objects = (ln.split() for ln in out_rev.splitlines())
     blob_trees = [obj for obj in objects if len(obj) == 2]
 
     num_objects = len(blob_trees)
