@@ -2241,6 +2241,7 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
     symbols can be either "customary", "customary_ext", "iec" or "iec_ext",
     see: http://goo.gl/kTQMs
 
+      >>> from datalad.utils import bytes2human
       >>> bytes2human(1)
       '1.0 B'
       >>> bytes2human(1024)
