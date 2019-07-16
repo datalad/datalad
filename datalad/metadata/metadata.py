@@ -62,7 +62,10 @@ from datalad.utils import (
     as_unicode,
 )
 from datalad.ui import ui
-from datalad.dochelpers import exc_str
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
 from datalad.consts import (
     OLDMETADATA_DIR,
     OLDMETADATA_FILENAME,
@@ -476,6 +479,18 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
     from pkg_resources import iter_entry_points  # delayed heavy import
     extractors = {ep.name: ep for ep in iter_entry_points('datalad.metadata.extractors')}
 
+    # we said that we want to fail, rather then just moan about less metadata
+    # Do an early check if all extractors are available so not to wait hours
+    # and then crash for some obvious reason
+    absent_extractors = [t for t in types if t not in extractors]
+    if absent_extractors:
+        raise ValueError(
+            '%d enabled metadata extractor%s not available in this installation'
+            ': %s' %
+            (len(absent_extractors),
+             single_or_plural(" is", "s are", len(absent_extractors)),
+             ', '.join(absent_extractors)))
+
     log_progress(
         lgr.info,
         'metadataextractors',
@@ -492,16 +507,6 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             'Engage %s metadata extractor', mtype_key,
             update=1,
             increment=True)
-        if mtype_key not in extractors:
-            # we said that we want to fail, rather then just moan about less metadata
-            log_progress(
-                lgr.error,
-                'metadataextractors',
-                'Failed %s metadata extraction from %s', mtype_key, ds,
-            )
-            raise ValueError(
-                'Enabled metadata extractor %s is not available in this installation',
-                mtype_key)
         try:
             extractor_cls = extractors[mtype_key].load()
             extractor = extractor_cls(
@@ -515,9 +520,8 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
             )
             raise ValueError(
                 "Failed to load metadata extractor for '%s', "
-                "broken dataset configuration (%s)?: %s",
-                mtype, ds, exc_str(e))
-            continue
+                "broken dataset configuration (%s)?: %s" %
+                (mtype, ds, exc_str(e)))
         try:
             dsmeta_t, contentmeta_t = extractor.get_metadata(
                 dataset=global_meta if global_meta is not None else ds.config.obtain(
