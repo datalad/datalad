@@ -22,6 +22,7 @@ from datalad.distribution.dataset import (
     Dataset
 )
 from datalad.api import create
+from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
     _path_,
@@ -224,6 +225,33 @@ def test_create_sub_gh3463(path):
     assert_repo_status(ds.path)
 
 
+@with_tempfile(mkdir=True)
+def test_create_dataset_same_as_path(path):
+    with chpwd(path):
+        ds = create(dataset=".", path=".")
+    assert_repo_status(ds.path)
+
+
+@with_tempfile
+def test_create_sub_dataset_dot_no_path(path):
+    ds = Dataset(path)
+    ds.create()
+
+    # Test non-bound call.
+    sub0_path = text_type(ds.pathobj / "sub0")
+    os.mkdir(sub0_path)
+    with chpwd(sub0_path):
+        subds0 = create(dataset=".")
+    assert_repo_status(ds.path, untracked=[subds0.path])
+    assert_repo_status(subds0.path)
+
+    # Test command-line invocation directly (regression from gh-3484).
+    sub1_path = text_type(ds.pathobj / "sub1")
+    os.mkdir(sub1_path)
+    Runner(cwd=sub1_path)(["datalad", "create", "-d."])
+    assert_repo_status(ds.path, untracked=[subds0.path, sub1_path])
+
+
 # windows failure triggered by
 # File "C:\Miniconda35\envs\test-environment\lib\site-packages\datalad\tests\utils.py", line 421, in newfunc
 #    rmtemp(d)
@@ -392,3 +420,16 @@ def test_cfg_passthrough(path):
     ds = Dataset(path)
     eq_(ds.config.get('annex.tune.objecthash1', None), 'true')
     eq_(ds.config.get('annex.tune.objecthashlower', None), 'true')
+
+
+@with_tree({"empty": {".git": {}, "ds": {}},
+            "nonempty": {".git": {"bogus": "content"}, "ds": {}}})
+def test_empty_git_upstairs(topdir):
+    # create() doesn't get confused by an empty .git/ upstairs (gh-3473)
+    assert_in_results(
+        create(op.join(topdir, "empty", "ds"), **raw),
+        status="ok", type="dataset", action="create")
+    # ... but it will stop short of checking that a directory with a .git path
+    # is a valid repo.
+    with assert_raises(CommandError):
+        create(op.join(topdir, "nonempty", "ds"), **raw)

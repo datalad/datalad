@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+from functools import partial
 from itertools import dropwhile
 import json
 import os.path as op
@@ -165,6 +166,16 @@ class Rerun(Interface):
             doc="""Don't actually re-execute anything, just display what would
             be done. [CMD: Note: If you give this option, you most likely want
             to set --output-format to 'json' or 'json_pp'. CMD]"""),
+        explicit=Parameter(
+            args=("--explicit",),
+            action="store_true",
+            doc="""Consider the specification of inputs and outputs in the run
+            record to be explicit. Don't warn if the repository is dirty, and
+            only save modifications to the outputs from the original record.
+            Note that when several run commits are specified, this applies to
+            every one. Care should also be taken when using [CMD: --onto
+            CMD][PY: `onto` PY] because checking out a new HEAD can easily fail
+            when the working tree has modifications."""),
     )
 
     @staticmethod
@@ -178,7 +189,8 @@ class Rerun(Interface):
             message=None,
             onto=None,
             script=None,
-            report=False):
+            report=False,
+            explicit=False):
 
         ds = require_dataset(
             dataset, check_installed=True,
@@ -186,7 +198,7 @@ class Rerun(Interface):
 
         lgr.debug('rerunning command output underneath %s', ds)
 
-        if script is None and not report and ds.repo.dirty:
+        if script is None and not (report or explicit) and ds.repo.dirty:
             yield get_status_dict(
                 'run',
                 ds=ds,
@@ -232,7 +244,7 @@ class Rerun(Interface):
         elif report:
             handler = _report
         else:
-            handler = _rerun
+            handler = partial(_rerun, explicit=explicit)
 
         for res in handler(ds, results):
             yield res
@@ -345,7 +357,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
         yield res
 
 
-def _rerun(dset, results):
+def _rerun(dset, results, explicit=False):
     for res in results:
         rerun_action = res.get("rerun_action")
         if not rerun_action:
@@ -389,6 +401,7 @@ def _rerun(dset, results):
                                  inputs=run_info.get("inputs", []),
                                  extra_inputs=run_info.get("extra_inputs", []),
                                  outputs=outputs,
+                                 explicit=explicit,
                                  rerun_outputs=auto_outputs,
                                  message=message,
                                  rerun_info=run_info):

@@ -32,9 +32,9 @@ from datalad.tests.utils import (
     eq_,
     ok_,
     chpwd,
+    known_failure_appveyor,
     known_failure_windows,
     OBSCURE_FILENAME,
-    SkipTest,
 )
 from datalad.distribution.tests.test_add import tree_arg
 
@@ -42,6 +42,7 @@ import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import CommandError
+from datalad.support.external_versions import external_versions
 from datalad.api import (
     save,
     create,
@@ -436,13 +437,11 @@ def test_add_mimetypes(path):
             assert_not_in('key', annexinfo[p], p)
 
 
+@known_failure_appveyor
+# ^ Issue only happens on appveyor, Python itself implodes. Cannot be
+#   reproduced on a real windows box.
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
-    if 'APPVEYOR' in os.environ:
-        # issue only happens on appveyor, Python itself implodes
-        # cannot be reproduced on a real windows box
-        raise SkipTest(
-            'this test causes appveyor to crash, reason unknown')
     ds = Dataset(path).create()
     sub = ds.create('sub')
     res = ds.subdatasets()
@@ -658,19 +657,42 @@ def test_surprise_subds(path):
     somerepo = AnnexRepo(path=op.join(path, 'd1', 'subrepo'), create=True)
     # a proper subdataset
     subds = create(op.join(path, 'd2', 'subds'), force=True)
+
+    # If subrepo is an adjusted branch, it would have a commit, making most of
+    # this test irrelevant because it is about the unborn branch edge case.
+    adjusted = somerepo.is_managed_branch()
+    # This edge case goes away with Git v2.22.0.
+    fixed_git = external_versions['cmd:git'] >= '2.22.0'
+
     # save non-recursive
-    ds.save(recursive=False)
+    res = ds.save(recursive=False, on_failure='ignore')
+    if not adjusted and fixed_git:
+        # We get an appropriate error about no commit being checked out.
+        assert_in_results(res, action='add_submodule', status='error')
+
     # the content of both subds and subrepo are not added to their
     # respective parent as no --recursive was given
     assert_repo_status(subds.path, untracked=['subfile'])
     assert_repo_status(somerepo.path, untracked=['subfile'])
-    # however, while the subdataset is added (and reported as modified
-    # because it content is still untracked) the subrepo
-    # cannot be added (it has no commit)
-    # worse: its untracked file add been added to the superdataset
-    # XXX the next conditional really says: if the subrepo is not in an
-    # adjusted branch: #datalad/3178 (that would have a commit)
-    if not on_windows:
+
+    if adjusted or fixed_git:
+        if adjusted:
+            # adjusted branch: #datalad/3178 (that would have a commit)
+            modified = [subds.pathobj, somerepo.pathobj]
+            untracked = []
+        else:
+            # Newer Git versions refuse to add a sub-repository with no commits
+            # checked out.
+            modified = [subds.pathobj]
+            untracked = ['d1']
+        assert_repo_status(ds.path, modified=modified, untracked=untracked)
+        assert_not_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
+                      ds.repo.get_content_info())
+    else:
+        # however, while the subdataset is added (and reported as modified
+        # because it content is still untracked) the subrepo
+        # cannot be added (it has no commit)
+        # worse: its untracked file add been added to the superdataset
         assert_repo_status(ds.path, modified=['d2/subds'])
         assert_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
                   ds.repo.get_content_info())
@@ -690,3 +712,18 @@ def test_bf3285(path):
     # subdataset.
     ds.save("foo")
     assert_repo_status(ds.path, untracked=[subds.path])
+
+
+@with_tree({"outside": "",
+            "ds": {"within": ""}})
+def test_on_failure_continue(path):
+    ds = Dataset(op.join(path, "ds")).create(force=True)
+    # save() calls status() in a way that respects on_failure.
+    assert_in_results(
+        ds.save(path=[op.join(path, "outside"),
+                      op.join(path, "ds", "within")],
+                on_failure="ignore"),
+        action="status",
+        status="error")
+    # save() continued despite the failure and saved ds/within.
+    assert_repo_status(ds.path)

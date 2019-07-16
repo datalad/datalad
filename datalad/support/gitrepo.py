@@ -410,7 +410,7 @@ def Repo(*args, **kwargs):
     # TODO: This probably doesn't work as intended (or at least not as
     #       consistently as intended). gitpy.Repo could be instantiated by
     #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a paramter to these methods instead of the
+    #       would be needed as a parameter to these methods instead of the
     #       constructor.
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
@@ -706,8 +706,9 @@ class GitRepo(RepoInterface):
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
-        # Disable automatic garbage and autopacking
-        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # Could be used to e.g. disable automatic garbage and autopacking
+        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        self._GIT_COMMON_OPTIONS = []
         # actually no need with default GitPython db backend not in memory
         # default_git_odbt but still allows for faster testing etc.
         # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
@@ -988,7 +989,15 @@ class GitRepo(RepoInterface):
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        return (Path(path) / '.git').exists()
+        path = Path(path) / '.git'
+        # the aim here is to have this test as cheap as possible, because
+        # it is performed a lot
+        # recognize two things as good-enough indicators of a present
+        # repo: 1) a non-empty .git directory (#3473) and 2) a pointer
+        # file or symlink
+        return path.exists() and (
+            not path.is_dir() or \
+            any(path.iterdir()))
 
     @staticmethod
     def get_git_dir(repo):
@@ -3513,6 +3522,7 @@ class GitRepo(RepoInterface):
                           for f, props in iteritems(status)
                           if props.get('state', None) == 'untracked' and
                           props.get('type', None) == 'directory']
+        to_add_submodules = []
         if untracked_dirs:
             to_add_submodules = [sm for sm, sm_props in iteritems(
                 self.get_content_info(
@@ -3603,7 +3613,8 @@ class GitRepo(RepoInterface):
             # handle it
             text_type(f.relative_to(self.pathobj)): props
             for f, props in iteritems(status)
-            if props.get('state', None) in ('modified', 'untracked')}
+            if (props.get('state', None) in ('modified', 'untracked') and
+                f not in to_add_submodules)}
         if to_add:
             lgr.debug(
                 '%i path(s) to add to %s %s',

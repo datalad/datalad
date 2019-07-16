@@ -61,6 +61,7 @@ from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
 from datalad.utils import make_tempfile
+from datalad.utils import partition
 from datalad.utils import unlink
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
@@ -86,6 +87,7 @@ from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
+from .exceptions import BrokenExternalDependency
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
@@ -710,17 +712,27 @@ class AnnexRepo(GitRepo, RepoInterface):
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return whether remote is a special annex remote
 
-        Decides based on the presence of diagnostic annex- options
-        for the remote
+        Decides based on the presence of an annex- option and lack of a
+        configured URL for the remote.
         """
         if check_if_known:
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(remote)
-        sec = 'remote.{}'.format(remote)
-        for opt in ('annex-externaltype', 'annex-webdav'):
-            if self.config.has_option(sec, opt):
-                return True
-        return False
+        opts = self.config.options('remote.{}'.format(remote))
+        if "url" in opts:
+            is_special = False
+        elif any(o.startswith("annex-") for o in opts
+                 if o not in ["annex-uuid", "annex-ignore"]):
+            # It's possible that there isn't a special-remote related option
+            # (we only filter out a few common ones), but given that there is
+            # no URL it should be a good bet that this is a special remote.
+            is_special = True
+        else:
+            is_special = False
+            lgr.warning("Remote '%s' has no URL or annex- option. "
+                        "Is it mis-configured?",
+                        remote)
+        return is_special
 
     @borrowkwargs(GitRepo)
     def get_remotes(self,
@@ -2112,7 +2124,9 @@ class AnnexRepo(GitRepo, RepoInterface):
             if e.stderr:
                 # else just warn about present errors
                 shorten = lambda x: x[:1000] + '...' if len(x) > 1000 else x
-                lgr.warning(
+
+                _log = lgr.debug if kwargs.get('expect_fail', False) else lgr.warning
+                _log(
                     "Running %s resulted in stderr output: %s",
                     command, shorten(e.stderr)
                 )
@@ -2120,10 +2134,32 @@ class AnnexRepo(GitRepo, RepoInterface):
             if progress_indicators:
                 progress_indicators.finish(partial=interrupted)
 
-        json_objects = (json_loads(line)
-                        for line in out.splitlines() if line.startswith('{'))
+        others, json_strs = partition((ln for ln in out.splitlines()),
+                                      lambda ln: ln.startswith('{'))
+
+        json_objects = (json_loads(line) for line in json_strs)
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
+
+        others = [ln for ln in others if ln.strip()]
+        if others:
+            if json_objects:
+                # We at least received some valid json output, so warn about
+                # non-json output and continue.
+                lgr.warning("Received non-json lines for --json command: %s",
+                            others)
+            else:
+                annex_ver = external_versions['cmd:annex']
+                if annex_ver == "7.20190626" and command == "find":
+                    # TODO: Drop this once GIT_ANNEX_MIN_VERSION is over
+                    # 7.20190626.
+                    exc = BrokenExternalDependency(
+                        "find --json output is broken on git-annex 7.20190626")
+                else:
+                    exc = RuntimeError(
+                        "Received no json output for --json command, only:\n{}"
+                        .format("  ".join(others)))
+                raise exc
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always

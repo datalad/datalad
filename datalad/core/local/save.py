@@ -81,10 +81,10 @@ class Save(Interface):
         % dataset save -d <path_to_dataset> --version-tag bestyet
 
     .. note::
-      For performance reasons, any Git repository without an initial commit
-      located inside a Dataset is ignored, and content underneath it will be
-      saved to the respective superdataset. DataLad datasets always have an
-      initial commit, hence are not affected by this behavior.
+      Before Git v2.22, any Git repository without an initial commit located
+      inside a Dataset is ignored, and content underneath it will be saved to
+      the respective superdataset. DataLad datasets always have an initial
+      commit, hence are not affected by this behavior.
     """
     # note above documents that out behavior is like that of `git add`, but
     # does not explicitly mention the connection to keep it simple.
@@ -196,7 +196,14 @@ class Save(Interface):
                 untracked=untracked_mode,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
+                on_failure='ignore',
                 result_renderer='disabled'):
+            if s['status'] == 'error':
+                # Downstream code can't do anything with these. Let the caller
+                # decide their fate.
+                yield s
+                continue
+
             # fish out status dict for this parent dataset
             ds_status = paths_by_ds.get(s['parentds'], {})
             # reassemble path status info as repo.status() would have made it

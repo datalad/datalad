@@ -63,11 +63,11 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure_appveyor,
     known_failure_windows,
     slow,
     with_testrepos,
     OBSCURE_FILENAME,
-    SkipTest,
 )
 
 
@@ -135,6 +135,9 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
+@known_failure_appveyor
+# ^ For an unknown reason, appveyor started failing after we removed
+#   receive.autogc=0 and gc.auto=0 from our common git options (gh-3482).
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
@@ -194,11 +197,9 @@ def test_run_save_deletion(path):
     assert_repo_status(ds.path)
 
 
+@known_failure_appveyor  # causes appveyor (only) to crash, reason unknown
 @with_tempfile(mkdir=True)
 def test_run_from_subds(path):
-    if 'APPVEYOR' in os.environ:
-        raise SkipTest('test causes appveyor (only) to crash, reason unknown')
-
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)
@@ -350,3 +351,58 @@ def test_run_cmdline_disambiguation(path):
                 main(["datalad", "run", "--", "echo", "--version"])
             exec_cmd.assert_called_once_with(
                 "echo --version", path, expected_exit=None)
+
+
+@with_tempfile(mkdir=True)
+def test_run_path_semantics(path):
+    # Test that we follow path resolution from gh-3435: paths are relative to
+    # dataset if a dataset instance is given and relative to the current
+    # working directory otherwise.
+
+    ds0 = Dataset(op.join(path, "ds0")).create()
+    ds0_subdir = op.join(ds0.path, "s0")
+    os.mkdir(ds0_subdir)
+
+    # Although not useful, we can specify `dataset` as a string that lines up
+    # with the one from the current directory.
+    with chpwd(ds0_subdir):
+        run("cd .> one", dataset="..")
+        run("cd .> one", outputs=["one"], dataset=ds0.path)
+    ok_exists(op.join(ds0_subdir, "one"))
+    assert_repo_status(ds0.path)
+
+    # Specify string dataset argument, running from another dataset ...
+
+    ds1 = Dataset(op.join(path, "ds1")).create()
+    ds1_subdir = op.join(ds1.path, "s1")
+    os.mkdir(ds1_subdir)
+
+    # ... producing output file in specified dataset
+    with chpwd(ds1_subdir):
+        run("cd .> {}".format(op.join(ds0.path, "two")),
+            dataset=ds0.path)
+    ok_exists(op.join(ds0.path, "two"))
+    assert_repo_status(ds0.path)
+
+    # ... producing output file in specified dataset and passing output file as
+    # relative to current directory
+    with chpwd(ds1_subdir):
+        out = op.join(ds0.path, "three")
+        run("cd .> {}".format(out), dataset=ds0.path, explicit=True,
+            outputs=[op.relpath(out, ds1_subdir)])
+    ok_exists(op.join(ds0.path, "three"))
+    assert_repo_status(ds0.path)
+
+    # ... producing output file outside of specified dataset, leaving it
+    # untracked in the other dataset
+    assert_repo_status(ds1.path)
+    with chpwd(ds1_subdir):
+        run("cd .> four", dataset=ds0.path)
+    assert_repo_status(ds1.path, untracked=[ds1_subdir])
+
+    # If we repeat above with an instance instead of the string, the directory
+    # for the run is the specified dataset.
+    with chpwd(ds1_subdir):
+        run("cd .> five", dataset=ds0)
+    ok_exists(op.join(ds0.path, "five"))
+    assert_repo_status(ds0.path)

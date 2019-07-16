@@ -14,13 +14,14 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 
 from .base import Interface
+from ..core.local.save import Save
 from ..interface.base import build_doc
 from ..interface.common_opts import nosave_opt
 from ..interface.common_opts import save_message_opt
 from ..interface.results import get_status_dict
 from ..interface.utils import eval_results
 from ..utils import assure_list_from_str
-from ..utils import get_dataset_pwds
+from ..distribution.dataset import Dataset
 from ..distribution.dataset import datasetmethod
 from ..distribution.dataset import EnsureDataset
 from ..distribution.dataset import require_dataset
@@ -88,8 +89,6 @@ class DownloadURL(Interface):
                  archive=False, save=True, message=None):
         from ..downloaders.providers import Providers
 
-        pwd, rel_pwd = get_dataset_pwds(dataset)
-
         ds = None
         if save or dataset:
             try:
@@ -101,6 +100,9 @@ class DownloadURL(Interface):
 
         common_report = {"action": "download_url",
                          "ds": ds}
+
+        if isinstance(dataset, Dataset):
+            path = op.normpath(op.join(ds.path, path or op.curdir))
 
         urls = assure_list_from_str(urls)
 
@@ -114,13 +116,6 @@ class DownloadURL(Interface):
                 path=path,
                 **common_report)
             return
-
-        if dataset:  # A dataset was explicitly given.
-            path = op.normpath(op.join(ds.path, path or op.curdir))
-        elif save and ds:
-            path = op.normpath(op.join(ds.path, rel_pwd, path or op.curdir))
-        elif not path:
-            path = op.curdir
 
         # TODO setup fancy ui.progressbars doing this in parallel and reporting overall progress
         # in % of urls which were already downloaded
@@ -156,7 +151,14 @@ class DownloadURL(Interface):
 URLs:
   {}""".format("\n  ".join(urls))
 
-            for r in ds.save(downloaded_paths, message=msg):
+            for r in Save()(downloaded_paths, message=msg,
+                            # ATTN: Pass the original dataset argument to
+                            # preserve relative path handling semantics.
+                            dataset=dataset,
+                            return_type="generator",
+                            result_xfm=None,
+                            result_filter=None,
+                            on_failure="ignore"):
                 yield r
 
             if isinstance(ds.repo, AnnexRepo):
