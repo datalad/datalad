@@ -66,6 +66,10 @@ _common_diffstatus_params = dict(
     annex=Parameter(
         args=('--annex',),
         metavar='MODE',
+        # the next two enable a sole `--annex` that auto-translates to
+        # `--annex basic`
+        const='basic',
+        nargs='?',
         constraints=EnsureChoice(None, 'basic', 'availability', 'all'),
         doc="""Switch whether to include information on the annex
         content of individual files in the status report, such as
@@ -78,6 +82,8 @@ _common_diffstatus_params = dict(
         'has_content' (boolean flag) and 'objloc' (absolute path to an
         existing annex object file); or 'all' which will report all
         available information (presently identical to 'availability').
+        [CMD: The 'basic' mode will be assumed when this option is given,
+        but no mode is specified. CMD]
         """),
     untracked=Parameter(
         args=('--untracked',),
