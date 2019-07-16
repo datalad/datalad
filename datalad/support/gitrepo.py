@@ -941,8 +941,8 @@ class GitRepo(RepoInterface):
                 # denied etc. So disabled 
                 #if exists(opj(self.path, '.git')):  # don't try to write otherwise
                 #    self.repo.index.write()
-        except InvalidGitRepositoryError:
-            # might have being removed and no longer valid
+        except (InvalidGitRepositoryError, AttributeError):
+            # might have being removed and no longer valid or attributes unbound
             pass
 
     def __repr__(self):
