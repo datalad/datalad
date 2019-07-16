@@ -418,6 +418,11 @@ def add_entrypoints_to_interface_groups(interface_groups):
             ep.name)
         try:
             spec = ep.load()
+            if len(spec) < 2 or not spec[1]:
+                lgr.debug(
+                    'Extension does not provide a command suite: %s',
+                    ep.name)
+                continue
             interface_groups.append((ep.name, spec[0], spec[1]))
             lgr.debug('Loaded entrypoint %s', ep.name)
         except Exception as e:
