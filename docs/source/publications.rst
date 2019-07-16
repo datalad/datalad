@@ -11,7 +11,7 @@ One thing to bind them all: A complete raw data structure for auto-generation of
    - Benjamin Poldrack, Kyle Meyer, Yaroslav O. Halchenko, Michael Hanke
 
 Fantastic containers and how to tame them [poster]
-   - Yaroslav O. Halchenko, Kyele Meyer, Matt Travers, Dorota Jarecka, Satrajit Ghosh, Jakub Kaczmarzyk, Michael Hanke
+   - Yaroslav O. Halchenko, Kyle Meyer, Matt Travers, Dorota Jarecka, Satrajit Ghosh, Jakub Kaczmarzyk, Michael Hanke
 
 YODA: YODA's Organigram on Data Analysis [poster]
    - An outline of a simple approach to structuring and conducting data analyses that aims to
