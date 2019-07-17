@@ -3174,7 +3174,20 @@ class AnnexRepo(GitRepo, RepoInterface):
             if 'bytesize' in rec:
                 # it makes sense to make this an int that one can calculate with
                 # with
-                rec['bytesize'] = int(rec['bytesize'])
+                try:
+                    rec['bytesize'] = int(rec['bytesize'])
+                except ValueError:
+                    # this would only ever happen, if the recorded key itself
+                    # has no size info. Even for a URL key, this would mean
+                    # that the server would have to not report size info at all
+                    # but it does actually happen, e.g.
+                    # URL--http&c%%ciml.info%dl%v0_9%ciml-v0_9-all.pdf
+                    # from github.com/datalad-datasets/machinelearning-books
+                    lgr.debug('Failed to convert "%s" to integer bytesize',
+                              rec['bytesize'])
+                    # remove the field completely to avoid ambiguous semantics
+                    # of None/NaN etc.
+                    del rec['bytesize']
             info[path] = rec
             # TODO make annex availability checks optional and move in here
             if not eval_availability:

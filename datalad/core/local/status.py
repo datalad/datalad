@@ -23,6 +23,7 @@ from collections import OrderedDict
 from datalad.utils import (
     assure_list,
     assure_unicode,
+    bytes2human,
 )
 from datalad.interface.base import (
     Interface,
@@ -66,6 +67,10 @@ _common_diffstatus_params = dict(
     annex=Parameter(
         args=('--annex',),
         metavar='MODE',
+        # the next two enable a sole `--annex` that auto-translates to
+        # `--annex basic`
+        const='basic',
+        nargs='?',
         constraints=EnsureChoice(None, 'basic', 'availability', 'all'),
         doc="""Switch whether to include information on the annex
         content of individual files in the status report, such as
@@ -78,6 +83,8 @@ _common_diffstatus_params = dict(
         'has_content' (boolean flag) and 'objloc' (absolute path to an
         existing annex object file); or 'all' which will report all
         available information (presently identical to 'availability').
+        [CMD: The 'basic' mode will be assumed when this option is given,
+        but no mode is specified. CMD]
         """),
     untracked=Parameter(
         args=('--untracked',),
@@ -433,44 +440,3 @@ class Status(Interface):
                         len(annexed),
                         single_or_plural('file', 'files', len(annexed)),
                         total_size))
-
-
-# TODO move to datalad.utils eventually
-def bytes2human(n, format='%(value).1f %(symbol)sB'):
-    """
-    Convert n bytes into a human readable string based on format.
-    symbols can be either "customary", "customary_ext", "iec" or "iec_ext",
-    see: http://goo.gl/kTQMs
-
-      >>> bytes2human(1)
-      '1.0 B'
-      >>> bytes2human(1024)
-      '1.0 KB'
-      >>> bytes2human(1048576)
-      '1.0 MB'
-      >>> bytes2human(1099511627776127398123789121)
-      '909.5 YB'
-
-      >>> bytes2human(10000, "%(value).1f %(symbol)s/sec")
-      '9.8 K/sec'
-
-      >>> # precision can be adjusted by playing with %f operator
-      >>> bytes2human(10000, format="%(value).5f %(symbol)s")
-      '9.76562 K'
-
-    Taken from: http://goo.gl/kTQMs and subsequently simplified
-    Original Author: Giampaolo Rodola' <g.rodola [AT] gmail [DOT] com>
-    License: MIT
-    """
-    n = int(n)
-    if n < 0:
-        raise ValueError("n < 0")
-    symbols = ('', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
-    prefix = {}
-    for i, s in enumerate(symbols[1:]):
-        prefix[s] = 1 << (i + 1) * 10
-    for symbol in reversed(symbols[1:]):
-        if n >= prefix[symbol]:
-            value = float(n) / prefix[symbol]
-            return format % locals()
-    return format % dict(symbol=symbols[0], value=n)
