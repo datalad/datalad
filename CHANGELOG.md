@@ -86,7 +86,7 @@ with more performant implementations.
 
 ### Fixes
 
-- `status`
+- [status][]
   - reported on directories that contained only ignored files ([#3238][])
   - gave a confusing failure when called from a subdataset with an
     explicitly specified dataset argument and "." as a path ([#3325][])
@@ -132,7 +132,7 @@ with more performant implementations.
    input paths because the batch call will silently hang if given
    non-annex files.  ([#3364][])
 
-- `status`
+- [status][]
   - now reports a "bytesize" field for files tracked by Git ([#3299][])
   - gained a new option `eval_subdataset_state` that controls how the
     subdataset state is evaluated.  Depending on the information you
@@ -1401,6 +1401,7 @@ publishing
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [siblings]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html
 [sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
+[status]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html
 [subdatasets]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-subdatasets.html
 [unlock]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-unlock.html
 [update]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html
