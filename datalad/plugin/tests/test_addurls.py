@@ -362,8 +362,7 @@ class TestAddurls(object):
         ds = Dataset(path).create(force=True)
 
         def get_annex_commit_counts():
-            return int(
-                ds.repo.repo.git.rev_list("--count", "git-annex").strip())
+            return len(ds.repo.get_revisions("git-annex"))
 
         n_annex_commits = get_annex_commit_counts()
 

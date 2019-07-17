@@ -299,7 +299,7 @@ class Add(Interface):
             discovered = {}
             discover_dataset_trace_to_targets(
                 # from here
-                dataset.path,
+                dataset.path if isinstance(dataset, Dataset) else dataset,
                 # to any dataset we are aware of
                 subds_to_add.keys(),
                 [],

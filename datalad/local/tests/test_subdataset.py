@@ -58,7 +58,7 @@ def test_get_subdatasets(path):
     eq_([(r['parentds'], r['path']) for r in ds.subdatasets()],
         [(path, opj(path, 'sub dataset1')),
          (path, opj(path, dots))])
-    eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), [
+    all_subs = [
         'sub dataset1',
         'sub dataset1/2',
         'sub dataset1/sub sub dataset1',
@@ -66,7 +66,16 @@ def test_get_subdatasets(path):
         'sub dataset1/sub sub dataset1/subm 1',
         'sub dataset1/subm 1',
         dots,
-    ])
+    ]
+    eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), all_subs)
+    with chpwd(text_type(ds.pathobj)):
+        # imitate cmdline invocation w/ no dataset argument
+        eq_(subdatasets(dataset=None,
+                        path=[],
+                        recursive=True,
+                        result_xfm='relpaths'),
+            all_subs)
+
     # redo, but limit to specific paths
     eq_(
         ds.subdatasets(
@@ -77,6 +86,19 @@ def test_get_subdatasets(path):
             'sub dataset1/sub sub dataset1',
             'sub dataset1/sub sub dataset1/2',
             'sub dataset1/sub sub dataset1/subm 1',
+        ]
+    )
+    eq_(
+        ds.subdatasets(
+            path=['sub dataset1'],
+            recursive=True, result_xfm='relpaths'),
+        [
+            'sub dataset1',
+            'sub dataset1/2',
+            'sub dataset1/sub sub dataset1',
+            'sub dataset1/sub sub dataset1/2',
+            'sub dataset1/sub sub dataset1/subm 1',
+            'sub dataset1/subm 1',
         ]
     )
     with chpwd(text_type(ds.pathobj / 'subdir')):

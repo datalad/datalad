@@ -57,6 +57,10 @@ class MissingExternalDependency(RuntimeError):
         return to_str
 
 
+class BrokenExternalDependency(RuntimeError):
+    """Some particular functionality is broken with this dependency."""
+
+
 class DeprecatedError(RuntimeError):
     """To raise whenever a deprecated entirely feature is used"""
     def __init__(self, new=None, version=None, msg=''):

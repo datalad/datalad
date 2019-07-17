@@ -252,7 +252,7 @@ def test_GitRepo_commit(path):
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(gr)
     eq_("Testing GitRepo.commit().{}".format(linesep),
-        gr.repo.head.commit.message)
+        gr.format_commit("%B"))
 
     with open(op.join(path, filename), 'w') as f:
         f.write("changed content")
@@ -1502,3 +1502,46 @@ def test_duecredit(path):
         assert_in('Data management and distribution platform', outs)
     else:
         eq_(outs, '')
+
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_get_revisions(path):
+    gr = GitRepo(path, create=True)
+
+    def commit(msg):
+        gr.commit(msg=msg, options=["--allow-empty"])
+
+    # We catch the error and return empty if the current branch doesn't have a
+    # commit checked out.
+    eq_(gr.get_revisions(), [])
+
+    # But will raise if on a bad ref name, including an unborn branch.
+    with assert_raises(CommandError):
+        gr.get_revisions("master")
+
+    # By default, we query HEAD.
+    commit("1")
+    eq_(len(gr.get_revisions()), 1)
+
+    gr.checkout("other", options=["-b"])
+    commit("2")
+
+    # We can also query branch by name.
+    eq_(len(gr.get_revisions("master")), 1)
+    eq_(len(gr.get_revisions("other")), 2)
+
+    # "name" is sugar for ["name"].
+    eq_(gr.get_revisions("master"),
+        gr.get_revisions(["master"]))
+
+    gr.checkout("master")
+    commit("3")
+    eq_(len(gr.get_revisions("master")), 2)
+    # We can pass multiple revisions...
+    eq_(len(gr.get_revisions(["master", "other"])), 3)
+    # ... or options like --all and --branches
+    eq_(gr.get_revisions(["master", "other"]),
+        gr.get_revisions(options=["--all"]))
+
+    # Ranges are supported.
+    eq_(gr.get_revisions("master.."), [])

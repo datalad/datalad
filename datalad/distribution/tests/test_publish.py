@@ -388,6 +388,9 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
 
+    # Don't fail when a string is passed as `dataset` and since="".
+    assert_status("notneeded", publish(since='', dataset=source.path))
+
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)

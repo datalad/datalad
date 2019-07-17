@@ -1960,6 +1960,32 @@ def test_fake_is_not_special(path):
     assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
 
 
+@with_tree(tree={"remote": {}, "main": {}, "special": {}})
+def test_is_special(path):
+    rem = AnnexRepo(op.join(path, "remote"), create=True)
+    dir_arg = "directory={}".format(op.join(path, "special"))
+    rem.init_remote("imspecial",
+                    ["type=directory", "encryption=none", dir_arg])
+    ok_(rem.is_special_annex_remote("imspecial"))
+
+    ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
+    assert_false(ar.is_special_annex_remote("origin"))
+
+    assert_false(ar.is_special_annex_remote("imspecial",
+                                            check_if_known=False))
+    # FIXME: ar.enable_remote() doesn't support specifying options, but we need
+    # to specify directory= here.
+    ar._run_annex_command("enableremote",
+                          annex_options=["imspecial", dir_arg])
+    ok_(ar.is_special_annex_remote("imspecial"))
+
+    # With a mis-configured remote, give warning and return false.
+    ar.config.unset("remote.origin.url", where="local")
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_false(ar.is_special_annex_remote("origin"))
+        cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
+
+
 @with_tempfile(mkdir=True)
 def test_fake_dates(path):
     ar = AnnexRepo(path, create=True, fake_dates=True)
@@ -1968,7 +1994,9 @@ def test_fake_dates(path):
     for commit in ar.get_branch_commits("git-annex"):
         eq_(timestamp, commit.committed_date)
     assert_in("timestamp={}s".format(timestamp),
-              ar.repo.git.cat_file("blob", "git-annex:uuid.log"))
+              ar._git_custom_command(
+                  None,
+                  ["git", "cat-file", "blob", "git-annex:uuid.log"])[0])
 
 
 def test_get_size_from_perc_complete():
@@ -2209,3 +2237,22 @@ def test_ro_operations(path):
 
     # just check that all is good again
     repo2.repo_info()
+
+
+@with_tempfile
+def test_annex_cmd_expect_fail(path):
+    # test, that log message about stderr on non-zero exit is logged on debug level if expect_fail was set to True,
+    # warning level else
+
+    from re import DOTALL
+
+    repo = AnnexRepo(path)
+
+    with swallow_logs(logging.DEBUG) as cml:
+        repo._run_annex_command_json('add', ['non-existing'], expect_fail=True)
+        # message shows up at DEBUG level:
+        assert_re_in(r".*\[DEBUG\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)
+    with swallow_logs(logging.DEBUG) as cml:
+        repo._run_annex_command_json('add', ['non-existing'], expect_fail=False)
+        # message shows up at WARNING level
+        assert_re_in(r".*\[WARNING\][^[]*git-annex: add: 1 failed", cml.out, flags=DOTALL)

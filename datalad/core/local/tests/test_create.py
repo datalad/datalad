@@ -402,11 +402,10 @@ def test_create_fake_dates(path):
     # Another instance detects the fake date configuration.
     ok_(Dataset(path).repo.fake_dates_enabled)
 
-    first_commit = ds.repo.repo.commit(
-        ds.repo.repo.git.rev_list("--reverse", "--all").split()[0])
+    first_commit = ds.repo.get_revisions(options=["--reverse", "--all"])[0]
 
     eq_(ds.config.obtain("datalad.fake-dates-start") + 1,
-        first_commit.committed_date)
+        int(ds.repo.format_commit("%ct", first_commit)))
 
 
 @with_tempfile(mkdir=True)
