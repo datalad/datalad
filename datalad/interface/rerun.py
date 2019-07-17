@@ -232,7 +232,7 @@ class Rerun(Interface):
         else:
             revrange = "{}..{}".format(since, revision)
 
-        if ds.repo.repo.git.rev_list("--merges", revrange, "--"):
+        if ds.repo.get_revisions(revrange, options=["--merges"]):
             yield get_status_dict(
                 "run", ds=ds, status="error",
                 message="cannot rerun history with merge commits")
@@ -273,7 +273,7 @@ def _rerun_as_results(dset, revrange, since, branch, onto, message):
     In the standard case, the information in these results will be used to
     actually re-execute the commands.
     """
-    revs = dset.repo.repo.git.rev_list("--reverse", revrange, "--").split()
+    revs = dset.repo.get_revisions(revrange, options=["--reverse"])
     try:
         results = _revs_as_results(dset, revs)
     except ValueError as exc:

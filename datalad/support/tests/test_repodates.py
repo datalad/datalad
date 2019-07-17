@@ -29,14 +29,22 @@ def test_check_dates(path):
 
     with set_date(refdate - 1):
         ar = AnnexRepo(path, create=True)
+
+        def tag_object(tag):
+            """Return object for tag.  Do not dereference it.
+            """
+            # We can't use ar.get_tags because that returns the commit's hexsha,
+            # not the tag's, and ar.get_hexsha is limited to commit objects.
+            return ar._git_custom_command(
+                None,
+                ["git", "rev-parse", "refs/tags/{}".format(tag)])[0].strip()
+
         ar.add("foo")
         ar.commit("add foo")
         foo_commit = ar.get_hexsha()
         ar.commit("add foo")
         ar.tag("foo-tag", "tag before refdate")
-        # We can't use ar.get_tags because that returns the commit's hexsha,
-        # not the tag's, and ar.get_hexsha is limited to commit objects.
-        foo_tag = ar.repo.git.rev_parse("foo-tag")
+        foo_tag = tag_object("foo-tag")
         # Make a lightweight tag to make sure `tag_dates` doesn't choke on it.
         ar.tag("light")
     with set_date(refdate + 1):
@@ -44,7 +52,7 @@ def test_check_dates(path):
         ar.commit("add bar")
         bar_commit = ar.get_hexsha()
         ar.tag("bar-tag", "tag after refdate")
-        bar_tag = ar.repo.git.rev_parse("bar-tag")
+        bar_tag = tag_object("bar-tag")
     with set_date(refdate + 2):
         # Drop an annexed file so that we have more blobs in the git-annex
         # branch than its current tree.

@@ -222,7 +222,7 @@ def test_get_modified_subpaths(path):
     ds.save(recursive=True)
     ok_clean_git(path)
 
-    orig_base_commit = ds.repo.repo.commit().hexsha
+    orig_base_commit = ds.repo.get_hexsha()
 
     # nothing was modified compared to the status quo, output must be empty
     eq_([],

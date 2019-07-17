@@ -144,7 +144,7 @@ def test_save_message_file(path):
                        "msg": "add foo"})
     ds.repo.add("foo")
     ds.save(message_file=op.join(ds.path, "msg"))
-    eq_(ds.repo.repo.git.show("--format=%s", "--no-patch"),
+    eq_(ds.repo.format_commit("%s"),
         "add foo")
 
 

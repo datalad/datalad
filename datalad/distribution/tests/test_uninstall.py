@@ -285,7 +285,7 @@ def test_remove_file_handle_only(path):
     ok_(exists(path_two))
     # remove one handle, should not affect the other
     ds.remove('two', check=False, message="custom msg")
-    eq_(ds.repo.repo.head.commit.message.rstrip(), "custom msg")
+    eq_(ds.repo.format_commit("%B").rstrip(), "custom msg")
     eq_(rpath_one, realpath(opj(ds.path, 'one')))
     ok_(exists(rpath_one))
     ok_(not exists(path_two))
