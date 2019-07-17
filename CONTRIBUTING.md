@@ -359,12 +359,12 @@ be used with `continuous`.
 #### Compare results for two commits from recorded runs
 
 Use [asv compare] to compare results from different runs, which should be
-available under `.asv/results/<machine>`.  In the example below we overcome a
-current [limitation in asv compare](https://github.com/airspeed-velocity/asv/issues/632)
-that requires commits to be specified as hexshas:
+available under `.asv/results/<machine>`.  (Note that the example
+below passes ref names instead of commit IDs, which requires asv v0.3
+or later.)
 
 ```shell
-> grp(){git rev-parse $1;}; asv compare -m hopa $(grp 0.9.x) $(grp master)
+> asv compare -m hopa 0.9.x master
 
 All benchmarks:
 
