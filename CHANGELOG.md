@@ -15,15 +15,82 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- The two modules below have a new home.  The old locations still
+  exist as compatibility shims and will be removed in a future
+  release.
+  - `datalad.distribution.subdatasets` has been moved to
+    `datalad.local.subdatasets` ([#3429][])
+  - `datalad.interface.run` has been moved to `datalad.core.local.run`
+    ([#3444][])
+
+- The `lock` method of `AnnexRepo` and the `options` parameter of
+  `AnnexRepo.unlock` were unused internally and have been removed.
+  ([#3459][])
+
+- The logic for resolving relative paths given to a command has
+  changed ([#3435][]).  The new rule is that relative paths are taken
+  as relative to the dataset only if a dataset _instance_ is passed by
+  the caller.  In all other scenarios they're considered relative to
+  the current directory.
+
+  The main user-visible difference from the command line is that using
+  the `--dataset` argument does _not_ result in relative paths being
+  taken as relative to the specified dataset.  (The undocumented
+  distinction between "rel/path" and "./rel/path" no longer exists.)
+
+  All commands under `datalad.core` and `datalad.local`, as well as
+  `unlock`, follow the new logic.  The goal is for all commands to
+  eventually do so.
 
 ### Fixes
 
-?
+- The function for loading JSON streams wasn't clever enough to handle
+  content that included a Unicode line separator like
+  U2028. ([#3524][])
+
+- When [unlock][] was called without an explicit target (i.e., a
+  directory or no paths at all), the call failed if any of the files
+  did not have content present.  ([#3459][])
+
+- `AnnexRepo.get_content_info` failed in the rare case of a key
+  without size information.  ([#3534][])
+
+- [save][] ignored `--on-failure` in its underlying call to
+  [status][].  ([#3470][])
 
 ### Enhancements and new features
 
-?
+- New command `create-sibling-gitlab` provides an interface for
+  creating a publication target on a GitLab instance.  ([#3447][])
+
+- [subdatasets][]  ([#3429][])
+  - now supports path-constrained queries in the same manner as
+    commands like `save` and `status`
+  - gained a `--contains=PATH` option that can be used to restrict the
+    output to datasets that include a specific path.
+  - now narrows the listed subdatasets to those underneath the current
+    directory when called with no arguments
+
+- [status][] learned to accept a plain `--annex` (no value) as
+  shorthand for `--annex basic`.  ([#3534][])
+
+- The `.dirty` property of `GitRepo` and `AnnexRepo` has been sped up.
+  ([#3460][])
+
+- Extensions that do not provide a command, such as those that provide
+  only metadata extractors, are now supported.  ([#3531][])
+
+- When calling git-annex with `--json`, we log standard error at the
+  debug level rather than the warning level if a non-zero exit is
+  expected behavior.  ([#3518][])
+
+- [create][] no longer refuses to create a new dataset in the odd
+  scenario of an empty .git/ directory upstairs.  ([#3475][])
+
+- As of v2.22.0 Git treats a sub-repository on an unborn branch as a
+  repository rather than as a directory.  Our documentation and tests
+  have been updated appropriately.  ([#3476][])
+
 
 ## 0.12.0rc4 (May 15, 2019) -- the revolution is over
 
@@ -1582,12 +1649,25 @@ publishing
 [#3403]: https://github.com/datalad/datalad/issues/3403
 [#3407]: https://github.com/datalad/datalad/issues/3407
 [#3425]: https://github.com/datalad/datalad/issues/3425
+[#3429]: https://github.com/datalad/datalad/issues/3429
+[#3435]: https://github.com/datalad/datalad/issues/3435
 [#3439]: https://github.com/datalad/datalad/issues/3439
 [#3440]: https://github.com/datalad/datalad/issues/3440
+[#3444]: https://github.com/datalad/datalad/issues/3444
+[#3447]: https://github.com/datalad/datalad/issues/3447
 [#3458]: https://github.com/datalad/datalad/issues/3458
+[#3459]: https://github.com/datalad/datalad/issues/3459
+[#3460]: https://github.com/datalad/datalad/issues/3460
+[#3470]: https://github.com/datalad/datalad/issues/3470
+[#3475]: https://github.com/datalad/datalad/issues/3475
+[#3476]: https://github.com/datalad/datalad/issues/3476
 [#3479]: https://github.com/datalad/datalad/issues/3479
 [#3492]: https://github.com/datalad/datalad/issues/3492
 [#3493]: https://github.com/datalad/datalad/issues/3493
 [#3498]: https://github.com/datalad/datalad/issues/3498
 [#3499]: https://github.com/datalad/datalad/issues/3499
 [#3516]: https://github.com/datalad/datalad/issues/3516
+[#3518]: https://github.com/datalad/datalad/issues/3518
+[#3524]: https://github.com/datalad/datalad/issues/3524
+[#3531]: https://github.com/datalad/datalad/issues/3531
+[#3534]: https://github.com/datalad/datalad/issues/3534
