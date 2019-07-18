@@ -15,31 +15,82 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- The two modules below have a new home.  The old locations still
+  exist as compatibility shims and will be removed in a future
+  release.
+  - `datalad.distribution.subdatasets` has been moved to
+    `datalad.local.subdatasets` ([#3429][])
+  - `datalad.interface.run` has been moved to `datalad.core.local.run`
+    ([#3444][])
+
+- The `lock` method of `AnnexRepo` and the `options` parameter of
+  `AnnexRepo.unlock` were unused internally and have been removed.
+  ([#3459][])
+
+- The logic for resolving relative paths given to a command has
+  changed ([#3435][]).  The new rule is that relative paths are taken
+  as relative to the dataset only if a dataset _instance_ is passed by
+  the caller.  In all other scenarios they're considered relative to
+  the current directory.
+
+  The main user-visible difference from the command line is that using
+  the `--dataset` argument does _not_ result in relative paths being
+  taken as relative to the specified dataset.  (The undocumented
+  distinction between "rel/path" and "./rel/path" no longer exists.)
+
+  All commands under `datalad.core` and `datalad.local`, as well as
+  `unlock`, follow the new logic.  The goal is for all commands to
+  eventually do so.
 
 ### Fixes
 
-- Our tests needed various adjustments to keep up with upstream
-  changes in Travis and Git. ([#3479][]) ([#3492][]) ([#3493][])
+- The function for loading JSON streams wasn't clever enough to handle
+  content that included a Unicode line separator like
+  U2028. ([#3524][])
 
-- `AnnexRepo.is_special_annex_remote` was too selective in what it
-  considered to be a special remote.  ([#3499][])
+- When [unlock][] was called without an explicit target (i.e., a
+  directory or no paths at all), the call failed if any of the files
+  did not have content present.  ([#3459][])
 
-- We now provide information about unexpected output when git-annex is
-  called with `--json`.  ([#3516][])
+- `AnnexRepo.get_content_info` failed in the rare case of a key
+  without size information.  ([#3534][])
+
+- [save][] ignored `--on-failure` in its underlying call to
+  [status][].  ([#3470][])
 
 ### Enhancements and new features
 
-- For calls to git and git-annex, we disable automatic garbage
-  collection due to past issues with GitPython's state becoming stale,
-  but doing so results in a larger .git/objects/ directory that isn't
-  cleaned up until garbage collection is triggered outside of DataLad.
-  Tests with the latest GitPython didn't reveal any state issues, so
-  we've re-enabled automatic garbage collection.  ([#3458][])
+- New command `create-sibling-gitlab` provides an interface for
+  creating a publication target on a GitLab instance.  ([#3447][])
 
-- [rerun][] learned an `--explicit` flag, which it relays to its calls
-  to [run][[]].  This makes it possible to call `rerun` in a dirty
-  working tree ([#3498][]).
+- [subdatasets][]  ([#3429][])
+  - now supports path-constrained queries in the same manner as
+    commands like `save` and `status`
+  - gained a `--contains=PATH` option that can be used to restrict the
+    output to datasets that include a specific path.
+  - now narrows the listed subdatasets to those underneath the current
+    directory when called with no arguments
+
+- [status][] learned to accept a plain `--annex` (no value) as
+  shorthand for `--annex basic`.  ([#3534][])
+
+- The `.dirty` property of `GitRepo` and `AnnexRepo` has been sped up.
+  ([#3460][])
+
+- Extensions that do not provide a command, such as those that provide
+  only metadata extractors, are now supported.  ([#3531][])
+
+- When calling git-annex with `--json`, we log standard error at the
+  debug level rather than the warning level if a non-zero exit is
+  expected behavior.  ([#3518][])
+
+- [create][] no longer refuses to create a new dataset in the odd
+  scenario of an empty .git/ directory upstairs.  ([#3475][])
+
+- As of v2.22.0 Git treats a sub-repository on an unborn branch as a
+  repository rather than as a directory.  Our documentation and tests
+  have been updated appropriately.  ([#3476][])
+
 
 ## 0.12.0rc4 (May 15, 2019) -- the revolution is over
 
@@ -102,7 +153,7 @@ with more performant implementations.
 
 ### Fixes
 
-- `status`
+- [status][]
   - reported on directories that contained only ignored files ([#3238][])
   - gave a confusing failure when called from a subdataset with an
     explicitly specified dataset argument and "." as a path ([#3325][])
@@ -148,7 +199,7 @@ with more performant implementations.
    input paths because the batch call will silently hang if given
    non-annex files.  ([#3364][])
 
-- `status`
+- [status][]
   - now reports a "bytesize" field for files tracked by Git ([#3299][])
   - gained a new option `eval_subdataset_state` that controls how the
     subdataset state is evaluated.  Depending on the information you
@@ -209,6 +260,40 @@ with more performant implementations.
 
 - Imported various additional methods for the Repo classes to query
   information and save changes.
+
+
+## 0.11.6 (??? ??, 2019) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- Our tests needed various adjustments to keep up with upstream
+  changes in Travis and Git. ([#3479][]) ([#3492][]) ([#3493][])
+
+- `AnnexRepo.is_special_annex_remote` was too selective in what it
+  considered to be a special remote.  ([#3499][])
+
+- We now provide information about unexpected output when git-annex is
+  called with `--json`.  ([#3516][])
+
+### Enhancements and new features
+
+- For calls to git and git-annex, we disable automatic garbage
+  collection due to past issues with GitPython's state becoming stale,
+  but doing so results in a larger .git/objects/ directory that isn't
+  cleaned up until garbage collection is triggered outside of DataLad.
+  Tests with the latest GitPython didn't reveal any state issues, so
+  we've re-enabled automatic garbage collection.  ([#3458][])
+
+- [rerun][] learned an `--explicit` flag, which it relays to its calls
+  to [run][[]].  This makes it possible to call `rerun` in a dirty
+  working tree ([#3498][]).
+
 
 ## 0.11.5 (May 23, 2019) -- stability is not overrated
 
@@ -799,10 +884,10 @@ A number of fixes did not make it into the 0.9.x series:
   included in the output by passing `--senstive=some` or `--senstive=all`.
 - Reduced startup latency by only importing commands necessary for a particular
   command line call.
-- [create]:
+- [create][]:
   - `-d <parent> --nosave` now registers subdatasets, when possible.
   - `--fake-dates` configures dataset to use fake-dates
-- [run] now provides a way for the caller to save the result when a
+- [run][] now provides a way for the caller to save the result when a
   command has a non-zero exit status.
 - `datalad rerun` now has a `--script` option that can be used to extract
   previous commands into a file.
@@ -1383,6 +1468,7 @@ publishing
 [search]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-search.html
 [siblings]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-siblings.html
 [sshrun]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html
+[status]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html
 [subdatasets]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-subdatasets.html
 [unlock]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-unlock.html
 [update]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-update.html
@@ -1563,12 +1649,25 @@ publishing
 [#3403]: https://github.com/datalad/datalad/issues/3403
 [#3407]: https://github.com/datalad/datalad/issues/3407
 [#3425]: https://github.com/datalad/datalad/issues/3425
+[#3429]: https://github.com/datalad/datalad/issues/3429
+[#3435]: https://github.com/datalad/datalad/issues/3435
 [#3439]: https://github.com/datalad/datalad/issues/3439
 [#3440]: https://github.com/datalad/datalad/issues/3440
+[#3444]: https://github.com/datalad/datalad/issues/3444
+[#3447]: https://github.com/datalad/datalad/issues/3447
 [#3458]: https://github.com/datalad/datalad/issues/3458
+[#3459]: https://github.com/datalad/datalad/issues/3459
+[#3460]: https://github.com/datalad/datalad/issues/3460
+[#3470]: https://github.com/datalad/datalad/issues/3470
+[#3475]: https://github.com/datalad/datalad/issues/3475
+[#3476]: https://github.com/datalad/datalad/issues/3476
 [#3479]: https://github.com/datalad/datalad/issues/3479
 [#3492]: https://github.com/datalad/datalad/issues/3492
 [#3493]: https://github.com/datalad/datalad/issues/3493
 [#3498]: https://github.com/datalad/datalad/issues/3498
 [#3499]: https://github.com/datalad/datalad/issues/3499
 [#3516]: https://github.com/datalad/datalad/issues/3516
+[#3518]: https://github.com/datalad/datalad/issues/3518
+[#3524]: https://github.com/datalad/datalad/issues/3524
+[#3531]: https://github.com/datalad/datalad/issues/3531
+[#3534]: https://github.com/datalad/datalad/issues/3534
