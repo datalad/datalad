@@ -19,6 +19,10 @@ configure_asv () {
 EOF
 }
 
+run_asv () {
+    asv run -E existing --set-commit-hash $(git rev-parse HEAD)
+}
+
 pip install asv
 asv machine --yes
 pip install -e .
@@ -26,7 +30,7 @@ pip install -e .
 configure_asv
 git tag '__bench_target__'
 git rev-parse HEAD __bench_target__
-asv run -E existing --set-commit-hash $(git rev-parse __bench_target__)
+run_asv
 
 git reset --hard
 git checkout origin/master
@@ -34,6 +38,6 @@ git rev-parse HEAD __bench_target__
 pip install -e .
 
 configure_asv
-asv run -E existing --set-commit-hash $(git rev-parse origin/master)
+run_asv
 
 asv compare origin/master __bench_target__
