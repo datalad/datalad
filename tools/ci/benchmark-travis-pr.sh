@@ -27,13 +27,13 @@ pip install asv
 asv machine --yes
 
 git tag '__bench_target__'
-git rev-parse HEAD __bench_target__
+git show --no-patch --format="%H (%s)"
 pip install -e .
 configure_asv
 run_asv
 
 git checkout --force origin/master
-git rev-parse HEAD __bench_target__
+git show --no-patch --format="%H (%s)"
 pip install -e .
 configure_asv
 run_asv
