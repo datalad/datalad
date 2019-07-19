@@ -3,8 +3,14 @@
 set -eu
 
 configure_asv () {
-    sed -i -e 's,"branches,//branches,g' -e 's,"pythons,//pythons,g' \
-        -e 's,.asv/,travisasv/,g' asv.conf.json
+    cat << EOF > asv.conf.json
+{
+    "version": 1,
+    "repo": ".",
+    "branches": ["HEAD"],
+    "environment_type": "virtualenv",
+}
+EOF
 }
 
 pip install asv
