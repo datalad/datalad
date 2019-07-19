@@ -32,8 +32,7 @@ pip install -e .
 configure_asv
 run_asv
 
-git reset --hard
-git checkout origin/master
+git checkout --force origin/master
 git rev-parse HEAD __bench_target__
 pip install -e .
 configure_asv
