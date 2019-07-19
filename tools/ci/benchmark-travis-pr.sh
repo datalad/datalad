@@ -20,8 +20,8 @@ EOF
 }
 
 run_asv () {
-    git show --no-patch --format="%H (%s)"
     pip install -e .
+    git show --no-patch --format="%H (%s)"
     configure_asv
     asv run -E existing --set-commit-hash $(git rev-parse HEAD)
 }
