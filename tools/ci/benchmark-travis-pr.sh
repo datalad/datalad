@@ -20,6 +20,9 @@ EOF
 }
 
 run_asv () {
+    git show --no-patch --format="%H (%s)"
+    pip install -e .
+    configure_asv
     asv run -E existing --set-commit-hash $(git rev-parse HEAD)
 }
 
@@ -31,15 +34,9 @@ git update-ref refs/bm/pr HEAD
 # the current target that this PR will be merged into is HEAD^1.
 git update-ref refs/bm/merge-target HEAD^1
 
-git show --no-patch --format="%H (%s)"
-pip install -e .
-configure_asv
 run_asv
 
 git checkout --force refs/bm/merge-target
-git show --no-patch --format="%H (%s)"
-pip install -e .
-configure_asv
 run_asv
 
 asv compare refs/bm/merge-target refs/bm/pr
