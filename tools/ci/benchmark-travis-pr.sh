@@ -2,6 +2,12 @@
 
 set -eu
 
+if [ "$TRAVIS_PULL_REQUEST" = "false" ]
+then
+    echo "I: skipping benchmarks for non-PR branch"
+    exit 0
+fi
+
 configure_asv () {
     cat << EOF > asv.conf.json
 {
