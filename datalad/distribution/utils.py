@@ -157,9 +157,19 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
     remote_names = repo.get_remotes(
         with_urls_only=False,
         exclude_special_remotes=False)
-    for k, v in repo.get_special_remotes().items():
-        sr_name = v.get('name', None)
-        if sr_name and sr_name not in remote_names:
+    remote_uuids = None  # might be necessary to discover known UUIDs
+    for uuid, config in repo.get_special_remotes().items():
+        sr_name = config.get('name', None)
+        sr_type = config.get('type', None)
+        if sr_type == 'git':
+            # determine either there is a registered remote with matching UUID
+            if remote_uuids is None:
+                remote_uuids = {
+                    repo.config.get('remote.%s.annex-uuid' % r)
+                    for r in remote_names
+                }
+        if (sr_type != 'git' and sr_name and sr_name not in remote_names) or \
+            (sr_type == 'git' and uuid and uuid not in remote_uuids):
             # if it is not listed among the remotes, it wasn't enabled
             lgr.info(
                 'access to dataset sibling "%s" not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
