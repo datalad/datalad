@@ -25,18 +25,17 @@ run_asv () {
 
 pip install asv
 asv machine --yes
-pip install -e .
 
-configure_asv
 git tag '__bench_target__'
 git rev-parse HEAD __bench_target__
+pip install -e .
+configure_asv
 run_asv
 
 git reset --hard
 git checkout origin/master
 git rev-parse HEAD __bench_target__
 pip install -e .
-
 configure_asv
 run_asv
 
