@@ -26,16 +26,20 @@ run_asv () {
 pip install asv
 asv machine --yes
 
-git tag '__bench_target__'
+git update-ref refs/bm/pr HEAD
+# We know this is a PR run. The branch is a GitHub refs/pull/*/merge ref, so
+# the current target that this PR will be merged into is HEAD^1.
+git update-ref refs/bm/merge-target HEAD^1
+
 git show --no-patch --format="%H (%s)"
 pip install -e .
 configure_asv
 run_asv
 
-git checkout --force origin/master
+git checkout --force refs/bm/merge-target
 git show --no-patch --format="%H (%s)"
 pip install -e .
 configure_asv
 run_asv
 
-asv compare origin/master __bench_target__
+asv compare refs/bm/merge-target refs/bm/pr
