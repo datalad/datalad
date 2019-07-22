@@ -2170,16 +2170,14 @@ class AnnexRepo(GitRepo, RepoInterface):
         # special remotes rather than particular annex commands. So, likely there's nothing callers could do about it
         # other than spitting it out.
 
-        to_remove = []
+        return_objects = []
         for obj in json_objects:
             if len(obj.keys()) == 1 and obj['info']:
                 lgr.info(obj['info'])
-                to_remove.append(obj)
+            else:
+                return_objects.append(obj)
 
-        for obj in to_remove:
-            json_objects.remove(obj)
-
-        return json_objects
+        return return_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
