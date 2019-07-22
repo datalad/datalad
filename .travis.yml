@@ -201,6 +201,10 @@ matrix:
     - NOSE_SELECTION_OP=not
     - NOSE_SELECTION=
 
+  # Run benchmark comparison against current master
+  - python: 3.6
+    env: _DL_BENCHMARK=1
+
 # Requires current master (0.12.x) so cannot be tested against 0.11.x
 #
 #  - python: 3.5
@@ -295,6 +299,7 @@ install:
   - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:
+  - if [ ! -z "${_DL_BENCHMARK:-}" ]; then tools/ci/benchmark-travis-pr.sh; exit $?; fi
   # Test installation system-wide
   - sudo pip install .
   - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
