@@ -66,6 +66,7 @@ from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import eq_
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
@@ -967,6 +968,7 @@ def test_AnnexRepo_get(src, dst):
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
+@known_failure_direct_mode  #FIXME https://github.com/datalad/datalad/pull/3542#issuecomment-513791662
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
 def test_v7_detached_get(opath, path):
