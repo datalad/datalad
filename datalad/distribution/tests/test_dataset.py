@@ -117,9 +117,8 @@ def test_is_installed(src, path):
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, status='error', path=subds.path,
-        message=(
-            'collision with content in parent dataset at %s: %s',
-            ds.path, [subds.path]))
+        message=('collision with %s (dataset) in dataset %s',
+                 subds.path, ds.path))
     # get the submodule
     # This would init so there is a .git file with symlink info, which is
     # as we agreed is more pain than gain, so let's use our install which would

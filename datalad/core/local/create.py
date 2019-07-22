@@ -247,9 +247,9 @@ class Create(Interface):
                 untracked='no',
                 # limit query to target path for a potentially massive speed-up
                 paths=[check_path.relative_to(parentds_path)])
-            if any(
-                    check_path == p or check_path in p.parents
-                    for p in pstatus):
+            if (not pstatus.get(check_path, {}).get("type") == "dataset" and
+                any(check_path == p or check_path in p.parents
+                    for p in pstatus)):
                 # redo the check in a slower fashion, it is already broken
                 # let's take our time for a proper error message
                 conflict = [

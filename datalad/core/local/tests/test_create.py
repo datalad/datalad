@@ -88,9 +88,9 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(obscure_ds, **raw),
         status='error',
-        message=('collision with content in parent dataset at %s: %s',
-                 ds.path,
-                 [text_type(ds.pathobj / obscure_ds)]),
+        message=('collision with %s (dataset) in dataset %s',
+                 text_type(ds.pathobj / obscure_ds),
+                 ds.path)
     )
 
     # now deinstall the sub and fail trying to create a new one at the
@@ -101,9 +101,9 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(obscure_ds, **raw),
         status='error',
-        message=('collision with content in parent dataset at %s: %s',
-                 ds.path,
-                 [text_type(ds.pathobj / obscure_ds)]),
+        message=('collision with %s (dataset) in dataset %s',
+                 text_type(ds.pathobj / obscure_ds),
+                 ds.path)
     )
     assert_in_results(
         ds.create(op.join(obscure_ds, 'subsub'), **raw),
