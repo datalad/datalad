@@ -126,6 +126,26 @@ def test_create_raises(path, outside_path):
 
 
 @with_tempfile
+def test_create_force_subds(path):
+    ds = Dataset(path).create()
+    subds = ds.create("subds")
+    # We get an error when trying calling create in an existing subdataset
+    assert_in_results(
+        subds.create(force=False, **raw),
+        status="error")
+    # ... but we can force it
+    assert_in_results(
+        subds.create(force=True, **raw),
+        status="ok")
+    # ... even if it is uninstalled.
+    subds.uninstall()
+    ok_(not subds.is_installed())
+    assert_in_results(
+        subds.create(force=True, **raw),
+        status="ok")
+
+
+@with_tempfile
 @with_tempfile
 def test_create_curdir(path, path2):
     with chpwd(path, mkdir=True):
