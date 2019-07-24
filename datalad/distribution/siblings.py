@@ -136,10 +136,10 @@ class Siblings(Interface):
         name=Parameter(
             args=('-s', '--name',),
             metavar='NAME',
-            doc="""name of the sibling. For sibling removal this option is
-            mandatory, otherwise the hostname part of a given URL is used as a
-            default. This option can be used to limit 'query' to a specific
-            sibling.""",
+            doc="""name of the sibling. For addition with path "URLs" and
+            sibling removal this option is mandatory, otherwise the hostname
+            part of a given URL is used as a default. This option can be used
+            to limit 'query' to a specific sibling.""",
             constraints=EnsureStr() | EnsureNone()),
         action=Parameter(
             args=('action',),
@@ -343,7 +343,12 @@ def _add_remote(
     if not name:
         urlri = RI(url)
         # use the hostname as default remote name
-        name = urlri.hostname
+        try:
+            name = urlri.hostname
+        except AttributeError:
+            raise InsufficientArgumentsError(
+                "cannot derive a default remote name from '{}', "
+                "please specify a name.".format(url))
         lgr.debug(
             "No sibling name given, use URL hostname '%s' as sibling name",
             name)
