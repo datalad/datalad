@@ -88,9 +88,9 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(obscure_ds, **raw),
         status='error',
-        message=('collision with content in parent dataset at %s: %s',
-                 ds.path,
-                 [text_type(ds.pathobj / obscure_ds)]),
+        message=('collision with %s (dataset) in dataset %s',
+                 text_type(ds.pathobj / obscure_ds),
+                 ds.path)
     )
 
     # now deinstall the sub and fail trying to create a new one at the
@@ -101,9 +101,9 @@ def test_create_raises(path, outside_path):
     assert_in_results(
         ds.create(obscure_ds, **raw),
         status='error',
-        message=('collision with content in parent dataset at %s: %s',
-                 ds.path,
-                 [text_type(ds.pathobj / obscure_ds)]),
+        message=('collision with %s (dataset) in dataset %s',
+                 text_type(ds.pathobj / obscure_ds),
+                 ds.path)
     )
     assert_in_results(
         ds.create(op.join(obscure_ds, 'subsub'), **raw),
@@ -123,6 +123,26 @@ def test_create_raises(path, outside_path):
                  ds.path,
                  [text_type(ds.pathobj / 'down' / 'someotherfile.tst')]),
     )
+
+
+@with_tempfile
+def test_create_force_subds(path):
+    ds = Dataset(path).create()
+    subds = ds.create("subds")
+    # We get an error when trying calling create in an existing subdataset
+    assert_in_results(
+        subds.create(force=False, **raw),
+        status="error")
+    # ... but we can force it
+    assert_in_results(
+        subds.create(force=True, **raw),
+        status="ok")
+    # ... even if it is uninstalled.
+    subds.uninstall()
+    ok_(not subds.is_installed())
+    assert_in_results(
+        subds.create(force=True, **raw),
+        status="ok")
 
 
 @with_tempfile

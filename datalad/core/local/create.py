@@ -247,9 +247,9 @@ class Create(Interface):
                 untracked='no',
                 # limit query to target path for a potentially massive speed-up
                 paths=[check_path.relative_to(parentds_path)])
-            if any(
-                    check_path == p or check_path in p.parents
-                    for p in pstatus):
+            if (not pstatus.get(check_path, {}).get("type") == "dataset" and
+                any(check_path == p or check_path in p.parents
+                    for p in pstatus)):
                 # redo the check in a slower fashion, it is already broken
                 # let's take our time for a proper error message
                 conflict = [
@@ -263,24 +263,25 @@ class Create(Interface):
                         [text_type(c) for c in conflict])})
                 yield res
                 return
-            # another set of check to see whether the target path is pointing
-            # into a known subdataset that is not around ATM
-            subds_status = {
-                parentds_path / k.relative_to(prepo.path)
-                for k, v in iteritems(pstatus)
-                if v.get('type', None) == 'dataset'}
-            check_paths = [check_path]
-            check_paths.extend(check_path.parents)
-            if any(p in subds_status for p in check_paths):
-                conflict = [p for p in check_paths if p in subds_status]
-                res.update({
-                    'status': 'error',
-                    'message': (
-                        'collision with %s (dataset) in dataset %s',
-                        text_type(conflict[0]),
-                        text_type(parentds_path))})
-                yield res
-                return
+            if not force:
+                # another set of check to see whether the target path is pointing
+                # into a known subdataset that is not around ATM
+                subds_status = {
+                    parentds_path / k.relative_to(prepo.path)
+                    for k, v in iteritems(pstatus)
+                    if v.get('type', None) == 'dataset'}
+                check_paths = [check_path]
+                check_paths.extend(check_path.parents)
+                if any(p in subds_status for p in check_paths):
+                    conflict = [p for p in check_paths if p in subds_status]
+                    res.update({
+                        'status': 'error',
+                        'message': (
+                            'collision with %s (dataset) in dataset %s',
+                            text_type(conflict[0]),
+                            text_type(parentds_path))})
+                    yield res
+                    return
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
