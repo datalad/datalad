@@ -2169,7 +2169,24 @@ class AnnexRepo(GitRepo, RepoInterface):
                         "Received no json output for --json command, only:\n{}"
                         .format("  ".join(others)))
                 raise exc
-        return json_objects
+
+        # A special remote might send a message via "info". This is supposed to be printed by annex but in case of
+        # `--json` is returned by annex as "{'info': '<message>'}".
+        # See https://git-annex.branchable.com/design/external_special_remote_protocol/#index5h2
+        #
+        # So, Ben thinks we should just spit it out here, since everything calling _run_annex_command_json
+        # is concerned with the actual results being returned. More over, this kind of response is special to particular
+        # special remotes rather than particular annex commands. So, likely there's nothing callers could do about it
+        # other than spitting it out.
+
+        return_objects = []
+        for obj in json_objects:
+            if len(obj.keys()) == 1 and obj['info']:
+                lgr.info(obj['info'])
+            else:
+                return_objects.append(obj)
+
+        return return_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
