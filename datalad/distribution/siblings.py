@@ -14,8 +14,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 import os
-from os.path import basename
-from os.path import relpath
+import os.path as op
 
 from six.moves.urllib.parse import urlparse
 
@@ -24,41 +23,55 @@ from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureChoice
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureBool
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureChoice,
+    EnsureNone,
+    EnsureBool,
+)
 from datalad.support.param import Parameter
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import AccessDeniedError
-from datalad.support.exceptions import AccessFailedError
-from datalad.support.exceptions import RemoteNotAvailableError
-from datalad.support.exceptions import DownloadError
-from datalad.support.network import RI
-from datalad.support.network import URL
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+    AccessDeniedError,
+    AccessFailedError,
+    RemoteNotAvailableError,
+    DownloadError,
+)
+from datalad.support.network import (
+    RI,
+    URL,
+)
 from datalad.support.gitrepo import GitRepo
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
-from datalad.interface.common_opts import as_common_datasrc
-from datalad.interface.common_opts import publish_depends
-from datalad.interface.common_opts import publish_by_default
-from datalad.interface.common_opts import annex_wanted_opt
-from datalad.interface.common_opts import annex_required_opt
-from datalad.interface.common_opts import annex_group_opt
-from datalad.interface.common_opts import annex_groupwanted_opt
-from datalad.interface.common_opts import inherit_opt
-from datalad.interface.common_opts import location_description
+from datalad.interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+    as_common_datasrc,
+    publish_depends,
+    publish_by_default,
+    annex_wanted_opt,
+    annex_required_opt,
+    annex_group_opt,
+    annex_groupwanted_opt,
+    inherit_opt,
+    location_description,
+)
 from datalad.downloaders.credentials import UserPassword
-from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import Dataset
+from datalad.distribution.dataset import (
+    require_dataset,
+    Dataset,
+)
 from datalad.distribution.update import Update
-from datalad.utils import assure_list
-from datalad.utils import slash_join
+from datalad.utils import (
+    assure_list,
+    slash_join,
+)
 from datalad.dochelpers import exc_str
 
-from .dataset import EnsureDataset
-from .dataset import datasetmethod
+from .dataset import (
+    EnsureDataset,
+    datasetmethod,
+)
 
 lgr = logging.getLogger('datalad.distribution.siblings')
 
@@ -228,7 +241,7 @@ class Siblings(Interface):
 
         res_kwargs = dict(refds=refds_path, logger=lgr)
 
-        ds_name = basename(dataset.path)
+        ds_name = op.basename(dataset.path)
 
         # do not form single list of datasets (with recursion results) to
         # give fastest possible response, for the precise of a long-all
@@ -258,7 +271,7 @@ class Siblings(Interface):
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
                 result_xfm='datasets'):
-            subds_name = relpath(subds.path, start=dataset.path)
+            subds_name = op.relpath(subds.path, start=dataset.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
                 subds_pushurl = slash_join(pushurl, subds_name)
@@ -287,7 +300,7 @@ class Siblings(Interface):
         if res['status'] != 'ok' or not res.get('action', '').endswith('-sibling') :
             # logging complained about this already
             return
-        path = relpath(res['path'],
+        path = op.relpath(res['path'],
                        res['refds']) if res.get('refds', None) else res['path']
         got_url = 'url' in res
         spec = '{}{}{}{}'.format(
