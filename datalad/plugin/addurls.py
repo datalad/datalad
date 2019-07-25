@@ -373,6 +373,24 @@ def add_extra_filename_values(filename_format, rows, urls, dry_run):
                          "Finished requesting file names")
 
 
+def sort_paths(paths):
+    """Sort `paths` by directory level and then alphabetically.
+
+    Parameters
+    ----------
+    paths : iterable of str
+
+    Returns
+    -------
+    Generator of sorted paths.
+    """
+    def level_and_name(p):
+        return p.count(os.path.sep), p
+
+    for path in sorted(paths, key=level_and_name):
+        yield path
+
+
 def extract(stream, input_type, url_format="{0}", filename_format="{1}",
             exclude_autometa=None, meta=None,
             dry_run=False, missing_value=None):
@@ -440,7 +458,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
         RepFormatter(colidx_to_name, missing_value).format,
         filename_format)
     subpaths = _format_filenames(format_filename, rows_with_url, infos)
-    return infos, subpaths
+    return infos, list(sort_paths(subpaths))
 
 
 @with_result_progress("Adding URLs")
