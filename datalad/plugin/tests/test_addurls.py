@@ -126,6 +126,11 @@ def test_get_subpaths():
             (op.join("p1//p2", "p3//n"),
              (op.join("p1", "p2", "p3", "n"),
               ["p1", op.join("p1", "p2", "p3")])),
+            (op.join("p1//p2", "p3//p4", "p5//", "n"),
+             (op.join("p1", "p2", "p3", "p4", "p5", "n"),
+              ["p1",
+               op.join("p1", "p2", "p3"),
+               op.join("p1", "p2", "p3", "p4", "p5")])),
             ("//n", (op.sep + "n", [""])),
             ("n//", ("n" + op.sep, ["n"]))]:
         eq_(au.get_subpaths(fname), expect)

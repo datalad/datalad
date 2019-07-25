@@ -176,7 +176,7 @@ def get_subpaths(filename):
 
     spaths = []
     for part in filename.split("//")[:-1]:
-        path = os.path.join(*(spaths + [part]))
+        path = os.path.join(spaths[-1], part) if spaths else part
         spaths.append(path)
     return filename.replace("//", os.path.sep), spaths
 
