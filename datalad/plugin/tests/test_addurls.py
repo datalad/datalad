@@ -415,8 +415,9 @@ class TestAddurls(object):
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
         dspath = os.path.join(path, "ds")
-        addurls(dspath, self.json_file, "{url}", "{name}")
-        for fname in ["a", "b", "c"]:
+        addurls(dspath, self.json_file, "{url}", "{name}",
+                cfg_proc=["yoda"])
+        for fname in ["a", "b", "c", "code"]:
             ok_exists(os.path.join(dspath, fname))
 
     @with_tempfile(mkdir=True)
@@ -428,7 +429,8 @@ class TestAddurls(object):
                 label = "save" if save else "nosave"
                 ds.addurls(self.json_file, "{url}",
                            "{subdir}-" + label + "//{name}",
-                           save=save)
+                           save=save,
+                           cfg_proc=["yoda"])
 
                 subdirs = ["{}-{}".format(d, label) for d in ["foo", "bar"]]
                 subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
@@ -436,7 +438,8 @@ class TestAddurls(object):
                 for subds, fnames in subdir_files.items():
                     for fname in fnames:
                         ok_exists(op.join(subds, fname))
-
+                # cfg_proc was applied generated subdatasets.
+                ok_exists(op.join(subds, "code"))
                 if save:
                     assert_repo_status(path)
                 else:

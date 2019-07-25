@@ -692,6 +692,12 @@ class Addurls(Interface):
             action="store_true",
             doc="""Try to add a version ID to the URL. This currently only has
             an effect on URLs for AWS S3 buckets."""),
+        cfg_proc=Parameter(
+            args=("-c", "--cfg-proc"),
+            metavar="PROC",
+            action='append',
+            doc="""Pass this [PY: cfg_proc PY][CMD: --cfg_proc CMD] value when
+            calling `create` to make datasets."""),
     )
 
     @staticmethod
@@ -700,7 +706,8 @@ class Addurls(Interface):
     def __call__(dataset, urlfile, urlformat, filenameformat,
                  input_type="ext", exclude_autometa=None, meta=None,
                  message=None, dry_run=False, fast=False, ifexists=None,
-                 missing_value=None, save=True, version_urls=False):
+                 missing_value=None, save=True, version_urls=False,
+                 cfg_proc=None):
         # Temporarily work around gh-2269.
         url_file = urlfile
         url_format, filename_format = urlformat, filenameformat
@@ -766,7 +773,8 @@ class Addurls(Interface):
         if not dataset.repo:
             # Populate a new dataset with the URLs.
             for r in dataset.create(result_xfm=None,
-                                    return_type='generator'):
+                                    return_type='generator',
+                                    cfg_proc=cfg_proc):
                 yield r
 
         annex_options = ["--fast"] if fast else []
@@ -778,6 +786,7 @@ class Addurls(Interface):
                     spath)
             else:
                 for r in dataset.create(spath, result_xfm=None,
+                                        cfg_proc=cfg_proc,
                                         return_type='generator'):
                     yield r
 
