@@ -12,6 +12,7 @@
 import json
 import logging
 import os
+import os.path as op
 import tempfile
 
 from mock import patch
@@ -117,12 +118,16 @@ def test_clean_meta_args():
 
 
 def test_get_subpaths():
-    for fname, expect in [("no/dbl/slash", ("no/dbl/slash", [])),
-                          ("p1//n", ("p1/n", ["p1"])),
-                          ("p1//p2/p3//n", ("p1/p2/p3/n",
-                                            ["p1", "p1/p2/p3"])),
-                          ("//n", ("/n", [""])),
-                          ("n//", ("n/", ["n"]))]:
+    for fname, expect in [
+            (op.join("no", "dbl", "slash"),
+             (op.join("no", "dbl", "slash"), [])),
+            ("p1//n",
+             (op.join("p1", "n"), ["p1"])),
+            (op.join("p1//p2", "p3//n"),
+             (op.join("p1", "p2", "p3", "n"),
+              ["p1", op.join("p1", "p2", "p3")])),
+            ("//n", (op.sep + "n", [""])),
+            ("n//", ("n" + op.sep, ["n"]))]:
         eq_(au.get_subpaths(fname), expect)
 
 
