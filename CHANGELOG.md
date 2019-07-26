@@ -37,7 +37,7 @@ bet we will fix some bugs and make a world even a better place.
   reliable, breadth-first order.  ([#3561][])
 
 - Cloning a `type=git` special remote showed a spurious warning about
-  the remote not being enabled.  (#3547)
+  the remote not being enabled.  ([#3547][])
 
 ### Enhancements and new features
 
@@ -1391,4 +1391,5 @@ publishing
 [#3516]: https://github.com/datalad/datalad/issues/3516
 [#3525]: https://github.com/datalad/datalad/issues/3525
 [#3527]: https://github.com/datalad/datalad/issues/3527
+[#3547]: https://github.com/datalad/datalad/issues/3547
 [#3561]: https://github.com/datalad/datalad/issues/3561
