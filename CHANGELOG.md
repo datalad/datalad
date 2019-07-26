@@ -36,6 +36,9 @@ bet we will fix some bugs and make a world even a better place.
   more than two levels deep and failed to create datasets in a
   reliable, breadth-first order.  ([#3561][])
 
+- Cloning a `type=git` special remote showed a spurious warning about
+  the remote not being enabled.  (#3547)
+
 ### Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
