@@ -19,13 +19,14 @@ import posixpath
 
 from six.moves.urllib.parse import unquote as urlunquote
 
+from ..dochelpers import single_or_plural
 from datalad.support.annexrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
 from datalad.support.network import PathRI
-from datalad.utils import knows_annex
+from datalad.utils import knows_annex, assure_bool
 
 
 lgr = logging.getLogger('datalad.distribution.utils')
@@ -152,30 +153,57 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
         repo._init(description=description)
     if reckless:
         repo._run_annex_command('untrust', annex_options=['here'])
-    # go through list of special remotes and issue info message that
-    # some additional ones are present and were not auto-enabled
-    remote_names = repo.get_remotes(
-        with_urls_only=False,
-        exclude_special_remotes=False)
+
+    srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
+
     for uuid, config in repo.get_special_remotes().items():
         sr_name = config.get('name', None)
-        sr_type = config.get('type', None)
-        if sr_type == 'git':
-            # determine either there is a registered remote with matching UUID
+        sr_autoenable = config.get('autoenable', False)
+        try:
+            sr_autoenable = assure_bool(sr_autoenable)
+        except ValueError:
+            # Be resilient against misconfiguration.  Here it is only about
+            # informing the user, so no harm would be done
+            lgr.warning(
+                'Failed to process "autoenable" value %r for sibling %s in '
+                'dataset %s as bool.  You might need to enable it later '
+                'manually and/or fix it up to avoid this message in the future.',
+                sr_autoenable, sr_name, dataset.path)
+            continue
+
+        # determine either there is a registered remote with matching UUID
+        if uuid:
             if remote_uuids is None:
                 remote_uuids = {
                     repo.config.get('remote.%s.annex-uuid' % r)
-                    for r in remote_names
+                    for r in repo.get_remotes()
                 }
-        if (sr_type != 'git' and sr_name and sr_name not in remote_names) or \
-            (sr_type == 'git' and uuid and uuid not in remote_uuids):
-            # if it is not listed among the remotes, it wasn't enabled
-            lgr.info(
-                'access to dataset sibling "%s" not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
-                sr_name,
-                dataset.path,
-                sr_name)
+            if uuid not in remote_uuids:
+                srs[sr_autoenable].append(sr_name)
+
+    if srs[True]:
+        lgr.debug(
+            "configuration for %s %s added because of autoenable,"
+            " but no UUIDs for them yet known for dataset %s",
+            # since we are only at debug level, we could call things their
+            # proper names
+            single_or_plural("special remote", "special remotes", len(srs[True]), True),
+            ", ".join(srs[True]),
+            dataset.path
+        )
+
+    if srs[False]:
+        # if has no auto-enable special remotes
+        lgr.info(
+            'access to %s %s not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
+            # but since humans might read it, we better confuse them with our
+            # own terms!
+            single_or_plural("dataset sibling", "dataset siblings", len(srs[False]), True),
+            ", ".join(srs[False]),
+            dataset.path,
+            srs[False][0] if len(srs[False]) == 1 else "SIBLING",
+        )
 
 
 def _get_installationpath_from_url(url):
