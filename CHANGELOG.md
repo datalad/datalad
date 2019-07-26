@@ -628,7 +628,7 @@ A number of fixes did not make it into the 0.9.x series:
      of metadata that can be represented in a tabular structure (substantial
      indexing cost, enables the most detailed queries of all modes)
 - New extensions:
-  - addurls, an extension for creating a dataset (and possibly subdatasets)
+  - [addurls][], an extension for creating a dataset (and possibly subdatasets)
     from a list of URLs.
   - export_to_figshare
   - extract_metadata
@@ -1189,6 +1189,7 @@ publishing
 [add-archive-content]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-add-archive-content.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
 [add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
+[addurls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
