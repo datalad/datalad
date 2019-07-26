@@ -16,6 +16,7 @@ from datalad.tests.utils import (
     slow
 )
 
+import logging
 import os
 from os.path import join as opj
 from os.path import isdir
@@ -54,6 +55,7 @@ from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
+from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import skip_if
@@ -358,3 +360,15 @@ def test_clone_report_permission_issue(tdir):
             message="could not create work tree dir '%s/%s': Permission denied"
                     % (pdir, get_datasets_topdir())
         )
+
+
+@skip_if_no_network
+@with_tempfile
+def test_autoenabled_remote_msg(path):
+    # Verify that no message about a remote not been enabled is displayed
+    # whenever the remote we clone is the  type=git special remote, so the name
+    # of the remote might not match
+    with swallow_logs(new_level=logging.INFO) as cml:
+        res = clone('///repronim/containers', path)
+        assert_status('ok', res)
+        assert_not_in("not auto-enabled", cml.out)
