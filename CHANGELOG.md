@@ -32,6 +32,10 @@ bet we will fix some bugs and make a world even a better place.
   `AnnexRepo` no longer fails if the names it needs are no longer
   bound.  ([#3527][])
 
+- [addurls][] botched the construction of subdataset paths that were
+  more than two levels deep and failed to create datasets in a
+  reliable, breadth-first order.  ([#3561][])
+
 ### Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
@@ -1384,3 +1388,4 @@ publishing
 [#3516]: https://github.com/datalad/datalad/issues/3516
 [#3525]: https://github.com/datalad/datalad/issues/3525
 [#3527]: https://github.com/datalad/datalad/issues/3527
+[#3561]: https://github.com/datalad/datalad/issues/3561
