@@ -28,6 +28,10 @@ bet we will fix some bugs and make a world even a better place.
 - We now provide information about unexpected output when git-annex is
   called with `--json`.  ([#3516][])
 
+- Exception logging in the `__del__` method of `GitRepo` and
+  `AnnexRepo` no longer fails if the names it needs are no longer
+  bound.  ([#3527][])
+
 ### Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
@@ -41,6 +45,8 @@ bet we will fix some bugs and make a world even a better place.
   to [run][[]].  This makes it possible to call `rerun` in a dirty
   working tree ([#3498][]).
 
+- The [metadata][] command aborts earlier if a metadata extractor is
+  unavailable.  ([#3525][])
 
 ## 0.11.5 (May 23, 2019) -- stability is not overrated
 
@@ -1375,3 +1381,5 @@ publishing
 [#3498]: https://github.com/datalad/datalad/issues/3498
 [#3499]: https://github.com/datalad/datalad/issues/3499
 [#3516]: https://github.com/datalad/datalad/issues/3516
+[#3525]: https://github.com/datalad/datalad/issues/3525
+[#3527]: https://github.com/datalad/datalad/issues/3527
