@@ -66,6 +66,7 @@ from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import eq_
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
@@ -965,6 +966,25 @@ def test_AnnexRepo_get(src, dst):
         annex.get(testfile, jobs=5)
     eq_(called, ['find', 'get'])
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
+
+
+@known_failure_direct_mode  #FIXME https://github.com/datalad/datalad/pull/3542#issuecomment-513791662
+@with_tree(tree={'file.dat': 'content'})
+@with_tempfile
+def test_v7_detached_get(opath, path):
+    # http://git-annex.branchable.com/bugs/get_fails_to_place_v7_unlocked_file_content_into_the_file_tree_in_v7_in_repo_with_detached_HEAD/
+    origin = AnnexRepo(opath, create=True, version=7)
+    GitRepo.add(origin, 'file.dat')  # force direct `git add` invocation
+    origin.commit('added')
+
+    AnnexRepo.clone(opath, path)
+    repo = AnnexRepo(path)
+    # test getting in a detached HEAD
+    repo.checkout('HEAD^{}')
+    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+
+    repo.get('file.dat')
+    ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
 
 
 # TODO:
