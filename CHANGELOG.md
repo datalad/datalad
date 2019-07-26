@@ -58,6 +58,12 @@ bet we will fix some bugs and make a world even a better place.
 - [save][] ignored `--on-failure` in its underlying call to
   [status][].  ([#3470][])
 
+- Our processing of `git-annex --json` output mishandled info messages
+  from special remotes.  ([#3546][])
+
+- As of 0.12.0rc3, calling [create][] with `--force` didn't bypass the
+  "existing subdataset" check.  ([#3552][])
+
 ### Enhancements and new features
 
 - New command `create-sibling-gitlab` provides an interface for
@@ -91,6 +97,8 @@ bet we will fix some bugs and make a world even a better place.
   repository rather than as a directory.  Our documentation and tests
   have been updated appropriately.  ([#3476][])
 
+- [addurls][] learned to accept a `--cfg-proc` value and pass it to
+  its `create` calls.  ([#3562][])
 
 ## 0.12.0rc4 (May 15, 2019) -- the revolution is over
 
@@ -1687,5 +1695,8 @@ publishing
 [#3527]: https://github.com/datalad/datalad/issues/3527
 [#3531]: https://github.com/datalad/datalad/issues/3531
 [#3534]: https://github.com/datalad/datalad/issues/3534
+[#3546]: https://github.com/datalad/datalad/issues/3546
 [#3547]: https://github.com/datalad/datalad/issues/3547
+[#3552]: https://github.com/datalad/datalad/issues/3552
 [#3561]: https://github.com/datalad/datalad/issues/3561
+[#3562]: https://github.com/datalad/datalad/issues/3562
