@@ -204,28 +204,28 @@ def alter_interface_docs_for_api(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| CMDLINE \>\>.*?\<\< CMDLINE \|\|',
+        r'\|\| CMDLINE \>\>.*?\<\< CMDLINE \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        '\[CMD:\s[^\[\]]*\sCMD\]',
+        r'\[CMD:\s[^\[\]]*\sCMD\]',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        '\[PY:\s([^\[\]]*)\sPY\]',
+        r'\[PY:\s([^\[\]]*)\sPY\]',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
+        r'\|\| PYTHON \>\>(.*?)\<\< PYTHON \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -241,23 +241,23 @@ def alter_interface_docs_for_cmdline(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| PYTHON \>\>.*?\<\< PYTHON \|\|',
+        r'\|\| PYTHON \>\>.*?\<\< PYTHON \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        '\[PY:\s[^\[\]]*\sPY\]',
+        r'\[PY:\s[^\[\]]*\sPY\]',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     docs = re.sub(
-        '\[CMD:\s([^\[\]]*)\sCMD\]',
+        r'\[CMD:\s([^\[\]]*)\sCMD\]',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
+        r'\|\| CMDLINE \>\>(.*?)\<\< CMDLINE \|\|',
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
@@ -271,19 +271,19 @@ def alter_interface_docs_for_cmdline(docs):
     # give option at all, but specifying `None` explicitly is practically
     # impossible
     docs = re.sub(
-        ',\sor\svalue\smust\sbe\s`None`',
+        r',\sor\svalue\smust\sbe\s`None`',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # capitalize variables and remove backticks to uniformize with
     # argparse output
     docs = re.sub(
-        '`\S*`',
+        r'`\S*`',
         lambda match: match.group(0).strip('`').upper(),
         docs)
     # clean up sphinx API refs
     docs = re.sub(
-        '\~datalad\.api\.\S*',
+        r'\~datalad\.api\.\S*',
         lambda match: "`{0}`".format(match.group(0)[13:]),
         docs)
     # Remove RST paragraph markup
@@ -293,7 +293,7 @@ def alter_interface_docs_for_cmdline(docs):
         docs,
         flags=re.MULTILINE)
     docs = re.sub(
-        '\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
+        r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)

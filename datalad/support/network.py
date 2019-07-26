@@ -342,7 +342,13 @@ def _guess_ri_cls(ri):
 
     if not fields['scheme'] and not fields['hostname']:
         parts = _split_colon(ri)
-        if fields['path'] and '@' in fields['path'] or len(parts) > 1:
+        # if no illegal for username@hostname characters in the first part and
+        # we either had username@hostname or multiple :-separated parts
+        if not set(parts[0]).intersection(set('/\\#')) and (
+                fields['path'] and
+                '@' in fields['path'] or
+                len(parts) > 1
+        ):
             # user@host:path/sp1
             # or host_name: (hence parts check)
             # TODO: we need a regex to catch those really, parts check is not suff
@@ -626,7 +632,7 @@ class URL(RI):
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
         if is_ipv6:
-            rem = re.match('\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
+            rem = re.match(r'\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
             if rem:
                 hostname, port = rem.groups()
                 port = int(port)
@@ -749,7 +755,7 @@ class SSHRI(RI, RegexBasedURLMixin):
         'port',
     )
 
-    _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$')
+    _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^#/\\:]+)(\:(?P<path>.*))?$')
 
     @classmethod
     def _normalize_fields(cls, fields):

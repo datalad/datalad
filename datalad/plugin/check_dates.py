@@ -65,8 +65,6 @@ class CheckDates(Interface):
     timestamps within files of the "git-annex" branch, and (3) the timestamps
     of annotated tags.
     """
-    from datalad.distribution.dataset import EnsureDataset
-    from datalad.distribution.dataset import datasetmethod
     from datalad.interface.utils import eval_results
     import datalad.support.ansi_colors as ac
     from datalad.support.constraints import EnsureChoice, EnsureNone, EnsureStr

@@ -1,0 +1,367 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA52TX2/aMBTFvwrLMxASoAqRpnUqk/YwNiZ11dYXdOOYxKtjR7YTxFC/e48TVhUm
+        TYInHPue3z3cP4dA6kKoIA32ZMSTrp1gwTAQeZBOF0myGAZK53zjv4PV8vvNw8+vkv1ezb8tizni
+        qCVHZtMYiffSudqmYdhf2um4EK5sssZyw7RyXLkx01XYhB35Q/t+BkJhjowuBS7OWLU4YnotWDY8
+        sVq6Sp4Z6PN2gpPQrZZS70A4N/z/JOGrDvb6s1DFVQzoDqF2JUfN8FeefQGEdZca6jSH0P+gNZ5i
+        0QbD8wtNHVWwtFNwcwgNr3WHazLLjMA0aHWpuRMtWNoUpMQfuoYFrQXC27rURqeBlrcYvEvFvegQ
+        1ka0xPa+JIYzLlqU+CrgmRo8t685Jv4HxsAXXDi+obzyq7glaTkWjyof8IuMtpLawWeSrOTqSSMc
+        o12T2uN5ScZVunHl4A7TzQs+HNwueSZI+QO28wvlOK33q4f1Rxy2JGSckQIkw+qDsNvtxhrtb6yF
+        ym8N3qRmXcPwvpakuBt8QqLS17MCAdd5l+T2H2UpDKdMwrpqpEQWoRF9V3Ls3Tvo6yaTgm369qTx
+        Yv561U11kMbJ3y2DAp9R/GbrghSvDBkcOkEO5HgySUZRPIqi+yhJ51E6TR6RpqnztzHRYjSZjSbJ
+        fTRL45s0mjwGzy/u9Bc1/AQAAA==
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:20 GMT']
+      etag: [W/"124a82f895a9c516ff34c113ec540eae"]
+      last-modified: ['Mon, 08 Apr 2019 14:26:10 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['AA5E:50A4:19BE69:37C74B:5CBE3E9C']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4969']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/yarikoptic/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAAw3JMQ6AIAwAwK+Yuho6uPEAR79gEBogAUqgsBj/rrfeA5l6N55Aw8myHDyKgw0c
+        25GpiJHI5Rot/R9EateIjiYlrtSUjxLGrSxnnDs2qtxx9STwfutuZdhYAAAA
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:20 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [404 Not Found]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['AA5E:50A4:19BE6D:37C755:5CBE3E9C']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4968']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 404, message: Not Found}
+- request:
+    body: !!python/unicode '{"has_issues": false, "auto_init": false, "has_wiki":
+      false, "name": "test_integration1", "has_downloads": false}'
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      Content-Length: ['113']
+      Content-Type: [application/json]
+      User-Agent: [PyGithub/Python]
+    method: POST
+    uri: https://api.github.com/user/repos
+  response:
+    body: {string: !!python/unicode '{"id":182876873,"node_id":"MDEwOlJlcG9zaXRvcnkxODI4NzY4NzM=","name":"test_integration1","full_name":"yarikoptic/test_integration1","private":false,"owner":{"login":"yarikoptic","id":39889,"node_id":"MDQ6VXNlcjM5ODg5","avatar_url":"https://avatars3.githubusercontent.com/u/39889?v=4","gravatar_id":"","url":"https://api.github.com/users/yarikoptic","html_url":"https://github.com/yarikoptic","followers_url":"https://api.github.com/users/yarikoptic/followers","following_url":"https://api.github.com/users/yarikoptic/following{/other_user}","gists_url":"https://api.github.com/users/yarikoptic/gists{/gist_id}","starred_url":"https://api.github.com/users/yarikoptic/starred{/owner}{/repo}","subscriptions_url":"https://api.github.com/users/yarikoptic/subscriptions","organizations_url":"https://api.github.com/users/yarikoptic/orgs","repos_url":"https://api.github.com/users/yarikoptic/repos","events_url":"https://api.github.com/users/yarikoptic/events{/privacy}","received_events_url":"https://api.github.com/users/yarikoptic/received_events","type":"User","site_admin":false},"html_url":"https://github.com/yarikoptic/test_integration1","description":null,"fork":false,"url":"https://api.github.com/repos/yarikoptic/test_integration1","forks_url":"https://api.github.com/repos/yarikoptic/test_integration1/forks","keys_url":"https://api.github.com/repos/yarikoptic/test_integration1/keys{/key_id}","collaborators_url":"https://api.github.com/repos/yarikoptic/test_integration1/collaborators{/collaborator}","teams_url":"https://api.github.com/repos/yarikoptic/test_integration1/teams","hooks_url":"https://api.github.com/repos/yarikoptic/test_integration1/hooks","issue_events_url":"https://api.github.com/repos/yarikoptic/test_integration1/issues/events{/number}","events_url":"https://api.github.com/repos/yarikoptic/test_integration1/events","assignees_url":"https://api.github.com/repos/yarikoptic/test_integration1/assignees{/user}","branches_url":"https://api.github.com/repos/yarikoptic/test_integration1/branches{/branch}","tags_url":"https://api.github.com/repos/yarikoptic/test_integration1/tags","blobs_url":"https://api.github.com/repos/yarikoptic/test_integration1/git/blobs{/sha}","git_tags_url":"https://api.github.com/repos/yarikoptic/test_integration1/git/tags{/sha}","git_refs_url":"https://api.github.com/repos/yarikoptic/test_integration1/git/refs{/sha}","trees_url":"https://api.github.com/repos/yarikoptic/test_integration1/git/trees{/sha}","statuses_url":"https://api.github.com/repos/yarikoptic/test_integration1/statuses/{sha}","languages_url":"https://api.github.com/repos/yarikoptic/test_integration1/languages","stargazers_url":"https://api.github.com/repos/yarikoptic/test_integration1/stargazers","contributors_url":"https://api.github.com/repos/yarikoptic/test_integration1/contributors","subscribers_url":"https://api.github.com/repos/yarikoptic/test_integration1/subscribers","subscription_url":"https://api.github.com/repos/yarikoptic/test_integration1/subscription","commits_url":"https://api.github.com/repos/yarikoptic/test_integration1/commits{/sha}","git_commits_url":"https://api.github.com/repos/yarikoptic/test_integration1/git/commits{/sha}","comments_url":"https://api.github.com/repos/yarikoptic/test_integration1/comments{/number}","issue_comment_url":"https://api.github.com/repos/yarikoptic/test_integration1/issues/comments{/number}","contents_url":"https://api.github.com/repos/yarikoptic/test_integration1/contents/{+path}","compare_url":"https://api.github.com/repos/yarikoptic/test_integration1/compare/{base}...{head}","merges_url":"https://api.github.com/repos/yarikoptic/test_integration1/merges","archive_url":"https://api.github.com/repos/yarikoptic/test_integration1/{archive_format}{/ref}","downloads_url":"https://api.github.com/repos/yarikoptic/test_integration1/downloads","issues_url":"https://api.github.com/repos/yarikoptic/test_integration1/issues{/number}","pulls_url":"https://api.github.com/repos/yarikoptic/test_integration1/pulls{/number}","milestones_url":"https://api.github.com/repos/yarikoptic/test_integration1/milestones{/number}","notifications_url":"https://api.github.com/repos/yarikoptic/test_integration1/notifications{?since,all,participating}","labels_url":"https://api.github.com/repos/yarikoptic/test_integration1/labels{/name}","releases_url":"https://api.github.com/repos/yarikoptic/test_integration1/releases{/id}","deployments_url":"https://api.github.com/repos/yarikoptic/test_integration1/deployments","created_at":"2019-04-22T22:22:20Z","updated_at":"2019-04-22T22:22:20Z","pushed_at":"2019-04-22T22:22:21Z","git_url":"git://github.com/yarikoptic/test_integration1.git","ssh_url":"git@github.com:yarikoptic/test_integration1.git","clone_url":"https://github.com/yarikoptic/test_integration1.git","svn_url":"https://github.com/yarikoptic/test_integration1","homepage":null,"size":0,"stargazers_count":0,"watchers_count":0,"language":null,"has_issues":false,"has_projects":true,"has_downloads":false,"has_wiki":false,"has_pages":false,"forks_count":0,"mirror_url":null,"archived":false,"disabled":false,"open_issues_count":0,"license":null,"forks":0,"open_issues":0,"watchers":0,"default_branch":"master","permissions":{"admin":true,"push":true,"pull":true},"allow_squash_merge":true,"allow_merge_commit":true,"allow_rebase_merge":true,"network_count":0,"subscribers_count":1}'}
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-length: ['5370']
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:21 GMT']
+      etag: ['"b9488ea91df827cbd915d22f146216b6"']
+      location: ['https://api.github.com/repos/yarikoptic/test_integration1']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [201 Created]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['public_repo, repo']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['AA5E:50A4:19BE72:37C760:5CBE3E9C']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4967']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 201, message: Created}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA52TXW/aMBSG/wrLNRASPhQiTetUJu1ibJ3UVVtv0IljEq+OHdlOEEP9732dsKow
+        aRJc4djnfc7L+TgEUhdCBWmwJyOedO0EC4aByIN0ukyS5TBQOucb/x2sV98XDz+/SvZ7Pf+2KuaI
+        o5YcmU1jJN5L52qbhmF/aafjQriyyRrLDdPKceXGTFdhE3bkD+37GQiFOTK6FLg4Y9XiiOm1YNnw
+        xGrpKnlmoM/bCU5Ct1pKvQPh3PD/k4SvOtjrz0IVVzGgO4TalRw1w1959gUQ1l1qqNMcQv+D1niK
+        RRsMzy80dVTB0k7BzSE0vNYdrsksMwLToNWl5k60YGlTkBJ/6BoWtBYIb+tSG50GWt5i8C4V96JD
+        WBvREtv7khjOuGhR4quAZ2rw3L7mmPgfGANfcOH4hvLKr+KWpOVYPKp8wC8y2kpqB59JspKrJ41w
+        jHZNao/nFRlX6caVg1tMNy/4cHCz4pkg5Q/Yzi+U43S3Xz/cfcRhS0LGGSlAMqw+CLvdbqzR/sZa
+        qPzW4E1q1jUM73eSFHeDT0hU+npWIOA675Lc/KMsheGUSVhXjZTIIjSib0uOvXsHfd1kUrBN3540
+        Xi5er7qpDtI4+btlUOAzit9sXZDilSGDQyfIgRxPJskoikdRdB8l6TxKp8kj0jR1/jYmWo4ms9Ek
+        uY9mabxIo8lj8PwCLTqSUfwEAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:22 GMT']
+      etag: [W/"a8fa37524fee015da76c68778eb7f335"]
+      last-modified: ['Mon, 08 Apr 2019 14:26:10 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['C116:0A12:FEB71:279699:5CBE3E9E']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4966']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/yarikoptic/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA62YbW/bNhDHv4vfLg0TJ20TA0X3IsOwAWmxYRu6vTFoiZbYSKRGUvYSId99/yP1
+        6GWxXAnIg03xfjye7si7qxYyXqwub5Y379/dvL86WygdizWNLe7vfth/zn7Ooh9vn/iXX3eRevjn
+        891P15+e/sTv/YcFJvNcYKYT1q2lciIx3EmtLvFoW2bZun7+yI180IWTEXtpamHkjjuAtjyz4myh
+        90qYxapaZDqRCvxOHmDS7er25uZ2qOsv7/748imLvt6//XyXvMU8DiY369JkIKTOFXbFWBi0V+eJ
+        dGm5Ka0wkYbiyp1HOmcl8+SPuw/XIGA3geHNgYEDViFrTJAFy7KBqqnLswMFwrpeYDB1q7NM70E4
+        VPj1RVgrRyb3DKmSb2JArmLapQI2w1aeyQDSulMV8jIVo39wI6JYvAYj4hOVqqWgEnnDc8WMKLTH
+        lRsbGQlv0upU5QayYGmTcCWfvNOeyoKsBYLUOlXUy0BW7OB4pwoHoYr5qIkeySRGRELuYOJvAh5I
+        g+ceCwrr3+EGZHDpxJrHOYWij9DnM8TTOM9+Md5j0b7AxUrhnCDXNQ9t/L8aZt52vdh5cQXCHbHr
+        cQ5iCxQY4EE8TocRpGL4W0dFhGDlG40DUx8L+hGqDmgV638lB3GC59O34CmgpVrPYF1PAU1aW4pR
+        njvCDh5mWRMjqsw34SgbExkj+AEDrbm1MlFCTLdqS6pYc+5uDFdROgO7AVUsfPK+wJPpShMErE2m
+        N9NhuBOZJ1XMpjxcPG49i56EJtCAbMR2HqUJ1JKdmcMbvMJEarm4CB0cY7rGDYhVtZUzrpKSJzOg
+        WxJdF7juE/50NJUZEW0dClzK04zclDOdlx2MdA45Bc6KGczcsTqyz1Zez4DG2KOX+niL5Lk8lj+M
+        wNacQYzMxSZ/PuTT9+OJz0jFCVSx7qAP10m9xGSL1/dJo3F/obpumO4wDYhV3xXcpXT+Yb2CGzFZ
+        /ZrDqg1H2nZ+fl6lgvukPBdmjsAPGPC4iVKkoJM1rhoQkq+cO5/3b0nhGHVApnk83d4tCdTwfidr
+        HTB97yiQ1k5X1VP62FxmqLW1muHM7lD9BZR2ciujMRXRiAAd0KqPVqpInHEk/PBudAMk/B1lJ71e
+        5MJiBoMFDDaExkSojDIB15/+JowIoIqFojYWRaYf5znGeiyKfSPQDInX3KEEW15c3r65uH6zXP62
+        XK7o5+IvzCmL+OicorTp/2MuCYPDuXZ9fEJ35MXmxH8LLOp6QNratJP+vpNdvdbuqWWjDD58EHYn
+        rr47vE9HykPzVOeiQOLTVJ9WPuHzxSB3iXSp8AYwuOcOyTgyg26oyXcaQMrtOpwBbRFLQ4XRX0Xk
+        7GLlTInGFo11p0/T7qLRvXyQQ1HKy9qRUM926+fSGF33tkIBXR+baFTVTbRYWr7JRDegC6FqJfs7
+        kZFQtrVEKHlp173pAyv4L7HY8jJz61BVwE9zbp1vFhTC5LAE9VOog1e3DcL2ySMbU9DJFj6jm4AT
+        Qe/X9u+Sw6X8ldJMC0/8EJSmdGf4xAi62YYySrg9KvfeJvvpXW3Ey+d/AcPXEmL6FAAA
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:22 GMT']
+      etag: [W/"b9488ea91df827cbd915d22f146216b6"]
+      last-modified: ['Mon, 22 Apr 2019 22:22:20 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['C116:0A12:FEB75:2796A4:5CBE3E9E']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4965']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/user
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA52TXW/aMBSG/wrLNRASPhQiTetUJu1ibJ3UVVtv0IljEq+OHdlOEEP9732dsKow
+        aRJc4djnfc7L+TgEUhdCBWmwJyOedO0EC4aByIN0ukyS5TBQOucb/x2sV98XDz+/SvZ7Pf+2KuaI
+        o5YcmU1jJN5L52qbhmF/aafjQriyyRrLDdPKceXGTFdhE3bkD+37GQiFOTK6FLg4Y9XiiOm1YNnw
+        xGrpKnlmoM/bCU5Ct1pKvQPh3PD/k4SvOtjrz0IVVzGgO4TalRw1w1959gUQ1l1qqNMcQv+D1niK
+        RRsMzy80dVTB0k7BzSE0vNYdrsksMwLToNWl5k60YGlTkBJ/6BoWtBYIb+tSG50GWt5i8C4V96JD
+        WBvREtv7khjOuGhR4quAZ2rw3L7mmPgfGANfcOH4hvLKr+KWpOVYPKp8wC8y2kpqB59JspKrJ41w
+        jHZNao/nFRlX6caVg1tMNy/4cHCz4pkg5Q/Yzi+U43S3Xz/cfcRhS0LGGSlAMqw+CLvdbqzR/sZa
+        qPzW4E1q1jUM73eSFHeDT0hU+npWIOA675Lc/KMsheGUSVhXjZTIIjSib0uOvXsHfd1kUrBN3540
+        Xi5er7qpDtI4+btlUOAzit9sXZDilSGDQyfIgRxPJskoikdRdB8l6TxKp8kj0jR1/jYmWo4ms9Ek
+        uY9mabxIo8lj8PwCLTqSUfwEAAA=
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:22 GMT']
+      etag: [W/"a8fa37524fee015da76c68778eb7f335"]
+      last-modified: ['Mon, 08 Apr 2019 14:26:10 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: ['']
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['AA62:108E:17B94B:34ADC9:5CBE3E9E']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4964']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+- request:
+    body: null
+    headers:
+      Accept: ['*/*']
+      Accept-Encoding: ['gzip, deflate']
+      Authorization: [!!python/unicode token TOKEN]
+      Connection: [keep-alive]
+      User-Agent: [PyGithub/Python]
+    method: GET
+    uri: https://api.github.com/repos/yarikoptic/test_integration1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA62YbW/bNhDHv4vfLg0TJ20TA0X3IsOwAWmxYRu6vTFoiZbYSKRGUvYSId99/yP1
+        6GWxXAnIg03xfjye7si7qxYyXqwub5Y379/dvL86WygdizWNLe7vfth/zn7Ooh9vn/iXX3eRevjn
+        891P15+e/sTv/YcFJvNcYKYT1q2lciIx3EmtLvFoW2bZun7+yI180IWTEXtpamHkjjuAtjyz4myh
+        90qYxapaZDqRCvxOHmDS7er25uZ2qOsv7/748imLvt6//XyXvMU8DiY369JkIKTOFXbFWBi0V+eJ
+        dGm5Ka0wkYbiyp1HOmcl8+SPuw/XIGA3geHNgYEDViFrTJAFy7KBqqnLswMFwrpeYDB1q7NM70E4
+        VPj1RVgrRyb3DKmSb2JArmLapQI2w1aeyQDSulMV8jIVo39wI6JYvAYj4hOVqqWgEnnDc8WMKLTH
+        lRsbGQlv0upU5QayYGmTcCWfvNOeyoKsBYLUOlXUy0BW7OB4pwoHoYr5qIkeySRGRELuYOJvAh5I
+        g+ceCwrr3+EGZHDpxJrHOYWij9DnM8TTOM9+Md5j0b7AxUrhnCDXNQ9t/L8aZt52vdh5cQXCHbHr
+        cQ5iCxQY4EE8TocRpGL4W0dFhGDlG40DUx8L+hGqDmgV638lB3GC59O34CmgpVrPYF1PAU1aW4pR
+        njvCDh5mWRMjqsw34SgbExkj+AEDrbm1MlFCTLdqS6pYc+5uDFdROgO7AVUsfPK+wJPpShMErE2m
+        N9NhuBOZJ1XMpjxcPG49i56EJtCAbMR2HqUJ1JKdmcMbvMJEarm4CB0cY7rGDYhVtZUzrpKSJzOg
+        WxJdF7juE/50NJUZEW0dClzK04zclDOdlx2MdA45Bc6KGczcsTqyz1Zez4DG2KOX+niL5Lk8lj+M
+        wNacQYzMxSZ/PuTT9+OJz0jFCVSx7qAP10m9xGSL1/dJo3F/obpumO4wDYhV3xXcpXT+Yb2CGzFZ
+        /ZrDqg1H2nZ+fl6lgvukPBdmjsAPGPC4iVKkoJM1rhoQkq+cO5/3b0nhGHVApnk83d4tCdTwfidr
+        HTB97yiQ1k5X1VP62FxmqLW1muHM7lD9BZR2ciujMRXRiAAd0KqPVqpInHEk/PBudAMk/B1lJ71e
+        5MJiBoMFDDaExkSojDIB15/+JowIoIqFojYWRaYf5znGeiyKfSPQDInX3KEEW15c3r65uH6zXP62
+        XK7o5+IvzCmL+OicorTp/2MuCYPDuXZ9fEJ35MXmxH8LLOp6QNratJP+vpNdvdbuqWWjDD58EHYn
+        rr47vE9HykPzVOeiQOLTVJ9WPuHzxSB3iXSp8AYwuOcOyTgyg26oyXcaQMrtOpwBbRFLQ4XRX0Xk
+        7GLlTInGFo11p0/T7qLRvXyQQ1HKy9qRUM926+fSGF33tkIBXR+baFTVTbRYWr7JRDegC6FqJfs7
+        kZFQtrVEKHlp173pAyv4L7HY8jJz61BVwE9zbp1vFhTC5LAE9VOog1e3DcL2ySMbU9DJFj6jm4AT
+        Qe/X9u+Sw6X8ldJMC0/8EJSmdGf4xAi62YYySrg9KvfeJvvpXW3Ey+d/AcPXEmL6FAAA
+    headers:
+      access-control-allow-origin: ['*']
+      access-control-expose-headers: ['ETag, Link, Location, Retry-After, X-GitHub-OTP,
+          X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-OAuth-Scopes,
+          X-Accepted-OAuth-Scopes, X-Poll-Interval, X-GitHub-Media-Type']
+      cache-control: ['private, max-age=60, s-maxage=60']
+      content-encoding: [gzip]
+      content-security-policy: [default-src 'none']
+      content-type: [application/json; charset=utf-8]
+      date: ['Mon, 22 Apr 2019 22:22:22 GMT']
+      etag: [W/"b9488ea91df827cbd915d22f146216b6"]
+      last-modified: ['Mon, 22 Apr 2019 22:22:20 GMT']
+      referrer-policy: ['origin-when-cross-origin, strict-origin-when-cross-origin']
+      server: [GitHub.com]
+      status: [200 OK]
+      strict-transport-security: [max-age=31536000; includeSubdomains; preload]
+      transfer-encoding: [chunked]
+      vary: ['Accept, Authorization, Cookie, X-GitHub-OTP']
+      x-accepted-oauth-scopes: [repo]
+      x-content-type-options: [nosniff]
+      x-frame-options: [deny]
+      x-github-media-type: [github.v3; format=json]
+      x-github-request-id: ['AA62:108E:17B950:34ADD4:5CBE3E9E']
+      x-oauth-scopes: [repo]
+      x-ratelimit-limit: ['5000']
+      x-ratelimit-remaining: ['4963']
+      x-ratelimit-reset: ['1555973199']
+      x-xss-protection: [1; mode=block]
+    status: {code: 200, message: OK}
+version: 1

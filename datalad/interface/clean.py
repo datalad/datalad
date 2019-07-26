@@ -15,9 +15,12 @@ from glob import glob
 from .base import Interface
 from ..utils import rmtree
 from ..support.param import Parameter
-from ..consts import ARCHIVES_TEMP_DIR
-from ..consts import ANNEX_TEMP_DIR
-from ..consts import SEARCH_INDEX_DOTGITDIR
+from ..consts import (
+    ARCHIVES_TEMP_DIR,
+    ANNEX_TEMP_DIR,
+    ANNEX_TRANSFER_DIR,
+    SEARCH_INDEX_DOTGITDIR,
+)
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.constraints import EnsureNone
@@ -58,7 +61,7 @@ class Clean(Interface):
         what=Parameter(
             args=("--what",),
             dest='what',
-            choices=('cached-archives', 'annex-tmp', 'search-index'),
+            choices=('cached-archives', 'annex-tmp', 'annex-transfer', 'search-index'),
             nargs="*",
             doc="""What to clean.  If none specified -- all known targets are
             cleaned"""),
@@ -91,13 +94,17 @@ class Clean(Interface):
                 continue
             d = ap['path']
             gitdir = GitRepo.get_git_dir(d)
+            DIRS_PLURAL = ("directory", "directories")
+            FILES_PLURAL = ("file", "files")
             for dirpath, flag, msg, sing_pl in [
                 (ARCHIVES_TEMP_DIR, "cached-archives",
-                 "temporary archive", ("directory", "directories")),
+                 "temporary archive", DIRS_PLURAL),
                 (ANNEX_TEMP_DIR, "annex-tmp",
-                 "temporary annex", ("file", "files")),
+                 "temporary annex", FILES_PLURAL),
+                (ANNEX_TRANSFER_DIR, "annex-transfer",
+                 "annex temporary transfer", DIRS_PLURAL),
                 (opj(gitdir, SEARCH_INDEX_DOTGITDIR), 'search-index',
-                 "metadata search index", ("file", "files")),
+                 "metadata search index", FILES_PLURAL),
             ]:
                 topdir = opj(d, dirpath)
                 lgr.debug("Considering to clean %s:%s", d, dirpath)

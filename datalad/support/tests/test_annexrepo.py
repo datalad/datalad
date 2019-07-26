@@ -66,6 +66,7 @@ from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import eq_
+from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
 from datalad.tests.utils import ok_annex_get
@@ -967,6 +968,25 @@ def test_AnnexRepo_get(src, dst):
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
+@known_failure_direct_mode  #FIXME https://github.com/datalad/datalad/pull/3542#issuecomment-513791662
+@with_tree(tree={'file.dat': 'content'})
+@with_tempfile
+def test_v7_detached_get(opath, path):
+    # http://git-annex.branchable.com/bugs/get_fails_to_place_v7_unlocked_file_content_into_the_file_tree_in_v7_in_repo_with_detached_HEAD/
+    origin = AnnexRepo(opath, create=True, version=7)
+    GitRepo.add(origin, 'file.dat')  # force direct `git add` invocation
+    origin.commit('added')
+
+    AnnexRepo.clone(opath, path)
+    repo = AnnexRepo(path)
+    # test getting in a detached HEAD
+    repo.checkout('HEAD^{}')
+    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+
+    repo.get('file.dat')
+    ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
+
+
 # TODO:
 #def init_remote(self, name, options):
 #def enable_remote(self, name):
@@ -1673,10 +1693,10 @@ def test_ProcessAnnexProgressIndicators():
         out = cmo.out
 
     from datalad.ui import ui
-    from datalad.ui.dialog import SilentConsoleLog
+    from datalad.ui.dialog import QuietConsoleLog
 
     assert out \
-        if not isinstance(ui.ui, SilentConsoleLog) else not out
+        if not isinstance(ui.ui, QuietConsoleLog) else not out
     assert proc.total_pbar is not None
     # and no side-effect of any kind in finish
     with swallow_outputs() as cmo:
@@ -1989,27 +2009,48 @@ def _test_status(ar):
 
     # create a subrepo:
     sub = AnnexRepo(opj(ar.path, 'submod'), create=True)
-    # nothing changed, it's empty besides .git, which is ignored
+
+    # Git v2.22.0 changed the way it treats sub-repositories without a commit
+    # checked out, so we need to condition the checks on that.
+    # ATTN: We look at the bundled git rather than "cmd:git" because `git annex
+    # status` will use it regardless of DATALAD_USE_DEFAULT_GIT.
+    bundled = external_versions['cmd:bundled-git']
+    if bundled is external_versions.UNKNOWN:
+        git_version = external_versions['cmd:git']
+    else:
+        git_version = bundled
+    fixed_git = git_version >= '2.22.0'
+
+    if fixed_git:
+        # Newer Git versions consider a repo without a commit a repository, not
+        # a directory.
+        stat["untracked"].append("submod/")
     eq_(stat, ar.get_status())
 
     # file in subrepo
     with open(opj(ar.path, 'submod', 'fourth'), 'w') as f:
         f.write("this is a birth certificate")
-    stat['untracked'].append(opj('submod', 'fourth'))
+
+    if not fixed_git:
+        # In the fixed case, nothing changes, since the empty repo is still
+        # seen as a repo.
+        stat['untracked'].append(opj('submod', 'fourth'))
     eq_(stat, ar.get_status())
 
     # add to subrepo
     sub.add('fourth')
     sub.commit(msg="birther mod init'ed")
-    stat['untracked'].remove(opj('submod', 'fourth'))
+    if not fixed_git:
+        stat['untracked'].remove(opj('submod', 'fourth'))
 
     if ar.get_active_branch().endswith('(unlocked)') and \
        'adjusted' in ar.get_active_branch():
         # we are running on adjusted branch => do it in submodule, too
         sub.adjust()
 
-    # Note, that now the non-empty repo is untracked
-    stat['untracked'].append('submod/')
+    if not fixed_git:
+        # Note, that now the non-empty repo is untracked
+        stat['untracked'].append('submod/')
     eq_(stat, ar.get_status())
 
     # add the submodule
@@ -2361,6 +2402,32 @@ def test_fake_is_not_special(path):
     # doesn't exist -- we fail by default
     assert_raises(RemoteNotAvailableError, ar.is_special_annex_remote, "fake")
     assert_false(ar.is_special_annex_remote("fake", check_if_known=False))
+
+
+@with_tree(tree={"remote": {}, "main": {}, "special": {}})
+def test_is_special(path):
+    rem = AnnexRepo(op.join(path, "remote"), create=True)
+    dir_arg = "directory={}".format(op.join(path, "special"))
+    rem.init_remote("imspecial",
+                    ["type=directory", "encryption=none", dir_arg])
+    ok_(rem.is_special_annex_remote("imspecial"))
+
+    ar = AnnexRepo.clone(rem.path, op.join(path, "main"))
+    assert_false(ar.is_special_annex_remote("origin"))
+
+    assert_false(ar.is_special_annex_remote("imspecial",
+                                            check_if_known=False))
+    # FIXME: ar.enable_remote() doesn't support specifying options, but we need
+    # to specify directory= here.
+    ar._run_annex_command("enableremote",
+                          annex_options=["imspecial", dir_arg])
+    ok_(ar.is_special_annex_remote("imspecial"))
+
+    # With a mis-configured remote, give warning and return false.
+    ar.config.unset("remote.origin.url", where="local")
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        assert_false(ar.is_special_annex_remote("origin"))
+        cml.assert_logged(msg=".*no URL.*", level="WARNING", regex=True)
 
 
 @with_tempfile(mkdir=True)

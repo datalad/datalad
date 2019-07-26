@@ -55,6 +55,10 @@ class MissingExternalDependency(RuntimeError):
         return to_str
 
 
+class BrokenExternalDependency(RuntimeError):
+    """Some particular functionality is broken with this dependency."""
+
+
 class DeprecatedError(RuntimeError):
     """To raise whenever a deprecated entirely feature is used"""
     def __init__(self, new=None, version=None, msg=''):
@@ -350,4 +354,20 @@ class CrawlerError(Exception):
 
 
 class PipelineNotSpecifiedError(CrawlerError):
+    pass
+
+
+#
+# Warnings
+#
+
+class DataLadWarning(Warning):
+    pass
+
+
+# We have an exception OutdatedExternalDependency, but it is intended for
+# an instance being raised.  `warnings` module requires a class to be provided
+# as a category, so here is a dedicated Warning class
+class OutdatedExternalDependencyWarning(DataLadWarning):
+    """Warning "category" to use to report about outdated"""
     pass

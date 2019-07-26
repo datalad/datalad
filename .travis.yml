@@ -35,7 +35,7 @@ env:
 matrix:
   include:
   # Additional custom ones
-  - python: 3.7-dev
+  - python: 3.7
     # Single run for Python 3.7
     env:
     # Run all tests in a single whoop here
@@ -125,6 +125,10 @@ matrix:
     - _DL_CRON=1
   # Run with latest git rather than the bundled one.
   - python: 3.5
+    addons:
+      apt:
+        sources:
+          - sourceline: 'ppa:git-core/ppa'
     env:
     - DATALAD_USE_DEFAULT_GIT=1
     - _DL_UPSTREAM_GIT=1
@@ -197,6 +201,10 @@ matrix:
     - NOSE_SELECTION_OP=not
     - NOSE_SELECTION=
 
+  # Run benchmark comparison against current master
+  - python: 3.6
+    env: _DL_BENCHMARK=1
+
 # Requires current master (0.12.x) so cannot be tested against 0.11.x
 #
 #  - python: 3.5
@@ -263,7 +271,9 @@ before_install:
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
   - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
-  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then sudo tools/ci/install-latest-git.sh || [ $? -eq 100 ] && exit 0; fi
+  - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
+      sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
+    fi
 
 install:
   # Install standalone build of git-annex for the recent enough version
@@ -275,7 +285,6 @@ install:
   - git config --global user.name "Travis Almighty"
   - cd ..; pip install -q codecov; cd -
   - pip install -r requirements-devel.txt
-  - pip install 'sphinx>=1.7.8'
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # TMPDIRs
@@ -290,13 +299,14 @@ install:
   - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:
+  - if [ ! -z "${_DL_BENCHMARK:-}" ]; then tools/ci/benchmark-travis-pr.sh; exit $?; fi
   # Test installation system-wide
   - sudo pip install .
   - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
-  - WRAPT_DISABLE_EXTENSIONS=1 http_proxy=
+  - http_proxy=
     PATH=$PWD/../tools/coverage-bin:$PATH
     $NOSE_WRAPPER `which nosetests` $NOSE_OPTS
       -A "$NOSE_SELECTION_OP($NOSE_SELECTION)"

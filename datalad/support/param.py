@@ -17,7 +17,7 @@ from inspect import getargspec
 
 from .constraints import expand_constraint_spec
 
-_whitespace_re = re.compile('\n\s+|^\s+')
+_whitespace_re = re.compile(r'\n\s+|^\s+')
 
 
 class Parameter(object):

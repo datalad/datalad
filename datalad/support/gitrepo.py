@@ -11,13 +11,14 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-
+from itertools import chain
 import logging
 import re
 import shlex
 import time
 import os
 import os.path as op
+import warnings
 from os import linesep
 from os.path import join as opj
 from os.path import exists
@@ -61,8 +62,7 @@ from datalad.utils import getpwd
 from datalad.utils import updated
 from datalad.utils import posix_relpath
 from datalad.utils import assure_dir
-from datalad.utils import CMD_MAX_ARG
-from datalad.utils import generate_chunks
+from datalad.utils import generate_file_chunks
 from ..utils import assure_unicode
 
 # imports from same module:
@@ -72,6 +72,7 @@ from .exceptions import DeprecatedError
 from .exceptions import FileNotInRepositoryError
 from .exceptions import GitIgnoreError
 from .exceptions import MissingBranchError
+from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
@@ -402,7 +403,7 @@ def Repo(*args, **kwargs):
     # TODO: This probably doesn't work as intended (or at least not as
     #       consistently as intended). gitpy.Repo could be instantiated by
     #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a paramter to these methods instead of the
+    #       would be needed as a parameter to these methods instead of the
     #       constructor.
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
@@ -516,13 +517,19 @@ class GitPythonProgressBar(RemoteProgress):
                 # spotted used by GitPython tests, so may be at times it is not
                 # known and assumed to be a 100%...? TODO
                 max_count = 100.0
+            if op_code:
+                # Apparently those are composite and we care only about the ones
+                # we know, so to avoid switching the progress bar for no good
+                # reason - first & with the mask
+                op_code = op_code & self.OP_MASK
             if self._op_code is None or self._op_code != op_code:
                 # new type of operation
                 self._close_pbar()
 
                 self._pbar = self._ui.get_progressbar(
                     self._get_human_msg(op_code),
-                    total=max_count
+                    total=max_count,
+                    unit=' objects'
                 )
                 self._op_code = op_code
             if not self._pbar:
@@ -676,8 +683,9 @@ class GitRepo(RepoInterface):
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
-        # Disable automatic garbage and autopacking
-        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # Could be used to e.g. disable automatic garbage and autopacking
+        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        self._GIT_COMMON_OPTIONS = []
         # actually no need with default GitPython db backend not in memory
         # default_git_odbt but still allows for faster testing etc.
         # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
@@ -729,7 +737,17 @@ class GitRepo(RepoInterface):
         self._fake_dates_enabled = None
 
     def _create_empty_repo(self, path, **kwargs):
-        if op.lexists(path):
+        # the issue: https://github.com/datalad/datalad/issues/3295
+        # discussion to just issue a warning:
+        #   https://github.com/datalad/datalad/pull/3296
+        if external_versions['cmd:git'] < '2.14.0':
+            warnings.warn(
+                "Your git version (%s) is too old, we will not safe-guard "
+                "against creating a new repository under already known to git "
+                "subdirectory" % external_versions['cmd:git'],
+                OutdatedExternalDependencyWarning
+            )
+        elif op.lexists(path):
             # Verify that we are not trying to initialize a new git repository
             # under a directory some files of which are already tracked by git
             # use case: https://github.com/datalad/datalad/issues/3068
@@ -923,8 +941,8 @@ class GitRepo(RepoInterface):
                 # denied etc. So disabled 
                 #if exists(opj(self.path, '.git')):  # don't try to write otherwise
                 #    self.repo.index.write()
-        except InvalidGitRepositoryError:
-            # might have being removed and no longer valid
+        except (InvalidGitRepositoryError, AttributeError):
+            # might have being removed and no longer valid or attributes unbound
             pass
 
     def __repr__(self):
@@ -1814,22 +1832,7 @@ class GitRepo(RepoInterface):
         if not files:
             file_chunks = [[]]
         else:
-            files = assure_list(files)
-
-            maxl = max(map(len, files))
-            chunk_size = max(
-                1,  # should at least be 1. If blows then - not our fault
-                (CMD_MAX_ARG
-                 - sum((len(x) + 3) for x in cmd)
-                 - 4   # for '--' below
-                 ) // (maxl + 3)  # +3 for possible quotes and a space
-            )
-            # TODO: additional treatment for "too many arguments"? although
-            # as https://github.com/datalad/datalad/issues/1883#issuecomment-436272758
-            # shows there seems to be no hardcoded limit on # of arguments,
-            # but may be we decide to go for smth like follow to be on safe side
-            # chunk_size = min(10240 - len(cmd), chunk_size)
-            file_chunks = generate_chunks(files, chunk_size)
+            file_chunks = generate_file_chunks(files, cmd)
 
         out, err = "", ""
         for file_chunk in file_chunks:
@@ -2601,7 +2604,8 @@ class GitRepo(RepoInterface):
                                     if len(item.split(': ')) == 2]}
         return count
 
-    def get_changed_files(self, staged=False, diff_filter='', index_file=None):
+    def get_changed_files(self, staged=False, diff_filter='', index_file=None,
+                          files=None):
         """Return files that have changed between the index and working tree.
 
         Parameters
@@ -2624,8 +2628,23 @@ class GitRepo(RepoInterface):
             opts.append('--diff-filter=%s' % diff_filter)
         if index_file:
             kwargs['env'] = {'GIT_INDEX_FILE': index_file}
-        return [normpath(f)  # Call normpath to convert separators on Windows.
-                for f in self.repo.git.diff(*opts, **kwargs).split('\0') if f]
+        if files is not None:
+            opts.append('--')
+            # might be too many, need to chunk up
+            optss = (
+                opts + file_chunk
+                for file_chunk in generate_file_chunks(files, ['git', 'diff'] + opts)
+            )
+        else:
+            optss = [opts]
+        return [
+            normpath(f)  # Call normpath to convert separators on Windows.
+            for f in chain(
+                *(self.repo.git.diff(*opts, **kwargs).split('\0')
+                for opts in optss)
+            )
+            if f
+        ]
 
     def get_missing_files(self):
         """Return a list of paths with missing files (and no staged deletion)"""

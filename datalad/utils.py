@@ -252,8 +252,8 @@ def sorted_files(dout):
                        for r, d, files in os.walk(dout)
                        if not '.git' in r], []))
 
-_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
-_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = r'%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = r'%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
@@ -488,7 +488,7 @@ def file_basename(name, return_ext=False):
     not a digit, so we could get rid of .tar.gz etc
     """
     bname = basename(name)
-    fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
+    fbname = re.sub(r'(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
     if return_ext:
         return fbname, bname[len(fbname) + 1:]
     else:
@@ -759,7 +759,7 @@ def as_unicode(val, cast_types=object):
             % (val, cast_types))
 
 
-def unique(seq, key=None):
+def unique(seq, key=None, reverse=False):
     """Given a sequence return a list only with unique elements while maintaining order
 
     This is the fastest solution.  See
@@ -776,15 +776,23 @@ def unique(seq, key=None):
     key: callable, optional
       Function to call on each element so we could decide not on a full
       element, but on its member etc
+    reverse: bool, optional
+      If True, uniqueness checked in the reverse order, so that the later ones
+      will take the order
     """
     seen = set()
     seen_add = seen.add
+
+    trans = reversed if reverse else lambda x: x
+
     if not key:
-        return [x for x in seq if not (x in seen or seen_add(x))]
+        out = [x for x in trans(seq) if not (x in seen or seen_add(x))]
     else:
         # OPT: could be optimized, since key is called twice, but for our cases
         # should be just as fine
-        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
+        out = [x for x in trans(seq) if not (key(x) in seen or seen_add(key(x)))]
+
+    return out[::-1] if reverse else out
 
 
 def all_same(items):
@@ -857,6 +865,37 @@ def generate_chunks(container, size):
     while container:
         yield container[:size]
         container = container[size:]
+
+
+def generate_file_chunks(files, cmd=None):
+    """Given a list of files, generate chunks of them to avoid exceding cmdline length
+
+    Parameters
+    ----------
+    files: list of str
+    cmd: str or list of str, optional
+      Command to account for as well
+    """
+    files = assure_list(files)
+    cmd = assure_list(cmd)
+
+    maxl = max(map(len, files)) if files else 0
+    chunk_size = max(
+        1,  # should at least be 1. If blows then - not our fault
+        (CMD_MAX_ARG
+         - sum((len(x) + 3) for x in cmd)
+         - 4  # for '--' below
+         ) // (maxl + 3)  # +3 for possible quotes and a space
+    )
+    # TODO: additional treatment for "too many arguments"? although
+    # as https://github.com/datalad/datalad/issues/1883#issuecomment
+    # -436272758
+    # shows there seems to be no hardcoded limit on # of arguments,
+    # but may be we decide to go for smth like follow to be on safe side
+    # chunk_size = min(10240 - len(cmd), chunk_size)
+    file_chunks = generate_chunks(files, chunk_size)
+    return file_chunks
+
 
 #
 # Generators helpers
@@ -1177,7 +1216,7 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
             from datalad.tests.utils import assert_in
 
             if regex:
-                match = '\[%s\] ' % level if level else "\[\S+\] "
+                match = r'\[%s\] ' % level if level else r"\[\S+\] "
             else:
                 match = '[%s] ' % level if level else ''
 

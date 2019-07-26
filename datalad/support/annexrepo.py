@@ -56,6 +56,7 @@ from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
 from datalad.utils import assure_unicode, assure_bytes
 from datalad.utils import make_tempfile
+from datalad.utils import partition
 from datalad.utils import unlink
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import GitRunner
@@ -80,6 +81,7 @@ from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
 from .exceptions import OutOfSpaceError
 from .exceptions import RemoteNotAvailableError
+from .exceptions import BrokenExternalDependency
 from .exceptions import OutdatedExternalDependency
 from .exceptions import MissingExternalDependency
 from .exceptions import IncompleteResultsError
@@ -348,6 +350,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set('annex.backends', backend, where='local')
 
     def __del__(self):
+
+        def safe__del__debug(e):
+            """We might be too late in the game and either .debug or exc_str
+            are no longer bound"""
+            try:
+                return lgr.debug(exc_str(e))
+            except (AttributeError, NameError):
+                return
+
         try:
             if hasattr(self, '_batched') and self._batched is not None:
                 self._batched.close()
@@ -360,12 +371,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
         try:
             super(AnnexRepo, self).__del__()
         except TypeError as e:
             # see above
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.
@@ -943,17 +954,27 @@ class AnnexRepo(GitRepo, RepoInterface):
     def is_special_annex_remote(self, remote, check_if_known=True):
         """Return whether remote is a special annex remote
 
-        Decides based on the presence of diagnostic annex- options
-        for the remote
+        Decides based on the presence of an annex- option and lack of a
+        configured URL for the remote.
         """
         if check_if_known:
             if remote not in self.get_remotes():
                 raise RemoteNotAvailableError(remote)
-        sec = 'remote.{}'.format(remote)
-        for opt in ('annex-externaltype', 'annex-webdav'):
-            if self.config.has_option(sec, opt):
-                return True
-        return False
+        opts = self.config.options('remote.{}'.format(remote))
+        if "url" in opts:
+            is_special = False
+        elif any(o.startswith("annex-") for o in opts
+                 if o not in ["annex-uuid", "annex-ignore"]):
+            # It's possible that there isn't a special-remote related option
+            # (we only filter out a few common ones), but given that there is
+            # no URL it should be a good bet that this is a special remote.
+            is_special = True
+        else:
+            is_special = False
+            lgr.warning("Remote '%s' has no URL or annex- option. "
+                        "Is it mis-configured?",
+                        remote)
+        return is_special
 
     @borrowkwargs(GitRepo)
     def get_remotes(self,
@@ -1121,7 +1142,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         lines_ = [
             l for l in lines
             if not re.search(
-                '\((merging .* into git-annex|recording state ).*\.\.\.\)', l
+                r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
         assert(len(lines_) <= 1)
@@ -2399,12 +2420,14 @@ class AnnexRepo(GitRepo, RepoInterface):
             # opts might be the '--key' which should go last
             annex_options += opts
 
+        interrupted = True
         try:
             out, err = self._run_annex_command(
                     command,
                     files=files,
                     annex_options=annex_options,
                     **kwargs)
+            interrupted = False
         except CommandError as e:
             # Note: A call might result in several 'failures', that can be or
             # cannot be handled here. Detection of something, we can deal with,
@@ -2502,12 +2525,34 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
         finally:
             if progress_indicators:
-                progress_indicators.finish()
+                progress_indicators.finish(partial=interrupted)
 
-        json_objects = (json_loads(line)
-                        for line in out.splitlines() if line.startswith('{'))
+        others, json_strs = partition((ln for ln in out.splitlines()),
+                                      lambda ln: ln.startswith('{'))
+
+        json_objects = (json_loads(line) for line in json_strs)
         # protect against progress leakage
         json_objects = [j for j in json_objects if 'byte-progress' not in j]
+
+        others = [ln for ln in others if ln.strip()]
+        if others:
+            if json_objects:
+                # We at least received some valid json output, so warn about
+                # non-json output and continue.
+                lgr.warning("Received non-json lines for --json command: %s",
+                            others)
+            else:
+                annex_ver = external_versions['cmd:annex']
+                if annex_ver == "7.20190626" and command == "find":
+                    # TODO: Drop this once GIT_ANNEX_MIN_VERSION is over
+                    # 7.20190626.
+                    exc = BrokenExternalDependency(
+                        "find --json output is broken on git-annex 7.20190626")
+                else:
+                    exc = RuntimeError(
+                        "Received no json output for --json command, only:\n{}"
+                        .format("  ".join(others)))
+                raise exc
         return json_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
@@ -2910,31 +2955,33 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # files "jumped" between git/annex.  Then also preparing a
                     # custom index and calling "commit" without files resolves
                     # the issue
-                    changed_files_staged = \
+                    all_changed_staged = \
                         set(self.get_changed_files(staged=True))
-                    changed_files_notstaged = \
-                        set() \
-                        if direct_mode \
-                        else set(self.get_changed_files(staged=False))
 
-                    files_set = {
+                    files_normalized = [
                         _normalize_path(self.path, f) if isabs(f) else f
                         for f in files
-                    }
-                    # files_notstaged = files_set.difference(changed_files_staged)
-                    files_changed_notstaged = files_set.intersection(changed_files_notstaged)
+                    ]
+
+                    files_changed_staged = \
+                        set(self.get_changed_files(staged=True, files=files_normalized))
+                    files_changed_notstaged = \
+                        set() \
+                        if direct_mode \
+                        else set(self.get_changed_files(staged=False, files=files_normalized))
 
                     # Files which were staged but not among files
-                    staged_not_to_commit = changed_files_staged.difference(files_set)
-                    if staged_not_to_commit or files_changed_notstaged:
+                    staged_not_to_commit = all_changed_staged.difference(files_changed_staged)
+
+                    if files_changed_notstaged:
+                        self.add(files=list(files_changed_notstaged))
+
+                    if staged_not_to_commit:
                         # Need an alternative index_file
                         with make_tempfile(dir=opj(self.path,
                                                    GitRepo.get_git_dir(self)),
                                            prefix="datalad-",
                                            suffix=".index") as index_file:
-                            # First add those which were changed but not staged yet
-                            if files_changed_notstaged:
-                                self.add(files=list(files_changed_notstaged))
 
                             alt_index_file = index_file
                             index_tree = self.repo.git.write_tree()
@@ -2953,12 +3000,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                                 careless=careless,
                                 index_file=alt_index_file)
 
-                            if files_changed_notstaged:
-                                # reset current index to reflect the changes annex might have done
-                                self._git_custom_command(
-                                    list(files_changed_notstaged),
-                                    ['git', 'reset']
-                                )
+                            # reset current index to reflect the changes annex might have done
+                            self._git_custom_command(
+                                list(files_changed_notstaged |
+                                     files_changed_staged),
+                                ['git', 'reset']
+                            )
 
                     # in any case we will not specify files explicitly
                     files_to_commit = None
@@ -3919,15 +3966,15 @@ class ProcessAnnexProgressIndicators(object):
             int(j.get('byte-progress'))
         )
 
-    def finish(self):
-        if self.total_pbar:
-            self.total_pbar.finish()
-            self.total_pbar = None
+    def finish(self, partial=False):
         if self.pbars:
             lgr.warning("Still have %d active progress bars when stopping",
                         len(self.pbars))
+        if self.total_pbar:
+            self.total_pbar.finish(partial=partial)
+            self.total_pbar = None
         for pbar in self.pbars.values():
-            pbar.finish()
+            pbar.finish(partial=partial)
         self.pbars = {}
         self._failed = 0
         self._succeeded = 0
