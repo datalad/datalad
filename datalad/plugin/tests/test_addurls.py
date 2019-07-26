@@ -119,13 +119,34 @@ def test_clean_meta_args():
 
 
 def test_get_subpaths():
-    for fname, expect in [("no/dbl/slash", ("no/dbl/slash", [])),
-                          ("p1//n", ("p1/n", ["p1"])),
-                          ("p1//p2/p3//n", ("p1/p2/p3/n",
-                                            ["p1", "p1/p2/p3"])),
-                          ("//n", ("/n", [""])),
-                          ("n//", ("n/", ["n"]))]:
+    for fname, expect in [
+            (op.join("no", "dbl", "slash"),
+             (op.join("no", "dbl", "slash"), [])),
+            ("p1//n",
+             (op.join("p1", "n"), ["p1"])),
+            (op.join("p1//p2", "p3//n"),
+             (op.join("p1", "p2", "p3", "n"),
+              ["p1", op.join("p1", "p2", "p3")])),
+            (op.join("p1//p2", "p3//p4", "p5//", "n"),
+             (op.join("p1", "p2", "p3", "p4", "p5", "n"),
+              ["p1",
+               op.join("p1", "p2", "p3"),
+               op.join("p1", "p2", "p3", "p4", "p5")])),
+            ("//n", (op.sep + "n", [""])),
+            ("n//", ("n" + op.sep, ["n"]))]:
         eq_(au.get_subpaths(fname), expect)
+
+
+def test_sort_paths():
+    paths = [op.join("x", "a", "b"),
+             "z",
+             op.join("y", "b"),
+             op.join("y", "a")]
+    expected = ["z",
+                op.join("y", "a"),
+                op.join("y", "b"),
+                op.join("x", "a", "b")]
+    eq_(list(au.sort_paths(paths)), expected)
 
 
 def test_is_legal_metafield():
@@ -215,7 +236,7 @@ def test_extract():
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
-        {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
+        ["adult", "kid", "adult/no", "adult/yes", "kid/no"])
 
     eq_([d["url"] for d in info],
         ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
@@ -548,3 +569,19 @@ class TestAddurls(object):
         for fname, info in whereis.items():
             eq_(info[ds.repo.WEB_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_deeper(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.addurls(
+            self.json_file, "{url}",
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+        eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+            {"foo",
+             "bar",
+             op.join("foo", "adir", "foo-again"),
+             op.join("bar", "adir", "bar-again"),
+             op.join("foo", "adir", "foo-again", "other-ds"),
+             op.join("bar", "adir", "bar-again", "other-ds")})
+        ok_exists(os.path.join(
+            ds.path, "foo", "adir", "foo-again", "other-ds", "bdir", "a"))

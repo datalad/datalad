@@ -281,6 +281,17 @@ bet we will fix some bugs and make a world even a better place.
 - We now provide information about unexpected output when git-annex is
   called with `--json`.  ([#3516][])
 
+- Exception logging in the `__del__` method of `GitRepo` and
+  `AnnexRepo` no longer fails if the names it needs are no longer
+  bound.  ([#3527][])
+
+- [addurls][] botched the construction of subdataset paths that were
+  more than two levels deep and failed to create datasets in a
+  reliable, breadth-first order.  ([#3561][])
+
+- Cloning a `type=git` special remote showed a spurious warning about
+  the remote not being enabled.  ([#3547][])
+
 ### Enhancements and new features
 
 - For calls to git and git-annex, we disable automatic garbage
@@ -294,6 +305,8 @@ bet we will fix some bugs and make a world even a better place.
   to [run][[]].  This makes it possible to call `rerun` in a dirty
   working tree ([#3498][]).
 
+- The [metadata][] command aborts earlier if a metadata extractor is
+  unavailable.  ([#3525][])
 
 ## 0.11.5 (May 23, 2019) -- stability is not overrated
 
@@ -875,7 +888,7 @@ A number of fixes did not make it into the 0.9.x series:
      of metadata that can be represented in a tabular structure (substantial
      indexing cost, enables the most detailed queries of all modes)
 - New extensions:
-  - addurls, an extension for creating a dataset (and possibly subdatasets)
+  - [addurls][], an extension for creating a dataset (and possibly subdatasets)
     from a list of URLs.
   - export_to_figshare
   - extract_metadata
@@ -1436,6 +1449,7 @@ publishing
 [add-archive-content]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-add-archive-content.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
 [add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
+[addurls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
@@ -1669,5 +1683,9 @@ publishing
 [#3516]: https://github.com/datalad/datalad/issues/3516
 [#3518]: https://github.com/datalad/datalad/issues/3518
 [#3524]: https://github.com/datalad/datalad/issues/3524
+[#3525]: https://github.com/datalad/datalad/issues/3525
+[#3527]: https://github.com/datalad/datalad/issues/3527
 [#3531]: https://github.com/datalad/datalad/issues/3531
 [#3534]: https://github.com/datalad/datalad/issues/3534
+[#3547]: https://github.com/datalad/datalad/issues/3547
+[#3561]: https://github.com/datalad/datalad/issues/3561
