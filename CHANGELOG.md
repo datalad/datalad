@@ -9,6 +9,48 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
+
+Primarily bug fixes to achieve more robust performance
+
+### Fixes
+
+- Our tests needed various adjustments to keep up with upstream
+  changes in Travis and Git. ([#3479][]) ([#3492][]) ([#3493][])
+
+- `AnnexRepo.is_special_annex_remote` was too selective in what it
+  considered to be a special remote.  ([#3499][])
+
+- We now provide information about unexpected output when git-annex is
+  called with `--json`.  ([#3516][])
+
+- Exception logging in the `__del__` method of `GitRepo` and
+  `AnnexRepo` no longer fails if the names it needs are no longer
+  bound.  ([#3527][])
+
+- [addurls][] botched the construction of subdataset paths that were
+  more than two levels deep and failed to create datasets in a
+  reliable, breadth-first order.  ([#3561][])
+
+- Cloning a `type=git` special remote showed a spurious warning about
+  the remote not being enabled.  ([#3547][])
+
+### Enhancements and new features
+
+- For calls to git and git-annex, we disable automatic garbage
+  collection due to past issues with GitPython's state becoming stale,
+  but doing so results in a larger .git/objects/ directory that isn't
+  cleaned up until garbage collection is triggered outside of DataLad.
+  Tests with the latest GitPython didn't reveal any state issues, so
+  we've re-enabled automatic garbage collection.  ([#3458][])
+
+- [rerun][] learned an `--explicit` flag, which it relays to its calls
+  to [run][[]].  This makes it possible to call `rerun` in a dirty
+  working tree ([#3498][]).
+
+- The [metadata][] command aborts earlier if a metadata extractor is
+  unavailable.  ([#3525][])
+
 ## 0.11.5 (May 23, 2019) -- stability is not overrated
 
 Should be faster and less buggy, with a few enhancements.
@@ -589,7 +631,7 @@ A number of fixes did not make it into the 0.9.x series:
      of metadata that can be represented in a tabular structure (substantial
      indexing cost, enables the most detailed queries of all modes)
 - New extensions:
-  - addurls, an extension for creating a dataset (and possibly subdatasets)
+  - [addurls][], an extension for creating a dataset (and possibly subdatasets)
     from a list of URLs.
   - export_to_figshare
   - extract_metadata
@@ -598,8 +640,10 @@ A number of fixes did not make it into the 0.9.x series:
   included in the output by passing `--senstive=some` or `--senstive=all`.
 - Reduced startup latency by only importing commands necessary for a particular
   command line call.
-- `datalad create -d <parent> --nosave` now registers subdatasets, when possible.
-- `datalad run` now provides a way for the caller to save the result when a
+- [create][]:
+  - `-d <parent> --nosave` now registers subdatasets, when possible.
+  - `--fake-dates` configures dataset to use fake-dates
+- [run] now provides a way for the caller to save the result when a
   command has a non-zero exit status.
 - `datalad rerun` now has a `--script` option that can be used to extract
   previous commands into a file.
@@ -1148,11 +1192,13 @@ publishing
 [add-archive-content]: https://datalad.readthedocs.io/en/latest/generated/man/datalad-add-archive-content.html
 [add-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add-sibling.html
 [add]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-add.html
+[addurls]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html
 [annotate-paths]: http://docs.datalad.org/en/latest/generated/man/datalad-annotate-paths.html
 [clean]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clean.html
 [clone]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html
 [configuration]: http://docs.datalad.org/en/latest/config.html
 [copy_to]: http://docs.datalad.org/en/latest/_modules/datalad/support/annexrepo.html?highlight=%22copy_to%22
+[create]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html
 [create-sibling-github]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling-github.html
 [create-sibling]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html
 [datalad]: http://docs.datalad.org/en/latest/generated/man/datalad.html
@@ -1332,3 +1378,14 @@ publishing
 [#3425]: https://github.com/datalad/datalad/issues/3425
 [#3439]: https://github.com/datalad/datalad/issues/3439
 [#3440]: https://github.com/datalad/datalad/issues/3440
+[#3458]: https://github.com/datalad/datalad/issues/3458
+[#3479]: https://github.com/datalad/datalad/issues/3479
+[#3492]: https://github.com/datalad/datalad/issues/3492
+[#3493]: https://github.com/datalad/datalad/issues/3493
+[#3498]: https://github.com/datalad/datalad/issues/3498
+[#3499]: https://github.com/datalad/datalad/issues/3499
+[#3516]: https://github.com/datalad/datalad/issues/3516
+[#3525]: https://github.com/datalad/datalad/issues/3525
+[#3527]: https://github.com/datalad/datalad/issues/3527
+[#3547]: https://github.com/datalad/datalad/issues/3547
+[#3561]: https://github.com/datalad/datalad/issues/3561

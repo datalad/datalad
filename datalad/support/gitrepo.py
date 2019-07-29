@@ -403,7 +403,7 @@ def Repo(*args, **kwargs):
     # TODO: This probably doesn't work as intended (or at least not as
     #       consistently as intended). gitpy.Repo could be instantiated by
     #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
-    #       would be needed as a paramter to these methods instead of the
+    #       would be needed as a parameter to these methods instead of the
     #       constructor.
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
@@ -683,8 +683,9 @@ class GitRepo(RepoInterface):
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
-        # Disable automatic garbage and autopacking
-        self._GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        # Could be used to e.g. disable automatic garbage and autopacking
+        # ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+        self._GIT_COMMON_OPTIONS = []
         # actually no need with default GitPython db backend not in memory
         # default_git_odbt but still allows for faster testing etc.
         # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
@@ -940,8 +941,8 @@ class GitRepo(RepoInterface):
                 # denied etc. So disabled 
                 #if exists(opj(self.path, '.git')):  # don't try to write otherwise
                 #    self.repo.index.write()
-        except InvalidGitRepositoryError:
-            # might have being removed and no longer valid
+        except (InvalidGitRepositoryError, AttributeError):
+            # might have being removed and no longer valid or attributes unbound
             pass
 
     def __repr__(self):

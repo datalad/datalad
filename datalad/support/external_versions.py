@@ -9,6 +9,7 @@
 """Module to help maintain a registry of versions for external modules etc
 """
 import sys
+import os.path as op
 from os import linesep
 from six import string_types
 from six import binary_type
@@ -76,6 +77,16 @@ def _get_system_git_version():
     return __get_git_version(_runner)
 
 
+def _get_bundled_git_version():
+    """Return version of git bundled with git-annex.
+    """
+    path = _git_runner._get_bundled_path()
+    if path:
+        out = _runner.run([op.join(path, "git"), "version"])[0]
+        # format: git version 2.22.0
+        return out.split()[2]
+
+
 def _get_system_ssh_version():
     """Return version of ssh available system-wide
 
@@ -114,6 +125,7 @@ class ExternalVersions(object):
     CUSTOM = {
         'cmd:annex': _get_annex_version,
         'cmd:git': _get_git_version,
+        'cmd:bundled-git': _get_bundled_git_version,
         'cmd:system-git': _get_system_git_version,
         'cmd:system-ssh': _get_system_ssh_version,
     }

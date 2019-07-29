@@ -308,6 +308,29 @@ def gen_bucket_test2_obscurenames_versioned():
     files("f &$=@:+,?;")
 
 
+def gen_bucket_test1_manydirs():
+    # to test crawling with flexible subdatasets making decisions
+    bucket_name = 'datalad-test1-manydirs-versioned'
+    bucket = gen_test_bucket(bucket_name)
+    bucket.configure_versioning(True)
+
+    # Enable web access to that bucket to everyone
+    bucket.configure_website('index.html')
+    set_bucket_public_access_policy(bucket)
+
+    files = VersionedFilesPool(bucket)
+
+    files("d1", load="")  # creating an empty file
+    # then we would like to remove that d1 as a file and make a directory out of it
+    files("d1/file1.txt")
+    files("d1/sd1/file1.txt")
+    files("d1/sd2/file3.txt", load="a")
+    files("d1/sd2/ssd1/file4.txt")
+    files("d2/file1.txt")
+    files("d2/sd1/file1.txt")
+    files("d2/sd1/ssd/sssd/file1.txt")
+
+
 def add_version_to_url(url, version, replace=False):
     """Add a version ID to `url`.
 
