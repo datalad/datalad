@@ -644,7 +644,7 @@ A number of fixes did not make it into the 0.9.x series:
   included in the output by passing `--senstive=some` or `--senstive=all`.
 - Reduced startup latency by only importing commands necessary for a particular
   command line call.
-- [create]:
+- [create][]:
   - `-d <parent> --nosave` now registers subdatasets, when possible.
   - `--fake-dates` configures dataset to use fake-dates
 - [run] now provides a way for the caller to save the result when a
