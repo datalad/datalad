@@ -445,7 +445,7 @@ class Create(Interface):
 
 
     @staticmethod
-    def custom_result_renderer(res, **kwargs):  # pragma: no cover
+    def custom_result_renderer(res, **kwargs):  # pragma: more cover
         from datalad.ui import ui
         if res.get('action', None) == 'create' and \
                 res.get('status', None) == 'ok' and \

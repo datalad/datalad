@@ -130,7 +130,7 @@ class Diff(Interface):
             yield r
 
     @staticmethod
-    def custom_result_renderer(res, **kwargs):  # pragma: no cover
+    def custom_result_renderer(res, **kwargs):  # pragma: more cover
         Status.custom_result_renderer(res, **kwargs)
 
 
