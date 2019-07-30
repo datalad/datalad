@@ -56,11 +56,13 @@ from datalad.support.due import due, Doi
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
 from datalad.cmd import BatchedCommand
+from datalad.config import _parse_gitconfig_dump
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
+from datalad.utils import PurePosixPath
 from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
@@ -2361,6 +2363,62 @@ class GitRepo(RepoInterface):
         if auto:
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
+
+    def _parse_gitmodules(self):
+        # TODO read .gitconfig from Git blob?
+        gitmodules = self.pathobj / '.gitmodules'
+        if not gitmodules.exists():
+            return {}
+        # pull out file content
+        out, err = self._git_custom_command(
+            '',
+            ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
+        # abuse our config parser
+        db, _ = _parse_gitconfig_dump(out, {}, None, True)
+        mods = {}
+        for k, v in iteritems(db):
+            if not k.startswith('submodule.'):
+                # we don't know what this is
+                lgr.debug("Skip unrecognized .gitmodule specification: %s=%s", k, v)
+                continue
+            k_l = k.split('.')
+            # module name is everything after 'submodule.' that is not the variable
+            # name
+            mod_name = '.'.join(k_l[1:-1])
+            mod = mods.get(mod_name, {})
+            # variable name is the last 'dot-free' segment in the key
+            mod[k_l[-1]] = v
+            mods[mod_name] = mod
+
+        out = {}
+        # bring into traditional shape
+        for name, props in iteritems(mods):
+            if 'path' not in props:
+                lgr.debug("Failed to get '%s.path', skipping section", name)
+                continue
+            modprops = {'gitmodule_{}'.format(k): v
+                        for k, v in iteritems(props)
+                        if not (k.startswith('__') or k == 'path')}
+            modpath = self.pathobj / PurePosixPath(props['path'])
+            modprops['gitmodule_name'] = name
+            out[modpath] = modprops
+        return out
+
+    def get_submodules_(self, paths=None):
+        if not (self.pathobj / ".gitmodules").exists():
+            return
+
+        modinfo = self._parse_gitmodules()
+        for path, props in iteritems(self.get_content_info(
+                paths=paths,
+                ref=None,
+                untracked='no',
+                eval_file_type=False)):
+            if props.get('type', None) != 'dataset':
+                continue
+            props["path"] = path
+            props.update(modinfo.get(path, {}))
+            yield props
 
     def get_submodules(self, sorted_=True):
         """Return a list of git.Submodule instances for all submodules"""

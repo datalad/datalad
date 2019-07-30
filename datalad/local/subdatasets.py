@@ -15,11 +15,8 @@ import logging
 import re
 import os
 from six import (
-    iteritems,
     text_type,
 )
-
-from datalad.config import _parse_gitconfig_dump
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -45,7 +42,6 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     assure_list,
     partition,
-    PurePosixPath,
 )
 
 from datalad.distribution.dataset import (
@@ -58,47 +54,6 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 
 
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
-
-
-def _parse_gitmodules(ds):
-    # TODO read .gitconfig from Git blob?
-    gitmodules = ds.pathobj / '.gitmodules'
-    if not gitmodules.exists():
-        return {}
-    # pull out file content
-    out, err = ds.repo._git_custom_command(
-        '',
-        ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
-    # abuse our config parser
-    db, _ = _parse_gitconfig_dump(out, {}, None, True)
-    mods = {}
-    for k, v in iteritems(db):
-        if not k.startswith('submodule.'):
-            # we don't know what this is
-            lgr.debug("Skip unrecognized .gitmodule specification: %s=%s", k, v)
-            continue
-        k_l = k.split('.')
-        # module name is everything after 'submodule.' that is not the variable
-        # name
-        mod_name = '.'.join(k_l[1:-1])
-        mod = mods.get(mod_name, {})
-        # variable name is the last 'dot-free' segment in the key
-        mod[k_l[-1]] = v
-        mods[mod_name] = mod
-
-    out = {}
-    # bring into traditional shape
-    for name, props in iteritems(mods):
-        if 'path' not in props:
-            lgr.debug("Failed to get '%s.path', skipping section", name)
-            continue
-        modprops = {'gitmodule_{}'.format(k): v
-                    for k, v in iteritems(props)
-                    if not (k.startswith('__') or k == 'path')}
-        modpath = ds.pathobj / PurePosixPath(props['path'])
-        modprops['gitmodule_name'] = name
-        out[modpath] = modprops
-    return out
 
 
 def _parse_git_submodules(ds, paths):
@@ -121,11 +76,8 @@ def _parse_git_submodules(ds, paths):
             else:
                 # we had path contraints, but none matched this dataset
                 return
-    for path, props in iteritems(ds.repo.get_content_info(
-            paths=paths,
-            ref=None,
-            untracked='no',
-            eval_file_type=False)):
+    for props in ds.repo.get_submodules_(paths=paths):
+        path = props["path"]
         if props.get('type', None) != 'dataset':
             continue
         if ds.pathobj != ds.repo.pathobj:
@@ -320,7 +272,6 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
     dspath = ds.path
     if not GitRepo.is_valid_repo(dspath):
         return
-    modinfo = _parse_gitmodules(ds)
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(ds, paths):
         if contains and not any(
@@ -333,7 +284,6 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         to_report = paths is None \
             or any(p == sm['path'] or p in sm['path'].parents
                    for p in paths)
-        sm.update(modinfo.get(sm['path'], {}))
         if to_report and (set_property or delete_property):
             # first deletions
             for dprop in assure_list(delete_property):
