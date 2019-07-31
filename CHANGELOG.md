@@ -270,13 +270,25 @@ with more performant implementations.
   information and save changes.
 
 
-## 0.11.6 (??? ??, 2019) -- will be better than ever
+## 0.11.7 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
 - hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
+
+Primarily bug fixes to achieve more robust performance
 
 ### Fixes
 
