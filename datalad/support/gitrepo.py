@@ -14,6 +14,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from itertools import chain
 import logging
 from collections import OrderedDict
+from collections import namedtuple
 import re
 import shlex
 import time
@@ -553,6 +554,10 @@ class GitPythonProgressBar(RemoteProgress):
         # a blink at some higher value.  Anyways git provides those
         # without flooding so should be safe to force here.
         self._pbar.refresh()
+
+
+# Compatibility kludge.  See GitRepo.get_submodules().
+Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
 @add_metaclass(Flyweight)
@@ -2432,15 +2437,47 @@ class GitRepo(RepoInterface):
             props.update(modinfo.get(path, {}))
             yield props
 
-    def get_submodules(self, sorted_=True):
-        """Return a list of git.Submodule instances for all submodules"""
-        # check whether we have anything in the repo. if not go home early
-        if not self.repo.head.is_valid():
-            return []
-        submodules = self.repo.submodules
+    def get_submodules(self, sorted_=True, paths=None, compat=True):
+        """Return list of submodules.
+
+        Parameters
+        ----------
+        sorted_ : bool, optional
+            Sort submodules by path name.
+        paths : list(pathlib.PurePath), optional
+            Restrict submodules to those under `paths`.
+        compat : bool, optional
+            If true, return a namedtuple that incompletely mimics the
+            attributes of GitPython's Submodule object in hope of backwards
+            compatibility with previous callers. Note that this form should be
+            considered temporary and callers should be updated; this flag will
+            be removed in a future release.
+
+        Returns
+        -------
+        List of submodule namedtuples if `compat` is true or otherwise a list
+        of dictionaries as returned by `get_submodules_`.
+        """
+        xs = self.get_submodules_(paths=paths)
+        if compat:
+            warnings.warn("The attribute-based return value of get_submodules() "
+                          "exists for compatibility purposes and will be removed "
+                          "in an upcoming release",
+                          DeprecationWarning)
+            xs = (Submodule(name=p["gitmodule_name"],
+                            path=text_type(p["path"].relative_to(self.pathobj)),
+                            url=p["gitmodule_url"])
+                  for p in xs)
+
         if sorted_:
-            submodules = sorted(submodules, key=lambda x: x.path)
-        return submodules
+            if compat:
+                def key(x):
+                    return x.path
+            else:
+                def key(x):
+                    return x["path"]
+            xs = sorted(xs, key=key)
+        return list(xs)
 
     def is_submodule_modified(self, name, options=[]):
         """Whether a submodule has new commits
