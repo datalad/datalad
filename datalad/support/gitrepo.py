@@ -3046,7 +3046,7 @@ class GitRepo(RepoInterface):
             if path_strs:
                 # we need to get their within repo elements since ls-tree
                 # for paths within submodules returns nothing!
-                # see https://www.spinics.net/lists/git/msg362459.html
+                # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
                 submodules = [s.path for s in self.get_submodules()]
                 path_strs = get_parent_paths(path_strs, submodules)
         else:
