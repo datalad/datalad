@@ -14,7 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 import os
-from os.path import relpath
 from six import (
     iteritems,
     text_type,
@@ -48,9 +47,6 @@ from datalad.utils import (
     partition,
     PurePosixPath,
 )
-
-# API commands
-import datalad.core.local.save
 
 from datalad.distribution.dataset import (
     EnsureDataset,
