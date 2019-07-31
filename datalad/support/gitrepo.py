@@ -2405,6 +2405,18 @@ class GitRepo(RepoInterface):
         return out
 
     def get_submodules_(self, paths=None):
+        """Yield submodules in this repository.
+
+        Parameters
+        ----------
+        paths : list(pathlib.PurePath), optional
+            Restrict submodules to those under `paths`.
+
+        Returns
+        -------
+        A generator that yields a dictionary with information for each
+        submodule.
+        """
         if not (self.pathobj / ".gitmodules").exists():
             return
 
