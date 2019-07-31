@@ -383,7 +383,7 @@ class Status(Interface):
                 )
 
     @staticmethod
-    def custom_result_renderer(res, **kwargs):  # pragma: no cover
+    def custom_result_renderer(res, **kwargs):  # pragma: more cover
         if not (res['status'] == 'ok' \
                 and res['action'] in ('status', 'diff') \
                 and res.get('state', None) != 'clean'):
@@ -414,7 +414,7 @@ class Status(Interface):
                 ac.color_word(type_, ac.MAGENTA) if type_ else '')))
 
     @staticmethod
-    def custom_result_summary_renderer(results):  # pragma: no cover
+    def custom_result_summary_renderer(results):  # pragma: more cover
         # fish out sizes of annexed files. those will only be present
         # with --annex ...
         annexed = [
