@@ -971,8 +971,7 @@ def test_AnnexRepo_get(src, dst):
 
 
 @known_failure_direct_mode  #FIXME https://github.com/datalad/datalad/pull/3542#issuecomment-513791662
-# Fix first appeared in  7.20190708+git36-g32d526164-1
-@skip_if(external_versions['cmd:annex'] < '7.20190708+git36', "Needs freshier git-annex")
+@skip_if(external_versions['cmd:annex'] < '7.20190717', "Needs freshier git-annex")
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
 def test_v7_detached_get(opath, path):
