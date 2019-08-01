@@ -285,3 +285,17 @@ def test_get_subdatasets_types(path):
     ds.create('true')
     # no types casting should happen
     eq_(ds.subdatasets(result_xfm='relpaths'), ['1', 'true'])
+
+
+@with_tempfile
+def test_parent_on_unborn_branch(path):
+    from datalad.support.gitrepo import GitRepo
+    ds = Dataset(GitRepo(path, create=True).path)
+    assert_false(ds.repo.get_hexsha())
+
+    subrepo = GitRepo(opj(path, "sub"), create=True)
+    subrepo.commit(msg="c", options=["--allow-empty"])
+
+    ds.repo.add_submodule(path="sub")
+    eq_(ds.subdatasets(result_xfm='relpaths'),
+        ["sub"])
