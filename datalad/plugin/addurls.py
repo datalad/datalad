@@ -754,6 +754,13 @@ class Addurls(Interface):
                                       message=exc_str(exc))
                 return
 
+        if not rows:
+            yield get_status_dict(action="addurls",
+                                  ds=dataset,
+                                  status="notneeded",
+                                  message="No rows to process")
+            return
+
         if len(rows) != len(set(row["filename"] for row in rows)):
             yield get_status_dict(action="addurls",
                                   ds=dataset,

@@ -594,5 +594,8 @@ class TestAddurls(object):
             # TODO: This op.join() can be dropped once gh-3580 is fixed.
             fname = op.join(path, fname)
             with swallow_logs(new_level=logging.WARNING) as cml:
-                ds.addurls(fname, "{url}", "{name}")
+                assert_in_results(
+                    ds.addurls(fname, "{url}", "{name}"),
+                    action="addurls",
+                    status="notneeded")
                 cml.assert_logged("No rows", regex=False)
