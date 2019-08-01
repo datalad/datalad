@@ -18,6 +18,7 @@ import tempfile
 from mock import patch
 
 from six.moves import StringIO
+from six import text_type
 
 from datalad.api import addurls, Dataset, subdatasets
 import datalad.plugin.addurls as au
@@ -28,6 +29,7 @@ from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
+from datalad.tests.utils import with_tree
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
@@ -574,3 +576,12 @@ class TestAddurls(object):
              op.join("bar", "adir", "bar-again", "other-ds")})
         ok_exists(os.path.join(
             ds.path, "foo", "adir", "foo-again", "other-ds", "bdir", "a"))
+
+    @with_tree({"in": ""})
+    def test_addurls_invalid_input(self, path):
+        ds = Dataset(path).create(force=True)
+        in_file = op.join(path, "in")
+        for in_type in ["csv", "json"]:
+            with assert_raises(IncompleteResultsError) as exc:
+                ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
+            assert_in("Failed to read", text_type(exc.exception))

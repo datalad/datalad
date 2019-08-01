@@ -252,14 +252,23 @@ def _read(stream, input_type):
     if input_type == "csv":
         import csv
         csvrows = csv.reader(stream)
-        headers = next(csvrows)
+        try:
+            headers = next(csvrows)
+        except StopIteration:
+            raise ValueError("Failed to read CSV rows from {}".format(stream))
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         idx_map = dict(enumerate(headers))
         rows = [dict(zip(headers, r)) for r in csvrows]
     elif input_type == "json":
         import json
-        rows = json.load(stream)
+        try:
+            rows = json.load(stream)
+        except getattr(json.decoder, "JSONDecodeError", ValueError) as e:
+            # ^ py2 compatibility kludge.
+            raise ValueError(
+                "Failed to read JSON from stream {}: {}"
+                .format(stream, exc_str(e)))
         # For json input, we do not support indexing by position,
         # only names.
         idx_map = {}
