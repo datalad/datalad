@@ -1012,6 +1012,16 @@ def test_GitRepo_get_submodules():
     raise SkipTest("TODO")
 
 
+@with_tempfile
+def test_get_submodules_parent_on_unborn_branch(path):
+    repo = GitRepo(path, create=True)
+    subrepo = GitRepo(op.join(path, "sub"), create=True)
+    subrepo.commit(msg="s", options=["--allow-empty"])
+    repo.add_submodule(path="sub")
+    eq_([s.name for s in repo.get_submodules()],
+        ["sub"])
+
+
 def test_kwargs_to_options():
 
     class Some(object):
