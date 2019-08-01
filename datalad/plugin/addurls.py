@@ -407,8 +407,8 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     Returns
     -------
     A tuple where the first item is a list with a dict of extracted information
-    for each row in `stream` and the second item is a set that contains all the
-    subdataset paths.
+    for each row in `stream` and the second item a list subdataset paths,
+    sorted breadth-first.
     """
     meta = assure_list(meta)
 
