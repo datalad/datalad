@@ -422,6 +422,9 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     meta = assure_list(meta)
 
     rows, colidx_to_name = _read(stream, input_type)
+    if not rows:
+        lgr.warning("No rows found in %s", stream)
+        return [], []
 
     fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
     format_url = partial(fmt.format, url_format)

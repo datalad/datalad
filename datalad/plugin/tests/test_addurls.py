@@ -585,3 +585,14 @@ class TestAddurls(object):
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
             assert_in("Failed to read", text_type(exc.exception))
+
+    @with_tree({"in.csv": "url,name,subdir",
+                "in.json": "[]"})
+    def test_addurls_no_rows(self, path):
+        ds = Dataset(path).create(force=True)
+        for fname in ["in.csv", "in.json"]:
+            # TODO: This op.join() can be dropped once gh-3580 is fixed.
+            fname = op.join(path, fname)
+            with swallow_logs(new_level=logging.WARNING) as cml:
+                ds.addurls(fname, "{url}", "{name}")
+                cml.assert_logged("No rows", regex=False)
