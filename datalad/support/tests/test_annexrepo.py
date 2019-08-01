@@ -884,8 +884,7 @@ def test_AnnexRepo_get(src, dst):
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
 
 
-# Fix first appeared in  7.20190708+git36-g32d526164-1
-@skip_if(external_versions['cmd:annex'] < '7.20190708+git36', "Needs freshier git-annex")
+@skip_if(external_versions['cmd:annex'] < '7.20190717', "Needs freshier git-annex")
 @with_tree(tree={'file.dat': 'content'})
 @with_tempfile
 def test_v7_detached_get(opath, path):
