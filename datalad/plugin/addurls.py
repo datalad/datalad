@@ -252,14 +252,23 @@ def _read(stream, input_type):
     if input_type == "csv":
         import csv
         csvrows = csv.reader(stream)
-        headers = next(csvrows)
+        try:
+            headers = next(csvrows)
+        except StopIteration:
+            raise ValueError("Failed to read CSV rows from {}".format(stream))
         lgr.debug("Taking %s fields from first line as headers: %s",
                   len(headers), headers)
         idx_map = dict(enumerate(headers))
         rows = [dict(zip(headers, r)) for r in csvrows]
     elif input_type == "json":
         import json
-        rows = json.load(stream)
+        try:
+            rows = json.load(stream)
+        except getattr(json.decoder, "JSONDecodeError", ValueError) as e:
+            # ^ py2 compatibility kludge.
+            raise ValueError(
+                "Failed to read JSON from stream {}: {}"
+                .format(stream, exc_str(e)))
         # For json input, we do not support indexing by position,
         # only names.
         idx_map = {}
@@ -407,12 +416,15 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     Returns
     -------
     A tuple where the first item is a list with a dict of extracted information
-    for each row in `stream` and the second item is a set that contains all the
-    subdataset paths.
+    for each row in `stream` and the second item a list subdataset paths,
+    sorted breadth-first.
     """
     meta = assure_list(meta)
 
     rows, colidx_to_name = _read(stream, input_type)
+    if not rows:
+        lgr.warning("No rows found in %s", stream)
+        return [], []
 
     fmt = Formatter(colidx_to_name, missing_value)  # For URL and meta
     format_url = partial(fmt.format, url_format)
@@ -741,6 +753,13 @@ class Addurls(Interface):
                                       status="error",
                                       message=exc_str(exc))
                 return
+
+        if not rows:
+            yield get_status_dict(action="addurls",
+                                  ds=dataset,
+                                  status="notneeded",
+                                  message="No rows to process")
+            return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
             yield get_status_dict(action="addurls",
