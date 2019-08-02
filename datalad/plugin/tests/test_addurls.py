@@ -461,8 +461,8 @@ class TestAddurls(object):
                 for subds, fnames in subdir_files.items():
                     for fname in fnames:
                         ok_exists(op.join(subds, fname))
-                # cfg_proc was applied generated subdatasets.
-                ok_exists(op.join(subds, "code"))
+                    # cfg_proc was applied generated subdatasets.
+                    ok_exists(op.join(subds, "code"))
                 if save:
                     assert_repo_status(path)
                 else:
