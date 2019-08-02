@@ -296,6 +296,7 @@ def eval_results(func):
 
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
+        lgr.log(2, "Entered eval_func for %s", func)
         # for result filters and pre/post procedures
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
@@ -362,33 +363,39 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None):
+        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None, proc_cfg=None):
+            lgr.log(2, "Getting procedure specs for %s of %s", param_key, ds)
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
-                return spec
+                return spec, proc_cfg
 
-            from datalad.distribution.dataset import Dataset
-            ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-            spec = (ds.config if ds and ds.is_installed()
-                    else dlcfg).get(cfg_key, None)
+            if not proc_cfg:
+                # .is_installed and .config can be costly, so ensure we do
+                # it only once. See https://github.com/datalad/datalad/issues/3575
+                from datalad.distribution.dataset import Dataset
+                ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
+                proc_cfg = ds.config if ds and ds.is_installed() else dlcfg
+
+            spec = proc_cfg.get(cfg_key, None)
             if spec is None:
-                return
+                return None, proc_cfg
             elif not isinstance(spec, tuple):
                 spec = [spec]
-            return [shlex.split(s) for s in spec]
+            return [shlex.split(s) for s in spec], proc_cfg
 
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
-        proc_pre = _get_procedure_specs(
+        proc_pre, proc_cfg = _get_procedure_specs(
             'proc_pre',
             'datalad.{}.proc-pre'.format(cmdline_name),
             ds=dataset_arg)
-        proc_post = _get_procedure_specs(
+        proc_post, proc_cfg = _get_procedure_specs(
             'proc_post',
             'datalad.{}.proc-post'.format(cmdline_name),
-            ds=dataset_arg)
+            ds=dataset_arg,
+            proc_cfg=proc_cfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -468,6 +475,7 @@ def eval_results(func):
 
         if return_type == 'generator':
             # hand over the generator
+            lgr.log(2, "Returning generator_func from eval_func for %s", _func_class)
             return generator_func(*args, **kwargs)
         else:
             @wrapt.decorator
@@ -487,7 +495,7 @@ def eval_results(func):
                     return results[0] if results else None
                 else:
                     return results
-
+            lgr.log(2, "Returning return_func from eval_func for %s", _func_class)
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
