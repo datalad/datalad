@@ -2385,7 +2385,7 @@ class GitRepo(RepoInterface):
         for k, v in iteritems(db):
             if not k.startswith('submodule.'):
                 # we don't know what this is
-                lgr.debug("Skip unrecognized .gitmodule specification: %s=%s", k, v)
+                lgr.warning("Skip unrecognized .gitmodule specification: %s=%s", k, v)
                 continue
             k_l = k.split('.')
             # module name is everything after 'submodule.' that is not the variable
@@ -2400,7 +2400,7 @@ class GitRepo(RepoInterface):
         # bring into traditional shape
         for name, props in iteritems(mods):
             if 'path' not in props:
-                lgr.debug("Failed to get '%s.path', skipping section", name)
+                lgr.warning("Failed to get '%s.path', skipping this submodule", name)
                 continue
             modprops = {'gitmodule_{}'.format(k): v
                         for k, v in iteritems(props)
