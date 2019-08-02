@@ -369,7 +369,7 @@ def eval_results(func):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
-                return spec
+                return spec, proc_cfg
 
             if not proc_cfg:
                 # .is_installed and .config can be costly, so ensure we do
