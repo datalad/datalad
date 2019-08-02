@@ -22,6 +22,7 @@ from six import (
 )
 from six.moves.urllib.parse import urlparse
 
+from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
@@ -657,10 +658,13 @@ class Addurls(Interface):
             args=("filenameformat",),
             metavar="FILENAME-FORMAT",
             doc="""Like `URL-FORMAT`, but this format string specifies the file
-            to which the URL's content will be downloaded.  The file name may
-            contain directories.  The separator "//" can be used to indicate
-            that the left-side directory should be created as a new subdataset.
-            See the 'Format Specification' section above."""),
+            to which the URL's content will be downloaded. The name should be a
+            relative path and will be taken as relative to the top-level
+            dataset, regardless of whether it is specified via [PY: `dataset`
+            PY][CMD: --dataset CMD]) or inferred. The file name may contain
+            directories. The separator "//" can be used to indicate that the
+            left-side directory should be created as a new subdataset. See the
+            'Format Specification' section above."""),
         input_type=Parameter(
             args=("-t", "--input-type"),
             metavar="TYPE",
@@ -750,13 +754,15 @@ class Addurls(Interface):
 
         lgr = logging.getLogger("datalad.plugin.addurls")
 
-        dataset = require_dataset(dataset, check_installed=False)
-        if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
+        ds = require_dataset(dataset, check_installed=False)
+        if ds.repo and not isinstance(ds.repo, AnnexRepo):
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="error",
                                   message="not an annex repo")
             return
+
+        url_file = resolve_path(url_file, dataset)
 
         if input_type == "ext":
             extension = os.path.splitext(url_file)[1]
@@ -771,21 +777,21 @@ class Addurls(Interface):
                                          missing_value)
             except (ValueError, RequestException) as exc:
                 yield get_status_dict(action="addurls",
-                                      ds=dataset,
+                                      ds=ds,
                                       status="error",
                                       message=exc_str(exc))
                 return
 
         if not rows:
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="notneeded",
                                   message="No rows to process")
             return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="error",
                                   message=("There are file name collisions; "
                                            "consider using {_repindex}"))
@@ -797,46 +803,46 @@ class Addurls(Interface):
             for row in rows:
                 lgr.info("Would download %s to %s",
                          row["url"],
-                         os.path.join(dataset.path, row["filename"]))
+                         os.path.join(ds.path, row["filename"]))
                 lgr.info("Metadata: %s",
                          sorted(u"{}={}".format(k, v)
                                 for k, v in row["meta_args"].items()))
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="ok",
                                   message="dry-run finished")
             return
 
-        if not dataset.repo:
+        if not ds.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None,
-                                    return_type='generator',
-                                    cfg_proc=cfg_proc):
+            for r in ds.create(result_xfm=None,
+                               return_type='generator',
+                               cfg_proc=cfg_proc):
                 yield r
 
         annex_options = ["--fast"] if fast else []
 
         for spath in subpaths:
-            if os.path.exists(os.path.join(dataset.path, spath)):
+            if os.path.exists(os.path.join(ds.path, spath)):
                 lgr.warning(
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                for r in dataset.create(spath, result_xfm=None,
-                                        cfg_proc=cfg_proc,
-                                        return_type='generator'):
+                for r in ds.create(spath, result_xfm=None,
+                                   cfg_proc=cfg_proc,
+                                   return_type='generator'):
                     yield r
 
         for row in rows:
             # Add additional information that we'll need for various
             # operations.
-            filename_abs = os.path.join(dataset.path, row["filename"])
+            filename_abs = os.path.join(ds.path, row["filename"])
             if row["subpath"]:
-                ds_current = Dataset(os.path.join(dataset.path,
+                ds_current = Dataset(os.path.join(ds.path,
                                                   row["subpath"]))
                 ds_filename = os.path.relpath(filename_abs, ds_current.path)
             else:
-                ds_current = dataset
+                ds_current = ds
                 ds_filename = row["filename"]
             row.update({"filename_abs": filename_abs,
                         "ds": ds_current,
@@ -883,7 +889,7 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
                 yield r
 
             if save:
-                for r in dataset.save(path=files_to_add, message=msg, recursive=True):
+                for r in ds.save(path=files_to_add, message=msg, recursive=True):
                     yield r
 
 
