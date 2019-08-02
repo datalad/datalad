@@ -728,10 +728,10 @@ class Addurls(Interface):
 
         lgr = logging.getLogger("datalad.plugin.addurls")
 
-        dataset = require_dataset(dataset, check_installed=False)
-        if dataset.repo and not isinstance(dataset.repo, AnnexRepo):
+        ds = require_dataset(dataset, check_installed=False)
+        if ds.repo and not isinstance(ds.repo, AnnexRepo):
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="error",
                                   message="not an annex repo")
             return
@@ -749,21 +749,21 @@ class Addurls(Interface):
                                          missing_value)
             except (ValueError, RequestException) as exc:
                 yield get_status_dict(action="addurls",
-                                      ds=dataset,
+                                      ds=ds,
                                       status="error",
                                       message=exc_str(exc))
                 return
 
         if not rows:
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="notneeded",
                                   message="No rows to process")
             return
 
         if len(rows) != len(set(row["filename"] for row in rows)):
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="error",
                                   message=("There are file name collisions; "
                                            "consider using {_repindex}"))
@@ -775,44 +775,44 @@ class Addurls(Interface):
             for row in rows:
                 lgr.info("Would download %s to %s",
                          row["url"],
-                         os.path.join(dataset.path, row["filename"]))
+                         os.path.join(ds.path, row["filename"]))
                 lgr.info("Metadata: %s",
                          sorted(u"{}={}".format(k, v)
                                 for k, v in row["meta_args"].items()))
             yield get_status_dict(action="addurls",
-                                  ds=dataset,
+                                  ds=ds,
                                   status="ok",
                                   message="dry-run finished")
             return
 
-        if not dataset.repo:
+        if not ds.repo:
             # Populate a new dataset with the URLs.
-            for r in dataset.create(result_xfm=None, return_type='generator',
-                                    save=save):
+            for r in ds.create(result_xfm=None, return_type='generator',
+                               save=save):
                 yield r
 
         annex_options = ["--fast"] if fast else []
 
         for spath in subpaths:
-            if os.path.exists(os.path.join(dataset.path, spath)):
+            if os.path.exists(os.path.join(ds.path, spath)):
                 lgr.warning(
                     "Not creating subdataset at existing path: %s",
                     spath)
             else:
-                for r in dataset.create(spath, result_xfm=None,
-                                        return_type='generator', save=save):
+                for r in ds.create(spath, result_xfm=None,
+                                   return_type='generator', save=save):
                     yield r
 
         for row in rows:
             # Add additional information that we'll need for various
             # operations.
-            filename_abs = os.path.join(dataset.path, row["filename"])
+            filename_abs = os.path.join(ds.path, row["filename"])
             if row["subpath"]:
-                ds_current = Dataset(os.path.join(dataset.path,
+                ds_current = Dataset(os.path.join(ds.path,
                                                   row["subpath"]))
                 ds_filename = os.path.relpath(filename_abs, ds_current.path)
             else:
-                ds_current = dataset
+                ds_current = ds
                 ds_filename = row["filename"]
             row.update({"filename_abs": filename_abs,
                         "ds": ds_current,
@@ -854,7 +854,7 @@ url_format='{}'
 filename_format='{}'""".format(url_file, url_format, filename_format)
 
         if files_to_add:
-            for r in dataset.add(files_to_add, save=False):
+            for r in ds.add(files_to_add, save=False):
                 yield r
 
             meta_rows = [r for r in rows if r["filename_abs"] in files_to_add]
@@ -864,7 +864,7 @@ filename_format='{}'""".format(url_file, url_format, filename_format)
             # Save here rather than the add call above to trigger a metadata
             # commit on the git-annex branch.
             if save:
-                for r in dataset.save(message=msg, recursive=True):
+                for r in ds.save(message=msg, recursive=True):
                     yield r
 
 
