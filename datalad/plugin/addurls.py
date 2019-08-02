@@ -22,7 +22,7 @@ from six import (
 )
 from six.moves.urllib.parse import urlparse
 
-from datalad.distribution.dataset import resolve_path
+from datalad.distribution.dataset import rev_resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
@@ -762,7 +762,7 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = resolve_path(url_file, dataset)
+        url_file = text_type(rev_resolve_path(url_file, dataset))
 
         if input_type == "ext":
             extension = os.path.splitext(url_file)[1]

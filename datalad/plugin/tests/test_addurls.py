@@ -452,9 +452,9 @@ class TestAddurls(object):
         # The input file is relative to the current working directory, as
         # with other commands.
         check("subdir0", None, "in.json")
-        # The input file (without a leading "./") is relative to the dataset if
-        # any dataset argument is given, even a string.
-        check("subdir1", ds.path, op.join("subdir1", "in.json"))
+        # Likewise the input file is relative to the current working directory
+        # if a string dataset argument is given.
+        check("subdir1", ds.path, "in.json")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
