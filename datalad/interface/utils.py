@@ -372,7 +372,7 @@ def eval_results(func):
                 return spec
 
             if not proc_cfg:
-                # .is_installed and .config can be costly, so assure we do
+                # .is_installed and .config can be costly, so ensure we do
                 # it only once. See https://github.com/datalad/datalad/issues/3575
                 from datalad.distribution.dataset import Dataset
                 ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
