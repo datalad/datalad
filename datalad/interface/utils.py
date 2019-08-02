@@ -382,7 +382,7 @@ def eval_results(func):
             if spec is None:
                 return None, proc_cfg
             elif not isinstance(spec, tuple):
-                spec = [spec], proc_cfg
+                spec = [spec]
             return [shlex.split(s) for s in spec], proc_cfg
 
         # query cfg for defaults
