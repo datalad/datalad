@@ -641,10 +641,13 @@ class Addurls(Interface):
             args=("filenameformat",),
             metavar="FILENAME-FORMAT",
             doc="""Like `URL-FORMAT`, but this format string specifies the file
-            to which the URL's content will be downloaded.  The file name may
-            contain directories.  The separator "//" can be used to indicate
-            that the left-side directory should be created as a new subdataset.
-            See the 'Format Specification' section above."""),
+            to which the URL's content will be downloaded. The name should be a
+            relative path and will be taken as relative to the top-level
+            dataset, regardless of whether it is specified via [PY: `dataset`
+            PY][CMD: --dataset CMD]) or inferred. The file name may contain
+            directories. The separator "//" can be used to indicate that the
+            left-side directory should be created as a new subdataset. See the
+            'Format Specification' section above."""),
         input_type=Parameter(
             args=("-t", "--input-type"),
             metavar="TYPE",
