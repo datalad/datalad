@@ -1103,7 +1103,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not key:
             expected_downloads, fetch_files = self._get_expected_files(
-                files, ['--not', '--in', 'here'],
+                files, ['--not', '--in', '.'],
                 merge_annex_branches=False  # interested only in local info
             )
         else:
@@ -2375,7 +2375,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 args.append('-)')
 
             if with_content_only:
-                args.extend(['--in', 'here'])
+                args.extend(['--in', '.'])
         out, err = self._run_annex_command(
             'find', annex_options=args, merge_annex_branches=False
         )
@@ -2816,7 +2816,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # is the verb (copy, copy) or (get, put) and remote ('here', remote)?
         if '--key' not in options:
             expected_copys, copy_files = self._get_expected_files(
-                files, ['--in', 'here', '--not', '--in', remote])
+                files, ['--in', '.', '--not', '--in', remote])
         else:
             copy_files = files
             assert(len(files) == 1)

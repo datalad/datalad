@@ -568,6 +568,16 @@ class AnnotatePaths(Interface):
             # re-append the preserved paths:
             requested_paths = chain(requested_paths, iter(preserved_paths))
 
+        # Possibly to be used "cache" of known subdatasets per each parent
+        # to avoid re-querying subdatasets per each path.  The assumption here
+        # is that the list of sub-datasets for a given parent should not change
+        # through the execution of this loop, which (hypothetically) could be
+        # incorrect while annotating paths for some commands.
+        # TODO: verify this assumption and possibly add an argument to turn
+        #  caching off if/when needed, or provide some other way to invalidate
+        #  it
+        subdss_cache = {}
+
         # do not loop over unique(), this could be a list of dicts
         # we avoid duplicates manually below via `reported_paths`
         for path in requested_paths:
@@ -674,9 +684,15 @@ class AnnotatePaths(Interface):
                 # a dataset (without this info) -> record whether this is a known subdataset
                 # to its parent
                 containing_ds = Dataset(parent)
-                subdss = containing_ds.subdatasets(
-                    fulfilled=None, recursive=False,
-                    result_xfm=None, result_filter=None, return_type='list')
+                # Possibly "cache" the list of known subdss for parents we
+                # have encountered so far
+                if parent in subdss_cache:
+                    subdss = subdss_cache[parent]
+                else:
+                    subdss = containing_ds.subdatasets(
+                        fulfilled=None, recursive=False,
+                        result_xfm=None, result_filter=None, return_type='list')
+                    subdss_cache[parent] = subdss
                 if path in [s['path'] for s in subdss]:
                     if path_type == 'directory' or not lexists(path):
                         # first record that it isn't here, if just a dir or not here at all
