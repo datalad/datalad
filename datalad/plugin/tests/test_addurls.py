@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import os.path as op
+import shutil
 import tempfile
 
 from mock import patch
@@ -436,6 +437,28 @@ class TestAddurls(object):
                           self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
+    def test_addurls_unbound_dataset(self, path):
+        ds = Dataset(path).create(force=True)
+
+        def check(subpath, dataset_arg, url_file):
+            subdir = op.join(path, subpath)
+            os.mkdir(subdir)
+            with chpwd(subdir):
+                shutil.copy(self.json_file, "in.json")
+                addurls(dataset_arg, url_file, "{url}", "{name}")
+                # Files specified in the CSV file are always relative to the
+                # dataset.
+                for fname in ["a", "b", "c"]:
+                    ok_exists(op.join(ds.path, fname))
+
+        # The input file is relative to the current working directory, as
+        # with other commands.
+        check("subdir0", None, "in.json")
+        # The input file (without a leading "./") is relative to the dataset if
+        # any dataset argument is given, even a string.
+        check("subdir1", ds.path, op.join("subdir1", "in.json"))
+
+    @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
         dspath = os.path.join(path, "ds")
         addurls(dspath, self.json_file, "{url}", "{name}")
@@ -591,8 +614,6 @@ class TestAddurls(object):
     def test_addurls_no_rows(self, path):
         ds = Dataset(path).create(force=True)
         for fname in ["in.csv", "in.json"]:
-            # TODO: This op.join() can be dropped once gh-3580 is fixed.
-            fname = op.join(path, fname)
             with swallow_logs(new_level=logging.WARNING) as cml:
                 assert_in_results(
                     ds.addurls(fname, "{url}", "{name}"),
