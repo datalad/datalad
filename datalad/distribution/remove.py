@@ -292,7 +292,6 @@ class Remove(Interface):
             return
 
         for res in Save.__call__(
-                # TODO compose hand-selected annotated paths
                 path=[ap["path"] for ap in to_save],
                 # we might have removed the reference dataset by now, recheck
                 dataset=refds_path
