@@ -37,7 +37,7 @@ from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.save import Save
+from datalad.core.local.save import Save
 from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
 from datalad.distribution.drop import check_argument
@@ -293,7 +293,7 @@ class Remove(Interface):
 
         for res in Save.__call__(
                 # TODO compose hand-selected annotated paths
-                path=to_save,
+                path=[ap["path"] for ap in to_save],
                 # we might have removed the reference dataset by now, recheck
                 dataset=refds_path
                         if (refds_path and GitRepo.is_valid_repo(refds_path))
