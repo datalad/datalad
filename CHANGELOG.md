@@ -19,11 +19,29 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- [addurls][]
+  - now provides better handling when the URL file isn't in the
+    expected format.  ([#3579][])
+  - always considered a relative file for the URL file argument as
+    relative to the current working directory, which goes against the
+    convention used by other commands of taking relative paths as
+    relative to the dataset argument.  ([#3582][])
+
+- [siblings][] now displays an informative error message if a local
+  path is given to `--url` but `--name` isn't specified.  ([#3555][])
 
 ### Enhancements and new features
 
-?
+- The [annotate-paths][] helper now caches subdatasets it has seen to
+  avoid unnecessary calls.  ([#3570][])
+
+- A repeated configuration query has been dropped from the handling of
+  `--proc-pre` and `--proc-post`.  ([#3576][])
+
+- Calls to `git annex find` now use `--in=.` instead of the alias
+  `--in=here` to take advantage of an optimization that git-annex (as
+  of the current release, 7.20190730) applies only to the
+  former. ([#3574][])
 
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
@@ -1404,4 +1422,10 @@ publishing
 [#3525]: https://github.com/datalad/datalad/issues/3525
 [#3527]: https://github.com/datalad/datalad/issues/3527
 [#3547]: https://github.com/datalad/datalad/issues/3547
+[#3555]: https://github.com/datalad/datalad/issues/3555
 [#3561]: https://github.com/datalad/datalad/issues/3561
+[#3570]: https://github.com/datalad/datalad/issues/3570
+[#3574]: https://github.com/datalad/datalad/issues/3574
+[#3576]: https://github.com/datalad/datalad/issues/3576
+[#3579]: https://github.com/datalad/datalad/issues/3579
+[#3582]: https://github.com/datalad/datalad/issues/3582
