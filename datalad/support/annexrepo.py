@@ -3181,15 +3181,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
         opts = ['--copies', '0']
+        files = None
         if ref:
             cmd = 'findref'
             opts.append(ref)
         else:
             cmd = 'find'
             # stringify any pathobjs
-            opts.extend([text_type(p) for p in paths]
-                        if paths else ['--include', '*'])
-        for j in self._run_annex_command_json(cmd, opts=opts):
+            if paths:
+                files = [text_type(p) for p in paths]
+            else:
+                opts.extend(['--include', '*'])
+
+        for j in self._run_annex_command_json(cmd, opts=opts, files=files):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
             if init is not None and rec is None:
