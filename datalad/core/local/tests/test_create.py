@@ -409,7 +409,7 @@ def test_create_withcfg(path):
         dataset=path,
         cfg_proc=['yoda'])
     assert_repo_status(path)
-    assert((ds.pathobj / 'README.md').exists())
+    assert (ds.pathobj / 'README.md').exists()
 
 
 @with_tempfile(mkdir=True)
