@@ -425,6 +425,10 @@ class Create(Interface):
             _status=add_to_git,
         )
 
+        for cfg_proc_ in cfg_proc or []:
+            for r in tbds.run_procedure('cfg_' + cfg_proc_):
+                yield r
+
         # the next only makes sense if we saved the created dataset,
         # otherwise we have no committed state to be registered
         # in the parent
@@ -438,11 +442,6 @@ class Create(Interface):
 
         res.update({'status': 'ok'})
         yield res
-
-        for cfg_proc_ in cfg_proc or []:
-            for r in tbds.run_procedure('cfg_' + cfg_proc_):
-                yield r
-
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: more cover
