@@ -409,7 +409,13 @@ def test_create_withcfg(path):
         dataset=path,
         cfg_proc=['yoda'])
     assert_repo_status(path)
-    assert((ds.pathobj / 'README.md').exists())
+    assert (ds.pathobj / 'README.md').exists()
+
+    # If we are creating a dataset within a reference dataset, we save _after_
+    # the procedure runs.
+    ds.create('subds', cfg_proc=['yoda'])
+    assert_repo_status(path)
+    assert (ds.pathobj / 'subds' / 'README.md').exists()
 
 
 @with_tempfile(mkdir=True)
