@@ -36,6 +36,7 @@ import json
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
+from datalad.utils import assure_bytes
 from datalad.utils import assure_unicode
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
@@ -503,7 +504,15 @@ def eval_results(func):
 
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
-        path = text_type(res['path'])
+        path = res['path']
+        if PY2:
+            # On Python 2 _process_results() has already converted all unicode
+            # in `res` to bytes, so it's easiest to work with bytes here rather
+            # than converting everything back to unicode.
+            if not isinstance(path, str):  # pathlib
+                path = assure_bytes(text_type(path))
+        else:
+            path = text_type(path)
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
