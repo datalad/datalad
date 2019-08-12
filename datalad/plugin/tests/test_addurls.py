@@ -27,6 +27,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import chpwd, slow, swallow_logs
 from datalad.tests.utils import assert_false, assert_true, assert_raises
 from datalad.tests.utils import assert_in, assert_re_in, assert_in_results
+from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
@@ -317,6 +318,34 @@ def test_addurls_nonannex_repo(path):
     with assert_raises(IncompleteResultsError) as raised:
         ds.addurls("dummy_arg0", "dummy_arg1", "dummy_arg2")
     assert_in("not an annex repo", str(raised.exception))
+
+
+@with_tree({"in.csv": "linky,abcd\nhttps://datalad.org,f"})
+def test_addurls_unknown_placeholder(path):
+    ds = Dataset(path).create(force=True)
+    # Close but wrong URL placeholder
+    with assert_raises(IncompleteResultsError) as exc:
+        ds.addurls("in.csv", "{link}", "{abcd}", dry_run=True)
+    assert_in("linky", str(exc.exception))
+    # Close but wrong file name placeholder
+    with assert_raises(IncompleteResultsError) as exc:
+        ds.addurls("in.csv", "{linky}", "{abc}", dry_run=True)
+    assert_in("abcd", str(exc.exception))
+    # Out-of-bounds index.
+    with assert_raises(IncompleteResultsError) as exc:
+        ds.addurls("in.csv", "{linky}", "{3}", dry_run=True)
+    assert_in("index", str(exc.exception))
+
+    # Suggestions also work for automatic file name placeholders
+    with assert_raises(IncompleteResultsError) as exc:
+        ds.addurls("in.csv", "{linky}", "{_url_hostnam}", dry_run=True)
+    assert_in("_url_hostname", str(exc.exception))
+    # ... though if you whiff on the beginning prefix, we don't suggest
+    # anything because we decide to generate those fields based on detecting
+    # the prefix.
+    with assert_raises(IncompleteResultsError) as exc:
+        ds.addurls("in.csv", "{linky}", "{_uurl_hostnam}", dry_run=True)
+    assert_not_in("_url_hostname", str(exc.exception))
 
 
 @with_tempfile(mkdir=True)
