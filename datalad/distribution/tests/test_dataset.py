@@ -33,6 +33,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import assert_is
 from datalad.tests.utils import assert_not_equal
+from datalad.tests.utils import OBSCURE_FILENAME
 
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import PathKnownToRepositoryError
@@ -226,7 +227,9 @@ def test_subdatasets(path):
 
 
 @with_tempfile(mkdir=True)
-def test_require_dataset(path):
+def check_require_dataset(ds_path, topdir):
+    path = opj(topdir, ds_path)
+    os.mkdir(path)
     with chpwd(path):
         assert_raises(
             InsufficientArgumentsError,
@@ -246,6 +249,11 @@ def test_require_dataset(path):
             require_dataset,
             'some',
             check_installed=True)
+
+
+def test_require_dataset():
+    yield check_require_dataset, "simple-path"
+    yield check_require_dataset, OBSCURE_FILENAME
 
 
 @with_tempfile(mkdir=True)
