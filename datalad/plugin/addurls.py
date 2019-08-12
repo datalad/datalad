@@ -32,6 +32,7 @@ from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
     assure_list,
+    get_suggestions_msg,
     unlink,
 )
 
@@ -278,10 +279,29 @@ def _read(stream, input_type):
     return rows, idx_map
 
 
+def _get_placeholder_exception(exc, msg_prefix, known):
+    """Recast KeyError as a ValueError with close-match suggestions.
+    """
+    value = exc.args[0]
+    if isinstance(value, string_types):
+        sugmsg = get_suggestions_msg(value, known)
+    else:
+        sugmsg = "Out-of-bounds or unsupported index."
+    # Note: Keeping this a KeyError is probably more appropriate but then the
+    # entire message, which KeyError takes as the key, will be rendered with
+    # outer quotes.
+    return ValueError("{}: {}{}{}"
+                      .format(msg_prefix, exc, ". " if sugmsg else "", sugmsg))
+
+
 def _format_filenames(format_fn, rows, row_infos):
     subpaths = set()
     for row, info in zip(rows, row_infos):
-        filename = format_fn(row)
+        try:
+            filename = format_fn(row)
+        except KeyError as exc:
+            raise _get_placeholder_exception(
+                exc, "Unknown placeholder in file name", row)
         filename, spaths = get_subpaths(filename)
         subpaths |= set(spaths)
         info["filename"] = filename
@@ -449,7 +469,11 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     rows_with_url = []
     infos = []
     for row in rows:
-        url = format_url(row)
+        try:
+            url = format_url(row)
+        except KeyError as exc:
+            raise _get_placeholder_exception(
+                exc, "Unknown placeholder in URL", row)
         if not url or url == missing_value:
             continue  # pragma: no cover, peephole optimization
         rows_with_url.append(row)
