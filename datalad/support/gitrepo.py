@@ -36,7 +36,7 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-
+from six import PY2
 from six import string_types
 from six import add_metaclass
 from functools import wraps
@@ -55,6 +55,7 @@ from datalad.cmd import GitRunner
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
+from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -705,7 +706,9 @@ class GitRepo(RepoInterface):
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-            self._repo = self._create_empty_repo(path, **git_opts)
+            self._repo = self._create_empty_repo(
+                assure_bytes(path) if PY2 else path,
+                **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -780,7 +783,8 @@ class GitRepo(RepoInterface):
                 "Initialize empty Git repository at '%s'%s",
                 path,
                 ' %s' % kwargs if kwargs else '')
-            repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+            repo = self.cmd_call_wrapper(gitpy.Repo.init,
+                                         assure_bytes(path) if PY2 else path,
                                          mkdir=True,
                                          odbt=default_git_odbt,
                                          **kwargs)
@@ -804,7 +808,8 @@ class GitRepo(RepoInterface):
         if self._repo is None:
             # Note, that this may raise GitCommandError, NoSuchPathError,
             # InvalidGitRepositoryError:
-            self._repo = self.cmd_call_wrapper(Repo, self.path)
+            self._repo = self.cmd_call_wrapper(
+                Repo, assure_bytes(self.path) if PY2 else self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
