@@ -583,9 +583,9 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
-    lgr.debug("Resolved dataset{0}: {1}".format(
-        ' for {}'.format(purpose) if purpose else '',
-        dataset))
+    lgr.debug("Resolved dataset%s: %s",
+              ' for {}'.format(purpose) if purpose else '',
+              dataset.path)
 
     if check_installed and not dataset.is_installed():
         raise ValueError("No installed dataset found at "
