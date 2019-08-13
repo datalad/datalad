@@ -23,17 +23,114 @@ repository <http://github.com/datalad/datalad>`__ for more details.
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--  hopefully none
+-  The two modules below have a new home. The old locations still exist
+   as compatibility shims and will be removed in a future release.
+
+   -  ``datalad.distribution.subdatasets`` has been moved to
+      ``datalad.local.subdatasets``
+      (`#3429 <https://github.com/datalad/datalad/issues/3429>`__)
+   -  ``datalad.interface.run`` has been moved to
+      ``datalad.core.local.run``
+      (`#3444 <https://github.com/datalad/datalad/issues/3444>`__)
+
+-  The ``lock`` method of ``AnnexRepo`` and the ``options`` parameter of
+   ``AnnexRepo.unlock`` were unused internally and have been removed.
+   (`#3459 <https://github.com/datalad/datalad/issues/3459>`__)
+
+-  The logic for resolving relative paths given to a command has changed
+   (`#3435 <https://github.com/datalad/datalad/issues/3435>`__). The new
+   rule is that relative paths are taken as relative to the dataset only
+   if a dataset *instance* is passed by the caller. In all other
+   scenarios they’re considered relative to the current directory.
+
+   The main user-visible difference from the command line is that using
+   the ``--dataset`` argument does *not* result in relative paths being
+   taken as relative to the specified dataset. (The undocumented
+   distinction between “rel/path” and “./rel/path” no longer exists.)
+
+   All commands under ``datalad.core`` and ``datalad.local``, as well as
+   ``unlock``, follow the new logic. The goal is for all commands to
+   eventually do so.
 
 Fixes
 ~~~~~
 
-?
+-  The function for loading JSON streams wasn’t clever enough to handle
+   content that included a Unicode line separator like U2028.
+   (`#3524 <https://github.com/datalad/datalad/issues/3524>`__)
+
+-  When
+   `unlock <http://datalad.readthedocs.io/en/latest/generated/man/datalad-unlock.html>`__
+   was called without an explicit target (i.e., a directory or no paths
+   at all), the call failed if any of the files did not have content
+   present. (`#3459 <https://github.com/datalad/datalad/issues/3459>`__)
+
+-  ``AnnexRepo.get_content_info`` failed in the rare case of a key
+   without size information.
+   (`#3534 <https://github.com/datalad/datalad/issues/3534>`__)
+
+-  `save <http://datalad.readthedocs.io/en/latest/generated/man/datalad-save.html>`__
+   ignored ``--on-failure`` in its underlying call to
+   `status <http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html>`__.
+   (`#3470 <https://github.com/datalad/datalad/issues/3470>`__)
+
+-  Our processing of ``git-annex --json`` output mishandled info
+   messages from special remotes.
+   (`#3546 <https://github.com/datalad/datalad/issues/3546>`__)
+
+-  As of 0.12.0rc3, calling
+   `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__
+   with ``--force`` didn’t bypass the “existing subdataset” check.
+   (`#3552 <https://github.com/datalad/datalad/issues/3552>`__)
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-?
+-  New command ``create-sibling-gitlab`` provides an interface for
+   creating a publication target on a GitLab instance.
+   (`#3447 <https://github.com/datalad/datalad/issues/3447>`__)
+
+-  `subdatasets <http://datalad.readthedocs.io/en/latest/generated/man/datalad-subdatasets.html>`__
+   (`#3429 <https://github.com/datalad/datalad/issues/3429>`__)
+
+   -  now supports path-constrained queries in the same manner as
+      commands like ``save`` and ``status``
+   -  gained a ``--contains=PATH`` option that can be used to restrict
+      the output to datasets that include a specific path.
+   -  now narrows the listed subdatasets to those underneath the current
+      directory when called with no arguments
+
+-  `status <http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html>`__
+   learned to accept a plain ``--annex`` (no value) as shorthand for
+   ``--annex basic``.
+   (`#3534 <https://github.com/datalad/datalad/issues/3534>`__)
+
+-  The ``.dirty`` property of ``GitRepo`` and ``AnnexRepo`` has been
+   sped up. (`#3460 <https://github.com/datalad/datalad/issues/3460>`__)
+
+-  Extensions that do not provide a command, such as those that provide
+   only metadata extractors, are now supported.
+   (`#3531 <https://github.com/datalad/datalad/issues/3531>`__)
+
+-  When calling git-annex with ``--json``, we log standard error at the
+   debug level rather than the warning level if a non-zero exit is
+   expected behavior.
+   (`#3518 <https://github.com/datalad/datalad/issues/3518>`__)
+
+-  `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__
+   no longer refuses to create a new dataset in the odd scenario of an
+   empty .git/ directory upstairs.
+   (`#3475 <https://github.com/datalad/datalad/issues/3475>`__)
+
+-  As of v2.22.0 Git treats a sub-repository on an unborn branch as a
+   repository rather than as a directory. Our documentation and tests
+   have been updated appropriately.
+   (`#3476 <https://github.com/datalad/datalad/issues/3476>`__)
+
+-  `addurls <http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html>`__
+   learned to accept a ``--cfg-proc`` value and pass it to its
+   ``create`` calls.
+   (`#3562 <https://github.com/datalad/datalad/issues/3562>`__)
 
 0.12.0rc4 (May 15, 2019) – the revolution is over
 -------------------------------------------------
@@ -119,7 +216,7 @@ Major refactoring and deprecations
 Fixes
 ~~~~~
 
--  ``status``
+-  `status <http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html>`__
 
    -  reported on directories that contained only ignored files
       (`#3238 <https://github.com/datalad/datalad/issues/3238>`__)
@@ -182,7 +279,7 @@ Enhancements and new features
    non-annex files.
    (`#3364 <https://github.com/datalad/datalad/issues/3364>`__)
 
--  ``status``
+-  `status <http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html>`__
 
    -  now reports a “bytesize” field for files tracked by Git
       (`#3299 <https://github.com/datalad/datalad/issues/3299>`__)
@@ -269,12 +366,100 @@ Enhancements and new features
 -  Imported various additional methods for the Repo classes to query
    information and save changes.
 
+0.11.7 (??? ??, 2019) – will be better than ever
+------------------------------------------------
+
+bet we will fix some bugs and make a world even a better place.
+
+.. _major-refactoring-and-deprecations-3:
+
+Major refactoring and deprecations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  hopefully none
+
+.. _fixes-4:
+
+Fixes
+~~~~~
+
+?
+
+.. _enhancements-and-new-features-5:
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+?
+
+0.11.6 (Jul 30, 2019) – am I the last of 0.11.x?
+------------------------------------------------
+
+Primarily bug fixes to achieve more robust performance
+
+.. _fixes-5:
+
+Fixes
+~~~~~
+
+-  Our tests needed various adjustments to keep up with upstream changes
+   in Travis and Git.
+   (`#3479 <https://github.com/datalad/datalad/issues/3479>`__)
+   (`#3492 <https://github.com/datalad/datalad/issues/3492>`__)
+   (`#3493 <https://github.com/datalad/datalad/issues/3493>`__)
+
+-  ``AnnexRepo.is_special_annex_remote`` was too selective in what it
+   considered to be a special remote.
+   (`#3499 <https://github.com/datalad/datalad/issues/3499>`__)
+
+-  We now provide information about unexpected output when git-annex is
+   called with ``--json``.
+   (`#3516 <https://github.com/datalad/datalad/issues/3516>`__)
+
+-  Exception logging in the ``__del__`` method of ``GitRepo`` and
+   ``AnnexRepo`` no longer fails if the names it needs are no longer
+   bound. (`#3527 <https://github.com/datalad/datalad/issues/3527>`__)
+
+-  `addurls <http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html>`__
+   botched the construction of subdataset paths that were more than two
+   levels deep and failed to create datasets in a reliable,
+   breadth-first order.
+   (`#3561 <https://github.com/datalad/datalad/issues/3561>`__)
+
+-  Cloning a ``type=git`` special remote showed a spurious warning about
+   the remote not being enabled.
+   (`#3547 <https://github.com/datalad/datalad/issues/3547>`__)
+
+.. _enhancements-and-new-features-6:
+
+Enhancements and new features
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  For calls to git and git-annex, we disable automatic garbage
+   collection due to past issues with GitPython’s state becoming stale,
+   but doing so results in a larger .git/objects/ directory that isn’t
+   cleaned up until garbage collection is triggered outside of DataLad.
+   Tests with the latest GitPython didn’t reveal any state issues, so
+   we’ve re-enabled automatic garbage collection.
+   (`#3458 <https://github.com/datalad/datalad/issues/3458>`__)
+
+-  `rerun <https://datalad.readthedocs.io/en/latest/generated/man/datalad-rerun.html>`__
+   learned an ``--explicit`` flag, which it relays to its calls to
+   [run][[]]. This makes it possible to call ``rerun`` in a dirty
+   working tree
+   (`#3498 <https://github.com/datalad/datalad/issues/3498>`__).
+
+-  The
+   `metadata <http://datalad.readthedocs.io/en/latest/generated/man/datalad-metadata.html>`__
+   command aborts earlier if a metadata extractor is unavailable.
+   (`#3525 <https://github.com/datalad/datalad/issues/3525>`__)
+
 0.11.5 (May 23, 2019) – stability is not overrated
 --------------------------------------------------
 
 Should be faster and less buggy, with a few enhancements.
 
-.. _fixes-4:
+.. _fixes-6:
 
 Fixes
 ~~~~~
@@ -314,7 +499,7 @@ Fixes
 -  The detection of SSH RIs has been improved.
    (`#3425 <https://github.com/datalad/datalad/issues/3425>`__)
 
-.. _enhancements-and-new-features-5:
+.. _enhancements-and-new-features-7:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -377,7 +562,7 @@ Important
    crippled (no symlinks and no locking) filesystems. v7 repositories
    should be used instead.
 
-.. _fixes-5:
+.. _fixes-7:
 
 Fixes
 ~~~~~
@@ -427,7 +612,7 @@ Fixes
    ``.isatty``.
    (`#3268 <https://github.com/datalad/datalad/issues/3268>`__)
 
-.. _enhancements-and-new-features-6:
+.. _enhancements-and-new-features-8:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -470,7 +655,7 @@ Enhancements and new features
 
 Just a few of important fixes and minor enhancements.
 
-.. _fixes-6:
+.. _fixes-8:
 
 Fixes
 ~~~~~
@@ -488,7 +673,7 @@ Fixes
    to avoid these failures.
    (`#3164 <https://github.com/datalad/datalad/issues/3164>`__)
 
-.. _enhancements-and-new-features-7:
+.. _enhancements-and-new-features-9:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -510,7 +695,7 @@ Enhancements and new features
 
 A variety of bugfixes and enhancements
 
-.. _major-refactoring-and-deprecations-3:
+.. _major-refactoring-and-deprecations-4:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -521,7 +706,7 @@ Major refactoring and deprecations
 -  The function ``datalad.cmd.get_runner`` has been removed.
    (`#3104 <https://github.com/datalad/datalad/issues/3104>`__)
 
-.. _fixes-7:
+.. _fixes-9:
 
 Fixes
 ~~~~~
@@ -583,7 +768,7 @@ Fixes
 -  Pass ``GIT_SSH_VARIANT=ssh`` to git processes to be able to specify
    alternative ports in SSH urls
 
-.. _enhancements-and-new-features-8:
+.. _enhancements-and-new-features-10:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -647,7 +832,7 @@ Rushed out bugfix release to stay fully compatible with recent
 `git-annex <http://git-annex.branchable.com/>`__ which introduced v7 to
 replace v6.
 
-.. _fixes-8:
+.. _fixes-10:
 
 Fixes
 ~~~~~
@@ -695,7 +880,7 @@ Fixes
    (`#2960 <https://github.com/datalad/datalad/issues/2960>`__)
    (`#2950 <https://github.com/datalad/datalad/issues/2950>`__)
 
-.. _enhancements-and-new-features-9:
+.. _enhancements-and-new-features-11:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -732,7 +917,7 @@ Enhancements and new features
 `git-annex <http://git-annex.branchable.com/>`__ 6.20180913 (or later)
 is now required - provides a number of fixes for v6 mode operations etc.
 
-.. _major-refactoring-and-deprecations-4:
+.. _major-refactoring-and-deprecations-5:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -759,7 +944,7 @@ Minor refactoring
    instead of ``treeishes``
    (`#2903 <https://github.com/datalad/datalad/issues/2903>`__)
 
-.. _fixes-9:
+.. _fixes-11:
 
 Fixes
 ~~~~~
@@ -808,7 +993,7 @@ Fixes
    paths when called more than once
    (`#2921 <https://github.com/datalad/datalad/issues/2921>`__)
 
-.. _enhancements-and-new-features-10:
+.. _enhancements-and-new-features-12:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -860,7 +1045,7 @@ Although we do not require with this release, it is recommended to make
 sure that you are using a recent ``git-annex`` since it also had a
 variety of fixes and enhancements in the past months.
 
-.. _fixes-10:
+.. _fixes-12:
 
 Fixes
 ~~~~~
@@ -923,7 +1108,7 @@ Fixes
    error message now.
    (`#2815 <https://github.com/datalad/datalad/issues/2815>`__)
 
-.. _enhancements-and-new-features-11:
+.. _enhancements-and-new-features-13:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -991,7 +1176,7 @@ Primarily a bugfix release to accommodate recent git-annex release
 forbidding file:// and http://localhost/ URLs which might lead to
 revealing private files if annex is publicly shared.
 
-.. _fixes-11:
+.. _fixes-13:
 
 Fixes
 ~~~~~
@@ -1001,7 +1186,7 @@ Fixes
    will now download to current directory instead of the top of the
    dataset
 
-.. _enhancements-and-new-features-12:
+.. _enhancements-and-new-features-14:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1022,7 +1207,7 @@ Enhancements and new features
 
 The is a minor bugfix release.
 
-.. _fixes-12:
+.. _fixes-14:
 
 Fixes
 ~~~~~
@@ -1037,7 +1222,7 @@ Fixes
 
 This release is a major leap forward in metadata support.
 
-.. _major-refactoring-and-deprecations-5:
+.. _major-refactoring-and-deprecations-6:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1068,7 +1253,7 @@ Major refactoring and deprecations
 -  By default a dataset X is now only considered to be a super-dataset
    of another dataset Y, if Y is also a registered subdataset of X.
 
-.. _fixes-13:
+.. _fixes-15:
 
 Fixes
 ~~~~~
@@ -1093,7 +1278,7 @@ A number of fixes did not make it into the 0.9.x series:
 -  More robust URL handling in ``simple_with_archives`` crawler
    pipeline.
 
-.. _enhancements-and-new-features-13:
+.. _enhancements-and-new-features-15:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1140,8 +1325,9 @@ Enhancements and new features
 
 -  New extensions:
 
-   -  addurls, an extension for creating a dataset (and possibly
-      subdatasets) from a list of URLs.
+   -  `addurls <http://datalad.readthedocs.io/en/latest/generated/man/datalad-addurls.html>`__,
+      an extension for creating a dataset (and possibly subdatasets)
+      from a list of URLs.
    -  export_to_figshare
    -  extract_metadata
 
@@ -1151,10 +1337,14 @@ Enhancements and new features
    ``--senstive=all``.
 -  Reduced startup latency by only importing commands necessary for a
    particular command line call.
--  ``datalad create -d <parent> --nosave`` now registers subdatasets,
-   when possible.
--  ``datalad run`` now provides a way for the caller to save the result
-   when a command has a non-zero exit status.
+-  `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__:
+
+   -  ``-d <parent> --nosave`` now registers subdatasets, when possible.
+   -  ``--fake-dates`` configures dataset to use fake-dates
+
+-  `run <http://datalad.readthedocs.io/en/latest/generated/man/datalad-run.html>`__
+   now provides a way for the caller to save the result when a command
+   has a non-zero exit status.
 -  ``datalad rerun`` now has a ``--script`` option that can be used to
    extract previous commands into a file.
 -  A DataLad Singularity container is now available on `Singularity
@@ -1170,7 +1360,7 @@ Enhancements and new features
 
 Some important bug fixes which should improve usability
 
-.. _fixes-14:
+.. _fixes-16:
 
 Fixes
 ~~~~~
@@ -1186,7 +1376,7 @@ Fixes
    “git mv”ed, so you can now ``datalad run git mv old new`` and have
    changes recorded
 
-.. _enhancements-and-new-features-14:
+.. _enhancements-and-new-features-16:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1204,7 +1394,7 @@ Enhancements and new features
 
 Largely a bugfix release with a few enhancements.
 
-.. _fixes-15:
+.. _fixes-17:
 
 Fixes
 ~~~~~
@@ -1231,7 +1421,7 @@ Fixes
 -  Assure that extracted from tarballs directories have executable bit
    set
 
-.. _enhancements-and-new-features-15:
+.. _enhancements-and-new-features-17:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1270,7 +1460,7 @@ Enhancements and new features
 
 Minor bugfix release
 
-.. _fixes-16:
+.. _fixes-18:
 
 Fixes
 ~~~~~
@@ -1283,7 +1473,7 @@ Fixes
 0.9.0 (Sep 19, 2017) – isn’t it a lucky day even though not a Friday?
 ---------------------------------------------------------------------
 
-.. _major-refactoring-and-deprecations-6:
+.. _major-refactoring-and-deprecations-7:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1303,7 +1493,7 @@ Major refactoring and deprecations
    `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__
    now transfers data before repository content is pushed.
 
-.. _fixes-17:
+.. _fixes-19:
 
 Fixes
 ~~~~~
@@ -1334,7 +1524,7 @@ Fixes
 -  crawl templates should not now override settings for ``largefiles``
    if specified in ``.gitattributes``
 
-.. _enhancements-and-new-features-16:
+.. _enhancements-and-new-features-18:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1375,7 +1565,7 @@ Enhancements and new features
 
 Bugfixes
 
-.. _fixes-18:
+.. _fixes-20:
 
 Fixes
 ~~~~~
@@ -1392,7 +1582,7 @@ Fixes
 -  More robust handling of unicode output in terminals which might not
    support it
 
-.. _enhancements-and-new-features-17:
+.. _enhancements-and-new-features-19:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1412,7 +1602,7 @@ Enhancements and new features
 
 A variety of fixes and enhancements
 
-.. _fixes-19:
+.. _fixes-21:
 
 Fixes
 ~~~~~
@@ -1427,7 +1617,7 @@ Fixes
    should better tollerate publishing to pure git and ``git-annex``
    special remotes
 
-.. _enhancements-and-new-features-18:
+.. _enhancements-and-new-features-20:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1452,7 +1642,7 @@ Enhancements and new features
 
 New features, refactorings, and bug fixes.
 
-.. _major-refactoring-and-deprecations-7:
+.. _major-refactoring-and-deprecations-8:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1467,7 +1657,7 @@ Major refactoring and deprecations
    have been re-written to support the same common API as most other
    commands
 
-.. _enhancements-and-new-features-19:
+.. _enhancements-and-new-features-21:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1487,7 +1677,7 @@ Enhancements and new features
 -  Significant parts of the documentation of been updated
 -  Instantiate GitPython’s Repo instances lazily
 
-.. _fixes-20:
+.. _fixes-22:
 
 Fixes
 ~~~~~
@@ -1514,7 +1704,7 @@ functionality more robust and flexible
 -  input paths/arguments analysis was redone for majority of the
    commands to provide unified behavior
 
-.. _major-refactoring-and-deprecations-8:
+.. _major-refactoring-and-deprecations-9:
 
 Major refactoring and deprecations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1525,7 +1715,7 @@ Major refactoring and deprecations
 -  ‘datalad.api.alwaysrender’ config setting/support is removed in favor
    of new outputs processing
 
-.. _fixes-21:
+.. _fixes-23:
 
 Fixes
 ~~~~~
@@ -1540,7 +1730,7 @@ Fixes
    closed <https://github.com/datalad/datalad/milestone/41?closed=1>`__
    for more information
 
-.. _enhancements-and-new-features-20:
+.. _enhancements-and-new-features-22:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1592,7 +1782,7 @@ Enhancements and new features
 
 A bugfix release
 
-.. _fixes-22:
+.. _fixes-24:
 
 Fixes
 ~~~~~
@@ -1613,7 +1803,7 @@ Fixes
       speeds
    -  should provide progress reports while using Python 3.x
 
-.. _enhancements-and-new-features-21:
+.. _enhancements-and-new-features-23:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1681,7 +1871,7 @@ Most notable changes
       `create-sibling <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create-sibling.html>`__
       ``--inherit``
 
-.. _fixes-23:
+.. _fixes-25:
 
 Fixes
 ~~~~~
@@ -1695,7 +1885,7 @@ Fixes
    operation outside of the datasets
 -  A number of fixes for direct and v6 mode of annex
 
-.. _enhancements-and-new-features-22:
+.. _enhancements-and-new-features-24:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1730,7 +1920,7 @@ Internal refactoring
 
 Requires now GitPython >= 2.1.0
 
-.. _fixes-24:
+.. _fixes-26:
 
 Fixes
 ~~~~~
@@ -1745,7 +1935,7 @@ Fixes
 -  do not log calls to ``git config`` to avoid leakage of possibly
    sensitive settings to the logs
 
-.. _enhancements-and-new-features-23:
+.. _enhancements-and-new-features-25:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1781,7 +1971,7 @@ and
 `get <http://datalad.readthedocs.io/en/latest/generated/man/datalad-get.html>`__
 implementation, it gets a new minor release.
 
-.. _fixes-25:
+.. _fixes-27:
 
 Fixes
 ~~~~~
@@ -1795,7 +1985,7 @@ Fixes
 -  robust detection of outdated
    `git-annex <http://git-annex.branchable.com/>`__
 
-.. _enhancements-and-new-features-24:
+.. _enhancements-and-new-features-26:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1824,7 +2014,7 @@ Enhancements and new features
 Primarily bugfixes but also a number of enhancements and core
 refactorings
 
-.. _fixes-26:
+.. _fixes-28:
 
 Fixes
 ~~~~~
@@ -1834,7 +2024,7 @@ Fixes
 -  `install <http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html>`__
    can be called on already installed dataset (with ``-r`` or ``-g``)
 
-.. _enhancements-and-new-features-25:
+.. _enhancements-and-new-features-27:
 
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

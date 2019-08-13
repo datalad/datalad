@@ -13,11 +13,13 @@ import json
 import logging
 import os
 import os.path as op
+import shutil
 import tempfile
 
 from mock import patch
 
 from six.moves import StringIO
+from six import text_type
 
 from datalad.api import addurls, Dataset, subdatasets
 import datalad.plugin.addurls as au
@@ -29,6 +31,7 @@ from datalad.tests.utils import assert_dict_equal
 from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
+from datalad.tests.utils import with_tree
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
@@ -119,13 +122,34 @@ def test_clean_meta_args():
 
 
 def test_get_subpaths():
-    for fname, expect in [("no/dbl/slash", ("no/dbl/slash", [])),
-                          ("p1//n", ("p1/n", ["p1"])),
-                          ("p1//p2/p3//n", ("p1/p2/p3/n",
-                                            ["p1", "p1/p2/p3"])),
-                          ("//n", ("/n", [""])),
-                          ("n//", ("n/", ["n"]))]:
+    for fname, expect in [
+            (op.join("no", "dbl", "slash"),
+             (op.join("no", "dbl", "slash"), [])),
+            ("p1//n",
+             (op.join("p1", "n"), ["p1"])),
+            (op.join("p1//p2", "p3//n"),
+             (op.join("p1", "p2", "p3", "n"),
+              ["p1", op.join("p1", "p2", "p3")])),
+            (op.join("p1//p2", "p3//p4", "p5//", "n"),
+             (op.join("p1", "p2", "p3", "p4", "p5", "n"),
+              ["p1",
+               op.join("p1", "p2", "p3"),
+               op.join("p1", "p2", "p3", "p4", "p5")])),
+            ("//n", (op.sep + "n", [""])),
+            ("n//", ("n" + op.sep, ["n"]))]:
         eq_(au.get_subpaths(fname), expect)
+
+
+def test_sort_paths():
+    paths = [op.join("x", "a", "b"),
+             "z",
+             op.join("y", "b"),
+             op.join("y", "a")]
+    expected = ["z",
+                op.join("y", "a"),
+                op.join("y", "b"),
+                op.join("x", "a", "b")]
+    eq_(list(au.sort_paths(paths)), expected)
 
 
 def test_is_legal_metafield():
@@ -215,7 +239,7 @@ def test_extract():
         filename_format="{age_group}//{now_dead}//{name}.csv")
 
     eq_(subpaths,
-        {"kid", "kid/no", "adult", "adult/yes", "adult/no"})
+        ["adult", "kid", "adult/no", "adult/yes", "kid/no"])
 
     eq_([d["url"] for d in info],
         ["will_1.com", "bob_2.com", "scott_1.com", "max_2.com"])
@@ -300,32 +324,31 @@ def test_addurls_nonannex_repo(path):
 def test_addurls_dry_run(path):
     ds = Dataset(path).create(force=True)
 
-    with chpwd(path):
-        json_file = "links.json"
-        with open(json_file, "w") as jfh:
-            json.dump([{"url": "URL/a.dat", "name": "a", "subdir": "foo"},
-                       {"url": "URL/b.dat", "name": "b", "subdir": "bar"},
-                       {"url": "URL/c.dat", "name": "c", "subdir": "foo"}],
-                      jfh)
+    json_file = "links.json"
+    with open(op.join(ds.path, json_file), "w") as jfh:
+        json.dump([{"url": "URL/a.dat", "name": "a", "subdir": "foo"},
+                   {"url": "URL/b.dat", "name": "b", "subdir": "bar"},
+                   {"url": "URL/c.dat", "name": "c", "subdir": "foo"}],
+                  jfh)
 
-        ds.save(message="setup")
+    ds.save(message="setup")
 
-        with swallow_logs(new_level=logging.INFO) as cml:
-            ds.addurls(json_file,
-                       "{url}",
-                       "{subdir}//{_url_filename_root}",
-                       dry_run=True)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        ds.addurls(json_file,
+                   "{url}",
+                   "{subdir}//{_url_filename_root}",
+                   dry_run=True)
 
-            for dir_ in ["foo", "bar"]:
-                assert_in("Would create a subdataset at {}".format(dir_),
-                          cml.out)
-            assert_in(
-                "Would download URL/a.dat to {}".format(
-                    os.path.join(path, "foo", "BASE")),
-                cml.out)
-
-            assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
+        for dir_ in ["foo", "bar"]:
+            assert_in("Would create a subdataset at {}".format(dir_),
                       cml.out)
+        assert_in(
+            "Would download URL/a.dat to {}".format(
+                os.path.join(path, "foo", "BASE")),
+            cml.out)
+
+        assert_in("Metadata: {}".format([u"name=a", u"subdir=foo"]),
+                  cml.out)
 
 
 @slow  # ~9s
@@ -366,138 +389,158 @@ class TestAddurls(object):
 
         n_annex_commits = get_annex_commit_counts()
 
-        with chpwd(path):
-            ds.addurls(self.json_file, "{url}", "{name}")
+        ds.addurls(self.json_file, "{url}", "{name}")
 
-            filenames = ["a", "b", "c"]
+        filenames = ["a", "b", "c"]
+        for fname in filenames:
+            ok_exists(op.join(ds.path, fname))
+
+        for (fname, meta), subdir in zip(ds.repo.get_metadata(filenames),
+                                         ["foo", "bar", "foo"]):
+            assert_dict_equal(meta,
+                              {"subdir": [subdir], "name": [fname]})
+
+        # Ignore this check if we're faking dates because that disables
+        # batch mode.
+        if not os.environ.get('DATALAD_FAKE__DATES'):
+            # We should have two new commits on the git-annex: one for the
+            # added urls and one for the added metadata.
+            eq_(n_annex_commits + 2, get_annex_commit_counts())
+
+        # Add to already existing links, overwriting.
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            ds.addurls(self.json_file, "{url}", "{name}",
+                       ifexists="overwrite")
             for fname in filenames:
-                ok_exists(fname)
+                assert_in("Removing {}".format(os.path.join(path, fname)),
+                          cml.out)
 
-            for (fname, meta), subdir in zip(ds.repo.get_metadata(filenames),
-                                             ["foo", "bar", "foo"]):
-                assert_dict_equal(meta,
-                                  {"subdir": [subdir], "name": [fname]})
+        # Add to already existing links, skipping.
+        assert_in_results(
+            ds.addurls(self.json_file, "{url}", "{name}", ifexists="skip"),
+            action="addurls",
+            status="notneeded")
 
-            # Ignore this check if we're faking dates because that disables
-            # batch mode.
-            if not os.environ.get('DATALAD_FAKE__DATES'):
-                # We should have two new commits on the git-annex: one for the
-                # added urls and one for the added metadata.
-                eq_(n_annex_commits + 2, get_annex_commit_counts())
+        # Add to already existing links works, as long content is the same.
+        ds.addurls(self.json_file, "{url}", "{name}")
 
-            # Add to already existing links, overwriting.
-            with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.addurls(self.json_file, "{url}", "{name}",
-                           ifexists="overwrite")
-                for fname in filenames:
-                    assert_in("Removing {}".format(os.path.join(path, fname)),
-                              cml.out)
+        # But it fails if something has changed.
+        ds.unlock("a")
+        with open(op.join(ds.path, "a"), "w") as ofh:
+            ofh.write("changed")
+        ds.save("a")
 
-            # Add to already existing links, skipping.
-            assert_in_results(
-                ds.addurls(self.json_file, "{url}", "{name}", ifexists="skip"),
-                action="addurls",
-                status="notneeded")
+        assert_raises(IncompleteResultsError,
+                      ds.addurls,
+                      self.json_file, "{url}", "{name}")
 
-            # Add to already existing links works, as long content is the same.
-            ds.addurls(self.json_file, "{url}", "{name}")
+    @with_tempfile(mkdir=True)
+    def test_addurls_unbound_dataset(self, path):
+        ds = Dataset(path).create(force=True)
 
-            # But it fails if something has changed.
-            ds.unlock("a")
-            with open("a", "w") as ofh:
-                ofh.write("changed")
-            ds.save("a")
+        def check(subpath, dataset_arg, url_file):
+            subdir = op.join(path, subpath)
+            os.mkdir(subdir)
+            with chpwd(subdir):
+                shutil.copy(self.json_file, "in.json")
+                addurls(dataset_arg, url_file, "{url}", "{name}")
+                # Files specified in the CSV file are always relative to the
+                # dataset.
+                for fname in ["a", "b", "c"]:
+                    ok_exists(op.join(ds.path, fname))
 
-            assert_raises(IncompleteResultsError,
-                          ds.addurls,
-                          self.json_file, "{url}", "{name}")
+        # The input file is relative to the current working directory, as
+        # with other commands.
+        check("subdir0", None, "in.json")
+        # Likewise the input file is relative to the current working directory
+        # if a string dataset argument is given.
+        check("subdir1", ds.path, "in.json")
 
     @with_tempfile(mkdir=True)
     def test_addurls_create_newdataset(self, path):
         dspath = os.path.join(path, "ds")
-        addurls(dspath, self.json_file, "{url}", "{name}")
-        for fname in ["a", "b", "c"]:
+        addurls(dspath, self.json_file, "{url}", "{name}",
+                cfg_proc=["yoda"])
+        for fname in ["a", "b", "c", "code"]:
             ok_exists(os.path.join(dspath, fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_subdataset(self, path):
         ds = Dataset(path).create(force=True)
 
-        with chpwd(path):
-            for save in True, False:
-                label = "save" if save else "nosave"
-                ds.addurls(self.json_file, "{url}",
-                           "{subdir}-" + label + "//{name}",
-                           save=save)
+        for save in True, False:
+            label = "save" if save else "nosave"
+            ds.addurls(self.json_file, "{url}",
+                       "{subdir}-" + label + "//{name}",
+                       save=save,
+                       cfg_proc=["yoda"])
 
-                subdirs = ["{}-{}".format(d, label) for d in ["foo", "bar"]]
-                subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
+            subdirs = [op.join(ds.path, "{}-{}".format(d, label))
+                       for d in ["foo", "bar"]]
+            subdir_files = dict(zip(subdirs, [["a", "c"], ["b"]]))
 
+            for subds, fnames in subdir_files.items():
+                for fname in fnames:
+                    ok_exists(op.join(subds, fname))
+                # cfg_proc was applied generated subdatasets.
+                ok_exists(op.join(subds, "code"))
+            if save:
+                assert_repo_status(path)
+            else:
+                # The datasets are create and saved ...
+                assert_repo_status(path, modified=subdirs)
+                # but the downloaded files aren't.
                 for subds, fnames in subdir_files.items():
-                    for fname in fnames:
-                        ok_exists(op.join(subds, fname))
+                    assert_repo_status(subds, added=fnames)
 
-                if save:
-                    assert_repo_status(path)
-                else:
-                    # The datasets are create and saved ...
-                    assert_repo_status(path, modified=subdirs)
-                    # but the downloaded files aren't.
-                    for subds, fnames in subdir_files.items():
-                        assert_repo_status(subds, added=fnames)
+        # Now save the "--nosave" changes and check that we have
+        # all the subdatasets.
+        ds.save()
+        eq_(set(subdatasets(dataset=ds, recursive=True,
+                            result_xfm="relpaths")),
+            {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})
 
-            # Now save the "--nosave" changes and check that we have
-            # all the subdatasets.
-            ds.save()
-            eq_(set(subdatasets(dataset=ds, recursive=True,
-                                result_xfm="relpaths")),
-                {"foo-save", "bar-save", "foo-nosave", "bar-nosave"})
-
-            # We don't try to recreate existing subdatasets.
-            with swallow_logs(new_level=logging.DEBUG) as cml:
-                ds.addurls(self.json_file, "{url}", "{subdir}-nosave//{name}")
-                assert_in("Not creating subdataset at existing path", cml.out)
+        # We don't try to recreate existing subdatasets.
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            ds.addurls(self.json_file, "{url}", "{subdir}-nosave//{name}")
+            assert_in("Not creating subdataset at existing path", cml.out)
 
     @with_tempfile(mkdir=True)
     def test_addurls_repindex(self, path):
         ds = Dataset(path).create(force=True)
 
-        with chpwd(path):
-            with assert_raises(IncompleteResultsError) as raised:
-                ds.addurls(self.json_file, "{url}", "{subdir}")
-            assert_in("There are file name collisions", str(raised.exception))
+        with assert_raises(IncompleteResultsError) as raised:
+            ds.addurls(self.json_file, "{url}", "{subdir}")
+        assert_in("There are file name collisions", str(raised.exception))
 
-            ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}")
+        ds.addurls(self.json_file, "{url}", "{subdir}-{_repindex}")
 
-            for fname in ["foo-0", "bar-0", "foo-1"]:
-                ok_exists(fname)
+        for fname in ["foo-0", "bar-0", "foo-1"]:
+            ok_exists(op.join(ds.path, fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_parts(self, path):
         ds = Dataset(path).create(force=True)
-        with chpwd(path):
-            ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
+        ds.addurls(self.json_file, "{url}", "{_url0}/{_url_basename}")
 
-            for fname in ["a.dat", "b.dat", "c.dat"]:
-                ok_exists(op.join("udir", fname))
+        for fname in ["a.dat", "b.dat", "c.dat"]:
+            ok_exists(op.join(ds.path, "udir", fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename(self, path):
         ds = Dataset(path).create(force=True)
-        with chpwd(path):
-            ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}")
-            for fname in ["a.dat", "b.dat", "c.dat"]:
-                ok_exists(op.join("udir", fname))
+        ds.addurls(self.json_file, "{url}", "{_url0}/{_url_filename}")
+        for fname in ["a.dat", "b.dat", "c.dat"]:
+            ok_exists(op.join(ds.path, "udir", fname))
 
     @with_tempfile(mkdir=True)
     def test_addurls_url_filename_fail(self, path):
         ds = Dataset(path).create(force=True)
-        with chpwd(path):
-            assert_raises(IncompleteResultsError,
-                          ds.addurls,
-                          self.json_file,
-                          "{url}/nofilename/",
-                          "{_url0}/{_url_filename}")
+        assert_raises(IncompleteResultsError,
+                      ds.addurls,
+                      self.json_file,
+                      "{url}/nofilename/",
+                      "{_url0}/{_url_filename}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_metafail(self, path):
@@ -510,14 +553,14 @@ class TestAddurls(object):
             for i in fn("wreaking-havoc-and-such", **kwargs):
                 yield i
 
-        with chpwd(path), patch.object(ds.repo, 'set_metadata_', set_meta):
+        with patch.object(ds.repo, 'set_metadata_', set_meta):
             with assert_raises(IncompleteResultsError):
                 ds.addurls(self.json_file, "{url}", "{name}")
 
     @with_tempfile(mkdir=True)
     def test_addurls_dropped_urls(self, path):
         ds = Dataset(path).create(force=True)
-        with chpwd(path), swallow_logs(new_level=logging.WARNING) as cml:
+        with swallow_logs(new_level=logging.WARNING) as cml:
             ds.addurls(self.json_file, "", "{subdir}//{name}")
             assert_re_in(r".*Dropped [0-9]+ row\(s\) that had an empty URL",
                          str(cml.out))
@@ -545,3 +588,40 @@ class TestAddurls(object):
         for fname, info in whereis.items():
             eq_(info[ds.repo.WEB_UUID]['urls'],
                 ["{}udir/{}.dat.v1".format(self.url, fname)])
+
+    @with_tempfile(mkdir=True)
+    def test_addurls_deeper(self, path):
+        ds = Dataset(path).create(force=True)
+        ds.addurls(
+            self.json_file, "{url}",
+            "{subdir}//adir/{subdir}-again//other-ds//bdir/{name}")
+        eq_(set(ds.subdatasets(recursive=True, result_xfm="relpaths")),
+            {"foo",
+             "bar",
+             op.join("foo", "adir", "foo-again"),
+             op.join("bar", "adir", "bar-again"),
+             op.join("foo", "adir", "foo-again", "other-ds"),
+             op.join("bar", "adir", "bar-again", "other-ds")})
+        ok_exists(os.path.join(
+            ds.path, "foo", "adir", "foo-again", "other-ds", "bdir", "a"))
+
+    @with_tree({"in": ""})
+    def test_addurls_invalid_input(self, path):
+        ds = Dataset(path).create(force=True)
+        in_file = op.join(path, "in")
+        for in_type in ["csv", "json"]:
+            with assert_raises(IncompleteResultsError) as exc:
+                ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
+            assert_in("Failed to read", text_type(exc.exception))
+
+    @with_tree({"in.csv": "url,name,subdir",
+                "in.json": "[]"})
+    def test_addurls_no_rows(self, path):
+        ds = Dataset(path).create(force=True)
+        for fname in ["in.csv", "in.json"]:
+            with swallow_logs(new_level=logging.WARNING) as cml:
+                assert_in_results(
+                    ds.addurls(fname, "{url}", "{name}"),
+                    action="addurls",
+                    status="notneeded")
+                cml.assert_logged("No rows", regex=False)

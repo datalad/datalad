@@ -5,6 +5,8 @@
 #
 # Changelog
 # ---------
+# 0.11.5
+#  - copied .fullmaster one to provide a version for 0.11.x branch build as well
 # 0.12.0rc4-239-gba66d1c9f
 #  - Update to get a fresh build of master
 # 0.11.1
@@ -41,9 +43,9 @@ From:neurodebian:latest
     eatmydata apt-get -y install --no-install-recommends python3-twisted
 
     # little dance because pip cannot handle this url plus [full] in one go
-    wget https://github.com/datalad/datalad/archive/master.zip
-    pip3 install --system master.zip[full]
-    rm -f master.zip
+    wget https://github.com/datalad/datalad/archive/0.11.x.zip
+    pip3 install --system 0.11.x.zip[full]
+    rm -f 0.11.x.zip
 
     # clean up
     apt-get clean

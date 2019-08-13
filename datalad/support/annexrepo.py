@@ -345,6 +345,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             self.config.set('annex.backends', backend, where='local')
 
     def __del__(self):
+
+        def safe__del__debug(e):
+            """We might be too late in the game and either .debug or exc_str
+            are no longer bound"""
+            try:
+                return lgr.debug(exc_str(e))
+            except (AttributeError, NameError):
+                return
+
         try:
             if hasattr(self, '_batched') and self._batched is not None:
                 self._batched.close()
@@ -357,12 +366,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             # thing to happen, since we check for things being None herein as
             # well as in super class __del__;
             # At least log it:
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
         try:
             super(AnnexRepo, self).__del__()
         except TypeError as e:
             # see above
-            lgr.debug(exc_str(e))
+            safe__del__debug(e)
 
     def _set_shared_connection(self, remote_name, url):
         """Make sure a remote with SSH URL uses shared connections.
@@ -1094,7 +1103,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if not key:
             expected_downloads, fetch_files = self._get_expected_files(
-                files, ['--not', '--in', 'here'],
+                files, ['--not', '--in', '.'],
                 merge_annex_branches=False  # interested only in local info
             )
         else:
@@ -2160,7 +2169,24 @@ class AnnexRepo(GitRepo, RepoInterface):
                         "Received no json output for --json command, only:\n{}"
                         .format("  ".join(others)))
                 raise exc
-        return json_objects
+
+        # A special remote might send a message via "info". This is supposed to be printed by annex but in case of
+        # `--json` is returned by annex as "{'info': '<message>'}".
+        # See https://git-annex.branchable.com/design/external_special_remote_protocol/#index5h2
+        #
+        # So, Ben thinks we should just spit it out here, since everything calling _run_annex_command_json
+        # is concerned with the actual results being returned. More over, this kind of response is special to particular
+        # special remotes rather than particular annex commands. So, likely there's nothing callers could do about it
+        # other than spitting it out.
+
+        return_objects = []
+        for obj in json_objects:
+            if len(obj.keys()) == 1 and obj['info']:
+                lgr.info(obj['info'])
+            else:
+                return_objects.append(obj)
+
+        return return_objects
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
@@ -2349,7 +2375,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 args.append('-)')
 
             if with_content_only:
-                args.extend(['--in', 'here'])
+                args.extend(['--in', '.'])
         out, err = self._run_annex_command(
             'find', annex_options=args, merge_annex_branches=False
         )
@@ -2790,7 +2816,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # is the verb (copy, copy) or (get, put) and remote ('here', remote)?
         if '--key' not in options:
             expected_copys, copy_files = self._get_expected_files(
-                files, ['--in', 'here', '--not', '--in', remote])
+                files, ['--in', '.', '--not', '--in', remote])
         else:
             copy_files = files
             assert(len(files) == 1)
@@ -3155,15 +3181,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         # it takes care of git-annex reporting on any known key, regardless
         # of whether or not it actually (did) exist in the local annex
         opts = ['--copies', '0']
+        files = None
         if ref:
             cmd = 'findref'
             opts.append(ref)
         else:
             cmd = 'find'
             # stringify any pathobjs
-            opts.extend([text_type(p) for p in paths]
-                        if paths else ['--include', '*'])
-        for j in self._run_annex_command_json(cmd, opts=opts):
+            if paths:
+                files = [text_type(p) for p in paths]
+            else:
+                opts.extend(['--include', '*'])
+
+        for j in self._run_annex_command_json(cmd, opts=opts, files=files):
             path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
             rec = info.get(path, None)
             if init is not None and rec is None:

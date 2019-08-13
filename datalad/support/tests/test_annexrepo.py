@@ -99,6 +99,8 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import AnnexBatchCommandError
 from datalad.support.exceptions import IncompleteResultsError
 
+from datalad.support.external_versions import external_versions
+
 from datalad.support.gitrepo import GitRepo
 
 # imports from same module:
@@ -880,6 +882,25 @@ def test_AnnexRepo_get(src, dst):
         annex.get(testfile, jobs=5)
     eq_(called, ['find', 'get'])
     ok_file_has_content(testfile_abs, "content to be annex-addurl'd", strip=True)
+
+
+@skip_if(external_versions['cmd:annex'] < '7.20190717', "Needs freshier git-annex")
+@with_tree(tree={'file.dat': 'content'})
+@with_tempfile
+def test_v7_detached_get(opath, path):
+    # http://git-annex.branchable.com/bugs/get_fails_to_place_v7_unlocked_file_content_into_the_file_tree_in_v7_in_repo_with_detached_HEAD/
+    origin = AnnexRepo(opath, create=True, version=7)
+    GitRepo.add(origin, 'file.dat')  # force direct `git add` invocation
+    origin.commit('added')
+
+    AnnexRepo.clone(opath, path)
+    repo = AnnexRepo(path)
+    # test getting in a detached HEAD
+    repo.checkout('HEAD^{}')
+    repo._run_annex_command('upgrade')  # TODO: .upgrade ?
+
+    repo.get('file.dat')
+    ok_file_has_content(op.join(repo.path, 'file.dat'), "content")
 
 
 # TODO:

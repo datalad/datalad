@@ -14,6 +14,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from itertools import chain
 import logging
 from collections import OrderedDict
+from collections import namedtuple
 import re
 import shlex
 import time
@@ -56,11 +57,13 @@ from datalad.support.due import due, Doi
 from datalad import ssh_manager
 from datalad.cmd import GitRunner
 from datalad.cmd import BatchedCommand
+from datalad.config import _parse_gitconfig_dump
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
+from datalad.utils import PurePosixPath
 from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
@@ -83,6 +86,7 @@ from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
+from .path import get_parent_paths
 from .repo import Flyweight
 from .repo import RepoInterface
 
@@ -553,6 +557,10 @@ class GitPythonProgressBar(RemoteProgress):
         self._pbar.refresh()
 
 
+# Compatibility kludge.  See GitRepo.get_submodules().
+Submodule = namedtuple("Submodule", ["name", "path", "url"])
+
+
 @add_metaclass(Flyweight)
 class GitRepo(RepoInterface):
     """Representation of a git repository
@@ -972,8 +980,8 @@ class GitRepo(RepoInterface):
                 # denied etc. So disabled 
                 #if exists(opj(self.path, '.git')):  # don't try to write otherwise
                 #    self.repo.index.write()
-        except InvalidGitRepositoryError:
-            # might have being removed and no longer valid
+        except (InvalidGitRepositoryError, AttributeError):
+            # might have being removed and no longer valid or attributes unbound
             pass
 
     def __repr__(self):
@@ -2362,15 +2370,115 @@ class GitRepo(RepoInterface):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
-    def get_submodules(self, sorted_=True):
-        """Return a list of git.Submodule instances for all submodules"""
-        # check whether we have anything in the repo. if not go home early
-        if not self.repo.head.is_valid():
-            return []
-        submodules = self.repo.submodules
+    def _parse_gitmodules(self):
+        # TODO read .gitconfig from Git blob?
+        gitmodules = self.pathobj / '.gitmodules'
+        if not gitmodules.exists():
+            return {}
+        # pull out file content
+        out, err = self._git_custom_command(
+            '',
+            ['git', 'config', '-z', '-l', '--file', '.gitmodules'])
+        # abuse our config parser
+        db, _ = _parse_gitconfig_dump(out, {}, None, True)
+        mods = {}
+        for k, v in iteritems(db):
+            if not k.startswith('submodule.'):
+                # we don't know what this is
+                lgr.warning("Skip unrecognized .gitmodule specification: %s=%s", k, v)
+                continue
+            k_l = k.split('.')
+            # module name is everything after 'submodule.' that is not the variable
+            # name
+            mod_name = '.'.join(k_l[1:-1])
+            mod = mods.get(mod_name, {})
+            # variable name is the last 'dot-free' segment in the key
+            mod[k_l[-1]] = v
+            mods[mod_name] = mod
+
+        out = {}
+        # bring into traditional shape
+        for name, props in iteritems(mods):
+            if 'path' not in props:
+                lgr.warning("Failed to get '%s.path', skipping this submodule", name)
+                continue
+            modprops = {'gitmodule_{}'.format(k): v
+                        for k, v in iteritems(props)
+                        if not (k.startswith('__') or k == 'path')}
+            modpath = self.pathobj / PurePosixPath(props['path'])
+            modprops['gitmodule_name'] = name
+            out[modpath] = modprops
+        return out
+
+    def get_submodules_(self, paths=None):
+        """Yield submodules in this repository.
+
+        Parameters
+        ----------
+        paths : list(pathlib.PurePath), optional
+            Restrict submodules to those under `paths`.
+
+        Returns
+        -------
+        A generator that yields a dictionary with information for each
+        submodule.
+        """
+        if not (self.pathobj / ".gitmodules").exists():
+            return
+
+        modinfo = self._parse_gitmodules()
+        for path, props in iteritems(self.get_content_info(
+                paths=paths,
+                ref=None,
+                untracked='no',
+                eval_file_type=False)):
+            if props.get('type', None) != 'dataset':
+                continue
+            props["path"] = path
+            props.update(modinfo.get(path, {}))
+            yield props
+
+    def get_submodules(self, sorted_=True, paths=None, compat=True):
+        """Return list of submodules.
+
+        Parameters
+        ----------
+        sorted_ : bool, optional
+            Sort submodules by path name.
+        paths : list(pathlib.PurePath), optional
+            Restrict submodules to those under `paths`.
+        compat : bool, optional
+            If true, return a namedtuple that incompletely mimics the
+            attributes of GitPython's Submodule object in hope of backwards
+            compatibility with previous callers. Note that this form should be
+            considered temporary and callers should be updated; this flag will
+            be removed in a future release.
+
+        Returns
+        -------
+        List of submodule namedtuples if `compat` is true or otherwise a list
+        of dictionaries as returned by `get_submodules_`.
+        """
+        xs = self.get_submodules_(paths=paths)
+        if compat:
+            warnings.warn("The attribute-based return value of get_submodules() "
+                          "exists for compatibility purposes and will be removed "
+                          "in an upcoming release",
+                          DeprecationWarning)
+            xs = (Submodule(name=p["gitmodule_name"],
+                            path=text_type(p["path"].relative_to(self.pathobj)),
+                            url=p["gitmodule_url"])
+                  for p in xs)
+
         if sorted_:
-            submodules = sorted(submodules, key=lambda x: x.path)
-        return submodules
+            if compat:
+                def key(x):
+                    return x.path
+            else:
+                def key(x):
+                    return x["path"]
+            xs = sorted(xs, key=key)
+        return list(xs)
 
     def is_submodule_modified(self, name, options=[]):
         """Whether a submodule has new commits
@@ -2908,6 +3016,8 @@ class GitRepo(RepoInterface):
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
 
+        path_strs = list(map(text_type, paths)) if paths else None
+
         # this will not work in direct mode, but everything else should be
         # just fine
         if not ref:
@@ -2932,6 +3042,13 @@ class GitRepo(RepoInterface):
                     'unknown value for `untracked`: %s', untracked)
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
+
+            if path_strs:
+                # we need to get their within repo elements since ls-tree
+                # for paths within submodules returns nothing!
+                # see https://public-inbox.org/git/20190703193305.GF21553@hopa.kiewit.dartmouth.edu/T/#u
+                submodules = [s.path for s in self.get_submodules()]
+                path_strs = get_parent_paths(path_strs, submodules)
         else:
             cmd = ['git', 'ls-tree', ref, '-z', '-r', '--full-tree', '-l']
             props_re = re.compile(
@@ -2940,11 +3057,7 @@ class GitRepo(RepoInterface):
         lgr.debug('Query repo: %s', cmd)
         try:
             stdout, stderr = self._git_custom_command(
-                # specifically always ask for a full report and
-                # filter out matching path later on to
-                # homogenize wrt subdataset content paths across
-                # ls-files and ls-tree
-                None,
+                path_strs,
                 cmd,
                 log_stderr=True,
                 log_stdout=True,
@@ -2991,7 +3104,6 @@ class GitRepo(RepoInterface):
 
         try:
             self._get_content_info_line_helper(
-                paths,
                 ref,
                 info,
                 stdout.split('\0'),
@@ -3005,7 +3117,7 @@ class GitRepo(RepoInterface):
         lgr.debug('Done %s.get_content_info(...)', self)
         return info
 
-    def _get_content_info_line_helper(self, paths, ref, info, lines,
+    def _get_content_info_line_helper(self, ref, info, lines,
                                       props_re, get_link_target):
         """Internal helper of get_content_info() to parse Git output"""
         mode_type_map = {
@@ -3026,24 +3138,6 @@ class GitRepo(RepoInterface):
             else:
                 # again Git reports always in POSIX
                 path = ut.PurePosixPath(props.group('fname'))
-
-            # rejects paths as early as possible
-
-            # the function assumes that any `path` is a relative path lib
-            # instance if there were path constraints given, we need to reject
-            # paths now
-            # reject anything that is:
-            # - not a direct match with a constraint
-            # - has no constraint as a parent
-            #   (relevant to find matches of regular files in a repository)
-            # - is not a parent of a constraint
-            #   (relevant for finding the matching subds entry for
-            #    subds-content paths)
-            if paths \
-                and not any(
-                    path == c or path in c.parents or c in path.parents
-                    for c in paths):
-                continue
 
             # revisit the file props after this path has not been rejected
             if props:
