@@ -27,7 +27,12 @@ def _path_rel2file(p):
 
 
 def get_version(name):
-    """Load version of datalad from version.py without entailing any imports
+    """Load version from version.py without entailing any imports
+
+    Parameters
+    ----------
+    name: str
+      Name of the folder (package) where from to read version.py
     """
     # This might entail lots of imports which might not yet be available
     # so let's do ad-hoc parsing of the version.py
