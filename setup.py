@@ -10,21 +10,14 @@ from os.path import (
     join as opj,
 )
 
-from setuptools import (
-    find_packages,
-    setup,
-)
-
 from setup_support import (
     BuildConfigInfo,
     BuildManPage,
     BuildRSTExamplesFromScripts,
     BuildSchema,
-    get_long_description_from_README,
-    get_version,
     setup_entry_points,
     findsome,
-)
+    datalad_setup)
 
 
 requires = {
@@ -160,23 +153,9 @@ entry_points.update({
     ]})
 setup_kwargs['entry_points'] = entry_points
 
-PACKAGE_NAME = 'datalad'
-
-# Only recentish versions of find_packages support include
-# datalad_pkgs = find_packages('.', include=['datalad*'])
-# so we will filter manually for maximal compatibility
-datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith(PACKAGE_NAME)]
-long_description = get_long_description_from_README()
-version = get_version()
-
-setup(
-    name=PACKAGE_NAME,
-    author="The DataLad Team and Contributors",
-    author_email="team@datalad.org",
-    version=version,
+datalad_setup(
+    'datalad',
     description="data distribution geared toward scientific datasets",
-    long_description=long_description,
-    packages=datalad_pkgs,
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
@@ -184,7 +163,8 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
+            findsome('resources',
+                     {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})

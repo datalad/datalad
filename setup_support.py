@@ -17,7 +17,7 @@ from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 import datetime
 
-from setuptools import findall
+from setuptools import findall, find_packages, setup
 
 import formatters as fmt
 
@@ -26,12 +26,12 @@ def _path_rel2file(p):
     return opj(dirname(__file__), p)
 
 
-def get_version():
+def get_version(name):
     """Load version of datalad from version.py without entailing any imports
     """
     # This might entail lots of imports which might not yet be available
     # so let's do ad-hoc parsing of the version.py
-    with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
+    with open(opj(dirname(__file__), name, 'version.py')) as f:
         version_lines = list(filter(lambda x: x.startswith('__version__'), f))
     assert (len(version_lines) == 1)
     return version_lines[0].split('=')[1].strip(" '\"\t\n")
@@ -397,3 +397,45 @@ def findsome(subdir, extensions):
         f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
         if splitext(f)[-1].lstrip('.') in extensions
     ]
+
+
+def datalad_setup(name, **kwargs):
+    """A helper for a typical invocation of setuptools.setup.
+
+    If not provided in kwargs, following fields will be autoset to the defaults
+    or obtained from the present on the file system files:
+
+    - author
+    - author_email
+    - packages -- all found packages which start with `name`
+    - long_description -- converted to .rst using pypandoc README.md
+    - version -- parsed `__version__` within `name/version.py`
+
+    Parameters
+    ----------
+    name: str
+        Name of the Python package
+    **kwargs:
+        The rest of the keyword arguments passed to setuptools.setup as is
+    """
+    # Simple defaults
+    for k, v in {
+        'author': "The DataLad Team and Contributors",
+        'author_email': "team@datalad.org"
+    }.items():
+        if kwargs.get(k) is None:
+            kwargs[k] = v
+
+    # More complex, requiring some function call
+
+    # Only recentish versions of find_packages support include
+    # packages = find_packages('.', include=['datalad*'])
+    # so we will filter manually for maximal compatibility
+    if kwargs.get('packages') is None:
+        kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
+    if kwargs.get('long_description') is None:
+        kwargs['long_description'] = get_long_description_from_README()
+    if kwargs.get('version') is None:
+        kwargs['version'] = get_version(name)
+
+    return setup(name=name, **kwargs)
