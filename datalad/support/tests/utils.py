@@ -21,7 +21,7 @@ def check_repo_deals_with_inode_change(class_, path, temp_store):
     repo.commit(msg="some load")
 
     # requesting HEAD info from
-    hexsha = repo.get_hexsha()
+    hexsha = repo.repo.head.object.hexsha
 
     # move everything to store
     import os
@@ -50,9 +50,12 @@ def check_repo_deals_with_inode_change(class_, path, temp_store):
 
     # The following two accesses fail in issue #1512:
     # 1. requesting HEAD info from old instance
-    hexsha = repo.get_hexsha()
+    #
+    # Note: This checks that we don't hit a GitPython failure, so this test
+    # must use .repo.head.object.hexsha, not repo.get_hexsha().
+    hexsha = repo.repo.head.object.hexsha
 
     # 2. get a "new" instance and requesting HEAD
     repo2 = class_(path)
-    hexsha2 = repo2.get_hexsha()
+    hexsha2 = repo2.repo.head.object.hexsha
 
