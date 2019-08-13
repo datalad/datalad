@@ -11,11 +11,14 @@ import platform
 import sys
 from genericpath import exists
 from os import linesep, makedirs
-from os.path import dirname, join as opj
+from os.path import dirname, join as opj, sep as pathsep, splitext
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 import datetime
+
+from setuptools import findall
+
 import formatters as fmt
 
 
@@ -361,3 +364,36 @@ def setup_entry_points(entry_points):
         setup_kwargs['scripts'] = scripts
 
     return setup_kwargs
+
+
+def get_long_description_from_README():
+    """Read README.md, convert to .rst using pypandoc
+
+    If pypandoc is not available or fails - just output original .md
+    """
+    # PyPI doesn't render markdown yet. Workaround for a sane appearance
+    # https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+    README = opj(dirname(__file__), 'README.md')
+    try:
+        import pypandoc
+        return pypandoc.convert(README, 'rst')
+    except (ImportError, OSError) as exc:
+        # attempting to install pandoc via brew on OSX currently hangs and
+        # pypandoc imports but throws OSError demanding pandoc
+        print(
+                "WARNING: pypandoc failed to import or thrown an error while "
+                "converting"
+                " README.md to RST: %r   .md version will be used as is" % exc
+        )
+        return open(README).read()
+
+
+def findsome(subdir, extensions):
+    """Find files under subdir having specified extensions
+
+    Leading directory (datalad) gets stripped
+    """
+    return [
+        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
+        if splitext(f)[-1].lstrip('.') in extensions
+    ]
