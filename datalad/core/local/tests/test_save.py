@@ -11,10 +11,12 @@
 import os
 import os.path as op
 from six import iteritems
+from six import PY2
 from six import text_type
 
 from datalad.utils import (
     on_windows,
+    assure_bytes,
     assure_list,
     rmtree,
 )
@@ -34,6 +36,7 @@ from datalad.tests.utils import (
     chpwd,
     known_failure_appveyor,
     known_failure_windows,
+    swallow_outputs,
     OBSCURE_FILENAME,
 )
 from datalad.distribution.tests.test_add import tree_arg
@@ -727,3 +730,15 @@ def test_on_failure_continue(path):
         status="error")
     # save() continued despite the failure and saved ds/within.
     assert_repo_status(ds.path)
+
+
+@with_tree(tree={OBSCURE_FILENAME: "abc"})
+def test_save_obscure_name(path):
+    ds = Dataset(path).create(force=True)
+    fname = OBSCURE_FILENAME
+    if PY2:
+        # Mimic how the path will come in from the command line.
+        fname = assure_bytes(fname)
+    # Just check that we don't fail with a unicode error.
+    with swallow_outputs():
+        ds.save(path=fname, result_renderer="default")
