@@ -43,6 +43,9 @@ bet we will fix some bugs and make a world even a better place.
   of the current release, 7.20190730) applies only to the
   former. ([#3574][])
 
+- [addurls][] now suggests close matches when the URL or file format
+  contains an unknown field.  ([#3594][])
+
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
 Primarily bug fixes to achieve more robust performance
@@ -1429,3 +1432,4 @@ publishing
 [#3576]: https://github.com/datalad/datalad/issues/3576
 [#3579]: https://github.com/datalad/datalad/issues/3579
 [#3582]: https://github.com/datalad/datalad/issues/3582
+[#3594]: https://github.com/datalad/datalad/issues/3594
