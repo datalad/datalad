@@ -6,17 +6,17 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 
+import datetime
 import os
 import platform
+import setuptools
 import sys
-from genericpath import exists
-from os import linesep, makedirs
-from os.path import dirname, join as opj, sep as pathsep, splitext
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
-import datetime
-
+from genericpath import exists
+from os import linesep, makedirs
+from os.path import dirname, join as opj, sep as pathsep, splitext
 from setuptools import findall, find_packages, setup
 
 import formatters as fmt
@@ -374,14 +374,31 @@ def setup_entry_points(entry_points):
 def get_long_description_from_README():
     """Read README.md, convert to .rst using pypandoc
 
-    If pypandoc is not available or fails - just output original .md
+    If pypandoc is not available or fails - just output original .md.
+
+    Returns
+    -------
+    dict
+      with keys long_description and possibly long_description_content_type
+      for newer setuptools which support uploading of markdown as is.
     """
-    # PyPI doesn't render markdown yet. Workaround for a sane appearance
+    # PyPI used to not render markdown. Workaround for a sane appearance
     # https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+    # is still in place for older setuptools
+
     README = opj(dirname(__file__), 'README.md')
+
+    ret = {}
+    if setuptools.__version__ > '38.6.0':  # Probably want a more correct
+        # check than this
+        ret['long_description'] = open(README).read()
+        ret['long_description_content_type'] = 'text/markdown'
+        return ret
+
+    # Convert or fall-back
     try:
         import pypandoc
-        return pypandoc.convert(README, 'rst')
+        return {'long_description': pypandoc.convert(README, 'rst')}
     except (ImportError, OSError) as exc:
         # attempting to install pandoc via brew on OSX currently hangs and
         # pypandoc imports but throws OSError demanding pandoc
@@ -390,7 +407,7 @@ def get_long_description_from_README():
                 "converting"
                 " README.md to RST: %r   .md version will be used as is" % exc
         )
-        return open(README).read()
+        return {'long_description': open(README).read()}
 
 
 def findsome(subdir, extensions):
@@ -439,7 +456,7 @@ def datalad_setup(name, **kwargs):
     if kwargs.get('packages') is None:
         kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
     if kwargs.get('long_description') is None:
-        kwargs['long_description'] = get_long_description_from_README()
+        kwargs.update(get_long_description_from_README())
     if kwargs.get('version') is None:
         kwargs['version'] = get_version(name)
 
