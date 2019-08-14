@@ -108,7 +108,7 @@ class BuildManPage(Command):
                 cmdname = "{0}{1}".format(
                     'datalad ' if cmdname != 'datalad' else '',
                     cmdname)
-                format = cls(cmdname, ext_sections=sections, version=get_version())
+                format = cls(cmdname, ext_sections=sections, version=get_version(appname))
                 formatted = format.format_man_page(p)
                 with open(opj(opath, '{0}.{1}'.format(
                         cmdname.replace(' ', '-'),
