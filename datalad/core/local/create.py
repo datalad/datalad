@@ -177,7 +177,11 @@ class Create(Interface):
             cfg_proc=None
     ):
         if dataset:
-            ds = dataset if isinstance(dataset, Dataset) else Dataset(dataset)
+            if isinstance(dataset, Dataset):
+                ds = dataset
+            else:
+                # assure_unicode() for PY2.
+                ds = Dataset(ut.assure_unicode(dataset))
             refds_path = ds.path
         else:
             ds = refds_path = None

@@ -477,3 +477,4 @@ def test_create_with_obscure_name():
         # Mimic how it comes in on the command-line.
         fname = assure_bytes(OBSCURE_FILENAME)
     yield check_create_obscure, {"path": fname}
+    yield check_create_obscure, {"dataset": fname}
