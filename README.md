@@ -60,6 +60,10 @@ provide recent releases of DataLad. Once enabled, just do:
 
     apt-get install datalad
 
+## Other Linux'es via conda
+
+    conda install -c conda-forge datalad
+
 ## Other Linux'es, OSX via pip
 
 Before you install this package, please make sure that you [install a recent
