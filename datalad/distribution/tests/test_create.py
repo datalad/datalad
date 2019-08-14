@@ -38,6 +38,7 @@ from datalad.tests.utils import ok_exists
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_file_under_git
+from datalad.tests.utils import OBSCURE_FILENAME
 
 
 _dataset_hierarchy_template = {
@@ -367,3 +368,10 @@ def test_create_fake_dates(path):
 
     eq_(ds.config.obtain("datalad.fake-dates-start") + 1,
         first_commit.committed_date)
+
+
+@with_tempfile(mkdir=True)
+def test_create_with_obscure_name(topdir):
+    path = opj(topdir, OBSCURE_FILENAME)
+    ds = create(dataset=path)
+    ok_(ds.is_installed())

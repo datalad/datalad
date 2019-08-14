@@ -40,6 +40,7 @@ from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
+from datalad.utils import assure_unicode
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
@@ -577,19 +578,20 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        dspath = get_dataset_root(getpwd())
+        # assure_unicode() can be dropped once we drop PY2.
+        dspath = assure_unicode(get_dataset_root(getpwd()))
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
 
     assert(dataset is not None)
-    lgr.debug("Resolved dataset{0}: {1}".format(
-        ' for {}'.format(purpose) if purpose else '',
-        dataset))
+    lgr.debug(u"Resolved dataset%s: %s",
+              u' for {}'.format(purpose) if purpose else '',
+              dataset.path)
 
     if check_installed and not dataset.is_installed():
-        raise ValueError("No installed dataset found at "
-                         "{0}.".format(dataset.path))
+        raise ValueError(u"No installed dataset found at "
+                         u"{0}.".format(dataset.path))
 
     return dataset
 

@@ -24,6 +24,7 @@ from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
 
+from datalad.utils import assure_unicode
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -37,6 +38,7 @@ from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import OBSCURE_FILENAME
 
 
 broken_plugin = """garbage"""
@@ -62,8 +64,9 @@ def dlplugin(dataset, noval, withval='test'):
 '''
 
 
-@with_tempfile(mkdir=True)
-def test_wtf(path):
+@with_tree({OBSCURE_FILENAME: {}})
+def test_wtf(topdir):
+    path = opj(topdir, OBSCURE_FILENAME)
     # smoke test for now
     with swallow_outputs() as cmo:
         wtf(dataset=path)
@@ -82,7 +85,8 @@ def test_wtf(path):
         wtf(dataset=ds.path)
         assert_in('## configuration', cmo.out)
         assert_in('## dataset', cmo.out)
-        assert_in('path: {}'.format(ds.path), cmo.out)
+        assert_in(u'path: {}'.format(ds.path),
+                  assure_unicode(cmo.out))
 
     # and if we run with all sensitive
     for sensitive in ('some', True):
