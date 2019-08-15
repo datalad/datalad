@@ -25,7 +25,10 @@ from . import formatters as fmt
 
 
 def _path_rel2file(*p):
-    return opj(dirname(__file__), os.pardir, *p)
+    # dirname instead of joining with pardir so it works if
+    # datalad_build_support/ is just symlinked into some extension
+    # while developing
+    return opj(dirname(dirname(__file__)), *p)
 
 
 def get_version(name):
