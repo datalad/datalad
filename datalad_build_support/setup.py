@@ -21,11 +21,11 @@ from os import linesep, makedirs
 from os.path import dirname, join as opj, sep as pathsep, splitext
 from setuptools import findall, find_packages, setup
 
-import formatters as fmt
+from . import formatters as fmt
 
 
-def _path_rel2file(p):
-    return opj(dirname(__file__), p)
+def _path_rel2file(*p):
+    return opj(dirname(__file__), os.pardir, *p)
 
 
 def get_version(name):
@@ -38,7 +38,7 @@ def get_version(name):
     """
     # This might entail lots of imports which might not yet be available
     # so let's do ad-hoc parsing of the version.py
-    with open(opj(dirname(__file__), name, 'version.py')) as f:
+    with open(_path_rel2file(name, 'version.py')) as f:
         version_lines = list(filter(lambda x: x.startswith('__version__'), f))
     assert (len(version_lines) == 1)
     return version_lines[0].split('=')[1].strip(" '\"\t\n")
@@ -428,7 +428,7 @@ def get_long_description_from_README():
     # https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
     # is still in place for older setuptools
 
-    README = opj(dirname(__file__), 'README.md')
+    README = opj(_path_rel2file('README.md'))
 
     ret = {}
     if LooseVersion(setuptools.__version__) >= '38.6.0':
