@@ -87,27 +87,42 @@ class BuildManPage(Command):
         self._today = datetime.date.today()
 
     @classmethod
-    def handle_module(cls, mod_name):
+    def handle_module(cls, mod_name, **kwargs):
         """Module specific handling.
 
+        This particular one does
         1. Memorize (at class level) the module name of interest here
-        2. Check if module has `command_suite` and take commands from there.
+        2. Check if 'datalad.extensions' are specified for the module,
+           and then analyzes them to obtain command names it provides
 
-        If `command_suite` is found, its entries are to be used instead of
-        _parser.
+        If cmdline commands are found, its entries are to be used instead of
+        the ones in datalad's _parser.
+
+        Parameters
+        ----------
+        **kwargs:
+            all the kwargs which might be provided to setuptools.setup
         """
-        mod = __import__(mod_name)
         cls.mod_name = mod_name
-        # TODO: it seems that command_suite is just a consistently named variable
-        # we point for 'datalad.extensions' entry_points so ideally we take
-        # those, but then we would need to pass here entry points as well...
-        if hasattr(mod, 'command_suite'):
-            command_suite = getattr(mod, 'command_suite')
-            assert len(command_suite) == 2 # as far as I see it
-            cls.cmdline_names = [
-                cmd
-                for _, _, cmd, _ in command_suite[1]
-            ]
+
+        exts = kwargs.get('entry_points', {}).get('datalad.extensions', [])
+        for ext in exts:
+            assert '=' in ext      # should be label=module:obj
+            ext_label, mod_obj = ext.split('=', 1)
+            assert ':' in mod_obj  # should be module:obj
+            mod, obj = mod_obj.split(':', 1)
+            assert mod_name == mod  # AFAIK should be identical
+
+            mod = __import__(mod_name)
+            if hasattr(mod, obj):
+                command_suite = getattr(mod, obj)
+                assert len(command_suite) == 2  # as far as I see it
+                if not hasattr(cls, 'cmdline_names'):
+                    cls.cmdline_names = []
+                cls.cmdline_names += [
+                    cmd
+                    for _, _, cmd, _ in command_suite[1]
+                ]
 
     def run(self):
 
@@ -489,5 +504,5 @@ def datalad_setup(name, **kwargs):
     # Check if command needs some module specific handling
     for v in cmdclass.values():
         if hasattr(v, 'handle_module'):
-            getattr(v, 'handle_module')(name)
+            getattr(v, 'handle_module')(name, **kwargs)
     return setup(name=name, **kwargs)
