@@ -86,6 +86,29 @@ class BuildManPage(Command):
         self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
 
+    @classmethod
+    def handle_module(cls, mod_name):
+        """Module specific handling.
+
+        1. Memorize (at class level) the module name of interest here
+        2. Check if module has `command_suite` and take commands from there.
+
+        If `command_suite` is found, its entries are to be used instead of
+        _parser.
+        """
+        mod = __import__(mod_name)
+        cls.mod_name = mod_name
+        # TODO: it seems that command_suite is just a consistently named variable
+        # we point for 'datalad.extensions' entry_points so ideally we take
+        # those, but then we would need to pass here entry points as well...
+        if hasattr(mod, 'command_suite'):
+            command_suite = getattr(mod, 'command_suite')
+            assert len(command_suite) == 2 # as far as I see it
+            cls.cmdline_names = [
+                cmd
+                for _, _, cmd, _ in command_suite[1]
+            ]
+
     def run(self):
 
         dist = self.distribution
@@ -98,17 +121,19 @@ class BuildManPage(Command):
                 appname, dist.get_author(), dist.get_author_email()),
         }
 
-        dist = self.distribution
         for cls, opath, ext in ((fmt.ManPageFormatter, self.manpath, '1'),
                                 (fmt.RSTManPageFormatter, self.rstpath, 'rst')):
             if not os.path.exists(opath):
                 os.makedirs(opath)
-            for cmdname in self._parser:
+            for cmdname in getattr(self, 'cmdline_names', list(self._parser)):
                 p = self._parser[cmdname]
                 cmdname = "{0}{1}".format(
                     'datalad ' if cmdname != 'datalad' else '',
                     cmdname)
-                format = cls(cmdname, ext_sections=sections, version=get_version(appname))
+                format = cls(
+                    cmdname,
+                    ext_sections=sections,
+                    version=get_version(getattr(self, 'mod_name', appname)))
                 formatted = format.format_man_page(p)
                 with open(opj(opath, '{0}.{1}'.format(
                         cmdname.replace(' ', '-'),
@@ -460,4 +485,9 @@ def datalad_setup(name, **kwargs):
     if kwargs.get('version') is None:
         kwargs['version'] = get_version(name)
 
+    cmdclass = kwargs.get('cmdclass', {})
+    # Check if command needs some module specific handling
+    for v in cmdclass.values():
+        if hasattr(v, 'handle_module'):
+            getattr(v, 'handle_module')(name)
     return setup(name=name, **kwargs)
