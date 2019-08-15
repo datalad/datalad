@@ -10,7 +10,7 @@ from os.path import (
     join as opj,
 )
 
-from datalad_build_support.setup import (
+from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
     BuildRSTExamplesFromScripts,
