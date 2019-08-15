@@ -99,6 +99,7 @@ from .utils import (
     skip_if,
     ok_file_has_content
 )
+from .utils import OBSCURE_FILENAME
 
 
 def test_get_func_kwargs_doc():
@@ -400,6 +401,15 @@ def test_getpwd_symlink(tdir):
     with chpwd(s2dir, mkdir=True):
         ok_(exists(s2dir))
         eq_(getpwd(), s2dir)
+
+
+@with_tempfile(mkdir=True)
+def test_chpwd_obscure_name(topdir):
+    path = op.join(topdir, OBSCURE_FILENAME)
+    os.mkdir(path)
+    # Just check that call doesn't fail.
+    with chpwd(path):
+        pass
 
 
 def test_auto_repr():

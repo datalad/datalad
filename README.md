@@ -28,12 +28,11 @@ to DataLad. In order to install DataLad customized for a particular domain, one
 can simply install an extension directly, and DataLad itself will be
 automatically installed with it. Here is a list of known extensions:
 
-- [tracking web resources and automated data distributions](https://github.com/datalad/datalad-crawler) [![crawler release](https://img.shields.io/github/release/datalad/datalad-crawler.svg)](https://GitHub.com/datalad/datalad-crawler/releases/)
-- [neuroimaging research data and workflows](https://github.com/datalad/datalad-neuroimaging) [![neuroimaging release](https://img.shields.io/github/release/datalad/datalad-neuroimaging.svg)](https://GitHub.com/datalad/datalad-neuroimaging/releases/)
-- [support for containerized computational environments](https://github.com/datalad/datalad-container) [![container release](https://img.shields.io/github/release/datalad/datalad-container.svg)](https://GitHub.com/datalad/datalad-container/releases/)
-- [alternative set of basic commands with improved cross-platform support](https://github.com/datalad/datalad-revolution) [![revolution release](https://img.shields.io/github/release/datalad/datalad-revolution.svg)](https://GitHub.com/datalad/datalad-revolution/releases/)
+- [crawler](https://github.com/datalad/datalad-crawler) -- tracking web resources and automated data distributions [![crawler release](https://img.shields.io/github/release/datalad/datalad-crawler.svg)](https://GitHub.com/datalad/datalad-crawler/releases/)
+- [neuroimaging](https://github.com/datalad/datalad-neuroimaging) -- neuroimaging research data and workflows [![neuroimaging release](https://img.shields.io/github/release/datalad/datalad-neuroimaging.svg)](https://GitHub.com/datalad/datalad-neuroimaging/releases/)
+- [container](https://github.com/datalad/datalad-container) -- support for containerized computational environments [![container release](https://img.shields.io/github/release/datalad/datalad-container.svg)](https://GitHub.com/datalad/datalad-container/releases/)
 
-- [webapp support](https://github.com/datalad/datalad-webapp) [tech demo]
+- [webapp](https://github.com/datalad/datalad-webapp) -- support for exposing selected DataLad API as REST API webapp [tech demo]
 
 
 # Support
@@ -62,6 +61,10 @@ On Debian-based systems, we recommend to enable [NeuroDebian] from which we
 provide recent releases of DataLad. Once enabled, just do:
 
     apt-get install datalad
+
+## Other Linux'es via conda
+
+    conda install -c conda-forge datalad
 
 ## Other Linux'es, OSX via pip
 

@@ -38,7 +38,7 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-
+from six import PY2
 from six import string_types
 from six import text_type
 from six import add_metaclass
@@ -736,7 +736,9 @@ class GitRepo(RepoInterface):
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-            self._repo = self._create_empty_repo(path, create_sanity_checks, **git_opts)
+            self._repo = self._create_empty_repo(
+                assure_bytes(path) if PY2 else path,
+                create_sanity_checks, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is

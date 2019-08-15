@@ -16,6 +16,8 @@ import os.path as op
 from functools import partial
 from collections import OrderedDict
 
+from six import PY2
+
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
@@ -374,7 +376,7 @@ class WTF(Interface):
         infos = OrderedDict()
         res = get_status_dict(
             action='wtf',
-            path=ds.path if ds else op.abspath(op.curdir),
+            path=ds.path if ds else assure_unicode(op.abspath(op.curdir)),
             type='dataset' if ds else 'directory',
             status='ok',
             logger=lgr,
@@ -406,7 +408,7 @@ class WTF(Interface):
                 'pyperclip', msg="It is needed to be able to use clipboard")
             import pyperclip
             report = _render_report(res)
-            pyperclip.copy(assure_bytes(report))
+            pyperclip.copy(report)
             ui.message("WTF information of length %s copied to clipboard"
                        % len(report))
         yield res
@@ -415,7 +417,8 @@ class WTF(Interface):
     @staticmethod
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
-        ui.message(_render_report(res))
+        out = _render_report(res)
+        ui.message(assure_bytes(out) if PY2 else out)
 
 
 def _render_report(res):
