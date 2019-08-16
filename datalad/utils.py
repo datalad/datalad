@@ -1491,7 +1491,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = path
+        os.environ['PWD'] = assure_bytes(path) if PY2 else path
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
