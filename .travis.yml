@@ -255,7 +255,7 @@ before_install:
   - if [ ! -z "${_DL_UPSTREAM_GITPYTHON:-}" ]; then pip install https://github.com/gitpython-developers/GitPython/archive/master.zip; fi
   - if [ ! -z "${_DL_UPSTREAM_GITANNEX:-}" ]; then sudo tools/ci/install-annex-snapshot.sh; sudo ln -s `find /usr/local/lib/git-annex.linux -maxdepth 1 -type f -perm /+x` /usr/local/bin/; else sudo eatmydata apt-get install git-annex-standalone ; fi
   # Install optionally -devel version of annex, and if goes wrong (we have most recent), exit right away
-  - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || exit 0; fi
+  - if [ ! -z "${_DL_DEVEL_ANNEX:-}" ]; then tools/ci/prep-travis-devel-annex.sh || { ex="$?"; if [ "$ex" -eq 99 ]; then exit 0; else exit "$ex"; fi; }; fi
   # Optionally install the latest Git.  Exit code 100 indicates that bundled is same as the latest.
   - if [ ! -z "${_DL_UPSTREAM_GIT:-}" ]; then
       sudo tools/ci/install-latest-git.sh || { [ $? -eq 100 ] && exit 0; } || exit 1;
