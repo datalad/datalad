@@ -16,6 +16,7 @@ from datalad.tests.utils import known_failure_windows
 import os
 import os.path as op
 
+from six import PY2
 from six import text_type
 
 from datalad.distribution.dataset import (
@@ -24,6 +25,7 @@ from datalad.distribution.dataset import (
 from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
+    assure_bytes,
     chpwd,
     _path_,
 )
@@ -38,6 +40,7 @@ from datalad.tests.utils import (
     assert_raises,
     assert_status,
     assert_in_results,
+    swallow_outputs,
     with_tree,
     OBSCURE_FILENAME,
 )
@@ -458,3 +461,20 @@ def test_empty_git_upstairs(topdir):
     # is a valid repo.
     with assert_raises(CommandError):
         create(op.join(topdir, "nonempty", "ds"), **raw)
+
+
+@with_tempfile(mkdir=True)
+def check_create_obscure(create_kwargs, path):
+    with chpwd(path):
+        with swallow_outputs():
+            ds = create(result_renderer="default", **create_kwargs)
+    ok_(ds.is_installed())
+
+
+def test_create_with_obscure_name():
+    fname = OBSCURE_FILENAME
+    if PY2:
+        # Mimic how it comes in on the command-line.
+        fname = assure_bytes(OBSCURE_FILENAME)
+    yield check_create_obscure, {"path": fname}
+    yield check_create_obscure, {"dataset": fname}

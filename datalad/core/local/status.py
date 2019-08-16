@@ -285,7 +285,7 @@ class Status(Interface):
         paths_by_ds = OrderedDict()
         if path:
             # sort any path argument into the respective subdatasets
-            for p in sorted(assure_list(path)):
+            for p in sorted(map(assure_unicode, assure_list(path))):
                 # it is important to capture the exact form of the
                 # given path argument, before any normalization happens
                 # for further decision logic below
