@@ -7,45 +7,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import (
-    dirname,
     join as opj,
-    sep as pathsep,
-    splitext,
 )
 
-from setuptools import (
-    findall,
-    find_packages,
-    setup,
-)
-
-from setup_support import (
+from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
     BuildRSTExamplesFromScripts,
     BuildSchema,
-    get_version,
     setup_entry_points,
+    findsome,
+    datalad_setup,
 )
 
-
-def findsome(subdir, extensions):
-    """Find files under subdir having specified extensions
-
-    Leading directory (datalad) gets stripped
-    """
-    return [
-        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
-        if splitext(f)[-1].lstrip('.') in extensions
-    ]
-
-# datalad version to be installed
-version = get_version()
-
-# Only recentish versions of find_packages support include
-# datalad_pkgs = find_packages('.', include=['datalad*'])
-# so we will filter manually for maximal compatibility
-datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 
 requires = {
     'core': [
@@ -155,22 +129,6 @@ cmdclass = {
     # 'build_py': DataladBuild
 }
 
-# PyPI doesn't render markdown yet. Workaround for a sane appearance
-# https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
-README = opj(dirname(__file__), 'README.md')
-try:
-    import pypandoc
-    long_description = pypandoc.convert(README, 'rst')
-except (ImportError, OSError) as exc:
-    # attempting to install pandoc via brew on OSX currently hangs and
-    # pypandoc imports but throws OSError demanding pandoc
-    print(
-        "WARNING: pypandoc failed to import or thrown an error while converting"
-        " README.md to RST: %r   .md version will be used as is" % exc
-    )
-    long_description = open(README).read()
-
-
 #
 # Avoid using entry_points due to their hefty overhead
 #
@@ -198,14 +156,9 @@ entry_points.update({
     ]})
 setup_kwargs['entry_points'] = entry_points
 
-setup(
-    name="datalad",
-    author="The DataLad Team and Contributors",
-    author_email="team@datalad.org",
-    version=version,
+datalad_setup(
+    'datalad',
     description="data distribution geared toward scientific datasets",
-    long_description=long_description,
-    packages=datalad_pkgs,
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
@@ -213,7 +166,8 @@ setup(
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
+            findsome('resources',
+                     {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})

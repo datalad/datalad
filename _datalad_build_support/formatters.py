@@ -69,7 +69,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         return usage
 
     def _mk_title(self, prog):
-        name_version = "\"{0} {1}\"".format(prog, self._version)
+        name_version = "{0} {1}".format(prog, self._version)
         return '.TH "{0}" "{1}" "{2}" "{3}"\n'.format(
             prog, self._section, self._today, name_version)
 
