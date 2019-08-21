@@ -53,10 +53,11 @@ FIXTURES_PATH = op.join(op.dirname(__file__), 'vcr_cassettes')
 
 
 def use_cassette(name, *args, **kwargs):
-    """Adapter to store fixtures locally
+    """Adapter to store fixtures locally and skip if there is no vcr
 
-    TODO: RF so could be used in other places as well
+    TODO: RF local aspect so could be used in other places as well
     """
+    kwargs['skip_if_no_vcr'] = kwargs.get('skip_if_no_vcr', True)
     return use_cassette_(op.join(FIXTURES_PATH, name + '.yaml'), *args, **kwargs)
 
 
