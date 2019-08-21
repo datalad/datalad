@@ -57,7 +57,7 @@ def use_cassette(name, *args, **kwargs):
 
     TODO: RF local aspect so could be used in other places as well
     """
-    kwargs['skip_if_no_vcr'] = kwargs.get('skip_if_no_vcr', True)
+    kwargs.setdefault('skip_if_no_vcr', True)
     return use_cassette_(op.join(FIXTURES_PATH, name + '.yaml'), *args, **kwargs)
 
 
