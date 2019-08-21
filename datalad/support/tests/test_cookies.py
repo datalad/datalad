@@ -36,4 +36,3 @@ def test_no_blows(cookiesdir):
     """
     rmtree(cookiesdir)
     cookies.close()
-    # cookies.close()
