@@ -52,6 +52,12 @@ class SSHRun(Interface):
         port=Parameter(
             args=("-p", '--port'),
             doc="port to connect to on the remote host"),
+        options=Parameter(
+            args=("-o",),
+            metavar="OPTION",
+            dest="options",
+            doc="configuration option passed to SSH",
+            action="append"),
         no_stdin=Parameter(
             args=("-n",),
             action="store_true",
@@ -60,9 +66,10 @@ class SSHRun(Interface):
     )
 
     @staticmethod
-    def __call__(login, cmd, port=None, no_stdin=False):
-        lgr.debug("sshrun invoked: login=%r, cmd=%r, port=%r, no_stdin=%r",
-                  login, cmd, port, no_stdin)
+    def __call__(login, cmd, port=None, options=None, no_stdin=False):
+        lgr.debug("sshrun invoked: login=%r, cmd=%r, port=%r, options=%r, "
+                  "no_stdin=%r",
+                  login, cmd, port, options, no_stdin)
         # Perspective workarounds for git-annex invocation, see
         # https://github.com/datalad/datalad/issues/1456#issuecomment-292641319
         
@@ -87,7 +94,8 @@ class SSHRun(Interface):
         # TODO: /dev/null on windows ;)  or may be could be just None?
         stdin_ = open('/dev/null', 'r') if no_stdin else sys.stdin
         try:
-            out, err = ssh(cmd, stdin=stdin_, log_output=False)
+            out, err = ssh(cmd, stdin=stdin_, log_output=False,
+                           options=options)
         finally:
             if no_stdin:
                 stdin_.close()

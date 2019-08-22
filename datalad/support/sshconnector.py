@@ -103,7 +103,7 @@ class SSHConnection(object):
         self._remote_props = {}
         self._opened_by_us = False
 
-    def __call__(self, cmd, stdin=None, log_output=True):
+    def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
 
         It is the callers responsibility to properly quote commands
@@ -114,6 +114,11 @@ class SSHConnection(object):
         ----------
         cmd: str
           command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
 
         Returns
         -------
@@ -144,6 +149,9 @@ class SSHConnection(object):
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
         ssh_cmd = ["ssh"] + self._ssh_args
+        for opt in options or []:
+            ssh_cmd.extend(["-o", opt])
+
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
