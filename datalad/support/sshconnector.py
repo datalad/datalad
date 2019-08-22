@@ -93,9 +93,9 @@ class SSHConnection(object):
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
         self.ctrl_path = ctrl_path
-        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
+        self._ssh_args = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
-            self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+            self._ssh_args += ['-p', '{}'.format(self.sshri.port)]
 
         self._identity_file = identity_file
 
@@ -143,7 +143,7 @@ class SSHConnection(object):
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
-        ssh_cmd = ["ssh"] + self._ctrl_options
+        ssh_cmd = ["ssh"] + self._ssh_args
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
@@ -176,7 +176,7 @@ class SSHConnection(object):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         null = open('/dev/null')
         try:
@@ -214,7 +214,7 @@ class SSHConnection(object):
         # set control options
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
-                        "-o", "ControlPersist=15m"] + self._ctrl_options
+                        "-o", "ControlPersist=15m"] + self._ssh_args
         if self._identity_file:
             ctrl_options.extend(["-i", self._identity_file])
         # create ssh control master command
@@ -246,7 +246,7 @@ class SSHConnection(object):
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self._ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
@@ -276,7 +276,7 @@ class SSHConnection(object):
           stdout, stderr of the copy operation.
         """
         # Convert ssh's port flag (-p) to scp's (-P).
-        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
+        scp_options = ["-P" if x == "-p" else x for x in self._ssh_args]
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
         scp_options += ["-r"] if recursive else []
         scp_options += ["-p"] if preserve_attrs else []
