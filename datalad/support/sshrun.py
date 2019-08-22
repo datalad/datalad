@@ -61,7 +61,8 @@ class SSHRun(Interface):
 
     @staticmethod
     def __call__(login, cmd, port=None, no_stdin=False):
-        lgr.debug("sshrun invoked: %r %r %r %r", login, cmd, port, no_stdin)
+        lgr.debug("sshrun invoked: login=%r, cmd=%r, port=%r, no_stdin=%r",
+                  login, cmd, port, no_stdin)
         # Perspective workarounds for git-annex invocation, see
         # https://github.com/datalad/datalad/issues/1456#issuecomment-292641319
         
