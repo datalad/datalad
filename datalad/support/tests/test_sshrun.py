@@ -13,6 +13,7 @@ from nose.tools import assert_raises, assert_equal
 
 from mock import patch
 
+from datalad.api import sshrun
 from datalad.cmd import Runner
 from datalad.cmdline.main import main
 
@@ -70,3 +71,23 @@ def test_ssh_option():
             main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
                   "localhost", "echo $LC_DATALAD_HACK"])
             assert_equal(cmo.out.strip(), "hackbert")
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_ipv4_6_incompatible():
+    with assert_raises(SystemExit):
+        main(["datalad", "sshrun", "-4", "-6", "localhost", "true"])
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_ipv4_6():
+    # This should fail with a RuntimeError if a version is not supported (we're
+    # not bothering to check what localhost supports), but if the processing
+    # fails, it should be something else.
+    for kwds in [{"ipv4": True}, {"ipv6": True}]:
+        try:
+            sshrun("localhost", "true", **kwds)
+        except RuntimeError:
+            pass

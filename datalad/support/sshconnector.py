@@ -37,7 +37,8 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username='', identity_file=''):
+def get_connection_hash(hostname, port='', username='', identity_file='',
+                        force_ip=False):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -55,12 +56,14 @@ def get_connection_hash(hostname, port='', username='', identity_file=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
-            username=username).encode('utf-8')).hexdigest()[:8]
+            username=username,
+            force_ip=force_ip or ''
+        ).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
@@ -68,7 +71,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri, identity_file=None):
+    def __init__(self, ctrl_path, sshri, identity_file=None, force_ip=False):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -82,6 +85,8 @@ class SSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
+        force_ip : {False, 4, 6}
+           Force the use of IPv4 or IPv6 addresses with -4 or -6.
         """
         self._runner = None
 
@@ -97,6 +102,8 @@ class SSHConnection(object):
         if self.sshri.port:
             self._ssh_args += ['-p', '{}'.format(self.sshri.port)]
 
+        if force_ip:
+            self._ssh_args.append("-{}".format(force_ip))
         self._identity_file = identity_file
 
         # essential properties of the remote system
@@ -421,13 +428,15 @@ class SSHManager(object):
                 "Found %d previous connections",
                 len(self._prev_connections))
 
-    def get_connection(self, url):
+    def get_connection(self, url, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
         ----------
         url: str
           ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
@@ -456,7 +465,8 @@ class SSHManager(object):
             sshri.hostname,
             port=sshri.port,
             identity_file=identity_file or "",
-            username=sshri.username)
+            username=sshri.username,
+            force_ip=force_ip)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
 
@@ -464,7 +474,8 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file)
+            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file,
+                              force_ip=force_ip)
             self._connections[ctrl_path] = c
             return c
 
