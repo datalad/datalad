@@ -37,7 +37,8 @@ from datalad.cmd import Runner
 lgr = logging.getLogger('datalad.support.sshconnector')
 
 
-def get_connection_hash(hostname, port='', username='', identity_file=''):
+def get_connection_hash(hostname, port='', username='', identity_file='',
+                        force_ip=False):
     """Generate a hash based on SSH connection properties
 
     This can be used for generating filenames that are unique
@@ -55,12 +56,14 @@ def get_connection_hash(hostname, port='', username='', identity_file=''):
     #  https://github.com/ansible/ansible/issues/11536#issuecomment-153030743
     #  https://github.com/datalad/datalad/pull/1377
     return md5(
-        '{lhost}{rhost}{port}{identity_file}{username}'.format(
+        '{lhost}{rhost}{port}{identity_file}{username}{force_ip}'.format(
             lhost=gethostname(),
             rhost=hostname,
             port=port,
             identity_file=identity_file,
-            username=username).encode('utf-8')).hexdigest()[:8]
+            username=username,
+            force_ip=force_ip or ''
+        ).encode('utf-8')).hexdigest()[:8]
 
 
 @auto_repr
@@ -68,7 +71,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, sshri, identity_file=None):
+    def __init__(self, ctrl_path, sshri, identity_file=None, force_ip=False):
         """Create a connection handler
 
         The actual opening of the connection is performed on-demand.
@@ -82,6 +85,8 @@ class SSHConnection(object):
           or another resource identifier that can be converted into an SSHRI.
         identity_file : str or None
           Value to pass to ssh's -i option.
+        force_ip : {False, 4, 6}
+           Force the use of IPv4 or IPv6 addresses with -4 or -6.
         """
         self._runner = None
 
@@ -93,17 +98,19 @@ class SSHConnection(object):
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
         self.ctrl_path = ctrl_path
-        self._ctrl_options = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
+        self._ssh_args = ["-o", "ControlPath=\"%s\"" % self.ctrl_path]
         if self.sshri.port:
-            self._ctrl_options += ['-p', '{}'.format(self.sshri.port)]
+            self._ssh_args += ['-p', '{}'.format(self.sshri.port)]
 
+        if force_ip:
+            self._ssh_args.append("-{}".format(force_ip))
         self._identity_file = identity_file
 
         # essential properties of the remote system
         self._remote_props = {}
         self._opened_by_us = False
 
-    def __call__(self, cmd, stdin=None, log_output=True):
+    def __call__(self, cmd, options=None, stdin=None, log_output=True):
         """Executes a command on the remote.
 
         It is the callers responsibility to properly quote commands
@@ -114,6 +121,11 @@ class SSHConnection(object):
         ----------
         cmd: str
           command to run on the remote
+        options : list of str, optional
+          Additional options to pass to the `-o` flag of `ssh`. Note: Many
+          (probably most) of the available configuration options should not be
+          set here because they can critically change the properties of the
+          connection. This exists to allow options like SendEnv to be set.
 
         Returns
         -------
@@ -143,7 +155,10 @@ class SSHConnection(object):
         # whatever it contains will go to the remote machine for execution
         # we cannot perform any sort of escaping, because it will limit
         # what we can do on the remote, e.g. concatenate commands with '&&'
-        ssh_cmd = ["ssh"] + self._ctrl_options
+        ssh_cmd = ["ssh"] + self._ssh_args
+        for opt in options or []:
+            ssh_cmd.extend(["-o", opt])
+
         ssh_cmd += [self.sshri.as_str()] \
             + [cmd]
 
@@ -176,7 +191,7 @@ class SSHConnection(object):
             )
             return False
         # check whether controlmaster is still running:
-        cmd = ["ssh", "-O", "check"] + self._ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "check"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Checking %s by calling %s" % (self, cmd))
         null = open('/dev/null')
         try:
@@ -214,7 +229,7 @@ class SSHConnection(object):
         # set control options
         ctrl_options = ["-fN",
                         "-o", "ControlMaster=auto",
-                        "-o", "ControlPersist=15m"] + self._ctrl_options
+                        "-o", "ControlPersist=15m"] + self._ssh_args
         if self._identity_file:
             ctrl_options.extend(["-i", self._identity_file])
         # create ssh control master command
@@ -246,7 +261,7 @@ class SSHConnection(object):
             lgr.debug("Not closing %s since was not opened by itself", self)
             return
         # stop controlmaster:
-        cmd = ["ssh", "-O", "stop"] + self._ctrl_options + [self.sshri.as_str()]
+        cmd = ["ssh", "-O", "stop"] + self._ssh_args + [self.sshri.as_str()]
         lgr.debug("Closing %s by calling %s", self, cmd)
         try:
             self.runner.run(cmd, expect_stderr=True, expect_fail=True)
@@ -276,7 +291,7 @@ class SSHConnection(object):
           stdout, stderr of the copy operation.
         """
         # Convert ssh's port flag (-p) to scp's (-P).
-        scp_options = ["-P" if x == "-p" else x for x in self._ctrl_options]
+        scp_options = ["-P" if x == "-p" else x for x in self._ssh_args]
         # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
         scp_options += ["-r"] if recursive else []
         scp_options += ["-p"] if preserve_attrs else []
@@ -413,13 +428,15 @@ class SSHManager(object):
                 "Found %d previous connections",
                 len(self._prev_connections))
 
-    def get_connection(self, url):
+    def get_connection(self, url, force_ip=False):
         """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
         ----------
         url: str
           ssh url
+        force_ip : {False, 4, 6}
+          Force the use of IPv4 or IPv6 addresses.
 
         Returns
         -------
@@ -448,7 +465,8 @@ class SSHManager(object):
             sshri.hostname,
             port=sshri.port,
             identity_file=identity_file or "",
-            username=sshri.username)
+            username=sshri.username,
+            force_ip=force_ip)
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, conhash)
 
@@ -456,7 +474,8 @@ class SSHManager(object):
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file)
+            c = SSHConnection(ctrl_path, sshri, identity_file=identity_file,
+                              force_ip=force_ip)
             self._connections[ctrl_path] = c
             return c
 
