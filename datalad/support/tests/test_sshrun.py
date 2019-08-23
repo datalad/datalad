@@ -11,9 +11,13 @@ import sys
 from six.moves import StringIO
 from nose.tools import assert_raises, assert_equal
 
+from mock import patch
+
+from datalad.api import sshrun
 from datalad.cmd import Runner
 from datalad.cmdline.main import main
 
+from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
@@ -54,3 +58,36 @@ def test_fancy_quotes(f):
     cmd = ['datalad', 'sshrun', 'localhost', """'cat '"'"'%s'"'"''""" % f]
     out, err = Runner().run(cmd)
     assert_equal(out, 'magic')
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_option():
+    # This test is hacky in that it depends on systems commonly configuring
+    # `AcceptEnv LC_*` in their sshd_config. If it ends up causing problems, we
+    # should just scrap it.
+    with patch.dict('os.environ', {"LC_DATALAD_HACK": 'hackbert'}):
+        with swallow_outputs() as cmo:  # need to give smth with .fileno ;)
+            main(["datalad", "sshrun", "-oSendEnv=LC_DATALAD_HACK",
+                  "localhost", "echo $LC_DATALAD_HACK"])
+            assert_equal(cmo.out.strip(), "hackbert")
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_ipv4_6_incompatible():
+    with assert_raises(SystemExit):
+        main(["datalad", "sshrun", "-4", "-6", "localhost", "true"])
+
+
+@skip_if_on_windows
+@skip_ssh
+def test_ssh_ipv4_6():
+    # This should fail with a RuntimeError if a version is not supported (we're
+    # not bothering to check what localhost supports), but if the processing
+    # fails, it should be something else.
+    for kwds in [{"ipv4": True}, {"ipv6": True}]:
+        try:
+            sshrun("localhost", "true", **kwds)
+        except RuntimeError:
+            pass
