@@ -23,6 +23,7 @@ import gc
 import glob
 import gzip
 import string
+import warnings
 import wrapt
 
 from copy import copy as shallow_copy
@@ -70,9 +71,25 @@ on_linux = platform_system == 'linux'
 on_msys_tainted_paths = on_windows \
                         and 'MSYS_NO_PATHCONV' not in os.environ \
                         and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
+
+
+def get_linux_distribution():
+    """Compatibility wrapper for {platform,distro}.linux_distribution().
+    """
+    if hasattr(platform, "linux_distribution"):
+        # Use deprecated (but faster) method if it's available.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            result = platform.linux_distribution()
+    else:
+        import distro  # We require this for Python 3.8 and above.
+        result = distro.linux_distribution(full_distribution_name=False)
+    return result
+
+
 try:
     linux_distribution_name, linux_distribution_release \
-        = platform.linux_distribution()[:2]
+        = get_linux_distribution()[:2]
     on_debian_wheezy = on_linux \
                        and linux_distribution_name == 'debian' \
                        and linux_distribution_release.startswith('7.')
