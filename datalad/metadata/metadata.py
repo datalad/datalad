@@ -461,7 +461,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         nocontent = len(fullpathlist) - len(paths)
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
-            lgr.warn(
+            lgr.warning(
                 '{} files have no content present, '
                 'some extractors will not operate on {}'.format(
                     nocontent,

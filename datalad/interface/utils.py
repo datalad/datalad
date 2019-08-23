@@ -601,8 +601,8 @@ def _process_results(
             try:
                 result_renderer(res, **kwargs)
             except Exception as e:
-                lgr.warn('Result rendering failed for: %s [%s]',
-                         res, exc_str(e))
+                lgr.warning('Result rendering failed for: %s [%s]',
+                            res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
