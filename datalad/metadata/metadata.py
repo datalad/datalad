@@ -18,8 +18,13 @@ import os
 import os.path as op
 from collections import (
     OrderedDict,
-    Mapping,
 )
+
+try:
+    from collections.abc import Mapping
+except ImportError:  # Python <= 3.3
+    from collections import Mapping
+
 from six import (
     binary_type,
     string_types,

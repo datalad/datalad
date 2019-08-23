@@ -13,6 +13,11 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
+try:
+    from collections.abc import Callable
+except ImportError:  # Python <= 3.3
+    from collections import Callable
+
 import logging
 import shutil
 import os
@@ -975,7 +980,7 @@ def optional_args(decorator):
         def dec(f):
             return decorator(f, *args, **kwargs)
 
-        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], collections.Callable)
+        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], Callable)
         if is_decorating:
             f = args[0]
             args = []

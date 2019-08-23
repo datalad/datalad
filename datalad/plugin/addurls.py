@@ -9,7 +9,11 @@
 """Create and update a dataset from a list of URLs.
 """
 
-from collections import Mapping
+try:
+    from collections.abc import Mapping
+except ImportError:  # Python <= 3.3
+    from collections import Mapping
+
 from functools import partial
 import logging
 import os
