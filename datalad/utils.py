@@ -35,7 +35,7 @@ from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
-from inspect import getargspec
+import inspect
 from itertools import tee
 
 import os.path as op
@@ -139,6 +139,16 @@ lgr.debug(
 #
 # Little helpers
 #
+
+# `getargspec` has been deprecated in Python 3.
+if hasattr(inspect, "getfullargspec"):
+    ArgSpecFake = collections.namedtuple(
+        "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
+
+    def getargspec(func):
+        return ArgSpecFake(*inspect.getfullargspec(func)[:4])
+else:
+    getargspec = inspect.getargspec
 
 
 def get_func_kwargs_doc(func):

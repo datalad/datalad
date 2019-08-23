@@ -109,7 +109,7 @@ def test_get_func_kwargs_doc():
 
 def test_better_wraps():
     from functools import wraps
-    from inspect import getargspec
+    from datalad.utils import getargspec
 
     def wraps_decorator(func):
         @wraps(func)
