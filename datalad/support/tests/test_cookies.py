@@ -34,5 +34,10 @@ def test_no_blows(cookiesdir):
 
     on Debian (python 3.7.3~rc1-1) I just get a warning: BDB3028 /home/yoh/.tmp/datalad_temp_test_no_blows58tdg67s/mycookies.db: unable to flush: No such file or directory
     """
-    rmtree(cookiesdir)
+    try:
+        rmtree(cookiesdir)
+    except OSError:
+        # on NFS directory might still be open, so .nfs* lock file would prevent
+        # removal, but it shouldn't matter and .close should succeed
+        pass
     cookies.close()
