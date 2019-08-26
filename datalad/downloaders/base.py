@@ -145,7 +145,6 @@ class BaseDownloader(object):
             supported_auth_types = []
             try:
                 used_old_session = False
-                access_denied = False
                 used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -167,63 +166,63 @@ class BaseDownloader(object):
                         " The failure response indicated that following " \
                         "authentication types should be used: %s" % (
                             ', '.join(supported_auth_types))
-                if access_denied:  # keep inside except https://github.com/datalad/datalad/issues/3621
-                    # TODO: what if it was anonimous attempt without authentication,
-                    #     so it is not "requires_authentication" but rather
-                    #     "supports_authentication"?  We should not report below in
-                    # _get_new_credential that authentication has failed then since there
-                    # were no authentication.  We might need a custom exception to
-                    # be caught above about that
-                    if needs_authentication:
-                        # so we knew it needs authentication
-                        if used_old_session:
-                            # Let's try with fresh ones
-                            allow_old_session = False
-                            continue
-                        else:
-                            # we did use new cookies, we knew that authentication is needed
-                            # but still failed. So possible cases:
-                            #  1. authentication credentials changed/were revoked
-                            #     - allow user to re-enter credentials
-                            #  2. authentication mechanisms changed
-                            #     - we can't do anything here about that
-                            #  3. bug in out code which would render authentication/cookie handling
-                            #     ineffective
-                            #     - not sure what to do about it
-                            if not ui.is_interactive:
-                                lgr.error(
-                                    "Interface is non interactive, so we are "
-                                    "reraising: %s" % exc_str(e))
-                                reraise(*exc_info)
-                            self._enter_credentials(
-                                url,
-                                denied_msg=access_denied,
-                                auth_types=supported_auth_types,
-                                new_provider=False)
-                            allow_old_session = False
-                            continue
-                    else:  # None or False
-                        if needs_authentication is False:
-                            # those urls must or should NOT require authentication
-                            # but we got denied
-                            raise DownloadError(
-                                "Failed to download from %s, which must be available"
-                                "without authentication but access was denied. "
-                                "Adjust your configuration for the provider.%s"
-                                % (url, msg_types))
-                        else:
-                            # how could be None or any other non-False bool(False)
-                            assert(needs_authentication is None)
-                            # So we didn't know if authentication necessary, and it
-                            # seems to be necessary, so Let's ask the user to setup
-                            # authentication mechanism for this website
-                            self._enter_credentials(
-                                url,
-                                denied_msg=access_denied,
-                                auth_types=supported_auth_types,
-                                new_provider=True)
-                            allow_old_session = False
-                            continue
+                # keep inside except https://github.com/datalad/datalad/issues/3621
+                # TODO: what if it was anonimous attempt without authentication,
+                #     so it is not "requires_authentication" but rather
+                #     "supports_authentication"?  We should not report below in
+                # _get_new_credential that authentication has failed then since there
+                # were no authentication.  We might need a custom exception to
+                # be caught above about that
+                if needs_authentication:
+                    # so we knew it needs authentication
+                    if used_old_session:
+                        # Let's try with fresh ones
+                        allow_old_session = False
+                        continue
+                    else:
+                        # we did use new cookies, we knew that authentication is needed
+                        # but still failed. So possible cases:
+                        #  1. authentication credentials changed/were revoked
+                        #     - allow user to re-enter credentials
+                        #  2. authentication mechanisms changed
+                        #     - we can't do anything here about that
+                        #  3. bug in out code which would render authentication/cookie handling
+                        #     ineffective
+                        #     - not sure what to do about it
+                        if not ui.is_interactive:
+                            lgr.error(
+                                "Interface is non interactive, so we are "
+                                "reraising: %s" % exc_str(e))
+                            reraise(*exc_info)
+                        self._enter_credentials(
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=False)
+                        allow_old_session = False
+                        continue
+                else:  # None or False
+                    if needs_authentication is False:
+                        # those urls must or should NOT require authentication
+                        # but we got denied
+                        raise DownloadError(
+                            "Failed to download from %s, which must be available"
+                            "without authentication but access was denied. "
+                            "Adjust your configuration for the provider.%s"
+                            % (url, msg_types))
+                    else:
+                        # how could be None or any other non-False bool(False)
+                        assert(needs_authentication is None)
+                        # So we didn't know if authentication necessary, and it
+                        # seems to be necessary, so Let's ask the user to setup
+                        # authentication mechanism for this website
+                        self._enter_credentials(
+                            url,
+                            denied_msg=access_denied,
+                            auth_types=supported_auth_types,
+                            new_provider=True)
+                        allow_old_session = False
+                        continue
 
             except IncompleteDownloadError as e:
                 exc_info = sys.exc_info()
