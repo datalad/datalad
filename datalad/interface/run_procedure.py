@@ -16,6 +16,7 @@ import logging
 from glob import iglob
 from argparse import REMAINDER
 import os
+import sys
 import os.path as op
 import stat
 
@@ -189,7 +190,7 @@ def _guess_exec(script_file):
                 'state': state}
     elif script_file.endswith('.py'):
         return {'type': u'python_script',
-                'template': u'python "{script}" "{ds}" {args}',
+                'template': u'%s "{script}" "{ds}" {args}' % sys.executable,
                 'state': state}
     else:
         return {'type': None, 'template': None, 'state': None}
