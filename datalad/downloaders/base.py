@@ -33,7 +33,14 @@ from ..utils import (
 )
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
-from ..support.exceptions import *
+from ..support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+    DownloadError,
+    IncompleteDownloadError,
+    UnaccountedDownloadError,
+)
+
 from ..support.network import RI
 
 from logging import getLogger
@@ -134,10 +141,10 @@ class BaseDownloader(object):
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
                 raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
             exc_info = None
+            msg_types = ''
             supported_auth_types = []
             try:
                 used_old_session = False
-                access_denied = False
                 used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -154,23 +161,12 @@ class BaseDownloader(object):
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
-            except IncompleteDownloadError as e:
-                exc_info = sys.exc_info()
-                incomplete_attempt += 1
-                if incomplete_attempt > 5:
-                    # give up
-                    raise
-                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
-                # TODO: may be fail ealier than after 20 attempts in such a case?
-            except DownloadError:
-                # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
-                raise
-
-            msg_types = ''
-            if supported_auth_types:
-                msg_types = " The failure response indicated that following " \
-                            "authentication types should be used: %s" % (', '.join(supported_auth_types))
-            if access_denied:  # moved logic outside of except for clarity
+                if supported_auth_types:
+                    msg_types = \
+                        " The failure response indicated that following " \
+                        "authentication types should be used: %s" % (
+                            ', '.join(supported_auth_types))
+                # keep inside except https://github.com/datalad/datalad/issues/3621
                 # TODO: what if it was anonimous attempt without authentication,
                 #     so it is not "requires_authentication" but rather
                 #     "supports_authentication"?  We should not report below in
@@ -227,6 +223,18 @@ class BaseDownloader(object):
                             new_provider=True)
                         allow_old_session = False
                         continue
+
+            except IncompleteDownloadError as e:
+                exc_info = sys.exc_info()
+                incomplete_attempt += 1
+                if incomplete_attempt > 5:
+                    # give up
+                    raise
+                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
+                # TODO: may be fail ealier than after 20 attempts in such a case?
+            except DownloadError:
+                # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
+                raise
 
         return result
 

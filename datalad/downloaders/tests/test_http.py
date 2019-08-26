@@ -18,7 +18,6 @@ import six.moves.builtins as __builtin__
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
-from ..base import AccessFailedError
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
@@ -30,6 +29,7 @@ from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..http import HTTPBearerTokenAuthenticator
 from ..http import process_www_authenticate
+from ...support.exceptions import AccessFailedError
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network

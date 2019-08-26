@@ -21,7 +21,10 @@ from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
-from .base import DownloadError, TargetFileAbsent
+from ..support.exceptions import (
+    DownloadError,
+    TargetFileAbsent,
+)
 from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
 from ..support.s3 import get_bucket
 from ..support.status import FileStatus
