@@ -38,6 +38,7 @@ from ..support.exceptions import (
     AnonymousAccessDeniedError,
     DownloadError,
     IncompleteDownloadError,
+    UnaccountedDownloadError,
 )
 
 from ..support.network import RI
