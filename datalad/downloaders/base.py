@@ -33,7 +33,13 @@ from ..utils import (
 )
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
-from ..support.exceptions import *
+from ..support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+    DownloadError,
+    IncompleteDownloadError,
+)
+
 from ..support.network import RI
 
 from logging import getLogger
