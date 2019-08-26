@@ -18,8 +18,13 @@ import os
 import os.path as op
 from collections import (
     OrderedDict,
-    Mapping,
 )
+
+try:
+    from collections.abc import Mapping
+except ImportError:  # Python <= 3.3
+    from collections import Mapping
+
 from six import (
     binary_type,
     string_types,
@@ -461,7 +466,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
         nocontent = len(fullpathlist) - len(paths)
         if nocontent:
             # TODO better fail, or support incremental and label this file as no present
-            lgr.warn(
+            lgr.warning(
                 '{} files have no content present, '
                 'some extractors will not operate on {}'.format(
                     nocontent,

@@ -36,6 +36,7 @@ from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge c
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
 from datalad.utils import assure_unicode
+from datalad.utils import getargspec
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
@@ -358,9 +359,7 @@ def eval_results(func):
         if result_filter:
             if isinstance(result_filter, Constraint):
                 _result_filter = result_filter.__call__
-            if (PY2 and inspect.getargspec(_result_filter).keywords) or \
-                    (not PY2 and inspect.getfullargspec(_result_filter).varkw):
-
+            if getargspec(_result_filter).keywords:
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
@@ -601,8 +600,8 @@ def _process_results(
             try:
                 result_renderer(res, **kwargs)
             except Exception as e:
-                lgr.warn('Result rendering failed for: %s [%s]',
-                         res, exc_str(e))
+                lgr.warning('Result rendering failed for: %s [%s]',
+                            res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
