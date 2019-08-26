@@ -31,10 +31,15 @@ from ..support.network import get_response_disposition_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 from ..support.status import FileStatus
+from ..support.exceptions import (
+    DownloadError,
+    AccessDeniedError,
+    AccessFailedError,
+    UnhandledRedirectError,
+)
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
-from .base import DownloadError, AccessDeniedError, AccessFailedError, UnhandledRedirectError
 
 from logging import getLogger
 from ..log import LoggerHelper
