@@ -451,8 +451,8 @@ class RunProcedure(Interface):
         cmd = ex['template'].format(
             script=procedure_file if on_windows else shlex_quote(procedure_file),
             ds='' if not ds else (ds.path if on_windows else shlex_quote(ds.path)),
-            args=(u' '.join(u'"{}"'.format(shlex_quote(a)) for a in args) if args else '') if not on_windows
-                    else u' '.join(u'"{}"'.format(a) for a in args) if args else '')
+            args=(u' '.join(shlex_quote(a) for a in args) if args else '') if not on_windows
+                    else u' '.join(str(a) for a in args) if args else '')
         lgr.debug('Attempt to run procedure {} as: {}'.format(
             name,
             cmd))
