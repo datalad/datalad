@@ -35,7 +35,7 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.utils import on_windows
+from datalad.utils import on_windows, maybe_shlex_quote
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
@@ -449,10 +449,9 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=procedure_file if on_windows else shlex_quote(procedure_file),
-            ds='' if not ds else (ds.path if on_windows else shlex_quote(ds.path)),
-            args=(u' '.join(shlex_quote(a) for a in args) if args else '') if not on_windows
-                    else u' '.join(str(a) for a in args) if args else '')
+            script=maybe_shlex_quote(procedure_file),
+            ds=maybe_shlex_quote(ds.path) if ds else '',
+            args=(u' '.join(maybe_shlex_quote(a) for a in args) if args else ''))
         lgr.debug('Attempt to run procedure {} as: {}'.format(
             name,
             cmd))
