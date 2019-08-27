@@ -184,16 +184,16 @@ def _guess_exec(script_file):
     # TODO check for exec permission and rely on interpreter
     if is_exec:
         return {'type': u'executable',
-                'template': u'"{script}" "{ds}" {args}',
+                'template': u'{script} {ds} {args}',
                 'state': state}
     elif script_file.endswith('.sh'):
         return {'type': u'bash_script',
-                'template': u'bash "{script}" "{ds}" {args}',
+                'template': u'bash {script} {ds} {args}',
                 'state': state}
     elif script_file.endswith('.py'):
         ex = sys.executable if on_windows else shlex_quote(sys.executable)
         return {'type': u'python_script',
-                'template': u'%s "{script}" "{ds}" {args}' % ex,
+                'template': u'%s {script} {ds} {args}' % ex,
                 'state': state}
     else:
         return {'type': None, 'template': None, 'state': None}
@@ -449,9 +449,10 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=procedure_file,
-            ds=ds.path if ds else '',
-            args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
+            script=procedure_file if on_windows else shlex_quote(procedure_file),
+            ds='' if not ds else (ds.path if on_windows else shlex_quote(ds.path)),
+            args=shlex_quote(u' '.join(u'"{}"'.format(a) for a in args) if args else '') if not on_windows
+                    else u' '.join(u'"{}"'.format(a) for a in args) if args else '')
         lgr.debug('Attempt to run procedure {} as: {}'.format(
             name,
             cmd))
