@@ -262,7 +262,7 @@ def test_eval_results_plus_build_doc():
     assert_equal(list(kwargs), ['return_type'])
 
     # test signature:
-    from inspect import getargspec
+    from datalad.utils import getargspec
     assert_equal(getargspec(Dataset.fake_command)[0], ['number', 'dataset'])
     assert_equal(getargspec(TestUtils.__call__)[0], ['number', 'dataset'])
 

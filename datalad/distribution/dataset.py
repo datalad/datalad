@@ -502,7 +502,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         # the function `f` to the Dataset class.
 
         kwargs = kwargs.copy()
-        from inspect import getargspec
+        from datalad.utils import getargspec
         orig_pos = getargspec(f).args
 
         # If bound function is used with wrong signature (especially by

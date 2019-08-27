@@ -15,7 +15,9 @@ import logging
 
 from glob import iglob
 from argparse import REMAINDER
+from six.moves import shlex_quote
 import os
+import sys
 import os.path as op
 import stat
 
@@ -33,6 +35,7 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.utils import on_windows
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
@@ -188,8 +191,9 @@ def _guess_exec(script_file):
                 'template': u'bash "{script}" "{ds}" {args}',
                 'state': state}
     elif script_file.endswith('.py'):
+        ex = sys.executable if on_windows else shlex_quote(sys.executable)
         return {'type': u'python_script',
-                'template': u'python "{script}" "{ds}" {args}',
+                'template': u'%s "{script}" "{ds}" {args}' % ex,
                 'state': state}
     else:
         return {'type': None, 'template': None, 'state': None}

@@ -217,7 +217,7 @@ def retry_urlopen(url, retries=3):
         try:
             return __urlopen_requests(url)
         except URLError as e:
-            lgr.warn("Received exception while reading %s: %s" % (url, e))
+            lgr.warning("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
                 # if we have reached allowed number of retries -- reraise
                 raise

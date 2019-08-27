@@ -55,7 +55,7 @@ def link_file_load(src, dst, dry_run=False):
     try:
         os.link(src_realpath, dst)
     except AttributeError as e:
-        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        lgr.warning("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:

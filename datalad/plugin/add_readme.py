@@ -89,7 +89,7 @@ class AddReadme(Interface):
             on_failure='ignore')
         meta = {}
         if not isinstance(dsinfo, dict) or dsinfo.get('status', None) != 'ok':
-            lgr.warn("Could not obtain dataset metadata, proceeding without")
+            lgr.warning("Could not obtain dataset metadata, proceeding without")
             dsinfo = {}
         else:
             # flatten possibly existing multiple metadata sources

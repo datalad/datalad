@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import re
 import textwrap
 import argparse
-from inspect import getargspec
+from datalad.utils import getargspec
 
 from .constraints import expand_constraint_spec
 
