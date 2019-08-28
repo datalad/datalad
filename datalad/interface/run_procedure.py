@@ -15,7 +15,6 @@ import logging
 
 from glob import iglob
 from argparse import REMAINDER
-from six.moves import shlex_quote
 import os
 import sys
 import os.path as op
@@ -35,7 +34,7 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.utils import on_windows, maybe_shlex_quote
+from datalad.utils import maybe_shlex_quote
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
