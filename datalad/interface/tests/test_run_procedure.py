@@ -238,7 +238,7 @@ def test_configs(path):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python "{script}" "{ds}" {{mysub}} {args}',
+        'python {script} {ds} {{mysub}} {args}',
         where='dataset'
     )
     ds.config.add(
@@ -258,7 +258,7 @@ def test_configs(path):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python "{script}" "{ds}" local {args}',
+        'python {script} {ds} local {args}',
         where='local'
     )
     ds.unlock("fromproc.txt")
