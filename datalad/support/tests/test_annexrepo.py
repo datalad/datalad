@@ -27,7 +27,6 @@ from os.path import exists
 from shutil import copyfile
 from nose.tools import assert_not_is_instance
 
-from six import text_type
 
 from urllib.parse import urljoin
 from urllib.parse import urlsplit

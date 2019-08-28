@@ -16,7 +16,6 @@ from os import chmod
 import stat
 import re
 from os.path import join as opj, exists, basename
-from six import text_type
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_sibling

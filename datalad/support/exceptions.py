@@ -12,7 +12,6 @@
 import re
 from os import linesep
 
-import six
 
 
 class CommandError(RuntimeError):

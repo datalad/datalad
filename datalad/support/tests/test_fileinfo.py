@@ -8,7 +8,6 @@
 """Test file info getters"""
 
 
-from six import iteritems
 import os.path as op
 import datalad.utils as ut
 

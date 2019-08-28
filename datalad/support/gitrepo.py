@@ -38,12 +38,6 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-from six import PY2
-from six import string_types
-from six import text_type
-from six import add_metaclass
-from six import iteritems
-from six import PY2
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName

@@ -22,8 +22,6 @@ except ImportError:  # pragma: no cover
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from six import PY2, PY3
-from six import text_type
 from urllib.request import urlopen
 
 from mock import patch

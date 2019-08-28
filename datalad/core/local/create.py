@@ -14,8 +14,6 @@ import os
 import logging
 import random
 import uuid
-from six import iteritems
-from six import text_type
 from argparse import (
     REMAINDER,
     ONE_OR_MORE,

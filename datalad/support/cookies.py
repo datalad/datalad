@@ -13,7 +13,6 @@ import shelve
 import pickle
 import appdirs
 import os.path
-from six import PY2
 
 from .network import get_tld
 from datalad.dochelpers import exc_str

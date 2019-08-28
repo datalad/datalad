@@ -19,7 +19,6 @@ import sys
 
 from ..support.path import exists, join as opj, realpath, dirname, lexists
 
-from six.moves import range
 from urllib.parse import urlparse
 
 import logging

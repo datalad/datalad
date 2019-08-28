@@ -11,7 +11,6 @@
 
 from glob import glob
 from logging import getLogger
-from six import iteritems
 
 import os
 import re

@@ -50,8 +50,6 @@ from os.path import dirname
 from os.path import split as psplit
 import posixpath
 
-
-from six import PY2, text_type, binary_type, string_types
 from shlex import quote as shlex_quote
 
 # from datalad.dochelpers import get_docstring_split

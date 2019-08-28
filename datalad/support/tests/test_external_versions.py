@@ -32,7 +32,6 @@ from nose.tools import (
     assert_raises, assert_in
 )
 from nose import SkipTest
-from six import PY3
 
 
 # just to ease testing

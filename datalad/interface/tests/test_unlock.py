@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from six import text_type
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create

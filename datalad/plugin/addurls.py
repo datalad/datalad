@@ -20,10 +20,6 @@ import os
 import re
 import string
 
-from six import (
-    string_types,
-    text_type,
-)
 from urllib.parse import urlparse
 
 from datalad.distribution.dataset import rev_resolve_path

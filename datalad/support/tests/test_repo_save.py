@@ -7,7 +7,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test saveds fuction"""
 
-from six import iteritems
 
 from datalad.tests.utils import (
     assert_in,

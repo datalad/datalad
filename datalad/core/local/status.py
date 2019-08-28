@@ -14,10 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
-from six import (
-    iteritems,
-    text_type,
-)
 from collections import OrderedDict
 
 from datalad.utils import (

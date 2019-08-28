@@ -45,11 +45,6 @@ from ..utils import get_dataset_root
 
 from datalad.customremotes.base import init_datalad_remote
 
-from six import (
-    string_types,
-    iteritems,
-)
-
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
 

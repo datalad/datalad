@@ -16,8 +16,6 @@ import shutil
 import sys
 import logging
 from mock import patch
-from six import PY3
-from six import text_type
 import builtins
 
 from operator import itemgetter

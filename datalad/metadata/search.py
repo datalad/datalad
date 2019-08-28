@@ -23,11 +23,6 @@ from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
-from six import (
-    reraise,
-    iteritems,
-    PY2,
-)
 from time import time
 
 from datalad import cfg

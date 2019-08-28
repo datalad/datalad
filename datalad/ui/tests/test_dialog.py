@@ -10,7 +10,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six import PY2
 from io import StringIO
 import builtins
 

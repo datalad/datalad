@@ -25,11 +25,6 @@ try:
 except ImportError:  # Python <= 3.3
     from collections import Mapping
 
-from six import (
-    binary_type,
-    string_types,
-    iteritems,
-)
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface

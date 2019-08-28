@@ -23,7 +23,6 @@ from os import (
 )
 import sys
 
-from six import PY2
 from mock import patch
 
 from datalad.utils import (

@@ -23,9 +23,6 @@ import logging
 import random
 import socket
 import warnings
-from six import PY2, text_type, iteritems
-from six import binary_type
-from six import string_types
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
@@ -34,8 +31,6 @@ from mock import patch
 
 from http.server import SimpleHTTPRequestHandler
 from http.server import HTTPServer
-from six import reraise
-from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir

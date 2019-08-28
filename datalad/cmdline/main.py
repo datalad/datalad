@@ -22,7 +22,6 @@ import sys
 import textwrap
 import os
 
-from six import text_type
 
 import datalad
 

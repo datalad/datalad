@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from six import iteritems
-from six import text_type
 
 from datalad.interface.base import (
     Interface,

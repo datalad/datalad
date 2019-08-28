@@ -17,7 +17,6 @@ import requests.auth
 # from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 import io
-from six import BytesIO
 from time import sleep
 
 from ..utils import assure_list_from_str, assure_dict_from_str

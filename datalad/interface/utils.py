@@ -27,8 +27,6 @@ from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
-from six import PY2
-from six import text_type
 
 import json
 

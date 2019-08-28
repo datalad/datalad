@@ -22,13 +22,6 @@ import functools
 import tempfile
 
 from collections import OrderedDict
-from six import (
-    PY3,
-    PY2,
-    string_types,
-    binary_type,
-    text_type,
-)
 from .support import path as op
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str

@@ -10,9 +10,6 @@
 
 import os
 import os.path as op
-from six import iteritems
-from six import PY2
-from six import text_type
 
 from datalad.utils import (
     on_windows,

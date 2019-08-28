@@ -8,9 +8,6 @@
 """Test create publication target on gitlab"""
 
 import os
-from six import (
-    text_type,
-)
 
 # this must import ok with and without gitlab
 from datalad.api import (

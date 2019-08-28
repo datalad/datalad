@@ -14,9 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 import re
 import os
-from six import (
-    text_type,
-)
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results

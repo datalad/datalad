@@ -19,7 +19,6 @@ import tempfile
 from mock import patch
 
 from io import StringIO
-from six import text_type
 
 from datalad.api import addurls, Dataset, subdatasets
 import datalad.plugin.addurls as au
