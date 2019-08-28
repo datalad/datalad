@@ -45,7 +45,7 @@ except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
     # https://github.com/datalad/datalad/pull/2623
     class NoHTTPPretty(object):
-       __bool__ = __nonzero__ = lambda s: False
+       __bool__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
 
