@@ -704,7 +704,7 @@ def _get_testrepos_uris(regex, flavors):
             _nested_submodule_annex_test_repo.create()
             _inner_submodule_annex_test_repo.create()
     uris = []
-    for name, spec in iteritems(_TESTREPOS):
+    for name, spec in _TESTREPOS.items():
         if not re.match(regex, name):
             continue
         uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
@@ -1547,7 +1547,7 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
     for state in ('added', 'untracked', 'deleted', 'modified'):
         oktobefound = sorted(r.pathobj.joinpath(ut.PurePosixPath(p))
                              for p in kwargs.get(state, []))
-        state_files = sorted(k for k, v in iteritems(status)
+        state_files = sorted(k for k, v in status.items()
                              if v.get('state', None) == state)
         eq_(state_files, oktobefound,
             'unexpected content of state "%s": %r != %r'

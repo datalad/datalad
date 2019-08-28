@@ -129,7 +129,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=None)
-    for path, props in iteritems(status):
+    for path, props in status.items():
         cpath = ds.pathobj / path.relative_to(repo_path)
         yield dict(
             props,

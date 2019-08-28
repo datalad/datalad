@@ -363,7 +363,7 @@ def test_add_files(path):
                 assert_result_count(result, 1, path=str(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
                 ut.Path(p) for p in assure_list(arg[0]))
-        for f, p in iteritems(status):
+        for f, p in status.items():
             if arg[1]:
                 assert p.get('key', None) is None, f
             else:

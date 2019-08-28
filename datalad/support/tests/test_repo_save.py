@@ -46,19 +46,19 @@ def _test_save_all(path, repocls):
     # make sure we get a 'delete' result for each deleted file
     eq_(
         set(r['path'] for r in res if r['action'] == 'delete'),
-        {k for k, v in iteritems(orig_status) if k.name == 'file_deleted'}
+        {k for k, v in orig_status.items() if k.name == 'file_deleted'}
     )
     saved_status = ds.repo.status(untracked='all')
     # we still have an entry for everything that did not get deleted
     # intentionally
     eq_(
-        len([f for f, p in iteritems(orig_status)
+        len([f for f, p in orig_status.items()
              if not f.match('*_deleted')]),
         len(saved_status))
     # everything but subdataset entries that contain untracked content,
     # or modified subsubdatasets is now clean, a repo simply doesn touch
     # other repos' private parts
-    for f, p in iteritems(saved_status):
+    for f, p in saved_status.items():
         if p.get('state', None) != 'clean':
             assert f.match('subds_modified'), f
     return ds
@@ -87,7 +87,7 @@ def test_save_to_git(path):
     ds.repo.save(paths=['file_ingit'], git=True)
     ds.repo.save(paths=['file_inannex'])
     assert_repo_status(ds.repo)
-    for f, p in iteritems(ds.repo.annexstatus()):
+    for f, p in ds.repo.annexstatus().items():
         eq_(p['state'], 'clean')
         if f.match('*ingit'):
             assert_not_in('key', p, f)

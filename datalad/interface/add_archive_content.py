@@ -514,7 +514,7 @@ class AddArchiveContent(Interface):
                 annex.precommit()  # so batched ones close and files become annex symlinks etc
                 precommitted = True
                 if any(r.get('state', None) != 'clean'
-                       for p, r in iteritems(annex.status(untracked='no'))):
+                       for p, r in annex.status(untracked='no').items()):
                     annex.commit(
                         "Added content extracted from %s %s\n\n%s" %
                         (origin, archive_rpath, commit_stats.as_str(mode='full')),
