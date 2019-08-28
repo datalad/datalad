@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -15,8 +15,10 @@ __docformat__ = 'restructuredtext'
 import os.path as op
 import sys
 
+from datalad.cmd import Runner
 from datalad.utils import chpwd
 from datalad.utils import maybe_shlex_quote
+from datalad.utils import swallow_outputs
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -28,10 +30,14 @@ from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
 from datalad.api import run_procedure
 from datalad import cfg
 
@@ -315,3 +321,29 @@ def test_spaces(path):
     ds.run_procedure(spec=['datalad_test_proc', 'with spaces', 'unrelated'])
     # check whether file has name with spaces
     ok_file_has_content(op.join(ds.path, 'with spaces'), 'hello\n')
+
+
+@with_tree(tree={OBSCURE_FILENAME:
+                 {"code": {"just2args.py": """
+import sys
+print(sys.argv)
+# script, dataset, and two others
+assert len(sys.argv) == 4
+"""}}})
+def test_quoting(path):
+    ds = Dataset(op.join(path, OBSCURE_FILENAME)).create(force=True)
+    # Our custom procedure fails if it receives anything other than two
+    # procedure arguments (so the script itself receives 3). Check a few cases
+    # from the Python API and CLI.
+    ds.config.add("datalad.locations.dataset-procedures", "code",
+                  where="dataset")
+    with swallow_outputs():
+        ds.run_procedure(spec=["just2args", "with ' sing", 'with " doub'])
+        with assert_raises(CommandError):
+            ds.run_procedure(spec=["just2args", "still-one arg"])
+
+        runner = Runner(cwd=ds.path)
+        runner.run(
+            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'")
+        with assert_raises(CommandError):
+            runner.run("datalad run-procedure just2args 'still-one arg'")
