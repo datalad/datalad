@@ -27,7 +27,7 @@ from .path import (
     sep as opsep,
 )
 from six import next, PY2
-from six.moves.urllib.parse import unquote as urlunquote
+from urllib.parse import unquote as urlunquote
 
 import string
 import random

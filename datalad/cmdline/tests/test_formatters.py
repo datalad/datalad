@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """"""
 
-from six.moves import StringIO as SIO
+from io import StringIO as SIO
 from os.path import exists
 from nose import SkipTest
 try:

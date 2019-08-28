@@ -58,9 +58,9 @@ if lgr.getEffectiveLevel() <= 1:
     # These two lines enable debugging at httplib level (requests->urllib3->http.client)
     # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
     # The only thing missing will be the response.body which is not logged.
-    from six.moves import http_client
+    import http.client
     # TODO: nohow wrapped with logging, plain prints (heh heh), so formatting will not be consistent
-    http_client.HTTPConnection.debuglevel = 1
+    http.client.HTTPConnection.debuglevel = 1
 
     # for requests we can define logging properly
     requests_log = LoggerHelper(logtarget="requests.packages.urllib3").get_initialized_logger()
@@ -374,7 +374,7 @@ class HTTPDownloaderSession(DownloaderSession):
         if f is None:
             # no file to download to
             # TODO: actually strange since it should have been decoded then...
-            f = BytesIO()
+            f = io.BytesIO()
 
         # must use .raw to be able avoiding decoding/decompression while downloading
         # to a file

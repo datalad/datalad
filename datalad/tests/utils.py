@@ -32,8 +32,8 @@ from difflib import unified_diff
 from contextlib import contextmanager
 from mock import patch
 
-from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
-from six.moves.BaseHTTPServer import HTTPServer
+from http.server import SimpleHTTPRequestHandler
+from http.server import HTTPServer
 from six import reraise
 from six.moves import map
 

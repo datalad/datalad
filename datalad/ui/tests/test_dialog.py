@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 from six import PY2
-from six.moves import StringIO
+from io import StringIO
 import six.moves.builtins as __builtin__
 
 from mock import (

@@ -20,7 +20,7 @@ from os import (
     remove,
 )
 
-from six.moves import StringIO
+from io import StringIO
 from mock import patch
 
 from datalad.utils import (

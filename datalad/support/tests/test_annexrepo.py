@@ -29,8 +29,8 @@ from nose.tools import assert_not_is_instance
 
 from six import text_type
 
-from six.moves.urllib.parse import urljoin
-from six.moves.urllib.parse import urlsplit
+from urllib.parse import urljoin
+from urllib.parse import urlsplit
 
 import git
 from git import GitCommandError

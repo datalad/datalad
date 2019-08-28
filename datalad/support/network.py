@@ -29,13 +29,13 @@ from ntpath import splitdrive as win_splitdrive
 
 from six import string_types
 from six import iteritems
-from six.moves.urllib.parse import urlsplit
-from six.moves.urllib.request import Request
-from six.moves.urllib.parse import unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
-from six.moves.urllib.parse import parse_qsl
-from six.moves.urllib.parse import urlencode
-from six.moves.urllib.error import URLError
+from urllib.parse import urlsplit
+from urllib.request import Request
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
+from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
@@ -52,9 +52,9 @@ from datalad.support.cache import lru_cache
 # strings. "~" is now included in the set of reserved characters.
 # For consistency we will provide urlquote
 if sys.version_info >= (3, 7):
-    from six.moves.urllib.parse import quote as urlquote
+    from urllib.parse import quote as urlquote
 else:
-    from six.moves.urllib.parse import quote as _urlquote
+    from urllib.parse import quote as _urlquote
 
     def urlquote(url, safe='/', **kwargs):
         safe += '~'

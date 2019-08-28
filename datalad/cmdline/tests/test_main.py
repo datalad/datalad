@@ -13,7 +13,7 @@ from datalad.tests.utils import on_windows
 
 import re
 import sys
-from six.moves import StringIO
+from io import StringIO
 from mock import patch
 
 import datalad

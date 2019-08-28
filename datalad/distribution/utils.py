@@ -17,7 +17,7 @@ from os.path import isabs
 from os.path import normpath
 import posixpath
 
-from six.moves.urllib.parse import unquote as urlunquote
+from urllib.parse import unquote as urlunquote
 
 from ..dochelpers import single_or_plural
 from datalad.support.annexrepo import GitRepo
