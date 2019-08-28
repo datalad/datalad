@@ -33,6 +33,7 @@ from datalad.tests.utils import skip_if
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_direct_mode
+from datalad.tests.utils import known_failure_windows
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
@@ -323,6 +324,7 @@ def test_spaces(path):
     ok_file_has_content(op.join(ds.path, 'with spaces'), 'hello\n')
 
 
+@known_failure_windows
 @with_tree(tree={OBSCURE_FILENAME:
                  {"code": {"just2args.py": """
 import sys
