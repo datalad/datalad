@@ -140,17 +140,13 @@ def test_range():
     # this should always work
     assert_equal(c(3.0), 3.0)
 
-    # Python 3 raises an TypeError if incompatible types are compared,
-    # whereas Python 2 raises a ValueError
-    type_error = TypeError if sys.version_info[0] >= 3 else ValueError
-
     # this should always fail
     assert_raises(ValueError, lambda: c(2.9999999))
     assert_raises(ValueError, lambda: c(77))
-    assert_raises(type_error, lambda: c('fail'))
-    assert_raises(type_error, lambda: c((3, 4)))
+    assert_raises(TypeError, lambda: c('fail'))
+    assert_raises(TypeError, lambda: c((3, 4)))
     # since no type checks are performed
-    assert_raises(type_error, lambda: c('7'))
+    assert_raises(TypeError, lambda: c('7'))
 
     # Range doesn't have to be numeric
     c = ct.EnsureRange(min="e", max="qqq")

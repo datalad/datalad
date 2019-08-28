@@ -42,7 +42,6 @@ from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
 
-# TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 

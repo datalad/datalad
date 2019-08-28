@@ -178,8 +178,7 @@ class Create(Interface):
             if isinstance(dataset, Dataset):
                 ds = dataset
             else:
-                # assure_unicode() for PY2.
-                ds = Dataset(ut.assure_unicode(dataset))
+                ds = Dataset(dataset)
             refds_path = ds.path
         else:
             ds = refds_path = None
