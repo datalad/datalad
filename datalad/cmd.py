@@ -194,7 +194,7 @@ class Runner(object):
           if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, string_types) or isinstance(cmd, list):
+        if isinstance(cmd, str) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
@@ -489,13 +489,13 @@ class Runner(object):
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, string_types)
+                shell = isinstance(cmd, str)
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(
                     shlex.split(cmd, posix=not on_windows)
-                    if isinstance(cmd, string_types)
+                    if isinstance(cmd, str)
                     else cmd)
             try:
                 proc = subprocess.Popen(cmd,
@@ -564,7 +564,7 @@ class Runner(object):
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd,
                                                       posix=not on_windows)
-                                          if isinstance(cmd, string_types)
+                                          if isinstance(cmd, str)
                                           else cmd, None)
             out = ("DRY", "DRY")
 
@@ -786,7 +786,7 @@ class BatchedCommand(object):
 
         and yields results for each item."""
         for entry in cmds:
-            if not isinstance(entry, string_types):
+            if not isinstance(entry, str):
                 entry = ' '.join(entry)
             yield self.proc1(entry)
 

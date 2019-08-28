@@ -1185,7 +1185,7 @@ def assert_dict_equal(d1, d2):
     for k in set(d1).intersection(d2):
         same = True
         try:
-            if isinstance(d1[k], string_types):
+            if isinstance(d1[k], str):
                 # do not compare types for string types to avoid all the hassle
                 # with the distinction of str and unicode in PY3, and simple
                 # test for equality

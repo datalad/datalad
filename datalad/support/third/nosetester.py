@@ -196,7 +196,7 @@ class NoseTester(object):
         '''
         argv = [__file__, self.package_path, '-s']
         if label and label != 'full':
-            if not isinstance(label, basestring):
+            if not isinstance(label, str):
                 raise TypeError('Selection label should be a string')
             if label == 'fast':
                 label = 'not slow'
@@ -371,7 +371,7 @@ class NoseTester(object):
 
         _warn_opts = dict(develop=(Warning,),
                           release=())
-        if isinstance(raise_warnings, basestring):
+        if isinstance(raise_warnings, str):
             raise_warnings = _warn_opts[raise_warnings]
 
         # Filter out some deprecation warnings inside nose 1.3.7 when run
