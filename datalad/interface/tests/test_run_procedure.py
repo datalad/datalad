@@ -13,8 +13,10 @@
 __docformat__ = 'restructuredtext'
 
 import os.path as op
+import sys
 
 from datalad.utils import chpwd
+from datalad.utils import maybe_shlex_quote
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
@@ -238,7 +240,7 @@ def test_configs(path):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python {script} {ds} {{mysub}} {args}',
+        u'%s {script} {ds} {{mysub}} {args}' % maybe_shlex_quote(sys.executable),
         where='dataset'
     )
     ds.config.add(
@@ -258,7 +260,7 @@ def test_configs(path):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python {script} {ds} local {args}',
+        u'%s {script} {ds} local {args}' % maybe_shlex_quote(sys.executable),
         where='local'
     )
     ds.unlock("fromproc.txt")
