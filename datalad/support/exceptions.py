@@ -139,7 +139,6 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     pass
 
 
-@six.python_2_unicode_compatible
 class InvalidGitReferenceError(ValueError):
     """Thrown if provided git reference is invalid
     """
