@@ -41,7 +41,7 @@ from datalad.tests.utils import (
 def test_get_subdatasets(path):
     ds = Dataset(path)
     # one more subdataset with a name that could ruin config option parsing
-    dots = text_type(Path('subdir') / '.lots.of.dots.')
+    dots = str(Path('subdir') / '.lots.of.dots.')
     ds.create(dots)
     eq_(ds.subdatasets(recursive=True, fulfilled=False, result_xfm='relpaths'), [
         'sub dataset1'
@@ -68,7 +68,7 @@ def test_get_subdatasets(path):
         dots,
     ]
     eq_(ds.subdatasets(recursive=True, result_xfm='relpaths'), all_subs)
-    with chpwd(text_type(ds.pathobj)):
+    with chpwd(str(ds.pathobj)):
         # imitate cmdline invocation w/ no dataset argument
         eq_(subdatasets(dataset=None,
                         path=[],
@@ -101,14 +101,14 @@ def test_get_subdatasets(path):
             'sub dataset1/subm 1',
         ]
     )
-    with chpwd(text_type(ds.pathobj / 'subdir')):
+    with chpwd(str(ds.pathobj / 'subdir')):
         # imitate cmdline invocation w/ no dataset argument
         # -> curdir limits the query, when no info is given
         eq_(subdatasets(dataset=None,
                         path=[],
                         recursive=True,
                         result_xfm='paths'),
-            [text_type(ds.pathobj / dots)]
+            [str(ds.pathobj / dots)]
         )
         # but with a dataset explicitly given, even if just as a path,
         # curdir does no limit the query

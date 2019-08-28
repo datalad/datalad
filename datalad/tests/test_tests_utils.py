@@ -398,8 +398,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
-    test_fpath_full = text_type(os.path.join(tmp_dir, test_fpath))
-    test_fpath_dir = text_type(os.path.dirname(test_fpath_full))
+    test_fpath_full = str(os.path.join(tmp_dir, test_fpath))
+    test_fpath_dir = str(os.path.dirname(test_fpath_full))
 
     if not os.path.exists(test_fpath_dir):
         os.makedirs(test_fpath_dir)

@@ -473,7 +473,7 @@ class SSHManager(object):
             Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
         self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
-            os.chmod(text_type(self._socket_dir), 0o700)
+            os.chmod(str(self._socket_dir), 0o700)
         except OSError as exc:
             lgr.warning(
                 "Failed to (re)set permissions on the %s. "

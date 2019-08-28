@@ -509,9 +509,9 @@ def default_result_renderer(res):
             # in `res` to bytes, so it's easiest to work with bytes here rather
             # than converting everything back to unicode.
             if not isinstance(path, str):  # pathlib
-                path = assure_bytes(text_type(path))
+                path = assure_bytes(str(path))
         else:
-            path = text_type(path)
+            path = str(path)
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),

@@ -95,7 +95,7 @@ class Unlock(Interface):
             for p in set(path).difference(set(paths_lexist)):
                 yield get_status_dict(
                     status="impossible",
-                    path=text_type(p),
+                    path=str(p),
                     type="file",
                     message="path does not exist",
                     **res_kwargs)

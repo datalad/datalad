@@ -130,7 +130,7 @@ class Dataset(object, metaclass=Flyweight):
 
         # mirror what is happening in __init__
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
 
         # Custom handling for few special abbreviations
         path_ = path
@@ -174,7 +174,7 @@ class Dataset(object, metaclass=Flyweight):
           yet.
         """
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
         self._path = path
         self._repo = None
         self._id = None
@@ -700,7 +700,7 @@ def rev_resolve_path(path, ds=None):
 def path_under_rev_dataset(ds, path):
     ds_path = ds.pathobj
     try:
-        rpath = text_type(ut.Path(path).relative_to(ds_path))
+        rpath = str(ut.Path(path).relative_to(ds_path))
         if not rpath.startswith(op.pardir):
             # path is already underneath the dataset
             return path
@@ -708,7 +708,7 @@ def path_under_rev_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = rev_get_dataset_root(text_type(path))
+    root = rev_get_dataset_root(str(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
@@ -718,7 +718,7 @@ def path_under_rev_dataset(ds, path):
         root = rev_get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
-    return ds_path / op.relpath(text_type(path), root)
+    return ds_path / op.relpath(str(path), root)
 
 
 # XXX this is a copy of the change proposed in

@@ -84,7 +84,7 @@ def _parse_git_submodules(ds, paths):
             props['path'] = ds.pathobj / path.relative_to(ds.repo.pathobj)
         else:
             props['path'] = path
-        if not path.exists() or not GitRepo.is_valid_repo(text_type(path)):
+        if not path.exists() or not GitRepo.is_valid_repo(str(path)):
             props['state'] = 'absent'
         # TODO kill this after some time. We used to do custom things here
         # and gitshasum was called revision. Be nice and duplicate for a bit
@@ -257,7 +257,7 @@ class Subdatasets(Interface):
                 refds_path):
             # a boat-load of ancient code consumes this and is ignorant of
             # Path objects
-            r['path'] = text_type(r['path'])
+            r['path'] = str(r['path'])
             # without the refds_path cannot be rendered/converted relative
             # in the eval_results decorator
             r['refds'] = refds_path
@@ -316,7 +316,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                         **dict(
                             sm,
                             refds_relpath=sm['path'].relative_to(refds_path),
-                            refds_relname=text_type(
+                            refds_relname=str(
                                 sm['path'].relative_to(refds_path)
                             ).replace(os.sep, '-')))
                 try:
@@ -324,7 +324,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                         '', ['git', 'config', '--file', '.gitmodules',
                              '--replace-all',
                              'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
-                             text_type(val),
+                             str(val),
                             ]
                     )
                 except CommandError as e:  # pragma: no cover

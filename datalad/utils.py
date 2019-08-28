@@ -560,7 +560,7 @@ def escape_filename(filename):
 def encode_filename(filename):
     """Encode unicode filename
     """
-    if isinstance(filename, text_type):
+    if isinstance(filename, str):
         return filename.encode(sys.getfilesystemencoding())
     else:
         return filename
@@ -573,7 +573,7 @@ def decode_input(s):
     If fails -- issue warning and decode allowing for errors
     being replaced
     """
-    if isinstance(s, text_type):
+    if isinstance(s, str):
         return s
     else:
         encoding = sys.stdin.encoding or 'UTF-8'
@@ -635,13 +635,13 @@ def assure_iter(s, cls, copy=False, iterate=True):
     copy: bool, optional
       If correct iterable is passed, it would generate its shallow copy
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
 
     if isinstance(s, cls):
         return s if not copy else shallow_copy(s)
-    elif isinstance(s, text_type):
+    elif isinstance(s, str):
         return cls((s,))
     elif iterate and hasattr(s, '__iter__'):
         return cls(s)
@@ -660,7 +660,7 @@ def assure_list(s, copy=False, iterate=True):
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
     return assure_iter(s, list, copy=copy, iterate=iterate)
@@ -711,14 +711,14 @@ def assure_dict_from_str(s, **kwargs):
 
 
 def assure_bytes(s, encoding='utf-8'):
-    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'str'
 
     Parameters
     ----------
     encoding: str, optional
       Encoding to use.  "utf-8" is the default
     """
-    if not isinstance(s, text_type):
+    if not isinstance(s, str):
         return s
     return s.encode(encoding)
 
@@ -801,12 +801,12 @@ def as_unicode(val, cast_types=object):
     """
     if val is None:
         return u''
-    elif isinstance(val, text_type):
+    elif isinstance(val, str):
         return val
     elif isinstance(val, unicode_srctypes):
         return assure_unicode(val)
     elif isinstance(val, cast_types):
-        return text_type(val)
+        return str(val)
     else:
         raise TypeError(
             "Value %r is not of any of known or provided %s types"

@@ -153,7 +153,7 @@ def _create_dataset_sibling(
                 try:
                     # ds_name is unicode which makes _msg unicode so we must be
                     # unicode-ready
-                    err_str = text_type(e.stderr)
+                    err_str = str(e.stderr)
                 except UnicodeDecodeError:
                     err_str = e.stderr.decode(errors='replace')
                 _msg += " And it fails to rmdir (%s)." % (err_str.strip(),)
@@ -218,7 +218,7 @@ def _create_dataset_sibling(
         # Either repository existed before or a new directory was created for it,
         # set its group to a desired one if was provided with the same chgrp
         ssh("chgrp -R {} {}".format(
-            sh_quote(text_type(group)),
+            sh_quote(str(group)),
             sh_quote(remoteds_path)))
     # don't (re-)initialize dataset if existing == reconfigure
     if not only_reconfigure:

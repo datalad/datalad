@@ -599,7 +599,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # mirror what is happening in __init__
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
@@ -2353,7 +2353,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         return [
             '{}{}'.format(
-                text_type(p.relative_to(self.pathobj)),
+                str(p.relative_to(self.pathobj)),
                 os.sep if props['type'] != 'file' else ''
             )
             for p, props in iteritems(self.status(
@@ -2467,7 +2467,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                           "in an upcoming release",
                           DeprecationWarning)
             xs = (Submodule(name=p["gitmodule_name"],
-                            path=text_type(p["path"].relative_to(self.pathobj)),
+                            path=str(p["path"].relative_to(self.pathobj)),
                             url=p["gitmodule_url"])
                   for p in xs)
 
@@ -3017,7 +3017,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
 
-        path_strs = list(map(text_type, paths)) if paths else None
+        path_strs = list(map(str, paths)) if paths else None
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -3069,7 +3069,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in text_type(exc):
+            if "fatal: Not a valid object name" in str(exc):
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
@@ -3148,12 +3148,12 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if get_link_target and inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
                           ut.Path(
-                            get_link_target(text_type(self.pathobj / path))
+                            get_link_target(str(self.pathobj / path))
                           ).as_posix()) or \
                          (ref and \
                           '.git/annex/objects' in get_link_target(
                               u'{}:{}'.format(
-                                  ref, text_type(path))))
+                                  ref, str(path))))
                         ):
                     # report annex symlink pointers as file, their
                     # symlink-nature is a technicality that is dependent
@@ -3319,7 +3319,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self._git_custom_command(
                         # low-level code cannot handle pathobjs
-                        [text_type(p) for p in paths] if paths else None,
+                        [str(p) for p in paths] if paths else None,
                         ['git', 'ls-files', '-z', '-m'])[0].split('\0')
                     if p)
                 _cache[key] = modified
@@ -3438,7 +3438,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # loop over all subdatasets and look for additional modifications
         for f, st in iteritems(status):
-            f = text_type(f)
+            f = str(f)
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
@@ -3532,7 +3532,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # TODO remove pathobj stringification when commit() can
         # handle it
-        to_commit = [text_type(f.relative_to(self.pathobj))
+        to_commit = [str(f.relative_to(self.pathobj))
                      for f, props in iteritems(status)] \
                     if partial_commit else None
         if not partial_commit or to_commit:
@@ -3612,7 +3612,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
-            text_type(f.relative_to(self.pathobj))
+            str(f.relative_to(self.pathobj))
             for f, props in iteritems(status)
             if props.get('state', None) == 'deleted' and
             # staged deletions have a gitshasum reported for them
@@ -3664,7 +3664,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             for cand_sm in to_add_submodules:
                 try:
                     self.add_submodule(
-                        text_type(cand_sm.relative_to(self.pathobj)),
+                        str(cand_sm.relative_to(self.pathobj)),
                         url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
@@ -3691,7 +3691,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
-                text_type(f.relative_to(self.pathobj)): props
+                str(f.relative_to(self.pathobj)): props
                 for f, props in iteritems(status)
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
@@ -3740,7 +3740,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
-            text_type(f.relative_to(self.pathobj)): props
+            str(f.relative_to(self.pathobj)): props
             for f, props in iteritems(status)
             if (props.get('state', None) in ('modified', 'untracked') and
                 f not in to_add_submodules)}

@@ -399,7 +399,7 @@ def ok_file_has_content(path, content, strip=False, re_=False,
     with open_func(path, 'rb') as f:
         file_content = f.read()
 
-    if isinstance(content, text_type):
+    if isinstance(content, str):
         file_content = assure_unicode(file_content)
 
     if os.linesep != '\n':
@@ -1741,7 +1741,7 @@ def get_deeply_nested_structure(path):
         }
     )
     create_tree(
-        text_type(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
+        str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
         {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()
