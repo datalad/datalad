@@ -293,9 +293,7 @@ def test_configs(path):
     assert_in_results(r, message="This is a help message", status='ok')
 
 
-# FIXME: For some reason fails to commit correctly if on windows and in direct
-# mode. However, direct mode on linux works
-@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@known_failure_windows
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
