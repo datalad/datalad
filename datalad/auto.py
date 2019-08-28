@@ -13,8 +13,7 @@ import sys
 # OPT delay import for expensive mock until used
 #from mock import patch
 from six import PY2
-import six.moves.builtins as __builtin__
-builtins_name = '__builtin__' if PY2 else 'builtins'
+import builtins
 
 import logging
 import io
@@ -97,7 +96,7 @@ class AutomagicIO(object):
           AutomagicIO supervision.
         """
         self._active = False
-        self._builtin_open = __builtin__.open
+        self._builtin_open = builtins.open
         self._io_open = io.open
         self._os_stat = os.stat
         self._builtin_exists = os.path.exists
@@ -196,7 +195,7 @@ class AutomagicIO(object):
         return origfunc(*args, **kwargs)
 
     def _proxy_open(self, *args, **kwargs):
-        return self._proxy_open_name_mode(builtins_name + '.open', self._builtin_open,
+        return self._proxy_open_name_mode('builtins.open', self._builtin_open,
                                           *args, **kwargs)
 
     def _proxy_io_open(self, *args, **kwargs):
@@ -313,7 +312,7 @@ class AutomagicIO(object):
             lgr.debug("%s already active. No action taken" % self)
             return
         # overloads
-        __builtin__.open = self._proxy_open
+        builtins.open = self._proxy_open
         io.open = self._proxy_io_open
         os.stat = self._proxy_os_stat
         os.path.exists = self._proxy_exists
@@ -330,7 +329,7 @@ class AutomagicIO(object):
         if not self.active:
             lgr.warning("%s is not active, can't deactivate" % self)
             return
-        __builtin__.open = self._builtin_open
+        builtins.open = self._builtin_open
         io.open = self._io_open
         os.stat = self._os_stat
         if h5py:

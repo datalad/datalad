@@ -18,7 +18,7 @@ import logging
 from mock import patch
 from six import PY3
 from six import text_type
-import six.moves.builtins as __builtin__
+import builtins
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -881,7 +881,7 @@ def test_safe_print():
         if called[0] == 1:
             raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
 
-    with patch.object(__builtin__, 'print', _print):
+    with patch.object(builtins, 'print', _print):
         safe_print("bua")
     assert_equal(called[0], 2)
 

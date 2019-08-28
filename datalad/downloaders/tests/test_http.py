@@ -14,7 +14,7 @@ from six import PY3
 import re
 
 import os
-import six.moves.builtins as __builtin__
+import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
@@ -142,7 +142,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # XXX obscure mocking since impossible to mock write alone
     # and it still results in some warning being spit out
     with swallow_logs(), \
-         patch.object(__builtin__, 'open', fake_open(write_=_raise_IOError)):
+         patch.object(builtins, 'open', fake_open(write_=_raise_IOError)):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
     # incomplete download scenario - should have 3 tries
