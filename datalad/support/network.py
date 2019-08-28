@@ -495,12 +495,9 @@ class RI(object):
     # location
     #
 
-    def __nonzero__(self):
+    def __bool__(self):
         fields = self._fields
         return any(fields.values())
-
-    # for PY3
-    __bool__ = __nonzero__
 
     #
     # Helpers to deal with internal structures and conversions

@@ -56,8 +56,6 @@ class GlobbedPaths(object):
     def __bool__(self):
         return bool(self._maybe_dot or self.expand())
 
-    __nonzero__ = __bool__  # py2
-
     def _get_sub_patterns(self, pattern):
         """Extract sub-patterns from the leading path of `pattern`.
 
