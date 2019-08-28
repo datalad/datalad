@@ -553,7 +553,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
             downloaded_size = len(content)
 
             # now that we know size based on encoded content, let's decode into string type
-            if PY3 and isinstance(content, bytes) and decode:
+            if isinstance(content, bytes) and decode:
                 content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
