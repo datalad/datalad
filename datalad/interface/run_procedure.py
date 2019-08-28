@@ -177,8 +177,7 @@ def _guess_exec(script_file):
                 # does not exist; there's nothing to detect at all
                 return {'type': None, 'template': None, 'state': None}
         else:
-            from six import reraise
-            reraise(e)
+            raise e
 
     # TODO check for exec permission and rely on interpreter
     if is_exec:

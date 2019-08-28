@@ -215,7 +215,7 @@ def _search_from_virgin_install(dataset, query):
                           % DEFAULT_DATASET_PATH):
                     pass
                 else:
-                    reraise(*exc_info)
+                    raise exc_info[1]
             else:
                 raise NoDatasetArgumentFound(
                     "No DataLad dataset found at current location. "
@@ -234,7 +234,7 @@ def _search_from_virgin_install(dataset, query):
                 "label '///'"
             )
         else:
-            reraise(*exc_info)
+            raise exc_info[1]
 
         lgr.info(
             "Performing search using DataLad superdataset %r",

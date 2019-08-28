@@ -193,7 +193,7 @@ class BaseDownloader(object, metaclass=ABCMeta):
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            reraise(*exc_info)
+                            raise e
                         self._enter_credentials(
                             url,
                             denied_msg=access_denied,
