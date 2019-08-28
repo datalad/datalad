@@ -59,13 +59,7 @@ _TEMP_std = sys.stdout, sys.stderr
 # which might be created outside and passed into Runner
 _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
-if PY2:
-    # TODO apparently there is a recommended substitution for Python2
-    # which is a backported implementation of python3 subprocess
-    # https://pypi.python.org/pypi/subprocess32/
-    file_class = file
-else:
-    from io import IOBase as file_class
+from io import IOBase as file_class
 
 
 def _decide_to_log(v):
@@ -451,8 +445,6 @@ class Runner(object):
 
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
-        if PY2:
-            popen_cwd = assure_bytes(popen_cwd)
 
         if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must
@@ -806,7 +798,7 @@ class BatchedCommand(object):
         # according to the internet wisdom there is no easy way with subprocess
         self._check_process(restart=True)
         process = self._process  # _check_process might have restarted it
-        process.stdin.write(assure_bytes(entry) if PY2 else entry)
+        process.stdin.write(entry)
         process.stdin.flush()
         lgr.log(5, "Done sending.")
         still_alive, stderr = self._check_process(restart=False)

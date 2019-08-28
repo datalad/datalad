@@ -766,10 +766,7 @@ class _EGrepCSSearch(_Search):
 
         for k in sorted(keys):
             if mode == 'name':
-                from datalad.utils import assure_bytes
-                # without assure_bytes UnicodeEncodeError in PY2 when
-                # output is piped into e.g. grep
-                print(assure_bytes(k) if PY2 else k)
+                print(k)
                 continue
 
             # do a bit more

@@ -359,23 +359,12 @@ def is_explicit_path(path):
 
 # handle this dance once, and import pathlib from here
 # in all other places
-if PY2:
-    from pathlib2 import (
-        Path,
-        PurePath,
-        PurePosixPath,
-    )
 
-    def _unicode_path(pathobj):
-        return assure_unicode(str(pathobj))
-
-    PurePath.__unicode__ = _unicode_path
-else:
-    from pathlib import (
-        Path,
-        PurePath,
-        PurePosixPath,
-    )
+from pathlib import (
+    Path,
+    PurePath,
+    PurePosixPath,
+)
 
 
 def rotree(path, ro=True, chmod_files=True):
@@ -1521,7 +1510,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = assure_bytes(path) if PY2 else path
+        os.environ['PWD'] = path
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1998,8 +1987,8 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    kw = {} if PY2 else dict(encoding='utf-8')
-    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
+    kw = dict(encoding='utf-8')
+    with open(fname, 'r', **kw) as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,

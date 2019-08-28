@@ -154,7 +154,7 @@ class AutomagicIO(object):
                     # name/file was provided
                     file = args[0]
                 else:
-                    filearg = "name" if PY2 else "file"
+                    filearg = "file"
                     if filearg not in kwargs:
                         # so the name was missing etc, just proxy into original open call and let it puke
                         raise _EarlyExit("no name/file was given")

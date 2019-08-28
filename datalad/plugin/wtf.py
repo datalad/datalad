@@ -22,7 +22,6 @@ from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
     assure_unicode,
-    assure_bytes,
     getpwd,
     unlink,
 )
@@ -404,7 +403,7 @@ class WTF(Interface):
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
         out = _render_report(res)
-        ui.message(assure_bytes(out) if PY2 else out)
+        ui.message(out)
 
 
 def _render_report(res):

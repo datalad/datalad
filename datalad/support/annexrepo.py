@@ -59,7 +59,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
-from datalad.utils import assure_unicode, assure_bytes
+from datalad.utils import assure_unicode
 from datalad.utils import make_tempfile
 from datalad.utils import partition
 from datalad.utils import unlink
@@ -1789,8 +1789,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
             files_opt = '--file=%s' % file_
-            if PY2:
-                files_opt = assure_bytes(files_opt)
             out_json = self._run_annex_command_json(
                 'addurl',
                 opts=options + [files_opt] + [url],

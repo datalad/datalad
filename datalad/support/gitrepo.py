@@ -64,7 +64,6 @@ from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
 from datalad.utils import PurePosixPath
-from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -736,7 +735,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
             self._repo = self._create_empty_repo(
-                assure_bytes(path) if PY2 else path,
+                path,
                 create_sanity_checks, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
@@ -842,9 +841,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # InvalidGitRepositoryError:
             self._repo = self.cmd_call_wrapper(
                 Repo,
-                # Encode path on Python 2 because, as of v2.1.11, GitPython's
-                # Repo will pass the path to str() otherwise.
-                assure_bytes(self.path) if PY2 else self.path)
+                self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:

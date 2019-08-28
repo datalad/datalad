@@ -162,10 +162,9 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
         outdir = unixify_path(dir_)
-        if not PY2:
-            # should be supplied in PY3 to avoid b''
-            outdir = assure_unicode(outdir)
-            archive = assure_unicode(archive)
+        # should be supplied in PY3 to avoid b''
+        outdir = assure_unicode(outdir)
+        archive = assure_unicode(archive)
 
         format_compression = patoolib.get_archive_format(archive)
         if format_compression == ('gzip', None):

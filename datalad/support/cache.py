@@ -12,10 +12,7 @@
 from collections import OrderedDict
 from six import PY2
 
-if PY2:
-    from ._lru_cache2 import lru_cache
-else:
-    from functools import lru_cache
+from functools import lru_cache
 
 
 # based on http://stackoverflow.com/a/2437645/1265472

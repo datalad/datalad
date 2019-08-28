@@ -25,7 +25,6 @@ from datalad.distribution.dataset import (
 from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
-    assure_bytes,
     chpwd,
     _path_,
 )
@@ -473,8 +472,5 @@ def check_create_obscure(create_kwargs, path):
 
 def test_create_with_obscure_name():
     fname = OBSCURE_FILENAME
-    if PY2:
-        # Mimic how it comes in on the command-line.
-        fname = assure_bytes(OBSCURE_FILENAME)
     yield check_create_obscure, {"path": fname}
     yield check_create_obscure, {"dataset": fname}

@@ -84,8 +84,6 @@ class CookiesDB(object):
 
     def _get_provider(self, url):
         tld = get_tld(url)
-        if PY2:
-            return tld.encode()
         return tld
 
     def __getitem__(self, url):

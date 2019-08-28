@@ -236,4 +236,4 @@ def test_both():
 
 def test_type_str():
     assert_equal(ct._type_str((str,)), 'str')
-    assert_equal(ct._type_str(str), 'basestring' if PY2 else 'str')
+    assert_equal(ct._type_str(str), 'str')

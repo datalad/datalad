@@ -16,7 +16,6 @@ from six import text_type
 
 from datalad.utils import (
     on_windows,
-    assure_bytes,
     assure_list,
     rmtree,
 )
@@ -736,9 +735,6 @@ def test_on_failure_continue(path):
 def test_save_obscure_name(path):
     ds = Dataset(path).create(force=True)
     fname = OBSCURE_FILENAME
-    if PY2:
-        # Mimic how the path will come in from the command line.
-        fname = assure_bytes(fname)
     # Just check that we don't fail with a unicode error.
     with swallow_outputs():
         ds.save(path=fname, result_renderer="default")
