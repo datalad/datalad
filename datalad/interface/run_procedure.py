@@ -451,9 +451,7 @@ class RunProcedure(Interface):
             script=maybe_shlex_quote(procedure_file),
             ds=maybe_shlex_quote(ds.path) if ds else '',
             args=(u' '.join(maybe_shlex_quote(a) for a in args) if args else ''))
-        lgr.debug('Attempt to run procedure {} as: {}'.format(
-            name,
-            cmd))
+        lgr.debug(u'Attempt to run procedure %s as: %s', name, cmd)
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,
