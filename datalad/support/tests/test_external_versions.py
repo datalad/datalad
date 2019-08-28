@@ -34,10 +34,10 @@ from nose.tools import (
 from nose import SkipTest
 from six import PY3
 
-if PY3:
-    # just to ease testing
-    def cmp(a, b):
-        return (a > b) - (a < b)
+
+# just to ease testing
+def cmp(a, b):
+    return (a > b) - (a < b)
 
 
 def test_external_versions_basic():

@@ -363,7 +363,7 @@ class Runner(object):
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
-                self._log_err(line.decode('utf-8') if PY3 else line,
+                self._log_err(line.decode('utf-8'),
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
@@ -518,12 +518,10 @@ class Runner(object):
                 else:
                     out = proc.communicate()
 
-                if PY3:
-                    # Decoding was delayed to this point
-                    def decode_if_not_None(x):
-                        return "" if x is None else bytes.decode(x)
-                    # TODO: check if we can avoid PY3 specific here
-                    out = tuple(map(decode_if_not_None, out))
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else bytes.decode(x)
+                out = tuple(map(decode_if_not_None, out))
 
                 status = proc.poll()
 

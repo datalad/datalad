@@ -1771,14 +1771,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         content_str = self.repo.commit(branch).tree[file_].data_stream.read()
 
         # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
+        conv_str = u''
+        for b in bytes(content_str):
+            conv_str += chr(b)
+        return conv_str.splitlines()
         # TODO: keep splitlines?
 
     def _get_files_history(self, files, branch='HEAD'):
