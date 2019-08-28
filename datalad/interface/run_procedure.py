@@ -190,7 +190,7 @@ def _guess_exec(script_file):
                 'template': u'bash {script} {ds} {args}',
                 'state': state}
     elif script_file.endswith('.py'):
-        ex = sys.executable if on_windows else shlex_quote(sys.executable)
+        ex = maybe_shlex_quote(sys.executable)
         return {'type': u'python_script',
                 'template': u'%s {script} {ds} {args}' % ex,
                 'state': state}
