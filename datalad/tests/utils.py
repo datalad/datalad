@@ -1127,7 +1127,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            reraise(*exc_info)
+            raise exc_info[1]
 
         return ret
 
