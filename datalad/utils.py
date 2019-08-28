@@ -732,7 +732,7 @@ def assure_unicode(s, encoding=None, confidence=None):
       A value between 0 and 1, so if guessing of encoding is of lower than
       specified confidence, ValueError is raised
     """
-    if not isinstance(s, binary_type):
+    if not isinstance(s, bytes):
         return s
     if encoding is None:
         # Figure out encoding, defaulting to 'utf-8' which is our common
@@ -1679,7 +1679,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = realpath(filename)
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
             f.write(content)
 
     if __debug__:
