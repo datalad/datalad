@@ -695,7 +695,9 @@ def assure_dict_from_str(s, **kwargs):
 
 
 def assure_bytes(s, encoding='utf-8'):
-    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'str'
+    """Convert/encode unicode string to bytes.
+
+    If `s` isn't a string, return it as is.
 
     Parameters
     ----------
@@ -708,7 +710,9 @@ def assure_bytes(s, encoding='utf-8'):
 
 
 def assure_unicode(s, encoding=None, confidence=None):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+    """Convert/decode bytestring to unicode.
+
+    If `s` isn't a bytestring, return it as is.
 
     Parameters
     ----------
