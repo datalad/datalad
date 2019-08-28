@@ -44,7 +44,6 @@ from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
-from datalad.utils import assure_unicode
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
@@ -488,7 +487,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     The decorator has no effect on the actual function decorated with it.
     """
     if not name:
-        name = f.func_name if PY2 else f.__name__
+        name = f.__name__
 
     @wrapt.decorator
     def apply_func(wrapped, instance, args, kwargs):

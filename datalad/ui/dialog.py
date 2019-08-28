@@ -277,7 +277,7 @@ class IPythonUI(DialogUI):
         if not hidden:
             self.out.write(prompt)
             self.out.flush()
-            return (raw_input if PY2 else input)()
+            return input()
         else:
             return getpass.getpass(prompt=prompt)
 
