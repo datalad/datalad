@@ -392,10 +392,7 @@ class Status(Interface):
         refds = res.get('refds', None)
         refds = refds if kwargs.get('dataset', None) is not None \
             or refds == os.getcwd() else None
-        # Note: We have to force unicode for res['path'] because
-        # interface.utils encodes it on py2 before passing it to
-        # custom_result_renderer().
-        path = assure_unicode(res['path']) if refds is None \
+        path = res['path'] if refds is None \
             else str(ut.Path(res['path']).relative_to(refds))
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')

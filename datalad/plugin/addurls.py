@@ -269,8 +269,7 @@ def _read(stream, input_type):
         import json
         try:
             rows = json.load(stream)
-        except getattr(json.decoder, "JSONDecodeError", ValueError) as e:
-            # ^ py2 compatibility kludge.
+        except json.decoder.JSONDecodeError as e:
             raise ValueError(
                 "Failed to read JSON from stream {}: {}"
                 .format(stream, exc_str(e)))

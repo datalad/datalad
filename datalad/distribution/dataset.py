@@ -581,8 +581,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        # assure_unicode() can be dropped once we drop PY2.
-        dspath = assure_unicode(get_dataset_root(getpwd()))
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
