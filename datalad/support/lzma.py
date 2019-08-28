@@ -10,8 +10,6 @@
 """
 from __future__ import absolute_import
 
-from six import PY2
-
 exc1 = ''
 try:
     try:

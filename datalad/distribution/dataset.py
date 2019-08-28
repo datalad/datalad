@@ -20,10 +20,6 @@ from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from weakref import WeakValueDictionary
-from six import PY2
-from six import string_types
-from six import text_type
-from six import add_metaclass
 import wrapt
 
 from datalad import cfg

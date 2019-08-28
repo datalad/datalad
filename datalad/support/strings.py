@@ -11,7 +11,6 @@
 __docformat__ = 'restructuredtext'
 
 from collections import OrderedDict
-from six import binary_type, text_type
 import re
 
 

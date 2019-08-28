@@ -27,7 +27,6 @@ import getpass
 # from mock import patch
 from collections import deque
 from copy import copy
-from six import PY2
 
 from ..utils import auto_repr
 from ..utils import on_windows

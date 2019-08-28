@@ -9,7 +9,6 @@
 """Test status command"""
 
 import os.path as op
-from six import text_type
 import datalad.utils as ut
 
 from datalad.utils import (

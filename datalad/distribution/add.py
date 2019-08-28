@@ -21,7 +21,6 @@ from os.path import normpath
 from os.path import pardir
 from os.path import relpath
 
-from six import text_type
 
 from datalad.utils import assure_unicode
 from datalad.utils import unique

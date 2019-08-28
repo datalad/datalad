@@ -25,7 +25,6 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
-from six import iteritems
 
 from ..ui import ui
 from ..dochelpers import exc_str

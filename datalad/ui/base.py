@@ -13,7 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 from abc import ABCMeta, abstractmethod
-from six import add_metaclass
 
 from ..utils import auto_repr
 

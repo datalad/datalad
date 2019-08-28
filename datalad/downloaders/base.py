@@ -20,10 +20,6 @@ import time
 from abc import ABCMeta, abstractmethod
 import os.path as op
 from os.path import exists, join as opj, isdir
-from six import PY2
-from six import binary_type, PY3
-from six import add_metaclass
-from six import reraise
 
 
 from .. import cfg

@@ -20,7 +20,6 @@ import os.path as op
 
 import sys
 
-from six import text_type
 
 from datalad import get_encoding_info
 from datalad.cmd import Runner

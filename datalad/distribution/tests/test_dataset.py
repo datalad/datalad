@@ -14,7 +14,6 @@ import shutil
 import os.path as op
 from os.path import join as opj, abspath, normpath, relpath, exists
 
-from six import text_type
 
 from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from ..dataset import rev_resolve_path

@@ -12,7 +12,6 @@
 import sys
 # OPT delay import for expensive mock until used
 #from mock import patch
-from six import PY2
 import builtins
 
 import logging

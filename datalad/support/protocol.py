@@ -10,7 +10,6 @@
 """
 
 from abc import ABCMeta, abstractmethod, abstractproperty
-from six import add_metaclass
 from os import linesep
 import logging
 import time

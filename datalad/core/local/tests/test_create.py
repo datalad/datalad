@@ -16,8 +16,6 @@ from datalad.tests.utils import known_failure_windows
 import os
 import os.path as op
 
-from six import PY2
-from six import text_type
 
 from datalad.distribution.dataset import (
     Dataset

@@ -9,7 +9,6 @@
 
 
 import os
-from six import text_type
 from os.path import (
     join as opj,
     relpath,

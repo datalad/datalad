@@ -17,7 +17,6 @@ from mock import patch
 
 from nose import SkipTest
 
-from six import text_type
 
 from datalad.support.external_versions import external_versions
 from datalad.utils import Path

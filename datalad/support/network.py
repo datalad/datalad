@@ -27,8 +27,6 @@ from os.path import join as opj
 from os.path import dirname
 from ntpath import splitdrive as win_splitdrive
 
-from six import string_types
-from six import iteritems
 from urllib.parse import urlsplit
 from urllib.request import Request
 from urllib.parse import unquote as urlunquote

@@ -17,7 +17,6 @@ import logging
 
 import os.path as op
 
-from six import text_type
 
 from datalad.core.local.status import Status
 from datalad.support.constraints import EnsureStr

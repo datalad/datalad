@@ -16,7 +16,6 @@ import os.path as op
 from functools import partial
 from collections import OrderedDict
 
-from six import PY2
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc

@@ -14,7 +14,6 @@ import operator
 import re
 import time
 
-from six import string_types
 
 from datalad.log import log_progress
 from datalad.support.exceptions import CommandError

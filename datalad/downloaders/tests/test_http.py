@@ -10,7 +10,6 @@
 
 import time
 from calendar import timegm
-from six import PY3
 import re
 
 import os

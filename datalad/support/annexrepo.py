@@ -39,10 +39,6 @@ from subprocess import Popen, PIPE
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from six import string_types, PY2
-from six import iteritems
-from six import text_type
-from six.moves import filter
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager

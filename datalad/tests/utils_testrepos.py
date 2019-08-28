@@ -11,7 +11,6 @@ import os
 import tempfile
 
 from abc import ABCMeta, abstractmethod
-from six import add_metaclass
 from os.path import dirname, join as opj, exists, pardir
 
 from ..support.gitrepo import GitRepo

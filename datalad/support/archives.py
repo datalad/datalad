@@ -26,7 +26,6 @@ from .path import (
     realpath,
     sep as opsep,
 )
-from six import next, PY2
 from urllib.parse import unquote as urlunquote
 
 import string

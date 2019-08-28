@@ -10,7 +10,6 @@
 """
 
 from collections import OrderedDict
-from six import PY2
 
 from functools import lru_cache
 

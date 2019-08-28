@@ -11,7 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six import text_type
 from distutils.version import LooseVersion
 from glob import glob
 import logging

@@ -12,7 +12,6 @@
 import sys
 import os
 from os.path import isabs, abspath, join as opj, normpath
-from six import string_types, PY2
 
 from ..support import constraints as ct
 from ..support.gitrepo import GitRepo

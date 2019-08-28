@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six import text_type
 import os
 import os.path as op
 from datalad.support.exceptions import (
