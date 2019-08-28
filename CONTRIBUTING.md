@@ -121,10 +121,7 @@ we outline the workflow used by the developers:
 Development environment
 -----------------------
 
-Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
-and thus instructions below are for python 2.7 deployments.  Replace `python-{`
-with `python{,3}-{` to also install dependencies for Python 3 (e.g., if you would
-like to develop and test through tox).
+We support Python 3 only (>= 3.5).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -133,14 +130,14 @@ since we use it to provide backports of recent fixed external modules we depend 
 
 ```sh
 apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,requests,setuptools,six}
+apt-get install -y -q patool python3-scrapy python3-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,requests,setuptools}
 ```
 
 and additionally, for development we suggest to use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python-{dev,httpretty,nose,pip,vcr,virtualenv} python-tox
+apt-get install -y -q python3-{dev,httpretty,nose,pip,vcr,virtualenv} python3-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
