@@ -284,3 +284,34 @@ def test_configs(path):
     r = ds.run_procedure('datalad_test_proc', help_proc=True)
     assert_true(len(r) == 1)
     assert_in_results(r, message="This is a help message", status='ok')
+
+
+# FIXME: For some reason fails to commit correctly if on windows and in direct
+# mode. However, direct mode on linux works
+@skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
+@with_tree(tree={
+    'code': {'datalad_test_proc.py': """\
+import sys
+import os.path as op
+from datalad.api import add, Dataset
+
+with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
+    f.write('hello\\n')
+add(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
+"""}})
+def test_spaces(path):
+    """
+    Test whether args with spaces are correctly parsed.
+    """
+    ds = Dataset(path).create(force=True)
+    ds.run_procedure('setup_yoda_dataset')
+    ok_clean_git(ds.path)
+    # configure dataset to look for procedures in its code folder
+    ds.config.add(
+        'datalad.locations.dataset-procedures',
+        'code',
+        where='dataset')
+    # 1. run procedure based on execution guessing by run_procedure:
+    ds.run_procedure(spec=['datalad_test_proc', 'with spaces', 'unrelated'])
+    # check whether file has name with spaces
+    ok_file_has_content(op.join(ds.path, 'with spaces'), 'hello\n')
