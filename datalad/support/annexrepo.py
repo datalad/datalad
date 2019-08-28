@@ -1958,7 +1958,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             initiate or continue with a batched run of annex dropkey, instead of just
             calling a single git annex dropkey command
         """
-        keys = [keys] if isinstance(keys, string_types) else keys
+        keys = [keys] if isinstance(keys, str) else keys
 
         options = options[:] if options else []
         options += ['--force']
@@ -2700,7 +2700,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         stdout, stderr
         """
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
-            if isinstance(cmd_str, string_types) \
+            if isinstance(cmd_str, str) \
             else cmd_str + files
 
         if self.fake_dates_enabled:

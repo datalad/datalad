@@ -408,7 +408,7 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
     if maxsize:
         d = {k: v for k, v in iteritems(d)
              if k.startswith('@') or (len(str(v)
-                                      if not isinstance(v, string_types + (binary_type,))
+                                      if not isinstance(v, (str, bytes,))
                                       else v) <= maxsize)}
     if len(d) != len(orig_keys):
         lgr.info(

@@ -318,7 +318,7 @@ class AddArchiveContent(Interface):
             annex.always_commit = annex.fake_dates_enabled
 
             if annex_options:
-                if isinstance(annex_options, string_types):
+                if isinstance(annex_options, str):
                     annex_options = shlex.split(annex_options)
 
             leading_dir = earchive.get_leading_directory(

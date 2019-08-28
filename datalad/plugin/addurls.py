@@ -95,7 +95,7 @@ class Formatter(string.Formatter):
             return super(Formatter, self).get_value(
                 key, args, kwargs)
 
-        if self.missing is not None and isinstance(value, string_types):
+        if self.missing is not None and isinstance(value, str):
             return value or self.missing
         return value
 
@@ -290,7 +290,7 @@ def _get_placeholder_exception(exc, msg_prefix, known):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
-    if isinstance(value, string_types):
+    if isinstance(value, str):
         sugmsg = get_suggestions_msg(value, known)
     else:
         sugmsg = "Out-of-bounds or unsupported index."

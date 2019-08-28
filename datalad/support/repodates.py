@@ -264,7 +264,7 @@ def check_dates(repo, timestamp=None, which="newer", revs=None,
     -------
     A dict that reports newer timestamps.
     """
-    if isinstance(repo, string_types):
+    if isinstance(repo, str):
         repo = GitRepo(repo, create=False)
 
     if timestamp is None:

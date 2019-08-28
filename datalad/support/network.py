@@ -244,9 +244,9 @@ def same_website(url_rec, u_rec):
     u_rec: ParseResult
       record for new url
     """
-    if isinstance(url_rec, string_types):
+    if isinstance(url_rec, str):
         url_rec = urlparse(url_rec)
-    if isinstance(u_rec, string_types):
+    if isinstance(u_rec, str):
         u_rec = urlparse(u_rec)
     return (url_rec.netloc == u_rec.netloc)
     # todo: collect more of sample cases.

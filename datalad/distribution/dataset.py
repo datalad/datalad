@@ -540,7 +540,7 @@ class EnsureDataset(Constraint):
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
-        elif isinstance(value, string_types):
+        elif isinstance(value, str):
             # we cannot convert to a Dataset class right here
             # - duplicates require_dataset() later on
             # - we need to be able to distinguish between a bound
@@ -694,7 +694,7 @@ def rev_resolve_path(path, ds=None):
         # pathlib docs for why this is the only sane choice in the
         # face of the possibility of symlinks in the path
         out.append(p)
-    return out[0] if isinstance(path, (string_types, PurePath)) else out
+    return out[0] if isinstance(path, (str, PurePath)) else out
 
 
 def path_under_rev_dataset(ds, path):

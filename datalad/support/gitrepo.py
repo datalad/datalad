@@ -294,7 +294,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
             else lambda rpath, filepath: filepath
 
         if files:
-            if isinstance(files, string_types) or not files:
+            if isinstance(files, str) or not files:
                 files_new = [normalize(self.path, files)]
                 single_file = True
             elif isinstance(files, list):
@@ -1541,7 +1541,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         if revrange is None:
             revrange = []
-        elif isinstance(revrange, string_types):
+        elif isinstance(revrange, str):
             revrange = [revrange]
 
         cmd = ["git", "log", "--format={}".format(fmt)]
@@ -1593,7 +1593,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           If no merge-base for given commits, or specified treeish doesn't
           exist, None returned
         """
-        if isinstance(commitishes, string_types):
+        if isinstance(commitishes, str):
             commitishes = [commitishes]
         if not commitishes:
             raise ValueError("Provide at least a single value")
@@ -1850,7 +1850,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
 
         # ensure cmd_str becomes a well-formed list:
-        if isinstance(cmd_str, string_types):
+        if isinstance(cmd_str, str):
             cmd = shlex.split(cmd_str, posix=not on_windows)
         else:
             cmd = cmd_str[:]  # we will modify in-place

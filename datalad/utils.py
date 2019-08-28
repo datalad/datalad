@@ -58,10 +58,7 @@ from shlex import quote as shlex_quote
 from datalad.consts import TIMESTAMP_FMT
 
 
-if PY2:
-    unicode_srctypes = string_types
-else:
-    unicode_srctypes = string_types + (bytes,)
+unicode_srctypes = str, bytes
 
 
 lgr = logging.getLogger("datalad.utils")
@@ -772,7 +769,7 @@ def assure_bool(s):
 
     to recognize on,True,yes as True, off,False,no as False
     """
-    if isinstance(s, string_types):
+    if isinstance(s, str):
         if s.isdigit():
             return bool(int(s))
         sl = s.lower()
