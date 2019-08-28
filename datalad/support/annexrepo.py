@@ -2923,7 +2923,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         matches = list(set(chain.from_iterable(
             [
                 [r['description'] for r in remotes if match(r)]
-                for k, remotes in iteritems(info)
+                for k, remotes in info.items()
                 if k.endswith(' repositories')
             ]
         )))
@@ -3117,7 +3117,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _mark_content_availability(self, info):
         objectstore = self.pathobj.joinpath(
             self.path, GitRepo.get_git_dir(self), 'annex', 'objects')
-        for f, r in iteritems(info):
+        for f, r in info.items():
             if 'key' not in r or 'has_content' in r:
                 # not annexed or already processed
                 continue
@@ -3286,7 +3286,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # https://github.com/datalad/datalad/issues/2955
             # check if there are any and pass them to git-add
             symlinks_toadd = {
-                p: props for p, props in iteritems(files)
+                p: props for p, props in files.items()
                 if props.get('type', None) == 'symlink'}
             if symlinks_toadd:
                 for r in GitRepo._save_add(
@@ -3296,7 +3296,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     yield r
             # trim `files` of symlinks
             files = {
-                p: props for p, props in iteritems(files)
+                p: props for p, props in files.items()
                 if props.get('type', None) != 'symlink'}
 
         expected_additions = None

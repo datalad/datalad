@@ -726,7 +726,7 @@ class _EGrepCSSearch(_Search):
             t0 = time()
             matches = {(q['query'] if isinstance(q, dict) else q, k):
                        q['query'].search(v) if isinstance(q, dict) else q.search(v)
-                       for k, v in iteritems(doc)
+                       for k, v in doc.items()
                        for q in query
                        if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
@@ -836,7 +836,7 @@ class _EGrepCSSearch(_Search):
             # no stringification of values for speed
             idxd = _meta2autofield_dict(meta, val2str=False)
 
-            for k, kvals in iteritems(idxd):
+            for k, kvals in idxd.items():
                 # TODO deal with conflicting definitions when available
                 keys[k].ndatasets += 1
                 if mode == 'name':

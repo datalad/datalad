@@ -2356,8 +2356,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 str(p.relative_to(self.pathobj)),
                 os.sep if props['type'] != 'file' else ''
             )
-            for p, props in iteritems(self.status(
-                untracked='all', eval_submodule_state='no'))
+            for p, props in self.status(
+                    untracked='all', eval_submodule_state='no').items()
             if props.get('state', None) == 'untracked'
         ]
 
@@ -2383,7 +2383,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # abuse our config parser
         db, _ = _parse_gitconfig_dump(out, {}, None, True)
         mods = {}
-        for k, v in iteritems(db):
+        for k, v in db.items():
             if not k.startswith('submodule.'):
                 # we don't know what this is
                 lgr.warning("Skip unrecognized .gitmodule specification: %s=%s", k, v)
@@ -2399,12 +2399,12 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         out = {}
         # bring into traditional shape
-        for name, props in iteritems(mods):
+        for name, props in mods.items():
             if 'path' not in props:
                 lgr.warning("Failed to get '%s.path', skipping this submodule", name)
                 continue
             modprops = {'gitmodule_{}'.format(k): v
-                        for k, v in iteritems(props)
+                        for k, v in props.items()
                         if not (k.startswith('__') or k == 'path')}
             modpath = self.pathobj / PurePosixPath(props['path'])
             modprops['gitmodule_name'] = name
@@ -2428,11 +2428,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             return
 
         modinfo = self._parse_gitmodules()
-        for path, props in iteritems(self.get_content_info(
+        for path, props in self.get_content_info(
                 paths=paths,
                 ref=None,
                 untracked='no',
-                eval_file_type=False)):
+                eval_file_type=False).items():
             if props.get('type', None) != 'dataset':
                 continue
             props["path"] = path
@@ -3259,10 +3259,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           `state`
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
-        return {k: v for k, v in iteritems(self.diffstatus(
+        return {k: v for k, v in self.diffstatus(
             fr=fr, to=to, paths=paths,
             untracked=untracked,
-            eval_submodule_state=eval_submodule_state))
+            eval_submodule_state=eval_submodule_state).items()
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
@@ -3347,7 +3347,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             _cache[key] = from_state
 
         status = OrderedDict()
-        for f, to_state_r in iteritems(to_state):
+        for f, to_state_r in to_state.items():
             props = None
             if f not in from_state:
                 # this is new, or rather not known to the previous state
@@ -3408,7 +3408,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props
 
-        for f, from_state_r in iteritems(from_state):
+        for f, from_state_r in from_state.items():
             if f not in to_state:
                 # we new this, but now it is gone and Git is not complaining
                 # about it being missing -> properly deleted and deletion
@@ -3437,7 +3437,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 return status
 
         # loop over all subdatasets and look for additional modifications
-        for f, st in iteritems(status):
+        for f, st in status.items():
             f = str(f)
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
@@ -3497,7 +3497,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # make sure to detach from prev. owner
             status = _status.copy()
         status = OrderedDict(
-            (k, v) for k, v in iteritems(status)
+            (k, v) for k, v in status.items()
             if v.get('state', None) != 'clean'
         )
         return status
@@ -3533,7 +3533,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # TODO remove pathobj stringification when commit() can
         # handle it
         to_commit = [str(f.relative_to(self.pathobj))
-                     for f, props in iteritems(status)] \
+                     for f, props in status.items()] \
                     if partial_commit else None
         if not partial_commit or to_commit:
             # we directly call GitRepo.commit() to avoid a whole slew
@@ -3613,7 +3613,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # TODO remove pathobj stringification when delete() can
             # handle it
             str(f.relative_to(self.pathobj))
-            for f, props in iteritems(status)
+            for f, props in status.items()
             if props.get('state', None) == 'deleted' and
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
@@ -3622,7 +3622,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         vanished_subds = any(
             props.get('type', None) == 'dataset' and
             props.get('state', None) == 'deleted'
-            for f, props in iteritems(status))
+            for f, props in status.items())
         if to_remove:
             for r in self.remove(
                     to_remove,
@@ -3648,18 +3648,18 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # looks for contained repositories
         added_submodule = False
         untracked_dirs = [f.relative_to(self.pathobj)
-                          for f, props in iteritems(status)
+                          for f, props in status.items()
                           if props.get('state', None) == 'untracked' and
                           props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
-            to_add_submodules = [sm for sm, sm_props in iteritems(
+            to_add_submodules = [sm for sm, sm_props in
                 self.get_content_info(
                     untracked_dirs,
                     ref=None,
                     # request exhaustive list, so that everything that is
                     # still reported as a directory must be its own repository
-                    untracked='all'))
+                    untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             for cand_sm in to_add_submodules:
                 try:
@@ -3692,7 +3692,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
                 str(f.relative_to(self.pathobj)): props
-                for f, props in iteritems(status)
+                for f, props in status.items()
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
             if to_stage_submodules:
@@ -3741,7 +3741,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # TODO remove pathobj stringification when add() can
             # handle it
             str(f.relative_to(self.pathobj)): props
-            for f, props in iteritems(status)
+            for f, props in status.items()
             if (props.get('state', None) in ('modified', 'untracked') and
                 f not in to_add_submodules)}
         if to_add:

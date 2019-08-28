@@ -243,7 +243,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     paths = None if origpaths is None \
         else OrderedDict(
             (repo_path / p.relative_to(ds.pathobj), goinside)
-            for p, goinside in iteritems(origpaths)
+            for p, goinside in origpaths.items()
             if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
         )
     try:
@@ -278,7 +278,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 ref=fr,
                 key_prefix="prev_")
 
-    for path, props in iteritems(diff_state):
+    for path, props in diff_state.items():
         pathinds = str(ds.pathobj / path.relative_to(repo_path))
         yield dict(
             props,

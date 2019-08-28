@@ -736,7 +736,7 @@ class RegexBasedURLMixin(object):
                    " Did you intent to use '///'?" if url_str.startswith('//') else '')
             )
         fields = cls._get_blank_fields()
-        fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})
+        fields.update({k: v for k, v in re_match.groupdict().items() if v})
         cls._normalize_fields(fields)
         return fields
 

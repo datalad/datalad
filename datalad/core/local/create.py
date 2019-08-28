@@ -272,7 +272,7 @@ class Create(Interface):
                 # into a known subdataset that is not around ATM
                 subds_status = {
                     parentds_path / k.relative_to(prepo.path)
-                    for k, v in iteritems(pstatus)
+                    for k, v in pstatus.items()
                     if v.get('type', None) == 'dataset'}
                 check_paths = [check_path]
                 check_paths.extend(check_path.parents)
@@ -406,7 +406,7 @@ class Create(Interface):
         # a dedicated argument, because it is sufficient for the cmdline
         # and unnecessary for the Python API (there could simply be a
         # subsequence ds.config.add() call)
-        for k, v in iteritems(tbds.config.overrides):
+        for k, v in tbds.config.overrides.items():
             tbds.config.add(k, v, where='local', reload=False)
 
         # all config manipulation is done -> fll reload
