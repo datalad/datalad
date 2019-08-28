@@ -177,7 +177,7 @@ class ExternalVersions(object):
         if isinstance(version, (tuple, list)):
             #  Generate string representation
             version = ".".join(str(x) for x in version)
-        elif isinstance(version, binary_type):
+        elif isinstance(version, bytes):
             version = version.decode()
         elif isinstance(version, str):
             pass

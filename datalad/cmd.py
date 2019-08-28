@@ -287,7 +287,7 @@ class Runner(object):
         -------
 
         """
-        stdout, stderr = binary_type(), binary_type()
+        stdout, stderr = bytes(), bytes()
 
         log_stdout_ = _decide_to_log(log_stdout)
         log_stderr_ = _decide_to_log(log_stderr)
@@ -333,7 +333,7 @@ class Runner(object):
     def _process_remaining_output(self, stream, out_, *pargs):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
-        out = binary_type()
+        out = bytes()
         if isinstance(stream, file_class) and \
                 _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
@@ -375,7 +375,7 @@ class Runner(object):
                 raise RuntimeError("must not get here")
             return (line + suf) if suf else line
         # it was output already directly but for code to work, return ""
-        return binary_type()
+        return bytes()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
@@ -529,7 +529,7 @@ class Runner(object):
                 if PY3:
                     # Decoding was delayed to this point
                     def decode_if_not_None(x):
-                        return "" if x is None else binary_type.decode(x)
+                        return "" if x is None else bytes.decode(x)
                     # TODO: check if we can avoid PY3 specific here
                     out = tuple(map(decode_if_not_None, out))
 

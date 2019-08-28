@@ -18,7 +18,7 @@ import re
 def get_replacement_dict(rules):
     """Given a string with replacement rules, produces a dict of from: to"""
 
-    if isinstance(rules, (binary_type, str)):
+    if isinstance(rules, (bytes, str)):
         rules = [rules]
 
     pairs = OrderedDict()
