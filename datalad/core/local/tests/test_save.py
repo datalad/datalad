@@ -360,7 +360,7 @@ def test_add_files(path):
         else:
             result = ds.save(arg[0], to_git=arg[1])
             for a in assure_list(arg[0]):
-                assert_result_count(result, 1, path=text_type(ds.pathobj / a))
+                assert_result_count(result, 1, path=str(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
                 ut.Path(p) for p in assure_list(arg[0]))
         for f, p in iteritems(status):
@@ -488,7 +488,7 @@ def test_gh1597_simpler(path):
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
-        sub = create(text_type(ds.pathobj / 'sub'))
+        sub = create(str(ds.pathobj / 'sub'))
         assert_repo_status(ds.path, untracked=['sub'])
         return ds
     # attempt one

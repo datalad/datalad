@@ -641,7 +641,7 @@ class TestAddurls(object):
         for in_type in ["csv", "json"]:
             with assert_raises(IncompleteResultsError) as exc:
                 ds.addurls(in_file, "{url}", "{name}", input_type=in_type)
-            assert_in("Failed to read", text_type(exc.exception))
+            assert_in("Failed to read", str(exc.exception))
 
     @with_tree({"in.csv": "url,name,subdir",
                 "in.json": "[]"})

@@ -276,7 +276,7 @@ class Save(Interface):
                     # version
                     for k in ('path', 'refds'):
                         if k in res:
-                            res[k] = text_type(
+                            res[k] = str(
                                 # recode path back to dataset path anchor
                                 pds.pathobj / res[k].relative_to(
                                     pds.repo.pathobj)

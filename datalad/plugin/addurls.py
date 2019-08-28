@@ -564,7 +564,7 @@ def add_meta(rows):
             yield dict(
                 action='add',
                 # decorator dies with Path()
-                path=text_type(ds.pathobj / filename),
+                path=str(ds.pathobj / filename),
                 type='file',
                 status=res_status,
                 parentds=ds.path,
@@ -790,7 +790,7 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = text_type(rev_resolve_path(url_file, dataset))
+        url_file = str(rev_resolve_path(url_file, dataset))
 
         if input_type == "ext":
             extension = os.path.splitext(url_file)[1]

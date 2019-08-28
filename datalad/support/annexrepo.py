@@ -3009,7 +3009,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # we can be lazy
             files = assure_list(files)
         else:
-            if isinstance(files, text_type):
+            if isinstance(files, str):
                 files = [files]
             # anything else is assumed to be an iterable (e.g. a generator)
         if batch is False:
@@ -3141,7 +3141,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if testpath.exists():
                     r.pop('hashdirlower', None)
                     r.pop('hashdirmixed', None)
-                    r['objloc'] = text_type(testpath)
+                    r['objloc'] = str(testpath)
                     r['has_content'] = True
                     break
 
@@ -3211,7 +3211,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd = 'find'
             # stringify any pathobjs
             if paths:
-                files = [text_type(p) for p in paths]
+                files = [str(p) for p in paths]
             else:
                 opts.extend(['--include', '*'])
 

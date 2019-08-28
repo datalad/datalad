@@ -171,7 +171,7 @@ def test_dryrun(path):
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         # http://site/group/dir--dir--dir--name.git
-        project='secret/{}'.format(text_type(
+        project='secret/{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
                 os.sep, '--')),
     )
@@ -188,14 +188,14 @@ def test_dryrun(path):
     assert_result_count(
         res, 1, path=ctlg['c1'].path, type='dataset', status='ok',
         # http://site/base--dir--dir--dir--name.git
-        project='secret--{}'.format(text_type(
+        project='secret--{}'.format(str(
             ctlg['c1'].pathobj.relative_to(ctlg['root'].pathobj)).replace(
                 os.sep, '--')),
     )
 
     # the results do not depend on explicitly given datasets, if we just enter
     # the parent dataset we get the same results
-    with chpwd(text_type(ctlg['root'].pathobj / 'subdir')):
+    with chpwd(str(ctlg['root'].pathobj / 'subdir')):
         rel_res = create_sibling_gitlab(path=os.curdir, dryrun=True)
         eq_(res, rel_res)
     # and again the same results if we are in a subdataset and point to a parent

@@ -478,7 +478,7 @@ def test_rev_resolve_path(path):
     for d in (opath,) if on_windows else (opath, lpath):
         ds_local = Dataset(d)
         # no symlink resolution
-        eq_(text_type(rev_resolve_path(d)), d)
+        eq_(str(rev_resolve_path(d)), d)
         # list comes out as a list
         eq_(rev_resolve_path([d]), [Path(d)])
         # multiple OK
@@ -486,7 +486,7 @@ def test_rev_resolve_path(path):
 
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
-            eq_(text_type(rev_resolve_path(d).cwd()), opath)
+            eq_(str(rev_resolve_path(d).cwd()), opath)
             # using pathlib's `resolve()` will resolve any
             # symlinks
             # also resolve `opath`, as on old windows systems the path might
@@ -495,7 +495,7 @@ def test_rev_resolve_path(path):
             eq_(rev_resolve_path('.').resolve(), ut.Path(opath).resolve())
             # no norming, but absolute paths, without resolving links
             eq_(rev_resolve_path('.'), ut.Path(d))
-            eq_(text_type(rev_resolve_path('.')), d)
+            eq_(str(rev_resolve_path('.')), d)
 
             # there is no concept of an "explicit" relative path anymore
             # relative is relative, regardless of the specific syntax
@@ -503,7 +503,7 @@ def test_rev_resolve_path(path):
                 ds_global.pathobj / 'bu')
             # there is no full normpath-ing or other funky resolution of
             # parent directory back-reference
-            eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+            eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
                 op.join(ds_global.path, os.pardir, 'bu'))
 
         # resolve against a dataset given as a path/str
@@ -517,7 +517,7 @@ def test_rev_resolve_path(path):
         # not being inside a dataset doesn't change the resolution result
         eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
             ds_global.pathobj / 'bu')
-        eq_(text_type(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+        eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
             op.join(ds_global.path, os.pardir, 'bu'))
 
 
@@ -526,7 +526,7 @@ def test_rev_resolve_path(path):
 @with_tempfile(mkdir=True)
 def test_rev_resolve_path_symlink_edition(path):
     deepest = ut.Path(path) / 'one' / 'two' / 'three'
-    deepest_str = text_type(deepest)
+    deepest_str = str(deepest)
     os.makedirs(deepest_str)
     with chpwd(deepest_str):
         # direct absolute
