@@ -18,8 +18,7 @@ import time
 lgr = logging.getLogger('datalad.protocol')
 
 
-@add_metaclass(ABCMeta)
-class ProtocolInterface(object):
+class ProtocolInterface(object, metaclass=ABCMeta):
     """Interface class for protocols used by the Runner.
 
     Implementations of this interface are supposed to store one section per

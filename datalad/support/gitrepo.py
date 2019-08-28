@@ -561,8 +561,7 @@ class GitPythonProgressBar(RemoteProgress):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-@add_metaclass(Flyweight)
-class GitRepo(RepoInterface):
+class GitRepo(RepoInterface, metaclass=Flyweight):
     """Representation of a git repository
 
     """

@@ -40,8 +40,7 @@ with open(remote_file_path, "w") as f:
 os.close(remote_file_fd)
 
 
-@add_metaclass(ABCMeta)
-class TestRepo(object):
+class TestRepo(object, metaclass=ABCMeta):
 
     REPO_CLASS = None  # Assign to the class to be used in the subclass
 
