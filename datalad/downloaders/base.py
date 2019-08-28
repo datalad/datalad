@@ -71,8 +71,7 @@ class DownloaderSession(object):
 
 
 @auto_repr
-@add_metaclass(ABCMeta)
-class BaseDownloader(object):
+class BaseDownloader(object, metaclass=ABCMeta):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None

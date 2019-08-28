@@ -86,8 +86,7 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
-@add_metaclass(Flyweight)
-class Dataset(object):
+class Dataset(object, metaclass=Flyweight):
     """Representation of a DataLad dataset/repository
 
     This is the core data type of DataLad: a representation of a dataset.
