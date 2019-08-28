@@ -24,7 +24,7 @@ from six import (
     string_types,
     text_type,
 )
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from datalad.distribution.dataset import rev_resolve_path
 from datalad.dochelpers import exc_str

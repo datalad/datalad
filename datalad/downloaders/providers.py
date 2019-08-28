@@ -16,7 +16,7 @@ from six import iteritems
 import os
 import re
 from os.path import dirname, abspath, join as pathjoin
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator

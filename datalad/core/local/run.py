@@ -22,7 +22,7 @@ from os.path import relpath
 from tempfile import mkdtemp
 
 from six.moves import map
-from six.moves import shlex_quote
+from shlex import quote as shlex_quote
 
 from datalad.core.local.save import Save
 

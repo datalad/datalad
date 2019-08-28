@@ -25,7 +25,7 @@ from os.path import exists, join as opj, basename
 
 from six import PY2, PY3
 from six import text_type
-from six.moves.urllib.request import urlopen
+from urllib.request import urlopen
 
 from mock import patch
 from nose.tools import assert_in, assert_not_in, assert_true

@@ -52,7 +52,7 @@ import posixpath
 
 
 from six import PY2, text_type, binary_type, string_types
-from six.moves import shlex_quote
+from shlex import quote as shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT

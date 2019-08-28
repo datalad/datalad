@@ -33,7 +33,7 @@ from datalad.support.exceptions import (
     AnonymousAccessDeniedError,
 )
 
-from six.moves.urllib.request import urlopen, Request
+from urllib.request import urlopen, Request
 
 
 try:

@@ -9,8 +9,9 @@
 import sys
 import json
 
-from six.moves.urllib.request import Request, urlopen
-from six.moves.urllib.error import HTTPError
+from urllib.request import Request
+from urllib.request import urlopen
+from urllib.error import HTTPError
 
 from datalad.support.exceptions import (
     AccessDeniedError,

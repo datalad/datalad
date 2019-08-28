@@ -10,7 +10,7 @@
 import sys
 
 from mock import patch
-from six.moves import StringIO
+from io import StringIO
 from tempfile import NamedTemporaryFile
 from nose.tools import assert_raises, assert_equal
 

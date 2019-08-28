@@ -11,7 +11,7 @@
 
 import re
 
-from six.moves.urllib.parse import urlsplit, unquote as urlunquote
+from urllib.parse import urlsplit, unquote as urlunquote
 
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
