@@ -281,7 +281,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             # Note: If 'annex.version' is missing in .git/config for some
             # reason, we need to try to set direct mode:
             repo_version = self.config.getint("annex", "version")
-            if (repo_version is None) or (repo_version < 6):
+            if self.supports_direct_mode and \
+               (repo_version is None or repo_version < 6):
                 lgr.debug("Switching to direct mode (%s)." % self)
                 self.set_direct_mode()
             else:
