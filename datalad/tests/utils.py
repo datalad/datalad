@@ -1097,6 +1097,30 @@ def skip_direct_mode(func, method='raise'):
 
 
 @optional_args
+def skip_if_no_direct_mode(func, other_cond=True, method='raise'):
+    """Skip test if git-annex version does not support direct mode.
+
+    Parameters
+    ----------
+    func : function
+    other_cond : bool, optional
+        Skip if annex does not support direct mode AND this value is true.
+    method : str, optional
+        Passed to `skip_if`.
+    """
+    from datalad.support.annexrepo import AnnexRepo
+    unsupported = not AnnexRepo.check_direct_mode_support()
+
+    @skip_if(unsupported and other_cond,
+             msg="Direct mode unsupported by git-annex version",
+             method=method)
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        return func(*args, **kwargs)
+    return newfunc
+
+
+@optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
 
