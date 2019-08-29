@@ -27,8 +27,22 @@ bet we will fix some bugs and make a world even a better place.
     convention used by other commands of taking relative paths as
     relative to the dataset argument.  ([#3582][])
 
+- [run-procedure][]
+  - hard coded "python" when formatting the command for non-executable
+    procedures ending with ".py".  `sys.executable` is now used.
+    ([#3624][])
+  - failed if arguments needed more complicated quoting than simply
+    surrounding the value with double quotes.  This has been resolved
+    for systems that support `shlex.quote`, but note that on Windows
+    values are left unquoted. ([#3626][])
+
 - [siblings][] now displays an informative error message if a local
   path is given to `--url` but `--name` isn't specified.  ([#3555][])
+
+- [sshrun][], the command DataLad uses for `GIT_SSH_COMMAND`, didn't
+  support all the parameters that Git expects it to.  ([#3616][])
+
+- Fixed a number of Unicode py2-compatibility issues. ([#3597][])
 
 ### Enhancements and new features
 
@@ -45,6 +59,11 @@ bet we will fix some bugs and make a world even a better place.
 
 - [addurls][] now suggests close matches when the URL or file format
   contains an unknown field.  ([#3594][])
+
+- Shared logic used in the setup.py files of Datalad and its
+  extensions has been moved to modules in the _datalad_build_support/
+  directory.  ([#3600][])
+
 
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
@@ -1433,3 +1452,8 @@ publishing
 [#3579]: https://github.com/datalad/datalad/issues/3579
 [#3582]: https://github.com/datalad/datalad/issues/3582
 [#3594]: https://github.com/datalad/datalad/issues/3594
+[#3597]: https://github.com/datalad/datalad/issues/3597
+[#3600]: https://github.com/datalad/datalad/issues/3600
+[#3616]: https://github.com/datalad/datalad/issues/3616
+[#3624]: https://github.com/datalad/datalad/issues/3624
+[#3626]: https://github.com/datalad/datalad/issues/3626
