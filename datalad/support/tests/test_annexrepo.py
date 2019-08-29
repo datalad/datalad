@@ -1575,7 +1575,7 @@ def test_annex_add_no_dotfiles(path):
 
 
 @with_tempfile
-def test_annex_version_handling(path):
+def test_annex_version_handling_at_min_version(path):
     with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
          patch.object(AnnexRepo, '_check_git_annex_version',
                       auto_spec=True,
@@ -1598,6 +1598,10 @@ def test_annex_version_handling(path):
             assert(ar2)
             eq_(AnnexRepo.git_annex_version, AnnexRepo.GIT_ANNEX_MIN_VERSION)
             eq_(cmpc.call_count, 1)
+
+
+@with_tempfile
+def test_annex_version_handling_bad_git_annex(path):
     with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
             patch.object(AnnexRepo, '_check_git_annex_version',
                          auto_spec=True,
@@ -1607,11 +1611,6 @@ def test_annex_version_handling(path):
                 external_versions, '_versions', {'cmd:annex': None}):
             eq_(AnnexRepo.git_annex_version, None)
             with assert_raises(MissingExternalDependency) as cme:
-                try:
-                    # Note: Remove to cause creation of a new instance
-                    rmtree(path)
-                except OSError:
-                    pass
                 AnnexRepo(path)
             if linux_distribution_name == 'debian':
                 assert_in("http://neuro.debian.net", str(cme.exception))
