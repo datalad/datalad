@@ -52,6 +52,7 @@ import posixpath
 
 
 from six import PY2, text_type, binary_type, string_types
+from six.moves import shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -2278,6 +2279,14 @@ def get_suggestions_msg(values, known, sep="\n        "):
         return msg + "%s\n" % sep.join(suggestions)
     return ''
 
+
+def maybe_shlex_quote(val):
+    """
+    shlex_quote() a value if the command is not run on a Windows
+    machine.
+    """
+
+    return val if on_windows else shlex_quote(val)
 
 
 lgr.log(5, "Done importing datalad.utils")
