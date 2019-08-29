@@ -120,6 +120,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 6.20180913 -- annex fixes all known to us issues for v6
     GIT_ANNEX_MIN_VERSION = '6.20180913'
     git_annex_version = None
+    supports_direct_mode = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
     # git annex 6.20180626 those will by default be not allowed for security
@@ -257,6 +258,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             else:
                 raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
 
+        # Ensure self.supports_direct_mode is set.
+        self.check_direct_mode_support()
         self._direct_mode = None  # we don't know yet
 
         # If we are in direct mode already, we need to make
@@ -778,6 +781,22 @@ class AnnexRepo(GitRepo, RepoInterface):
         elif ver < cls.GIT_ANNEX_MIN_VERSION:
             raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
         cls.git_annex_version = ver
+
+    @classmethod
+    def check_direct_mode_support(cls):
+        """Does git-annex version support direct mode?
+
+        The result is cached at `cls.supports_direct_mode`.
+
+        Returns
+        -------
+        bool
+        """
+        if cls.supports_direct_mode is None:
+            if cls.git_annex_version is None:
+                cls._check_git_annex_version()
+            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
+        return cls.supports_direct_mode
 
     @staticmethod
     def get_size_from_key(key):
