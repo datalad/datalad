@@ -52,6 +52,7 @@ import posixpath
 
 
 from six import PY2, text_type, binary_type, string_types
+from six.moves import shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
@@ -2306,6 +2307,15 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
             value = float(n) / prefix[symbol]
             return format % locals()
     return format % dict(symbol=symbols[0], value=n)
+
+
+def maybe_shlex_quote(val):
+    """
+    shlex_quote() a value if the command is not run on a Windows
+    machine.
+    """
+
+    return val if on_windows else shlex_quote(val)
 
 
 lgr.log(5, "Done importing datalad.utils")
