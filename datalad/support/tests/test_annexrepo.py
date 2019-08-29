@@ -35,6 +35,7 @@ from git import GitCommandError
 from mock import patch
 import gc
 
+from datalad import cfg
 from datalad.cmd import Runner
 
 from datalad.support.external_versions import external_versions
@@ -81,6 +82,7 @@ from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if_no_direct_mode
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
@@ -199,6 +201,7 @@ def test_AnnexRepo_is_direct_mode_gitrepo(path):
         assert_false(dm)
 
 
+@skip_if_no_direct_mode
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
 @with_tempfile
@@ -223,6 +226,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
         assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
 
 
+@skip_if_no_direct_mode
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -906,6 +910,7 @@ def test_AnnexRepo_add_to_git(path):
     ok_clean_git(repo, annex=True, ignore_submodules=True)
 
 
+@skip_if_no_direct_mode
 @with_testrepos('submodule_annex', flavors=['clone'])
 def test_AnnexRepo_add_unexpected_direct_mode(path):
     # tests a special case where a submodule is in direct mode, while it's
@@ -1575,6 +1580,8 @@ def test_annex_add_no_dotfiles(path):
     assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))
 
 
+@skip_if_no_direct_mode(
+    other_cond=cfg.getbool("datalad", "repo.direct", default=False))
 @with_tempfile
 def test_annex_version_handling_at_min_version(path):
     with set_annex_version(AnnexRepo.GIT_ANNEX_MIN_VERSION):
