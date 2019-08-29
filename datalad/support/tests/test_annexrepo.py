@@ -84,6 +84,7 @@ from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
+from datalad.tests.utils import set_annex_version
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -1576,13 +1577,11 @@ def test_annex_add_no_dotfiles(path):
 
 @with_tempfile
 def test_annex_version_handling_at_min_version(path):
-    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
-         patch.object(AnnexRepo, '_check_git_annex_version',
-                      auto_spec=True,
-                      side_effect=AnnexRepo._check_git_annex_version) \
-            as cmpc, \
-         patch.object(external_versions, '_versions',
-                      {'cmd:annex': AnnexRepo.GIT_ANNEX_MIN_VERSION}):
+    with set_annex_version(AnnexRepo.GIT_ANNEX_MIN_VERSION):
+        po = patch.object(AnnexRepo, '_check_git_annex_version',
+                          auto_spec=True,
+                          side_effect=AnnexRepo._check_git_annex_version)
+        with po as cmpc:
             eq_(AnnexRepo.git_annex_version, None)
             ar1 = AnnexRepo(path, create=True)
             assert(ar1)
@@ -1602,39 +1601,31 @@ def test_annex_version_handling_at_min_version(path):
 
 @with_tempfile
 def test_annex_version_handling_bad_git_annex(path):
-    with patch.object(AnnexRepo, 'git_annex_version', None) as cmpov, \
-            patch.object(AnnexRepo, '_check_git_annex_version',
-                         auto_spec=True,
-                         side_effect=AnnexRepo._check_git_annex_version):
-        # no git-annex at all
-        with patch.object(
-                external_versions, '_versions', {'cmd:annex': None}):
-            eq_(AnnexRepo.git_annex_version, None)
-            with assert_raises(MissingExternalDependency) as cme:
-                AnnexRepo(path)
-            if linux_distribution_name == 'debian':
-                assert_in("http://neuro.debian.net", str(cme.exception))
-            eq_(AnnexRepo.git_annex_version, None)
+    with set_annex_version(None):
+        eq_(AnnexRepo.git_annex_version, None)
+        with assert_raises(MissingExternalDependency) as cme:
+            AnnexRepo(path)
+        if linux_distribution_name == 'debian':
+            assert_in("http://neuro.debian.net", str(cme.exception))
+        eq_(AnnexRepo.git_annex_version, None)
 
-        # outdated git-annex at all
-        with patch.object(
-                external_versions, '_versions', {'cmd:annex': '6.20160505'}):
-            eq_(AnnexRepo.git_annex_version, None)
-            try:
-                # Note: Remove to cause creation of a new instance
-                rmtree(path)
-            except OSError:
-                pass
-            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
-            # and we don't assign it
-            eq_(AnnexRepo.git_annex_version, None)
-            # so we could still fail
-            try:
-                # Note: Remove to cause creation of a new instance
-                rmtree(path)
-            except OSError:
-                pass
-            assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+    with set_annex_version('6.20160505'):
+        eq_(AnnexRepo.git_annex_version, None)
+        try:
+            # Note: Remove to cause creation of a new instance
+            rmtree(path)
+        except OSError:
+            pass
+        assert_raises(OutdatedExternalDependency, AnnexRepo, path)
+        # and we don't assign it
+        eq_(AnnexRepo.git_annex_version, None)
+        # so we could still fail
+        try:
+            # Note: Remove to cause creation of a new instance
+            rmtree(path)
+        except OSError:
+            pass
+        assert_raises(OutdatedExternalDependency, AnnexRepo, path)
 
 
 def test_ProcessAnnexProgressIndicators():

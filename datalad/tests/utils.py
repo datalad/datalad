@@ -1549,6 +1549,24 @@ def set_date(timestamp):
         yield
 
 
+@contextmanager
+def set_annex_version(version):
+    """Override the git-annex version.
+
+    This temporarily masks the git-annex version present in external_versions
+    and make AnnexRepo forget its cached version information.
+    """
+    from datalad.support.annexrepo import AnnexRepo
+    ar_vers = AnnexRepo.git_annex_version
+    with patch.dict(
+            "datalad.support.annexrepo.external_versions._versions",
+            {"cmd:annex": version}):
+        try:
+            AnnexRepo.git_annex_version = None
+            yield
+        finally:
+            AnnexRepo.git_annex_version = ar_vers
+
 #
 # Test tags
 #
