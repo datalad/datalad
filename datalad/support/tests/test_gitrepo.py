@@ -250,8 +250,8 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(gr)
-    eq_("Testing GitRepo.commit().{}".format(linesep),
-        gr.format_commit("%B"))
+    eq_("Testing GitRepo.commit().",
+        gr.format_commit("%B").strip())
 
     with open(op.join(path, filename), 'w') as f:
         f.write("changed content")
