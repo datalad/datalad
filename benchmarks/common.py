@@ -16,6 +16,7 @@ import os.path as op
 from glob import glob
 
 from datalad.utils import (
+    create_tree,
     getpwd,
     get_tempfile_kwargs,
     rmtree,
@@ -101,7 +102,7 @@ class SuprocBenchmarks(object):
         print("BM: "+ str(msg % tuple(args)))
 
 
-class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
+class SampleDatasetBenchmarksBase(SuprocBenchmarks):
     """
     Setup a sample hierarchy of datasets to be used
     """
@@ -117,20 +118,27 @@ class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
     #  https://asv.readthedocs.io/en/stable/writing_benchmarks.html
     # that is where it would be run and cleaned up after
 
-    dsname = 'testds1'
-    tarfile = 'testds1.tar'
+    # Subclasses should define
+    dsname = None
+
+    @property
+    def tarfile(self):
+        return '%s.tar' % self.dsname
+
+    def create_test_dataset(self):
+        """A method to be implemented in subclasses.
+
+        Should return a path to the sample dataset
+        """
+        raise NotImplementedError()
 
     def setup_cache(self):
-        ds_path = create_test_dataset(
-            self.dsname
-            , spec='2/-2/-2'
-            , seed=0
-        )[0]
+        ds_path = self.create_test_dataset()
         self.log("Setup cache ds path %s. CWD: %s", ds_path, getpwd())
         # Will store into a tarfile since otherwise install -r is way too slow
         # to be invoked for every benchmark
         # Store full path since apparently setup is not ran in that directory
-        self.tarfile = op.realpath(SampleSuperDatasetBenchmarks.tarfile)
+        self.tarfile = op.realpath(self.tarfile)
         with tarfile.open(self.tarfile, "w") as tar:
             # F.CK -- Python tarfile can't later extract those because key dirs are
             # read-only.  For now just a workaround - make it all writeable
@@ -150,10 +158,25 @@ class SampleSuperDatasetBenchmarks(SuprocBenchmarks):
             tar.extractall(tempdir)
 
         # TODO -- remove this abomination after https://github.com/datalad/datalad/issues/1512 is fixed
-        epath = op.join(tempdir, 'testds1')
+        epath = op.join(tempdir, self.dsname)
         epath_unique = epath + str(self.__class__.ds_count)
         os.rename(epath, epath_unique)
         self.__class__.ds_count += 1
         self.ds = Dataset(epath_unique)
         self.repo = self.ds.repo
         self.log("Finished setup for %s", tempdir)
+
+
+class Sample222DatasetBenchmarks(SuprocBenchmarks):
+    """Our benchmark setup which uses create_test_dataset with 2/-2/-2
+    configuration.
+    """
+
+    dsname = 'testds1'
+
+    def create_test_dataset(self):
+        return create_test_dataset(
+            self.dsname
+            , spec='2/-2/-2'
+            , seed=0
+        )[0]

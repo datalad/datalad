@@ -45,7 +45,7 @@ except ImportError:
 
 
 from .common import (
-    SampleSuperDatasetBenchmarks,
+    Sample222DatasetBenchmarks,
     SuprocBenchmarks,
 )
 
@@ -66,7 +66,7 @@ class testds(SuprocBenchmarks):
         )
 
 
-class supers(SampleSuperDatasetBenchmarks):
+class supers(Sample222DatasetBenchmarks):
     """
     Benchmarks on common operations on collections of datasets using datalad API
     """

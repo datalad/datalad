@@ -8,15 +8,15 @@
 """Benchmarks of the basic repos (Git/Annex) functionality"""
 
 from .common import (
-    SampleSuperDatasetBenchmarks,
+    Sample222DatasetBenchmarks,
     SuprocBenchmarks,
 )
 
 
-# TODO: probably SampleSuperDatasetBenchmarks is not the best for these benchmarks
+# TODO: probably Sample222DatasetBenchmarks is not the best for these benchmarks
 #       but we are yet to make it parametric so we could sweep through a set
 #       of typical scenarios
-class gitrepo(SampleSuperDatasetBenchmarks):
+class gitrepo(Sample222DatasetBenchmarks):
 
     def time_get_content_info(self):
         info = self.repo.get_content_info()
