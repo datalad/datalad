@@ -46,6 +46,7 @@ from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if_on_windows
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -1128,6 +1129,9 @@ def test_get_missing(path):
     eq_(repo.get_deleted_files(), ['test1'])
 
 
+# this is simply broken on win, but less important
+# https://github.com/datalad/datalad/issues/3639
+@skip_if_on_windows
 @with_tempfile
 def test_optimized_cloning(path):
     # make test repo with one file and one commit
