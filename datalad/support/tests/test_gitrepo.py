@@ -50,6 +50,7 @@ from datalad.tests.utils import skip_if_on_windows
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
+from datalad.utils import on_windows
 
 from datalad.dochelpers import exc_str
 
@@ -1312,7 +1313,7 @@ def test_gitattributes(path):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
-    if get_encoding_info()['default'] != 'ascii':
+    if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths
         # with spaces and other funky stuff are just fine
