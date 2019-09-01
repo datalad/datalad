@@ -2913,6 +2913,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
                     op.join(self.path, op.dirname(attrfile)), pattern)
+                # paths in gitattributes always have to be POSIX
+                npath = Path(npath).as_posix()
                 attrline = u''
                 if npath.count(' '):
                     # quote patterns with spaces
