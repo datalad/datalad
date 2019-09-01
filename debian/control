@@ -1,7 +1,7 @@
 Source: datalad
 Section: science
 Priority: optional
-Maintainer: NeuroDebian Team <team@neuro.debian.net>
+Maintainer: NeuroDebian Team <team@datalad.org>
 Uploaders:
  Yaroslav Halchenko <debian@onerussian.com>,
  Michael Hanke <mih@debian.org>
