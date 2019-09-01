@@ -755,9 +755,6 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @wraps(t)
     @attr('with_testrepos')
     def newfunc(*arg, **kw):
-        if on_windows:
-            raise SkipTest("Testrepo setup is broken on Windows")
-
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
         flavors_ = _get_resolved_flavors(flavors)
