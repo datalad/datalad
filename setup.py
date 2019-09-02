@@ -178,6 +178,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
+    python_requires='>=3.5',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={
