@@ -24,7 +24,7 @@ export PYBUILD_BEFORE_TEST=PYTHONPATH=$(CURDIR)/bin python{version} setup.py dev
 export WRAPT_DISABLE_EXTENSIONS=1
 
 %:
-	dh $@ --with python2,python3 --buildsystem=pybuild
+	dh $@ --with python3 --buildsystem=pybuild
 
 clean::
 	dh_clean
@@ -55,7 +55,7 @@ override_dh_auto_install:
 	mkdir -p build/man
 	HOME=$(CURDIR)/build python3 setup.py build_manpage
 	# Generating argcomplete helper for bash_completion.d
-	register-python-argcomplete datalad > debian/datalad/usr/share/bash-completion/completions/datalad
+	register-python-argcomplete3 datalad > debian/datalad/usr/share/bash-completion/completions/datalad
 
 override_dh_installchangelogs:
 	dh_installchangelogs CHANGELOG.md
