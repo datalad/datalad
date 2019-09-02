@@ -1,8 +1,8 @@
 --- a/setup.py
 +++ b/setup.py
-@@ -208,8 +208,7 @@ setup(
-     long_description=long_description,
-     packages=datalad_pkgs,
+@@ -158,8 +158,7 @@ datalad_setup(
+     'datalad',
+     description="data distribution geared toward scientific datasets",
      install_requires=
 -        requires['core'] + requires['downloaders'] +
 -        requires['publish'] + requires['metadata'],
