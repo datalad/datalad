@@ -21,6 +21,7 @@ from ...support.annexrepo import AnnexRepo
 from ...tests.utils import (
     with_tempfile,
     create_tree,
+    set_annex_version,
     swallow_logs,
 )
 
@@ -172,7 +173,8 @@ def _test_annex_version_comparison(v, cmp_):
             return v, ""
 
     ev = ExternalVersions()
-    with patch('datalad.support.external_versions._runner', _runner()), \
+    with set_annex_version(None), \
+         patch('datalad.support.external_versions._runner', _runner()), \
          patch('datalad.support.annexrepo.external_versions',
                ExternalVersions()):
         ev['cmd:annex'] < AnnexRepo.GIT_ANNEX_MIN_VERSION
