@@ -9,7 +9,7 @@
 '''Unit tests for Python API functionality.'''
 
 import re
-from inspect import getargspec
+from datalad.utils import getargspec
 
 from nose.tools import assert_true, assert_false
 from nose import SkipTest

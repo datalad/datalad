@@ -10,6 +10,8 @@
 
 """
 
+import logging
+
 from datalad.tests.utils import known_failure_direct_mode
 
 from copy import deepcopy
@@ -27,6 +29,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import slow
+from datalad.tests.utils import swallow_logs
 
 
 from datalad.distribution.dataset import Dataset
@@ -105,6 +108,13 @@ def test_annotate_paths(dspath, nodspath):
             [{k: v for k, v in ap.items()
               if k not in ('registered_subds', 'raw_input', 'orig_request', 'refds')}
              for ap in annotate_paths(dataset='b', recursive=True)])
+
+        # when we point to a list of directories, there should be no
+        # multiple rediscoveries of the subdatasets
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            annotate_paths(path=['a', 'b'])
+            eq_(cml.out.count('Resolved dataset for subdataset reporting/modification'), 1)
+
     # now do it again, pointing to the ds directly
     res = ds.annotate_paths(on_failure='ignore')
     # no request, no refds, but otherwise the same

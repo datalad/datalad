@@ -33,6 +33,13 @@ class CookiesDB(object):
     def __init__(self, filename=None):
         self._filename = filename
         self._cookies_db = None
+        atexit.register(self.close)
+
+    @property
+    def cookies_db(self):
+        if self._cookies_db is None:
+            self._load()
+        return self._cookies_db
 
     def _load(self):
         if self._cookies_db is not None:
@@ -51,19 +58,31 @@ class CookiesDB(object):
 
         lgr.debug("Opening cookies DB %s", filename)
         try:
-            db = self._cookies_db = shelve.open(filename, writeback=True,
-                                                protocol=2)
-            atexit.register(db.close)
+            self._cookies_db = shelve.open(filename, writeback=True, protocol=2)
         except Exception as exc:
             lgr.warning("Failed to open cookies DB %s: %s", filename, exc_str(exc))
 
     def close(self):
-        if self._cookies_db:
-            self._cookies_db.close()
+        if self._cookies_db is not None:
+            try:
+                # It might print out traceback right on the terminal instead of
+                # just throwing an exception
+                known_cookies = list(self._cookies_db)
+            except:
+                # May be already not accessible
+                known_cookies = None
+            try:
+                self._cookies_db.close()
+            except Exception as exc:
+                if known_cookies:
+                    lgr.warning(
+                        "Failed to save possibly updated %d cookies (%s): %s",
+                        len(known_cookies), ', '.join(known_cookies),
+                        exc_str(exc))
+            # no cookies - no worries!
+            self._cookies_db = None
 
     def _get_provider(self, url):
-        if self._cookies_db is None:
-            self._load()
         tld = get_tld(url)
         if PY2:
             return tld.encode()
@@ -71,7 +90,7 @@ class CookiesDB(object):
 
     def __getitem__(self, url):
         try:
-            return self._cookies_db[self._get_provider(url)]
+            return self.cookies_db[self._get_provider(url)]
         except Exception as exc:
             lgr.warning("Failed to get a cookie for %s: %s",
                         url, exc_str(exc))
@@ -79,14 +98,14 @@ class CookiesDB(object):
 
     def __setitem__(self, url, value):
         try:
-            self._cookies_db[self._get_provider(url)] = value
+            self.cookies_db[self._get_provider(url)] = value
         except Exception as exc:
             lgr.warning("Failed to set a cookie for %s: %s",
                         url, exc_str(exc))
 
     def __contains__(self, url):
         try:
-            return self._get_provider(url) in self._cookies_db
+            return self._get_provider(url) in self.cookies_db
         except Exception as exc:
             lgr.warning("Failed to check for having a cookie for %s: %s",
                         url, exc_str(exc))

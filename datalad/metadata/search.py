@@ -805,7 +805,7 @@ class _EGrepCSSearch(_Search):
             ))
         # After #2156 datasets may not necessarily carry all
         # keys in the "unique" summary
-        lgr.warn('In this search mode, the reported list of metadata keys may be incomplete')
+        lgr.warning('In this search mode, the reported list of metadata keys may be incomplete')
 
 
     def _get_keys(self, mode=None):

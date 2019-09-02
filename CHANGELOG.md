@@ -9,6 +9,61 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.11.7 (Sep 02, 2019) -- python2-we-still-love-you-but-...
+
+Primarily bugfixes with some optimizations and refactorings.
+
+### Fixes
+
+- [addurls][]
+  - now provides better handling when the URL file isn't in the
+    expected format.  ([#3579][])
+  - always considered a relative file for the URL file argument as
+    relative to the current working directory, which goes against the
+    convention used by other commands of taking relative paths as
+    relative to the dataset argument.  ([#3582][])
+
+- [run-procedure][]
+  - hard coded "python" when formatting the command for non-executable
+    procedures ending with ".py".  `sys.executable` is now used.
+    ([#3624][])
+  - failed if arguments needed more complicated quoting than simply
+    surrounding the value with double quotes.  This has been resolved
+    for systems that support `shlex.quote`, but note that on Windows
+    values are left unquoted. ([#3626][])
+
+- [siblings][] now displays an informative error message if a local
+  path is given to `--url` but `--name` isn't specified.  ([#3555][])
+
+- [sshrun][], the command DataLad uses for `GIT_SSH_COMMAND`, didn't
+  support all the parameters that Git expects it to.  ([#3616][])
+
+- Fixed a number of Unicode py2-compatibility issues. ([#3597][])
+
+### Enhancements and new features
+
+- The [annotate-paths][] helper now caches subdatasets it has seen to
+  avoid unnecessary calls.  ([#3570][])
+
+- A repeated configuration query has been dropped from the handling of
+  `--proc-pre` and `--proc-post`.  ([#3576][])
+
+- Calls to `git annex find` now use `--in=.` instead of the alias
+  `--in=here` to take advantage of an optimization that git-annex (as
+  of the current release, 7.20190730) applies only to the
+  former. ([#3574][])
+
+- [addurls][] now suggests close matches when the URL or file format
+  contains an unknown field.  ([#3594][])
+
+- Shared logic used in the setup.py files of Datalad and its
+  extensions has been moved to modules in the _datalad_build_support/
+  directory.  ([#3600][])
+
+- Get ready for upcoming git-annex dropping support for direct mode
+  ([#3631][])
+
+
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
 Primarily bug fixes to achieve more robust performance
@@ -1388,4 +1443,17 @@ publishing
 [#3525]: https://github.com/datalad/datalad/issues/3525
 [#3527]: https://github.com/datalad/datalad/issues/3527
 [#3547]: https://github.com/datalad/datalad/issues/3547
+[#3555]: https://github.com/datalad/datalad/issues/3555
 [#3561]: https://github.com/datalad/datalad/issues/3561
+[#3570]: https://github.com/datalad/datalad/issues/3570
+[#3574]: https://github.com/datalad/datalad/issues/3574
+[#3576]: https://github.com/datalad/datalad/issues/3576
+[#3579]: https://github.com/datalad/datalad/issues/3579
+[#3582]: https://github.com/datalad/datalad/issues/3582
+[#3594]: https://github.com/datalad/datalad/issues/3594
+[#3597]: https://github.com/datalad/datalad/issues/3597
+[#3600]: https://github.com/datalad/datalad/issues/3600
+[#3616]: https://github.com/datalad/datalad/issues/3616
+[#3624]: https://github.com/datalad/datalad/issues/3624
+[#3626]: https://github.com/datalad/datalad/issues/3626
+[#3631]: https://github.com/datalad/datalad/issues/3631

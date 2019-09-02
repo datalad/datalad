@@ -8,12 +8,13 @@
 """Utils for testing support module
 """
 
-
+from datalad.support.external_versions import external_versions
 from datalad.tests.utils import *
 
 
 def check_repo_deals_with_inode_change(class_, path, temp_store):
-
+    if external_versions["git"] == "3.0.0":
+        raise SkipTest("Fails due to GitPython regression (gh-3598)")
     repo = class_(path, create=True)
     with open(opj(path, "testfile.txt"), "w") as f:
         f.write("whatever")

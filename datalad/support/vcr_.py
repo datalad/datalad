@@ -41,13 +41,17 @@ try:
 
     from vcr import use_cassette as _use_cassette, VCR as _VCR
 
-    def use_cassette(path, return_body=None, **kwargs):
+    def use_cassette(path, return_body=None, skip_if_no_vcr=False, **kwargs):
         """Adapter so we could create/use custom use_cassette with custom parameters
 
         Parameters
         ----------
         path : str
           If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
+        skip_if_no_vcr : bool
+          Rather than running without VCR it would throw unittest.SkipTest
+          exception.  Of effect only if vcr import fails (so not in this
+          implementation but the one below)
         """
         path = _get_cassette_path(path)
         lgr.debug("Using cassette %s" % path)
@@ -69,14 +73,23 @@ except Exception as exc:
                     exc_str(exc, limit=10))
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
 
-    def use_cassette(*args, **kwargs):
-        def do_nothing_decorator(t):
-            @wraps(t)
-            def wrapper(*args, **kwargs):
-                lgr.debug("Not using vcr cassette")
-                return t(*args, **kwargs)
-            return wrapper
-        return do_nothing_decorator
+    def use_cassette(path, return_body=None, skip_if_no_vcr=False, **kwargs):
+        if skip_if_no_vcr:
+            def skip_decorator(t):
+                @wraps(t)
+                def wrapper(*args, **kwargs):
+                    from nose import SkipTest
+                    raise SkipTest("No vcr")
+                return wrapper
+            return skip_decorator
+        else:
+            def do_nothing_decorator(t):
+                @wraps(t)
+                def wrapper(*args, **kwargs):
+                    lgr.debug("Not using vcr cassette")
+                    return t(*args, **kwargs)
+                return wrapper
+            return do_nothing_decorator
 
 
 @contextmanager

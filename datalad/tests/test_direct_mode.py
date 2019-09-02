@@ -37,6 +37,10 @@ if on_windows:
     raise SkipTest("Can't test direct mode switch, "
                    "if direct mode is forced by OS anyway.")
 
+if not AnnexRepo.check_direct_mode_support():
+    raise SkipTest("git-annex version does not support direct mode")
+
+
 repo_version = cfg.get("datalad.repo.version", None)
 if repo_version and int(repo_version) >= 6:
     raise SkipTest("Can't test direct mode switch, "

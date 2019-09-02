@@ -16,6 +16,7 @@ import logging
 from glob import iglob
 from argparse import REMAINDER
 import os
+import sys
 import os.path as op
 import stat
 
@@ -33,6 +34,7 @@ from datalad.support.param import Parameter
 from datalad.distribution.dataset import datasetmethod
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
+from datalad.utils import maybe_shlex_quote
 
 from datalad.utils import assure_list
 import datalad.support.ansi_colors as ac
@@ -181,15 +183,16 @@ def _guess_exec(script_file):
     # TODO check for exec permission and rely on interpreter
     if is_exec:
         return {'type': u'executable',
-                'template': u'"{script}" "{ds}" {args}',
+                'template': u'{script} {ds} {args}',
                 'state': state}
     elif script_file.endswith('.sh'):
         return {'type': u'bash_script',
-                'template': u'bash "{script}" "{ds}" {args}',
+                'template': u'bash {script} {ds} {args}',
                 'state': state}
     elif script_file.endswith('.py'):
+        ex = maybe_shlex_quote(sys.executable)
         return {'type': u'python_script',
-                'template': u'python "{script}" "{ds}" {args}',
+                'template': u'%s {script} {ds} {args}' % ex,
                 'state': state}
     else:
         return {'type': None, 'template': None, 'state': None}
@@ -445,12 +448,10 @@ class RunProcedure(Interface):
                              "Missing 'execute' permissions?" % procedure_file)
 
         cmd = ex['template'].format(
-            script=procedure_file,
-            ds=ds.path if ds else '',
-            args=u' '.join(u'"{}"'.format(a) for a in args) if args else '')
-        lgr.debug('Attempt to run procedure {} as: {}'.format(
-            name,
-            cmd))
+            script=maybe_shlex_quote(procedure_file),
+            ds=maybe_shlex_quote(ds.path) if ds else '',
+            args=(u' '.join(maybe_shlex_quote(a) for a in args) if args else ''))
+        lgr.debug(u'Attempt to run procedure %s as: %s', name, cmd)
         for r in Run.__call__(
                 cmd=cmd,
                 dataset=ds,

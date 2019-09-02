@@ -232,3 +232,20 @@ def test_here(path):
     assert_result_count(res, 1, name='here')
     here = res[0]
     eq_('very special', here['annex-description'])
+
+
+@with_tempfile()
+@with_tempfile()
+def test_arg_missing(path, path2):
+    # test fix for gh-3553
+    ds = create(path)
+    assert_raises(
+        InsufficientArgumentsError,
+        ds.siblings,
+        'add',
+        url=path2,
+    )
+    assert_status(
+        'ok',
+        ds.siblings(
+            'add', url=path2, name='somename'))
