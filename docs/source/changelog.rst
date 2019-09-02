@@ -84,6 +84,9 @@ Enhancements and new features
    has been moved to modules in the \_datalad_build_support/ directory.
    (`#3600 <https://github.com/datalad/datalad/issues/3600>`__)
 
+-  Get ready for upcoming git-annex dropping support for direct mode
+   (`#3631 <https://github.com/datalad/datalad/issues/3631>`__)
+
 0.11.6 (Jul 30, 2019) – am I the last of 0.11.x?
 ------------------------------------------------
 
