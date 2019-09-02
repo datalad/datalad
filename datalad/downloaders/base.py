@@ -18,6 +18,7 @@ import sys
 import time
 
 from abc import ABCMeta, abstractmethod
+import os.path as op
 from os.path import exists, join as opj, isdir
 from six import PY2
 from six import binary_type, PY3
@@ -402,6 +403,13 @@ class BaseDownloader(object):
                     "It will be overriden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
+            download_dir = op.dirname(temp_filepath)
+            if download_dir and not exists(download_dir):
+                # We use the "not exist then makedirs" pattern across our
+                # codebase. This is racy in a way that is unlikely to matter
+                # here, but when we drop Python 2, we might as well switch the
+                # code below to use exist_ok=True.
+                os.makedirs(download_dir)
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
