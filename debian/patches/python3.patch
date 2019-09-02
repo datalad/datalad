@@ -1,0 +1,77 @@
+Description: use python3 interpreter, not python
+ datalad will automatically try to run .py scripts it's been given under
+ 'python' but that is python2 and no longer guaranteed to be available by
+ default.  Dispatch these instead to python3.
+Author: Steve Langasek <steve.langasek@ubuntu.com>
+Last-Modified: 2019-08-17
+
+Index: datalad-0.11.6/datalad/interface/run_procedure.py
+===================================================================
+--- datalad-0.11.6.orig/datalad/interface/run_procedure.py
++++ datalad-0.11.6/datalad/interface/run_procedure.py
+@@ -189,7 +189,7 @@
+                 'state': state}
+     elif script_file.endswith('.py'):
+         return {'type': u'python_script',
+-                'template': u'python "{script}" "{ds}" {args}',
++                'template': u'python3 "{script}" "{ds}" {args}',
+                 'state': state}
+     else:
+         return {'type': None, 'template': None, 'state': None}
+Index: datalad-0.11.6/datalad/interface/tests/test_run_procedure.py
+===================================================================
+--- datalad-0.11.6.orig/datalad/interface/tests/test_run_procedure.py
++++ datalad-0.11.6/datalad/interface/tests/test_run_procedure.py
+@@ -238,7 +238,7 @@
+     # for run:
+     ds.config.add(
+         'datalad.procedures.datalad_test_proc.call-format',
+-        'python "{script}" "{ds}" {{mysub}} {args}',
++        'python3 "{script}" "{ds}" {{mysub}} {args}',
+         where='dataset'
+     )
+     ds.config.add(
+@@ -258,7 +258,7 @@
+     # config on dataset level:
+     ds.config.add(
+         'datalad.procedures.datalad_test_proc.call-format',
+-        'python "{script}" "{ds}" local {args}',
++        'python3 "{script}" "{ds}" local {args}',
+         where='local'
+     )
+     ds.unlock("fromproc.txt")
+Index: datalad-0.11.6/Makefile
+===================================================================
+--- datalad-0.11.6.orig/Makefile
++++ datalad-0.11.6/Makefile
+@@ -1,8 +1,8 @@
+ # simple makefile to simplify repetetive build env management tasks under posix
+ # Ideas borrowed from scikit-learn's and PyMVPA Makefiles  -- thanks!
+ 
+-PYTHON ?= python
+-NOSETESTS ?= nosetests
++PYTHON ?= python3
++NOSETESTS ?= nosetests3
+ 
+ MODULE ?= datalad
+ 
+@@ -16,7 +16,7 @@
+ 
+ bin:
+ 	mkdir -p $@
+-	PYTHONPATH=bin:$(PYTHONPATH) python setup.py develop --install-dir $@
++	PYTHONPATH=bin:$(PYTHONPATH) $(PYTHON) setup.py develop --install-dir $@
+ 
+ test-code: bin
+ 	PATH=bin:$(PATH) PYTHONPATH=bin:$(PYTHONPATH) $(NOSETESTS) -s -v $(MODULE)
+@@ -45,8 +45,8 @@
+ release-pypi: update-changelog
+ 	# better safe than sorry
+ 	test ! -e dist
+-	python setup.py sdist
+-	python setup.py bdist_wheel --universal
++	$(PYTHON) setup.py sdist
++	$(PYTHON) setup.py bdist_wheel --universal
+ 	twine upload dist/*
+ 
+ render-casts: docs/source/usecases/simple_provenance_tracking.rst.in

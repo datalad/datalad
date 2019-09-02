@@ -11,39 +11,6 @@ Build-Depends:
  git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
  help2man,
  patool,
- python-all,
- python-appdirs,
- python-argcomplete,
- python-boto,
- python-dateutil,
- python-exif,
- python-fasteners,
- python-iso8601,
- python-jsmin,
- python-git (>= 2.1.6~),
- python-github,
- python-html5lib,
- python-httpretty,
- python-humanize,
- python-keyrings.alt | python-keyring (<=8),
- python-keyring,
- python-secretstorage | python-keyring (<<9.2),
- python-nose (>= 1.3.7-2) | python-libxmp,
- python-lzma,
- python-mock,
- python-msgpack,
- python-mutagen,
- python-nose,
- python-pil,
- python-pyperclip,
- python-requests,
- python-setuptools,
- python-simplejson,
- python-six (>= 1.8.0~),
- python-tqdm,
- python-whoosh,
- python-vcr,
- python-wrapt,
  python3-all,
  python3-appdirs,
  python3-argcomplete,
@@ -89,7 +56,7 @@ Depends:
  python3-datalad (= ${binary:Version}),
  python3-argcomplete,
  ${misc:Depends},
- ${python:Depends}
+ ${python3:Depends}
 Suggests:
  datalad-containers,
  datalad-crawler,
@@ -112,69 +79,6 @@ Description: data files management and distribution platform
  .
  This package provides the command line tools.  Install without
  Recommends if you need only core functionality.
-
-Package: python-datalad
-Architecture: all
-Section: python
-Provides: ${python:Provides}
-Depends:
- git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
- patool,
- python-appdirs,
- python-fasteners,
- python-git (>= 2.1.6~),
- python-humanize,
- python-iso8601,
- python-keyrings.alt | python-keyring (<=8),
- python-secretstorage,
- python-keyring,
- python-mock,
- python-msgpack,
- python-pil,
- python-requests,
- python-simplejson,
- python-six (>= 1.8.0~),
- python-tqdm,
- python-wrapt,
- ${misc:Depends},
- ${python:Depends}
-Recommends:
- python-exif,
- python-github,
- python-jsmin,
- python-html5lib,
- python-httpretty,
- python-libxmp,
- python-lzma,
- python-mutagen,
- python-nose,
- python-pyperclip,
- python-requests-ftp,
- python-vcr,
- python-whoosh,
-Suggests:
- python-duecredit,
- python-bs4,
- python-numpy,
-Description: data files management and distribution platform
- DataLad is a data management and distribution platform providing
- access to a wide range of data resources already available online.
- Using git-annex as its backend for data logistics it provides following
- facilities built-in or available through additional extensions
- .
-  - command line and Python interfaces for manipulation of collections of
-    datasets (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get)
-  - extract, aggregate, and search through various sources of metadata
-    (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
-    support)
-  - crawl web sites to automatically prepare and update git-annex
-    repositories with content from online websites, S3, etc (install
-    datalad-crawler)
- .
- This package installs the module for Python 2, and Recommends install
- all dependencies necessary for searching and managing datasets, publishing,
- and testing.  If you need base functionality, install without Recommends.
 
 Package: python3-datalad
 Architecture: all
