@@ -1,3 +1,2 @@
 # We provide patches for backport-dsc to automate backporting for NeuroDebian
-datalad source: patch-file-present-but-not-mentioned-in-series *-dsc-patch
-datalad source: patch-file-present-but-not-mentioned-in-series support-python2.patch
+datalad source: patch-file-present-but-not-mentioned-in-series *
