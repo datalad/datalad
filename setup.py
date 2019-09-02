@@ -164,5 +164,8 @@ datalad_setup(
             findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})
     },
+    classifiers=[
+        'Programming Language :: Python :: 3 :: Only'
+    ],
     **setup_kwargs
 )
