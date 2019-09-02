@@ -5,41 +5,6 @@ Description: use python3 interpreter, not python
 Author: Steve Langasek <steve.langasek@ubuntu.com>
 Last-Modified: 2019-08-17
 
-Index: datalad-0.11.6/datalad/interface/run_procedure.py
-===================================================================
---- datalad-0.11.6.orig/datalad/interface/run_procedure.py
-+++ datalad-0.11.6/datalad/interface/run_procedure.py
-@@ -189,7 +189,7 @@
-                 'state': state}
-     elif script_file.endswith('.py'):
-         return {'type': u'python_script',
--                'template': u'python "{script}" "{ds}" {args}',
-+                'template': u'python3 "{script}" "{ds}" {args}',
-                 'state': state}
-     else:
-         return {'type': None, 'template': None, 'state': None}
-Index: datalad-0.11.6/datalad/interface/tests/test_run_procedure.py
-===================================================================
---- datalad-0.11.6.orig/datalad/interface/tests/test_run_procedure.py
-+++ datalad-0.11.6/datalad/interface/tests/test_run_procedure.py
-@@ -238,7 +238,7 @@
-     # for run:
-     ds.config.add(
-         'datalad.procedures.datalad_test_proc.call-format',
--        'python "{script}" "{ds}" {{mysub}} {args}',
-+        'python3 "{script}" "{ds}" {{mysub}} {args}',
-         where='dataset'
-     )
-     ds.config.add(
-@@ -258,7 +258,7 @@
-     # config on dataset level:
-     ds.config.add(
-         'datalad.procedures.datalad_test_proc.call-format',
--        'python "{script}" "{ds}" local {args}',
-+        'python3 "{script}" "{ds}" local {args}',
-         where='local'
-     )
-     ds.unlock("fromproc.txt")
 Index: datalad-0.11.6/Makefile
 ===================================================================
 --- datalad-0.11.6.orig/Makefile

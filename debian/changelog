@@ -1,8 +1,11 @@
-datalad (0.11.7-1) UNRELEASED; urgency=medium
+datalad (0.11.7-1) unstable; urgency=medium
 
+  * Fresh upstream release
   * Use team@datalad.org not @neuro.debian.net address for Maintainers
+  * debian/patches/python3.patch
+    - removed changes to *procedures* - handled upstream more flexibly
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 01 Sep 2019 11:07:44 +0200
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 02 Sep 2019 09:18:59 +0200
 
 datalad (0.11.6-1.1) unstable; urgency=medium
 
