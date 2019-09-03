@@ -114,6 +114,11 @@ def test_download_url_dataset(toppath, topurl, path):
     ds.download_url([opj(topurl, "file3.txt")], save=False)
     assert_false(ds.repo.file_has_content("file3.txt"))
 
+    # Leading paths for target are created if needed.
+    subdir_target = opj("l1", "l2", "f")
+    ds.download_url([opj(topurl, "file1.txt")], path=subdir_target)
+    ok_(ds.repo.file_has_content(subdir_target))
+
     subdir_path = opj(path, "subdir")
     os.mkdir(subdir_path)
     with chpwd(subdir_path):
