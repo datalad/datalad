@@ -1326,10 +1326,12 @@ def test_repo_version(path1, path2, path3):
         version = annex.repo.config_reader().get_value('annex', 'version')
         eq_(version, v6_lands_on)
 
-        # parameter `version` still has priority over default config:
-        annex = AnnexRepo(path3, create=True, version=5)
-        version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 5)
+        # Assuming specified version is a supported version...
+        if 5 in supported_versions:
+            # ...parameter `version` still has priority over default config:
+            annex = AnnexRepo(path3, create=True, version=5)
+            version = annex.repo.config_reader().get_value('annex', 'version')
+            eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
