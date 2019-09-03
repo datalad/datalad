@@ -4,6 +4,8 @@ datalad (0.11.7-1) unstable; urgency=medium
   * Use team@datalad.org not @neuro.debian.net address for Maintainers
   * debian/patches/python3.patch
     - removed changes to *procedures* - handled upstream more flexibly
+  * debian/patches/deb_no_utf8
+    - do not use unicode in OBSCURE_FILENAME due to a bug in git-annex
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 02 Sep 2019 09:18:59 +0200
 
