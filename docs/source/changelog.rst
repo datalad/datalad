@@ -58,6 +58,10 @@ Fixes
 -  Fixed a number of Unicode py2-compatibility issues.
    (`#3597 <https://github.com/datalad/datalad/issues/3597>`__)
 
+-  `download-url <https://datalad.readthedocs.io/en/latest/generated/man/datalad-download-url.html>`__
+   now will create leading directories of the output path if they do not
+   exist (`#3646 <https://github.com/datalad/datalad/issues/3646>`__)
+
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

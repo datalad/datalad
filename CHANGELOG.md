@@ -40,6 +40,9 @@ Primarily bugfixes with some optimizations and refactorings.
 
 - Fixed a number of Unicode py2-compatibility issues. ([#3597][])
 
+- [download-url][] now will create leading directories of the output path
+  if they do not exist ([#3646][])
+
 ### Enhancements and new features
 
 - The [annotate-paths][] helper now caches subdatasets it has seen to
@@ -1457,3 +1460,4 @@ publishing
 [#3624]: https://github.com/datalad/datalad/issues/3624
 [#3626]: https://github.com/datalad/datalad/issues/3626
 [#3631]: https://github.com/datalad/datalad/issues/3631
+[#3646]: https://github.com/datalad/datalad/issues/3646
