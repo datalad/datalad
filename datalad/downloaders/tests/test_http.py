@@ -117,6 +117,11 @@ def test_HTTPDownloader_basic(toppath, topurl):
     download(furl, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
+    # download() creates leading directories if needed.
+    subdir_tfpath = opj(toppath, "l1", "l2", "file-downloaded.dat")
+    download(furl, subdir_tfpath)
+    ok_file_has_content(subdir_tfpath, 'abc')
+
     # see if fetch works correctly
     assert_equal(downloader.fetch(furl), 'abc')
 
