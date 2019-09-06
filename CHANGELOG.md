@@ -9,7 +9,7 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.11.7 (Sep 02, 2019) -- python2-we-still-love-you-but-...
+## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
 Primarily bugfixes with some optimizations and refactorings.
 
