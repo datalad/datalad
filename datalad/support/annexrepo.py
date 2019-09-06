@@ -2712,13 +2712,18 @@ class AnnexRepo(GitRepo, RepoInterface):
     def repo_info(self, fast=False, merge_annex_branches=True):
         """Provide annex info for the entire repository.
 
+        Parameters
+        ----------
+        fast : bool, optional
+          Pass `--fast` to `git annex info`.
+        merge_annex_branches : bool, optional
+          Whether to allow git-annex if needed to merge annex branches, e.g. to
+          make sure up to date descriptions for git annex remotes
+
         Returns
         -------
         dict
           Info for the repository, with keys matching the ones returned by annex
-        merge_annex_branches: bool, optional
-          Either to allow git-annex if needed to merge annex branches, e.g. to
-          make sure up to date descriptions for git annex remotes
         """
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']

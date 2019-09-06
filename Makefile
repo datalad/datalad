@@ -2,7 +2,7 @@
 # Ideas borrowed from scikit-learn's and PyMVPA Makefiles  -- thanks!
 
 PYTHON ?= python
-NOSETESTS ?= nosetests
+NOSETESTS ?= $(PYTHON) -m nose
 
 MODULE ?= datalad
 
@@ -16,7 +16,7 @@ clean:
 
 bin:
 	mkdir -p $@
-	PYTHONPATH=bin:$(PYTHONPATH) python setup.py develop --install-dir $@
+	PYTHONPATH=bin:$(PYTHONPATH) $(PYTHON) setup.py develop --install-dir $@
 
 test-code: bin
 	PATH=bin:$(PATH) PYTHONPATH=bin:$(PYTHONPATH) $(NOSETESTS) -s -v $(MODULE)
@@ -45,8 +45,8 @@ update-changelog: linkissues-changelog
 release-pypi: update-changelog
 	# better safe than sorry
 	test ! -e dist
-	python setup.py sdist
-	python setup.py bdist_wheel --universal
+	$(PYTHON) setup.py sdist
+	$(PYTHON) setup.py bdist_wheel --universal
 	twine upload dist/*
 
 render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
