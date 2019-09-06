@@ -1,42 +1,16 @@
-Description: use python3 interpreter, not python
- datalad will automatically try to run .py scripts it's been given under
- 'python' but that is python2 and no longer guaranteed to be available by
- default.  Dispatch these instead to python3.
-Author: Steve Langasek <steve.langasek@ubuntu.com>
-Last-Modified: 2019-08-17
+Description: use python3 interpreter, not python by default in Makefile
+  The rest of the original patch by Steve Langasek <steve.langasek@ubuntu.com>
+  are no longer needed/adopted upstream
+Last-Modified: 2019-09-06
 
-Index: datalad-0.11.6/Makefile
-===================================================================
---- datalad-0.11.6.orig/Makefile
-+++ datalad-0.11.6/Makefile
-@@ -1,8 +1,8 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
  # simple makefile to simplify repetetive build env management tasks under posix
  # Ideas borrowed from scikit-learn's and PyMVPA Makefiles  -- thanks!
  
 -PYTHON ?= python
--NOSETESTS ?= nosetests
 +PYTHON ?= python3
-+NOSETESTS ?= nosetests3
+ NOSETESTS ?= $(PYTHON) -m nose
  
  MODULE ?= datalad
- 
-@@ -16,7 +16,7 @@
- 
- bin:
- 	mkdir -p $@
--	PYTHONPATH=bin:$(PYTHONPATH) python setup.py develop --install-dir $@
-+	PYTHONPATH=bin:$(PYTHONPATH) $(PYTHON) setup.py develop --install-dir $@
- 
- test-code: bin
- 	PATH=bin:$(PATH) PYTHONPATH=bin:$(PYTHONPATH) $(NOSETESTS) -s -v $(MODULE)
-@@ -45,8 +45,8 @@
- release-pypi: update-changelog
- 	# better safe than sorry
- 	test ! -e dist
--	python setup.py sdist
--	python setup.py bdist_wheel --universal
-+	$(PYTHON) setup.py sdist
-+	$(PYTHON) setup.py bdist_wheel --universal
- 	twine upload dist/*
- 
- render-casts: docs/source/usecases/simple_provenance_tracking.rst.in
