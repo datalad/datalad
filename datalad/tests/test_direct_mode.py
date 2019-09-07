@@ -70,6 +70,10 @@ def test_direct_cfg(path1, path2):
     # check if we somehow didn't reset the flag
     assert not ar.is_direct_mode()
 
+    if not ar.check_direct_mode_support():
+        raise SkipTest(
+            "Rest of test requires direct mode support in git-annex")
+
     if ar.config.obtain("datalad.repo.version") >= 6:
         raise SkipTest("Created repo not v5, cannot test detection of direct mode repos")
     # and if repo existed before and was in direct mode, we fail too
