@@ -312,13 +312,9 @@ with more performant implementations.
   information and save changes.
 
 
-## 0.11.7 (??? ??, 2019) -- will be better than ever
+## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+Primarily bugfixes with some optimizations and refactorings.
 
 ### Fixes
 
@@ -347,6 +343,9 @@ bet we will fix some bugs and make a world even a better place.
 
 - Fixed a number of Unicode py2-compatibility issues. ([#3597][])
 
+- [download-url][] now will create leading directories of the output path
+  if they do not exist ([#3646][])
+
 ### Enhancements and new features
 
 - The [annotate-paths][] helper now caches subdatasets it has seen to
@@ -366,6 +365,9 @@ bet we will fix some bugs and make a world even a better place.
 - Shared logic used in the setup.py files of Datalad and its
   extensions has been moved to modules in the _datalad_build_support/
   directory.  ([#3600][])
+
+- Get ready for upcoming git-annex dropping support for direct mode
+  ([#3631][])
 
 
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
@@ -1812,3 +1814,5 @@ publishing
 [#3622]: https://github.com/datalad/datalad/issues/3622
 [#3624]: https://github.com/datalad/datalad/issues/3624
 [#3626]: https://github.com/datalad/datalad/issues/3626
+[#3631]: https://github.com/datalad/datalad/issues/3631
+[#3646]: https://github.com/datalad/datalad/issues/3646
