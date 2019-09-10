@@ -11,7 +11,6 @@ Wrapper for command and function calls, allowing for dry runs and output handlin
 
 """
 
-import time
 import subprocess
 import sys
 import logging
@@ -35,7 +34,6 @@ from .utils import (
     on_windows,
     get_tempfile_kwargs,
     assure_unicode,
-    assure_bytes,
     unlink,
     auto_repr,
 )
@@ -251,120 +249,6 @@ class Runner(object):
                      level={True: 9,
                             False: 11}[expected])
         return line  # Return to ease collection for asyncio callback.
-
-    def _get_output_online(self, proc,
-                           log_stdout, log_stderr,
-                           outputstream, errstream,
-                           expect_stderr=False, expect_fail=False):
-        """
-
-        If log_stdout or log_stderr are callables, they will be given a read
-        line to be processed, and return processed result.  So if they need to
-        'swallow' the line from being logged, should just return None
-
-        Parameters
-        ----------
-        proc
-        log_stdout: bool or callable or 'online' or 'offline'
-        log_stderr: : bool or callable or 'online' or 'offline'
-          If any of those 'offline', we would call proc.communicate at the
-          end to grab possibly outstanding output from it
-        expect_stderr
-        expect_fail
-
-        Returns
-        -------
-
-        """
-        stdout, stderr = bytes(), bytes()
-
-        log_stdout_ = _decide_to_log(log_stdout)
-        log_stderr_ = _decide_to_log(log_stderr)
-        log_stdout_is_callable = callable(log_stdout_)
-        log_stderr_is_callable = callable(log_stderr_)
-
-        # arguments to be passed into _process_one_line
-        stdout_args = (
-                'stdout',
-                proc, log_stdout_, log_stdout_is_callable
-        )
-        stderr_args = (
-                'stderr',
-                proc, log_stderr_, log_stderr_is_callable,
-                expect_stderr or expect_fail
-        )
-
-        while proc.poll() is None:
-            # see for a possibly useful approach to processing output
-            # in another thread http://codereview.stackexchange.com/a/17959
-            # current problem is that if there is no output on stderr
-            # it stalls
-            # Monitor if anything was output and if nothing, sleep a bit
-            stdout_, stderr_ = None, None
-            if log_stdout_:
-                stdout_ = self._process_one_line(*stdout_args)
-                stdout += stdout_
-            if log_stderr_:
-                stderr_ = self._process_one_line(*stderr_args)
-                stderr += stderr_
-            if stdout_ is None and stderr_ is None:
-                # no output was really produced, so sleep a tiny bit
-                time.sleep(0.001)
-
-        # Handle possible remaining output
-        stdout_, stderr_ = proc.communicate()
-        # ??? should we condition it on log_stdout in {'offline'} ???
-        stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)
-        stderr += self._process_remaining_output(errstream, stderr_, *stderr_args)
-
-        return stdout, stderr
-
-    def _process_remaining_output(self, stream, out_, *pargs):
-        """Helper to process output which might have been obtained from popen or
-        should be loaded from file"""
-        out = bytes()
-        if isinstance(stream, file_class) and \
-                _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
-            assert out_ is None, "should have gone into a file"
-            if not stream.closed:
-                stream.close()
-            with open(stream.name, 'rb') as f:
-                for line in f:
-                    out += self._process_one_line(*pargs, line=line)
-        else:
-            if out_:
-                # resolving a once in a while failing test #2185
-                if isinstance(out_, str):
-                    out_ = out_.encode('utf-8')
-                for line in out_.split(linesep_bytes):
-                    out += self._process_one_line(
-                        *pargs, line=line, suf=linesep_bytes)
-        return out
-
-    def _process_one_line(self, out_type, proc, log_, log_is_callable,
-                          expected=False, line=None, suf=None):
-        if line is None:
-            lgr.log(3, "Reading line from %s", out_type)
-            line = {'stdout': proc.stdout, 'stderr': proc.stderr}[out_type].readline()
-        else:
-            lgr.log(3, "Processing provided line")
-        if line and log_is_callable:
-            # Let it be processed
-            line = log_(assure_unicode(line))
-            if line is not None:
-                # we are working with binary type here
-                line = assure_bytes(line)
-        if line:
-            if out_type == 'stdout':
-                self._log_out(assure_unicode(line))
-            elif out_type == 'stderr':
-                self._log_err(line.decode('utf-8'),
-                              expected)
-            else:  # pragma: no cover
-                raise RuntimeError("must not get here")
-            return (line + suf) if suf else line
-        # it was output already directly but for code to work, return ""
-        return bytes()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,

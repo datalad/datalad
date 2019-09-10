@@ -324,17 +324,3 @@ def test_runner_stdin(path):
     with swallow_outputs() as cmo, open(op.join(path, "test_input.txt"), "r") as fake_input:
         runner.run(['cat'], log_stdout=False, stdin=fake_input)
         assert_in("whatever", cmo.out)
-
-
-def test_process_remaining_output():
-    runner = Runner()
-    out = u"""\
-s
-п
-"""
-    out_bytes = out.encode('utf-8')
-    target = u"s{ls}п{ls}".format(ls=os.linesep).encode('utf-8')
-    args = ['stdout', None, False, False]
-    #  probably #2185
-    eq_(runner._process_remaining_output(None, out_bytes, *args), target)
-    eq_(runner._process_remaining_output(None, out, *args), target)
