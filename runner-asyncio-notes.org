@@ -1,0 +1,38 @@
+
+* BlockingIOError wakeup messages
+
+When running some tests (e.g., test_gitrepo.py), the test pass but
+there are lots of errors like this
+
+#+begin_quote
+  Exception ignored when trying to write to the signal wakeup fd:
+  BlockingIOError: [Errno 11] Resource temporarily unavailable
+#+end_quote
+
+For more information, see [[https://bugs.python.org/issue21595][here]], where it was somewhat mitigated but
+not solved.
+
+I've blindly tried various ways of cleaning things up with asyncio,
+but haven't been able to stumble onto anything that removes the error.
+
+* parameter interaction
+
+| log_online | log_stdout | log_stderr |   | stdout is | stderr is |
+|------------+------------+------------+---+-----------+-----------|
+| False      | False      | False      |   | displayed | displayed |
+| False      | True       | False      |   | captured  | displayed |
+| False      | True       | True       |   | captured  | captured  |
+| False      | False      | True       |   | displayed | captured  |
+| True       | False      | False      |   | displayed | displayed |
+| True       | True       | False      |   | captured  | displayed |
+| True       | True       | True       |   | captured  | captured  |
+| True       | False      | True       |   | displayed | captured  |
+
+My understanding is that, if log_STREAM is ~True~, the output to the
+stream is captured and logged based on ~datalad.log.cmd.outputs~.  If
+log_STREAM is a callable, output lines are captured but not logged.
+And if log_STREAM is false, lines are written directly to the stream.
+
+~log_online~ influences how the output is processed, but it doesn't
+influcence whether the output is captured.  That comes down to
+log_STREAM.
