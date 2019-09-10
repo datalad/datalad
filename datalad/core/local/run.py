@@ -392,8 +392,6 @@ def _execute_command(command, pwd, expected_exit=None):
         lgr.info("== Command start (output follows) =====")
         runner.run(
             command,
-            # immediate output
-            log_online=True,
             # not yet sure what we should do with the command output
             # IMHO `run` itself should be very silent and let the command talk
             log_stdout=False,

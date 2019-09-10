@@ -447,6 +447,10 @@ class Runner(object):
             popen_env = popen_env.copy()  # to avoid side-effects
             popen_env['PWD'] = popen_cwd
 
+        if log_online and not (log_stdout or log_stdout):
+            lgr.warning("log_online has no effect "
+                        "unless log_stdout or log_stderr is set; ignoring")
+            log_online = False
         # TODO: if outputstream is sys.stdout and that one is set to StringIO
         #       we have to "shim" it with something providing fileno().
         # This happens when we do not swallow outputs, while allowing nosetest's
