@@ -243,12 +243,14 @@ class Runner(object):
     def _log_out(self, line):
         if line and self.log_outputs:
             self.log("stdout| " + line.rstrip('\n'))
+        return line  # Return to ease collection for asyncio callback.
 
     def _log_err(self, line, expected=False):
         if line and self.log_outputs:
             self.log("stderr| " + line.rstrip('\n'),
                      level={True: 9,
                             False: 11}[expected])
+        return line  # Return to ease collection for asyncio callback.
 
     def _get_output_online(self, proc,
                            log_stdout, log_stderr,
