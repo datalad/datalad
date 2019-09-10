@@ -7,6 +7,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Benchmarks of the datalad.api functionality"""
 
+from glob import glob
 from os.path import join as opj
 
 try:
@@ -45,7 +46,10 @@ except ImportError:
 
 
 from .common import (
-    Sample222DatasetBenchmarks,
+    Heavy1Dataset,
+    Heavy1SavedDataset,
+    Sample222Dataset,
+    SampleDatasetBenchmarksBase,
     SuprocBenchmarks,
 )
 
@@ -66,7 +70,7 @@ class testds(SuprocBenchmarks):
         )
 
 
-class supers(Sample222DatasetBenchmarks):
+class supers(Sample222Dataset):
     """
     Benchmarks on common operations on collections of datasets using datalad API
     """
@@ -111,6 +115,8 @@ class supers(Sample222DatasetBenchmarks):
         for subm in self.ds.repo.get_submodules():
             self.ds.uninstall(subm.path, recursive=True, check=False)
 
+
+
     def time_remove(self):
         remove(self.ds.path, recursive=True)
 
@@ -126,3 +132,29 @@ class supers(Sample222DatasetBenchmarks):
 
     def time_status_recursive(self):
         self.ds.status(recursive=True)
+
+
+class TypicalOps(SampleDatasetBenchmarksBase):
+
+    def time_status(self):
+        self.ds.status()
+
+    def time_status_dot(self):
+        self.ds.status(['.'])
+
+    def time_status_half(self):
+        self.ds.status(self.half_paths_level0)
+
+
+
+# Mix-ins to benchmark typical operations in a variety of scenarios
+# Actual effect of any given operation would depend on the dataset in question.
+# E.g. saving "changes" in a non-dirty dataset would result in no actual
+# commit
+
+class heavy1(TypicalOps, Heavy1Dataset):
+    pass
+
+
+class heavy1saved(TypicalOps, Heavy1SavedDataset):
+    pass

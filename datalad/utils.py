@@ -2240,6 +2240,8 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
                     archives_leading_dir=archives_leading_dir,
                     remove_existing=remove_existing)
         else:
+            # TODO: rm if exists since might fail if file was annexed
+            # and we do not want to remove an entire tree first
             open_func = open
             if full_name.endswith('.gz'):
                 open_func = gzip.open
