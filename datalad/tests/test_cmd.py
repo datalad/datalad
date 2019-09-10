@@ -229,7 +229,7 @@ def check_runner_heavy_output(log_online):
     #do it again with capturing:
     with swallow_logs():
         ret = runner.run(cmd,
-                         log_online=True, log_stderr=True, log_stdout=True,
+                         log_online=log_online, log_stderr=True, log_stdout=True,
                          expect_stderr=True)
 
     if log_online:
