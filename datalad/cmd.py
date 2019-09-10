@@ -488,15 +488,51 @@ class Runner(object):
                     shlex.split(cmd, posix=not on_windows)
                     if isinstance(cmd, str)
                     else cmd)
-            try:
-                proc = subprocess.Popen(cmd,
-                                        stdout=outputstream,
-                                        stderr=errstream,
-                                        shell=shell,
-                                        cwd=popen_cwd,
-                                        env=popen_env,
-                                        stdin=stdin)
 
+            def run_it():
+                if log_online:
+                    from datalad import acmd
+
+                    if log_stdout is True:
+                        log_stdout_fn = self._log_out
+                    else:
+                        log_stdout_fn = log_stdout
+
+                    if log_stderr is True:
+                        log_stderr_fn = functools.partial(
+                            self._log_err, expected=expect_fail)
+                    else:
+                        log_stderr_fn = log_stderr
+
+                    return acmd.run(cmd,
+                                    log_stdout=log_stdout_fn,
+                                    log_stderr=log_stderr_fn,
+                                    shell=shell,
+                                    cwd=popen_cwd,
+                                    env=popen_env,
+                                    stdin=stdin)
+                else:
+                    try:
+                        proc = subprocess.Popen(cmd,
+                                                stdout=outputstream,
+                                                stderr=errstream,
+                                                shell=shell,
+                                                cwd=popen_cwd,
+                                                env=popen_env,
+                                                stdin=stdin)
+                        out = proc.communicate()
+                        status = proc.returncode
+                    finally:
+                        # Those streams are for us to close if we asked for a PIPE
+                        # TODO -- assure closing the files import pdb; pdb.set_trace()
+                        _cleanup_output(outputstream, proc.stdout)
+                        _cleanup_output(errstream, proc.stderr)
+                    return out, status
+
+            out = b'', b''
+            status = None
+            try:
+                out, status = run_it()
             except Exception as e:
                 prot_exc = e
                 lgr.log(11, "Failed to start %r%r: %s" %
@@ -507,22 +543,10 @@ class Runner(object):
                 if self.protocol.records_ext_commands:
                     self.protocol.end_section(prot_id, prot_exc)
 
-            try:
-                if log_online:
-                    out = self._get_output_online(proc,
-                                                  log_stdout, log_stderr,
-                                                  outputstream, errstream,
-                                                  expect_stderr=expect_stderr,
-                                                  expect_fail=expect_fail)
-                else:
-                    out = proc.communicate()
-
                 # Decoding was delayed to this point
                 def decode_if_not_None(x):
                     return "" if x is None else bytes.decode(x)
                 out = tuple(map(decode_if_not_None, out))
-
-                status = proc.poll()
 
                 # needs to be done after we know status
                 if not log_online:
@@ -543,12 +567,6 @@ class Runner(object):
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
-            finally:
-                # Those streams are for us to close if we asked for a PIPE
-                # TODO -- assure closing the files import pdb; pdb.set_trace()
-                _cleanup_output(outputstream, proc.stdout)
-                _cleanup_output(errstream, proc.stderr)
-
         else:
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd,
