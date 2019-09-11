@@ -131,6 +131,20 @@ class runner(SuprocBenchmarks):
                                   log_stderr='offline',  # needed to would get stuck
                                   log_online=True)
 
+    def time_heavyout_online_through(self):
+        return self.runner.run(heavyout_cmd,
+                               log_stderr='offline',  # needed to would get stuck
+                               log_online=True)
+
+    def time_heavyout_online_process(self):
+        return self.runner.run(heavyout_cmd,
+                               log_stdout=lambda s: '',
+                               log_stderr='offline',  # needed to would get stuck
+                               log_online=True)
+
+    def time_system_call(self):
+        os.system(heavyout_cmd + " >/dev/null 2>&1")
+
     # # Probably not really interesting, and good lord wobbles around 0
     # def track_overhead_heavyout_offline(self):
     #     return self._get_overhead(heavyout_cmd,
