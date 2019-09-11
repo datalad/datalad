@@ -41,7 +41,7 @@ from datalad.utils import getpwd
 from .common import SuprocBenchmarks
 
 scripts_dir = osp.join(osp.dirname(__file__), 'scripts')
-heavyout_cmd = "{} 1000".format(osp.join(scripts_dir, 'heavyout'))
+heavyout_cmd = "{} 10000".format(osp.join(scripts_dir, 'heavyout'))
 
 class startup(SuprocBenchmarks):
     """
