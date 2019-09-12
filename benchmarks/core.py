@@ -89,7 +89,7 @@ class runner(SuprocBenchmarks):
 
     unit = "% overhead"
 
-    def _get_overhead(self, cmd, nrepeats=3, **run_kwargs):
+    def _get_overhead(self, cmd, nrepeats=10, **run_kwargs):
         """Estimate overhead over running command via the simplest os.system
         and to not care about any output
         """
