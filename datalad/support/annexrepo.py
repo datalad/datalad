@@ -776,7 +776,38 @@ class AnnexRepo(GitRepo, RepoInterface):
         remotes : list of str
           List of names of the remotes
         """
+
         remotes = super(AnnexRepo, self).get_remotes(with_urls_only=with_urls_only)
+
+        # Note: the above seems fine for git remotes and special remotes, that show up in configs.
+        # However, this is insufficient to discover all annex special remotes.
+        # To find special remotes, check git-annex-info (--json), which is available via self.repo_info()
+        #
+        # In any case: We don't know whether there are special remotes in `remotes` already. Surely we want to find
+        # special remotes only, if we are not filtering them out afterwards. But we can't fully integrate with the
+        # conditional for the filtering (move into its else-clause).
+        if not exclude_special_remotes:
+            annex_remotes = []
+            repo_info = self.repo_info(fast=True)
+            descriptions = [r["description"]
+                            for r in repo_info["untrusted repositories"] +
+                                     repo_info["semitrusted repositories"] +
+                                     repo_info["trusted repositories"]
+                            if not r["here"] and r["description"] not in ["web", "bittorrent"]]
+            for d in descriptions:
+                parts = d.split()
+                if len(parts) >= 2 and parts[-1].startswith('['):
+                    annex_remotes.append(parts[-1][1:-1])
+                else:
+                    annex_remotes.append(d)
+
+            if with_urls_only:
+                annex_remotes = [
+                    r for r in annex_remotes
+                    if self.config.get('remote.%s.url' % r)
+                ]
+
+            remotes.extend([r for r in annex_remotes if r not in remotes])
 
         if exclude_special_remotes:
             return [
