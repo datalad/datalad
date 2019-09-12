@@ -7,4 +7,6 @@ niter = int(sys.argv[1])
 load = {i: "x" * i for i in range(10)}
 
 for i in range(niter):
-    print("I am looping already for {} iterations. Load: {}".format(i, load))
+    print("stdout: I am looping already for {} iterations. Load: {}".format(i, load))
+    print("stderr: I am looping already for {} iterations. Load: {}".format(i, load),
+          file=sys.stderr)
