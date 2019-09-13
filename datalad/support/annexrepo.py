@@ -219,7 +219,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # check for possible SSH URLs of the remotes in order to set up
         # shared connections:
-        for r in self.get_remotes():
+        for r in self.get_remotes(with_urls_only=True):
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
                 if url is not None:
@@ -786,7 +786,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # In any case: We don't know whether there are special remotes in `remotes` already. Surely we want to find
         # special remotes only, if we are not filtering them out afterwards. But we can't fully integrate with the
         # conditional for the filtering (move into its else-clause).
-        if not exclude_special_remotes:
+        if not exclude_special_remotes and not with_urls_only:
             annex_remotes = []
             repo_info = self.repo_info(fast=True)
             descriptions = [r["description"]
@@ -801,11 +801,11 @@ class AnnexRepo(GitRepo, RepoInterface):
                 else:
                     annex_remotes.append(d)
 
-            if with_urls_only:
-                annex_remotes = [
-                    r for r in annex_remotes
-                    if self.config.get('remote.%s.url' % r)
-                ]
+            # if with_urls_only:
+            #     annex_remotes = [
+            #         r for r in annex_remotes
+            #         if self.config.get('remote.%s.url' % r)
+            #     ]
 
             remotes.extend([r for r in annex_remotes if r not in remotes])
 
