@@ -763,13 +763,16 @@ class AnnexRepo(GitRepo, RepoInterface):
     @borrowkwargs(GitRepo)
     def get_remotes(self,
                     with_urls_only=False,
-                    exclude_special_remotes=False):
+                    exclude_special_remotes=False,
+                    exclude_disabled=True):
         """Get known (special-) remotes of the repository
 
         Parameters
         ----------
         exclude_special_remotes: bool, optional
           if True, don't return annex special remotes
+        exclude_disabled: bool, optional
+          if True, don't query annex for not (yet) enabled (special) remotes
 
         Returns
         -------
@@ -786,7 +789,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # In any case: We don't know whether there are special remotes in `remotes` already. Surely we want to find
         # special remotes only, if we are not filtering them out afterwards. But we can't fully integrate with the
         # conditional for the filtering (move into its else-clause).
-        if not exclude_special_remotes and not with_urls_only:
+        if not exclude_disabled and not exclude_special_remotes and not with_urls_only:
             annex_remotes = []
             repo_info = self.repo_info(fast=True)
             descriptions = [r["description"]
