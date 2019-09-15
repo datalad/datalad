@@ -13,7 +13,10 @@ from os.path import (
 from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
-    BuildRSTExamplesFromScripts,
+    # no longer needed, all scenario docs are in the handbook now
+    # keeping the original examples here only to be able to execute them
+    # as part of the tests
+    #BuildRSTExamplesFromScripts,
     BuildSchema,
     setup_entry_points,
     findsome,
@@ -123,7 +126,7 @@ requires['devel'] = sum(list(requires.values()), [])
 
 cmdclass = {
     'build_manpage': BuildManPage,
-    'build_examples': BuildRSTExamplesFromScripts,
+    # 'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
     'build_schema': BuildSchema,
     # 'build_py': DataladBuild
