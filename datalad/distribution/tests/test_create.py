@@ -334,7 +334,7 @@ def test_create_text_no_annex(path):
     import re
     ok_file_has_content(
         _path_(path, '.gitattributes'),
-        content='\* annex\.largefiles=\(not\(mimetype=text/\*\)\)',
+        content='\* annex\.largefiles=\(not\(\(mimetype=text/\*\)or\(smallerthan=0.001kb\)\)\)',
         re_=True,
         match=False,
         flags=re.MULTILINE
@@ -344,13 +344,12 @@ def test_create_text_no_annex(path):
     create_tree(path,
         {
             't': 'some text',
-            'b': ''  # empty file is not considered to be a text file
-                     # should we adjust the rule to consider only non empty files?
+            'b': ''  # Empty file is considered text file.
         }
     )
     ds.add(['t', 'b'])
     ok_file_under_git(path, 't', annexed=False)
-    ok_file_under_git(path, 'b', annexed=True)
+    ok_file_under_git(path, 'b', annexed=False)
 
 
 @with_tempfile(mkdir=True)
