@@ -142,7 +142,6 @@ class ExternalVersions(object):
         'patool',
         'requests',
         'scrapy',
-        'six',
         'wrapt',
     )
 
