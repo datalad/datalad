@@ -19,12 +19,12 @@ from datalad.cmd import Runner
 from datalad.utils import chpwd
 from datalad.utils import maybe_shlex_quote
 from datalad.utils import swallow_outputs
-from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
@@ -57,6 +57,19 @@ def test_invalid_call(path):
 
 
 @known_failure_windows  #FIXME
+@with_tree(tree={'README.md': 'dirty'})
+def test_dirty(path):
+    ds = Dataset(path).create(force=True)
+    # must fail, because README.md is to be modified, but already dirty
+    assert_raises(CommandError, ds.run_procedure, 'cfg_yoda')
+    # make sure that was the issue
+    # save to git explicitly to keep the test simple and avoid unlocking...
+    ds.save('README.md', to_git=True)
+    ds.run_procedure('cfg_yoda')
+    assert_repo_status(ds.path)
+
+
+@known_failure_windows  #FIXME
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -71,8 +84,9 @@ save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     assert_false(ds.repo.is_under_annex("README.md"))
+    # save the procedure
+    ds.save('code')
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -89,7 +103,7 @@ def test_basics(path, super_path):
     ds.clean()
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
+    assert_repo_status(ds.path, modified=[op.join('.datalad', 'config')])
 
     # make a fresh dataset:
     super = Dataset(super_path).create()
@@ -105,7 +119,7 @@ def test_basics(path, super_path):
     super.clean()
     # look for traces
     ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
+    assert_repo_status(super.path, modified=[op.join('.datalad', 'config')])
 
 
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
@@ -139,7 +153,6 @@ def test_procedure_discovery(path, super_path):
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -168,6 +181,8 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
 
     # make it a subdataset and try again:
+    # first we need to save the beast to make install work
+    ds.save()
     super = Dataset(super_path).create()
     super.install('sub', source=ds.path)
 
@@ -223,7 +238,6 @@ def test_configs(path):
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -302,7 +316,6 @@ def test_spaces(path):
     """
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
