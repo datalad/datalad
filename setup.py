@@ -156,6 +156,30 @@ entry_points.update({
     ]})
 setup_kwargs['entry_points'] = entry_points
 
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Education',
+    'Intended Audience :: End Users/Desktop',
+    'Intended Audience :: Science/Research',
+    'License :: DFSG approved',
+    'License :: OSI Approved :: MIT License',
+    'Natural Language :: English',
+    'Operating System :: POSIX',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Unix Shell',
+    'Topic :: Communications :: File Sharing',
+    'Topic :: Education',
+    'Topic :: Internet',
+    'Topic :: Other/Nonlisted Topic',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Software Development :: Version Control :: Git',
+    'Topic :: Utilities',
+]
+setup_kwargs['classifiers'] = classifiers
+
 datalad_setup(
     'datalad',
     description="data distribution geared toward scientific datasets",
