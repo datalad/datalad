@@ -343,9 +343,9 @@ class Create(Interface):
                 attrs = tbrepo.get_gitattributes('.')
                 # some basic protection against useless duplication
                 # on rerun with --force
-                if not attrs.get('.', {}).get('annex.largefiles', None) == '(not(mimetype=text/*))':
+                if not attrs.get('.', {}).get('annex.largefiles', None) == '(not((mimetype=text/*)or(smallerthan=0.001kb)))':
                     tbrepo.set_gitattributes([
-                        ('*', {'annex.largefiles': '(not(mimetype=text/*))'})])
+                        ('*', {'annex.largefiles': '(not((mimetype=text/*)or(smallerthan=0.001kb)))'})])
                     add_to_git.append('.gitattributes')
 
         if native_metadata_type is not None:
