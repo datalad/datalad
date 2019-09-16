@@ -928,7 +928,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                 r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
-        assert(len(lines_) <= 1)
+
+        if len(lines_) > 1:
+            raise AssertionError("Expected one line but got {}".format(lines_))
         return lines_[0] if lines_ else None
 
     def _is_direct_mode_from_config(self):
