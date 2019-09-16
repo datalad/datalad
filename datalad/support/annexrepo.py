@@ -924,7 +924,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
         lines_ = [
             l for l in lines
-            if not re.search(
+            if l and not re.search(
                 r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
