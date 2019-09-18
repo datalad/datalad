@@ -25,11 +25,6 @@ try:
 except ImportError:  # Python <= 3.3
     from collections import Mapping
 
-from six import (
-    binary_type,
-    string_types,
-    iteritems,
-)
 from datalad import cfg
 from datalad.interface.annotate_paths import AnnotatePaths
 from datalad.interface.base import Interface
@@ -129,7 +124,7 @@ def _load_xz_json_stream(fpath, cache=None):
         cache = {}
     obj = cache.get(
         fpath,
-        {s['path']: {k: v for k, v in iteritems(s) if k != 'path'}
+        {s['path']: {k: v for k, v in s.items() if k != 'path'}
          # take out the 'path' from the payload
          for s in load_xzstream(fpath)} if op.lexists(fpath) else {})
     cache[fpath] = obj
@@ -403,12 +398,12 @@ def _filter_metadata_fields(d, maxsize=None, blacklist=None):
             maxsize, blacklist, len(d))
     orig_keys = set(d.keys())
     if blacklist:
-        d = {k: v for k, v in iteritems(d)
+        d = {k: v for k, v in d.items()
              if k.startswith('@') or not any(bl.match(k) for bl in blacklist)}
     if maxsize:
-        d = {k: v for k, v in iteritems(d)
+        d = {k: v for k, v in d.items()
              if k.startswith('@') or (len(str(v)
-                                      if not isinstance(v, string_types + (binary_type,))
+                                      if not isinstance(v, (str, bytes,))
                                       else v) <= maxsize)}
     if len(d) != len(orig_keys):
         lgr.info(
@@ -623,7 +618,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     valtype=EnsureBool()):
                 # go through content metadata and inject report of unique keys
                 # and values into `dsmeta`
-                for k, v in iteritems(meta):
+                for k, v in meta.items():
                     if k in dsmeta.get(mtype_key, {}):
                         # if the dataset already has a dedicated idea
                         # about a key, we skip it from the unique list
@@ -665,7 +660,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
 
             def _ensure_serializable(val):
                 if isinstance(val, ReadOnlyDict):
-                    return {k: _ensure_serializable(v) for k, v in iteritems(val)}
+                    return {k: _ensure_serializable(v) for k, v in val.items()}
                 if isinstance(val, (tuple, list)):
                     return [_ensure_serializable(v) for v in val]
                 else:
@@ -676,7 +671,7 @@ def _get_metadata(ds, types, global_meta=None, content_meta=None, paths=None):
                     for i in sorted(
                         v,
                         key=_unique_value_key)] if v is not None else None
-                for k, v in iteritems(unique_cm)
+                for k, v in unique_cm.items()
                 # v == None (disable unique, but there was a value at some point)
                 # otherwise we only want actual values, and also no single-item-lists
                 # of a non-value
@@ -762,7 +757,7 @@ class ReadOnlyDict(Mapping):
     def __hash__(self):
         if self._hash is None:
             h = 0
-            for key, value in iteritems(self._dict):
+            for key, value in self._dict.items():
                 h ^= hash((key, _val2hashable(value)))
             self._hash = h
         return self._hash

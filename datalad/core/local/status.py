@@ -14,10 +14,6 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import os.path as op
-from six import (
-    iteritems,
-    text_type,
-)
 from collections import OrderedDict
 
 from datalad.utils import (
@@ -129,18 +125,18 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=None)
-    for path, props in iteritems(status):
+    for path, props in status.items():
         cpath = ds.pathobj / path.relative_to(repo_path)
         yield dict(
             props,
-            path=text_type(cpath),
+            path=str(cpath),
             # report the dataset path rather than the repo path to avoid
             # realpath/symlink issues
             parentds=ds.path,
         )
         queried.add(ds.pathobj)
         if recursion_limit and props.get('type', None) == 'dataset':
-            subds = Dataset(text_type(cpath))
+            subds = Dataset(str(cpath))
             if subds.is_installed():
                 for r in _yield_status(
                         subds,
@@ -289,9 +285,9 @@ class Status(Interface):
                 # it is important to capture the exact form of the
                 # given path argument, before any normalization happens
                 # for further decision logic below
-                orig_path = text_type(p)
+                orig_path = str(p)
                 p = rev_resolve_path(p, dataset)
-                root = rev_get_dataset_root(text_type(p))
+                root = rev_get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
@@ -303,7 +299,7 @@ class Status(Interface):
                         logger=lgr)
                     continue
                 else:
-                    if dataset and root == text_type(p) and \
+                    if dataset and root == str(p) and \
                             not (orig_path.endswith(op.sep) or
                                  orig_path == "."):
                         # the given path is pointing to a dataset
@@ -343,7 +339,7 @@ class Status(Interface):
                 # nothing we support handling any further
                 # there is only a single refds
                 yield dict(
-                    path=text_type(qdspath),
+                    path=str(qdspath),
                     refds=ds.path,
                     action='status',
                     status='error',
@@ -363,7 +359,7 @@ class Status(Interface):
             if qdspath in queried:
                 # do not report on a single dataset twice
                 continue
-            qds = Dataset(text_type(qdspath))
+            qds = Dataset(str(qdspath))
             for r in _yield_status(
                     qds,
                     qpaths,
@@ -396,11 +392,8 @@ class Status(Interface):
         refds = res.get('refds', None)
         refds = refds if kwargs.get('dataset', None) is not None \
             or refds == os.getcwd() else None
-        # Note: We have to force unicode for res['path'] because
-        # interface.utils encodes it on py2 before passing it to
-        # custom_result_renderer().
-        path = assure_unicode(res['path']) if refds is None \
-            else text_type(ut.Path(res['path']).relative_to(refds))
+        path = res['path'] if refds is None \
+            else str(ut.Path(res['path']).relative_to(refds))
         type_ = res.get('type', res.get('type_src', ''))
         max_len = len('untracked')
         state = res.get('state', 'unknown')

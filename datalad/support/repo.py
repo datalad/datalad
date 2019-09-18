@@ -43,10 +43,8 @@ class Flyweight(type):
     Example:
 
     from weakref import WeakValueDictionary
-    from six import add_metaclass
 
-    @add_metaclass(Flyweight)
-    class MyFlyweightClass(object):
+    class MyFlyweightClass(object, metaclass=Flyweight):
 
         _unique_instances = WeakValueDictionary()
 

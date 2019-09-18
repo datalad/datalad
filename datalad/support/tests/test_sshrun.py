@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import sys
-from six.moves import StringIO
+from io import StringIO
 from nose.tools import assert_raises, assert_equal
 
 from mock import patch

@@ -20,11 +20,7 @@ import os
 import re
 import string
 
-from six import (
-    string_types,
-    text_type,
-)
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from datalad.distribution.dataset import rev_resolve_path
 from datalad.dochelpers import exc_str
@@ -95,7 +91,7 @@ class Formatter(string.Formatter):
             return super(Formatter, self).get_value(
                 key, args, kwargs)
 
-        if self.missing is not None and isinstance(value, string_types):
+        if self.missing is not None and isinstance(value, str):
             return value or self.missing
         return value
 
@@ -273,8 +269,7 @@ def _read(stream, input_type):
         import json
         try:
             rows = json.load(stream)
-        except getattr(json.decoder, "JSONDecodeError", ValueError) as e:
-            # ^ py2 compatibility kludge.
+        except json.decoder.JSONDecodeError as e:
             raise ValueError(
                 "Failed to read JSON from stream {}: {}"
                 .format(stream, exc_str(e)))
@@ -290,7 +285,7 @@ def _get_placeholder_exception(exc, msg_prefix, known):
     """Recast KeyError as a ValueError with close-match suggestions.
     """
     value = exc.args[0]
-    if isinstance(value, string_types):
+    if isinstance(value, str):
         sugmsg = get_suggestions_msg(value, known)
     else:
         sugmsg = "Out-of-bounds or unsupported index."
@@ -564,7 +559,7 @@ def add_meta(rows):
             yield dict(
                 action='add',
                 # decorator dies with Path()
-                path=text_type(ds.pathobj / filename),
+                path=str(ds.pathobj / filename),
                 type='file',
                 status=res_status,
                 parentds=ds.path,
@@ -790,7 +785,7 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = text_type(rev_resolve_path(url_file, dataset))
+        url_file = str(rev_resolve_path(url_file, dataset))
 
         if input_type == "ext":
             extension = os.path.splitext(url_file)[1]

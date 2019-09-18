@@ -33,10 +33,8 @@ requires = {
         'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'six>=1.8.0',
         'tqdm',
         'wrapt',
-        'pathlib2; python_version < "3.0"',  # brought to you by revolution1
     ],
     'downloaders': [
         'boto',
@@ -63,12 +61,6 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        # lzma is included in python since 3.3
-        # We now support backports.lzma as well (besides AutomagicIO), but since
-        # there is not way to define an alternative here (AFAIK, yoh), we will
-        # use pyliblzma as the default for now.  Patch were you would prefer
-        # backports.lzma instead
-        'pyliblzma; python_version < "3.3"',
         'simplejson',
         'whoosh',
     ],
@@ -186,6 +178,7 @@ datalad_setup(
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
+    python_requires='>=3.5',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={

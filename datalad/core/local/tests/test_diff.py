@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from six import text_type
 import os
 import os.path as op
 from datalad.support.exceptions import (
@@ -326,7 +325,7 @@ def test_path_diff(_path, linkpath):
         # technical reasons (annex using it for something in some mode)
         # should be reported as the thing it is representing (i.e.
         # a file)
-        if 'link2' in text_type(res['path']):
+        if 'link2' in str(res['path']):
             assert res['type'] == 'symlink', res
         else:
             assert res['type'] != 'symlink', res
@@ -354,7 +353,7 @@ def test_path_diff(_path, linkpath):
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
                     u'{}_directory_untracked'.format(OBSCURE_FILENAME))
     apathobj = ds.pathobj / rpath
-    apath = text_type(apathobj)
+    apath = str(apathobj)
     for p in (rpath, apath, None):
         if p is None:
             # change into the realpath of the dataset and

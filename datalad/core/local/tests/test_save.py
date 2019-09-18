@@ -10,13 +10,9 @@
 
 import os
 import os.path as op
-from six import iteritems
-from six import PY2
-from six import text_type
 
 from datalad.utils import (
     on_windows,
-    assure_bytes,
     assure_list,
     rmtree,
 )
@@ -360,10 +356,10 @@ def test_add_files(path):
         else:
             result = ds.save(arg[0], to_git=arg[1])
             for a in assure_list(arg[0]):
-                assert_result_count(result, 1, path=text_type(ds.pathobj / a))
+                assert_result_count(result, 1, path=str(ds.pathobj / a))
             status = ds.repo.get_content_annexinfo(
                 ut.Path(p) for p in assure_list(arg[0]))
-        for f, p in iteritems(status):
+        for f, p in status.items():
             if arg[1]:
                 assert p.get('key', None) is None, f
             else:
@@ -488,7 +484,7 @@ def test_gh1597_simpler(path):
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
-        sub = create(text_type(ds.pathobj / 'sub'))
+        sub = create(str(ds.pathobj / 'sub'))
         assert_repo_status(ds.path, untracked=['sub'])
         return ds
     # attempt one
@@ -736,9 +732,6 @@ def test_on_failure_continue(path):
 def test_save_obscure_name(path):
     ds = Dataset(path).create(force=True)
     fname = OBSCURE_FILENAME
-    if PY2:
-        # Mimic how the path will come in from the command line.
-        fname = assure_bytes(fname)
     # Just check that we don't fail with a unicode error.
     with swallow_outputs():
         ds.save(path=fname, result_renderer="default")

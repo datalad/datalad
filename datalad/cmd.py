@@ -22,13 +22,6 @@ import functools
 import tempfile
 
 from collections import OrderedDict
-from six import (
-    PY3,
-    PY2,
-    string_types,
-    binary_type,
-    text_type,
-)
 from .support import path as op
 from .consts import GIT_SSH_COMMAND
 from .dochelpers import exc_str
@@ -59,13 +52,7 @@ _TEMP_std = sys.stdout, sys.stderr
 # which might be created outside and passed into Runner
 _MAGICAL_OUTPUT_MARKER = "_runneroutput_"
 
-if PY2:
-    # TODO apparently there is a recommended substitution for Python2
-    # which is a backported implementation of python3 subprocess
-    # https://pypi.python.org/pypi/subprocess32/
-    file_class = file
-else:
-    from io import IOBase as file_class
+from io import IOBase as file_class
 
 
 def _decide_to_log(v):
@@ -194,7 +181,7 @@ class Runner(object):
           if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, string_types) or isinstance(cmd, list):
+        if isinstance(cmd, str) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
@@ -287,7 +274,7 @@ class Runner(object):
         -------
 
         """
-        stdout, stderr = binary_type(), binary_type()
+        stdout, stderr = bytes(), bytes()
 
         log_stdout_ = _decide_to_log(log_stdout)
         log_stderr_ = _decide_to_log(log_stderr)
@@ -333,7 +320,7 @@ class Runner(object):
     def _process_remaining_output(self, stream, out_, *pargs):
         """Helper to process output which might have been obtained from popen or
         should be loaded from file"""
-        out = binary_type()
+        out = bytes()
         if isinstance(stream, file_class) and \
                 _MAGICAL_OUTPUT_MARKER in getattr(stream, 'name', ''):
             assert out_ is None, "should have gone into a file"
@@ -345,7 +332,7 @@ class Runner(object):
         else:
             if out_:
                 # resolving a once in a while failing test #2185
-                if isinstance(out_, text_type):
+                if isinstance(out_, str):
                     out_ = out_.encode('utf-8')
                 for line in out_.split(linesep_bytes):
                     out += self._process_one_line(
@@ -369,13 +356,13 @@ class Runner(object):
             if out_type == 'stdout':
                 self._log_out(assure_unicode(line))
             elif out_type == 'stderr':
-                self._log_err(line.decode('utf-8') if PY3 else line,
+                self._log_err(line.decode('utf-8'),
                               expected)
             else:  # pragma: no cover
                 raise RuntimeError("must not get here")
             return (line + suf) if suf else line
         # it was output already directly but for code to work, return ""
-        return binary_type()
+        return bytes()
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
             expect_stderr=False, expect_fail=False,
@@ -451,8 +438,6 @@ class Runner(object):
 
         popen_env = env or self.env
         popen_cwd = cwd or self.cwd
-        if PY2:
-            popen_cwd = assure_bytes(popen_cwd)
 
         if popen_cwd and popen_env and 'PWD' in popen_env:
             # we must have inherited PWD, but cwd was provided, so we must
@@ -489,13 +474,13 @@ class Runner(object):
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, string_types)
+                shell = isinstance(cmd, str)
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(
                     shlex.split(cmd, posix=not on_windows)
-                    if isinstance(cmd, string_types)
+                    if isinstance(cmd, str)
                     else cmd)
             try:
                 proc = subprocess.Popen(cmd,
@@ -526,12 +511,10 @@ class Runner(object):
                 else:
                     out = proc.communicate()
 
-                if PY3:
-                    # Decoding was delayed to this point
-                    def decode_if_not_None(x):
-                        return "" if x is None else binary_type.decode(x)
-                    # TODO: check if we can avoid PY3 specific here
-                    out = tuple(map(decode_if_not_None, out))
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else bytes.decode(x)
+                out = tuple(map(decode_if_not_None, out))
 
                 status = proc.poll()
 
@@ -550,7 +533,7 @@ class Runner(object):
                            "" if log_online else " out=%s" % out[0],
                            "" if log_online else " err=%s" % out[1])
                     lgr.log(9 if expect_fail else 11, msg)
-                    raise CommandError(text_type(cmd), msg, status, out[0], out[1])
+                    raise CommandError(str(cmd), msg, status, out[0], out[1])
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
@@ -564,7 +547,7 @@ class Runner(object):
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd,
                                                       posix=not on_windows)
-                                          if isinstance(cmd, string_types)
+                                          if isinstance(cmd, str)
                                           else cmd, None)
             out = ("DRY", "DRY")
 
@@ -786,7 +769,7 @@ class BatchedCommand(object):
 
         and yields results for each item."""
         for entry in cmds:
-            if not isinstance(entry, string_types):
+            if not isinstance(entry, str):
                 entry = ' '.join(entry)
             yield self.proc1(entry)
 
@@ -806,7 +789,7 @@ class BatchedCommand(object):
         # according to the internet wisdom there is no easy way with subprocess
         self._check_process(restart=True)
         process = self._process  # _check_process might have restarted it
-        process.stdin.write(assure_bytes(entry) if PY2 else entry)
+        process.stdin.write(entry)
         process.stdin.flush()
         lgr.log(5, "Done sending.")
         still_alive, stderr = self._check_process(restart=False)

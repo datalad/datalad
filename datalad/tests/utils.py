@@ -23,19 +23,14 @@ import logging
 import random
 import socket
 import warnings
-from six import PY2, text_type, iteritems
-from six import binary_type
-from six import string_types
 from fnmatch import fnmatch
 import time
 from difflib import unified_diff
 from contextlib import contextmanager
 from mock import patch
 
-from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
-from six.moves.BaseHTTPServer import HTTPServer
-from six import reraise
-from six.moves import map
+from http.server import SimpleHTTPRequestHandler
+from http.server import HTTPServer
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
@@ -399,7 +394,7 @@ def ok_file_has_content(path, content, strip=False, re_=False,
     with open_func(path, 'rb') as f:
         file_content = f.read()
 
-    if isinstance(content, text_type):
+    if isinstance(content, str):
         file_content = assure_unicode(file_content)
 
     if os.linesep != '\n':
@@ -704,7 +699,7 @@ def _get_testrepos_uris(regex, flavors):
             _nested_submodule_annex_test_repo.create()
             _inner_submodule_annex_test_repo.create()
     uris = []
-    for name, spec in iteritems(_TESTREPOS):
+    for name, spec in _TESTREPOS.items():
         if not re.match(regex, name):
             continue
         uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
@@ -1127,7 +1122,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            reraise(*exc_info)
+            raise exc_info[1]
 
         return ret
 
@@ -1185,7 +1180,7 @@ def assert_dict_equal(d1, d2):
     for k in set(d1).intersection(d2):
         same = True
         try:
-            if isinstance(d1[k], string_types):
+            if isinstance(d1[k], str):
                 # do not compare types for string types to avoid all the hassle
                 # with the distinction of str and unicode in PY3, and simple
                 # test for equality
@@ -1547,7 +1542,7 @@ def assert_repo_status(path, annex=None, untracked_mode='normal', **kwargs):
     for state in ('added', 'untracked', 'deleted', 'modified'):
         oktobefound = sorted(r.pathobj.joinpath(ut.PurePosixPath(p))
                              for p in kwargs.get(state, []))
-        state_files = sorted(k for k, v in iteritems(status)
+        state_files = sorted(k for k, v in status.items()
                              if v.get('state', None) == state)
         eq_(state_files, oktobefound,
             'unexpected content of state "%s": %r != %r'
@@ -1741,7 +1736,7 @@ def get_deeply_nested_structure(path):
         }
     )
     create_tree(
-        text_type(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
+        str(ds.pathobj / 'subds_modified' / 'subds_lvl1_modified'),
         {OBSCURE_FILENAME + u'_directory_untracked': {"untraced_file": ""}}
     )
     (ut.Path(subds.path) / 'subdir').mkdir()

@@ -20,10 +20,6 @@ from os.path import pardir
 from os.path import realpath
 from os.path import relpath
 from weakref import WeakValueDictionary
-from six import PY2
-from six import string_types
-from six import text_type
-from six import add_metaclass
 import wrapt
 
 from datalad import cfg
@@ -44,7 +40,6 @@ from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
-from datalad.utils import assure_unicode
 from datalad.utils import getpwd
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import get_dataset_root
@@ -86,8 +81,7 @@ def resolve_path(path, ds=None):
     return normpath(opj(top_path, path))
 
 
-@add_metaclass(Flyweight)
-class Dataset(object):
+class Dataset(object, metaclass=Flyweight):
     """Representation of a DataLad dataset/repository
 
     This is the core data type of DataLad: a representation of a dataset.
@@ -131,7 +125,7 @@ class Dataset(object):
 
         # mirror what is happening in __init__
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
 
         # Custom handling for few special abbreviations
         path_ = path
@@ -175,7 +169,7 @@ class Dataset(object):
           yet.
         """
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
         self._path = path
         self._repo = None
         self._id = None
@@ -489,7 +483,7 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
     The decorator has no effect on the actual function decorated with it.
     """
     if not name:
-        name = f.func_name if PY2 else f.__name__
+        name = f.__name__
 
     @wrapt.decorator
     def apply_func(wrapped, instance, args, kwargs):
@@ -541,7 +535,7 @@ class EnsureDataset(Constraint):
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
-        elif isinstance(value, string_types):
+        elif isinstance(value, str):
             # we cannot convert to a Dataset class right here
             # - duplicates require_dataset() later on
             # - we need to be able to distinguish between a bound
@@ -587,8 +581,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
         dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
-        # assure_unicode() can be dropped once we drop PY2.
-        dspath = assure_unicode(get_dataset_root(getpwd()))
+        dspath = get_dataset_root(getpwd())
         if not dspath:
             raise NoDatasetArgumentFound("No dataset found")
         dataset = Dataset(dspath)
@@ -695,13 +688,13 @@ def rev_resolve_path(path, ds=None):
         # pathlib docs for why this is the only sane choice in the
         # face of the possibility of symlinks in the path
         out.append(p)
-    return out[0] if isinstance(path, (string_types, PurePath)) else out
+    return out[0] if isinstance(path, (str, PurePath)) else out
 
 
 def path_under_rev_dataset(ds, path):
     ds_path = ds.pathobj
     try:
-        rpath = text_type(ut.Path(path).relative_to(ds_path))
+        rpath = str(ut.Path(path).relative_to(ds_path))
         if not rpath.startswith(op.pardir):
             # path is already underneath the dataset
             return path
@@ -709,7 +702,7 @@ def path_under_rev_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = rev_get_dataset_root(text_type(path))
+    root = rev_get_dataset_root(str(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
@@ -719,7 +712,7 @@ def path_under_rev_dataset(ds, path):
         root = rev_get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
-    return ds_path / op.relpath(text_type(path), root)
+    return ds_path / op.relpath(str(path), root)
 
 
 # XXX this is a copy of the change proposed in

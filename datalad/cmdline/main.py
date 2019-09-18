@@ -22,7 +22,6 @@ import sys
 import textwrap
 import os
 
-from six import text_type
 
 import datalad
 
@@ -529,12 +528,12 @@ def main(args=None):
                 # exit code as is
                 exc_msg = str(exc)
                 if exc_msg:
-                    msg = exc_msg.encode() if isinstance(exc_msg, text_type) else exc_msg
+                    msg = exc_msg.encode() if isinstance(exc_msg, str) else exc_msg
                     os.write(2, msg + b"\n")
                 if exc.stdout:
-                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, text_type) else exc.stdout)
+                    os.write(1, exc.stdout.encode() if isinstance(exc.stdout, str) else exc.stdout)
                 if exc.stderr:
-                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, text_type) else exc.stderr)
+                    os.write(2, exc.stderr.encode() if isinstance(exc.stderr, str) else exc.stderr)
                 # We must not exit with 0 code if any exception got here but
                 # had no code defined
                 sys.exit(exc.code if exc.code is not None else 1)

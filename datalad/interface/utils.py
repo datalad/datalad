@@ -27,8 +27,6 @@ from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
-from six import PY2
-from six import text_type
 
 import json
 
@@ -36,7 +34,6 @@ import json
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
-from datalad.utils import assure_bytes
 from datalad.utils import assure_unicode
 from datalad.utils import getargspec
 from datalad.support.gitrepo import GitRepo
@@ -50,7 +47,6 @@ from datalad.support.constraints import Constraint
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
 
-from datalad.interface.base import Interface
 from datalad.interface.base import default_logchannels
 from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
@@ -304,30 +300,8 @@ def eval_results(func):
         # incl. defaults and args given as positionals
         allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
         # determine class, the __call__ method of which we are decorating:
-        # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
-        # when and how to use eval_results as well as on how to name a command's
-        # module and class. As of now, we are inline with these requirements as
-        # far as I'm aware.
         mod = sys.modules[wrapped.__module__]
-        if PY2:
-            # we rely on:
-            # - decorated function is method of a subclass of Interface
-            # - the name of the class matches the last part of the module's name
-            #   if converted to lower
-            # for example:
-            # ..../where/ever/mycommand.py:
-            # class MyCommand(Interface):
-            #     @eval_results
-            #     def __call__(..)
-            command_class_names = \
-                [i for i in mod.__dict__
-                 if type(mod.__dict__[i]) == type and
-                 issubclass(mod.__dict__[i], Interface) and
-                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('datalad_', '').replace('_', ''))]
-            assert len(command_class_names) == 1, (command_class_names, mod.__name__)
-            command_class_name = command_class_names[0]
-        else:
-            command_class_name = wrapped.__qualname__.split('.')[-2]
+        command_class_name = wrapped.__qualname__.split('.')[-2]
         _func_class = mod.__dict__[command_class_name]
         lgr.debug("Determined class of decorated function: %s", _func_class)
 
@@ -504,14 +478,7 @@ def eval_results(func):
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
         path = res['path']
-        if PY2:
-            # On Python 2 _process_results() has already converted all unicode
-            # in `res` to bytes, so it's easiest to work with bytes here rather
-            # than converting everything back to unicode.
-            if not isinstance(path, str):  # pathlib
-                path = assure_bytes(text_type(path))
-        else:
-            path = text_type(path)
+        path = str(path)
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
@@ -538,11 +505,6 @@ def _process_results(
             # XXX Yarik has to no clue on how to track the origin of the
             # record to figure out WTF, so he just skips it
             continue
-
-        if PY2:
-            for k, v in res.items():
-                if isinstance(v, unicode):
-                    res[k] = v.encode('utf-8')
 
         actsum = action_summary.get(res['action'], {})
         if res['status']:
@@ -611,11 +573,6 @@ def _process_results(
                             res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
-
-        if PY2:
-            for k, v in res.items():
-                if isinstance(v, str):
-                    res[k] = v.decode('utf-8')
 
         if result_xfm:
             res = result_xfm(res)

@@ -13,10 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from six.moves import (
-    filter,
-    map,
-)
 
 from os import makedirs
 from os import listdir

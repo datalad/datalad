@@ -21,8 +21,7 @@ from subprocess import Popen
 import tempfile
 # importing the quote function here so it can always be imported from this
 # module
-from six.moves import shlex_quote as sh_quote
-from six import text_type
+from shlex import quote as sh_quote
 
 # !!! Do not import network here -- delay import, allows to shave off 50ms or so
 # on initial import datalad time
@@ -473,7 +472,7 @@ class SSHManager(object):
             Path(cfg.obtain('datalad.locations.cache')) / 'sockets'
         self._socket_dir.mkdir(exist_ok=True, parents=True)
         try:
-            os.chmod(text_type(self._socket_dir), 0o700)
+            os.chmod(str(self._socket_dir), 0o700)
         except OSError as exc:
             lgr.warning(
                 "Failed to (re)set permissions on the %s. "

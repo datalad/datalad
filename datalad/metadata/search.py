@@ -23,11 +23,6 @@ from os.path import join as opj, exists
 from os.path import relpath
 from os.path import normpath
 import sys
-from six import (
-    reraise,
-    iteritems,
-    PY2,
-)
 from time import time
 
 from datalad import cfg
@@ -215,7 +210,7 @@ def _search_from_virgin_install(dataset, query):
                           % DEFAULT_DATASET_PATH):
                     pass
                 else:
-                    reraise(*exc_info)
+                    raise exc_info[1]
             else:
                 raise NoDatasetArgumentFound(
                     "No DataLad dataset found at current location. "
@@ -234,7 +229,7 @@ def _search_from_virgin_install(dataset, query):
                 "label '///'"
             )
         else:
-            reraise(*exc_info)
+            raise exc_info[1]
 
         lgr.info(
             "Performing search using DataLad superdataset %r",
@@ -726,7 +721,7 @@ class _EGrepCSSearch(_Search):
             t0 = time()
             matches = {(q['query'] if isinstance(q, dict) else q, k):
                        q['query'].search(v) if isinstance(q, dict) else q.search(v)
-                       for k, v in iteritems(doc)
+                       for k, v in doc.items()
                        for q in query
                        if not isinstance(q, dict) or q['field'].match(k)}
             dt = time() - t0
@@ -766,10 +761,7 @@ class _EGrepCSSearch(_Search):
 
         for k in sorted(keys):
             if mode == 'name':
-                from datalad.utils import assure_bytes
-                # without assure_bytes UnicodeEncodeError in PY2 when
-                # output is piped into e.g. grep
-                print(assure_bytes(k) if PY2 else k)
+                print(k)
                 continue
 
             # do a bit more
@@ -836,7 +828,7 @@ class _EGrepCSSearch(_Search):
             # no stringification of values for speed
             idxd = _meta2autofield_dict(meta, val2str=False)
 
-            for k, kvals in iteritems(idxd):
+            for k, kvals in idxd.items():
                 # TODO deal with conflicting definitions when available
                 keys[k].ndatasets += 1
                 if mode == 'name':

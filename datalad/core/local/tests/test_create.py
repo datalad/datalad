@@ -16,8 +16,6 @@ from datalad.tests.utils import known_failure_windows
 import os
 import os.path as op
 
-from six import PY2
-from six import text_type
 
 from datalad.distribution.dataset import (
     Dataset
@@ -25,7 +23,6 @@ from datalad.distribution.dataset import (
 from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
-    assure_bytes,
     chpwd,
     _path_,
 )
@@ -92,7 +89,7 @@ def test_create_raises(path, outside_path):
         ds.create(obscure_ds, **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
-                 text_type(ds.pathobj / obscure_ds),
+                 str(ds.pathobj / obscure_ds),
                  ds.path)
     )
 
@@ -105,14 +102,14 @@ def test_create_raises(path, outside_path):
         ds.create(obscure_ds, **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
-                 text_type(ds.pathobj / obscure_ds),
+                 str(ds.pathobj / obscure_ds),
                  ds.path)
     )
     assert_in_results(
         ds.create(op.join(obscure_ds, 'subsub'), **raw),
         status='error',
         message=('collision with %s (dataset) in dataset %s',
-                 text_type(ds.pathobj / obscure_ds),
+                 str(ds.pathobj / obscure_ds),
                  ds.path)
     )
     os.makedirs(op.join(ds.path, 'down'))
@@ -124,7 +121,7 @@ def test_create_raises(path, outside_path):
         status='error',
         message=('collision with content in parent dataset at %s: %s',
                  ds.path,
-                 [text_type(ds.pathobj / 'down' / 'someotherfile.tst')]),
+                 [str(ds.pathobj / 'down' / 'someotherfile.tst')]),
     )
 
 
@@ -261,7 +258,7 @@ def test_create_sub_dataset_dot_no_path(path):
     ds.create()
 
     # Test non-bound call.
-    sub0_path = text_type(ds.pathobj / "sub0")
+    sub0_path = str(ds.pathobj / "sub0")
     os.mkdir(sub0_path)
     with chpwd(sub0_path):
         subds0 = create(dataset=".")
@@ -269,7 +266,7 @@ def test_create_sub_dataset_dot_no_path(path):
     assert_repo_status(subds0.path)
 
     # Test command-line invocation directly (regression from gh-3484).
-    sub1_path = text_type(ds.pathobj / "sub1")
+    sub1_path = str(ds.pathobj / "sub1")
     os.mkdir(sub1_path)
     Runner(cwd=sub1_path)(["datalad", "create", "-d."])
     assert_repo_status(ds.path, untracked=[subds0.path, sub1_path])
@@ -473,8 +470,5 @@ def check_create_obscure(create_kwargs, path):
 
 def test_create_with_obscure_name():
     fname = OBSCURE_FILENAME
-    if PY2:
-        # Mimic how it comes in on the command-line.
-        fname = assure_bytes(OBSCURE_FILENAME)
     yield check_create_obscure, {"path": fname}
     yield check_create_obscure, {"dataset": fname}

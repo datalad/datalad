@@ -15,7 +15,6 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import join as opj
 
-from six import text_type
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import create
@@ -181,27 +180,27 @@ def test_unlock_directory(path):
     else:
         assert_repo_status(ds.path, modified=[dirpath / "a", dirpath / "b"])
     ds.save()
-    ds.drop(text_type(dirpath / "a"), check=False)
-    assert_false(ds.repo.file_has_content(text_type(dirpath / "a")))
+    ds.drop(str(dirpath / "a"), check=False)
+    assert_false(ds.repo.file_has_content(str(dirpath / "a")))
 
     # Unlocking without an explicit non-directory path doesn't fail if one of
     # the directory's files doesn't have content.
     res = ds.unlock(path="dir")
     assert_not_in_results(res, action="unlock",
-                          path=text_type(dirpath_abs / "a"))
+                          path=str(dirpath_abs / "a"))
     if is_managed_branch:
         assert_not_in_results(res, action="unlock",
-                              path=text_type(dirpath_abs / "b"))
+                              path=str(dirpath_abs / "b"))
     else:
         assert_in_results(res, action="unlock", status="ok",
-                          path=text_type(dirpath_abs / "b"))
+                          path=str(dirpath_abs / "b"))
         assert_repo_status(ds.path, modified=[dirpath / "b"])
 
     # If we explicitly provide a path that lacks content, we get a result
     # for it.
     assert_in_results(ds.unlock(path=dirpath / "a", on_failure="ignore"),
                       action="unlock", status="impossible",
-                      path=text_type(dirpath_abs / "a"))
+                      path=str(dirpath_abs / "a"))
 
 
 @with_tree(tree={"untracked": "untracked",
@@ -230,4 +229,4 @@ def test_unlock_cant_unlock(path):
             ds.unlock(path=f, on_failure="ignore"),
             action="unlock",
             status=status,
-            path=text_type(ds.pathobj / f))
+            path=str(ds.pathobj / f))

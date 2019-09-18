@@ -12,7 +12,6 @@
 
 import io
 import codecs
-from six import PY2
 from os.path import (
     dirname,
     exists,

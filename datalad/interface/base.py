@@ -25,7 +25,6 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
-from six import iteritems
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -499,7 +498,7 @@ class DefaultOutputRenderer(object):
         if isinstance(v, list):
             return [cls._dict_to_nadict(x) for x in v]
         elif isinstance(v, dict):
-            return nadict((k, cls._dict_to_nadict(x)) for k, x in iteritems(v))
+            return nadict((k, cls._dict_to_nadict(x)) for k, x in v.items())
         else:
             return v
 

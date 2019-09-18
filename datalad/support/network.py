@@ -27,15 +27,13 @@ from os.path import join as opj
 from os.path import dirname
 from ntpath import splitdrive as win_splitdrive
 
-from six import string_types
-from six import iteritems
-from six.moves.urllib.parse import urlsplit
-from six.moves.urllib.request import Request
-from six.moves.urllib.parse import unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
-from six.moves.urllib.parse import parse_qsl
-from six.moves.urllib.parse import urlencode
-from six.moves.urllib.error import URLError
+from urllib.parse import urlsplit
+from urllib.request import Request
+from urllib.parse import unquote as urlunquote
+from urllib.parse import urljoin, urlparse, urlsplit, urlunparse, ParseResult
+from urllib.parse import parse_qsl
+from urllib.parse import urlencode
+from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
@@ -44,7 +42,6 @@ from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
 
-# TODO not sure what needs to use `six` here yet
 # !!! Lazily import requests where needed -- needs 30ms or so
 # import requests
 
@@ -52,9 +49,9 @@ from datalad.support.cache import lru_cache
 # strings. "~" is now included in the set of reserved characters.
 # For consistency we will provide urlquote
 if sys.version_info >= (3, 7):
-    from six.moves.urllib.parse import quote as urlquote
+    from urllib.parse import quote as urlquote
 else:
-    from six.moves.urllib.parse import quote as _urlquote
+    from urllib.parse import quote as _urlquote
 
     def urlquote(url, safe='/', **kwargs):
         safe += '~'
@@ -244,9 +241,9 @@ def same_website(url_rec, u_rec):
     u_rec: ParseResult
       record for new url
     """
-    if isinstance(url_rec, string_types):
+    if isinstance(url_rec, str):
         url_rec = urlparse(url_rec)
-    if isinstance(u_rec, string_types):
+    if isinstance(u_rec, str):
         u_rec = urlparse(u_rec)
     return (url_rec.netloc == u_rec.netloc)
     # todo: collect more of sample cases.
@@ -495,12 +492,9 @@ class RI(object):
     # location
     #
 
-    def __nonzero__(self):
+    def __bool__(self):
         fields = self._fields
         return any(fields.values())
-
-    # for PY3
-    __bool__ = __nonzero__
 
     #
     # Helpers to deal with internal structures and conversions
@@ -736,7 +730,7 @@ class RegexBasedURLMixin(object):
                    " Did you intent to use '///'?" if url_str.startswith('//') else '')
             )
         fields = cls._get_blank_fields()
-        fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})
+        fields.update({k: v for k, v in re_match.groupdict().items() if v})
         cls._normalize_fields(fields)
         return fields
 

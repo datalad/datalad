@@ -20,10 +20,6 @@ import time
 from abc import ABCMeta, abstractmethod
 import os.path as op
 from os.path import exists, join as opj, isdir
-from six import PY2
-from six import binary_type, PY3
-from six import add_metaclass
-from six import reraise
 
 
 from .. import cfg
@@ -71,8 +67,7 @@ class DownloaderSession(object):
 
 
 @auto_repr
-@add_metaclass(ABCMeta)
-class BaseDownloader(object):
+class BaseDownloader(object, metaclass=ABCMeta):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
@@ -194,7 +189,7 @@ class BaseDownloader(object):
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            reraise(*exc_info)
+                            raise e
                         self._enter_credentials(
                             url,
                             denied_msg=access_denied,
@@ -488,10 +483,7 @@ class BaseDownloader(object):
         if self._cache is None:
             # TODO: move this all logic outside into a dedicated caching beast
             lgr.info("Initializing cache for fetches")
-            if PY2:
-                import anydbm as dbm
-            else:
-                import dbm
+            import dbm
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
             cache_dir = cfg.obtain('datalad.locations.cache')
@@ -557,7 +549,7 @@ class BaseDownloader(object):
             downloaded_size = len(content)
 
             # now that we know size based on encoded content, let's decode into string type
-            if PY3 and isinstance(content, binary_type) and decode:
+            if isinstance(content, bytes) and decode:
                 content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
