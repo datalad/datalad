@@ -212,13 +212,7 @@ def test_proxying_io_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
-from datalad.tests.utils import skip_if_no_module
-
-
 def test_proxying_lzma_LZMAFile():
-    skip_if_no_module('datalad.support.lzma')
-    from datalad.support.lzma import lzma
-
     def generate_dat(f):
         with LZMAFile(f, "w") as f:
             f.write("123".encode('utf-8'))
