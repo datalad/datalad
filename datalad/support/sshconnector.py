@@ -33,6 +33,7 @@ from datalad.utils import (
     auto_repr,
     Path,
     assure_list,
+    on_windows,
 )
 from datalad.cmd import Runner
 
@@ -105,7 +106,11 @@ class SSHConnection(object):
                 "connections: {}".format(sshri))
         self.sshri = SSHRI(**{k: v for k, v in sshri.fields.items()
                               if k in ('username', 'hostname', 'port')})
-        self._ssh_args = ["-o", "ControlPath=\"%s\"" % ctrl_path]
+        # on windows cmd args lists are always converted into a string using appropriate
+        # quoting rules, on other platforms args lists are passed directly and we need
+        # to take care of quoting ourselves
+        ctrlpath_arg = "ControlPath={}".format(ctrl_path if on_windows else sh_quote(str(ctrl_path)))
+        self._ssh_args = ["-o", ctrlpath_arg]
         self.ctrl_path = Path(ctrl_path)
         if self.sshri.port:
             self._ssh_args += ['-p', '{}'.format(self.sshri.port)]
