@@ -310,6 +310,14 @@ class Runner(object):
                 time.sleep(0.001)
 
         # Handle possible remaining output
+        if log_stdout_ and log_stderr_:
+            # If Popen was called with more than two pipes, calling
+            # communicate() after we partially read the stream will return
+            # empty output.
+            stdout += self._process_remaining_output(
+                outputstream, proc.stdout.read(), *stdout_args)
+            stderr += self._process_remaining_output(
+                errstream, proc.stderr.read(), *stderr_args)
         stdout_, stderr_ = proc.communicate()
         # ??? should we condition it on log_stdout in {'offline'} ???
         stdout += self._process_remaining_output(outputstream, stdout_, *stdout_args)

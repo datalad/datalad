@@ -29,6 +29,7 @@ from .utils import (
     SkipTest,
     skip_if_on_windows,
     with_tempfile,
+    with_tree,
     assert_cwd_unchanged,
     swallow_outputs,
     swallow_logs,
@@ -229,7 +230,7 @@ def check_runner_heavy_output(log_online):
     #do it again with capturing:
     with swallow_logs():
         ret = runner.run(cmd,
-                         log_online=True, log_stderr=True, log_stdout=True,
+                         log_online=log_online, log_stderr=True, log_stdout=True,
                          expect_stderr=True)
 
     if log_online:
@@ -338,3 +339,38 @@ s
     #  probably #2185
     eq_(runner._process_remaining_output(None, out_bytes, *args), target)
     eq_(runner._process_remaining_output(None, out, *args), target)
+
+
+@with_tree({"infile": "\n".join(map(str, range(10))) + "\n"})
+def test_runner_remaining_output_two_pipes(path):
+    from ..support.gitrepo import GitRepo
+    GitRepo(path, create=True)
+    runner = GitRunner(cwd=path)
+    # The particular command doesn't matter. The one below is the command where
+    # I first noticed the issue, and it reliably triggers it on my end. The
+    # command should have multiple lines and be slow enough that it passes the
+    # initial `proc.poll() is None` condition.
+    cmd = ["git", "count-objects", "-v"]
+    expected, _ = runner(cmd, log_online=False,
+                         log_stdout=True, log_stderr=False)
+
+    # log_stderr=True would fail (at least on Python 3.7) without a workaround.
+    for log_stderr in [False, True]:
+        eq_(expected,
+            runner(cmd, log_online=True, log_stdout=True,
+                   log_stderr=log_stderr)[0])
+
+    if on_windows:
+        raise SkipTest("Remaining part of test uses `cat`")
+
+    cmd = ["cat"]
+    with open(op.join(path, "infile")) as fh:
+        expected, _ = runner(cmd, log_online=False, stdin=fh,
+                             log_stdout=True, log_stderr=False)
+
+    # As with above, log_stderr=True would fail without a workaround.
+    for log_stderr in [False, True]:
+        with open(op.join(path, "infile")) as fh:
+            eq_(expected,
+                runner(cmd, log_online=True, stdin=fh,
+                       log_stdout=True, log_stderr=log_stderr)[0])
