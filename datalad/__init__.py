@@ -167,7 +167,7 @@ def setup_package():
 
     # Monkey patch nose so it does not ERROR out whenever code asks for fileno
     # of the output. See https://github.com/nose-devs/nose/issues/6
-    from six.moves import StringIO as OrigStringIO
+    from io import StringIO as OrigStringIO
 
     class StringIO(OrigStringIO):
         fileno = lambda self: 1

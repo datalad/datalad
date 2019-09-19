@@ -19,8 +19,7 @@ import sys
 
 from ..support.path import exists, join as opj, realpath, dirname, lexists
 
-from six.moves import range
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 import logging
 lgr = logging.getLogger('datalad.customremotes')
@@ -33,6 +32,7 @@ from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
 from ..utils import assure_unicode
+from ..utils import getargspec
 
 
 URI_PREFIX = "dl"
@@ -51,7 +51,7 @@ class AnnexRemoteQuit(Exception):
 def get_function_nargs(f):
     while hasattr(f, 'wrapped'):
         f = f.wrapped
-    argspec = inspect.getargspec(f)
+    argspec = getargspec(f)
     assert not argspec.keywords, \
         "ATM we have none defined with keywords, so disabling having them"
     if argspec.varargs:

@@ -13,8 +13,6 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from six import iteritems
-from six import text_type
 
 from datalad.interface.base import (
     Interface,
@@ -208,7 +206,7 @@ class Save(Interface):
             ds_status = paths_by_ds.get(s['parentds'], {})
             # reassemble path status info as repo.status() would have made it
             ds_status[ut.Path(s['path'])] = \
-                {k: v for k, v in iteritems(s)
+                {k: v for k, v in s.items()
                  if k not in (
                      'path', 'parentds', 'refds', 'status', 'action',
                      'logger')}
@@ -226,11 +224,11 @@ class Save(Interface):
         # sort the datasets into (potentially) disjoint hierarchies,
         # or a single one, if a reference dataset was given
         dataset_hierarchies = get_tree_roots(discovered_datasets)
-        for rootds, children in iteritems(dataset_hierarchies):
+        for rootds, children in dataset_hierarchies.items():
             edges = {}
             discover_dataset_trace_to_targets(
                 rootds, children, [], edges, includeds=children)
-            for superds, subdss in iteritems(edges):
+            for superds, subdss in edges.items():
                 superds_status = paths_by_ds.get(superds, {})
                 for subds in subdss:
                     # TODO actually start from an entry that may already
@@ -255,7 +253,7 @@ class Save(Interface):
                 # cumbersome symlink handling without context in the
                 # lower levels
                 pds.repo.pathobj / p.relative_to(pdspath): props
-                for p, props in iteritems(paths_by_ds.pop(pdspath))}
+                for p, props in paths_by_ds.pop(pdspath).items()}
             start_commit = pds.repo.get_hexsha()
             if not all(p['state'] == 'clean' for p in pds_status.values()):
                 for res in pds.repo.save_(
@@ -276,7 +274,7 @@ class Save(Interface):
                     # version
                     for k in ('path', 'refds'):
                         if k in res:
-                            res[k] = text_type(
+                            res[k] = str(
                                 # recode path back to dataset path anchor
                                 pds.pathobj / res[k].relative_to(
                                     pds.repo.pathobj)

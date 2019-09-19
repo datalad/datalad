@@ -10,15 +10,13 @@
 
 import time
 from calendar import timegm
-from six import PY3
 import re
 
 import os
-import six.moves.builtins as __builtin__
+import builtins
 from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
-from ..base import AccessFailedError
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
@@ -30,6 +28,7 @@ from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..http import HTTPBearerTokenAuthenticator
 from ..http import process_www_authenticate
+from ...support.exceptions import AccessFailedError
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
@@ -38,14 +37,13 @@ from ...tests.utils import with_memory_keyring
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
-    if PY3:
-        raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
+    raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
 except (ImportError, AttributeError):
     # Attribute Error happens with newer httpretty and older ssl module
     # https://github.com/datalad/datalad/pull/2623
     class NoHTTPPretty(object):
-       __bool__ = __nonzero__ = lambda s: False
+       __bool__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
 
@@ -117,6 +115,11 @@ def test_HTTPDownloader_basic(toppath, topurl):
     download(furl, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
+    # download() creates leading directories if needed.
+    subdir_tfpath = opj(toppath, "l1", "l2", "file-downloaded.dat")
+    download(furl, subdir_tfpath)
+    ok_file_has_content(subdir_tfpath, 'abc')
+
     # see if fetch works correctly
     assert_equal(downloader.fetch(furl), 'abc')
 
@@ -137,7 +140,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # XXX obscure mocking since impossible to mock write alone
     # and it still results in some warning being spit out
     with swallow_logs(), \
-         patch.object(__builtin__, 'open', fake_open(write_=_raise_IOError)):
+         patch.object(builtins, 'open', fake_open(write_=_raise_IOError)):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
     # incomplete download scenario - should have 3 tries

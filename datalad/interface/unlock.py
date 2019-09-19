@@ -17,7 +17,6 @@ import logging
 
 import os.path as op
 
-from six import text_type
 
 from datalad.core.local.status import Status
 from datalad.support.constraints import EnsureStr
@@ -95,7 +94,7 @@ class Unlock(Interface):
             for p in set(path).difference(set(paths_lexist)):
                 yield get_status_dict(
                     status="impossible",
-                    path=text_type(p),
+                    path=str(p),
                     type="file",
                     message="path does not exist",
                     **res_kwargs)

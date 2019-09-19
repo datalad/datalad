@@ -16,13 +16,11 @@ import os.path as op
 from functools import partial
 from collections import OrderedDict
 
-from six import PY2
 
 from datalad.interface.base import Interface
 from datalad.interface.base import build_doc
 from datalad.utils import (
     assure_unicode,
-    assure_bytes,
     getpwd,
     unlink,
 )
@@ -114,26 +112,12 @@ def _describe_annex():
 def _describe_system():
     import platform as pl
     from datalad import get_encoding_info
-
-    if hasattr(pl, 'dist'):
-        dist = pl.dist()
-    else:
-        # Python 3.8 removed .dist but recommended "distro" is slow, so we
-        # try it only if needed
-        try:
-            import distro
-            dist = distro.linux_distribution(full_distribution_name=False)
-        except ImportError:
-            lgr.info(
-                "Please install 'distro' package to obtain distribution information"
-            )
-            dist = tuple()
-        except Exception as exc:
-            lgr.warning(
-                "No distribution information will be provided since 'distro' "
-                "fails to import/run: %s", exc_str(exc)
-            )
-            dist = tuple()
+    from datalad.utils import get_linux_distribution
+    try:
+        dist = get_linux_distribution()
+    except Exception as exc:
+        lgr.warning("Failed to get distribution information: %s", exc_str(exc))
+        dist = tuple()
 
     return {
         'type': os.name,
@@ -418,7 +402,7 @@ class WTF(Interface):
     def custom_result_renderer(res, **kwargs):
         from datalad.ui import ui
         out = _render_report(res)
-        ui.message(assure_bytes(out) if PY2 else out)
+        ui.message(out)
 
 
 def _render_report(res):

@@ -17,7 +17,6 @@ import requests.auth
 # from urllib3.exceptions import MaxRetryError, NewConnectionError
 
 import io
-from six import BytesIO
 from time import sleep
 
 from ..utils import assure_list_from_str, assure_dict_from_str
@@ -31,10 +30,15 @@ from ..support.network import get_response_disposition_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 from ..support.status import FileStatus
+from ..support.exceptions import (
+    DownloadError,
+    AccessDeniedError,
+    AccessFailedError,
+    UnhandledRedirectError,
+)
 
 from .base import Authenticator
 from .base import BaseDownloader, DownloaderSession
-from .base import DownloadError, AccessDeniedError, AccessFailedError, UnhandledRedirectError
 
 from logging import getLogger
 from ..log import LoggerHelper
@@ -53,9 +57,9 @@ if lgr.getEffectiveLevel() <= 1:
     # These two lines enable debugging at httplib level (requests->urllib3->http.client)
     # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
     # The only thing missing will be the response.body which is not logged.
-    from six.moves import http_client
+    import http.client
     # TODO: nohow wrapped with logging, plain prints (heh heh), so formatting will not be consistent
-    http_client.HTTPConnection.debuglevel = 1
+    http.client.HTTPConnection.debuglevel = 1
 
     # for requests we can define logging properly
     requests_log = LoggerHelper(logtarget="requests.packages.urllib3").get_initialized_logger()
@@ -369,7 +373,7 @@ class HTTPDownloaderSession(DownloaderSession):
         if f is None:
             # no file to download to
             # TODO: actually strange since it should have been decoded then...
-            f = BytesIO()
+            f = io.BytesIO()
 
         # must use .raw to be able avoiding decoding/decompression while downloading
         # to a file

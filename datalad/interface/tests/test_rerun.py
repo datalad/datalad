@@ -20,7 +20,7 @@ from os import (
     remove,
 )
 
-from six.moves import StringIO
+from io import StringIO
 from mock import patch
 
 from datalad.utils import (
@@ -136,7 +136,7 @@ def test_rerun(path, nodspath):
     report = ds.rerun(since="", report=True, return_type="list")
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
-    assert_result_count(report, 1, rerun_action="skip")
+    assert_result_count(report, 1, rerun_action="skip-or-pick")
     report[-1]["commit"] == ds.repo.get_hexsha()
 
     # If a file is dropped, we remove it instead of unlocking it.
@@ -145,15 +145,6 @@ def test_rerun(path, nodspath):
         ds.rerun()
 
     eq_('x\n', open(probe_path).read())
-    # If the history to rerun has a merge commit, we abort.
-    ds.repo.checkout("HEAD~3", options=["-b", "topic"])
-    with open(op.join(path, "topic-file"), "w") as f:
-        f.write("topic")
-    ds.save("topic-file")
-    ds.repo.checkout("master")
-    ds.repo.merge("topic")
-    assert_repo_status(ds.path)
-    assert_raises(IncompleteResultsError, ds.rerun)
 
 
 @with_tempfile(mkdir=True)
@@ -265,26 +256,13 @@ def test_rerun_chain(path):
 @with_tempfile(mkdir=True)
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
-
-    # Check out an orphan branch so that we can test the "one commit
-    # in a repo" case.
     ds.repo.checkout("orph", options=["--orphan"])
     ds.repo._git_custom_command(None, ["git", "reset", "--hard"])
     ds.repo.config.reload()
 
     ds.run('echo static-content > static')
     eq_(len(ds.repo.get_revisions("HEAD")), 1)
-
-    # Rerunning with just one commit doesn't raise an error ...
-    ds.rerun()
-    # ... but we're still at one commit because the content didn't
-    # change.
-    eq_(len(ds.repo.get_revisions("HEAD")), 1)
-
-    # We abort rather than trying to do anything when --onto='' and
-    # --since='' are given together and the first commit contains a
-    # run command.
-    ds.repo.commit(msg="empty", options=["--allow-empty"])
+    assert_raises(IncompleteResultsError, ds.rerun)
     assert_raises(IncompleteResultsError, ds.rerun, since="", onto="")
 
     # --script propagates the error.
@@ -413,6 +391,33 @@ def test_rerun_cherry_pick(path):
     for onto, action in [("HEAD", "skip"), ("prerun", "pick")]:
         results = ds.rerun(since="prerun", onto=onto)
         assert_in_results(results, status='ok', rerun_action=action)
+
+
+@known_failure_windows
+@with_tempfile(mkdir=True)
+def test_rerun_invalid_merge_run_commit(path):
+    ds = Dataset(path).create()
+    ds.run("echo foo >>foo")
+    ds.run("echo invalid >>invalid")
+    run_msg = ds.repo.format_commit("%B")
+    run_hexsha = ds.repo.get_hexsha()
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard", "master~"])
+    with open(op.join(ds.path, "non-run"), "w") as nrfh:
+        nrfh.write("non-run")
+    ds.save()
+    # Assign two parents to the invalid run commit.
+    commit = ds.repo._git_custom_command(
+        None,
+        ["git", "commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
+         "-p", run_hexsha + "^",
+         "-p", ds.repo.get_hexsha()])[0].strip()
+
+    ds.repo._git_custom_command(None, ["git", "reset", "--hard", commit])
+    hexsha_orig = ds.repo.get_hexsha()
+    with swallow_logs(new_level=logging.WARN) as cml:
+        ds.rerun(since="")
+        assert_in("has run information but is a merge commit", cml.out)
+    eq_(len(ds.repo.get_revisions(hexsha_orig + "..master")), 1)
 
 
 @known_failure_windows

@@ -15,7 +15,7 @@ from os.path import join as opj, dirname
 
 from mock import patch
 
-from six.moves import StringIO
+from io import StringIO
 from .utils import with_testrepos
 from .utils import assert_raises, eq_, ok_, assert_false, assert_true
 from .utils import swallow_outputs

@@ -38,12 +38,6 @@ import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
 
-from six import PY2
-from six import string_types
-from six import text_type
-from six import add_metaclass
-from six import iteritems
-from six import PY2
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
@@ -64,7 +58,6 @@ from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
 from datalad.utils import PurePosixPath
-from datalad.utils import assure_bytes
 from datalad.utils import assure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
@@ -294,7 +287,7 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
             else lambda rpath, filepath: filepath
 
         if files:
-            if isinstance(files, string_types) or not files:
+            if isinstance(files, str) or not files:
                 files_new = [normalize(self.path, files)]
                 single_file = True
             elif isinstance(files, list):
@@ -561,8 +554,7 @@ class GitPythonProgressBar(RemoteProgress):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-@add_metaclass(Flyweight)
-class GitRepo(RepoInterface):
+class GitRepo(RepoInterface, metaclass=Flyweight):
     """Representation of a git repository
 
     """
@@ -600,7 +592,7 @@ class GitRepo(RepoInterface):
 
         # mirror what is happening in __init__
         if isinstance(path, ut.PurePath):
-            path = text_type(path)
+            path = str(path)
 
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
@@ -737,7 +729,7 @@ class GitRepo(RepoInterface):
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
             self._repo = self._create_empty_repo(
-                assure_bytes(path) if PY2 else path,
+                path,
                 create_sanity_checks, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
@@ -843,9 +835,7 @@ class GitRepo(RepoInterface):
             # InvalidGitRepositoryError:
             self._repo = self.cmd_call_wrapper(
                 Repo,
-                # Encode path on Python 2 because, as of v2.1.11, GitPython's
-                # Repo will pass the path to str() otherwise.
-                assure_bytes(self.path) if PY2 else self.path)
+                self.path)
             lgr.log(8, "Using existing Git repository at %s", self.path)
 
         # inject git options into GitPython's git call wrapper:
@@ -1542,7 +1532,7 @@ class GitRepo(RepoInterface):
         """
         if revrange is None:
             revrange = []
-        elif isinstance(revrange, string_types):
+        elif isinstance(revrange, str):
             revrange = [revrange]
 
         cmd = ["git", "log", "--format={}".format(fmt)]
@@ -1594,7 +1584,7 @@ class GitRepo(RepoInterface):
           If no merge-base for given commits, or specified treeish doesn't
           exist, None returned
         """
-        if isinstance(commitishes, string_types):
+        if isinstance(commitishes, str):
             commitishes = [commitishes]
         if not commitishes:
             raise ValueError("Provide at least a single value")
@@ -1775,14 +1765,10 @@ class GitRepo(RepoInterface):
         content_str = self.repo.commit(branch).tree[file_].data_stream.read()
 
         # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
+        conv_str = u''
+        for b in bytes(content_str):
+            conv_str += chr(b)
+        return conv_str.splitlines()
         # TODO: keep splitlines?
 
     def _get_files_history(self, files, branch='HEAD'):
@@ -1851,7 +1837,7 @@ class GitRepo(RepoInterface):
         """
 
         # ensure cmd_str becomes a well-formed list:
-        if isinstance(cmd_str, string_types):
+        if isinstance(cmd_str, str):
             cmd = shlex.split(cmd_str, posix=not on_windows)
         else:
             cmd = cmd_str[:]  # we will modify in-place
@@ -2354,11 +2340,11 @@ class GitRepo(RepoInterface):
         """
         return [
             '{}{}'.format(
-                text_type(p.relative_to(self.pathobj)),
+                str(p.relative_to(self.pathobj)),
                 os.sep if props['type'] != 'file' else ''
             )
-            for p, props in iteritems(self.status(
-                untracked='all', eval_submodule_state='no'))
+            for p, props in self.status(
+                    untracked='all', eval_submodule_state='no').items()
             if props.get('state', None) == 'untracked'
         ]
 
@@ -2384,7 +2370,7 @@ class GitRepo(RepoInterface):
         # abuse our config parser
         db, _ = _parse_gitconfig_dump(out, {}, None, True)
         mods = {}
-        for k, v in iteritems(db):
+        for k, v in db.items():
             if not k.startswith('submodule.'):
                 # we don't know what this is
                 lgr.warning("Skip unrecognized .gitmodule specification: %s=%s", k, v)
@@ -2400,12 +2386,12 @@ class GitRepo(RepoInterface):
 
         out = {}
         # bring into traditional shape
-        for name, props in iteritems(mods):
+        for name, props in mods.items():
             if 'path' not in props:
                 lgr.warning("Failed to get '%s.path', skipping this submodule", name)
                 continue
             modprops = {'gitmodule_{}'.format(k): v
-                        for k, v in iteritems(props)
+                        for k, v in props.items()
                         if not (k.startswith('__') or k == 'path')}
             modpath = self.pathobj / PurePosixPath(props['path'])
             modprops['gitmodule_name'] = name
@@ -2429,11 +2415,11 @@ class GitRepo(RepoInterface):
             return
 
         modinfo = self._parse_gitmodules()
-        for path, props in iteritems(self.get_content_info(
+        for path, props in self.get_content_info(
                 paths=paths,
                 ref=None,
                 untracked='no',
-                eval_file_type=False)):
+                eval_file_type=False).items():
             if props.get('type', None) != 'dataset':
                 continue
             props["path"] = path
@@ -2468,7 +2454,7 @@ class GitRepo(RepoInterface):
                           "in an upcoming release",
                           DeprecationWarning)
             xs = (Submodule(name=p["gitmodule_name"],
-                            path=text_type(p["path"].relative_to(self.pathobj)),
+                            path=str(p["path"].relative_to(self.pathobj)),
                             url=p["gitmodule_url"])
                   for p in xs)
 
@@ -3018,7 +3004,7 @@ class GitRepo(RepoInterface):
             # convert unconditionally
             paths = [ut.PurePosixPath(p) for p in paths]
 
-        path_strs = list(map(text_type, paths)) if paths else None
+        path_strs = list(map(str, paths)) if paths else None
 
         # this will not work in direct mode, but everything else should be
         # just fine
@@ -3070,7 +3056,7 @@ class GitRepo(RepoInterface):
                 # we don't want it to scream on stdout
                 expect_fail=True)
         except CommandError as exc:
-            if "fatal: Not a valid object name" in text_type(exc):
+            if "fatal: Not a valid object name" in str(exc):
                 raise InvalidGitReferenceError(ref)
             raise
         lgr.debug('Done query repo: %s', cmd)
@@ -3149,12 +3135,12 @@ class GitRepo(RepoInterface):
                 if get_link_target and inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
                           ut.Path(
-                            get_link_target(text_type(self.pathobj / path))
+                            get_link_target(str(self.pathobj / path))
                           ).as_posix()) or \
                          (ref and \
                           '.git/annex/objects' in get_link_target(
                               u'{}:{}'.format(
-                                  ref, text_type(path))))
+                                  ref, str(path))))
                         ):
                     # report annex symlink pointers as file, their
                     # symlink-nature is a technicality that is dependent
@@ -3260,10 +3246,10 @@ class GitRepo(RepoInterface):
           `state`
             Can be 'added', 'untracked', 'clean', 'deleted', 'modified'.
         """
-        return {k: v for k, v in iteritems(self.diffstatus(
+        return {k: v for k, v in self.diffstatus(
             fr=fr, to=to, paths=paths,
             untracked=untracked,
-            eval_submodule_state=eval_submodule_state))
+            eval_submodule_state=eval_submodule_state).items()
             if v.get('state', None) != 'clean'}
 
     def diffstatus(self, fr, to, paths=None, untracked='all',
@@ -3320,7 +3306,7 @@ class GitRepo(RepoInterface):
                     self.pathobj.joinpath(ut.PurePosixPath(p))
                     for p in self._git_custom_command(
                         # low-level code cannot handle pathobjs
-                        [text_type(p) for p in paths] if paths else None,
+                        [str(p) for p in paths] if paths else None,
                         ['git', 'ls-files', '-z', '-m'])[0].split('\0')
                     if p)
                 _cache[key] = modified
@@ -3348,7 +3334,7 @@ class GitRepo(RepoInterface):
             _cache[key] = from_state
 
         status = OrderedDict()
-        for f, to_state_r in iteritems(to_state):
+        for f, to_state_r in to_state.items():
             props = None
             if f not in from_state:
                 # this is new, or rather not known to the previous state
@@ -3409,7 +3395,7 @@ class GitRepo(RepoInterface):
                 props['prev_gitshasum'] = from_state[f]['gitshasum']
             status[f] = props
 
-        for f, from_state_r in iteritems(from_state):
+        for f, from_state_r in from_state.items():
             if f not in to_state:
                 # we new this, but now it is gone and Git is not complaining
                 # about it being missing -> properly deleted and deletion
@@ -3438,8 +3424,8 @@ class GitRepo(RepoInterface):
                 return status
 
         # loop over all subdatasets and look for additional modifications
-        for f, st in iteritems(status):
-            f = text_type(f)
+        for f, st in status.items():
+            f = str(f)
             if 'state' in st or not st['type'] == 'dataset':
                 # no business here
                 continue
@@ -3498,7 +3484,7 @@ class GitRepo(RepoInterface):
             # make sure to detach from prev. owner
             status = _status.copy()
         status = OrderedDict(
-            (k, v) for k, v in iteritems(status)
+            (k, v) for k, v in status.items()
             if v.get('state', None) != 'clean'
         )
         return status
@@ -3533,8 +3519,8 @@ class GitRepo(RepoInterface):
 
         # TODO remove pathobj stringification when commit() can
         # handle it
-        to_commit = [text_type(f.relative_to(self.pathobj))
-                     for f, props in iteritems(status)] \
+        to_commit = [str(f.relative_to(self.pathobj))
+                     for f, props in status.items()] \
                     if partial_commit else None
         if not partial_commit or to_commit:
             # we directly call GitRepo.commit() to avoid a whole slew
@@ -3613,8 +3599,8 @@ class GitRepo(RepoInterface):
         to_remove = [
             # TODO remove pathobj stringification when delete() can
             # handle it
-            text_type(f.relative_to(self.pathobj))
-            for f, props in iteritems(status)
+            str(f.relative_to(self.pathobj))
+            for f, props in status.items()
             if props.get('state', None) == 'deleted' and
             # staged deletions have a gitshasum reported for them
             # those should not be processed as git rm will error
@@ -3623,7 +3609,7 @@ class GitRepo(RepoInterface):
         vanished_subds = any(
             props.get('type', None) == 'dataset' and
             props.get('state', None) == 'deleted'
-            for f, props in iteritems(status))
+            for f, props in status.items())
         if to_remove:
             for r in self.remove(
                     to_remove,
@@ -3649,23 +3635,23 @@ class GitRepo(RepoInterface):
         # looks for contained repositories
         added_submodule = False
         untracked_dirs = [f.relative_to(self.pathobj)
-                          for f, props in iteritems(status)
+                          for f, props in status.items()
                           if props.get('state', None) == 'untracked' and
                           props.get('type', None) == 'directory']
         to_add_submodules = []
         if untracked_dirs:
-            to_add_submodules = [sm for sm, sm_props in iteritems(
+            to_add_submodules = [sm for sm, sm_props in
                 self.get_content_info(
                     untracked_dirs,
                     ref=None,
                     # request exhaustive list, so that everything that is
                     # still reported as a directory must be its own repository
-                    untracked='all'))
+                    untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
             for cand_sm in to_add_submodules:
                 try:
                     self.add_submodule(
-                        text_type(cand_sm.relative_to(self.pathobj)),
+                        str(cand_sm.relative_to(self.pathobj)),
                         url=None, name=None)
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
@@ -3692,8 +3678,8 @@ class GitRepo(RepoInterface):
             # without a partial commit an AnnexRepo would ignore any submodule
             # path in its add helper, hence `git add` them explicitly
             to_stage_submodules = {
-                text_type(f.relative_to(self.pathobj)): props
-                for f, props in iteritems(status)
+                str(f.relative_to(self.pathobj)): props
+                for f, props in status.items()
                 if props.get('state', None) in ('modified', 'untracked')
                 and props.get('type', None) == 'dataset'}
             if to_stage_submodules:
@@ -3741,8 +3727,8 @@ class GitRepo(RepoInterface):
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
-            text_type(f.relative_to(self.pathobj)): props
-            for f, props in iteritems(status)
+            str(f.relative_to(self.pathobj)): props
+            for f, props in status.items()
             if (props.get('state', None) in ('modified', 'untracked') and
                 f not in to_add_submodules)}
         if to_add:

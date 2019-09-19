@@ -18,11 +18,8 @@ import sys
 import time
 
 from abc import ABCMeta, abstractmethod
+import os.path as op
 from os.path import exists, join as opj, isdir
-from six import PY2
-from six import binary_type, PY3
-from six import add_metaclass
-from six import reraise
 
 
 from .. import cfg
@@ -33,7 +30,14 @@ from ..utils import (
 )
 from ..dochelpers import exc_str
 from .credentials import CREDENTIAL_TYPES
-from ..support.exceptions import *
+from ..support.exceptions import (
+    AccessDeniedError,
+    AnonymousAccessDeniedError,
+    DownloadError,
+    IncompleteDownloadError,
+    UnaccountedDownloadError,
+)
+
 from ..support.network import RI
 
 from logging import getLogger
@@ -63,8 +67,7 @@ class DownloaderSession(object):
 
 
 @auto_repr
-@add_metaclass(ABCMeta)
-class BaseDownloader(object):
+class BaseDownloader(object, metaclass=ABCMeta):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
@@ -134,10 +137,10 @@ class BaseDownloader(object):
                 # are we stuck in a loop somehow? I think logic doesn't allow this atm
                 raise RuntimeError("Got to the %d'th iteration while trying to download %s" % (attempt, url))
             exc_info = None
+            msg_types = ''
             supported_auth_types = []
             try:
                 used_old_session = False
-                access_denied = False
                 used_old_session = self._establish_session(url, allow_old=allow_old_session)
                 if not allow_old_session:
                     assert(not used_old_session)
@@ -154,23 +157,12 @@ class BaseDownloader(object):
                 supported_auth_types = e.supported_types
                 exc_info = sys.exc_info()
 
-            except IncompleteDownloadError as e:
-                exc_info = sys.exc_info()
-                incomplete_attempt += 1
-                if incomplete_attempt > 5:
-                    # give up
-                    raise
-                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
-                # TODO: may be fail ealier than after 20 attempts in such a case?
-            except DownloadError:
-                # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
-                raise
-
-            msg_types = ''
-            if supported_auth_types:
-                msg_types = " The failure response indicated that following " \
-                            "authentication types should be used: %s" % (', '.join(supported_auth_types))
-            if access_denied:  # moved logic outside of except for clarity
+                if supported_auth_types:
+                    msg_types = \
+                        " The failure response indicated that following " \
+                        "authentication types should be used: %s" % (
+                            ', '.join(supported_auth_types))
+                # keep inside except https://github.com/datalad/datalad/issues/3621
                 # TODO: what if it was anonimous attempt without authentication,
                 #     so it is not "requires_authentication" but rather
                 #     "supports_authentication"?  We should not report below in
@@ -197,7 +189,7 @@ class BaseDownloader(object):
                             lgr.error(
                                 "Interface is non interactive, so we are "
                                 "reraising: %s" % exc_str(e))
-                            reraise(*exc_info)
+                            raise e
                         self._enter_credentials(
                             url,
                             denied_msg=access_denied,
@@ -227,6 +219,18 @@ class BaseDownloader(object):
                             new_provider=True)
                         allow_old_session = False
                         continue
+
+            except IncompleteDownloadError as e:
+                exc_info = sys.exc_info()
+                incomplete_attempt += 1
+                if incomplete_attempt > 5:
+                    # give up
+                    raise
+                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
+                # TODO: may be fail ealier than after 20 attempts in such a case?
+            except DownloadError:
+                # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
+                raise
 
         return result
 
@@ -402,6 +406,13 @@ class BaseDownloader(object):
                     "It will be overriden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
+            download_dir = op.dirname(temp_filepath)
+            if download_dir and not exists(download_dir):
+                # We use the "not exist then makedirs" pattern across our
+                # codebase. This is racy in a way that is unlikely to matter
+                # here, but when we drop Python 2, we might as well switch the
+                # code below to use exist_ok=True.
+                os.makedirs(download_dir)
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
@@ -472,10 +483,7 @@ class BaseDownloader(object):
         if self._cache is None:
             # TODO: move this all logic outside into a dedicated caching beast
             lgr.info("Initializing cache for fetches")
-            if PY2:
-                import anydbm as dbm
-            else:
-                import dbm
+            import dbm
             # Initiate cache.
             # Very rudimentary caching for now, might fail many ways
             cache_dir = cfg.obtain('datalad.locations.cache')
@@ -541,7 +549,7 @@ class BaseDownloader(object):
             downloaded_size = len(content)
 
             # now that we know size based on encoded content, let's decode into string type
-            if PY3 and isinstance(content, binary_type) and decode:
+            if isinstance(content, bytes) and decode:
                 content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 

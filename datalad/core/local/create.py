@@ -14,8 +14,6 @@ import os
 import logging
 import random
 import uuid
-from six import iteritems
-from six import text_type
 from argparse import (
     REMAINDER,
     ONE_OR_MORE,
@@ -177,7 +175,10 @@ class Create(Interface):
             cfg_proc=None
     ):
         if dataset:
-            ds = dataset if isinstance(dataset, Dataset) else Dataset(dataset)
+            if isinstance(dataset, Dataset):
+                ds = dataset
+            else:
+                ds = Dataset(dataset)
             refds_path = ds.path
         else:
             ds = refds_path = None
@@ -206,12 +207,12 @@ class Create(Interface):
         assert(path is not None)
 
         # prep for yield
-        res = dict(action='create', path=text_type(path),
+        res = dict(action='create', path=str(path),
                    logger=lgr, type='dataset',
                    refds=refds_path)
 
         refds = None
-        if refds_path and refds_path != text_type(path):
+        if refds_path and refds_path != str(path):
             refds = require_dataset(
                 refds_path, check_installed=True,
                 purpose='creating a subdataset')
@@ -224,7 +225,7 @@ class Create(Interface):
                     message=(
                         "dataset containing given paths is not underneath "
                         "the reference dataset %s: %s",
-                        ds, text_type(path)),
+                        ds, str(path)),
                 )
                 return
 
@@ -235,7 +236,7 @@ class Create(Interface):
         # in this location
         # it will cost some filesystem traversal though...
         parentds_path = rev_get_dataset_root(
-            op.normpath(op.join(text_type(path), os.pardir)))
+            op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)
             parentds_path = ut.Path(parentds_path)
@@ -259,8 +260,8 @@ class Create(Interface):
                     'status': 'error',
                     'message': (
                         'collision with content in parent dataset at %s: %s',
-                        text_type(parentds_path),
-                        [text_type(c) for c in conflict])})
+                        str(parentds_path),
+                        [str(c) for c in conflict])})
                 yield res
                 return
             if not force:
@@ -268,7 +269,7 @@ class Create(Interface):
                 # into a known subdataset that is not around ATM
                 subds_status = {
                     parentds_path / k.relative_to(prepo.path)
-                    for k, v in iteritems(pstatus)
+                    for k, v in pstatus.items()
                     if v.get('type', None) == 'dataset'}
                 check_paths = [check_path]
                 check_paths.extend(check_path.parents)
@@ -278,15 +279,15 @@ class Create(Interface):
                         'status': 'error',
                         'message': (
                             'collision with %s (dataset) in dataset %s',
-                            text_type(conflict[0]),
-                            text_type(parentds_path))})
+                            str(conflict[0]),
+                            str(parentds_path))})
                     yield res
                     return
 
         # important to use the given Dataset object to avoid spurious ID
         # changes with not-yet-materialized Datasets
         tbds = ds if isinstance(ds, Dataset) and \
-            ds.path == path else Dataset(text_type(path))
+            ds.path == path else Dataset(str(path))
 
         # don't create in non-empty directory without `force`:
         if op.isdir(tbds.path) and listdir(tbds.path) != [] and not force:
@@ -402,7 +403,7 @@ class Create(Interface):
         # a dedicated argument, because it is sufficient for the cmdline
         # and unnecessary for the Python API (there could simply be a
         # subsequence ds.config.add() call)
-        for k, v in iteritems(tbds.config.overrides):
+        for k, v in tbds.config.overrides.items():
             tbds.config.add(k, v, where='local', reload=False)
 
         # all config manipulation is done -> fll reload

@@ -17,7 +17,6 @@ from mock import patch
 
 from nose import SkipTest
 
-from six import text_type
 
 from datalad.support.external_versions import external_versions
 from datalad.utils import Path
@@ -81,7 +80,7 @@ def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
 
-    path = opj(text_type(manager.socket_dir),
+    path = opj(str(manager.socket_dir),
                get_connection_hash('localhost', bundled=True))
     # TODO: facilitate the test when it didn't exist
     existed_before = exists(path)
@@ -118,9 +117,9 @@ def test_ssh_manager_close():
     manager = SSHManager()
 
     # check for previously existing sockets:
-    existed_before_1 = exists(opj(text_type(manager.socket_dir),
+    existed_before_1 = exists(opj(str(manager.socket_dir),
                                   get_connection_hash('localhost')))
-    existed_before_2 = exists(opj(text_type(manager.socket_dir),
+    existed_before_2 = exists(opj(str(manager.socket_dir),
                                   get_connection_hash('datalad-test')))
 
     manager.get_connection('ssh://localhost').open()
@@ -132,16 +131,16 @@ def test_ssh_manager_close():
         manager.get_connection('ssh://localhost').close()
         manager.get_connection('ssh://localhost').open()
 
-    ok_(exists(opj(text_type(manager.socket_dir),
+    ok_(exists(opj(str(manager.socket_dir),
                    get_connection_hash('localhost', bundled=True))))
-    ok_(exists(opj(text_type(manager.socket_dir),
+    ok_(exists(opj(str(manager.socket_dir),
                    get_connection_hash('datalad-test', bundled=True))))
 
     manager.close()
 
-    still_exists_1 = exists(opj(text_type(manager.socket_dir),
+    still_exists_1 = exists(opj(str(manager.socket_dir),
                                 get_connection_hash('localhost')))
-    still_exists_2 = exists(opj(text_type(manager.socket_dir),
+    still_exists_2 = exists(opj(str(manager.socket_dir),
                                 get_connection_hash('datalad-test')))
 
     eq_(existed_before_1, still_exists_1)
@@ -217,8 +216,8 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # and now a quick smoke test for get
     togetfile = Path(targetdir) / '2|g>e"t.t&x;t'
-    togetfile.write_text(text_type('something'))
-    ssh.get(opj(remote_url, text_type(togetfile)), sourcedir)
+    togetfile.write_text(str('something'))
+    ssh.get(opj(remote_url, str(togetfile)), sourcedir)
     ok_((Path(sourcedir) / '2|g>e"t.t&x;t').exists())
 
     ssh.close()
@@ -250,7 +249,7 @@ def test_ssh_custom_identity_file():
                 ssh = manager.get_connection('ssh://localhost')
                 cmd_out, _ = ssh("echo blah")
                 expected_socket = op.join(
-                    text_type(manager.socket_dir),
+                    str(manager.socket_dir),
                     get_connection_hash("localhost", identity_file=ifile,
                                         bundled=True))
                 ok_(exists(expected_socket))
@@ -289,6 +288,6 @@ def test_bundle_invariance(path):
     for flag in (True, False):
         assert_false(testfile.exists())
         ssh = manager.get_connection(remote_url, use_remote_annex_bundle=flag)
-        ssh('cd .>{}'.format(text_type(testfile)))
+        ssh('cd .>{}'.format(str(testfile)))
         ok_(testfile.exists())
         testfile.unlink()

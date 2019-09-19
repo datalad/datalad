@@ -16,9 +16,7 @@ import shutil
 import sys
 import logging
 from mock import patch
-from six import PY3
-from six import text_type
-import six.moves.builtins as __builtin__
+import builtins
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -110,7 +108,7 @@ def test_get_func_kwargs_doc():
 
 def test_better_wraps():
     from functools import wraps
-    from inspect import getargspec
+    from datalad.utils import getargspec
 
     def wraps_decorator(func):
         @wraps(func)
@@ -282,14 +280,13 @@ def _check_setup_exceptionhook(interactive):
             except Exception as e:  # RuntimeError:
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
-            if PY3:
-                # Happens under tox environment but not in manually crafted
-                # ones -- not yet sure what it is about but --dbg does work
-                # with python3 so lettting it skip for now
-                raise SkipTest(
-                    "TODO: Not clear why in PY3 calls cleanup if we try to "
-                    "access the beast"
-                )
+            # Happens under tox environment but not in manually crafted
+            # ones -- not yet sure what it is about but --dbg does work
+            # with python3 so lettting it skip for now
+            raise SkipTest(
+                "TODO: Not clear why in PY3 calls cleanup if we try to "
+                "access the beast"
+            )
             assert_in('Traceback (most recent call last)', cmo.err)
             assert_in('in _check_setup_exceptionhook', cmo.err)
             if interactive:
@@ -728,9 +725,9 @@ def test_memoized_generator():
 
 
 def test_assure_unicode():
-    ok_(isinstance(assure_unicode("m"), text_type))
-    ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
-    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
+    ok_(isinstance(assure_unicode("m"), str))
+    ok_(isinstance(assure_unicode('grandchild_äöü東'), str))
+    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), str))
     eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
@@ -743,7 +740,7 @@ def test_assure_unicode():
     eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
     # but when we mix, it does still guess something allowing to decode:
     mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
-    ok_(isinstance(assure_unicode(mixedin), text_type))
+    ok_(isinstance(assure_unicode(mixedin), str))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
         assure_unicode(mixedin, confidence=0.9)
@@ -753,8 +750,8 @@ def test_assure_unicode():
 
 
 def test_pathlib_unicode():
-    eq_(text_type(Path("a")), u"a")
-    eq_(text_type(Path(u"β")), u"β")
+    eq_(str(Path("a")), u"a")
+    eq_(str(Path(u"β")), u"β")
 
 
 def test_as_unicode():
@@ -881,7 +878,7 @@ def test_safe_print():
         if called[0] == 1:
             raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
 
-    with patch.object(__builtin__, 'print', _print):
+    with patch.object(builtins, 'print', _print):
         safe_print("bua")
     assert_equal(called[0], 2)
 

@@ -25,7 +25,6 @@ from collections import (
     defaultdict,
     OrderedDict,
 )
-from six import iteritems
 
 from ..ui import ui
 from ..dochelpers import exc_str
@@ -318,7 +317,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     description of its parameters. The Parameter spec needs to match
     the number and names of the callables arguments.
     """
-    from inspect import getargspec
+    from datalad.utils import getargspec
     # get the signature
     ndefaults = 0
     args, varargs, varkw, defaults = getargspec(func)
@@ -499,7 +498,7 @@ class DefaultOutputRenderer(object):
         if isinstance(v, list):
             return [cls._dict_to_nadict(x) for x in v]
         elif isinstance(v, dict):
-            return nadict((k, cls._dict_to_nadict(x)) for k, x in iteritems(v))
+            return nadict((k, cls._dict_to_nadict(x)) for k, x in v.items())
         else:
             return v
 
@@ -532,7 +531,7 @@ class Interface(object):
         # XXX needs safety check for name collisions
         # XXX allow for parser kwargs customization
         parser_kwargs = {}
-        from inspect import getargspec
+        from datalad.utils import getargspec
         # get the signature
         ndefaults = 0
         args, varargs, varkw, defaults = getargspec(cls.__call__)
@@ -596,7 +595,7 @@ class Interface(object):
     @classmethod
     def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
-        from inspect import getargspec
+        from datalad.utils import getargspec
         argspec = getargspec(cls.__call__)
         if argspec[2] is None:
             # no **kwargs in the call receiver, pull argnames from signature
@@ -695,7 +694,7 @@ def get_allargs_as_kwargs(call, args, kwargs):
     resolvin the defaults for all kwargs that are not given in a kwargs
     dict
     """
-    from inspect import getargspec
+    from datalad.utils import getargspec
     argspec = getargspec(call)
     defaults = argspec.defaults
     nargs = len(argspec.args)

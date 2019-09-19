@@ -8,7 +8,6 @@
 """Test file info getters"""
 
 
-from six import iteritems
 import os.path as op
 import datalad.utils as ut
 
@@ -159,8 +158,8 @@ def test_compare_content_info(path):
     wt = ds.repo.get_content_info(ref=None)
     assert_dict_equal(
         wt,
-        {f: {k: v for k, v in iteritems(p) if k != 'bytesize'}
-         for f, p in iteritems(ds.repo.get_content_info(ref='HEAD'))}
+        {f: {k: v for k, v in p.items() if k != 'bytesize'}
+         for f, p in ds.repo.get_content_info(ref='HEAD').items()}
     )
 
 

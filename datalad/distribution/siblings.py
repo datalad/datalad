@@ -16,7 +16,7 @@ import logging
 import os
 import os.path as op
 
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results

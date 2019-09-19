@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -13,23 +13,31 @@
 __docformat__ = 'restructuredtext'
 
 import os.path as op
+import sys
 
+from datalad.cmd import Runner
 from datalad.utils import chpwd
-from datalad.tests.utils import ok_clean_git
+from datalad.utils import maybe_shlex_quote
+from datalad.utils import swallow_outputs
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import assert_true
 from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_windows
 from datalad.distribution.dataset import Dataset
-from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import (
+    CommandError,
+    InsufficientArgumentsError,
+)
 from datalad.api import run_procedure
 from datalad import cfg
 
@@ -49,6 +57,19 @@ def test_invalid_call(path):
 
 
 @known_failure_windows  #FIXME
+@with_tree(tree={'README.md': 'dirty'})
+def test_dirty(path):
+    ds = Dataset(path).create(force=True)
+    # must fail, because README.md is to be modified, but already dirty
+    assert_raises(CommandError, ds.run_procedure, 'cfg_yoda')
+    # make sure that was the issue
+    # save to git explicitly to keep the test simple and avoid unlocking...
+    ds.save('README.md', to_git=True)
+    ds.run_procedure('cfg_yoda')
+    assert_repo_status(ds.path)
+
+
+@known_failure_windows  #FIXME
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
 import sys
@@ -63,8 +84,9 @@ save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 def test_basics(path, super_path):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     assert_false(ds.repo.is_under_annex("README.md"))
+    # save the procedure
+    ds.save('code')
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -81,7 +103,7 @@ def test_basics(path, super_path):
     ds.clean()
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(ds.path, index_modified=[op.join('.datalad', 'config')])
+    assert_repo_status(ds.path, modified=[op.join('.datalad', 'config')])
 
     # make a fresh dataset:
     super = Dataset(super_path).create()
@@ -97,7 +119,7 @@ def test_basics(path, super_path):
     super.clean()
     # look for traces
     ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-    ok_clean_git(super.path, index_modified=[op.join('.datalad', 'config')])
+    assert_repo_status(super.path, modified=[op.join('.datalad', 'config')])
 
 
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
@@ -131,7 +153,6 @@ def test_procedure_discovery(path, super_path):
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -160,6 +181,8 @@ def test_procedure_discovery(path, super_path):
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
 
     # make it a subdataset and try again:
+    # first we need to save the beast to make install work
+    ds.save()
     super = Dataset(super_path).create()
     super.install('sub', source=ds.path)
 
@@ -215,7 +238,6 @@ def test_configs(path):
     # set up dataset with registered procedure (c&p from test_basics):
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_yoda')
-    ok_clean_git(ds.path)
     # configure dataset to look for procedures in its code folder
     ds.config.add(
         'datalad.locations.dataset-procedures',
@@ -231,7 +253,7 @@ def test_configs(path):
     # for run:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python "{script}" "{ds}" {{mysub}} {args}',
+        u'%s {script} {ds} {{mysub}} {args}' % maybe_shlex_quote(sys.executable),
         where='dataset'
     )
     ds.config.add(
@@ -251,7 +273,7 @@ def test_configs(path):
     # config on dataset level:
     ds.config.add(
         'datalad.procedures.datalad_test_proc.call-format',
-        'python "{script}" "{ds}" local {args}',
+        u'%s {script} {ds} local {args}' % maybe_shlex_quote(sys.executable),
         where='local'
     )
     ds.unlock("fromproc.txt")
@@ -275,3 +297,58 @@ def test_configs(path):
     r = ds.run_procedure('datalad_test_proc', help_proc=True)
     assert_true(len(r) == 1)
     assert_in_results(r, message="This is a help message", status='ok')
+
+
+@known_failure_windows
+@with_tree(tree={
+    'code': {'datalad_test_proc.py': """\
+import sys
+import os.path as op
+from datalad.api import add, Dataset
+
+with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
+    f.write('hello\\n')
+add(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
+"""}})
+def test_spaces(path):
+    """
+    Test whether args with spaces are correctly parsed.
+    """
+    ds = Dataset(path).create(force=True)
+    ds.run_procedure('cfg_yoda')
+    # configure dataset to look for procedures in its code folder
+    ds.config.add(
+        'datalad.locations.dataset-procedures',
+        'code',
+        where='dataset')
+    # 1. run procedure based on execution guessing by run_procedure:
+    ds.run_procedure(spec=['datalad_test_proc', 'with spaces', 'unrelated'])
+    # check whether file has name with spaces
+    ok_file_has_content(op.join(ds.path, 'with spaces'), 'hello\n')
+
+
+@known_failure_windows
+@with_tree(tree={OBSCURE_FILENAME:
+                 {"code": {"just2args.py": """
+import sys
+print(sys.argv)
+# script, dataset, and two others
+assert len(sys.argv) == 4
+"""}}})
+def test_quoting(path):
+    ds = Dataset(op.join(path, OBSCURE_FILENAME)).create(force=True)
+    # Our custom procedure fails if it receives anything other than two
+    # procedure arguments (so the script itself receives 3). Check a few cases
+    # from the Python API and CLI.
+    ds.config.add("datalad.locations.dataset-procedures", "code",
+                  where="dataset")
+    with swallow_outputs():
+        ds.run_procedure(spec=["just2args", "with ' sing", 'with " doub'])
+        with assert_raises(CommandError):
+            ds.run_procedure(spec=["just2args", "still-one arg"])
+
+        runner = Runner(cwd=ds.path)
+        runner.run(
+            "datalad run-procedure just2args \"with ' sing\" 'with \" doub'")
+        with assert_raises(CommandError):
+            runner.run("datalad run-procedure just2args 'still-one arg'")

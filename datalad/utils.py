@@ -10,8 +10,13 @@
 import collections
 import hashlib
 import re
-import six.moves.builtins as __builtin__
+import builtins
 import time
+
+try:
+    from collections.abc import Callable
+except ImportError:  # Python <= 3.3
+    from collections import Callable
 
 import logging
 import shutil
@@ -23,13 +28,14 @@ import gc
 import glob
 import gzip
 import string
+import warnings
 import wrapt
 
 from copy import copy as shallow_copy
 from contextlib import contextmanager
 from functools import wraps
 from time import sleep
-from inspect import getargspec
+import inspect
 from itertools import tee
 
 import os.path as op
@@ -44,17 +50,13 @@ from os.path import dirname
 from os.path import split as psplit
 import posixpath
 
-
-from six import PY2, text_type, binary_type, string_types
+from shlex import quote as shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
 from datalad.consts import TIMESTAMP_FMT
 
 
-if PY2:
-    unicode_srctypes = string_types
-else:
-    unicode_srctypes = string_types + (bytes,)
+unicode_srctypes = str, bytes
 
 
 lgr = logging.getLogger("datalad.utils")
@@ -70,9 +72,25 @@ on_linux = platform_system == 'linux'
 on_msys_tainted_paths = on_windows \
                         and 'MSYS_NO_PATHCONV' not in os.environ \
                         and os.environ.get('MSYSTEM', '')[:4] in ('MSYS', 'MING')
+
+
+def get_linux_distribution():
+    """Compatibility wrapper for {platform,distro}.linux_distribution().
+    """
+    if hasattr(platform, "linux_distribution"):
+        # Use deprecated (but faster) method if it's available.
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            result = platform.linux_distribution()
+    else:
+        import distro  # We require this for Python 3.8 and above.
+        result = distro.linux_distribution(full_distribution_name=False)
+    return result
+
+
 try:
     linux_distribution_name, linux_distribution_release \
-        = platform.linux_distribution()[:2]
+        = get_linux_distribution()[:2]
     on_debian_wheezy = on_linux \
                        and linux_distribution_name == 'debian' \
                        and linux_distribution_release.startswith('7.')
@@ -117,6 +135,16 @@ lgr.debug(
 #
 # Little helpers
 #
+
+# `getargspec` has been deprecated in Python 3.
+if hasattr(inspect, "getfullargspec"):
+    ArgSpecFake = collections.namedtuple(
+        "ArgSpecFake", ["args", "varargs", "keywords", "defaults"])
+
+    def getargspec(func):
+        return ArgSpecFake(*inspect.getfullargspec(func)[:4])
+else:
+    getargspec = inspect.getargspec
 
 
 def get_func_kwargs_doc(func):
@@ -329,23 +357,12 @@ def is_explicit_path(path):
 
 # handle this dance once, and import pathlib from here
 # in all other places
-if PY2:
-    from pathlib2 import (
-        Path,
-        PurePath,
-        PurePosixPath,
-    )
 
-    def _unicode_path(pathobj):
-        return assure_unicode(str(pathobj))
-
-    PurePath.__unicode__ = _unicode_path
-else:
-    from pathlib import (
-        Path,
-        PurePath,
-        PurePosixPath,
-    )
+from pathlib import (
+    Path,
+    PurePath,
+    PurePosixPath,
+)
 
 
 def rotree(path, ro=True, chmod_files=True):
@@ -527,7 +544,7 @@ def escape_filename(filename):
 def encode_filename(filename):
     """Encode unicode filename
     """
-    if isinstance(filename, text_type):
+    if isinstance(filename, str):
         return filename.encode(sys.getfilesystemencoding())
     else:
         return filename
@@ -540,7 +557,7 @@ def decode_input(s):
     If fails -- issue warning and decode allowing for errors
     being replaced
     """
-    if isinstance(s, text_type):
+    if isinstance(s, str):
         return s
     else:
         encoding = sys.stdin.encoding or 'UTF-8'
@@ -602,13 +619,13 @@ def assure_iter(s, cls, copy=False, iterate=True):
     copy: bool, optional
       If correct iterable is passed, it would generate its shallow copy
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
 
     if isinstance(s, cls):
         return s if not copy else shallow_copy(s)
-    elif isinstance(s, text_type):
+    elif isinstance(s, str):
         return cls((s,))
     elif iterate and hasattr(s, '__iter__'):
         return cls(s)
@@ -627,7 +644,7 @@ def assure_list(s, copy=False, iterate=True):
     copy: bool, optional
       If list is passed, it would generate a shallow copy of the list
     iterate: bool, optional
-      If it is not a list, but something iterable (but not a text_type)
+      If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
     return assure_iter(s, list, copy=copy, iterate=iterate)
@@ -678,20 +695,24 @@ def assure_dict_from_str(s, **kwargs):
 
 
 def assure_bytes(s, encoding='utf-8'):
-    """Convert/encode unicode to str (PY2) or bytes (PY3) if of 'text_type'
+    """Convert/encode unicode string to bytes.
+
+    If `s` isn't a string, return it as is.
 
     Parameters
     ----------
     encoding: str, optional
       Encoding to use.  "utf-8" is the default
     """
-    if not isinstance(s, text_type):
+    if not isinstance(s, str):
         return s
     return s.encode(encoding)
 
 
 def assure_unicode(s, encoding=None, confidence=None):
-    """Convert/decode to unicode (PY2) or str (PY3) if of 'binary_type'
+    """Convert/decode bytestring to unicode.
+
+    If `s` isn't a bytestring, return it as is.
 
     Parameters
     ----------
@@ -702,7 +723,7 @@ def assure_unicode(s, encoding=None, confidence=None):
       A value between 0 and 1, so if guessing of encoding is of lower than
       specified confidence, ValueError is raised
     """
-    if not isinstance(s, binary_type):
+    if not isinstance(s, bytes):
         return s
     if encoding is None:
         # Figure out encoding, defaulting to 'utf-8' which is our common
@@ -739,7 +760,7 @@ def assure_bool(s):
 
     to recognize on,True,yes as True, off,False,no as False
     """
-    if isinstance(s, string_types):
+    if isinstance(s, str):
         if s.isdigit():
             return bool(int(s))
         sl = s.lower()
@@ -768,12 +789,12 @@ def as_unicode(val, cast_types=object):
     """
     if val is None:
         return u''
-    elif isinstance(val, text_type):
+    elif isinstance(val, str):
         return val
     elif isinstance(val, unicode_srctypes):
         return assure_unicode(val)
     elif isinstance(val, cast_types):
-        return text_type(val)
+        return str(val)
     else:
         raise TypeError(
             "Value %r is not of any of known or provided %s types"
@@ -979,7 +1000,7 @@ def optional_args(decorator):
         def dec(f):
             return decorator(f, *args, **kwargs)
 
-        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], collections.Callable)
+        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], Callable)
         if is_decorating:
             f = args[0]
             args = []
@@ -1139,7 +1160,7 @@ def swallow_outputs():
 
     from .ui import ui
     # preserve -- they could have been mocked already
-    oldprint = getattr(__builtin__, 'print')
+    oldprint = getattr(builtins, 'print')
     oldout, olderr = sys.stdout, sys.stderr
     olduiout = ui.out
     adapter = StringIOAdapter()
@@ -1147,12 +1168,12 @@ def swallow_outputs():
     try:
         sys.stdout, sys.stderr = adapter.handles
         ui.out = adapter.handles[0]
-        setattr(__builtin__, 'print', fake_print)
+        setattr(builtins, 'print', fake_print)
 
         yield adapter
     finally:
         sys.stdout, sys.stderr, ui.out = oldout, olderr, olduiout
-        setattr(__builtin__, 'print',  oldprint)
+        setattr(builtins, 'print',  oldprint)
         adapter.cleanup()
 
 
@@ -1491,7 +1512,7 @@ class chpwd(object):
             self._mkdir = False
         lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
-        os.environ['PWD'] = assure_bytes(path) if PY2 else path
+        os.environ['PWD'] = path
 
     def __enter__(self):
         # nothing more to do really, chdir was in the constructor
@@ -1649,7 +1670,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
     filename = realpath(filename)
 
     if content:
-        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+        with open(filename, 'w' + ('b' if isinstance(content, bytes) else '')) as f:
             f.write(content)
 
     if __debug__:
@@ -1897,7 +1918,7 @@ def slash_join(base, extension):
 def safe_print(s):
     """Print with protection against UTF-8 encoding errors"""
     # A little bit of dance to be able to test this code
-    print_f = getattr(__builtin__, "print")
+    print_f = getattr(builtins, "print")
     try:
         print_f(s)
     except UnicodeEncodeError:
@@ -1968,8 +1989,8 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
                 )
                 dialect = 'excel-tab'
 
-    kw = {} if PY2 else dict(encoding='utf-8')
-    with open(fname, 'rb' if PY2 else 'r', **kw) as tsvfile:
+    kw = dict(encoding='utf-8')
+    with open(fname, 'r', **kw) as tsvfile:
         # csv.py doesn't do Unicode; encode temporarily as UTF-8:
         csv_reader = csv.reader(
             tsvfile,
@@ -2274,6 +2295,15 @@ def bytes2human(n, format='%(value).1f %(symbol)sB'):
             value = float(n) / prefix[symbol]
             return format % locals()
     return format % dict(symbol=symbols[0], value=n)
+
+
+def maybe_shlex_quote(val):
+    """
+    shlex_quote() a value if the command is not run on a Windows
+    machine.
+    """
+
+    return val if on_windows else shlex_quote(val)
 
 
 lgr.log(5, "Done importing datalad.utils")

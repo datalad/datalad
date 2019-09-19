@@ -13,10 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os.path as op
-from six import (
-    iteritems,
-    text_type,
-)
 from collections import OrderedDict
 from datalad.utils import (
     assure_list,
@@ -162,12 +158,12 @@ def _diff_cmd(
             # content (e.g. 'ds/')
             # special case is the root dataset, always report its content
             # changes
-            orig_path = text_type(p)
+            orig_path = str(p)
             resolved_path = rev_resolve_path(p, dataset)
             p = \
                 resolved_path, \
                 orig_path.endswith(op.sep) or resolved_path == ds.pathobj
-            str_path = text_type(p[0])
+            str_path = str(p[0])
             root = rev_get_dataset_root(str_path)
             if root is None:
                 # no root, not possibly underneath the refds
@@ -243,7 +239,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
     paths = None if origpaths is None \
         else OrderedDict(
             (repo_path / p.relative_to(ds.pathobj), goinside)
-            for p, goinside in iteritems(origpaths)
+            for p, goinside in origpaths.items()
             if ds.pathobj in p.parents or (p == ds.pathobj and goinside)
         )
     try:
@@ -259,7 +255,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         yield dict(
             path=ds.path,
             status='impossible',
-            message=text_type(e),
+            message=str(e),
         )
         return
 
@@ -278,8 +274,8 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
                 ref=fr,
                 key_prefix="prev_")
 
-    for path, props in iteritems(diff_state):
-        pathinds = text_type(ds.pathobj / path.relative_to(repo_path))
+    for path, props in diff_state.items():
+        pathinds = str(ds.pathobj / path.relative_to(repo_path))
         yield dict(
             props,
             path=pathinds,

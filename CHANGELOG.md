@@ -9,9 +9,25 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.12.0rc5 (??? ??, 2019) -- will be better than ever
-￼
+## 0.12.0rc6 (??? ??, 2019) -- will be better than ever
+
 bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+?
+
+### Enhancements and new features
+
+?
+
+## 0.12.0rc5 (September 04, 2019) -- .
+
+Various fixes and enhancements that bring the 0.12.0 release closer.
 
 ### Major refactoring and deprecations
 
@@ -27,6 +43,12 @@ bet we will fix some bugs and make a world even a better place.
   `AnnexRepo.unlock` were unused internally and have been removed.
   ([#3459][])
 
+- The `get_submodules` method of `GitRepo` has been rewritten without
+  GitPython.  When the new `compat` flag is true (the current
+  default), the method returns a value that is compatible with the old
+  return value.  This backwards-compatible return value and the
+  `compat` flag will be removed in a future release.  ([#3508][])
+
 - The logic for resolving relative paths given to a command has
   changed ([#3435][]).  The new rule is that relative paths are taken
   as relative to the dataset only if a dataset _instance_ is passed by
@@ -39,8 +61,8 @@ bet we will fix some bugs and make a world even a better place.
   distinction between "rel/path" and "./rel/path" no longer exists.)
 
   All commands under `datalad.core` and `datalad.local`, as well as
-  `unlock`, follow the new logic.  The goal is for all commands to
-  eventually do so.
+  `unlock` and `addurls`, follow the new logic.  The goal is for all
+  commands to eventually do so.
 
 ### Fixes
 
@@ -58,11 +80,26 @@ bet we will fix some bugs and make a world even a better place.
 - [save][] ignored `--on-failure` in its underlying call to
   [status][].  ([#3470][])
 
+- Calling [remove][] with a subdirectory displayed spurious warnings
+  about the subdirectory files not existing.  ([#3586][])
+
 - Our processing of `git-annex --json` output mishandled info messages
   from special remotes.  ([#3546][])
 
-- As of 0.12.0rc3, calling [create][] with `--force` didn't bypass the
-  "existing subdataset" check.  ([#3552][])
+- [create][]
+  - didn't bypass the "existing subdataset" check when called with
+    `--force` as of 0.12.0rc3 ([#3552][])
+  - failed to register the up-to-date revision of a subdataset when
+    `--cfg-proc` was used with `--dataset` ([#3591][])
+
+- The base downloader had some error handling that wasn't compatible
+  with Python 3.  ([#3622][])
+
+- Fixed a number of Unicode py2-compatibility issues. ([#3602][])
+
+- `AnnexRepo.get_content_annexinfo` did not properly chunk file
+  arguments to avoid exceeding the command-line character limit.
+  ([#3587][])
 
 ### Enhancements and new features
 
@@ -82,6 +119,11 @@ bet we will fix some bugs and make a world even a better place.
 
 - The `.dirty` property of `GitRepo` and `AnnexRepo` has been sped up.
   ([#3460][])
+
+- The `get_content_info` method of `GitRepo`, used by `status` and
+  commands that depend on `status`, now restricts its git calls to a
+  subset of files, if possible, for a performance gain in repositories
+  with many files.  ([#3508][])
 
 - Extensions that do not provide a command, such as those that provide
   only metadata extractors, are now supported.  ([#3531][])
@@ -270,13 +312,9 @@ with more performant implementations.
   information and save changes.
 
 
-## 0.11.7 (??? ??, 2019) -- will be better than ever
+## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
-bet we will fix some bugs and make a world even a better place.
-
-### Major refactoring and deprecations
-
-- hopefully none
+Primarily bugfixes with some optimizations and refactorings.
 
 ### Fixes
 
@@ -288,8 +326,25 @@ bet we will fix some bugs and make a world even a better place.
     convention used by other commands of taking relative paths as
     relative to the dataset argument.  ([#3582][])
 
+- [run-procedure][]
+  - hard coded "python" when formatting the command for non-executable
+    procedures ending with ".py".  `sys.executable` is now used.
+    ([#3624][])
+  - failed if arguments needed more complicated quoting than simply
+    surrounding the value with double quotes.  This has been resolved
+    for systems that support `shlex.quote`, but note that on Windows
+    values are left unquoted. ([#3626][])
+
 - [siblings][] now displays an informative error message if a local
   path is given to `--url` but `--name` isn't specified.  ([#3555][])
+
+- [sshrun][], the command DataLad uses for `GIT_SSH_COMMAND`, didn't
+  support all the parameters that Git expects it to.  ([#3616][])
+
+- Fixed a number of Unicode py2-compatibility issues. ([#3597][])
+
+- [download-url][] now will create leading directories of the output path
+  if they do not exist ([#3646][])
 
 ### Enhancements and new features
 
@@ -306,6 +361,14 @@ bet we will fix some bugs and make a world even a better place.
 
 - [addurls][] now suggests close matches when the URL or file format
   contains an unknown field.  ([#3594][])
+
+- Shared logic used in the setup.py files of Datalad and its
+  extensions has been moved to modules in the _datalad_build_support/
+  directory.  ([#3600][])
+
+- Get ready for upcoming git-annex dropping support for direct mode
+  ([#3631][])
+
 
 ## 0.11.6 (Jul 30, 2019) -- am I the last of 0.11.x?
 
@@ -1721,6 +1784,7 @@ publishing
 [#3493]: https://github.com/datalad/datalad/issues/3493
 [#3498]: https://github.com/datalad/datalad/issues/3498
 [#3499]: https://github.com/datalad/datalad/issues/3499
+[#3508]: https://github.com/datalad/datalad/issues/3508
 [#3516]: https://github.com/datalad/datalad/issues/3516
 [#3518]: https://github.com/datalad/datalad/issues/3518
 [#3524]: https://github.com/datalad/datalad/issues/3524
@@ -1739,4 +1803,16 @@ publishing
 [#3576]: https://github.com/datalad/datalad/issues/3576
 [#3579]: https://github.com/datalad/datalad/issues/3579
 [#3582]: https://github.com/datalad/datalad/issues/3582
+[#3586]: https://github.com/datalad/datalad/issues/3586
+[#3587]: https://github.com/datalad/datalad/issues/3587
+[#3591]: https://github.com/datalad/datalad/issues/3591
 [#3594]: https://github.com/datalad/datalad/issues/3594
+[#3597]: https://github.com/datalad/datalad/issues/3597
+[#3600]: https://github.com/datalad/datalad/issues/3600
+[#3602]: https://github.com/datalad/datalad/issues/3602
+[#3616]: https://github.com/datalad/datalad/issues/3616
+[#3622]: https://github.com/datalad/datalad/issues/3622
+[#3624]: https://github.com/datalad/datalad/issues/3624
+[#3626]: https://github.com/datalad/datalad/issues/3626
+[#3631]: https://github.com/datalad/datalad/issues/3631
+[#3646]: https://github.com/datalad/datalad/issues/3646

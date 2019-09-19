@@ -15,6 +15,30 @@ ds = require_dataset(
     check_installed=True,
     purpose='YODA dataset setup')
 
+to_modify = [
+    ds.pathobj / 'code' / 'README.md',
+    ds.pathobj / 'code' / '.gitattributes',
+    ds.pathobj / 'README.md',
+    ds.pathobj / 'CHANGELOG.md',
+    ds.pathobj / '.gitattributes',
+]
+
+dirty = [
+    s for s in ds.status(
+        to_modify,
+        result_renderer='disabled',
+        return_type='generator',
+    )
+    if s['state'] != 'clean'
+]
+
+if dirty:
+    raise RuntimeError(
+        'Stopping, because to be modified dataset '
+        'content was found dirty: {}'.format(
+            [s['path'] for s in dirty]
+        ))
+
 README_code = """\
 All custom code goes into this directory. All scripts should be written such
 that they can be executed from the root of the dataset, and are only using
@@ -60,7 +84,7 @@ ds.repo.set_gitattributes(
     [(p, {'annex.largefiles': 'nothing'}) for p in force_in_git])
 
 # leave clean
-# TODO only commit actually changed/added files
 ds.save(
+    path=to_modify,
     message="Apply YODA dataset setup",
 )

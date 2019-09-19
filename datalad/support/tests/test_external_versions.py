@@ -21,6 +21,7 @@ from ...support.annexrepo import AnnexRepo
 from ...tests.utils import (
     with_tempfile,
     create_tree,
+    set_annex_version,
     swallow_logs,
 )
 
@@ -31,12 +32,11 @@ from nose.tools import (
     assert_raises, assert_in
 )
 from nose import SkipTest
-from six import PY3
 
-if PY3:
-    # just to ease testing
-    def cmp(a, b):
-        return (a > b) - (a < b)
+
+# just to ease testing
+def cmp(a, b):
+    return (a > b) - (a < b)
 
 
 def test_external_versions_basic():
@@ -172,7 +172,8 @@ def _test_annex_version_comparison(v, cmp_):
             return v, ""
 
     ev = ExternalVersions()
-    with patch('datalad.support.external_versions._runner', _runner()), \
+    with set_annex_version(None), \
+         patch('datalad.support.external_versions._runner', _runner()), \
          patch('datalad.support.annexrepo.external_versions',
                ExternalVersions()):
         ev['cmd:annex'] < AnnexRepo.GIT_ANNEX_MIN_VERSION

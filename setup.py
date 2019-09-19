@@ -7,45 +7,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import (
-    dirname,
     join as opj,
-    sep as pathsep,
-    splitext,
 )
 
-from setuptools import (
-    findall,
-    find_packages,
-    setup,
-)
-
-from setup_support import (
+from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
     BuildRSTExamplesFromScripts,
     BuildSchema,
-    get_version,
     setup_entry_points,
+    findsome,
+    datalad_setup,
 )
 
-
-def findsome(subdir, extensions):
-    """Find files under subdir having specified extensions
-
-    Leading directory (datalad) gets stripped
-    """
-    return [
-        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
-        if splitext(f)[-1].lstrip('.') in extensions
-    ]
-
-# datalad version to be installed
-version = get_version()
-
-# Only recentish versions of find_packages support include
-# datalad_pkgs = find_packages('.', include=['datalad*'])
-# so we will filter manually for maximal compatibility
-datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 
 requires = {
     'core': [
@@ -59,10 +33,8 @@ requires = {
         'fasteners',
         'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'six>=1.8.0',
         'tqdm',
         'wrapt',
-        'pathlib2; python_version < "3.0"',  # brought to you by revolution1
     ],
     'downloaders': [
         'boto',
@@ -89,12 +61,6 @@ requires = {
         'vcrpy',
     ],
     'metadata': [
-        # lzma is included in python since 3.3
-        # We now support backports.lzma as well (besides AutomagicIO), but since
-        # there is not way to define an alternative here (AFAIK, yoh), we will
-        # use pyliblzma as the default for now.  Patch were you would prefer
-        # backports.lzma instead
-        'pyliblzma; python_version < "3.3"',
         'simplejson',
         'whoosh',
     ],
@@ -155,22 +121,6 @@ cmdclass = {
     # 'build_py': DataladBuild
 }
 
-# PyPI doesn't render markdown yet. Workaround for a sane appearance
-# https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
-README = opj(dirname(__file__), 'README.md')
-try:
-    import pypandoc
-    long_description = pypandoc.convert(README, 'rst')
-except (ImportError, OSError) as exc:
-    # attempting to install pandoc via brew on OSX currently hangs and
-    # pypandoc imports but throws OSError demanding pandoc
-    print(
-        "WARNING: pypandoc failed to import or thrown an error while converting"
-        " README.md to RST: %r   .md version will be used as is" % exc
-    )
-    long_description = open(README).read()
-
-
 #
 # Avoid using entry_points due to their hefty overhead
 #
@@ -198,22 +148,43 @@ entry_points.update({
     ]})
 setup_kwargs['entry_points'] = entry_points
 
-setup(
-    name="datalad",
-    author="The DataLad Team and Contributors",
-    author_email="team@datalad.org",
-    version=version,
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Education',
+    'Intended Audience :: End Users/Desktop',
+    'Intended Audience :: Science/Research',
+    'License :: DFSG approved',
+    'License :: OSI Approved :: MIT License',
+    'Natural Language :: English',
+    'Operating System :: POSIX',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Unix Shell',
+    'Topic :: Communications :: File Sharing',
+    'Topic :: Education',
+    'Topic :: Internet',
+    'Topic :: Other/Nonlisted Topic',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Software Development :: Version Control :: Git',
+    'Topic :: Utilities',
+]
+setup_kwargs['classifiers'] = classifiers
+
+datalad_setup(
+    'datalad',
     description="data distribution geared toward scientific datasets",
-    long_description=long_description,
-    packages=datalad_pkgs,
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
+    python_requires='>=3.5',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={
         'datalad':
-            findsome('resources', {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
+            findsome('resources',
+                     {'sh', 'html', 'js', 'css', 'png', 'svg', 'txt', 'py'}) +
             findsome(opj('downloaders', 'configs'), {'cfg'}) +
             findsome(opj('distribution', 'tests'), {'yaml'}) +
             findsome(opj('metadata', 'tests', 'data'), {'mp3', 'jpg', 'pdf'})

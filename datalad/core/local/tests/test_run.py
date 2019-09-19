@@ -23,7 +23,6 @@ from os import (
 )
 import sys
 
-from six import PY2
 from mock import patch
 
 from datalad.utils import (
@@ -332,7 +331,7 @@ def test_run_cmdline_disambiguation(path):
 
         # And a twist on above: Our parser mishandles --version (gh-3067),
         # treating 'datalad run CMD --version' as 'datalad --version'.
-        version_stream = "err" if PY2 else "out"
+        version_stream = "out"
         with swallow_outputs() as cmo:
             with assert_raises(SystemExit) as cm:
                 main(["datalad", "run", "echo", "--version"])

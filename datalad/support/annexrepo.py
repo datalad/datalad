@@ -39,10 +39,6 @@ from subprocess import Popen, PIPE
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
-from six import string_types, PY2
-from six import iteritems
-from six import text_type
-from six.moves import filter
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
@@ -59,7 +55,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import assure_list
 from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
-from datalad.utils import assure_unicode, assure_bytes
+from datalad.utils import assure_unicode
 from datalad.utils import make_tempfile
 from datalad.utils import partition
 from datalad.utils import unlink
@@ -128,6 +124,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     # 7          -- annex makes v7 mode default on crippled systems. We demand it for consistent operation
     GIT_ANNEX_MIN_VERSION = '7'
     git_annex_version = None
+    supports_direct_mode = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
     # git annex 6.20180626 those will by default be not allowed for security
@@ -546,6 +543,22 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise OutdatedExternalDependency(ver_present=ver, **exc_kwargs)
         cls.git_annex_version = ver
 
+    @classmethod
+    def check_direct_mode_support(cls):
+        """Does git-annex version support direct mode?
+
+        The result is cached at `cls.supports_direct_mode`.
+
+        Returns
+        -------
+        bool
+        """
+        if cls.supports_direct_mode is None:
+            if cls.git_annex_version is None:
+                cls._check_git_annex_version()
+            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
+        return cls.supports_direct_mode
+
     @staticmethod
     def get_size_from_key(key):
         """A little helper to obtain size encoded in a key"""
@@ -911,11 +924,13 @@ class AnnexRepo(GitRepo, RepoInterface):
         # see https://git-annex.branchable.com/todo/output_of_wanted___40__and_possibly_group_etc__41___should_not_be_polluted_with___34__informational__34___messages/
         lines_ = [
             l for l in lines
-            if not re.search(
+            if l and not re.search(
                 r'\((merging .* into git-annex|recording state ).*\.\.\.\)', l
             )
         ]
-        assert(len(lines_) <= 1)
+
+        if len(lines_) > 1:
+            raise AssertionError("Expected one line but got {}".format(lines_))
         return lines_[0] if lines_ else None
 
     def _is_direct_mode_from_config(self):
@@ -1772,8 +1787,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                 lgr.debug("Not batching addurl call "
                           "because fake dates are enabled")
             files_opt = '--file=%s' % file_
-            if PY2:
-                files_opt = assure_bytes(files_opt)
             out_json = self._run_annex_command_json(
                 'addurl',
                 opts=options + [files_opt] + [url],
@@ -1958,7 +1971,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             initiate or continue with a batched run of annex dropkey, instead of just
             calling a single git annex dropkey command
         """
-        keys = [keys] if isinstance(keys, string_types) else keys
+        keys = [keys] if isinstance(keys, str) else keys
 
         options = options[:] if options else []
         options += ['--force']
@@ -2316,13 +2329,18 @@ class AnnexRepo(GitRepo, RepoInterface):
     def repo_info(self, fast=False, merge_annex_branches=True):
         """Provide annex info for the entire repository.
 
+        Parameters
+        ----------
+        fast : bool, optional
+          Pass `--fast` to `git annex info`.
+        merge_annex_branches : bool, optional
+          Whether to allow git-annex if needed to merge annex branches, e.g. to
+          make sure up to date descriptions for git annex remotes
+
         Returns
         -------
         dict
           Info for the repository, with keys matching the ones returned by annex
-        merge_annex_branches: bool, optional
-          Either to allow git-annex if needed to merge annex branches, e.g. to
-          make sure up to date descriptions for git annex remotes
         """
 
         options = ['--bytes', '--fast'] if fast else ['--bytes']
@@ -2695,7 +2713,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         stdout, stderr
         """
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
-            if isinstance(cmd_str, string_types) \
+            if isinstance(cmd_str, str) \
             else cmd_str + files
 
         if self.fake_dates_enabled:
@@ -2901,7 +2919,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         matches = list(set(chain.from_iterable(
             [
                 [r['description'] for r in remotes if match(r)]
-                for k, remotes in iteritems(info)
+                for k, remotes in info.items()
                 if k.endswith(' repositories')
             ]
         )))
@@ -2987,7 +3005,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # we can be lazy
             files = assure_list(files)
         else:
-            if isinstance(files, text_type):
+            if isinstance(files, str):
                 files = [files]
             # anything else is assumed to be an iterable (e.g. a generator)
         if batch is False:
@@ -3095,7 +3113,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     def _mark_content_availability(self, info):
         objectstore = self.pathobj.joinpath(
             self.path, GitRepo.get_git_dir(self), 'annex', 'objects')
-        for f, r in iteritems(info):
+        for f, r in info.items():
             if 'key' not in r or 'has_content' in r:
                 # not annexed or already processed
                 continue
@@ -3119,7 +3137,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 if testpath.exists():
                     r.pop('hashdirlower', None)
                     r.pop('hashdirmixed', None)
-                    r['objloc'] = text_type(testpath)
+                    r['objloc'] = str(testpath)
                     r['has_content'] = True
                     break
 
@@ -3189,7 +3207,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             cmd = 'find'
             # stringify any pathobjs
             if paths:
-                files = [text_type(p) for p in paths]
+                files = [str(p) for p in paths]
             else:
                 opts.extend(['--include', '*'])
 
@@ -3264,7 +3282,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             # https://github.com/datalad/datalad/issues/2955
             # check if there are any and pass them to git-add
             symlinks_toadd = {
-                p: props for p, props in iteritems(files)
+                p: props for p, props in files.items()
                 if props.get('type', None) == 'symlink'}
             if symlinks_toadd:
                 for r in GitRepo._save_add(
@@ -3274,7 +3292,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     yield r
             # trim `files` of symlinks
             files = {
-                p: props for p, props in iteritems(files)
+                p: props for p, props in files.items()
                 if props.get('type', None) != 'symlink'}
 
         expected_additions = None

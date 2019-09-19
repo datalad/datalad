@@ -6,29 +6,42 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 
+import datetime
 import os
 import platform
+import setuptools
 import sys
-from genericpath import exists
-from os import linesep, makedirs
-from os.path import dirname, join as opj
+
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
-import datetime
-import formatters as fmt
+from distutils.version import LooseVersion
+from genericpath import exists
+from os import linesep, makedirs
+from os.path import dirname, join as opj, sep as pathsep, splitext
+from setuptools import findall, find_packages, setup
+
+from . import formatters as fmt
 
 
-def _path_rel2file(p):
-    return opj(dirname(__file__), p)
+def _path_rel2file(*p):
+    # dirname instead of joining with pardir so it works if
+    # datalad_build_support/ is just symlinked into some extension
+    # while developing
+    return opj(dirname(dirname(__file__)), *p)
 
 
-def get_version():
-    """Load version of datalad from version.py without entailing any imports
+def get_version(name):
+    """Load version from version.py without entailing any imports
+
+    Parameters
+    ----------
+    name: str
+      Name of the folder (package) where from to read version.py
     """
     # This might entail lots of imports which might not yet be available
     # so let's do ad-hoc parsing of the version.py
-    with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
+    with open(_path_rel2file(name, 'version.py')) as f:
         version_lines = list(filter(lambda x: x.startswith('__version__'), f))
     assert (len(version_lines) == 1)
     return version_lines[0].split('=')[1].strip(" '\"\t\n")
@@ -79,6 +92,44 @@ class BuildManPage(Command):
         self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
 
+    @classmethod
+    def handle_module(cls, mod_name, **kwargs):
+        """Module specific handling.
+
+        This particular one does
+        1. Memorize (at class level) the module name of interest here
+        2. Check if 'datalad.extensions' are specified for the module,
+           and then analyzes them to obtain command names it provides
+
+        If cmdline commands are found, its entries are to be used instead of
+        the ones in datalad's _parser.
+
+        Parameters
+        ----------
+        **kwargs:
+            all the kwargs which might be provided to setuptools.setup
+        """
+        cls.mod_name = mod_name
+
+        exts = kwargs.get('entry_points', {}).get('datalad.extensions', [])
+        for ext in exts:
+            assert '=' in ext      # should be label=module:obj
+            ext_label, mod_obj = ext.split('=', 1)
+            assert ':' in mod_obj  # should be module:obj
+            mod, obj = mod_obj.split(':', 1)
+            assert mod_name == mod  # AFAIK should be identical
+
+            mod = __import__(mod_name)
+            if hasattr(mod, obj):
+                command_suite = getattr(mod, obj)
+                assert len(command_suite) == 2  # as far as I see it
+                if not hasattr(cls, 'cmdline_names'):
+                    cls.cmdline_names = []
+                cls.cmdline_names += [
+                    cmd
+                    for _, _, cmd, _ in command_suite[1]
+                ]
+
     def run(self):
 
         dist = self.distribution
@@ -91,17 +142,19 @@ class BuildManPage(Command):
                 appname, dist.get_author(), dist.get_author_email()),
         }
 
-        dist = self.distribution
         for cls, opath, ext in ((fmt.ManPageFormatter, self.manpath, '1'),
                                 (fmt.RSTManPageFormatter, self.rstpath, 'rst')):
             if not os.path.exists(opath):
                 os.makedirs(opath)
-            for cmdname in self._parser:
+            for cmdname in getattr(self, 'cmdline_names', list(self._parser)):
                 p = self._parser[cmdname]
                 cmdname = "{0}{1}".format(
                     'datalad ' if cmdname != 'datalad' else '',
                     cmdname)
-                format = cls(cmdname, ext_sections=sections, version=get_version())
+                format = cls(
+                    cmdname,
+                    ext_sections=sections,
+                    version=get_version(getattr(self, 'mod_name', appname)))
                 formatted = format.format_man_page(p)
                 with open(opj(opath, '{0}.{1}'.format(
                         cmdname.replace(' ', '-'),
@@ -362,3 +415,100 @@ def setup_entry_points(entry_points):
         setup_kwargs['scripts'] = scripts
 
     return setup_kwargs
+
+
+def get_long_description_from_README():
+    """Read README.md, convert to .rst using pypandoc
+
+    If pypandoc is not available or fails - just output original .md.
+
+    Returns
+    -------
+    dict
+      with keys long_description and possibly long_description_content_type
+      for newer setuptools which support uploading of markdown as is.
+    """
+    # PyPI used to not render markdown. Workaround for a sane appearance
+    # https://github.com/pypa/pypi-legacy/issues/148#issuecomment-227757822
+    # is still in place for older setuptools
+
+    README = opj(_path_rel2file('README.md'))
+
+    ret = {}
+    if LooseVersion(setuptools.__version__) >= '38.6.0':
+        # check than this
+        ret['long_description'] = open(README).read()
+        ret['long_description_content_type'] = 'text/markdown'
+        return ret
+
+    # Convert or fall-back
+    try:
+        import pypandoc
+        return {'long_description': pypandoc.convert(README, 'rst')}
+    except (ImportError, OSError) as exc:
+        # attempting to install pandoc via brew on OSX currently hangs and
+        # pypandoc imports but throws OSError demanding pandoc
+        print(
+                "WARNING: pypandoc failed to import or thrown an error while "
+                "converting"
+                " README.md to RST: %r   .md version will be used as is" % exc
+        )
+        return {'long_description': open(README).read()}
+
+
+def findsome(subdir, extensions):
+    """Find files under subdir having specified extensions
+
+    Leading directory (datalad) gets stripped
+    """
+    return [
+        f.split(pathsep, 1)[1] for f in findall(opj('datalad', subdir))
+        if splitext(f)[-1].lstrip('.') in extensions
+    ]
+
+
+def datalad_setup(name, **kwargs):
+    """A helper for a typical invocation of setuptools.setup.
+
+    If not provided in kwargs, following fields will be autoset to the defaults
+    or obtained from the present on the file system files:
+
+    - author
+    - author_email
+    - packages -- all found packages which start with `name`
+    - long_description -- converted to .rst using pypandoc README.md
+    - version -- parsed `__version__` within `name/version.py`
+
+    Parameters
+    ----------
+    name: str
+        Name of the Python package
+    **kwargs:
+        The rest of the keyword arguments passed to setuptools.setup as is
+    """
+    # Simple defaults
+    for k, v in {
+        'author': "The DataLad Team and Contributors",
+        'author_email': "team@datalad.org"
+    }.items():
+        if kwargs.get(k) is None:
+            kwargs[k] = v
+
+    # More complex, requiring some function call
+
+    # Only recentish versions of find_packages support include
+    # packages = find_packages('.', include=['datalad*'])
+    # so we will filter manually for maximal compatibility
+    if kwargs.get('packages') is None:
+        kwargs['packages'] = [pkg for pkg in find_packages('.') if pkg.startswith(name)]
+    if kwargs.get('long_description') is None:
+        kwargs.update(get_long_description_from_README())
+    if kwargs.get('version') is None:
+        kwargs['version'] = get_version(name)
+
+    cmdclass = kwargs.get('cmdclass', {})
+    # Check if command needs some module specific handling
+    for v in cmdclass.values():
+        if hasattr(v, 'handle_module'):
+            getattr(v, 'handle_module')(name, **kwargs)
+    return setup(name=name, **kwargs)

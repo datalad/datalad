@@ -9,7 +9,6 @@
 """Test status command"""
 
 import os.path as op
-from six import text_type
 import datalad.utils as ut
 
 from datalad.utils import (
@@ -108,7 +107,7 @@ def test_status_nods(path, otherpath):
 def test_status(_path, linkpath):
     # do the setup on the real path, not the symlink, to have its
     # bugs not affect this test of status()
-    ds = get_deeply_nested_structure(text_type(_path))
+    ds = get_deeply_nested_structure(str(_path))
     if has_symlink_capability():
         # make it more complicated by default
         ut.Path(linkpath).symlink_to(_path, target_is_directory=True)
@@ -128,10 +127,10 @@ def test_status(_path, linkpath):
     assert_result_count(
         ds.status(annex='all'),
         1,
-        path=text_type(ds.pathobj / 'subdir' / 'annexed_file.txt'),
+        path=str(ds.pathobj / 'subdir' / 'annexed_file.txt'),
         key='MD5E-s5--275876e34cf609db118f3d84b799a790.txt',
         has_content=True,
-        objloc=text_type(ds.repo.pathobj / '.git' / 'annex' / 'objects' /
+        objloc=str(ds.repo.pathobj / '.git' / 'annex' / 'objects' /
         # hashdir is different on windows
         ('f33' if on_windows else '7p') /
         ('94b' if on_windows else 'gp') /
@@ -147,7 +146,7 @@ def test_status(_path, linkpath):
         # technical reasons (annex using it for something in some mode)
         # should be reported as the thing it is representing (i.e.
         # a file)
-        if 'link2' in text_type(res['path']):
+        if 'link2' in str(res['path']):
             assert res['type'] == 'symlink', res
         else:
             assert res['type'] != 'symlink', res
@@ -175,7 +174,7 @@ def test_status(_path, linkpath):
     rpath = op.join('subds_modified', 'subds_lvl1_modified',
                     OBSCURE_FILENAME + u'_directory_untracked')
     apathobj = ds.pathobj / rpath
-    apath = text_type(apathobj)
+    apath = str(apathobj)
     # ds.repo.pathobj will have the symlink resolved
     arealpath = ds.repo.pathobj / rpath
     # TODO include explicit relative path in test

@@ -14,7 +14,6 @@ import operator
 import re
 import time
 
-from six import string_types
 
 from datalad.log import log_progress
 from datalad.support.exceptions import CommandError
@@ -264,7 +263,7 @@ def check_dates(repo, timestamp=None, which="newer", revs=None,
     -------
     A dict that reports newer timestamps.
     """
-    if isinstance(repo, string_types):
+    if isinstance(repo, str):
         repo = GitRepo(repo, create=False)
 
     if timestamp is None:
