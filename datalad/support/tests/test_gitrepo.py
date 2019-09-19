@@ -519,6 +519,20 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([], fetched)
 
 
+def _path2localsshurl(path):
+    """Helper to build valid localhost SSH urls on Windows too"""
+    from pathlib import Path
+    path = op.abspath(path)
+    p = Path(path)
+    if p.drive:
+        path = '/'.join(('/{}'.format(p.drive[0]),) + p.parts[1:])
+    url = "ssh://localhost{}".format(path)
+    return url
+
+
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
@@ -526,7 +540,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=False)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -548,6 +562,9 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     assert_in('ssh-remote/master', repo.get_remote_branches())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -555,7 +572,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -584,6 +601,9 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -591,7 +611,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
