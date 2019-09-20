@@ -102,7 +102,7 @@ def LZMAFile(*args, **kwargs):
     calling dir() helps to avoid AttributeError __exit__
     see https://bugs.launchpad.net/pyliblzma/+bug/1219296
     """
-    from .lzma import lzma
+    import lzma
     lzmafile = lzma.LZMAFile(*args, **kwargs)
     dir(lzmafile)
     return lzmafile
