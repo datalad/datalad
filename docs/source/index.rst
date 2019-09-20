@@ -1,10 +1,19 @@
-DataLad |---| data management and publication multitool: Documentation
-**********************************************************************
+DataLad |---| data management and publication multitool
+*******************************************************
+
+Welcome to DataLad's **technical documentation**. Information here is targeting
+software developers and is focused on the Python and command line APIs, as well
+as software design, employed technologies, and key features.  Comprehensive
+**user documentation** with information on installation, basic operation,
+support, and (advanced) use case descriptions is available in the `DataLad
+handbook <http://handbook.datalad.org>`_.
+
+Content
+^^^^^^^
 
 .. toctree::
    :maxdepth: 1
 
-   gettingstarted
    changelog
    acknowledgements
    publications
@@ -18,7 +27,6 @@ Concepts and technologies
    background
    related
    basics
-   usecases/index
    metadata
    customization
    glossary
