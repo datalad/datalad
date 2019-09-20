@@ -171,7 +171,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                     parts.append('%s %s' % (self._bold(option_string),
                                             args_string))
 
-            return ', '.join(parts)
+            return ', '.join(p.replace('--', '-\\\\-') for p in parts)
 
 
 class RSTManPageFormatter(ManPageFormatter):
