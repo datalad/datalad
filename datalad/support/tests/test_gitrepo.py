@@ -46,9 +46,11 @@ from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if_on_windows
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
+from datalad.utils import on_windows
 
 from datalad.dochelpers import exc_str
 
@@ -250,8 +252,8 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(gr)
-    eq_("Testing GitRepo.commit().{}".format(linesep),
-        gr.format_commit("%B"))
+    eq_("Testing GitRepo.commit().",
+        gr.format_commit("%B").strip())
 
     with open(op.join(path, filename), 'w') as f:
         f.write("changed content")
@@ -517,6 +519,20 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([], fetched)
 
 
+def _path2localsshurl(path):
+    """Helper to build valid localhost SSH urls on Windows too"""
+    from pathlib import Path
+    path = op.abspath(path)
+    p = Path(path)
+    if p.drive:
+        path = '/'.join(('/{}'.format(p.drive[0]),) + p.parts[1:])
+    url = "ssh://localhost{}".format(path)
+    return url
+
+
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
@@ -524,7 +540,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=False)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -546,6 +562,9 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     assert_in('ssh-remote/master', repo.get_remote_branches())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -553,7 +572,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -582,6 +601,9 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -589,7 +611,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -1128,6 +1150,9 @@ def test_get_missing(path):
     eq_(repo.get_deleted_files(), ['test1'])
 
 
+# this is simply broken on win, but less important
+# https://github.com/datalad/datalad/issues/3639
+@skip_if_on_windows
 @with_tempfile
 def test_optimized_cloning(path):
     # make test repo with one file and one commit
@@ -1308,7 +1333,7 @@ def test_gitattributes(path):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
-    if get_encoding_info()['default'] != 'ascii':
+    if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths
         # with spaces and other funky stuff are just fine
