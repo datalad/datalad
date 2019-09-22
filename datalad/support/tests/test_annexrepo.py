@@ -1319,6 +1319,7 @@ def test_annex_drop(src, dst):
     assert_false(ar.file_has_content(testfile))
     ar.get(testfile)
     ok_(ar.file_has_content(testfile))
+    eq_(len([f for f in ar.fsck(fast=True) if f['file'] == testfile]), 1)
 
     # drop file by name:
     result = ar.drop([testfile])
