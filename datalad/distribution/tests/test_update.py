@@ -76,15 +76,6 @@ def test_update_simple(origin, src_path, dst_path):
     source.save(path="update.txt", message="Added update.txt")
     ok_clean_git(src_path)
 
-    # fail when asked to update a non-dataset
-    assert_status(
-        'impossible',
-        source.update("update.txt", on_failure='ignore'))
-    # fail when asked to update a something non-existent
-    assert_status(
-        'impossible',
-        source.update("nothere", on_failure='ignore'))
-
     # update without `merge` only fetches:
     assert_status('ok', dest.update())
     # modification is not known to active branch:
