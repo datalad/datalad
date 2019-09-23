@@ -1417,6 +1417,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             else:
                 raise
 
+    # TODO usage is primarily in the tests, consider making a test helper and
+    # remove from GitRepo API
     def get_indexed_files(self):
         """Get a list of files in git's index
 
@@ -1426,8 +1428,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             list of paths rooting in git's base dir
         """
 
-        return [x[0] for x in self.cmd_call_wrapper(
-            self.repo.index.entries.keys)]
+        return [
+            str(r.relative_to(self.pathobj))
+            for r in self.get_content_info(
+                paths=None, ref=None, untracked='no', eval_file_type=False)
+        ]
 
     def format_commit(self, fmt, commitish=None):
         """Return `git show` output for `commitish`.
