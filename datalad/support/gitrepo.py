@@ -1110,16 +1110,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         return toppath
 
-    # classmethod so behavior could be tuned in derived classes
-    @classmethod
-    def _get_added_files_commit_msg(cls, files):
-        if not files:
-            return "No files were added"
-        msg = "Added %d file" % len(files)
-        if len(files) > 1:
-            msg += "s"
-        return msg + '\n\nFiles:\n' + '\n'.join(files)
-
     @normalize_paths
     def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
