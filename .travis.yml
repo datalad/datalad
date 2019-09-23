@@ -174,14 +174,17 @@ matrix:
     - DATALAD_TESTS_SSH=1
     - _DL_CRON=1
 
-  - python: 3.5
-    # test with extension datalad-crawler
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-crawler
-    - TESTS_TO_PERFORM=datalad_crawler
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
+  # TODO: The current release of datalad-crawler (0.4.1) fails when
+  # tested with the latest git-annex (7.20190912) Uncomment this once
+  # a fix for datalad/datalad-crawler#55 makes it into a release.
+  # - python: 3.5
+  #   # test with extension datalad-crawler
+  #   env:
+  #   - BUILD_DATALAD_EXTENSION=datalad-crawler
+  #   - TESTS_TO_PERFORM=datalad_crawler
+  #   # Use a selector that will always be true.
+  #   - NOSE_SELECTION_OP=not
+  #   - NOSE_SELECTION=
 
   - python: 3.5
     # test with extension datalad-neuroimaging
