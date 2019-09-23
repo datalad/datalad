@@ -1725,6 +1725,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             ]
         return remotes
 
+    # TODO this is practically unused outside the tests, consider turning
+    # into a test helper and trim from the API
     def get_files(self, branch=None):
         """Get a list of files in git.
 
@@ -1740,14 +1742,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         [str]
           list of files.
         """
-        # TODO: RF codes base and melt get_indexed_files() in
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
+        return [
+            str(p.relative_to(self.pathobj))
+            for p in self.get_content_info(
+                paths=None, ref=branch, untracked='no', eval_file_type=False)
+            ]
 
     def get_file_content(self, file_, branch='HEAD'):
         """
