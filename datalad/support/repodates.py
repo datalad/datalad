@@ -196,7 +196,7 @@ def tag_dates(repo, pattern=""):
     """
     for rec in repo.for_each_ref_(
             fields=['objectname', 'taggerdate:raw'],
-            pattern='refs/heads/' + pattern):
+            pattern='refs/tags/' + pattern):
         if not rec['taggerdate:raw']:
             # There's not a tagger date. It's not an annotated tag.
             continue
