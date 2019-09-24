@@ -1699,15 +1699,25 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return getattr(commit, "%s_date" % date)
 
     def get_active_branch(self):
+        """Get the name of the active branch
+
+        Returns
+        -------
+        str or None
+          Returns None if there is no active branch, i.e. detached HEAD,
+          and the branch name otherwise.
+        """
         try:
-            branch = self.repo.active_branch.name
-        except TypeError as e:
-            if "HEAD is a detached symbolic reference" in str(e):
+            out, _ = self._git_custom_command(
+                "", ["git", "symbolic-ref", "HEAD"],
+                expect_fail=True)
+        except CommandError as e:
+            if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
                 return None
             else:
-                raise
-        return branch
+                raise e
+        return out.strip()[11:]  # strip refs/heads/
 
     def get_branches(self):
         """Get all branches of the repo.
