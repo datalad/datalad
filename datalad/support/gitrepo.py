@@ -2718,16 +2718,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           is attached to. The list is sorted by commit date, with the most
           recent commit being the last element.
         """
-        tag_objs = sorted(
-            self.repo.tags,
-            key=lambda t: t.commit.committed_date
-        )
         tags = [
-            {
-                'name': t.name,
-                'hexsha': t.commit.hexsha
-             }
-            for t in tag_objs
+            dict(
+                name=t['refname:lstrip=2'],
+                hexsha=t['object'] if t['object'] else t['objectname'],
+            )
+            for t in self.for_each_ref_(
+                fields=['refname:lstrip=2', 'objectname', 'object'],
+                pattern='refs/tags',
+                sort='taggerdate')
         ]
         if output:
             return [t[output] for t in tags]
