@@ -106,41 +106,6 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-# TODO: ignore leading and/or trailing underscore to allow for
-# python-reserved words
-@optional_args
-def kwargs_to_options(func, split_single_char_options=True,
-                      target_kw='options'):
-    """Decorator to provide convenient way to pass options to command calls.
-
-    Parameters
-    ----------
-    func: Callable
-        function to decorate
-    split_single_char_options: bool
-        whether or not to split key and value of single char keyword arguments
-        into two subsequent entries of the list
-    target_kw: str
-        keyword argument to pass the generated list of cmdline arguments to
-
-    Returns
-    -------
-    Callable
-    """
-
-    # TODO: don't overwrite options, but join
-
-    @wraps(func)
-    def newfunc(self, *args, **kwargs):
-        t_kwargs = dict()
-        t_kwargs[target_kw] = \
-            gitpy.Git().transform_kwargs(
-                split_single_char_options=split_single_char_options,
-                **kwargs)
-        return func(self, *args, **t_kwargs)
-    return newfunc
-
-
 def to_options(**kwargs):
     """Transform keyword arguments into a list of cmdline options
 
@@ -412,26 +377,6 @@ def Repo(*args, **kwargs):
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
     return gitpy.Repo(*args, **kwargs)
-
-
-def split_remote_branch(branch):
-    """Splits a remote branch's name into the name of the remote and the name
-    of the branch.
-
-    Parameters
-    ----------
-    branch: str
-      the remote branch's name to split
-
-    Returns
-    -------
-    list of str
-    """
-    assert '/' in branch, \
-        "remote branch %s must have had a /" % branch
-    assert not branch.endswith('/'), \
-        "branch name with trailing / is invalid. (%s)" % branch
-    return branch.split('/', 1)
 
 
 def guard_BadName(func):

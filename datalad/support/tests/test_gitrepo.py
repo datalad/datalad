@@ -61,10 +61,8 @@ from datalad.support.gitrepo import GitCommandError
 from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import to_options
-from datalad.support.gitrepo import kwargs_to_options
 from datalad.support.gitrepo import _normalize_path
 from datalad.support.gitrepo import normalize_paths
-from datalad.support.gitrepo import split_remote_branch
 from datalad.support.gitrepo import gitpy
 from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
@@ -941,17 +939,6 @@ def test_GitRepo_git_get_branch_commits(src):
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 
-def test_split_remote_branch():
-    r, b = split_remote_branch("MyRemote/SimpleBranch")
-    eq_(r, "MyRemote")
-    eq_(b, "SimpleBranch")
-    r, b = split_remote_branch("MyRemote/Branch/with/slashes")
-    eq_(r, "MyRemote")
-    eq_(b, "Branch/with/slashes")
-    assert_raises(AssertionError, split_remote_branch, "NoSlashesAtAll")
-    assert_raises(AssertionError, split_remote_branch, "TrailingSlash/")
-
-
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_get_tracking_branch(o_path, c_path):
@@ -1034,28 +1021,6 @@ def test_get_submodules_parent_on_unborn_branch(path):
     repo.add_submodule(path="sub")
     eq_([s.name for s in repo.get_submodules()],
         ["sub"])
-
-
-def test_kwargs_to_options():
-
-    class Some(object):
-
-        @kwargs_to_options(split_single_char_options=True)
-        def f_decorated_split(self, options=None):
-            return options
-
-        @kwargs_to_options(split_single_char_options=False,
-                           target_kw='another')
-        def f_decorated_no_split(self, another=None):
-            return another
-
-    res = Some().f_decorated_split(C="/some/path", m=3, b=True, more_fancy=['one', 'two'])
-    ok_(isinstance(res, list))
-    eq_(res, ['-C', "/some/path", '-b', '-m', '3',
-              '--more-fancy=one', '--more-fancy=two'])
-
-    res = Some().f_decorated_no_split(f='some')
-    eq_(res, ['-fsome'])
 
 
 def test_to_options():
