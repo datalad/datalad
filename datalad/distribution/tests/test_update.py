@@ -93,6 +93,33 @@ def test_update_simple(origin, src_path, dst_path):
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
+    # check subdataset path constraints, baseline (parent + 2 subds)
+    assert_result_count(dest.update(recursive=True),
+                        3, status='ok', type='dataset')
+    # no recursion and invalid path still updates the parent
+    res = dest.update(path='whatever')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # invalid path with recursion also does
+    res = dest.update(recursive=True, path='whatever')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # valid path and no recursion only updates the parent
+    res = dest.update(path='subm 1')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # valid path and recursion updates matching
+    res = dest.update(recursive=True, path='subm 1')
+    assert_result_count(res, 2, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    assert_result_count(res, 1, status='ok', path=str(dest.pathobj / 'subm 1'))
+    # additional invalid path doesn't hurt
+    res = dest.update(recursive=True, path=['subm 1', 'mike'])
+    assert_result_count(res, 2, status='ok', type='dataset')
+    # full match
+    res = dest.update(recursive=True, path=['subm 1', '2'])
+    assert_result_count(res, 3, status='ok', type='dataset')
+
     # smoke-test if recursive update doesn't fail if submodule is removed
     # and that we can run it from within a dataset without providing it
     # explicitly
