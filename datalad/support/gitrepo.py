@@ -1110,16 +1110,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         return toppath
 
-    # classmethod so behavior could be tuned in derived classes
-    @classmethod
-    def _get_added_files_commit_msg(cls, files):
-        if not files:
-            return "No files were added"
-        msg = "Added %d file" % len(files)
-        if len(files) > 1:
-            msg += "s"
-        return msg + '\n\nFiles:\n' + '\n'.join(files)
-
     @normalize_paths
     def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
@@ -1427,6 +1417,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             else:
                 raise
 
+    # TODO usage is primarily in the tests, consider making a test helper and
+    # remove from GitRepo API
     def get_indexed_files(self):
         """Get a list of files in git's index
 
@@ -1436,8 +1428,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             list of paths rooting in git's base dir
         """
 
-        return [x[0] for x in self.cmd_call_wrapper(
-            self.repo.index.entries.keys)]
+        return [
+            str(r.relative_to(self.pathobj))
+            for r in self.get_content_info(
+                paths=None, ref=None, untracked='no', eval_file_type=False)
+        ]
 
     def format_commit(self, fmt, commitish=None):
         """Return `git show` output for `commitish`.
@@ -1730,6 +1725,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             ]
         return remotes
 
+    # TODO this is practically unused outside the tests, consider turning
+    # into a test helper and trim from the API
     def get_files(self, branch=None):
         """Get a list of files in git.
 
@@ -1745,14 +1742,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         [str]
           list of files.
         """
-        # TODO: RF codes base and melt get_indexed_files() in
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
+        return [
+            str(p.relative_to(self.pathobj))
+            for p in self.get_content_info(
+                paths=None, ref=branch, untracked='no', eval_file_type=False)
+            ]
 
     def get_file_content(self, file_, branch='HEAD'):
         """
@@ -2467,36 +2461,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     return x["path"]
             xs = sorted(xs, key=key)
         return list(xs)
-
-    def is_submodule_modified(self, name, options=[]):
-        """Whether a submodule has new commits
-
-        Note: This is an adhoc method. It parses output of
-        'git submodule summary' and currently is not able to distinguish whether
-        or not this change is staged in `self` and whether this would be
-        reported 'added' or 'modified' by 'git status'.
-        Parsing isn't heavily tested yet.
-
-        Parameters
-        ----------
-        name: str
-          the submodule's name
-        options: list
-          options to pass to 'git submodule summary'
-        Returns
-        -------
-        bool
-          True if there are commits in the submodule, differing from
-          what is registered in `self`
-        --------
-        """
-
-        out, err = self._git_custom_command('',
-                                            ['git', 'submodule', 'summary'] + \
-                                            options + ['--', name])
-        return any([line.split()[1] == name
-                    for line in out.splitlines()
-                    if line and len(line.split()) > 1])
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.
