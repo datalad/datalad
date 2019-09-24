@@ -1266,6 +1266,60 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
+    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
+                      pattern=None, points_at=None, sort=None, count=None):
+        """Wrapper for `git for-each-ref`
+
+        Parameters
+        ----------
+        fields : list or str
+        pattern : list or str
+        points_at : str
+        sort : list or str
+        count : int
+
+        Yields
+        ------
+        dict with items matching the given `fields`
+
+        Raises
+        ------
+        ValueError
+          if no `fields` are given
+
+        RuntimeError
+          if `git for-each-ref` returns a record where the number of
+          properties does not match the number of `fields`
+        """
+        if not fields:
+            raise ValueError('no `fields` provided, refuse to proceed')
+        fields = assure_list(fields)
+        cmd = [
+            "git",
+            "for-each-ref",
+            "--format={}".format(
+                '%00'.join(
+                    '%({})'.format(f) for f in fields)),
+        ]
+        if points_at:
+            cmd.append('--points-at={}'.format(points_at))
+        if sort:
+            for k in assure_list(sort):
+                cmd.append('--sort={}'.format(k))
+        if pattern:
+            cmd += assure_list(pattern)
+        if count:
+            cmd.append('--count={:d}'.format(count))
+
+        out, _ = self._git_custom_command(None, cmd)
+        for line in out.splitlines():
+            props = line.split('\0')
+            if len(fields) != len(props):
+                raise RuntimeError(
+                    'expected fields {} from git-for-each-ref, but got: {}'.format(
+                        fields, props))
+            yield dict(zip(fields, props))
+
     def configure_fake_dates(self):
         """Configure repository to use fake dates.
         """
@@ -1297,16 +1351,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         env = (env if env is not None else os.environ).copy()
         # Note: Use _git_custom_command here rather than repo.git.for_each_ref
         # so that we use annex-proxy in direct mode.
-        last_date = self._git_custom_command(
-            None,
-            ["git", "for-each-ref", "--count=1",
-             "--sort=-committerdate", "--format=%(committerdate:raw)",
-             "refs/heads"])[0].strip()
+        last_date = list(self.for_each_ref_(
+            fields='committerdate:raw',
+            count=1,
+            pattern='refs/heads',
+            sort="-committerdate",
+        ))
 
         if last_date:
             # Drop the "contextual" timezone, leaving the unix timestamp.  We
             # avoid :unix above because it wasn't introduced until Git v2.9.4.
-            last_date = last_date.split()[0]
+            last_date = last_date[0]['committerdate:raw'].split()[0]
             seconds = int(last_date)
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
