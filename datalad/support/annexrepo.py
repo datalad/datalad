@@ -2785,8 +2785,11 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return None
 
-    def fsck(self, paths=None, remote=None, fast=False, incremental=False,
-             limit=None, annex_options=None, git_options=None):
+    # comment out presently unnecessary functionality, bring back once needed
+    #def fsck(self, paths=None, remote=None, fast=False, incremental=False,
+    #         limit=None, annex_options=None, git_options=None):
+    def fsck(self, paths=None, remote=None, fast=False,
+             annex_options=None, git_options=None):
         """Front-end for git-annex fsck
 
         Parameters
@@ -2799,34 +2802,34 @@ class AnnexRepo(GitRepo, RepoInterface):
         fast : bool
           If True, typically means that no actual content is being verified,
           but tests are limited to the presence of files.
-        incremental : bool or {'continue'} or SCHEDULE
-          If given, `fsck` is called with `--incremental`. If 'continue',
-          `fsck` is additionally called with `--more`, and any other argument
-          is given to `--incremental-schedule`.
-        limit : str or all
-          If the functor `all` is given, `fsck` is called with `--all`. Any
-          other value is passed on to `--branch`.
         """
+        #incremental : bool or {'continue'} or SCHEDULE
+        #  If given, `fsck` is called with `--incremental`. If 'continue',
+        #  `fsck` is additionally called with `--more`, and any other argument
+        #  is given to `--incremental-schedule`.
+        #limit : str or all
+        #  If the function `all` is given, `fsck` is called with `--all`. Any
+        #  other value is passed on to `--branch`.
         args = [] if annex_options is None else list(annex_options)
         if fast:
             args.append('--fast')
-        if limit:
-            # looks funky, but really is a test if the `all` function was passed
-            # alternatives would have been 1) a dedicated argument (would need
-            # a check for mutual exclusivity with --branch), or 2) a str-type
-            # special values that has no meaning in Git and is less confusing
-            if limit is all:
-                args.append('--all')
-            else:
-                args.append('--branch={}'.format(limit))
         if remote:
             args.append('--from={}'.format(remote))
-        if incremental == 'continue':
-            args.append('--more')
-        elif incremental:
-            args.append('--incremental')
-            if not (incremental is True):
-                args.append('--incremental-schedule={}'.format(incremental))
+        #if limit:
+        #    # looks funky, but really is a test if the `all` function was passed
+        #    # alternatives would have been 1) a dedicated argument (would need
+        #    # a check for mutual exclusivity with --branch), or 2) a str-type
+        #    # special values that has no meaning in Git and is less confusing
+        #    if limit is all:
+        #        args.append('--all')
+        #    else:
+        #        args.append('--branch={}'.format(limit))
+        #if incremental == 'continue':
+        #    args.append('--more')
+        #elif incremental:
+        #    args.append('--incremental')
+        #    if not (incremental is True):
+        #        args.append('--incremental-schedule={}'.format(incremental))
         return self._run_annex_command_json(
             'fsck',
             files=paths,
