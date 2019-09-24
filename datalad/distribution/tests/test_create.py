@@ -334,7 +334,7 @@ def test_create_text_no_annex(path):
     import re
     ok_file_has_content(
         _path_(path, '.gitattributes'),
-        content='\* annex\.largefiles=\(not\(\(mimetype=text/\*\)or\(smallerthan=0.001kb\)\)\)',
+        content='\* annex\.largefiles=\(not\(mimetype=text/\*\)and\(largerthan=0\)\)',
         re_=True,
         match=False,
         flags=re.MULTILINE
