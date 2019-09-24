@@ -109,7 +109,6 @@ class Update(Interface):
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
 
         refds = require_dataset(dataset, check_installed=True, purpose='updating')
-        refds_path = Interface.get_refds_path(dataset)
 
         save_paths = []
 
@@ -123,7 +122,7 @@ class Update(Interface):
             repo = ds.repo
             # prepare return value
             # TODO reuse AP for return props
-            res = get_status_dict('update', ds=ds, logger=lgr, refds=refds_path)
+            res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
@@ -175,7 +174,7 @@ class Update(Interface):
             yield res
             save_paths.append(ds.path)
         if recursive:
-            save_paths = [p for p in save_paths if p != refds_path]
+            save_paths = [p for p in save_paths if p != refds.path]
             if not save_paths:
                 return
             lgr.debug(
