@@ -102,21 +102,27 @@ class Update(Interface):
         """
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
+        if path and not recursive:
+            lgr.warning('path constraints for subdataset updates ignored, '
+                        'because `recursive` option was not given')
 
         refds = require_dataset(dataset, check_installed=True, purpose='updating')
 
         save_paths = []
 
+        saw_subds = False
         for ds in itertools.chain([refds], refds.subdatasets(
+                path=path,
                 fulfilled=True,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 return_type='generator',
                 result_renderer='disabled',
                 result_xfm='datasets') if recursive else []):
+            if ds != refds:
+                saw_subds = True
             repo = ds.repo
             # prepare return value
-            # TODO reuse AP for return props
             res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
             # get all remotes which have references (would exclude
             # special remotes)
@@ -169,6 +175,10 @@ class Update(Interface):
             yield res
             save_paths.append(ds.path)
         if recursive:
+            if path and not saw_subds:
+                lgr.warning(
+                    'path constraints did not match an installed subdataset: %s',
+                    path)
             save_paths = [p for p in save_paths if p != refds.path]
             if not save_paths:
                 return
