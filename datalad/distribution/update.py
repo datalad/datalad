@@ -34,14 +34,9 @@ from datalad.interface.common_opts import (
 from datalad.distribution.dataset import require_dataset
 
 from .dataset import (
-    Dataset,
     EnsureDataset,
     datasetmethod,
 )
-
-# needed API commands
-import datalad.distribution.subdatasets
-import datalad.core.local.save
 
 lgr = logging.getLogger('datalad.distribution.update')
 
