@@ -987,14 +987,20 @@ def known_failure(func):
 def known_failure_v6_or_later(func):
     """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    If the default repository version is 6 or later behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
     """
 
     from datalad import cfg
+    from datalad.support.annexrepo import AnnexRepo
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version >= 6:
+    info = AnnexRepo.check_repository_versions()
+
+    if (version and version >= 6) or 5 not in info["supported"]:
 
         @known_failure
         @wraps(func)
