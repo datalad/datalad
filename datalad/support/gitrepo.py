@@ -1718,7 +1718,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             Names of all branches of this repository.
         """
 
-        return [branch.name for branch in self.repo.branches]
+        return [
+            b['refname'][11:]  # strip 'refs/heads/'
+            for b in self.for_each_ref_(fields='refname', pattern='refs/heads')
+        ]
 
     def get_remote_branches(self):
         """Get all branches of all remotes of the repo.
@@ -1733,21 +1736,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
 
-        # For some reason, this is three times faster than the version below:
-        remote_branches = list()
-        for remote in self.repo.remotes:
-            try:
-                for ref in remote.refs:
-                    remote_branches.append(ref.name)
-            except AssertionError as e:
-                if str(e).endswith("did not have any references"):
-                    # this will happen with git annex special remotes
-                    pass
-                else:
-                    raise e
-        return remote_branches
-        # return [branch.strip() for branch in
-        #         self.repo.git.branch(r=True).splitlines()]
+        return [
+            b['refname'][13:]  # strip 'refs/remotes/'
+            for b in self.for_each_ref_(fields='refname', pattern='refs/remotes')
+        ]
 
     def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
