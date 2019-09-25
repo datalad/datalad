@@ -2677,8 +2677,9 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           Each item is a dictionary with information on a tag. At present
           this includes 'hexsha', and 'name', where the latter is the string
           label of the tag, and the former the hexsha of the object the tag
-          is attached to. The list is sorted by commit date, with the most
-          recent commit being the last element.
+          is attached to. The list is sorted by the creator date (committer
+          date for lightweight tags and tagger date for annotated tags), with
+          the most recent commit being the last element.
         """
         tags = [
             dict(
