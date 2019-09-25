@@ -1729,8 +1729,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
 
         return [
-            b['refname'][11:]  # strip 'refs/heads/'
-            for b in self.for_each_ref_(fields='refname', pattern='refs/heads')
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/heads')
         ]
 
     def get_remote_branches(self):
@@ -1747,8 +1747,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # currently this is done in collection
 
         return [
-            b['refname'][13:]  # strip 'refs/remotes/'
-            for b in self.for_each_ref_(fields='refname', pattern='refs/remotes')
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/remotes')
         ]
 
     def get_remotes(self, with_urls_only=False):
@@ -2720,11 +2720,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         tags = [
             dict(
-                name=t['refname:lstrip=2'],
+                name=t['refname:strip=2'],
                 hexsha=t['object'] if t['object'] else t['objectname'],
             )
             for t in self.for_each_ref_(
-                fields=['refname:lstrip=2', 'objectname', 'object'],
+                fields=['refname:strip=2', 'objectname', 'object'],
                 pattern='refs/tags',
                 sort='taggerdate')
         ]
