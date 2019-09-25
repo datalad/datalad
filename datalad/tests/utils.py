@@ -974,14 +974,20 @@ def known_failure(func):
 def known_failure_v6_or_later(func):
     """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    If the default repository version is 6 or later behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
     """
 
     from datalad import cfg
+    from datalad.support.annexrepo import AnnexRepo
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version >= 6:
+    info = AnnexRepo.check_repository_versions()
+
+    if (version and version >= 6) or 5 not in info["supported"]:
 
         @known_failure
         @wraps(func)
@@ -1059,14 +1065,21 @@ def known_failure_appveyor(func):
 
 @optional_args
 def skip_v6_or_later(func, method='raise'):
-    """Skips tests if datalad is configured to use v6 mode or later
-    (e.g., DATALAD_REPO_VERSION=6)
+    """Skip tests if v6 or later will be used as the default repo version.
+
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
     """
 
     from datalad import cfg
-    version = cfg.obtain("datalad.repo.version")
+    from datalad.support.annexrepo import AnnexRepo
 
-    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
+    version = cfg.obtain("datalad.repo.version")
+    info = AnnexRepo.check_repository_versions()
+
+    @skip_if(version >= 6 or 5 not in info["supported"],
+             msg="Skip test in v6+ test run", method=method)
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')

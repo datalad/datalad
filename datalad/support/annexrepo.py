@@ -125,6 +125,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '7'
     git_annex_version = None
     supports_direct_mode = None
+    repository_versions = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
     # git annex 6.20180626 those will by default be not allowed for security
@@ -558,6 +559,30 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cls._check_git_annex_version()
             cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
         return cls.supports_direct_mode
+
+    @classmethod
+    def check_repository_versions(cls):
+        """Get information on supported and upgradable repository versions.
+
+        The result is cached at `cls.repository_versions`.
+
+        Returns
+        -------
+        dict
+          supported -> list of supported versions (int)
+          upgradable -> list of upgradable versions (int)
+        """
+        if cls.repository_versions is None:
+            from datalad.cmd import Runner
+            key_remap = {
+                "supported repository versions": "supported",
+                "upgrade supported from repository versions": "upgradable"}
+            out, _ = Runner().run(["git", "annex", "version"])
+            kvs = (ln.split(":", 1) for ln in out.splitlines())
+            cls.repository_versions = {
+                key_remap[k]: list(map(int, v.strip().split()))
+                for k, v in kvs if k in key_remap}
+        return cls.repository_versions
 
     @staticmethod
     def get_size_from_key(key):

@@ -15,5 +15,5 @@ if dpkg --compare-versions "$devel_annex_version" gt "$current_annex_version"; t
     sudo apt-get install "git-annex-standalone=$devel_annex_version"
 else
     echo "I: devel version $devel_annex_version is not newer than installed $current_annex_version"
-    exit 1
+    exit 99
 fi

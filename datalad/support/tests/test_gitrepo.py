@@ -1537,3 +1537,13 @@ def test_GitRepo_get_revisions(path):
 
     # Ranges are supported.
     eq_(gr.get_revisions("master.."), [])
+
+
+@with_tree({"foo": "foo"})
+def test_gitrepo_add_to_git_with_annex_v7(path):
+    from datalad.support.annexrepo import AnnexRepo
+    ar = AnnexRepo(path, create=True, version=7)
+    gr = GitRepo(path)
+    gr.add("foo")
+    gr.commit(msg="c1")
+    assert_false(ar.is_under_annex("foo"))
