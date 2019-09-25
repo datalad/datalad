@@ -1279,7 +1279,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         fields : iterable or str
           Used to compose a NULL-delimited specification for for-each-ref's
           --format option. The default field list reflects the standard
-          behavior of for-each-ref when not --format option is given
+          behavior of for-each-ref when the --format option is not given.
         pattern : list or str, optional
           If provided, report only refs that match at least one of the given
           patterns.
