@@ -2726,7 +2726,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             for t in self.for_each_ref_(
                 fields=['refname:strip=2', 'objectname', 'object'],
                 pattern='refs/tags',
-                sort='taggerdate')
+                sort='creatordate')
         ]
         if output:
             return [t[output] for t in tags]
