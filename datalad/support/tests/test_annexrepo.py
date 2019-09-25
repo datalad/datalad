@@ -1315,21 +1315,23 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    # TODO: Since git-annex 7.20181031, v6 repos upgrade to v7. Once that
-    # version or later is our minimum required version, update this test and
-    # the one below to eq_(version, 7).
-    assert_in(version, [6, 7])
+    # Since git-annex 7.20181031, v6 repos upgrade to v7.
+    supported_versions = AnnexRepo.check_repository_versions()["supported"]
+    v6_lands_on = next(i for i in supported_versions if i >= 6)
+    eq_(version, v6_lands_on)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
         version = annex.repo.config_reader().get_value('annex', 'version')
-        assert_in(version, [6, 7])
+        eq_(version, v6_lands_on)
 
-        # parameter `version` still has priority over default config:
-        annex = AnnexRepo(path3, create=True, version=5)
-        version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 5)
+        # Assuming specified version is a supported version...
+        if 5 in supported_versions:
+            # ...parameter `version` still has priority over default config:
+            annex = AnnexRepo(path3, create=True, version=5)
+            version = annex.repo.config_reader().get_value('annex', 'version')
+            eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
