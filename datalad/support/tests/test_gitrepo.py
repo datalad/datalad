@@ -1329,7 +1329,8 @@ def test_get_tags(path):
 
     # Explicitly override the committer date because tests may set it to a
     # fixed value, but we want to check that the returned tags are sorted by
-    # the committer date.
+    # the date the tag (for annotaged tags) or commit (for lightweight tags)
+    # was created.
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Thu, 07 Apr 2005 22:13:13 +0200"}):
         create_tree(gr.path, {'file': ""})
@@ -1353,7 +1354,10 @@ def test_get_tags(path):
         gr.add('file')
         gr.commit(msg="changed")
 
-    gr.tag("annotated", message="annotation")
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Fri, 09 Apr 2005 22:13:13 +0200"}):
+        gr.tag("annotated", message="annotation")
+    # The annotated tag happened later, so it comes last.
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
     eq_(gr.describe(), tags2[1]['name'])
