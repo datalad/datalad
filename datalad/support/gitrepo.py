@@ -1214,6 +1214,74 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
+    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
+                      pattern=None, points_at=None, sort=None, count=None):
+        """Wrapper for `git for-each-ref`
+
+        Please see manual page git-for-each-ref(1) for a complete overview
+        of its functionality. Only a subset of it is supported by this
+        wrapper.
+
+        Parameters
+        ----------
+        fields : iterable or str
+          Used to compose a NULL-delimited specification for for-each-ref's
+          --format option. The default field list reflects the standard
+          behavior of for-each-ref when the --format option is not given.
+        pattern : list or str, optional
+          If provided, report only refs that match at least one of the given
+          patterns.
+        points_at : str, optional
+          Only list refs which points at the given object.
+        sort : list or str, optional
+          Field name(s) to sort-by. If multiple fields are given, the last one
+          becomes the primary key. Prefix any field name with '-' to sort in
+          descending order.
+        count : int, optional
+          Stop iteration after the given number of matches.
+
+        Yields
+        ------
+        dict with items matching the given `fields`
+
+        Raises
+        ------
+        ValueError
+          if no `fields` are given
+
+        RuntimeError
+          if `git for-each-ref` returns a record where the number of
+          properties does not match the number of `fields`
+        """
+        if not fields:
+            raise ValueError('no `fields` provided, refuse to proceed')
+        fields = assure_list(fields)
+        cmd = [
+            "git",
+            "for-each-ref",
+            "--format={}".format(
+                '%00'.join(
+                    '%({})'.format(f) for f in fields)),
+        ]
+        if points_at:
+            cmd.append('--points-at={}'.format(points_at))
+        if sort:
+            for k in assure_list(sort):
+                cmd.append('--sort={}'.format(k))
+        if pattern:
+            cmd += assure_list(pattern)
+        if count:
+            cmd.append('--count={:d}'.format(count))
+
+        out, _ = self._git_custom_command(None, cmd)
+        for line in out.splitlines():
+            props = line.split('\0')
+            if len(fields) != len(props):
+                raise RuntimeError(
+                    'expected fields {} from git-for-each-ref, but got: {}'.format(
+                        fields, props))
+            yield dict(zip(fields, props))
+
     def configure_fake_dates(self):
         """Configure repository to use fake dates.
         """
@@ -1245,16 +1313,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         env = (env if env is not None else os.environ).copy()
         # Note: Use _git_custom_command here rather than repo.git.for_each_ref
         # so that we use annex-proxy in direct mode.
-        last_date = self._git_custom_command(
-            None,
-            ["git", "for-each-ref", "--count=1",
-             "--sort=-committerdate", "--format=%(committerdate:raw)",
-             "refs/heads"])[0].strip()
+        last_date = list(self.for_each_ref_(
+            fields='committerdate:raw',
+            count=1,
+            pattern='refs/heads',
+            sort="-committerdate",
+        ))
 
         if last_date:
             # Drop the "contextual" timezone, leaving the unix timestamp.  We
             # avoid :unix above because it wasn't introduced until Git v2.9.4.
-            last_date = last_date.split()[0]
+            last_date = last_date[0]['committerdate:raw'].split()[0]
             seconds = int(last_date)
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
@@ -1592,15 +1661,25 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return getattr(commit, "%s_date" % date)
 
     def get_active_branch(self):
+        """Get the name of the active branch
+
+        Returns
+        -------
+        str or None
+          Returns None if there is no active branch, i.e. detached HEAD,
+          and the branch name otherwise.
+        """
         try:
-            branch = self.repo.active_branch.name
-        except TypeError as e:
-            if "HEAD is a detached symbolic reference" in str(e):
+            out, _ = self._git_custom_command(
+                "", ["git", "symbolic-ref", "HEAD"],
+                expect_fail=True)
+        except CommandError as e:
+            if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
                 return None
             else:
-                raise
-        return branch
+                raise e
+        return out.strip()[11:]  # strip refs/heads/
 
     def get_branches(self):
         """Get all branches of the repo.
@@ -1611,7 +1690,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             Names of all branches of this repository.
         """
 
-        return [branch.name for branch in self.repo.branches]
+        return [
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/heads')
+        ]
 
     def get_remote_branches(self):
         """Get all branches of all remotes of the repo.
@@ -1626,21 +1708,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
 
-        # For some reason, this is three times faster than the version below:
-        remote_branches = list()
-        for remote in self.repo.remotes:
-            try:
-                for ref in remote.refs:
-                    remote_branches.append(ref.name)
-            except AssertionError as e:
-                if str(e).endswith("did not have any references"):
-                    # this will happen with git annex special remotes
-                    pass
-                else:
-                    raise e
-        return remote_branches
-        # return [branch.strip() for branch in
-        #         self.repo.git.branch(r=True).splitlines()]
+        return [
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/remotes')
+        ]
 
     def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
@@ -2609,16 +2680,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           is attached to. The list is sorted by commit date, with the most
           recent commit being the last element.
         """
-        tag_objs = sorted(
-            self.repo.tags,
-            key=lambda t: t.commit.committed_date
-        )
         tags = [
-            {
-                'name': t.name,
-                'hexsha': t.commit.hexsha
-             }
-            for t in tag_objs
+            dict(
+                name=t['refname:strip=2'],
+                hexsha=t['object'] if t['object'] else t['objectname'],
+            )
+            for t in self.for_each_ref_(
+                fields=['refname:strip=2', 'objectname', 'object'],
+                pattern='refs/tags',
+                sort='creatordate')
         ]
         if output:
             return [t[output] for t in tags]
