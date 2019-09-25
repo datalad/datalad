@@ -35,7 +35,6 @@ from datalad.tests.utils import (
     swallow_outputs,
     OBSCURE_FILENAME,
 )
-from datalad.distribution.tests.test_add import tree_arg
 
 import datalad.utils as ut
 from datalad.distribution.dataset import Dataset
@@ -52,6 +51,16 @@ from datalad.tests.utils import (
     assert_repo_status,
     skip_wo_symlink_capability,
 )
+
+
+tree_arg = dict(tree={'test.txt': 'some',
+                      'test_annex.txt': 'some annex',
+                      'test1.dat': 'test file 1',
+                      'test2.dat': 'test file 2',
+                      OBSCURE_FILENAME: 'blobert',
+                      'dir': {'testindir': 'someother',
+                              OBSCURE_FILENAME: 'none'},
+                      'dir2': {'testindir3': 'someother3'}})
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
