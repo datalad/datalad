@@ -78,23 +78,25 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     """
     clone_urls = []
 
+    ds_repo = ds.repo
+
     # should be our first candidate
-    tracking_remote, tracking_branch = ds.repo.get_tracking_branch()
+    tracking_remote, tracking_branch = ds_repo.get_tracking_branch()
     candidate_remotes = [tracking_remote] if tracking_remote else []
 
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
     try:
-        last_commit = next(ds.repo._get_files_history(sm_path)).hexsha
+        last_commit = next(ds_repo._get_files_history(sm_path)).hexsha
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
-        candidate_remotes += list(ds.repo._get_remotes_having_commit(last_commit))
+        candidate_remotes += list(ds_repo._get_remotes_having_commit(last_commit))
     except StopIteration:
         # no commit for it known yet, ... oh well
         pass
 
     for remote in unique(candidate_remotes):
-        remote_url = ds.repo.get_remote_url(remote, push=False)
+        remote_url = ds_repo.get_remote_url(remote, push=False)
 
         # Directly on parent's ds url
         if remote_url:
@@ -601,6 +603,7 @@ class Get(Interface):
         # report files in git as 'notneeded' to get
         for ds_path in sorted(content_by_ds.keys()):
             ds = Dataset(ds_path)
+            ds_repo = ds.repo
             # grab content, ignore subdataset entries
             content = [ap['path'] for ap in content_by_ds[ds_path]
                        if ap.get('type', None) != 'dataset' or ap['path'] == ds.path]
@@ -608,7 +611,7 @@ class Get(Interface):
                 # cut this short should there be nothing
                 continue
             # needs to be an annex to get content
-            if not isinstance(ds.repo, AnnexRepo):
+            if not isinstance(ds_repo, AnnexRepo):
                 for r in results_from_paths(
                         content, status='notneeded',
                         message="no dataset annex, content already present",
@@ -617,7 +620,7 @@ class Get(Interface):
                     yield r
                 continue
             respath_by_status = {}
-            for res in ds.repo.get(
+            for res in ds_repo.get(
                     content,
                     options=['--from=%s' % source] if source else [],
                     jobs=jobs):

@@ -630,7 +630,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     outputs_to_save = outputs.expand(full=True) if explicit else '.'
     if not rerun_info and cmd_exitcode:
         if outputs_to_save:
-            msg_path = relpath(opj(ds.repo.path, ds.repo.get_git_dir(ds.repo),
+            repo = ds.repo
+            msg_path = relpath(opj(repo.path, repo.get_git_dir(repo),
                                    "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
                 ofh.write(assure_bytes(msg))
