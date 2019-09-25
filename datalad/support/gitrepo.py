@@ -1270,13 +1270,27 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                       pattern=None, points_at=None, sort=None, count=None):
         """Wrapper for `git for-each-ref`
 
+        Please see manual page git-for-each-ref(1) for a complete overview
+        of its functionality. Only a subset of it is supported by this
+        wrapper.
+
         Parameters
         ----------
-        fields : list or str
-        pattern : list or str
-        points_at : str
-        sort : list or str
-        count : int
+        fields : iterable or str
+          Used to compose a NULL-delimited specification for for-each-ref's
+          --format option. The default field list reflects the standard
+          behavior of for-each-ref when not --format option is given
+        pattern : list or str, optional
+          If provided, report only refs that match at least one of the given
+          patterns.
+        points_at : str, optional
+          Only list refs which points at the given object.
+        sort : list or str, optional
+          Field name(s) to sort-by. If multiple fields are given, the last one
+          becomes the primary key. Prefix any field name with '-' to sort in
+          descending order.
+        count : int, optional
+          Stop iteration after the given number of matches.
 
         Yields
         ------
