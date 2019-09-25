@@ -163,6 +163,8 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
         set(target.get_branch_commits("git-annex"))))
 
+    eq_(source.repo.fsck(), source.repo.fsck(remote='target'))
+
 
 @with_testrepos('basic_git', flavors=['local'])
 @with_tempfile(mkdir=True)
@@ -482,6 +484,13 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     # and empty again if we try again
     res = source.publish(to="target")
     assert_result_count(res, 1, status='notneeded', path=source.path)
+
+    # data integrity check looks identical from all perspectives
+    # minus "note" statements from git-annex
+    eq_(source.repo.fsck(),
+        [{k: v for k, v in i.items() if k != 'note'}
+         for i in source.repo.fsck(remote='target')])
+    eq_(target.fsck(), source.repo.fsck(remote='target'))
 
 
 @skip_if_on_windows  # create_sibling incompatible with win servers

@@ -2810,8 +2810,62 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return None
 
-    def fsck(self):
-        self._run_annex_command('fsck')
+    # comment out presently unnecessary functionality, bring back once needed
+    #def fsck(self, paths=None, remote=None, fast=False, incremental=False,
+    #         limit=None, annex_options=None, git_options=None):
+    def fsck(self, paths=None, remote=None, fast=False,
+             annex_options=None, git_options=None):
+        """Front-end for git-annex fsck
+
+        Parameters
+        ----------
+        paths : list
+          Limit operation to specific paths.
+        remote : str
+          If given, the identified remote will be fsck'ed instead of the
+          local repository.
+        fast : bool
+          If True, typically means that no actual content is being verified,
+          but tests are limited to the presence of files.
+        """
+        #incremental : bool or {'continue'} or SCHEDULE
+        #  If given, `fsck` is called with `--incremental`. If 'continue',
+        #  `fsck` is additionally called with `--more`, and any other argument
+        #  is given to `--incremental-schedule`.
+        #limit : str or all
+        #  If the function `all` is given, `fsck` is called with `--all`. Any
+        #  other value is passed on to `--branch`.
+        args = [] if annex_options is None else list(annex_options)
+        if fast:
+            args.append('--fast')
+        if remote:
+            args.append('--from={}'.format(remote))
+        #if limit:
+        #    # looks funky, but really is a test if the `all` function was passed
+        #    # alternatives would have been 1) a dedicated argument (would need
+        #    # a check for mutual exclusivity with --branch), or 2) a str-type
+        #    # special values that has no meaning in Git and is less confusing
+        #    if limit is all:
+        #        args.append('--all')
+        #    else:
+        #        args.append('--branch={}'.format(limit))
+        #if incremental == 'continue':
+        #    args.append('--more')
+        #elif incremental:
+        #    args.append('--incremental')
+        #    if not (incremental is True):
+        #        args.append('--incremental-schedule={}'.format(incremental))
+        return self._run_annex_command_json(
+            'fsck',
+            files=paths,
+            git_options=git_options,
+            opts=args,
+            # next two are to avoid warnings and errors due to an fsck
+            # finding any issues -- those will be reported in the
+            # JSON results, and can be acted upon
+            expect_stderr=True,
+            expect_fail=True,
+        )
 
     # TODO: we probably need to override get_file_content, since it returns the
     # symlink's target instead of the actual content.
