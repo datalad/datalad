@@ -21,6 +21,7 @@ from os.path import join as opj
 from os.path import relpath
 from os import mkdir, remove
 import sys
+from time import sleep
 
 from six import PY2
 from six.moves import StringIO
@@ -31,6 +32,7 @@ from datalad.utils import chpwd
 
 from datalad.cmdline.main import main
 from datalad.distribution.dataset import Dataset
+from datalad.dochelpers import exc_str
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
@@ -63,6 +65,8 @@ from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import slow
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import OBSCURE_FILENAME
+
+lgr = logging.getLogger("datalad.interface.run")
 
 
 @with_tempfile(mkdir=True)
@@ -767,7 +771,19 @@ def test_run_inputs_outputs(src, path):
     for idx, (inputs_arg, expected_present) in enumerate(test_cases):
         assert_false(any(ds.repo.file_has_content(i) for i in inputs))
 
-        ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+        try:
+            ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+        except IncompleteResultsError as exc:
+            # This test started to fail intermittently on Travis (gh-3653).
+            if "transfer lock" in str(exc):
+                lgr.warning(
+                    "Sleeping and running again to try to work around "
+                    "'git annex get' lock failure occurred (gh-3653): %s",
+                    exc_str(exc))
+                sleep(0.2)
+                ds.run("touch dummy{}".format(idx), inputs=inputs_arg)
+            else:
+                raise
         ok_(all(ds.repo.file_has_content(f) for f in expected_present))
         # Globs are stored unexpanded by default.
         assert_in(inputs_arg[0], ds.repo.format_commit("%B"))
