@@ -107,10 +107,11 @@ STATE_COLOR_MAP = {
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
                   eval_submodule_state, eval_filetype, cache):
     # take the datase that went in first
-    repo_path = ds.repo.pathobj
-    lgr.debug('query %s.diffstatus() for paths: %s', ds.repo, paths)
-    status = ds.repo.diffstatus(
-        fr='HEAD' if ds.repo.get_hexsha() else None,
+    repo = ds.repo
+    repo_path = repo.pathobj
+    lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
+    status = repo.diffstatus(
+        fr='HEAD' if repo.get_hexsha() else None,
         to=None,
         # recode paths with repo reference for low-level API
         paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
@@ -118,10 +119,10 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
         eval_submodule_state=eval_submodule_state,
         eval_file_type=eval_filetype,
         _cache=cache)
-    if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
-        lgr.debug('query %s.get_content_annexinfo() for paths: %s', ds.repo, paths)
+    if annexinfo and hasattr(repo, 'get_content_annexinfo'):
+        lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
-        ds.repo.get_content_annexinfo(
+        repo.get_content_annexinfo(
             paths=paths if paths else None,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
