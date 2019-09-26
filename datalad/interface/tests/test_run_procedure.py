@@ -33,6 +33,7 @@ from datalad.tests.utils import skip_if
 from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import skip_if_on_windows
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
@@ -352,3 +353,18 @@ def test_quoting(path):
             "datalad run-procedure just2args \"with ' sing\" 'with \" doub'")
         with assert_raises(CommandError):
             runner.run("datalad run-procedure just2args 'still-one arg'")
+
+@skip_if_on_windows
+@with_tempfile
+def test_text2git_empty(path):
+    """
+    Tests that empty files are not annexed in a ds configured with text2git.
+    """
+    ds = Dataset(path).create(force=True)
+    ds.run_procedure('cfg_text2git')
+    assert_repo_status(ds.path)
+    # create an empty file, no extension
+    open(op.join(path, 'emptyfile'), 'a').close()
+    ds.save(message="add empty file")
+    # check that it's not annexed
+    assert_false(ds.repo.is_under_annex("emptyfile"))
