@@ -1387,6 +1387,9 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    if on_windows:
+        # TODO: really figure out unicode handling on windows
+        UNICODE_FILENAME = ''
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
