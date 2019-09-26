@@ -12,6 +12,7 @@
 
 
 from os import curdir
+import os.path as op
 from os.path import join as opj, basename
 from glob import glob
 
@@ -84,10 +85,11 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
-    eq_(f(clone, 'sub'), [t + '/sub'])
-    eq_(f(clone, 'sub', sshurl), [t + '/sub', sshurl])
-    eq_(f(clone, 'sub', httpurl), [t + '/sub'] + sm_httpurls)
-    eq_(f(clone, 'sub'), [t + '/sub'])  # otherwise really we have no clue were to get from
+    subpath = op.sep.join((t, 'sub'))
+    eq_(f(clone, 'sub'), [subpath])
+    eq_(f(clone, 'sub', sshurl), [subpath, sshurl])
+    eq_(f(clone, 'sub', httpurl), [subpath] + sm_httpurls)
+    eq_(f(clone, 'sub'), [subpath])  # otherwise really we have no clue were to get from
     # TODO: check that http:// urls for the dataset itself get resolved
 
     # TODO: many more!!
