@@ -63,7 +63,7 @@ ask () {
 
 cleanup () {
 	# remove reference and object locally
-	rm -f "$gitdir/$ref"
+	rungitcmd update-ref -d "$ref"
 	if [ "$knownobj" = '' ]; then
 		rm -f "$objfile"
 	fi
@@ -125,6 +125,7 @@ while read line; do
 					#  since we don't know object hash. may be we should save
 					#  it into the STATE and use that to check first
 					knownobj=''
+					# TODO: interface progress reporting
 					rungitcmd fetch "$remote" "$ref:$ref"
 					echo DEBUG "getting git hexsha"
 					h=$(git -c gc.auto=0 show-ref -s "$ref")
