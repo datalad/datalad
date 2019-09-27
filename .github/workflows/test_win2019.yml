@@ -10,19 +10,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # group modules to get a job runtime of ~15min
         module: [
             datalad.core,
-            datalad.customremotes,
-            datalad.distributed,
+            datalad.local datalad.distributed datalad.support,
+            datalad.customremotes datalad.downloaders datalad.plugin,
             datalad.distribution,
-            datalad.downloaders,
             datalad.interface,
-            datalad.local,
-            datalad.metadata,
-            datalad.plugin,
-            datalad.support,
-            datalad.tests,
-            datalad.ui datalad.cmdline
+            datalad.metadata datalad.tests datalad.ui datalad.cmdline
         ]
     steps:
     - name: Set up environment
