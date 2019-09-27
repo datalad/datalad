@@ -143,8 +143,9 @@ while read line; do
 			#  would fetch the object?
 			key="$2"
 			calcref "$key"
-			rungitcmd fetch "$remote" --dry-run "$ref:$ref" \
-				&& echo CHECKPRESENT-SUCCESS "$key" || echo CHECKPRESENT-FAILURE "$key"
+			rungitcmd ls-remote --exit-code "$remote" "$ref" \
+				&& echo CHECKPRESENT-SUCCESS "$key" \
+				|| echo CHECKPRESENT-FAILURE "$key"
 			rm -f "$gitdir/$ref"
 		;;
 		REMOVE)
