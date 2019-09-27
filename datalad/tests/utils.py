@@ -1387,6 +1387,9 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    if on_windows:
+        # TODO: really figure out unicode handling on windows
+        UNICODE_FILENAME = ''
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
@@ -1728,6 +1731,9 @@ def get_deeply_nested_structure(path):
     |      └── subds_lvl1_modified
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
+
+    When a system has no symlink support, the link2... components are not
+    included.
     """
     ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
@@ -1756,6 +1762,10 @@ def get_deeply_nested_structure(path):
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
     subds.save()
     (ds.pathobj / 'directory_untracked').mkdir()
+
+    if not has_symlink_capability():
+        return ds
+
     # symlink farm #1
     # symlink to annexed file
     (ds.pathobj / 'subdir' / 'link2annex_files.txt').symlink_to(
