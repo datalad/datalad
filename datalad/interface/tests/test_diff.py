@@ -32,6 +32,7 @@ from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import known_failure_githubci_win
 
 
 @known_failure_windows
@@ -45,6 +46,7 @@ def test_magic_number():
     eq_(out.strip(), PRE_INIT_COMMIT_SHA)
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_diff(path, norepo):
@@ -134,6 +136,7 @@ def test_diff(path, norepo):
         res, 1, state='added', path=opj(ds.path, 'deep', 'down2'), type='file')
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_diff_recursive(path):
     ds = Dataset(path).create()

@@ -85,6 +85,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
 from datalad.tests.utils import set_annex_version
+from datalad.tests.utils import known_failure_githubci_win
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -172,6 +173,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     assert_false(ar.is_crippled_fs())
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
@@ -181,6 +183,7 @@ def test_AnnexRepo_is_direct_mode(path):
         ar.is_direct_mode())
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_AnnexRepo_is_direct_mode_gitrepo(path):
     repo = GitRepo(path, create=True)
@@ -331,6 +334,7 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
         [False])
 
 
+@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -944,6 +948,7 @@ def test_AnnexRepo_get_contentlocation():
         yield _test_AnnexRepo_get_contentlocation, batch
 
 
+@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('about2_.txt', 'more abouts_'),
@@ -1814,6 +1819,7 @@ def test_wanted(path):
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
@@ -2062,6 +2068,7 @@ def test_error_reporting(path):
 
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
+@known_failure_githubci_win
 @with_tree(tree={
     '.gitattributes': "** annex.largefiles=(largerthan=4b)",
     'alwaysbig': 'a'*10,
@@ -2185,6 +2192,7 @@ def check_files_split(cls, topdir):
     dl.add(dirs)
 
 
+@known_failure_githubci_win
 @slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:

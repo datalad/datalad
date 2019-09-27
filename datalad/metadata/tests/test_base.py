@@ -38,6 +38,7 @@ from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import ok_
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import assert_re_in
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.support.gitrepo import GitRepo
@@ -95,6 +96,7 @@ def _compare_metadata_helper(origres, compds):
                 eq_(ores[i], cres[i])
 
 
+@known_failure_githubci_win
 @slow  # ~16s
 @with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
@@ -248,6 +250,7 @@ def test_bf2458(src, dst):
     eq_(clone.repo.whereis('dummy'), [ds.config.get('annex.uuid')])
 
 
+@known_failure_githubci_win
 def test_get_containingds_from_agginfo():
     eq_(None, _get_containingds_from_agginfo({}, 'any'))
     # direct hit returns itself

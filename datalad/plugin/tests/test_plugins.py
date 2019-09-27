@@ -38,6 +38,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import OBSCURE_FILENAME
+from datalad.tests.utils import known_failure_githubci_win
 
 
 broken_plugin = """garbage"""
@@ -158,6 +159,7 @@ def test_wtf(topdir):
         assert_in("cmd:annex:", pyperclip.paste())  # but the content is there
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_no_annex(path):
     ds = create(path)

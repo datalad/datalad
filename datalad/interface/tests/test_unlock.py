@@ -39,6 +39,7 @@ from datalad.tests.utils import (
     assert_not_in_results,
     assert_result_count,
     assert_status,
+    known_failure_githubci_win,
 )
 
 
@@ -163,6 +164,7 @@ def test_unlock(path):
         eq_("change content again", f.read())
 
 
+@known_failure_githubci_win
 @with_tree(tree={"dir": {"a": "a", "b": "b"}})
 def test_unlock_directory(path):
     ds = Dataset(path).create(force=True)

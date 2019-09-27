@@ -19,6 +19,7 @@ from io import StringIO
 from .utils import with_testrepos
 from .utils import assert_raises, eq_, ok_, assert_false, assert_true
 from .utils import swallow_outputs
+from datalad.tests.utils import known_failure_githubci_win
 
 from ..auto import AutomagicIO
 
@@ -187,6 +188,7 @@ def test_proxying_open_h5py():
     yield _test_proxying_open, generate_hdf5, verify_hdf5
 
 
+@known_failure_githubci_win
 def test_proxying_open_regular():
     def generate_dat(f):
         with open(f, "w") as f:
@@ -199,6 +201,7 @@ def test_proxying_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
+@known_failure_githubci_win
 def test_proxying_io_open_regular():
 
     def generate_dat(f):
@@ -212,6 +215,7 @@ def test_proxying_io_open_regular():
     yield _test_proxying_open, generate_dat, verify_dat
 
 
+@known_failure_githubci_win
 def test_proxying_lzma_LZMAFile():
     def generate_dat(f):
         with LZMAFile(f, "w") as f:
@@ -245,6 +249,7 @@ def test_proxying_open_nibabel():
     yield _test_proxying_open, generate_nii, verify_nii
 
 
+@known_failure_githubci_win
 def test_proxying_os_stat():
     from os.path import exists
     def generate_dat(f):

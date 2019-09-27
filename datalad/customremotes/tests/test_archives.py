@@ -46,6 +46,7 @@ from ...tests.utils import (
     swallow_outputs,
     swallow_logs,
     serve_path_via_http,
+    known_failure_githubci_win,
 )
 from ...cmd import Runner, GitRunner
 from ...utils import (
@@ -70,6 +71,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
+@known_failure_githubci_win
 @with_tree(
     tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
           ('simple.txt', '123'),
@@ -157,6 +159,7 @@ def test_basic_scenario(d, d2):
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
 
 
+@known_failure_githubci_win
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
 )
@@ -176,6 +179,7 @@ def test_annex_get_from_subdir(topdir):
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
+@known_failure_githubci_win
 def test_get_git_environ_adjusted():
     gitrunner = GitRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
@@ -287,6 +291,7 @@ def check_observe_tqdm(topdir, topurl, outdir):
         sleep(0.1)
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_link_file_load(tempfile):
     tempfile2 = tempfile + '_'

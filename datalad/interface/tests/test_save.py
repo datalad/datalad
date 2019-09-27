@@ -43,6 +43,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import skip_v6_or_later
 from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import known_failure_githubci_win
 
 
 save = Save.__call__
@@ -119,6 +120,7 @@ def test_save(path):
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_recursive_save(path):
     ds = Dataset(path).create()
@@ -267,6 +269,7 @@ def test_recursive_save(path):
                  'saving sub')
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_save_message_file(path):
     ds = Dataset(path).create()
@@ -281,6 +284,7 @@ def test_save_message_file(path):
                  u"add β")
 
 
+@known_failure_githubci_win
 def test_renamed_file():
     @with_tempfile()
     def check_renamed_file(recursive, no_annex, path):
@@ -415,6 +419,7 @@ def test_bf1886(path):
     ok_clean_git(parent.path)
 
 
+@known_failure_githubci_win
 @with_tree({
     '1': '',
     '2': '',
@@ -444,6 +449,7 @@ def test_gh2043p1(path):
     skip_v6_or_later(method='pass')(ok_clean_git)(ds.path)
 
 
+@known_failure_githubci_win
 @with_tree({
     'staged': 'staged',
     'untracked': 'untracked'})
@@ -459,6 +465,7 @@ def test_bf2043p2(path):
 
 
 # https://github.com/datalad/datalad/issues/3087
+@known_failure_githubci_win
 @with_tree({
     'sdir1': {'foo': 'foo'},
     'sdir2': {'foo': 'foo'},
@@ -494,6 +501,7 @@ def test_save_partial_index(path):
     ok_clean_git(ds.path, head_modified=["staged"])
 
 
+@known_failure_githubci_win
 @with_tree({
     'top:file': 'data',
     'd': {'sub:file': 'data'}

@@ -23,6 +23,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import known_failure_githubci_win
 
 from datalad.support.exceptions import IncompleteResultsError
 
@@ -37,6 +38,7 @@ def test_error(path):
         assert_raises(ValueError, extract_metadata, types=['bogus__'], files=[testpath])
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_ds_extraction(path):
     from datalad.tests.utils import SkipTest
@@ -76,6 +78,7 @@ def test_ds_extraction(path):
         assert_in('xmp', r['metadata'])
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_file_extraction(path):
     from datalad.tests.utils import SkipTest

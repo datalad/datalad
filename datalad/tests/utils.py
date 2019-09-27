@@ -1058,6 +1058,20 @@ def known_failure_appveyor(func):
     return func
 
 
+def known_failure_githubci_win(func):
+    """Test decorator for a known test failure on Github's Windows CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_windows:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_win')
+        @attr('githubci_win')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###

@@ -42,6 +42,7 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import usecase
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
@@ -215,6 +216,7 @@ def test_uninstall_subdataset(src, dst):
         ok_(exists(subds.path))
 
 
+@known_failure_githubci_win
 @with_tree({
     'deep': {
         'dir': {
@@ -269,6 +271,7 @@ def test_uninstall_dataset(path):
     ok_(not exists(ds.path))
 
 
+@known_failure_githubci_win
 @with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
@@ -298,6 +301,7 @@ def test_remove_file_handle_only(path):
     ok_(ds.repo.dirty)
 
 
+@known_failure_githubci_win
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)

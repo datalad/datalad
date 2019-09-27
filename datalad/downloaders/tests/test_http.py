@@ -34,6 +34,7 @@ from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
 from ...tests.utils import with_testsui
 from ...tests.utils import with_memory_keyring
+from ...tests.utils import known_failure_githubci_win
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -105,6 +106,7 @@ def test_process_www_authenticate():
                  [])
 
 
+@known_failure_githubci_win
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
 def test_HTTPDownloader_basic(toppath, topurl):
@@ -311,6 +313,7 @@ def test_authenticate_external_portals():
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
+@known_failure_githubci_win
 @skip_if_no_network
 def test_download_ftp():
     try:

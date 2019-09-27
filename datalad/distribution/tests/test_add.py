@@ -39,6 +39,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import OBSCURE_FILENAME
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import chpwd
 
 from ..dataset import Dataset
@@ -86,6 +87,7 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
+@known_failure_githubci_win
 @with_tree(**tree_arg)
 def test_add_files(path):
     ds = Dataset(path)
@@ -137,6 +139,7 @@ def test_add_files(path):
         ok_(unstaged.isdisjoint(indexed))
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_update_known_submodule(path):
     def get_baseline(p):
@@ -161,6 +164,7 @@ def test_update_known_submodule(path):
     ok_clean_git(ds.path)
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_add_recursive(path):
     # make simple hierarchy
@@ -192,6 +196,7 @@ def test_add_recursive(path):
     ok_clean_git(parent.path)
 
 
+@known_failure_githubci_win
 @with_tree(**tree_arg)
 def test_add_dirty_tree(path):
     ds = Dataset(path)
@@ -379,6 +384,7 @@ def test_add_subdataset(path, other):
     ok_(other_clone.is_installed)
 
 
+@known_failure_githubci_win
 @with_tree(tree={
     'file.txt': 'some text',
     'empty': '',

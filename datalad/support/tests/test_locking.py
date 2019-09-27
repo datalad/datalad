@@ -23,9 +23,16 @@
 """
 import os.path as op
 from ..locking import lock_if_check_fails
-from datalad.tests.utils import ok_exists, with_tempfile, ok_, eq_
+from datalad.tests.utils import (
+    ok_exists,
+    with_tempfile,
+    ok_,
+    eq_,
+    known_failure_githubci_win,
+)
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_lock_if_check_fails(tempfile):
     # basic test, should never try to lock so filename is not important

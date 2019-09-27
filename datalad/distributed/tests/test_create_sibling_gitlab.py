@@ -25,6 +25,7 @@ from datalad.tests.utils import (
     assert_raises,
     eq_,
     with_tempfile,
+    known_failure_githubci_win,
 )
 
 
@@ -51,6 +52,7 @@ def _get_nested_collections(path):
 
 
 # doesn't actually need gitlab and exercises most of the decision logic
+@known_failure_githubci_win
 @with_tempfile
 def test_dryrun(path):
     ctlg = _get_nested_collections(path)
