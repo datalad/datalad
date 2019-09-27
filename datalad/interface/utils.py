@@ -21,6 +21,7 @@ import shlex
 from os import curdir
 from os import pardir
 from os import listdir
+import os.path as op
 from os.path import join as opj
 from os.path import isdir
 from os.path import relpath
@@ -156,7 +157,14 @@ def path_is_under(values, path=None):
         path = getpwd()
     if isinstance(values, dict):
         values = chain(*values.values())
+    path_drive, _ = op.splitdrive(path)
     for p in values:
+        p_drive, _ = op.splitdrive(p)
+        # need to protect against unsupported use of relpath() with
+        # abspaths on windows from different drives (gh-3724)
+        if path_drive != p_drive:
+        # different drives, enough evidence for "not under"
+            continue
         rpath = relpath(p, start=path)
         if rpath == curdir \
                 or rpath == pardir \
