@@ -41,7 +41,7 @@ calcref () {
 }
 
 calcobjfile () {
-	objfile="$dotgit/objects/${h:0:2}/${h:2}"
+	objfile="$gitdir/objects/${h:0:2}/${h:2}"
 	echo DEBUG "objfile=$objfile"
 }
 
@@ -63,19 +63,16 @@ ask () {
 
 cleanup () {
 	# remove reference and object locally
-	rm -f "$dotgit/$ref"
+	rm -f "$gitdir/$ref"
 	if [ "$knownobj" = '' ]; then
 		rm -f "$objfile"
 	fi
 }
 
+gitdir=$(git rev-parse --git-dir)
+
 # This has to come first, to get the protocol started.
 echo VERSION 1
-
-# quick and dirty way to figure out root, dunno any better ATM but set
-# an alias
-git config --local --add alias.root '!pwd'
-dotgit=$(git root)/.git
 
 while read line; do
 	set -- $line
@@ -148,7 +145,7 @@ while read line; do
 			calcref "$key"
 			rungitcmd fetch "$remote" --dry-run "$ref:$ref" \
 				&& echo CHECKPRESENT-SUCCESS "$key" || echo CHECKPRESENT-FAILURE "$key"
-			rm -f "$dotgit/$ref"
+			rm -f "$gitdir/$ref"
 		;;
 		REMOVE)
 			key="$2"
