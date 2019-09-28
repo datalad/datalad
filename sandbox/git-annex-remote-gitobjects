@@ -106,7 +106,7 @@ while read line; do
 					# based on the key.
 					# We will need to do it twice ATM to make sure that we do
 					# not wipe out object which magically already exists
-					h=$(git -c gc.auto=0 hash-object --stdin < "$1")
+					h=$(git -c gc.auto=0 hash-object --stdin < "$file")
 					calcobjfile "$h"
 					knownobj=$( [ -e "$objfile" ] && echo 1 || echo '' )
 					echo DEBUG knownobj=$knownobj
