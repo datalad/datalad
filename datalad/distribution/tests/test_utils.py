@@ -19,6 +19,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import eq_
 from datalad.tests.utils import assert_raises
+from datalad.tests.utils import known_failure_githubci_win
 
 from datalad.utils import (
     on_windows,
@@ -26,6 +27,7 @@ from datalad.utils import (
 )
 
 
+@known_failure_githubci_win
 def test_get_flexible_source_candidates():
     f = _get_flexible_source_candidates
     # for http and https (dummy transport) we should get /.git source added

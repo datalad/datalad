@@ -32,6 +32,7 @@ from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import eq_, ok_exists
 from datalad.tests.utils import create_tree, with_tempfile, HTTPPath
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import get_tempfile_kwargs, rmtemp
 
 
@@ -232,6 +233,7 @@ def json_stream(data):
     return stream
 
 
+@known_failure_githubci_win
 def test_extract():
     info, subpaths = au.extract(
         json_stream(ST_DATA["rows"]), "json",

@@ -27,6 +27,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_githubci_win
 
 
 def _assert_metadata_empty(meta):
@@ -92,6 +93,7 @@ def test_basic_aggregate(path):
 
 
 # tree puts aggregate metadata structures on two levels inside a dataset
+@known_failure_githubci_win
 @with_tree(tree={
     '.datalad': {
         'metadata': {
@@ -143,6 +145,7 @@ def test_aggregate_query(path):
 
 
 # this is for gh-1971
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_reaggregate_with_unavailable_objects(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
@@ -176,6 +179,7 @@ def test_reaggregate_with_unavailable_objects(path):
     )
 
 
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 @with_tempfile(mkdir=True)
 def test_aggregate_with_unavailable_objects_from_subds(path, target):

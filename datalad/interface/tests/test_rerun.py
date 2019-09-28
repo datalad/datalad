@@ -69,6 +69,7 @@ from datalad.tests.utils import (
     swallow_outputs,
     known_failure_appveyor,
     known_failure_windows,
+    known_failure_githubci_win,
     slow,
 )
 
@@ -275,6 +276,7 @@ def test_rerun_just_one_commit(path):
                   report=True, return_type="list")
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_run_failure(path):
     ds = Dataset(path).create()
@@ -581,6 +583,7 @@ def test_rerun_script(path):
 
 
 @slow  # ~10s
+@known_failure_githubci_win
 @known_failure_appveyor
 # ^ Issue only happens on appveyor, Python itself implodes. Cannot be
 #   reproduced on a real win7 box

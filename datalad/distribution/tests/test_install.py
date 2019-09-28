@@ -70,6 +70,7 @@ from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -168,7 +169,8 @@ def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install, None)
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
-
+# ValueError: path is on mount 'D:', start on mount 'C:
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_invalid_args(path):
     assert_raises(IncompleteResultsError, install, 'Zoidberg', source='Zoidberg')

@@ -24,8 +24,10 @@ from ..support.gitrepo import GitRepo
 from ..cmd import Runner
 from .utils import with_tempfile
 from .utils import swallow_logs
+from .utils import known_failure_githubci_win
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_protocol_commons(protocol_file):
 

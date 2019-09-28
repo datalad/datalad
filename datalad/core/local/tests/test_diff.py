@@ -34,6 +34,7 @@ from datalad.tests.utils import (
     chpwd,
     assert_result_count,
     OBSCURE_FILENAME,
+    known_failure_githubci_win,
 )
 
 import datalad.utils as ut
@@ -296,6 +297,8 @@ def test_diff_recursive(path):
         action='diff', state='modified', path=sub.path, type='dataset')
 
 
+# https://github.com/datalad/datalad/issues/3725
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 @with_tempfile()
 def test_path_diff(_path, linkpath):

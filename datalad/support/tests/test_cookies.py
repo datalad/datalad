@@ -13,9 +13,11 @@ from ...utils import rmtree
 from ...tests.utils import (
     assert_equal,
     with_tempfile,
+    known_failure_githubci_win,
 )
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_no_blows(cookiesdir):
     cookies = CookiesDB(op.join(cookiesdir, 'mycookies'))
