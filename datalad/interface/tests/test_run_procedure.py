@@ -128,11 +128,11 @@ def test_basics(path, super_path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
+save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
 """}})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
@@ -305,11 +305,11 @@ def test_configs(path):
     'code': {'datalad_test_proc.py': """\
 import sys
 import os.path as op
-from datalad.api import add, Dataset
+from datalad.api import save, Dataset
 
 with open(op.join(sys.argv[1], sys.argv[2]), 'w') as f:
     f.write('hello\\n')
-add(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
+save(dataset=Dataset(sys.argv[1]), path=sys.argv[2])
 """}})
 def test_spaces(path):
     """
