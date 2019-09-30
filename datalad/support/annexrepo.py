@@ -545,22 +545,6 @@ class AnnexRepo(GitRepo, RepoInterface):
         cls.git_annex_version = ver
 
     @classmethod
-    def check_direct_mode_support(cls):
-        """Does git-annex version support direct mode?
-
-        The result is cached at `cls.supports_direct_mode`.
-
-        Returns
-        -------
-        bool
-        """
-        if cls.supports_direct_mode is None:
-            if cls.git_annex_version is None:
-                cls._check_git_annex_version()
-            cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
-        return cls.supports_direct_mode
-
-    @classmethod
     def check_repository_versions(cls):
         """Get information on supported and upgradable repository versions.
 
