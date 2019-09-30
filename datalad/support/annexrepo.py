@@ -1648,6 +1648,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         if pointers or batch or not allow_quick:
             # We're only concerned about modified files in V6+ mode. In V5
             # `find` returns an empty string for unlocked files.
+            # TODO this is the last use of get_changed_files()
             modified = self.get_changed_files() if pointers else []
             annex_res = fn(files, normalize_paths=False, batch=batch)
             return [bool(annex_res.get(f) and
