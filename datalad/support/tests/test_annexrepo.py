@@ -2189,7 +2189,7 @@ def check_files_split(cls, topdir):
         os.unlink(f)
         with open(f, 'w') as f:
             f.write('1')
-    dl.add(dirs)
+    dl.save(dataset=r.path, path=dirs)
 
 
 @known_failure_githubci_win
