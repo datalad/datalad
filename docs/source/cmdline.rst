@@ -21,7 +21,6 @@ Dataset operations
 .. toctree::
    :maxdepth: 1
 
-   generated/man/datalad-add
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github

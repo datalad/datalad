@@ -34,7 +34,7 @@ say "Adding this new content with Git or git-annex would be an exercise"
 run_expfail "git add sub1/justadir/sub2/anotherdir/afile"
 
 say "DataLad does not require users to determine the correct repository in the tree"
-run "datalad add -d . sub1/justadir/sub2/anotherdir/afile"
+run "datalad save -d . sub1/justadir/sub2/anotherdir/afile"
 
 say "Again, all associated changes in the entire dataset tree, up to the given parent dataset, were committed"
 run "git status"
