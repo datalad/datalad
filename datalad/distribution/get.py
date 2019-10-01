@@ -247,9 +247,15 @@ def _install_necessary_subdatasets(
     path: str
     reckless: bool
     """
+
+    def subds_result_filter(res):
+        return res.get('status') == 'ok' and res.get('type') == 'dataset'
+
     # figuring out what dataset to start with, --contains limits --recursive
     # to visit only subdataset on the trajectory to the target path
-    subds_trail = ds.subdatasets(contains=path, recursive=True)
+    subds_trail = ds.subdatasets(contains=path, recursive=True,
+                                 on_failure="ignore",
+                                 result_filter=subds_result_filter)
     if not subds_trail:
         # there is not a single known subdataset (installed or not)
         # for this path -- job done
@@ -283,7 +289,9 @@ def _install_necessary_subdatasets(
 
         # now check whether the just installed subds brought us any closer to
         # the target path
-        subds_trail = sd.subdatasets(contains=path, recursive=False)
+        subds_trail = sd.subdatasets(contains=path, recursive=False,
+                                     on_failure='ignore',
+                                     result_filter=subds_result_filter)
         if not subds_trail:
             # no (newly available) subdataset get's us any closer
             return
