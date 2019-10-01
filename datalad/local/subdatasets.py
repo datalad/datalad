@@ -248,6 +248,7 @@ class Subdatasets(Interface):
                         "start with a letter)" % k)
         if contains:
             contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
+        contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
                 contains, bottomup, set_property, delete_property,
@@ -258,7 +259,25 @@ class Subdatasets(Interface):
             # without the refds_path cannot be rendered/converted relative
             # in the eval_results decorator
             r['refds'] = refds_path
+            if 'contains' in r:
+                contains_hits.update(r['contains'])
+                r['contains'] = [str(c) for c in r['contains']]
             yield r
+        if contains:
+            for c in set(contains).difference(contains_hits):
+                yield get_status_dict(
+                    'subdataset',
+                    path=str(c),
+                    status='impossible',
+                    message='path not contained in any matching subdataset',
+                    # we do not want to log such an event, because it is a
+                    # legit query to check for matching subdatasets simply
+                    # for the purpose of further decision making
+                    # user communication in front-end scenarios will happen
+                    # via result rendering
+                    #logger=lgr
+                )
+
 
 
 # internal helper that needs all switches, simply to avoid going through
@@ -363,7 +382,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         subdsres['parentds'] = dspath
         if to_report:
             if contains_hits:
-                subdsres['contains'] = [str(c) for c in contains_hits]
+                subdsres['contains'] = contains_hits
             if (not bottomup and \
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm['path']) == fulfilled)):
