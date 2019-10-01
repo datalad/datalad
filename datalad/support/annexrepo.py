@@ -580,6 +580,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             return None
         return int(size_str) if size_str.isdigit() else None
 
+    # only used in two place of AnnexRepo for UI stuff, better move to a higher
+    # level on be based on get_content_info() and no FS queries
     @normalize_path
     def get_file_size(self, path):
         fpath = opj(self.path, path)
@@ -1560,6 +1562,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:  # ad-hoc check which should be faster than call into annex
             return [quick_fn(f) for f in files]
 
+    # TODO this is pretty much only used as a test helper
     @normalize_paths
     def file_has_content(self, files, allow_quick=True, batch=False):
         """Check whether files have their content present under annex.
@@ -2374,6 +2377,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         assert(info.pop('command') == 'info')
         return info  # just as is for now
 
+    # TODO pretty much only used as a test helper
     def get_annexed_files(self, with_content_only=False, patterns=None):
         """Get a list of files in annex
 
