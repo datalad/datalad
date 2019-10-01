@@ -37,6 +37,7 @@ from datalad.dochelpers import (
 from datalad.ui import ui
 from datalad.utils import (
     Path,
+    PurePosixPath,
     linux_distribution_name,
     auto_repr,
     on_windows,
