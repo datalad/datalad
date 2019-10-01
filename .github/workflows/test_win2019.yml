@@ -1,4 +1,4 @@
-name: Win2019 tests
+name: Win2019
 
 on: [pull_request]
 
