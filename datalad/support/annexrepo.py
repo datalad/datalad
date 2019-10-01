@@ -23,15 +23,6 @@ import shlex
 
 from itertools import chain
 from os import linesep
-from os.path import curdir
-from os.path import join as opj
-from os.path import exists
-from os.path import islink
-from os.path import realpath
-from os.path import lexists
-from os.path import isdir
-from os.path import isabs
-from os.path import normpath
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
@@ -574,8 +565,8 @@ class AnnexRepo(GitRepo, RepoInterface):
     # level on be based on get_content_info() and no FS queries
     @normalize_path
     def get_file_size(self, path):
-        fpath = opj(self.path, path)
-        return 0 if not exists(fpath) else os.stat(fpath).st_size
+        fpath = op.join(self.path, path)
+        return 0 if not op.exists(fpath) else os.stat(fpath).st_size
 
     # TODO: Once the PR containing super class 'Repo' was merged, move there and
     # melt with GitRepo.get_toppath including tests for both
@@ -653,17 +644,17 @@ class AnnexRepo(GitRepo, RepoInterface):
 
             if external_versions['cmd:git'] < '2.13.0':
                 # we got a path relative to `path` instead of an absolute one
-                toppath = opj(path, toppath)
+                toppath = op.join(path, toppath)
 
             # we got the git-dir. Assuming the root dir we are looking for is
             # one level up:
-            toppath = realpath(normpath(opj(toppath, pardir)))
+            toppath = op.realpath(op.normpath(op.join(toppath, pardir)))
 
             if follow_up:
                 path_ = path
                 path_prev = ""
                 while path_ and path_ != path_prev:  # on top /.. = /
-                    if realpath(path_) == toppath:
+                    if op.realpath(path_) == toppath:
                         toppath = path_
                         break
                     path_prev = path_
@@ -683,19 +674,19 @@ class AnnexRepo(GitRepo, RepoInterface):
         def git_file_has_annex(p):
             """Return True if `p` contains a .git file, that points to a git
             dir with a subdir 'annex'"""
-            _git = opj(p, '.git')
+            _git = op.join(p, '.git')
             if not os.path.isfile(_git):
                 return False
             with open(_git, "r") as f:
                 line = f.readline()
                 if line.startswith("gitdir: "):
-                    return exists(opj(p, line[8:], 'annex'))
+                    return op.exists(op.join(p, line[8:], 'annex'))
                 else:
                     lgr.debug("Invalid .git file: %s", _git)
                     return False
 
         initialized_annex = GitRepo.is_valid_repo(path) and \
-            (exists(opj(path, '.git', 'annex')) or
+            (op.exists(op.join(path, '.git', 'annex')) or
              git_file_has_annex(path))
 
         if allow_noninitialized:
@@ -1385,7 +1376,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 )
             except CommandError as e:
                 if e.code == 1:
-                    if not exists(opj(self.path, files)):
+                    if not op.exists(op.join(self.path, files)):
                         raise IOError(e.code, "File not found.", files)
                     # XXX you don't like me because I can be real slow!
                     elif files in self.get_indexed_files():
@@ -1512,7 +1503,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         objects = {}
         # Ignore batch=True if any path is a directory because `git annex find
         # --batch` always returns an empty string for directories.
-        if batch and not any(isdir(opj(self.path, f)) for f in files):
+        if batch and not any(op.isdir(op.join(self.path, f)) for f in files):
             find = self._batched.get(
                 'find', json=True, path=self.path,
                 # Since we are just interested in local information
@@ -1547,7 +1538,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             modified = self.get_changed_files() if pointers else []
             annex_res = fn(files, normalize_paths=False, batch=batch)
             return [bool(annex_res.get(f) and
-                         not (pointers and normpath(f) in modified))
+                         not (pointers and op.normpath(f) in modified))
                     for f in files]
         else:  # ad-hoc check which should be faster than call into annex
             return [quick_fn(f) for f in files]
@@ -1573,16 +1564,16 @@ class AnnexRepo(GitRepo, RepoInterface):
         # TODO: Also provide option to look for key instead of path
 
         def quick_check(filename):
-            filepath = opj(self.path, filename)
-            if islink(filepath):                    # if symlink
+            filepath = op.join(self.path, filename)
+            if op.islink(filepath):                    # if symlink
                 # find abspath of node pointed to by symlink
-                target_path = realpath(filepath)  # realpath OK
+                target_path = op.realpath(filepath)  # realpath OK
                 # TODO: checks for being not outside of this repository
                 # Note: ben removed '.git/' from '.git/annex/objects',
                 # since it is not true for submodules, whose '.git' is a
                 # symlink and being resolved to some
                 # '.git/modules/.../annex/objects'
-                return exists(target_path) and 'annex/objects' in str(target_path)
+                return op.exists(target_path) and 'annex/objects' in str(target_path)
             return False
 
         return self._check_files(self.find, quick_check,
@@ -1611,25 +1602,25 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         # This is an ugly hack to prevent files from being treated as
         # remotes by `git annex info`. See annex's `nameToUUID'`.
-        files = [opj(curdir, f) for f in files]
+        files = [op.join(op.curdir, f) for f in files]
 
         def check(files, **kwargs):
             # Filter out directories because it doesn't make sense to ask if
             # they are under annex control and `info` can only handle
             # non-directories.
-            return self.info([f for f in files if not isdir(f)],
+            return self.info([f for f in files if not op.isdir(f)],
                              fast=True, **kwargs)
 
         def quick_check(filename):
-            filepath = opj(self.path, filename)
+            filepath = op.join(self.path, filename)
             # todo checks for being not outside of this repository
             # Note: ben removed '.git/' from '.git/annex/objects',
             # since it is not true for submodules, whose '.git' is a
             # symlink and being resolved to some
             # '.git/modules/.../annex/objects'
             return (
-                islink(filepath)
-                and 'annex/objects' in str(realpath(filepath))  # realpath OK
+                op.islink(filepath)
+                and 'annex/objects' in str(op.realpath(filepath))  # realpath OK
             )
 
         return self._check_files(check, quick_check,
@@ -1775,7 +1766,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         options = options[:] if options else []
         git_options = []
         kwargs = dict(backend=backend)
-        if lexists(opj(self.path, file_)) and \
+        if op.lexists(op.join(self.path, file_)) and \
                 unlink_existing and \
                 not self.is_under_annex(file_):
             # already under git, we can't addurl for under annex
@@ -1783,7 +1774,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 "File %s:%s is already under git, removing so it could possibly"
                 " be added under annex", self, file_
             )
-            unlink(opj(self.path, file_))
+            unlink(op.join(self.path, file_))
         if not batch or self.fake_dates_enabled:
             if batch:
                 lgr.debug("Not batching addurl call "
@@ -2521,7 +2512,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                     set(self.get_changed_files(staged=True))
 
                 files_normalized = [
-                    _normalize_path(self.path, f) if isabs(f) else f
+                    _normalize_path(self.path, f) if op.isabs(f) else f
                     for f in files
                 ]
 
@@ -2538,7 +2529,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
                 if staged_not_to_commit:
                     # Need an alternative index_file
-                    with make_tempfile(dir=opj(self.path,
+                    with make_tempfile(dir=op.join(self.path,
                                                GitRepo.get_git_dir(self)),
                                        prefix="datalad-",
                                        suffix=".index") as index_file:
@@ -2575,7 +2566,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                               careless=careless,
                                               files=files_to_commit)
         finally:
-            if alt_index_file and os.path.exists(alt_index_file):
+            if alt_index_file and op.exists(alt_index_file):
                 unlink(alt_index_file)
 
     @normalize_paths(match_return_type=False)
@@ -2884,7 +2875,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         # (see return value).
         # Therefore raise telling exceptions before even calling annex:
         if len(files) == 1:
-            if not isdir(files[0]):
+            if not op.isdir(files[0]):
                 self.get_file_key(files[0])
 
         # TODO: RF -- logic is duplicated with get() -- the only difference
