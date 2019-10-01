@@ -271,11 +271,15 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
         return
     # put in giant for-loop to be able to yield results before completion
     for sm in _parse_git_submodules(ds, paths):
-        if contains and not any(
-                sm['path'] == c or sm['path'] in c.parents for c in contains):
-            # we are not looking for this subds, because it doesn't
-            # match the target path
-            continue
+        contains_hits = []
+        if contains:
+            contains_hits = [
+                c for c in contains if sm['path'] == c or sm['path'] in c.parents
+            ]
+            if not contains_hits:
+                # we are not looking for this subds, because it doesn't
+                # match the target path
+                continue
         # do we just need this to recurse into subdatasets, or is this a
         # real results?
         to_report = paths is None \
@@ -357,10 +361,13 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             logger=lgr)
         subdsres.update(sm)
         subdsres['parentds'] = dspath
-        if to_report and (not bottomup and \
+        if to_report:
+            if contains_hits:
+                subdsres['contains'] = [str(c) for c in contains_hits]
+            if (not bottomup and \
                 (fulfilled is None or
                  GitRepo.is_valid_repo(sm['path']) == fulfilled)):
-            yield subdsres
+                yield subdsres
 
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
