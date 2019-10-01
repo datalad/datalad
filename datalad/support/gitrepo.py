@@ -13,8 +13,10 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 from itertools import chain
 import logging
-from collections import OrderedDict
-from collections import namedtuple
+from collections import (
+    OrderedDict,
+    namedtuple,
+)
 import re
 import shlex
 import time
@@ -29,46 +31,62 @@ from weakref import WeakValueDictionary
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
-from git.exc import GitCommandError
-from git.exc import NoSuchPathError
-from git.exc import InvalidGitRepositoryError
+from git.exc import (
+    GitCommandError,
+    NoSuchPathError,
+    InvalidGitRepositoryError,
+)
 
-from datalad.support.due import due, Doi
+from datalad.support.due import (
+    due,
+    Doi,
+)
 
 from datalad import ssh_manager
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand,
+)
 from datalad.config import _parse_gitconfig_dump
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
 from datalad.config import ConfigManager
-import datalad.utils as ut
-from datalad.utils import Path
-from datalad.utils import PurePosixPath
-from datalad.utils import assure_list
-from datalad.utils import optional_args
-from datalad.utils import on_windows
-from datalad.utils import getpwd
-from datalad.utils import posix_relpath
-from datalad.utils import assure_dir
-from datalad.utils import generate_file_chunks
-from ..utils import assure_unicode
+from datalad.utils import (
+    Path,
+    PurePath,
+    PurePosixPath,
+    assure_list,
+    optional_args,
+    on_windows,
+    getpwd,
+    posix_relpath,
+    assure_dir,
+    generate_file_chunks,
+    assure_unicode,
+)
 
 # imports from same module:
 from .external_versions import external_versions
-from .exceptions import CommandError
-from .exceptions import DeprecatedError
-from .exceptions import FileNotInRepositoryError
-from .exceptions import GitIgnoreError
-from .exceptions import InvalidGitReferenceError
-from .exceptions import MissingBranchError
-from .exceptions import OutdatedExternalDependencyWarning
-from .exceptions import PathKnownToRepositoryError
-from .network import RI, PathRI
-from .network import is_ssh
+from .exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    GitIgnoreError,
+    InvalidGitReferenceError,
+    MissingBranchError,
+    OutdatedExternalDependencyWarning,
+    PathKnownToRepositoryError,
+)
+from .network import (
+    RI,
+    PathRI,
+    is_ssh,
+)
 from .path import get_parent_paths
-from .repo import Flyweight
-from .repo import RepoInterface
+from .repo import (
+    Flyweight,
+    RepoInterface,
+)
 
 # shortcuts
 _curdirsep = op.curdir + op.sep
@@ -523,7 +541,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             raise AttributeError
 
         # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
+        if isinstance(path, PurePath):
             path = str(path)
 
         # Sanity check for argument `path`:
@@ -693,7 +711,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
 
-        self.pathobj = ut.Path(self.path)
+        self.pathobj = Path(self.path)
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
@@ -2974,7 +2992,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # and Git always reports POSIX paths
             # any incoming path has to be relative already, so we can simply
             # convert unconditionally
-            paths = [ut.PurePosixPath(p) for p in paths]
+            paths = [PurePosixPath(p) for p in paths]
 
         path_strs = list(map(str, paths)) if paths else None
 
@@ -3093,11 +3111,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             props = props_re.match(line)
             if not props:
                 # not known to Git, but Git always reports POSIX
-                path = ut.PurePosixPath(line)
+                path = PurePosixPath(line)
                 inf['gitshasum'] = None
             else:
                 # again Git reports always in POSIX
-                path = ut.PurePosixPath(props.group('fname'))
+                path = PurePosixPath(props.group('fname'))
 
             # revisit the file props after this path has not been rejected
             if props:
@@ -3106,7 +3124,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     props.group('type'), props.group('type'))
                 if get_link_target and inf['type'] == 'symlink' and \
                         ((ref is None and '.git/annex/objects' in \
-                          ut.Path(
+                          Path(
                             get_link_target(str(self.pathobj / path))
                           ).as_posix()) or \
                          (ref and \
@@ -3248,7 +3266,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         if paths:
             # at this point we must normalize paths to the form that
             # Git would report them, to easy matching later on
-            paths = [ut.Path(p) for p in paths]
+            paths = [Path(p) for p in paths]
             paths = [
                 p.relative_to(self.pathobj) if p.is_absolute() else p
                 for p in paths
@@ -3275,7 +3293,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 modified = _cache[key]
             else:
                 modified = set(
-                    self.pathobj.joinpath(ut.PurePosixPath(p))
+                    self.pathobj.joinpath(PurePosixPath(p))
                     for p in self._git_custom_command(
                         # low-level code cannot handle pathobjs
                         [str(p) for p in paths] if paths else None,
@@ -3594,7 +3612,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     # TODO make remove() report the type
                     # for now it claims to report on files only
                     type='file',
-                    path=(self.pathobj / ut.PurePosixPath(r)),
+                    path=(self.pathobj / PurePosixPath(r)),
                     # make remove() report on failures too
                     status='ok',
                     logger=lgr)
@@ -3629,7 +3647,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     yield get_status_dict(
                         action='add_submodule',
                         ds=self,
-                        path=self.pathobj / ut.PurePosixPath(cand_sm),
+                        path=self.pathobj / PurePosixPath(cand_sm),
                         status='error',
                         message=e.stderr if hasattr(e, 'stderr')
                         else ('not a Git repository: %s', exc_str(e)),
@@ -3642,7 +3660,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     refds=self.pathobj,
                     type='file',
                     key=None,
-                    path=self.pathobj / ut.PurePosixPath(cand_sm),
+                    path=self.pathobj / PurePosixPath(cand_sm),
                     status='ok',
                     logger=lgr)
                 added_submodule = True
@@ -3669,7 +3687,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         action=r.get('command', 'add'),
                         refds=self.pathobj,
                         type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file']))
+                        path=(self.pathobj / PurePosixPath(r['file']))
                         if 'file' in r else None,
                         status='ok' if r.get('success', None) else 'error',
                         key=r.get('key', None),
@@ -3693,7 +3711,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         action='add',
                         refds=self.pathobj,
                         type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
+                        path=(self.pathobj / PurePosixPath(r['file'])),
                         status='ok' if r.get('success', None) else 'error',
                         logger=lgr)
         to_add = {
@@ -3718,7 +3736,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
                     type='file',
-                    path=(self.pathobj / ut.PurePosixPath(r['file']))
+                    path=(self.pathobj / PurePosixPath(r['file']))
                     if 'file' in r else None,
                     status='ok' if r.get('success', None) else 'error',
                     key=r.get('key', None),
