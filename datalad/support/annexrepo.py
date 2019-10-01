@@ -29,49 +29,59 @@ from weakref import WeakValueDictionary
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
-from datalad.dochelpers import exc_str
-from datalad.dochelpers import borrowdoc
-from datalad.dochelpers import borrowkwargs
+from datalad.dochelpers import (
+    exc_str,
+    borrowdoc,
+    borrowkwargs,
+)
 from datalad.ui import ui
-import datalad.utils as ut
-from datalad.utils import linux_distribution_name
-from datalad.utils import auto_repr
-from datalad.utils import on_windows
-from datalad.utils import assure_list
-from datalad.utils import make_tempfile
-from datalad.utils import partition
-from datalad.utils import unlink
+from datalad.utils import (
+    Path,
+    linux_distribution_name,
+    auto_repr,
+    on_windows,
+    assure_list,
+    make_tempfile,
+    partition,
+    unlink,
+)
 from datalad.support.json_py import loads as json_loads
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand,
+)
 
 # imports from same module:
 from .repo import RepoInterface
-from .gitrepo import GitRepo
-from .gitrepo import NoSuchPathError
-from .gitrepo import _normalize_path
-from .gitrepo import normalize_path
-from .gitrepo import normalize_paths
-from .gitrepo import GitCommandError
-from .gitrepo import to_options
+from .gitrepo import (
+    GitRepo,
+    NoSuchPathError,
+    _normalize_path,
+    normalize_path,
+    normalize_paths,
+    GitCommandError,
+    to_options,
+)
 from . import ansi_colors
 from .external_versions import external_versions
-from .exceptions import CommandNotAvailableError
-from .exceptions import CommandError
-from .exceptions import FileNotInAnnexError
-from .exceptions import FileInGitError
-from .exceptions import AnnexBatchCommandError
-from .exceptions import InsufficientArgumentsError
-from .exceptions import OutOfSpaceError
-from .exceptions import RemoteNotAvailableError
-from .exceptions import BrokenExternalDependency
-from .exceptions import OutdatedExternalDependency
-from .exceptions import MissingExternalDependency
-from .exceptions import IncompleteResultsError
-from .exceptions import AccessDeniedError
-from .exceptions import AccessFailedError
-from .exceptions import InvalidAnnexRepositoryError
-from .exceptions import DirectModeNoLongerSupportedError
+from .exceptions import (
+    CommandNotAvailableError,
+    CommandError,
+    FileNotInAnnexError,
+    FileInGitError,
+    AnnexBatchCommandError,
+    InsufficientArgumentsError,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+    BrokenExternalDependency,
+    OutdatedExternalDependency,
+    MissingExternalDependency,
+    IncompleteResultsError,
+    AccessDeniedError,
+    AccessFailedError,
+    InvalidAnnexRepositoryError,
+    DirectModeNoLongerSupportedError,
+)
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -3179,9 +3189,9 @@ class AnnexRepo(GitRepo, RepoInterface):
                     # just the containing dir, as on windows the latter
                     # may not always get cleaned up on `drop`
                     objectstore.joinpath(
-                        ut.Path(r['hashdirmixed']), key, key),
+                        Path(r['hashdirmixed']), key, key),
                     objectstore.joinpath(
-                        ut.Path(r['hashdirlower']), key, key)):
+                        Path(r['hashdirlower']), key, key)):
                 if testpath.exists():
                     r.pop('hashdirlower', None)
                     r.pop('hashdirmixed', None)
@@ -3260,7 +3270,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 opts.extend(['--include', '*'])
 
         for j in self._run_annex_command_json(cmd, opts=opts, files=files):
-            path = self.pathobj.joinpath(ut.PurePosixPath(j['file']))
+            path = self.pathobj.joinpath(PurePosixPath(j['file']))
             rec = info.get(path, None)
             if init is not None and rec is None:
                 # init constraint knows nothing about this path -> skip
