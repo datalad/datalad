@@ -197,10 +197,7 @@ class Remove(Interface):
                         # this is for subdatasets of the to-be-removed dataset
                         # we want to simply uninstall them in a regular manner
                         for r in Uninstall.__call__(
-                                # use annotate path as input, but pass a copy because
-                                # we cannot rely on it being unaltered by reannotation
-                                # TODO maybe adjust annotate_path to do that
-                                [ap.copy()],
+                                ap['path'],
                                 dataset=refds_path, recursive=recursive, check=check,
                                 if_dirty=if_dirty, result_xfm=None, result_filter=None,
                                 on_failure='ignore'):
