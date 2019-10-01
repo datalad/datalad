@@ -22,18 +22,6 @@ import os
 import os.path as op
 import warnings
 from os import linesep
-from os.path import join as opj
-from os.path import exists
-from os.path import normpath
-from os.path import isabs
-from os.path import commonprefix
-from os.path import relpath
-from os.path import realpath
-from os.path import dirname
-from os.path import basename
-from os.path import curdir
-from os.path import pardir
-from os.path import sep
 import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
@@ -44,7 +32,6 @@ from gitdb.exc import BadName
 from git.exc import GitCommandError
 from git.exc import NoSuchPathError
 from git.exc import InvalidGitRepositoryError
-from git.objects.blob import Blob
 
 from datalad.support.due import due, Doi
 
@@ -84,8 +71,8 @@ from .repo import Flyweight
 from .repo import RepoInterface
 
 # shortcuts
-_curdirsep = curdir + sep
-_pardirsep = pardir + sep
+_curdirsep = op.curdir + op.sep
+_pardirsep = op.pardir + op.sep
 
 
 lgr = logging.getLogger('datalad.gitrepo')
@@ -148,37 +135,37 @@ def _normalize_path(base_dir, path):
     if not path:
         return path
 
-    base_dir = realpath(base_dir)  # realpath OK
-    # path = normpath(path)
+    base_dir = op.realpath(base_dir)  # realpath OK
+    # path = op.normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
     # correct base.
 
-    if isabs(path):
+    if op.isabs(path):
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
+        path = op.join(op.realpath(op.dirname(path)), op.basename(path))  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
-    # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
+    # elif op.commonprefix([op.realpath(getpwd()), base_dir]) == base_dir:
     #     # If we are inside repository, rebuilt relative paths.
-    #     path = opj(realpath(getpwd()), path)
+    #     path = op.join(op.realpath(getpwd()), path)
     #
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-        path = normpath(opj(realpath(getpwd()), path))  # realpath OK
+        path = op.normpath(op.join(op.realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
         return path
 
-    if commonprefix([path, base_dir]) != base_dir:
+    if op.commonprefix([path, base_dir]) != base_dir:
         raise FileNotInRepositoryError(msg="Path outside repository: %s"
                                            % path, filename=path)
 
-    return relpath(path, start=base_dir)
+    return op.relpath(path, start=base_dir)
 
 
 @optional_args
@@ -545,7 +532,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         path = RI(path).localpath
         # resolve symlinks to make sure we have exactly one instance per
         # physical repository at a time
-        path = realpath(path)
+        path = op.realpath(path)
         kwargs['path'] = path
         return path, args, kwargs
 
@@ -647,7 +634,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             check_git_configured()
             GitRepo._config_checked = True
 
-        self.realpath = realpath(path)
+        self.realpath = op.realpath(path)
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
@@ -684,7 +671,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # `repo`, we detect those cases without instantiating a
             # gitpy.Repo().
 
-            if not exists(path):
+            if not op.exists(path):
                 raise NoSuchPathError(path)
             if not _valid_repo:
                 raise InvalidGitRepositoryError(path)
@@ -696,7 +683,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
         # with DryRunProtocol path might still not exist
-        if exists(self.realpath):
+        if op.exists(self.realpath):
             self.inode = os.stat(self.realpath).st_ino
         else:
             self.inode = None
@@ -766,7 +753,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     @property
     def repo(self):
         # with DryRunProtocol path not exist
-        if exists(self.realpath):
+        if op.exists(self.realpath):
             inode = os.stat(self.realpath).st_ino
         else:
             inode = None
@@ -814,7 +801,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         expect_fail = kwargs.pop('expect_fail', False)
         # fail early on non-empty target:
         from os import listdir
-        if exists(path) and listdir(path):
+        if op.exists(path) and listdir(path):
             # simulate actual GitCommandError:
             lgr.warning("destination path '%s' already exists and is not an "
                         "empty directory." % path)
@@ -894,7 +881,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     raise GitCommandError(
                         "clone has failed, telling ya",
                         999,  # good number
-                        stdout="%s already exists" if exists(path) else "")
+                        stdout="%s already exists" if op.exists(path) else "")
                 raise  # reraise original
 
         gr = cls(path, *args, repo=repo, **kwargs)
@@ -907,7 +894,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # Make sure to flush pending changes, especially close batch processes
         # (internal `git cat-file --batch` by GitPython)
         try:
-            if getattr(self, '_repo', None) is not None and exists(self.path):
+            if getattr(self, '_repo', None) is not None and op.exists(self.path):
                 # gc might be late, so the (temporary)
                 # repo doesn't exist on FS anymore
                 self._repo.git.clear_cache()
@@ -915,7 +902,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # state... but such unconditional write is really a workaround
                 # and does not play nice with read-only operations - permission
                 # denied etc. So disabled 
-                #if exists(opj(self.path, '.git')):  # don't try to write otherwise
+                #if op.exists(op.join(self.path, '.git')):  # don't try to write otherwise
                 #    self.repo.index.write()
         except (InvalidGitRepositoryError, AttributeError):
             # might have being removed and no longer valid or attributes unbound
@@ -1040,18 +1027,18 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         except CommandError:
             return None
         except OSError:
-            toppath = GitRepo.get_toppath(dirname(path), follow_up=follow_up,
+            toppath = GitRepo.get_toppath(op.dirname(path), follow_up=follow_up,
                                           git_options=git_options)
 
         if follow_up:
             path_ = path
             path_prev = ""
             while path_ and path_ != path_prev:  # on top /.. = /
-                if realpath(path_) == toppath:
+                if op.realpath(path_) == toppath:
                     toppath = path_
                     break
                 path_prev = path_
-                path_ = dirname(path_)
+                path_ = op.dirname(path_)
 
         return toppath
 
@@ -1197,7 +1184,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         # All GitPython commands should take care about flushing index
         # whenever they modify it, so we would not care to do anything
-        # if self.repo is not None and exists(opj(self.path, '.git')):  # don't try to write otherwise:
+        # if self.repo is not None and exists(op.join(self.path, '.git')):  # don't try to write otherwise:
         #     # flush possibly cached in GitPython changes to index:
         #     # if self.repo.git:
         #     #     sys.stderr.write("CLEARING\n")
@@ -2536,10 +2523,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         if url is None:
             # had no luck with a remote URL
-            if not isabs(path):
+            if not op.isabs(path):
                 # need to recode into a relative path "URL" in POSIX
                 # style, even on windows
-                url = posixpath.join(curdir, posix_relpath(path))
+                url = posixpath.join(op.curdir, posix_relpath(path))
             else:
                 url = path
         cmd += [url, path]
@@ -2604,8 +2591,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         cmd = ['git', 'submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
-            subgitpath = opj(self.path, path, '.git')
-            if not exists(subgitpath):
+            subgitpath = op.join(self.path, path, '.git')
+            if not op.exists(subgitpath):
                 # TODO:  wouldn't with --init we get all those symlink'ed .git/?
                 # At least let's warn
                 lgr.warning(
@@ -2789,7 +2776,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         else:
             optss = [opts]
         return [
-            normpath(f)  # Call normpath to convert separators on Windows.
+            op.normpath(f)  # Call normpath to convert separators on Windows.
             for f in chain(
                 *(self.repo.git.diff(*opts, **kwargs).split('\0')
                 for opts in optss)
@@ -3770,8 +3757,8 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     """
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
-    path = opj(ds.path, relativepath)
-    subds_dotgit = opj(path, ".git")
+    path = op.join(ds.path, relativepath)
+    subds_dotgit = op.join(path, ".git")
     src_dotgit = GitRepo.get_git_dir(path)
 
     if src_dotgit == '.git':
@@ -3788,12 +3775,12 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # replace by the target
     os.remove(subds_dotgit)
     # make absolute
-    src_dotgit = opj(path, src_dotgit)
+    src_dotgit = op.join(path, src_dotgit)
     # move .git
     from os import rename, listdir, rmdir
     assure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
-        rename(opj(src_dotgit, dot_git_entry),
-               opj(subds_dotgit, dot_git_entry))
+        rename(op.join(src_dotgit, dot_git_entry),
+               op.join(subds_dotgit, dot_git_entry))
     assert not listdir(src_dotgit)
     rmdir(src_dotgit)
