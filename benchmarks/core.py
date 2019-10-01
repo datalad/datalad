@@ -19,7 +19,7 @@ from subprocess import call
 
 from datalad.cmd import Runner
 
-from datalad.api import add
+from datalad.api import save
 from datalad.api import create
 from datalad.api import create_test_dataset
 from datalad.api import Dataset
