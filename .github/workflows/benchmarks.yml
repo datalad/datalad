@@ -1,6 +1,6 @@
 name: Benchmarks
 
-on: [push]
+on: [pull_request]
 
 jobs:
   vs-master:
