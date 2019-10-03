@@ -384,6 +384,7 @@ def _install_targetpath(
             path=ds.path,
             status='notneeded',
             contains=[target_path],
+            refds=refds_path,
         )
     else:
         # we don't have it yet. is it in a subdataset?
@@ -401,6 +402,7 @@ def _install_targetpath(
                 action='get',
                 path=str(target_path),
                 status='impossible',
+                refds=refds_path,
                 message='path does not exist',
             )
             return
