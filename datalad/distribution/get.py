@@ -290,7 +290,7 @@ def _install_necessary_subdatasets(
         # report installation, whether it helped or not
         yield get_status_dict(
             'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
-            message=("Installed subdataset in order to get %s", path))
+            message=("Installed subdataset in order to get %s", str(path)))
 
         # now check whether the just installed subds brought us any closer to
         # the target path
