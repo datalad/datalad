@@ -466,7 +466,8 @@ def test_remove_recursive_2(tdir):
     # fails in some cases https://github.com/datalad/datalad/issues/1573
     with chpwd(tdir):
         install('///labs')
-        install('labs/tarr/face_place')
+        with chpwd('labs'):
+            install('tarr/face_place')
         remove(dataset='labs', recursive=True)
 
 
