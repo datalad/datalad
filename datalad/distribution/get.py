@@ -602,8 +602,11 @@ class Get(Interface):
                 dataset=dataset,
                 # always come from the top to get sensible generator behavior
                 bottomup=False,
-                recursive=recursive,
-                recursion_limit=recursion_limit,
+                # when paths are given, they will constrain the recursion
+                # automatically, and we need to enable recursion so we can
+                # location path in subdatasets several levels down
+                recursive=True if path else recursive,
+                recursion_limit=None if path else recursion_limit,
                 return_type='generator',
                 on_failure='ignore'):
             if sdsres.get('type', None) != 'dataset':
