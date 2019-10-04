@@ -260,7 +260,7 @@ def _install_and_reglob(dset, gpaths):
         for res in dset.install(dirs_new,
                                 result_xfm=None, return_type='generator',
                                 on_failure="ignore"):
-            if res.get("state") == "absent":
+            if _is_nonexistent_path(res):
                 lgr.debug("Skipping install of non-existent path: %s",
                           res["path"])
             else:
