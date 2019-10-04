@@ -626,9 +626,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         message if message is not None else _format_cmd_shorty(cmd_expanded),
         '"{}"'.format(record_id) if use_sidecar else record)
 
-    outputs_to_save = outputs.expand(full=True) if explicit else '.'
+    outputs_to_save = outputs.expand() if explicit else None
+    do_save = outputs_to_save is None or outputs_to_save
     if not rerun_info and cmd_exitcode:
-        if outputs_to_save:
+        if do_save:
             repo = ds.repo
             msg_path = relpath(opj(repo.path, repo.get_git_dir(repo),
                                    "COMMIT_EDITMSG"))
@@ -639,7 +640,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      "'datalad save -d . -r -F %s'",
                      msg_path)
         raise exc
-    elif outputs_to_save:
+    elif do_save:
         # Note: Passing the resolved `ds` instead of `dataset` isn't breaking
         # path semantics because outputs_to_save is either a list of full paths
         # or ".". In the second case, we _need_ to pass an instance so that "."
