@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import json
+import warnings
 
 from argparse import REMAINDER
 import os.path as op
@@ -428,16 +429,6 @@ def _execute_command(command, pwd, expected_exit=None):
     return cmd_exitcode or 0, exc
 
 
-def _save_outputs(ds, to_save, msg):
-    """Helper to save results after command execution is completed"""
-    return Save.__call__(
-        to_save,
-        dataset=ds,
-        recursive=True,
-        message=msg,
-        return_type='generator')
-
-
 def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 explicit=False, message=None, sidecar=None,
                 extra_info=None,
@@ -445,7 +436,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                 extra_inputs=None,
                 rerun_outputs=None,
                 inject=False,
-                saver=_save_outputs):
+                saver=None):
     """Run `cmd` in `dataset` and record the results.
 
     `Run.__call__` is a simple wrapper over this function. Aside from backward
@@ -474,11 +465,8 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         preparation and command execution. In this mode, the caller is
         responsible for ensuring that the state of the working tree is
         appropriate for recording the command's results.
-    saver : callable, optional
-        Must take the value given as `dataset`, a list of paths to save, and a
-        message string as arguments and must record any changes done
-        to any content matching an entry in the path list. Must yield
-        result dictionaries as a generator.
+    saver : None
+        This is obsolete and ignored. It will be removed in a later release.
 
     Yields
     ------
@@ -487,6 +475,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not cmd:
         lgr.warning("No command given")
         return
+    if saver:
+        warnings.warn("`saver` argument is ignored "
+                      "and will be removed in a future release",
+                      DeprecationWarning)
 
     rel_pwd = rerun_info.get('pwd') if rerun_info else None
     if rel_pwd and dataset:
@@ -652,5 +644,10 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         # path semantics because outputs_to_save is either a list of full paths
         # or ".". In the second case, we _need_ to pass an instance so that "."
         # resolves to the dataset and not the current working directory.
-        for r in saver(ds, outputs_to_save, msg):
+        for r in Save.__call__(
+                dataset=ds,
+                path=outputs_to_save,
+                recursive=True,
+                message=msg,
+                return_type='generator'):
             yield r
