@@ -234,6 +234,12 @@ def get_command_pwds(dataset):
     return pwd, rel_pwd
 
 
+def _is_nonexistent_path(result):
+    return (result.get("action") == "get" and
+            result.get("status") == "impossible" and
+            result.get("message") == "path does not exist")
+
+
 def _install_and_reglob(dset, gpaths):
     """Install globbed subdatasets and repeat.
 
@@ -285,9 +291,7 @@ def prepare_inputs(dset, inputs, extra_inputs=None):
         for res in _install_and_reglob(dset, gp):
             yield res
         for res in dset.get(gp.expand(full=True), on_failure="ignore"):
-            if res.get("action") == "get" and \
-                    res.get("status") == "impossible" and \
-                    res.get("message") == "path does not exist":
+            if _is_nonexistent_path(res):
                 # MIH why just a warning if given inputs are not valid?
                 lgr.warning("Input does not exist: %s", res["path"])
             else:
