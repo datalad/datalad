@@ -491,9 +491,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     ds = require_dataset(
         dataset, check_installed=True,
         purpose='tracking outcomes of a command')
-
-    # not needed ATM
-    #refds_path = ds.path
+    ds_path = ds.path
 
     lgr.debug('tracking command output underneath %s', ds)
 
@@ -548,7 +546,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         cmd_expanded = format_command(
             ds, cmd,
             pwd=pwd,
-            dspath=ds.path,
+            dspath=ds_path,
             # Check if the command contains "{tmpdir}" to avoid creating an
             # unnecessary temporary directory in most but not all cases.
             tmpdir=mkdtemp(prefix="datalad-run-") if "{tmpdir}" in cmd else "",
@@ -608,7 +606,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
         from hashlib import md5
         record_id = md5(record.encode('utf-8')).hexdigest()
         record_dir = ds.config.get('datalad.run.record-directory', default=op.join('.datalad', 'runinfo'))
-        record_path = op.join(ds.path, record_dir, record_id)
+        record_path = op.join(ds_path, record_dir, record_id)
         if not op.lexists(record_path):
             # go for compression, even for minimal records not much difference, despite offset cost
             # wrap in list -- there is just one record
