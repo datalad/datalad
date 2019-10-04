@@ -59,6 +59,7 @@ from datalad.tests.utils import (
     assert_status,
     assert_result_count,
     assert_in,
+    assert_in_results,
     assert_not_in,
     swallow_logs,
     swallow_outputs,
@@ -204,6 +205,40 @@ def test_run_from_subds(path):
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)
+
+
+@with_tree(tree={"sub": {"input": ""}})
+def test_run_from_subds_gh3551(path):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    ds.create("output")
+    with chpwd(op.join(ds.path, "sub")):
+        assert_in_results(
+            run("echo",
+                inputs=[op.join(op.pardir, "sub", "input")],
+                outputs=[op.join(op.pardir, "output")],
+                return_type="list", result_filter=None, result_xfm=None),
+            action="get",
+            status="notneeded")
+    assert_repo_status(ds.path)
+
+    subds_path = op.join("output", "subds")
+    ds.create(subds_path)
+    with chpwd(op.join(ds.path, "sub")):
+        output_dir = op.join(op.pardir, "output", "subds")
+        # The below command is trying to be compatible. It could be made better
+        # (e.g., actually using the input file) by someone that knows something
+        # about Windows.
+        assert_in_results(
+            run("cd .> {}".format(op.join(output_dir, "f")),
+                inputs=[op.join(op.pardir, "sub", "input")],
+                outputs=[output_dir],
+                return_type="list", result_filter=None, result_xfm=None),
+            action="save",
+            status="ok")
+    assert_repo_status(ds.path)
+    subds = Dataset(op.join(ds.path, subds_path))
+    ok_(subds.repo.file_has_content("f"))
 
 
 @slow  # ~10s
@@ -354,8 +389,6 @@ def test_run_cmdline_disambiguation(path):
                 "echo --version", path, expected_exit=None)
 
 
-# https://github.com/datalad/datalad/pull/3746#issuecomment-538425192
-@known_failure
 @with_tempfile(mkdir=True)
 def test_run_path_semantics(path):
     # Test that we follow path resolution from gh-3435: paths are relative to

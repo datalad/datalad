@@ -25,6 +25,10 @@ from tempfile import mkdtemp
 from shlex import quote as shlex_quote
 
 from datalad.core.local.save import Save
+from datalad.distribution.get import Get
+from datalad.distribution.install import Install
+from datalad.distribution.remove import Remove
+from datalad.interface.unlock import Unlock
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -49,6 +53,7 @@ from datalad.distribution.dataset import datasetmethod
 
 from datalad.utils import assure_bytes
 from datalad.utils import assure_unicode
+from datalad.utils import chpwd
 from datalad.utils import get_dataset_root
 from datalad.utils import getpwd
 from datalad.utils import SequenceFormatter
@@ -235,32 +240,47 @@ def get_command_pwds(dataset):
     return pwd, rel_pwd
 
 
+def _dset_arg_kludge(arg):
+    if isinstance(arg, Dataset):
+        warnings.warn("Passing dataset instance is deprecated; "
+                      "pass path as a string instead",
+                      DeprecationWarning)
+        arg = arg.path
+    return arg
+
+
 def _is_nonexistent_path(result):
     return (result.get("action") == "get" and
             result.get("status") == "impossible" and
             result.get("message") == "path does not exist")
 
 
-def _install_and_reglob(dset, gpaths):
+def _install_and_reglob(dset_path, gpaths):
     """Install globbed subdatasets and repeat.
 
     Parameters
     ----------
-    dset : Dataset
+    dset_path : str
     gpaths : GlobbedPaths object
 
     Returns
     -------
     Generator with the results of the `install` calls.
     """
-    def glob_dirs():
-        return list(map(op.dirname, gpaths.expand(refresh=True)))
+    dset_path = _dset_arg_kludge(dset_path)
 
+    def glob_dirs():
+        return [d for d in map(op.dirname, gpaths.expand(refresh=True))
+                # d could be an empty string because there are relative paths.
+                if d]
+
+    install = Install()
     dirs, dirs_new = [], glob_dirs()
-    while dirs != dirs_new:
-        for res in dset.install(dirs_new,
-                                result_xfm=None, return_type='generator',
-                                on_failure="ignore"):
+    while dirs_new and dirs != dirs_new:
+        for res in install(dataset=dset_path,
+                           path=dirs_new,
+                           result_xfm=None, return_type='generator',
+                           on_failure="ignore"):
             if _is_nonexistent_path(res):
                 lgr.debug("Skipping install of non-existent path: %s",
                           res["path"])
@@ -269,7 +289,7 @@ def _install_and_reglob(dset, gpaths):
         dirs, dirs_new = dirs_new, glob_dirs()
 
 
-def prepare_inputs(dset, inputs, extra_inputs=None):
+def prepare_inputs(dset_path, inputs, extra_inputs=None):
     """Prepare `inputs` for running a command.
 
     This consists of installing required subdatasets and getting the input
@@ -277,7 +297,7 @@ def prepare_inputs(dset, inputs, extra_inputs=None):
 
     Parameters
     ----------
-    dset : Dataset
+    dset_path : str
     inputs : GlobbedPaths object
     extra_inputs : GlobbedPaths object, optional
 
@@ -285,13 +305,17 @@ def prepare_inputs(dset, inputs, extra_inputs=None):
     -------
     Generator with the result records.
     """
+    dset_path = _dset_arg_kludge(dset_path)
+
     gps = list(filter(bool, [inputs, extra_inputs]))
     if gps:
         lgr.info('Making sure inputs are available (this may take some time)')
+
+    get = Get()
     for gp in gps:
-        for res in _install_and_reglob(dset, gp):
+        for res in _install_and_reglob(dset_path, gp):
             yield res
-        for res in dset.get(gp.expand(full=True), on_failure="ignore"):
+        for res in get(dataset=dset_path, path=gp.expand(), on_failure="ignore"):
             if _is_nonexistent_path(res):
                 # MIH why just a warning if given inputs are not valid?
                 lgr.warning("Input does not exist: %s", res["path"])
@@ -299,12 +323,12 @@ def prepare_inputs(dset, inputs, extra_inputs=None):
                 yield res
 
 
-def _unlock_or_remove(dset, paths):
+def _unlock_or_remove(dset_path, paths):
     """Unlock `paths` if content is present; remove otherwise.
 
     Parameters
     ----------
-    dset : Dataset
+    dset_path : str
     paths : list of string
         Absolute paths of dataset files.
 
@@ -312,6 +336,8 @@ def _unlock_or_remove(dset, paths):
     -------
     Generator with result records.
     """
+    dset_path = _dset_arg_kludge(dset_path)
+
     existing = []
     for path in paths:
         if op.exists(path) or op.lexists(path):
@@ -322,11 +348,14 @@ def _unlock_or_remove(dset, paths):
             lgr.debug("Filtered out non-existing path: %s", path)
 
     if existing:
-        for res in dset.unlock(existing, on_failure="ignore"):
+        remove = Remove()
+        for res in Unlock()(dataset=dset_path, path=existing,
+                            on_failure="ignore"):
             if res["status"] == "impossible":
                 if "cannot unlock" in res["message"]:
-                    for rem_res in dset.remove(res["path"],
-                                               check=False, save=False):
+                    for rem_res in remove(dataset=dset_path,
+                                          path=res["path"],
+                                          check=False, save=False):
                         yield rem_res
                     continue
             yield res
@@ -520,22 +549,23 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     outputs = GlobbedPaths(outputs, pwd=pwd,
                            expand=expand in ["outputs", "both"])
 
+    # ATTN: For correct path handling, all dataset commands call should be
+    # unbound. They should (1) receive a string dataset argument, (2) receive
+    # relative paths, and (3) happen within a chpwd(pwd) context.
     if not inject:
-        for res in prepare_inputs(ds, inputs, extra_inputs):
-            yield res
-
-        if outputs:
-            for res in _install_and_reglob(ds, outputs):
-                yield res
-            for res in _unlock_or_remove(ds, outputs.expand(full=True)):
+        with chpwd(pwd):
+            for res in prepare_inputs(ds_path, inputs, extra_inputs):
                 yield res
 
-        if rerun_outputs is not None:
-            # These are files we need to unlock/remove for a rerun that aren't
-            # included in the explicit outputs. Unlike inputs/outputs, these are
-            # full paths, so we can pass them directly to unlock.
-            for res in _unlock_or_remove(ds, rerun_outputs):
-                yield res
+            if outputs:
+                for res in _install_and_reglob(ds_path, outputs):
+                    yield res
+                for res in _unlock_or_remove(ds_path, outputs.expand()):
+                    yield res
+
+            if rerun_outputs is not None:
+                for res in _unlock_or_remove(ds_path, rerun_outputs):
+                    yield res
     else:
         # If an inject=True caller wants to override the exit code, they can do
         # so in extra_info.
@@ -639,14 +669,11 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
                      msg_path)
         raise exc
     elif do_save:
-        # Note: Passing the resolved `ds` instead of `dataset` isn't breaking
-        # path semantics because outputs_to_save is either a list of full paths
-        # or ".". In the second case, we _need_ to pass an instance so that "."
-        # resolves to the dataset and not the current working directory.
-        for r in Save.__call__(
-                dataset=ds,
-                path=outputs_to_save,
-                recursive=True,
-                message=msg,
-                return_type='generator'):
-            yield r
+        with chpwd(pwd):
+            for r in Save.__call__(
+                    dataset=ds_path,
+                    path=outputs_to_save,
+                    recursive=True,
+                    message=msg,
+                    return_type='generator'):
+                yield r
