@@ -3341,6 +3341,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _save_add(self, files, git=None, git_opts=None):
         """Simple helper to add files in save()"""
+        from datalad.interface.results import get_status_dict
         # alter default behavior of git-annex by considering dotfiles
         # too
         # however, this helper is controlled by save() which itself
@@ -3390,7 +3391,17 @@ class AnnexRepo(GitRepo, RepoInterface):
                 jobs=None,
                 expected_entries=expected_additions,
                 expect_stderr=True):
-            yield r
+            yield get_status_dict(
+                action=r.get('command', 'add'),
+                refds=self.pathobj,
+                type='file',
+                path=(self.pathobj / ut.PurePosixPath(r['file']))
+                if 'file' in r else None,
+                status='ok' if r.get('success', None) else 'error',
+                key=r.get('key', None),
+                message='\n'.join(r['error-messages'])
+                if 'error-messages' in r else None,
+                logger=lgr)
 
 
 # TODO: Why was this commented out?
