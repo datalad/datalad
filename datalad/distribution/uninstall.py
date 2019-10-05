@@ -42,13 +42,25 @@ from datalad.interface.utils import (
 )
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.utils import rmtree
+from datalad.utils import (
+    rmtree,
+    Path,
+)
 
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
 def _uninstall_dataset(ds, check, has_super, **kwargs):
+    cwd = Path.cwd()
+    if ds.pathobj == cwd or ds.pathobj in cwd.parents:
+        yield get_status_dict(
+            status='error',
+            ds=ds,
+            message='refusing to uninstall a dataset at or above the '
+                    'current working directory',
+            **kwargs)
+        return
     if check and ds.is_installed():
         # if the checks are on we need to make sure to exit this function
         # whenever any drop failed, because we cannot rely on the error

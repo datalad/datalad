@@ -61,6 +61,11 @@ def test_safetynet(path):
                 assert_status(
                     ('error', 'impossible'),
                     uninstall(path=target, on_failure='ignore'))
+    sub = ds.create('sub')
+    subsub = sub.create('subsub')
+    for p in (sub.path, subsub.path):
+        with chpwd(p):
+            assert_status('error', uninstall(on_failure='ignore'))
 
 
 @with_tempfile()
