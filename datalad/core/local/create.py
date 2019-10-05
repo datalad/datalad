@@ -197,7 +197,7 @@ class Create(Interface):
                                  "no annex repo.")
 
         if path:
-            path = rev_resolve_path(path, ds)
+            path = rev_resolve_path(path, dataset)
 
         path = path if path \
             else getpwd() if ds is None \
