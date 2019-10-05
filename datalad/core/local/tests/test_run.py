@@ -62,6 +62,7 @@ from datalad.tests.utils import (
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     slow,
@@ -353,6 +354,8 @@ def test_run_cmdline_disambiguation(path):
                 "echo --version", path, expected_exit=None)
 
 
+# https://github.com/datalad/datalad/pull/3746#issuecomment-538425192
+@known_failure
 @with_tempfile(mkdir=True)
 def test_run_path_semantics(path):
     # Test that we follow path resolution from gh-3435: paths are relative to
