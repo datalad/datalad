@@ -2060,7 +2060,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 log_online=True
             ))
         # TODO: refactor to account for possible --batch ones
-        annex_options = ['--json']
+        annex_options = ['--json', '--json-error-messages']
         if progress:
             annex_options += ['--json-progress']
 
@@ -3487,7 +3487,7 @@ class BatchedAnnex(BatchedCommand):
             ['annex'] + \
             annex_cmd + \
             (annex_options if annex_options else []) + \
-            (['--json'] if json else []) + \
+            (['--json', '--json-error-messages'] if json else []) + \
             ['--batch']  # , '--debug']
         output_proc = \
             output_proc if output_proc else readline_json if json else None
