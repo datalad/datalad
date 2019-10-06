@@ -754,6 +754,7 @@ def test_run_inputs_outputs(src, path):
                         strip=True)
 
 
+@known_failure_windows
 @with_tempfile(mkdir=True)
 def test_run_inputs_no_annex_repo(path):
     ds = Dataset(path).create(no_annex=True)
