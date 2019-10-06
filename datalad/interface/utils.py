@@ -523,19 +523,20 @@ def _process_results(
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
             action_summary[res['action']] = actsum
-        ## log message, if a logger was given
+        ## log message, if there is one and a logger was given
+        msg = res.get('message', None)
         # remove logger instance from results, as it is no longer useful
         # after logging was done, it isn't serializable, and generally
         # pollutes the output
         res_lgr = res.pop('logger', None)
-        if isinstance(res_lgr, logging.Logger):
-            # didn't get a particular log function, go with default
-            res_lgr = getattr(
-                res_lgr,
-                default_logchannels[res['status']]
-                if result_log_level is None
-                else result_log_level)
-        if res_lgr and 'message' in res:
+        if msg and res_lgr:
+            if isinstance(res_lgr, logging.Logger):
+                # didn't get a particular log function, go with default
+                res_lgr = getattr(
+                    res_lgr,
+                    default_logchannels[res['status']]
+                    if result_log_level is None
+                    else result_log_level)
             msg = res['message']
             msgargs = None
             if isinstance(msg, tuple):
