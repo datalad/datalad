@@ -472,12 +472,20 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
         track_remote, track_refspec = ds.repo.get_tracking_branch()
         if not track_remote:
             # no tracking remote configured, but let try one more
-            # if we only have one remote, and it has a push target
-            # configured that is "good enough" for us
+            # if we only have one remote, and it has a url
+            # configured that is "good enough" for us. If multiple - we will
+            # clarify in interactive mode
             cand_remotes = [r for r in ds.repo.get_remotes()
-                            if 'remote.{}.push'.format(r) in ds.config]
+                            if 'remote.{}.url'.format(r) in ds.config]
             if len(cand_remotes) > 1:
-                lgr.warning('Target sibling ambiguous, please specific via --to')
+                from datalad.ui import ui
+                if ui.is_interactive:
+                    track_remote = _ui_ask_track_remote(ds, cand_remotes)
+                else:
+                    lgr.warning(
+                        'Target sibling ambiguous (candidates: {}), please '
+                        'specify via --to'.format(', '.join(cand_remotes))
+                    )
             elif len(cand_remotes) == 1:
                 track_remote = cand_remotes[0]
             else:
@@ -520,6 +528,22 @@ def _get_remote_info(ds_path, ds_remote_info, to, missing):
         # all good: remote given and is known
         ds_remote_info[ds_path] = {'remote': to}
 
+
+def _ui_ask_track_remote(ds, cand_remotes):
+    from datalad.ui import ui
+    track_remote = ui.question(
+        "Which sibling would you like to publish to?",
+        title="Target sibling ambiguous",
+        choices=cand_remotes)
+    branch = ds.repo.get_active_branch()
+    if ui.yesno(
+            "Would you like to record that choice in "
+            ".git/config for the {} branch?".format(branch)):
+        ds.repo.config.set(
+            'branch.{0}.remote'.format(branch),
+            track_remote,
+            where='local')
+    return track_remote
 
 
 def _get_remote_diff(ds, current_commit, remote, remote_branch_name):
