@@ -192,6 +192,17 @@ definitions = {
             'title': 'Used for control the verbosity of logs printed to '
                      'stdout while running datalad commands/debugging'}),
     },
+    'datalad.log.result-level': {
+        'ui': ('question', {
+               'title': 'Log level for command result messages',
+               'text': "Overrides the default behavior of logging 'impossible' "
+                       "results as a warning, 'error' results as errors, and "
+                       "everything else as 'debug' with a single alternative "
+                       "log level"}),
+        'type': EnsureChoice('debug', 'info', 'warning', 'error'),
+        # None keeps the default behavior
+        'default': 'None',
+    },
     'datalad.log.name': {
         'ui': ('question', {
             'title': 'Include name of the log target in the log line'}),

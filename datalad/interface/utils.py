@@ -332,6 +332,8 @@ def eval_results(func):
         # TODO remove this conditional branch entirely, done outside
         if not result_renderer:
             result_renderer = dlcfg.get('datalad.api.result-renderer', None)
+        # look for potential override of logging behavior
+        result_log_level = dlcfg.get('datalad.log.result-level', None)
         # wrap the filter into a helper to be able to pass additional arguments
         # if the filter supports it, but at the same time keep the required interface
         # as minimal as possible. Also do this here, in order to avoid this test
@@ -400,6 +402,7 @@ def eval_results(func):
                             _func_class, action_summary,
                             on_failure, incomplete_results,
                             result_renderer, result_xfm, result_filter,
+                            result_log_level,
                             **_kwargs):
                         yield r
 
@@ -414,7 +417,8 @@ def eval_results(func):
                     wrapped(*_args, **_kwargs),
                     _func_class, action_summary,
                     on_failure, incomplete_results,
-                    result_renderer, result_xfm, _result_filter, **_kwargs):
+                    result_renderer, result_xfm, _result_filter,
+                    result_log_level, **_kwargs):
                 yield r
                 # collect if summary is desired
                 if do_custom_result_summary:
@@ -432,7 +436,7 @@ def eval_results(func):
                             _func_class, action_summary,
                             on_failure, incomplete_results,
                             result_renderer, result_xfm, result_filter,
-                            **_kwargs):
+                            result_log_level, **_kwargs):
                         yield r
 
             # result summary before a potential exception
@@ -504,7 +508,8 @@ def default_result_renderer(res):
 def _process_results(
         results, cmd_class,
         action_summary, on_failure, incomplete_results,
-        result_renderer, result_xfm, result_filter, **kwargs):
+        result_renderer, result_xfm, result_filter,
+        result_log_level, **kwargs):
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
@@ -518,15 +523,20 @@ def _process_results(
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
             action_summary[res['action']] = actsum
-        ## log message, if a logger was given
+        ## log message, if there is one and a logger was given
+        msg = res.get('message', None)
         # remove logger instance from results, as it is no longer useful
         # after logging was done, it isn't serializable, and generally
         # pollutes the output
         res_lgr = res.pop('logger', None)
-        if isinstance(res_lgr, logging.Logger):
-            # didn't get a particular log function, go with default
-            res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-        if res_lgr and 'message' in res:
+        if msg and res_lgr:
+            if isinstance(res_lgr, logging.Logger):
+                # didn't get a particular log function, go with default
+                res_lgr = getattr(
+                    res_lgr,
+                    default_logchannels[res['status']]
+                    if result_log_level is None
+                    else result_log_level)
             msg = res['message']
             msgargs = None
             if isinstance(msg, tuple):
