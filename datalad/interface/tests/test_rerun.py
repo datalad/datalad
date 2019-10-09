@@ -583,8 +583,6 @@ def test_rerun_script(path):
                   cmout.getvalue().splitlines())
 
 
-# https://github.com/datalad/datalad/pull/3746#issuecomment-538425192
-@known_failure
 @slow  # ~10s
 @known_failure_githubci_win
 @known_failure_appveyor
