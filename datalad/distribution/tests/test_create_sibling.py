@@ -570,14 +570,13 @@ def _test_target_ssh_inherit(standardgroup, ui, src_path, target_path):
         Dataset(opj(*([target_path] + ['sub'] * (i+1))))
         for i in range(nlevels)
     ]
-    # since we do not have yet/thus have not used an option to record to publish
-    # to that sibling by default (e.g. --set-upstream), if we run just ds.publish
-    # -- should fail
+    # since we have only a single sibling with a URL, we will publish to it
     assert_result_count(
         ds.publish(on_failure='ignore'),
         1,
-        status='impossible',
-        message='No target sibling configured for default publication, please specific via --to')
+        status='ok'
+    )
+
     ds.publish(to=remote)  # should be ok, non recursive; BUT it (git or us?) would
                   # create an empty sub/ directory
     assert_postupdate_hooks(target_path, installed=ui)
