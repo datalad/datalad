@@ -275,7 +275,8 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     if respath in paths:
         # absolute match, pretty sure we want this
         return True
-    elif kwargs.get('dataset', None) and YieldRelativePaths()(res) in paths:
+    elif isinstance(kwargs.get('dataset', None), Dataset) and \
+            YieldRelativePaths()(res) in paths:
         # command was called with a reference dataset, and a relative
         # path of a result matches in input argument -- not 100% exhaustive
         # test, but could be good enough

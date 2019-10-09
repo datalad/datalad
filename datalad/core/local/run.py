@@ -285,7 +285,10 @@ def prepare_inputs(dset, inputs, extra_inputs=None):
         for res in _install_and_reglob(dset, gp):
             yield res
         for res in dset.get(gp.expand(full=True), on_failure="ignore"):
-            if res.get("state") == "absent":
+            if res.get("action") == "get" and \
+                    res.get("status") == "impossible" and \
+                    res.get("message") == "path does not exist":
+                # MIH why just a warning if given inputs are not valid?
                 lgr.warning("Input does not exist: %s", res["path"])
             else:
                 yield res
