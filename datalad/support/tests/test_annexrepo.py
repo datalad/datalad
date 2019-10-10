@@ -66,6 +66,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
@@ -2258,6 +2259,42 @@ def test_ro_operations(path):
 
     # just check that all is good again
     repo2.repo_info()
+
+
+@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
+@with_tree({
+    'file1': 'file1',
+})
+def test_save_noperms(path):
+    # check that we do report annex error messages
+
+    # This test would function only if there is a way to run sudo
+    # non-interactively, e.g. on Travis or on your local (watchout!) system
+    # after you ran sudo command recently.
+    repo = AnnexRepo(path, init=True)
+
+    from datalad.cmd import Runner
+    run = Runner().run
+    sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
+
+    try:
+        # To assure that git/git-annex really cannot acquire a lock and do
+        # any changes (e.g. merge git-annex branch), we make this repo owned by root
+        sudochown(['-R', 'root:root', repo.pathobj / 'file1'])
+    except Exception as exc:
+        # Exception could be CommandError or IOError when there is no sudo
+        raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
+
+    try:
+        res = repo.save(paths=['file1'])
+
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, type='file', path=repo.pathobj / 'file1', action='add', status='error'
+        )
+        assert_in('permission denied', res[0]['message'])
+    finally:
+        sudochown(['-R', str(os.geteuid()), repo.path])
 
 
 @with_tempfile
