@@ -2060,7 +2060,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 log_online=True
             ))
         # TODO: refactor to account for possible --batch ones
-        annex_options = ['--json']
+        annex_options = ['--json', '--json-error-messages']
         if progress:
             annex_options += ['--json-progress']
 
@@ -3341,6 +3341,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _save_add(self, files, git=None, git_opts=None):
         """Simple helper to add files in save()"""
+        from datalad.interface.results import get_status_dict
         # alter default behavior of git-annex by considering dotfiles
         # too
         # however, this helper is controlled by save() which itself
@@ -3390,7 +3391,17 @@ class AnnexRepo(GitRepo, RepoInterface):
                 jobs=None,
                 expected_entries=expected_additions,
                 expect_stderr=True):
-            yield r
+            yield get_status_dict(
+                action=r.get('command', 'add'),
+                refds=self.pathobj,
+                type='file',
+                path=(self.pathobj / ut.PurePosixPath(r['file']))
+                if 'file' in r else None,
+                status='ok' if r.get('success', None) else 'error',
+                key=r.get('key', None),
+                message='\n'.join(r['error-messages'])
+                if 'error-messages' in r else None,
+                logger=lgr)
 
 
 # TODO: Why was this commented out?
@@ -3487,7 +3498,7 @@ class BatchedAnnex(BatchedCommand):
             ['annex'] + \
             annex_cmd + \
             (annex_options if annex_options else []) + \
-            (['--json'] if json else []) + \
+            (['--json', '--json-error-messages'] if json else []) + \
             ['--batch']  # , '--debug']
         output_proc = \
             output_proc if output_proc else readline_json if json else None

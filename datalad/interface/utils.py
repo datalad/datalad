@@ -502,7 +502,7 @@ def default_result_renderer(res):
                         res['message'][0] % res['message'][1:]
                         if isinstance(res['message'], tuple) else res[
                             'message'])
-                if 'message' in res else ''))
+                if res.get('message', None) else ''))
 
 
 def _process_results(

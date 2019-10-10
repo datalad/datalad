@@ -3677,16 +3677,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         self,
                         to_stage_submodules,
                         git_opts=None):
-                    # TODO the helper can yield proper dicts right away
-                    yield get_status_dict(
-                        action=r.get('command', 'add'),
-                        refds=self.pathobj,
-                        type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file']))
-                        if 'file' in r else None,
-                        status='ok' if r.get('success', None) else 'error',
-                        key=r.get('key', None),
-                        logger=lgr)
+                    yield r
 
         if added_submodule or vanished_subds:
             # need to include .gitmodules in what needs saving
@@ -3702,13 +3693,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 for r in GitRepo._save_add(
                         self,
                         {op.join(self.path, '.gitmodules'): None}):
-                    yield get_status_dict(
-                        action='add',
-                        refds=self.pathobj,
-                        type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
-                        status='ok' if r.get('success', None) else 'error',
-                        logger=lgr)
+                    yield r
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
@@ -3726,7 +3711,23 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     **{k: kwargs[k] for k in kwargs
                        if k in (('git',) if hasattr(self, 'annexstatus')
                                 else tuple())}):
-                # TODO the helper can yield proper dicts right away
+                yield r
+
+        self._save_post(message, status, need_partial_commit)
+        # TODO yield result for commit, prev helper checked hexsha pre
+        # and post...
+
+    def _save_add(self, files, git_opts=None):
+        """Simple helper to add files in save()"""
+        from datalad.interface.results import get_status_dict
+        try:
+            # without --verbose git 2.9.3  add does not return anything
+            add_out = self._git_custom_command(
+                list(files.keys()),
+                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
+            )
+            # get all the entries
+            for r in self._process_git_get_output(*add_out):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
@@ -3735,23 +3736,12 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     if 'file' in r else None,
                     status='ok' if r.get('success', None) else 'error',
                     key=r.get('key', None),
+                    # while there is no git-annex underneath here, we
+                    # tend to fake its behavior, so we can also support
+                    # this type of messaging
+                    message='\n'.join(r['error-messages'])
+                    if 'error-messages' in r else None,
                     logger=lgr)
-
-        self._save_post(message, status, need_partial_commit)
-        # TODO yield result for commit, prev helper checked hexsha pre
-        # and post...
-
-    def _save_add(self, files, git_opts=None):
-        """Simple helper to add files in save()"""
-        try:
-            # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                list(files.keys()),
-                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
-            )
-            # get all the entries
-            for o in self._process_git_get_output(*add_out):
-                yield o
         except OSError as e:
             lgr.error("add: %s" % e)
             raise
