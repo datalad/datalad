@@ -24,6 +24,7 @@ from ...tests.utils import assert_not_in
 from ...tests.utils import assert_in_results
 from ...tests.utils import with_tree
 from ...tests.utils import serve_path_via_http
+from ...tests.utils import known_failure_githubci_win
 
 
 def test_download_url_exceptions():
@@ -50,6 +51,7 @@ def test_download_url_exceptions():
         assert_in('http://example.com/bogus', msg)
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged
 @with_tree(tree=[
     ('file1.txt', 'abc'),
@@ -150,6 +152,7 @@ def test_download_url_dataset(toppath, topurl, path):
     assert_false((ds.pathobj / "file8.txt").exists())
 
 
+@known_failure_githubci_win
 @with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
 @serve_path_via_http
 @with_tempfile(mkdir=True)

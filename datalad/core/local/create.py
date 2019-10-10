@@ -37,7 +37,10 @@ from datalad.support.constraints import (
     EnsureKeyChoice,
 )
 from datalad.support.param import Parameter
-from datalad.utils import getpwd
+from datalad.utils import (
+    getpwd,
+    assure_list,
+)
 
 from datalad.distribution.dataset import (
     Dataset,
@@ -197,7 +200,7 @@ class Create(Interface):
                                  "no annex repo.")
 
         if path:
-            path = rev_resolve_path(path, ds)
+            path = rev_resolve_path(path, dataset)
 
         path = path if path \
             else getpwd() if ds is None \
@@ -205,6 +208,9 @@ class Create(Interface):
 
         # we know that we need to create a dataset at `path`
         assert(path is not None)
+
+        # assure cfg_proc is a list (relevant if used via Python API)
+        cfg_proc = assure_list(cfg_proc)
 
         # prep for yield
         res = dict(action='create', path=str(path),
@@ -426,7 +432,7 @@ class Create(Interface):
             _status=add_to_git,
         )
 
-        for cfg_proc_ in cfg_proc or []:
+        for cfg_proc_ in cfg_proc:
             for r in tbds.run_procedure('cfg_' + cfg_proc_):
                 yield r
 

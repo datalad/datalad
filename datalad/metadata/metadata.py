@@ -290,8 +290,7 @@ def query_aggregated_metadata(reporton, ds, aps, recursive=False,
             'Verifying/achieving local availability of %i metadata objects',
             len(objfiles))
         if objfiles:
-            get(path=[dict(path=op.join(agg_base_path, of),
-                           parentds=ds.path, type='file')
+            get(path=[op.join(agg_base_path, of)
                       for of in objfiles if of],
                 dataset=ds,
                 result_renderer='disabled')

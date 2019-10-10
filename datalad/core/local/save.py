@@ -192,6 +192,7 @@ class Save(Interface):
                 dataset=dataset,
                 path=path,
                 untracked=untracked_mode,
+                report_filetype=False,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
                 on_failure='ignore',
@@ -246,17 +247,18 @@ class Save(Interface):
         # sort list of dataset to handle, starting with the ones deep down
         for pdspath in sorted(paths_by_ds, reverse=True):
             pds = Dataset(pdspath)
+            pds_repo = pds.repo
             # pop status for this dataset, we are not coming back to it
             pds_status = {
                 # for handing over to the low-level code, we recode any
                 # path relative to the real repo location, this avoid
                 # cumbersome symlink handling without context in the
                 # lower levels
-                pds.repo.pathobj / p.relative_to(pdspath): props
+                pds_repo.pathobj / p.relative_to(pdspath): props
                 for p, props in paths_by_ds.pop(pdspath).items()}
-            start_commit = pds.repo.get_hexsha()
+            start_commit = pds_repo.get_hexsha()
             if not all(p['state'] == 'clean' for p in pds_status.values()):
-                for res in pds.repo.save_(
+                for res in pds_repo.save_(
                         message=message,
                         # make sure to have the `path` arg be None, as we want
                         # to prevent and bypass any additional repo.status()
@@ -277,7 +279,7 @@ class Save(Interface):
                             res[k] = str(
                                 # recode path back to dataset path anchor
                                 pds.pathobj / res[k].relative_to(
-                                    pds.repo.pathobj)
+                                    pds_repo.pathobj)
                             )
                     yield res
             # report on the dataset itself
@@ -287,7 +289,7 @@ class Save(Interface):
                 path=pds.path,
                 refds=ds.path,
                 status='ok'
-                if start_commit != pds.repo.get_hexsha()
+                if start_commit != pds_repo.get_hexsha()
                 else 'notneeded',
                 logger=lgr,
             )
@@ -295,7 +297,7 @@ class Save(Interface):
                 yield dsres
                 continue
             try:
-                pds.repo.tag(version_tag)
+                pds_repo.tag(version_tag)
                 dsres.update(
                     status='ok',
                     version_tag=version_tag)

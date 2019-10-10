@@ -40,7 +40,8 @@ from .utils import (
     swallow_outputs, swallow_logs,
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http,
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink,
-    ok_file_under_git
+    ok_file_under_git,
+    known_failure_githubci_win,
 )
 from .utils import ok_generator
 from .utils import assert_dict_equal
@@ -202,6 +203,7 @@ def test_with_tempfile_specified_prefix(d1):
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
+@known_failure_githubci_win
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
     if platform.system() in ('Linux', 'Darwin'):
@@ -421,6 +423,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
     test_path_and_url()
 
 
+# just look at the path specs...
+@known_failure_githubci_win
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
                        'test_dir/test2.txt',
@@ -437,6 +441,7 @@ def test_serve_path_via_http():
         yield _test_serve_path_via_http, test_fpath
 
 
+@known_failure_githubci_win
 def test_without_http_proxy():
 
     @without_http_proxy

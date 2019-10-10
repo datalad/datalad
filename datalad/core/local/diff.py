@@ -233,7 +233,8 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         lgr.debug("Skip diff of unavailable subdataset: %s", ds)
         return
 
-    repo_path = ds.repo.pathobj
+    repo = ds.repo
+    repo_path = repo.pathobj
     # filter and normalize paths that match this dataset before passing them
     # onto the low-level query method
     paths = None if origpaths is None \
@@ -244,7 +245,7 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         )
     try:
         lgr.debug("diff %s from '%s' to '%s'", ds, fr, to)
-        diff_state = ds.repo.diffstatus(
+        diff_state = repo.diffstatus(
             fr,
             to,
             paths=None if not paths else [p for p in paths],
@@ -259,15 +260,15 @@ def _diff_ds(ds, fr, to, constant_refs, recursion_level, origpaths, untracked,
         )
         return
 
-    if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
+    if annexinfo and hasattr(repo, 'get_content_annexinfo'):
         # this will ammend `status`
-        ds.repo.get_content_annexinfo(
+        repo.get_content_annexinfo(
             paths=paths.keys() if paths is not None else paths,
             init=diff_state,
             eval_availability=annexinfo in ('availability', 'all'),
             ref=to)
         if fr != to:
-            ds.repo.get_content_annexinfo(
+            repo.get_content_annexinfo(
                 paths=paths.keys() if paths is not None else paths,
                 init=diff_state,
                 eval_availability=annexinfo in ('availability', 'all'),

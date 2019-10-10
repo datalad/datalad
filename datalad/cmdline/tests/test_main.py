@@ -239,6 +239,13 @@ def test_cfg_override(path):
         assert_in('datalad.dummy: this', out)
 
 
+def test_incorrect_cfg_override():
+    run_main(['-c', 'some', 'wtf'], exit_code=3)
+    run_main(['-c', 'some=', 'wtf'], exit_code=3)
+    run_main(['-c', 'some.var', 'wtf'], exit_code=3)
+    run_main(['-c', 'some.var=', 'wtf'], exit_code=3)
+
+
 def test_fail_with_short_help():
     out = StringIO()
     with assert_raises(SystemExit) as cme:

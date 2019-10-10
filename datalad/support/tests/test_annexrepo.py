@@ -66,6 +66,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_not_equal
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_true
+from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import eq_
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_git_config_not_empty
@@ -85,6 +86,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
 from datalad.tests.utils import set_annex_version
+from datalad.tests.utils import known_failure_githubci_win
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -172,6 +174,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     assert_false(ar.is_crippled_fs())
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
@@ -181,6 +184,7 @@ def test_AnnexRepo_is_direct_mode(path):
         ar.is_direct_mode())
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_AnnexRepo_is_direct_mode_gitrepo(path):
     repo = GitRepo(path, create=True)
@@ -331,6 +335,7 @@ def test_AnnexRepo_is_under_annex(batch, src, annex_path):
         [False])
 
 
+@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -944,6 +949,7 @@ def test_AnnexRepo_get_contentlocation():
         yield _test_AnnexRepo_get_contentlocation, batch
 
 
+@known_failure_githubci_win
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('about2_.txt', 'more abouts_'),
@@ -1217,21 +1223,23 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    # TODO: Since git-annex 7.20181031, v6 repos upgrade to v7. Once that
-    # version or later is our minimum required version, update this test and
-    # the one below to eq_(version, 7).
-    assert_in(version, [6, 7])
+    # Since git-annex 7.20181031, v6 repos upgrade to v7.
+    supported_versions = AnnexRepo.check_repository_versions()["supported"]
+    v6_lands_on = next(i for i in supported_versions if i >= 6)
+    eq_(version, v6_lands_on)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
         version = annex.repo.config_reader().get_value('annex', 'version')
-        assert_in(version, [6, 7])
+        eq_(version, v6_lands_on)
 
-        # parameter `version` still has priority over default config:
-        annex = AnnexRepo(path3, create=True, version=5)
-        version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 5)
+        # Assuming specified version is a supported version...
+        if 5 in supported_versions:
+            # ...parameter `version` still has priority over default config:
+            annex = AnnexRepo(path3, create=True, version=5)
+            version = annex.repo.config_reader().get_value('annex', 'version')
+            eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -1319,6 +1327,7 @@ def test_annex_drop(src, dst):
     assert_false(ar.file_has_content(testfile))
     ar.get(testfile)
     ok_(ar.file_has_content(testfile))
+    eq_(len([f for f in ar.fsck(fast=True) if f['file'] == testfile]), 1)
 
     # drop file by name:
     result = ar.drop([testfile])
@@ -1811,6 +1820,7 @@ def test_wanted(path):
     eq_(ar1.get_preferred_content('wanted'), 'standard')
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_AnnexRepo_metadata(path):
     # prelude
@@ -2059,6 +2069,7 @@ def test_error_reporting(path):
 
 # http://git-annex.branchable.com/bugs/cannot_commit___34__annex_add__34__ed_modified_file_which_switched_its_largefile_status_to_be_committed_to_git_now/#comment-bf70dd0071de1bfdae9fd4f736fd1ec
 # https://github.com/datalad/datalad/issues/1651
+@known_failure_githubci_win
 @with_tree(tree={
     '.gitattributes': "** annex.largefiles=(largerthan=4b)",
     'alwaysbig': 'a'*10,
@@ -2179,9 +2190,10 @@ def check_files_split(cls, topdir):
         os.unlink(f)
         with open(f, 'w') as f:
             f.write('1')
-    dl.add(dirs)
+    dl.save(dataset=r.path, path=dirs)
 
 
+@known_failure_githubci_win
 @slow  # 313s  well -- if errors out - only 3 sec
 def test_files_split():
     for cls in GitRepo, AnnexRepo:
@@ -2247,6 +2259,42 @@ def test_ro_operations(path):
 
     # just check that all is good again
     repo2.repo_info()
+
+
+@skip_if(cond=(on_windows or os.geteuid() == 0))  # uid and sudo not available on windows
+@with_tree({
+    'file1': 'file1',
+})
+def test_save_noperms(path):
+    # check that we do report annex error messages
+
+    # This test would function only if there is a way to run sudo
+    # non-interactively, e.g. on Travis or on your local (watchout!) system
+    # after you ran sudo command recently.
+    repo = AnnexRepo(path, init=True)
+
+    from datalad.cmd import Runner
+    run = Runner().run
+    sudochown = lambda cmd: run(['sudo', '-n', 'chown'] + cmd)
+
+    try:
+        # To assure that git/git-annex really cannot acquire a lock and do
+        # any changes (e.g. merge git-annex branch), we make this repo owned by root
+        sudochown(['-R', 'root:root', repo.pathobj / 'file1'])
+    except Exception as exc:
+        # Exception could be CommandError or IOError when there is no sudo
+        raise SkipTest("Cannot run sudo chown non-interactively: %s" % exc)
+
+    try:
+        res = repo.save(paths=['file1'])
+
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, type='file', path=repo.pathobj / 'file1', action='add', status='error'
+        )
+        assert_in('permission denied', res[0]['message'])
+    finally:
+        sudochown(['-R', str(os.geteuid()), repo.path])
 
 
 @with_tempfile

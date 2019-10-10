@@ -21,6 +21,7 @@ import shlex
 from os import curdir
 from os import pardir
 from os import listdir
+import os.path as op
 from os.path import join as opj
 from os.path import isdir
 from os.path import relpath
@@ -156,7 +157,14 @@ def path_is_under(values, path=None):
         path = getpwd()
     if isinstance(values, dict):
         values = chain(*values.values())
+    path_drive, _ = op.splitdrive(path)
     for p in values:
+        p_drive, _ = op.splitdrive(p)
+        # need to protect against unsupported use of relpath() with
+        # abspaths on windows from different drives (gh-3724)
+        if path_drive != p_drive:
+        # different drives, enough evidence for "not under"
+            continue
         rpath = relpath(p, start=path)
         if rpath == curdir \
                 or rpath == pardir \
@@ -324,6 +332,8 @@ def eval_results(func):
         # TODO remove this conditional branch entirely, done outside
         if not result_renderer:
             result_renderer = dlcfg.get('datalad.api.result-renderer', None)
+        # look for potential override of logging behavior
+        result_log_level = dlcfg.get('datalad.log.result-level', None)
         # wrap the filter into a helper to be able to pass additional arguments
         # if the filter supports it, but at the same time keep the required interface
         # as minimal as possible. Also do this here, in order to avoid this test
@@ -392,6 +402,7 @@ def eval_results(func):
                             _func_class, action_summary,
                             on_failure, incomplete_results,
                             result_renderer, result_xfm, result_filter,
+                            result_log_level,
                             **_kwargs):
                         yield r
 
@@ -406,7 +417,8 @@ def eval_results(func):
                     wrapped(*_args, **_kwargs),
                     _func_class, action_summary,
                     on_failure, incomplete_results,
-                    result_renderer, result_xfm, _result_filter, **_kwargs):
+                    result_renderer, result_xfm, _result_filter,
+                    result_log_level, **_kwargs):
                 yield r
                 # collect if summary is desired
                 if do_custom_result_summary:
@@ -424,7 +436,7 @@ def eval_results(func):
                             _func_class, action_summary,
                             on_failure, incomplete_results,
                             result_renderer, result_xfm, result_filter,
-                            **_kwargs):
+                            result_log_level, **_kwargs):
                         yield r
 
             # result summary before a potential exception
@@ -490,13 +502,14 @@ def default_result_renderer(res):
                         res['message'][0] % res['message'][1:]
                         if isinstance(res['message'], tuple) else res[
                             'message'])
-                if 'message' in res else ''))
+                if res.get('message', None) else ''))
 
 
 def _process_results(
         results, cmd_class,
         action_summary, on_failure, incomplete_results,
-        result_renderer, result_xfm, result_filter, **kwargs):
+        result_renderer, result_xfm, result_filter,
+        result_log_level, **kwargs):
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
@@ -510,15 +523,20 @@ def _process_results(
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
             action_summary[res['action']] = actsum
-        ## log message, if a logger was given
+        ## log message, if there is one and a logger was given
+        msg = res.get('message', None)
         # remove logger instance from results, as it is no longer useful
         # after logging was done, it isn't serializable, and generally
         # pollutes the output
         res_lgr = res.pop('logger', None)
-        if isinstance(res_lgr, logging.Logger):
-            # didn't get a particular log function, go with default
-            res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-        if res_lgr and 'message' in res:
+        if msg and res_lgr:
+            if isinstance(res_lgr, logging.Logger):
+                # didn't get a particular log function, go with default
+                res_lgr = getattr(
+                    res_lgr,
+                    default_logchannels[res['status']]
+                    if result_log_level is None
+                    else result_log_level)
             msg = res['message']
             msgargs = None
             if isinstance(msg, tuple):

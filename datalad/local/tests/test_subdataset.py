@@ -231,17 +231,20 @@ def test_get_subdatasets(path):
          'sub dataset1/sub sub dataset1/subm 1'])
     # but it has to be a subdataset, otherwise no match
     # which is what get_containing_subdataset() used to do
-    eq_(ds.subdatasets(contains=ds.path), [])
-    # no error if contains is bullshit
-    eq_(ds.subdatasets(recursive=True,
-                       contains='errrr_nope',
-                       result_xfm='paths'),
-        [])
-    # TODO maybe at a courtesy bullshit detector some day
-    eq_(ds.subdatasets(recursive=True,
-                       contains=opj(pardir, 'errrr_nope'),
-                       result_xfm='paths'),
-        [])
+    assert_status('impossible',
+                  ds.subdatasets(contains=ds.path, on_failure='ignore'))
+
+    # 'impossible' if contains is bullshit
+    assert_status('impossible',
+                  ds.subdatasets(recursive=True,
+                                 contains='impossible_yes',
+                                 on_failure='ignore'))
+
+    assert_status('impossible',
+                  ds.subdatasets(recursive=True,
+                                 contains=opj(pardir, 'impossible_yes'),
+                                 on_failure='ignore'))
+
     eq_(ds.subdatasets(
         recursive=True,
         contains=[target_sub, 'sub dataset1/2'],

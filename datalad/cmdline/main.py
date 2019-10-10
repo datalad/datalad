@@ -474,6 +474,24 @@ def main(args=None):
     args_ = args or sys.argv
 
     if cmdlineargs.cfg_overrides is not None:
+        import re
+        # this expression is deliberately loose as gitconfig offers
+        # quite some flexibility -- this is just meant to catch stupid
+        # errors: we need a section, a variable, and a value at minimum
+        # otherwise we break our own config parsing helpers
+        # https://github.com/datalad/datalad/issues/3451
+        noassign_expr = re.compile(r'[^\s]+\.[^\s]+=[\S]+')
+        noassign = [
+            o
+            for o in cmdlineargs.cfg_overrides
+            if not noassign_expr.match(o)
+        ]
+        if noassign:
+            lgr.error(
+                "Configuration override without section/variable "
+                "or value assignment (must be 'section.variable=value'): %s",
+                noassign)
+            sys.exit(3)
         overrides = dict([
             (o.split('=')[0], '='.join(o.split('=')[1:]))
             for o in cmdlineargs.cfg_overrides])

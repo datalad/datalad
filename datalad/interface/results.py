@@ -20,9 +20,12 @@ from os.path import join as opj
 from os.path import relpath
 from os.path import abspath
 from os.path import normpath
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import path_is_subpath
+from datalad.utils import (
+    assure_list,
+    with_pathsep as _with_sep,
+    path_is_subpath,
+    PurePosixPath,
+)
 from datalad.support.path import robust_abspath
 
 from datalad.distribution.dataset import Dataset
@@ -214,7 +217,7 @@ def annexjson2result(d, ds, **kwargs):
     # we cannot rely on any of these to be available as the feed from
     # git annex (or its wrapper) is not always homogeneous
     if 'file' in d:
-        res['path'] = opj(ds.path, d['file'])
+        res['path'] = str(ds.pathobj / PurePosixPath(d['file']))
     if 'command' in d:
         res['action'] = d['command']
     if 'key' in d:
@@ -272,7 +275,8 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     if respath in paths:
         # absolute match, pretty sure we want this
         return True
-    elif kwargs.get('dataset', None) and YieldRelativePaths()(res) in paths:
+    elif isinstance(kwargs.get('dataset', None), Dataset) and \
+            YieldRelativePaths()(res) in paths:
         # command was called with a reference dataset, and a relative
         # path of a result matches in input argument -- not 100% exhaustive
         # test, but could be good enough

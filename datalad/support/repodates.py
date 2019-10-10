@@ -194,16 +194,13 @@ def tag_dates(repo, pattern=""):
     -------
     A generator object that returns a tuple with the tag hexsha and timestamp.
     """
-    out, _ = repo._git_custom_command(
-        None,
-        ["git", "for-each-ref", "--format=%(objectname) %(taggerdate:raw)"
-         "refs/tags/" + pattern])
-    for line in out.splitlines():
-        fields = line.split()
-        if len(fields) != 3:
+    for rec in repo.for_each_ref_(
+            fields=['objectname', 'taggerdate:raw'],
+            pattern='refs/tags/' + pattern):
+        if not rec['taggerdate:raw']:
             # There's not a tagger date. It's not an annotated tag.
             continue
-        yield fields[0], int(fields[1])
+        yield rec['objectname'], int(rec['taggerdate:raw'].split()[0])
 
 
 def log_dates(repo, revs=None):

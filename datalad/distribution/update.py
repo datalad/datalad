@@ -15,23 +15,28 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os.path import lexists, join as opj
+import itertools
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import (
+    EnsureStr,
+    EnsureNone,
+)
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+)
 from datalad.distribution.dataset import require_dataset
 
-from .dataset import Dataset
-from .dataset import EnsureDataset
-from .dataset import datasetmethod
+from .dataset import (
+    EnsureDataset,
+    datasetmethod,
+)
 
 lgr = logging.getLogger('datalad.distribution.update')
 
@@ -48,7 +53,8 @@ class Update(Interface):
         path=Parameter(
             args=("path",),
             metavar="PATH",
-            doc="path to a dataset that shall be updated",
+            doc="""contrain to-be-updated subdatasets to the given path for recursive
+            operation.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         sibling=Parameter(
@@ -60,7 +66,7 @@ class Update(Interface):
             args=("-d", "--dataset"),
             doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the input and/or the current working directory""",
+            based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
@@ -96,46 +102,28 @@ class Update(Interface):
         """
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
+        if path and not recursive:
+            lgr.warning('path constraints for subdataset updates ignored, '
+                        'because `recursive` option was not given')
 
-        if not dataset and not path:
-            # try to find a dataset in PWD
-            dataset = require_dataset(
-                None, check_installed=True, purpose='updating')
-        refds_path = Interface.get_refds_path(dataset)
-        if dataset and not path:
-            # act on the whole dataset if nothing else was specified
-            path = refds_path
+        refds = require_dataset(dataset, check_installed=True, purpose='updating')
 
         save_paths = []
-        for ap in AnnotatePaths.__call__(
-                dataset=refds_path,
+
+        saw_subds = False
+        for ds in itertools.chain([refds], refds.subdatasets(
                 path=path,
+                fulfilled=True,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                action='update',
-                unavailable_path_status='impossible',
-                nondataset_path_status='error',
                 return_type='generator',
-                on_failure='ignore'):
-            if ap.get('status', None):
-                # this is done
-                yield ap
-                continue
-            if not ap.get('type', None) == 'dataset':
-                ap.update(
-                    status='impossible',
-                    message="can only update datasets")
-                yield ap
-                continue
-            # this is definitely as dataset from here on
-            ds = Dataset(ap['path'])
-            if not ds.is_installed():
-                lgr.debug("Skipping update since not installed %s", ds)
-                continue
+                result_renderer='disabled',
+                result_xfm='datasets') if recursive else []):
+            if ds != refds:
+                saw_subds = True
             repo = ds.repo
             # prepare return value
-            # TODO reuse AP for return props
-            res = get_status_dict('update', ds=ds, logger=lgr, refds=refds_path)
+            res = get_status_dict('update', ds=ds, logger=lgr, refds=refds.path)
             # get all remotes which have references (would exclude
             # special remotes)
             remotes = repo.get_remotes(
@@ -185,15 +173,19 @@ class Update(Interface):
                     yield fr
             res['status'] = 'ok'
             yield res
-            save_paths.append(ap['path'])
+            save_paths.append(ds.path)
         if recursive:
-            save_paths = [p for p in save_paths if p != refds_path]
+            if path and not saw_subds:
+                lgr.warning(
+                    'path constraints did not match an installed subdataset: %s',
+                    path)
+            save_paths = [p for p in save_paths if p != refds.path]
             if not save_paths:
                 return
             lgr.debug(
                 'Subdatasets where updated state may need to be '
                 'saved in the parent dataset: %s', save_paths)
-            for r in Dataset(refds_path).save(
+            for r in refds.save(
                     path=save_paths,
                     recursive=False,
                     message='[DATALAD] Save updated subdatasets'):

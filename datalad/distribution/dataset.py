@@ -431,6 +431,17 @@ class Dataset(object, metaclass=Flyweight):
         #       (meaning: registered as submodule)?
         path = self.path
         sds_path = path if topmost else None
+
+        def res_filter(res):
+            return res.get('status') == 'ok' and res.get('type') == 'dataset'
+
+        def subds_contains_path(ds, path):
+            return path in sds.subdatasets(recursive=False,
+                                           contains=path,
+                                           result_filter=res_filter,
+                                           on_failure='ignore',
+                                           result_xfm='paths')
+
         while path:
             # normalize the path after adding .. so we guaranteed to not
             # follow into original directory if path itself is a symlink
@@ -446,10 +457,7 @@ class Dataset(object, metaclass=Flyweight):
                 if not sds.id:
                     break
             if registered_only:
-                if path not in sds.subdatasets(
-                        recursive=False,
-                        contains=path,
-                        result_xfm='paths'):
+                if not subds_contains_path(sds, path):
                     break
 
             # That was a good candidate

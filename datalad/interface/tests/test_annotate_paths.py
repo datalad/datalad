@@ -28,6 +28,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import slow
 from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import known_failure_githubci_win
 
 
 from datalad.distribution.dataset import Dataset
@@ -221,6 +222,7 @@ def test_annotate_paths(dspath, nodspath):
     eq_(orig_res, res_recursion_again)
 
 
+@known_failure_githubci_win
 @slow  # 11.0891s
 @with_tree(demo_hierarchy['b'])
 def test_get_modified_subpaths(path):
@@ -363,8 +365,8 @@ def test_recurseinto(dspath, dest):
     # explicitly -- must get it installed
     dest = install(source=ds.path, path=dest)
     res = dest.get(['.', opj('b', 'bb')], get_data=False, recursive=True)
-    assert_result_count(res, 8)
-    assert_result_count(res, 8, type='dataset')
+    assert_result_count(res, 7)
+    assert_result_count(res, 7, type='dataset')
     assert_result_count(res, 1, type='dataset',
                         path=opj(dest.path, 'b', 'bb'))
     assert(Dataset(opj(dest.path, 'b', 'bb')).is_installed())

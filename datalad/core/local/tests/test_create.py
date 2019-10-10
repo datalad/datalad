@@ -25,6 +25,7 @@ from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
     _path_,
+    Path,
 )
 from datalad.cmd import Runner
 
@@ -472,3 +473,42 @@ def test_create_with_obscure_name():
     fname = OBSCURE_FILENAME
     yield check_create_obscure, {"path": fname}
     yield check_create_obscure, {"dataset": fname}
+
+
+@with_tempfile
+@with_tempfile(mkdir=True)
+def check_create_path_semantics(
+        cwd, create_ds, path_arg, base_path, other_path):
+    ds = Dataset(base_path).create()
+    os.makedirs(op.join(ds.path, 'some'))
+    target_path = ds.pathobj / "some" / "what" / "deeper"
+    with chpwd(
+            other_path if cwd == 'elsewhere' else
+            base_path if cwd == 'parentds' else
+            str(ds.pathobj / 'some') if cwd == 'subdir' else
+            str(Path.cwd())):
+        subds = create(
+            dataset=ds.path if create_ds == 'abspath'
+            else str(ds.pathobj.relative_to(cwd)) if create_ds == 'relpath'
+            else ds if create_ds == 'instance'
+            else create_ds,
+            path=str(target_path) if path_arg == 'abspath'
+            else str(target_path.relative_to(ds.pathobj)) if path_arg == 'relpath'
+            else op.join('what', 'deeper') if path_arg == 'subdir_relpath'
+            else path_arg)
+        eq_(subds.pathobj, target_path)
+
+
+def test_create_relpath_semantics():
+    yield check_create_path_semantics, 'subdir', None, 'subdir_relpath'
+    yield check_create_path_semantics, 'subdir', 'abspath', 'subdir_relpath'
+    yield check_create_path_semantics, 'subdir', 'abspath', 'abspath'
+    yield check_create_path_semantics, 'parentds', None, 'relpath'
+    yield check_create_path_semantics, 'parentds', 'abspath', 'relpath'
+    yield check_create_path_semantics, 'parentds', 'abspath', 'abspath'
+    yield check_create_path_semantics, None, 'abspath', 'abspath'
+    yield check_create_path_semantics, None, 'instance', 'abspath'
+    yield check_create_path_semantics, None, 'instance', 'relpath'
+    yield check_create_path_semantics, 'elsewhere', 'abspath', 'abspath'
+    yield check_create_path_semantics, 'elsewhere', 'instance', 'abspath'
+    yield check_create_path_semantics, 'elsewhere', 'instance', 'relpath'

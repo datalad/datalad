@@ -46,9 +46,12 @@ from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
+from datalad.utils import on_windows
 
 from datalad.dochelpers import exc_str
 
@@ -59,10 +62,8 @@ from datalad.support.gitrepo import GitCommandError
 from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.gitrepo import InvalidGitRepositoryError
 from datalad.support.gitrepo import to_options
-from datalad.support.gitrepo import kwargs_to_options
 from datalad.support.gitrepo import _normalize_path
 from datalad.support.gitrepo import normalize_paths
-from datalad.support.gitrepo import split_remote_branch
 from datalad.support.gitrepo import gitpy
 from datalad.support.gitrepo import guard_BadName
 from datalad.support.exceptions import DeprecatedError
@@ -250,8 +251,8 @@ def test_GitRepo_commit(path):
     gr.add(filename)
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(gr)
-    eq_("Testing GitRepo.commit().{}".format(linesep),
-        gr.format_commit("%B"))
+    eq_("Testing GitRepo.commit().",
+        gr.format_commit("%B").strip())
 
     with open(op.join(path, filename), 'w') as f:
         f.write("changed content")
@@ -517,6 +518,20 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     eq_([], fetched)
 
 
+def _path2localsshurl(path):
+    """Helper to build valid localhost SSH urls on Windows too"""
+    from pathlib import Path
+    path = op.abspath(path)
+    p = Path(path)
+    if p.drive:
+        path = '/'.join(('/{}'.format(p.drive[0]),) + p.parts[1:])
+    url = "ssh://localhost{}".format(path)
+    return url
+
+
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
@@ -524,7 +539,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=False)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -546,6 +561,9 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     assert_in('ssh-remote/master', repo.get_remote_branches())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -553,7 +571,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -582,6 +600,9 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
+# broken,possibly due to a GitPy issue with windows sshurls
+# see https://github.com/datalad/datalad/pull/3638
+@skip_if_on_windows
 @skip_ssh
 @with_tempfile
 @with_tempfile
@@ -589,7 +610,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     from datalad import ssh_manager
 
     remote_repo = GitRepo(remote_path, create=True)
-    url = "ssh://localhost" + op.abspath(remote_path)
+    url = _path2localsshurl(remote_path)
     socket_path = op.join(str(ssh_manager.socket_dir),
                           get_connection_hash('localhost', bundled=True))
     repo = GitRepo(repo_path, create=True)
@@ -742,6 +763,7 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
+@known_failure_githubci_win
 @with_tree(tree={
     'd1': {'f1': 'content1',
            'f2': 'content2'},
@@ -919,24 +941,6 @@ def test_GitRepo_git_get_branch_commits(src):
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 
-def test_split_remote_branch():
-    r, b = split_remote_branch("MyRemote/SimpleBranch")
-    eq_(r, "MyRemote")
-    eq_(b, "SimpleBranch")
-    r, b = split_remote_branch("MyRemote/Branch/with/slashes")
-    eq_(r, "MyRemote")
-    eq_(b, "Branch/with/slashes")
-    assert_raises(AssertionError, split_remote_branch, "NoSlashesAtAll")
-    assert_raises(AssertionError, split_remote_branch, "TrailingSlash/")
-
-
-def test_get_added_files_commit_msg():
-    f = GitRepo._get_added_files_commit_msg
-    eq_(f([]), 'No files were added')
-    eq_(f(["f1"]), 'Added 1 file\n\nFiles:\nf1')
-    eq_(f(["f1", "f2"]), 'Added 2 files\n\nFiles:\nf1\nf2')
-
-
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_get_tracking_branch(o_path, c_path):
@@ -1019,28 +1023,6 @@ def test_get_submodules_parent_on_unborn_branch(path):
     repo.add_submodule(path="sub")
     eq_([s.name for s in repo.get_submodules()],
         ["sub"])
-
-
-def test_kwargs_to_options():
-
-    class Some(object):
-
-        @kwargs_to_options(split_single_char_options=True)
-        def f_decorated_split(self, options=None):
-            return options
-
-        @kwargs_to_options(split_single_char_options=False,
-                           target_kw='another')
-        def f_decorated_no_split(self, another=None):
-            return another
-
-    res = Some().f_decorated_split(C="/some/path", m=3, b=True, more_fancy=['one', 'two'])
-    ok_(isinstance(res, list))
-    eq_(res, ['-C', "/some/path", '-b', '-m', '3',
-              '--more-fancy=one', '--more-fancy=two'])
-
-    res = Some().f_decorated_no_split(f='some')
-    eq_(res, ['-fsome'])
 
 
 def test_to_options():
@@ -1128,6 +1110,9 @@ def test_get_missing(path):
     eq_(repo.get_deleted_files(), ['test1'])
 
 
+# this is simply broken on win, but less important
+# https://github.com/datalad/datalad/issues/3639
+@skip_if_on_windows
 @with_tempfile
 def test_optimized_cloning(path):
     # make test repo with one file and one commit
@@ -1308,7 +1293,7 @@ def test_gitattributes(path):
         # always comes out relative to the repo root, even if abs goes in
         {op.join('relative', 'ikethemike', 'probe'):
             {'tag': False, 'sec.key': 'val', 'bang': True}})
-    if get_encoding_info()['default'] != 'ascii':
+    if get_encoding_info()['default'] != 'ascii' and not on_windows:
         # do not perform this on obscure systems without anything like UTF
         # it is not relevant whether a path actually exists, and paths
         # with spaces and other funky stuff are just fine
@@ -1346,7 +1331,8 @@ def test_get_tags(path):
 
     # Explicitly override the committer date because tests may set it to a
     # fixed value, but we want to check that the returned tags are sorted by
-    # the committer date.
+    # the date the tag (for annotaged tags) or commit (for lightweight tags)
+    # was created.
     with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
                                    "Thu, 07 Apr 2005 22:13:13 +0200"}):
         create_tree(gr.path, {'file': ""})
@@ -1370,7 +1356,10 @@ def test_get_tags(path):
         gr.add('file')
         gr.commit(msg="changed")
 
-    gr.tag("annotated", message="annotation")
+    with patch.dict("os.environ", {"GIT_COMMITTER_DATE":
+                                   "Fri, 09 Apr 2005 22:13:13 +0200"}):
+        gr.tag("annotated", message="annotation")
+    # The annotated tag happened later, so it comes last.
     tags2 = tags1 + [{'name': 'annotated', 'hexsha': gr.get_hexsha()}]
     eq_(gr.get_tags(), tags2)
     eq_(gr.describe(), tags2[1]['name'])
@@ -1554,3 +1543,13 @@ def test_GitRepo_get_revisions(path):
 
     # Ranges are supported.
     eq_(gr.get_revisions("master.."), [])
+
+
+@with_tree({"foo": "foo"})
+def test_gitrepo_add_to_git_with_annex_v7(path):
+    from datalad.support.annexrepo import AnnexRepo
+    ar = AnnexRepo(path, create=True, version=7)
+    gr = GitRepo(path)
+    gr.add("foo")
+    gr.commit(msg="c1")
+    assert_false(ar.is_under_annex("foo"))

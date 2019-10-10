@@ -12,6 +12,7 @@
 
 
 from os import curdir
+import os.path as op
 from os.path import join as opj, basename
 from glob import glob
 
@@ -84,10 +85,11 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
-    eq_(f(clone, 'sub'), [t + '/sub'])
-    eq_(f(clone, 'sub', sshurl), [t + '/sub', sshurl])
-    eq_(f(clone, 'sub', httpurl), [t + '/sub'] + sm_httpurls)
-    eq_(f(clone, 'sub'), [t + '/sub'])  # otherwise really we have no clue were to get from
+    subpath = op.sep.join((t, 'sub'))
+    eq_(f(clone, 'sub'), [subpath])
+    eq_(f(clone, 'sub', sshurl), [subpath, sshurl])
+    eq_(f(clone, 'sub', httpurl), [subpath] + sm_httpurls)
+    eq_(f(clone, 'sub'), [subpath])  # otherwise really we have no clue were to get from
     # TODO: check that http:// urls for the dataset itself get resolved
 
     # TODO: many more!!
@@ -101,7 +103,7 @@ def test_get_invalid_call(path, file_outside):
     assert_raises(InsufficientArgumentsError, get, None)
     assert_raises(InsufficientArgumentsError, get, [])
     # invalid dataset:
-    assert_status('impossible', get(None, dataset=path, on_failure='ignore'))
+    assert_raises(ValueError, get, None, dataset=path, on_failure='ignore')
 
     # have a plain git:
     ds = Dataset(path)
@@ -135,7 +137,8 @@ def test_get_invalid_call(path, file_outside):
     # path outside repo errors as with most other commands:
     res = ds.get(file_outside, on_failure='ignore')
     assert_in_results(
-        res, status='impossible', message='path not associated with any dataset')
+        res, status='error',
+        message=('path not associated with dataset', ds))
 
 
 @with_testrepos('basic_annex', flavors='clone')
@@ -224,7 +227,6 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(not any(ds.repo.file_has_content(file_list)))
 
     result = ds.get('subdir')
-
     # check result:
     assert_status('ok', result)
     eq_(set([item.get('path')[len(ds.path) + 1:] for item in result
@@ -395,23 +397,6 @@ def test_get_mixed_hierarchy(src, path):
     ok_(subds.repo.file_has_content("file_in_annex.txt") is True)
 
 
-@with_testrepos('submodule_annex', flavors='local')
-@with_tempfile(mkdir=True)
-def test_autoresolve_multiple_datasets(src, path):
-    with chpwd(path):
-        ds1 = install(
-            'ds1', source=src,
-            result_xfm='datasets', return_type='item-or-list')
-        ds2 = install(
-            'ds2', source=src,
-            result_xfm='datasets', return_type='item-or-list')
-        results = get([opj('ds1', 'test-annex.dat')] + glob(opj('ds2', '*.dat')))
-        # each ds has one file
-        assert_result_count(results, 2, type='file', action='get', status='ok')
-        ok_(ds1.repo.file_has_content('test-annex.dat') is True)
-        ok_(ds2.repo.file_has_content('test-annex.dat') is True)
-
-
 @slow  # 20 sec
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -429,7 +414,8 @@ def test_get_autoresolve_recurse_subdatasets(src, path):
         result_xfm='datasets', return_type='item-or-list')
     eq_(len(ds.subdatasets(fulfilled=True)), 0)
 
-    results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
+    with chpwd(ds.path):
+        results = get(opj(ds.path, 'sub'), recursive=True, result_xfm='datasets')
     eq_(len(ds.subdatasets(fulfilled=True, recursive=True)), 2)
     subsub = Dataset(opj(ds.path, 'sub', 'subsub'))
     ok_(subsub.is_installed())
@@ -491,7 +477,8 @@ def test_get_in_unavailable_subdataset(src, path):
         result_xfm='datasets', return_type='item-or-list')
     targetpath = opj('sub1', 'sub2')
     targetabspath = opj(root.path, targetpath)
-    res = get(targetabspath)
+    with chpwd(path):
+        res = get(targetabspath)
     assert_result_count(res, 2, status='ok', action='install', type='dataset')
     # dry-fit result filter that only returns the result that matched the requested
     # path

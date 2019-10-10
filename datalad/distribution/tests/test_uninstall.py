@@ -42,6 +42,7 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import usecase
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
@@ -60,6 +61,11 @@ def test_safetynet(path):
                 assert_status(
                     ('error', 'impossible'),
                     uninstall(path=target, on_failure='ignore'))
+    sub = ds.create('sub')
+    subsub = sub.create('subsub')
+    for p in (sub.path, subsub.path):
+        with chpwd(p):
+            assert_status('error', uninstall(on_failure='ignore'))
 
 
 @with_tempfile()
@@ -68,7 +74,7 @@ def test_uninstall_uninstalled(path):
     # nothing installed, any removal was already a success before it started
     ds = Dataset(path)
     assert_status('error', ds.drop(on_failure="ignore"))
-    assert_status('error', ds.uninstall(on_failure='ignore'))
+    assert_raises(ValueError, ds.uninstall)
     assert_status('notneeded', ds.remove())
 
 
@@ -107,11 +113,13 @@ def test_clean_subds_removal(path):
     eq_(res, [subds2, ds])
 
 
-@with_testrepos('.*basic.*', flavors=['clone'])
+@with_tempfile()
 def test_uninstall_invalid(path):
     ds = Dataset(path).create(force=True)
-    for method in (uninstall, remove, drop):
-        assert_raises(InsufficientArgumentsError, method)
+    # no longer a uniform API for uninstall, drop, and remove
+    for method in (uninstall,): #  remove, drop):
+        with chpwd(ds.path):
+            assert_status('error', method(on_failure='ignore'))
         # refuse to touch stuff outside the dataset
         assert_status('error', method(dataset=ds, path='..', on_failure='ignore'))
         # same if it doesn't exist, for consistency
@@ -163,10 +171,8 @@ def test_uninstall_git_file(path):
         message="no annex'ed content")
 
     res = ds.uninstall(path="INFO.txt", on_failure='ignore')
-    assert_result_count(
-        res, 1,
-        status='impossible',
-        message='can only uninstall datasets (consider the `drop` command)')
+    # no matching subdataset
+    assert_result_count(res, 0)
 
     # remove the file:
     res = ds.remove(path='INFO.txt', result_xfm='paths',
@@ -215,6 +221,7 @@ def test_uninstall_subdataset(src, dst):
         ok_(exists(subds.path))
 
 
+@known_failure_githubci_win
 @with_tree({
     'deep': {
         'dir': {
@@ -269,6 +276,7 @@ def test_uninstall_dataset(path):
     ok_(not exists(ds.path))
 
 
+@known_failure_githubci_win
 @with_tree({'one': 'test', 'two': 'test', 'three': 'test2'})
 def test_remove_file_handle_only(path):
     ds = Dataset(path).create(force=True)
@@ -298,6 +306,7 @@ def test_remove_file_handle_only(path):
     ok_(ds.repo.dirty)
 
 
+@known_failure_githubci_win
 @with_tree({'deep': {'dir': {'test': 'testcontent'}}})
 def test_uninstall_recursive(path):
     ds = Dataset(path).create(force=True)
@@ -356,7 +365,7 @@ def test_remove_dataset_hierarchy(path):
     ds = Dataset(path).create()
     ds.create('deep')
     ok_clean_git(ds.path)
-    remove(ds.path, recursive=True)
+    remove(dataset=ds.path, recursive=True)
     # completely gone
     ok_(not ds.is_installed())
     ok_(not exists(ds.path))
@@ -457,8 +466,9 @@ def test_remove_recursive_2(tdir):
     # fails in some cases https://github.com/datalad/datalad/issues/1573
     with chpwd(tdir):
         install('///labs')
-        install('labs/tarr/face_place')
-        remove('labs', recursive=True)
+        with chpwd('labs'):
+            install('tarr/face_place')
+        remove(dataset='labs', recursive=True)
 
 
 @with_tempfile(mkdir=True)
@@ -499,7 +509,8 @@ def test_uninstall_without_super(path):
     # it should be possible to uninstall the proper subdataset, even without
     # explicitly calling the uninstall methods of the parent -- things should
     # be figured out by datalad
-    uninstall(sub.path)
+    with chpwd(parent.path):
+        uninstall(sub.path)
     assert not sub.is_installed()
     # no present subdatasets anymore
     subreport = parent.subdatasets()
@@ -507,7 +518,8 @@ def test_uninstall_without_super(path):
     assert_result_count(subreport, 1, path=sub.path, state='absent')
     assert_result_count(subreport, 0, path=nosub.path)
     # but we should fail on an attempt to uninstall the non-subdataset
-    res = uninstall(nosub.path, on_failure='ignore')
+    with chpwd(nosub.path):
+        res = uninstall(on_failure='ignore')
     assert_result_count(
         res, 1, path=nosub.path, status='error',
         message="will not uninstall top-level dataset (consider `remove` command)")

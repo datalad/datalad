@@ -105,22 +105,24 @@ STATE_COLOR_MAP = {
 
 
 def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
-                  eval_submodule_state, cache):
+                  eval_submodule_state, eval_filetype, cache):
     # take the datase that went in first
-    repo_path = ds.repo.pathobj
-    lgr.debug('query %s.diffstatus() for paths: %s', ds.repo, paths)
-    status = ds.repo.diffstatus(
-        fr='HEAD' if ds.repo.get_hexsha() else None,
+    repo = ds.repo
+    repo_path = repo.pathobj
+    lgr.debug('query %s.diffstatus() for paths: %s', repo, paths)
+    status = repo.diffstatus(
+        fr='HEAD' if repo.get_hexsha() else None,
         to=None,
         # recode paths with repo reference for low-level API
         paths=[repo_path / p.relative_to(ds.pathobj) for p in paths] if paths else None,
         untracked=untracked,
         eval_submodule_state=eval_submodule_state,
+        eval_file_type=eval_filetype,
         _cache=cache)
-    if annexinfo and hasattr(ds.repo, 'get_content_annexinfo'):
-        lgr.debug('query %s.get_content_annexinfo() for paths: %s', ds.repo, paths)
+    if annexinfo and hasattr(repo, 'get_content_annexinfo'):
+        lgr.debug('query %s.get_content_annexinfo() for paths: %s', repo, paths)
         # this will amend `status`
-        ds.repo.get_content_annexinfo(
+        repo.get_content_annexinfo(
             paths=paths if paths else None,
             init=status,
             eval_availability=annexinfo in ('availability', 'all'),
@@ -146,6 +148,7 @@ def _yield_status(ds, paths, annexinfo, untracked, recursion_limit, queried,
                         recursion_limit - 1,
                         queried,
                         eval_submodule_state,
+                        eval_filetype,
                         cache):
                     yield r
 
@@ -250,6 +253,17 @@ class Status(Interface):
             too (see the 'untracked' option for further tailoring
             modification testing).
             """),
+        report_filetype=Parameter(
+            args=("-t", "--report-filetype",),
+            constraints=EnsureChoice('raw', 'eval'),
+            doc="""Report mode for file types. With 'eval' each symlink
+            is inspected whether it is a pointer to an annex'ed file, and
+            is reported as 'type=file' in this case, and 'type=symlink'
+            otherwise. With 'raw' no type inspection is performed, and
+            symlinks representing annex'ed files are indistinguishable
+            from other symlinks. Type inspection is relatively expensive
+            and can lead to slow operation in datasets with a large number
+            of files."""),
     )
 
     @staticmethod
@@ -262,7 +276,8 @@ class Status(Interface):
             untracked='normal',
             recursive=False,
             recursion_limit=None,
-            eval_subdataset_state='full'):
+            eval_subdataset_state='full',
+            report_filetype='eval'):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
@@ -370,6 +385,7 @@ class Status(Interface):
                     if recursive else 0,
                     queried,
                     eval_subdataset_state,
+                    report_filetype == 'eval',
                     content_info_cache):
                 yield dict(
                     r,

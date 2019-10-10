@@ -37,6 +37,7 @@ from .utils import (
     on_windows,
     lgr,
     OBSCURE_FILENAME,
+    known_failure_githubci_win,
 )
 
 from ..cmd import (
@@ -47,6 +48,7 @@ from ..support.exceptions import CommandError
 from ..support.protocol import DryRunProtocol
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -72,6 +74,7 @@ def test_runner_dry(tempfile):
     assert_equal("args=('foo', 'bar')", dry[1]['command'][1])
 
 
+@known_failure_githubci_win
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
@@ -150,6 +153,7 @@ def test_runner_instance_callable_wet():
     eq_(ret, os.path.join('foo', 'bar'))
 
 
+@known_failure_githubci_win
 def test_runner_log_stderr():
 
     runner = Runner(log_outputs=True)
@@ -175,6 +179,7 @@ def test_runner_log_stderr():
                           "stderr| stderr-Message should not be logged")
 
 
+@known_failure_githubci_win
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of
     # assertion yet.
@@ -327,6 +332,7 @@ def test_runner_stdin(path):
         assert_in("whatever", cmo.out)
 
 
+@known_failure_githubci_win
 def test_process_remaining_output():
     runner = Runner()
     out = u"""\

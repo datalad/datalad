@@ -106,41 +106,6 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # log Exceptions from git commands.
 
 
-# TODO: ignore leading and/or trailing underscore to allow for
-# python-reserved words
-@optional_args
-def kwargs_to_options(func, split_single_char_options=True,
-                      target_kw='options'):
-    """Decorator to provide convenient way to pass options to command calls.
-
-    Parameters
-    ----------
-    func: Callable
-        function to decorate
-    split_single_char_options: bool
-        whether or not to split key and value of single char keyword arguments
-        into two subsequent entries of the list
-    target_kw: str
-        keyword argument to pass the generated list of cmdline arguments to
-
-    Returns
-    -------
-    Callable
-    """
-
-    # TODO: don't overwrite options, but join
-
-    @wraps(func)
-    def newfunc(self, *args, **kwargs):
-        t_kwargs = dict()
-        t_kwargs[target_kw] = \
-            gitpy.Git().transform_kwargs(
-                split_single_char_options=split_single_char_options,
-                **kwargs)
-        return func(self, *args, **t_kwargs)
-    return newfunc
-
-
 def to_options(**kwargs):
     """Transform keyword arguments into a list of cmdline options
 
@@ -412,26 +377,6 @@ def Repo(*args, **kwargs):
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
     return gitpy.Repo(*args, **kwargs)
-
-
-def split_remote_branch(branch):
-    """Splits a remote branch's name into the name of the remote and the name
-    of the branch.
-
-    Parameters
-    ----------
-    branch: str
-      the remote branch's name to split
-
-    Returns
-    -------
-    list of str
-    """
-    assert '/' in branch, \
-        "remote branch %s must have had a /" % branch
-    assert not branch.endswith('/'), \
-        "branch name with trailing / is invalid. (%s)" % branch
-    return branch.split('/', 1)
 
 
 def guard_BadName(func):
@@ -1110,16 +1055,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         return toppath
 
-    # classmethod so behavior could be tuned in derived classes
-    @classmethod
-    def _get_added_files_commit_msg(cls, files):
-        if not files:
-            return "No files were added"
-        msg = "Added %d file" % len(files)
-        if len(files) > 1:
-            msg += "s"
-        return msg + '\n\nFiles:\n' + '\n'.join(files)
-
     @normalize_paths
     def add(self, files, git=True, git_options=None, update=False):
         """Adds file(s) to the repository.
@@ -1177,7 +1112,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 files,
-                ['git', 'add'] + assure_list(git_options) +
+                # Set annex.largefiles to prevent storing files in annex when
+                # GitRepo() is instantiated with a v6+ annex repo.
+                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                assure_list(git_options) +
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
@@ -1276,6 +1214,74 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         DATALAD_PREFIX = "[DATALAD]"
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
+    def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
+                      pattern=None, points_at=None, sort=None, count=None):
+        """Wrapper for `git for-each-ref`
+
+        Please see manual page git-for-each-ref(1) for a complete overview
+        of its functionality. Only a subset of it is supported by this
+        wrapper.
+
+        Parameters
+        ----------
+        fields : iterable or str
+          Used to compose a NULL-delimited specification for for-each-ref's
+          --format option. The default field list reflects the standard
+          behavior of for-each-ref when the --format option is not given.
+        pattern : list or str, optional
+          If provided, report only refs that match at least one of the given
+          patterns.
+        points_at : str, optional
+          Only list refs which points at the given object.
+        sort : list or str, optional
+          Field name(s) to sort-by. If multiple fields are given, the last one
+          becomes the primary key. Prefix any field name with '-' to sort in
+          descending order.
+        count : int, optional
+          Stop iteration after the given number of matches.
+
+        Yields
+        ------
+        dict with items matching the given `fields`
+
+        Raises
+        ------
+        ValueError
+          if no `fields` are given
+
+        RuntimeError
+          if `git for-each-ref` returns a record where the number of
+          properties does not match the number of `fields`
+        """
+        if not fields:
+            raise ValueError('no `fields` provided, refuse to proceed')
+        fields = assure_list(fields)
+        cmd = [
+            "git",
+            "for-each-ref",
+            "--format={}".format(
+                '%00'.join(
+                    '%({})'.format(f) for f in fields)),
+        ]
+        if points_at:
+            cmd.append('--points-at={}'.format(points_at))
+        if sort:
+            for k in assure_list(sort):
+                cmd.append('--sort={}'.format(k))
+        if pattern:
+            cmd += assure_list(pattern)
+        if count:
+            cmd.append('--count={:d}'.format(count))
+
+        out, _ = self._git_custom_command(None, cmd)
+        for line in out.splitlines():
+            props = line.split('\0')
+            if len(fields) != len(props):
+                raise RuntimeError(
+                    'expected fields {} from git-for-each-ref, but got: {}'.format(
+                        fields, props))
+            yield dict(zip(fields, props))
+
     def configure_fake_dates(self):
         """Configure repository to use fake dates.
         """
@@ -1307,16 +1313,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         env = (env if env is not None else os.environ).copy()
         # Note: Use _git_custom_command here rather than repo.git.for_each_ref
         # so that we use annex-proxy in direct mode.
-        last_date = self._git_custom_command(
-            None,
-            ["git", "for-each-ref", "--count=1",
-             "--sort=-committerdate", "--format=%(committerdate:raw)",
-             "refs/heads"])[0].strip()
+        last_date = list(self.for_each_ref_(
+            fields='committerdate:raw',
+            count=1,
+            pattern='refs/heads',
+            sort="-committerdate",
+        ))
 
         if last_date:
             # Drop the "contextual" timezone, leaving the unix timestamp.  We
             # avoid :unix above because it wasn't introduced until Git v2.9.4.
-            last_date = last_date.split()[0]
+            last_date = last_date[0]['committerdate:raw'].split()[0]
             seconds = int(last_date)
         else:
             seconds = self.config.obtain("datalad.fake-dates-start")
@@ -1427,6 +1434,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             else:
                 raise
 
+    # TODO usage is primarily in the tests, consider making a test helper and
+    # remove from GitRepo API
     def get_indexed_files(self):
         """Get a list of files in git's index
 
@@ -1436,8 +1445,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             list of paths rooting in git's base dir
         """
 
-        return [x[0] for x in self.cmd_call_wrapper(
-            self.repo.index.entries.keys)]
+        return [
+            str(r.relative_to(self.pathobj))
+            for r in self.get_content_info(
+                paths=None, ref=None, untracked='no', eval_file_type=False)
+        ]
 
     def format_commit(self, fmt, commitish=None):
         """Return `git show` output for `commitish`.
@@ -1649,15 +1661,25 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return getattr(commit, "%s_date" % date)
 
     def get_active_branch(self):
+        """Get the name of the active branch
+
+        Returns
+        -------
+        str or None
+          Returns None if there is no active branch, i.e. detached HEAD,
+          and the branch name otherwise.
+        """
         try:
-            branch = self.repo.active_branch.name
-        except TypeError as e:
-            if "HEAD is a detached symbolic reference" in str(e):
+            out, _ = self._git_custom_command(
+                "", ["git", "symbolic-ref", "HEAD"],
+                expect_fail=True)
+        except CommandError as e:
+            if 'HEAD is not a symbolic ref' in e.stderr:
                 lgr.debug("detached HEAD in {0}".format(self))
                 return None
             else:
-                raise
-        return branch
+                raise e
+        return out.strip()[11:]  # strip refs/heads/
 
     def get_branches(self):
         """Get all branches of the repo.
@@ -1668,7 +1690,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             Names of all branches of this repository.
         """
 
-        return [branch.name for branch in self.repo.branches]
+        return [
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/heads')
+        ]
 
     def get_remote_branches(self):
         """Get all branches of all remotes of the repo.
@@ -1683,21 +1708,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
 
-        # For some reason, this is three times faster than the version below:
-        remote_branches = list()
-        for remote in self.repo.remotes:
-            try:
-                for ref in remote.refs:
-                    remote_branches.append(ref.name)
-            except AssertionError as e:
-                if str(e).endswith("did not have any references"):
-                    # this will happen with git annex special remotes
-                    pass
-                else:
-                    raise e
-        return remote_branches
-        # return [branch.strip() for branch in
-        #         self.repo.git.branch(r=True).splitlines()]
+        return [
+            b['refname:strip=2']
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern='refs/remotes')
+        ]
 
     def get_remotes(self, with_urls_only=False):
         """Get known remotes of the repository
@@ -1730,6 +1744,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             ]
         return remotes
 
+    # TODO this is practically unused outside the tests, consider turning
+    # into a test helper and trim from the API
     def get_files(self, branch=None):
         """Get a list of files in git.
 
@@ -1745,14 +1761,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         [str]
           list of files.
         """
-        # TODO: RF codes base and melt get_indexed_files() in
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
+        return [
+            str(p.relative_to(self.pathobj))
+            for p in self.get_content_info(
+                paths=None, ref=branch, untracked='no', eval_file_type=False)
+            ]
 
     def get_file_content(self, file_, branch='HEAD'):
         """
@@ -2468,36 +2481,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             xs = sorted(xs, key=key)
         return list(xs)
 
-    def is_submodule_modified(self, name, options=[]):
-        """Whether a submodule has new commits
-
-        Note: This is an adhoc method. It parses output of
-        'git submodule summary' and currently is not able to distinguish whether
-        or not this change is staged in `self` and whether this would be
-        reported 'added' or 'modified' by 'git status'.
-        Parsing isn't heavily tested yet.
-
-        Parameters
-        ----------
-        name: str
-          the submodule's name
-        options: list
-          options to pass to 'git submodule summary'
-        Returns
-        -------
-        bool
-          True if there are commits in the submodule, differing from
-          what is registered in `self`
-        --------
-        """
-
-        out, err = self._git_custom_command('',
-                                            ['git', 'submodule', 'summary'] + \
-                                            options + ['--', name])
-        return any([line.split()[1] == name
-                    for line in out.splitlines()
-                    if line and len(line.split()) > 1])
-
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.
 
@@ -2693,20 +2676,20 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         list
           Each item is a dictionary with information on a tag. At present
           this includes 'hexsha', and 'name', where the latter is the string
-          label of the tag, and the format the hexsha of the object the tag
-          is attached to. The list is sorted by commit date, with the most
-          recent commit being the last element.
+          label of the tag, and the former the hexsha of the object the tag
+          is attached to. The list is sorted by the creator date (committer
+          date for lightweight tags and tagger date for annotated tags), with
+          the most recent commit being the last element.
         """
-        tag_objs = sorted(
-            self.repo.tags,
-            key=lambda t: t.commit.committed_date
-        )
         tags = [
-            {
-                'name': t.name,
-                'hexsha': t.commit.hexsha
-             }
-            for t in tag_objs
+            dict(
+                name=t['refname:strip=2'],
+                hexsha=t['object'] if t['object'] else t['objectname'],
+            )
+            for t in self.for_each_ref_(
+                fields=['refname:strip=2', 'objectname', 'object'],
+                pattern='refs/tags',
+                sort='creatordate')
         ]
         if output:
             return [t[output] for t in tags]
@@ -2913,6 +2896,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # normalize the pattern relative to the target .gitattributes file
                 npath = _normalize_path(
                     op.join(self.path, op.dirname(attrfile)), pattern)
+                # paths in gitattributes always have to be POSIX
+                npath = Path(npath).as_posix()
                 attrline = u''
                 if npath.count(' '):
                     # quote patterns with spaces
@@ -3692,16 +3677,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         self,
                         to_stage_submodules,
                         git_opts=None):
-                    # TODO the helper can yield proper dicts right away
-                    yield get_status_dict(
-                        action=r.get('command', 'add'),
-                        refds=self.pathobj,
-                        type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file']))
-                        if 'file' in r else None,
-                        status='ok' if r.get('success', None) else 'error',
-                        key=r.get('key', None),
-                        logger=lgr)
+                    yield r
 
         if added_submodule or vanished_subds:
             # need to include .gitmodules in what needs saving
@@ -3717,13 +3693,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 for r in GitRepo._save_add(
                         self,
                         {op.join(self.path, '.gitmodules'): None}):
-                    yield get_status_dict(
-                        action='add',
-                        refds=self.pathobj,
-                        type='file',
-                        path=(self.pathobj / ut.PurePosixPath(r['file'])),
-                        status='ok' if r.get('success', None) else 'error',
-                        logger=lgr)
+                    yield r
         to_add = {
             # TODO remove pathobj stringification when add() can
             # handle it
@@ -3741,7 +3711,23 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     **{k: kwargs[k] for k in kwargs
                        if k in (('git',) if hasattr(self, 'annexstatus')
                                 else tuple())}):
-                # TODO the helper can yield proper dicts right away
+                yield r
+
+        self._save_post(message, status, need_partial_commit)
+        # TODO yield result for commit, prev helper checked hexsha pre
+        # and post...
+
+    def _save_add(self, files, git_opts=None):
+        """Simple helper to add files in save()"""
+        from datalad.interface.results import get_status_dict
+        try:
+            # without --verbose git 2.9.3  add does not return anything
+            add_out = self._git_custom_command(
+                list(files.keys()),
+                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
+            )
+            # get all the entries
+            for r in self._process_git_get_output(*add_out):
                 yield get_status_dict(
                     action=r.get('command', 'add'),
                     refds=self.pathobj,
@@ -3750,23 +3736,12 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     if 'file' in r else None,
                     status='ok' if r.get('success', None) else 'error',
                     key=r.get('key', None),
+                    # while there is no git-annex underneath here, we
+                    # tend to fake its behavior, so we can also support
+                    # this type of messaging
+                    message='\n'.join(r['error-messages'])
+                    if 'error-messages' in r else None,
                     logger=lgr)
-
-        self._save_post(message, status, need_partial_commit)
-        # TODO yield result for commit, prev helper checked hexsha pre
-        # and post...
-
-    def _save_add(self, files, git_opts=None):
-        """Simple helper to add files in save()"""
-        try:
-            # without --verbose git 2.9.3  add does not return anything
-            add_out = self._git_custom_command(
-                list(files.keys()),
-                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
-            )
-            # get all the entries
-            for o in self._process_git_get_output(*add_out):
-                yield o
         except OSError as e:
             lgr.error("add: %s" % e)
             raise

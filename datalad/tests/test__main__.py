@@ -16,6 +16,7 @@ from nose.tools import assert_raises, assert_equal
 
 from .. import __main__, __version__
 from ..auto import AutomagicIO
+from datalad.tests.utils import known_failure_githubci_win
 
 
 @patch('sys.stdout', new_callable=StringIO)
@@ -31,6 +32,8 @@ def test_main_version(stdout):
     assert_raises(SystemExit, __main__.main, ['__main__.py', '--version'])
     assert_equal(stdout.getvalue().rstrip(), "datalad %s" % __version__)
 
+
+@known_failure_githubci_win
 @patch.object(AutomagicIO, 'activate')
 @patch('sys.stdout', new_callable=StringIO)
 def test_main_run_a_script(stdout, mock_activate):

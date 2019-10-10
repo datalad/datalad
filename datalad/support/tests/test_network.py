@@ -19,6 +19,7 @@ from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import known_failure_githubci_win
 
 from ..network import same_website, dlurljoin
 from ..network import get_tld
@@ -189,6 +190,7 @@ def test_url_base():
         eq_(purl.as_str(), 'http://example.com/')
 
 
+@known_failure_githubci_win
 def test_url_samples():
     _check_ri("http://example.com", URL, scheme='http', hostname="example.com")
     # "complete" one for classical http

@@ -403,10 +403,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # make sure all the to-be-moved metadata records are present
         # locally
         aggfrom_ds.get(
-            # prep annotated path records to speed up the call
-            path=[dict(path=op.join(aggfrom_ds.path, p),
-                       parentds=aggfrom_ds.path,
-                       type='file')
+            path=[op.join(aggfrom_ds.path, p)
                   for p in objrelpaths.values()],
             result_renderer='disabled')
 

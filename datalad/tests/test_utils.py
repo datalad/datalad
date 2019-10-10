@@ -95,7 +95,8 @@ from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
     skip_if,
-    ok_file_has_content
+    ok_file_has_content,
+    known_failure_githubci_win,
 )
 from .utils import OBSCURE_FILENAME
 
@@ -502,6 +503,7 @@ def test_any_re_search():
     assert_false(any_re_search(['^b', 'bab'], 'ab'))
 
 
+@known_failure_githubci_win
 def test_find_files():
     tests_dir = dirname(__file__)
     proj_dir = normpath(opj(dirname(__file__), pardir))
@@ -528,6 +530,7 @@ def test_find_files():
         ok_startswith(basename(f), 'test_')
 
 
+@known_failure_githubci_win
 @with_tree(tree={
     '.git': {
         '1': '2'
@@ -678,6 +681,7 @@ def test_path_():
         eq_(_path_(p, 'd'), 'a/b/c/d')
 
 
+@known_failure_githubci_win
 def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     import time
@@ -769,6 +773,7 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_path_prefix(path):
     eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
@@ -836,6 +841,7 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(fname), os.curdir)
 
 
+@known_failure_githubci_win
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
     ok_(path_startswith('/a/b', '/a/b'))
@@ -851,6 +857,7 @@ def test_path_startswith():
     assert_raises(ValueError, path_startswith, '/a/b', 'a')
 
 
+@known_failure_githubci_win
 def test_path_is_subpath():
     ok_(path_is_subpath('/a/b', '/a'))
     ok_(path_is_subpath('/a/b/c', '/a'))

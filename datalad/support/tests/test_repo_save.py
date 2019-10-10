@@ -14,6 +14,7 @@ from datalad.tests.utils import (
     create_tree,
     with_tempfile,
     eq_,
+    known_failure_githubci_win,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -63,11 +64,13 @@ def _test_save_all(path, repocls):
     return ds
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_gitrepo_save_all(path):
     _test_save_all(path, GitRepo)
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_annexrepo_save_all(path):
     _test_save_all(path, AnnexRepo)

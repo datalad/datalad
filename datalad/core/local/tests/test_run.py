@@ -59,9 +59,11 @@ from datalad.tests.utils import (
     assert_status,
     assert_result_count,
     assert_in,
+    assert_in_results,
     assert_not_in,
     swallow_logs,
     swallow_outputs,
+    known_failure,
     known_failure_appveyor,
     known_failure_windows,
     slow,
@@ -134,9 +136,10 @@ def test_basics(path, nodspath):
             assert_in("No command given", cml.out)
 
 
-@known_failure_appveyor
+@known_failure_windows
 # ^ For an unknown reason, appveyor started failing after we removed
 #   receive.autogc=0 and gc.auto=0 from our common git options (gh-3482).
+# moreover the usage of unicode in the file names also breaks this on windows
 @with_tempfile(mkdir=True)
 def test_py2_unicode_command(path):
     # Avoid OBSCURE_FILENAME to avoid windows-breakage (gh-2929).
@@ -202,6 +205,44 @@ def test_run_from_subds(path):
     subds = Dataset(path).create().create("sub")
     subds.run("cd .> foo")
     assert_repo_status(subds.path)
+
+
+@with_tree(tree={"sub": {"input": ""}})
+def test_run_from_subds_gh3551(path):
+    ds = Dataset(path).create(force=True)
+    ds.save()
+    ds.create("output")
+    with chpwd(op.join(ds.path, "sub")):
+        assert_in_results(
+            run("echo",
+                inputs=[op.join(op.pardir, "sub", "input")],
+                outputs=[op.join(op.pardir, "output")],
+                return_type="list", result_filter=None, result_xfm=None),
+            action="get",
+            status="notneeded")
+    assert_repo_status(ds.path)
+
+    subds_path = op.join("output", "subds")
+    ds.create(subds_path)
+    with chpwd(op.join(ds.path, "sub")):
+        output_dir = op.join(op.pardir, "output", "subds")
+        # The below command is trying to be compatible. It could be made better
+        # (e.g., actually using the input file) by someone that knows something
+        # about Windows.
+        assert_in_results(
+            run("cd .> {}".format(op.join(output_dir, "f")),
+                inputs=[op.join(op.pardir, "sub", "input")],
+                outputs=[output_dir],
+                return_type="list", result_filter=None, result_xfm=None),
+            action="save",
+            status="ok")
+    assert_repo_status(ds.path)
+    subds = Dataset(op.join(ds.path, subds_path))
+    ok_exists(op.join(subds.path, "f"))
+    if not on_windows:  # FIXME
+        # This check fails on Windows:
+        # https://github.com/datalad/datalad/pull/3747/checks?check_run_id=248506560#step:8:254
+        ok_(subds.repo.file_has_content("f"))
 
 
 @slow  # ~10s

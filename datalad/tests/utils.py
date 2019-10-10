@@ -974,14 +974,20 @@ def known_failure(func):
 def known_failure_v6_or_later(func):
     """Test decorator marking a test as known to fail in a v6+ test run
 
-    If datalad.repo.version is set to 6 or later behaves like `known_failure`.
+    If the default repository version is 6 or later behaves like `known_failure`.
     Otherwise the original (undecorated) function is returned.
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
     """
 
     from datalad import cfg
+    from datalad.support.annexrepo import AnnexRepo
 
     version = cfg.obtain("datalad.repo.version")
-    if version and version >= 6:
+    info = AnnexRepo.check_repository_versions()
+
+    if (version and version >= 6) or 5 not in info["supported"]:
 
         @known_failure
         @wraps(func)
@@ -1052,6 +1058,20 @@ def known_failure_appveyor(func):
     return func
 
 
+def known_failure_githubci_win(func):
+    """Test decorator for a known test failure on Github's Windows CI
+    """
+    if 'GITHUB_WORKFLOW' in os.environ and on_windows:
+        @known_failure
+        @wraps(func)
+        @attr('known_failure_githubci_win')
+        @attr('githubci_win')
+        def dm_func(*args, **kwargs):
+            return func(*args, **kwargs)
+        return dm_func
+    return func
+
+
 # ### ###
 # END known failure decorators
 # ### ###
@@ -1059,14 +1079,21 @@ def known_failure_appveyor(func):
 
 @optional_args
 def skip_v6_or_later(func, method='raise'):
-    """Skips tests if datalad is configured to use v6 mode or later
-    (e.g., DATALAD_REPO_VERSION=6)
+    """Skip tests if v6 or later will be used as the default repo version.
+
+    The default repository version is controlled by the configured value of
+    DATALAD_REPO_VERSION and whether v5 repositories are supported by the
+    installed git-annex.
     """
 
     from datalad import cfg
-    version = cfg.obtain("datalad.repo.version")
+    from datalad.support.annexrepo import AnnexRepo
 
-    @skip_if(version >= 6, msg="Skip test in v6+ test run", method=method)
+    version = cfg.obtain("datalad.repo.version")
+    info = AnnexRepo.check_repository_versions()
+
+    @skip_if(version >= 6 or 5 not in info["supported"],
+             msg="Skip test in v6+ test run", method=method)
     @wraps(func)
     @attr('skip_v6_or_later')
     @attr('v6_or_later')
@@ -1374,6 +1401,9 @@ if sys.getfilesystemencoding().lower() == 'utf-8':
     if on_osx:
         # TODO: figure it really out
         UNICODE_FILENAME = UNICODE_FILENAME.replace(u"Й", u"")
+    if on_windows:
+        # TODO: really figure out unicode handling on windows
+        UNICODE_FILENAME = ''
     # Prepend the list with unicode names first
     OBSCURE_FILENAMES = tuple(
         f.replace(u'c', u'c' + UNICODE_FILENAME) for f in OBSCURE_FILENAMES
@@ -1715,6 +1745,9 @@ def get_deeply_nested_structure(path):
     |      └── subds_lvl1_modified
     |          └── OBSCURE_FILENAME_directory_untracked
     |              └── untracked_file
+
+    When a system has no symlink support, the link2... components are not
+    included.
     """
     ds = Dataset(path).create()
     (ds.pathobj / 'subdir').mkdir()
@@ -1743,6 +1776,10 @@ def get_deeply_nested_structure(path):
     (ut.Path(subds.path) / 'subdir' / 'annexed_file.txt').write_text(u'dummy')
     subds.save()
     (ds.pathobj / 'directory_untracked').mkdir()
+
+    if not has_symlink_capability():
+        return ds
+
     # symlink farm #1
     # symlink to annexed file
     (ds.pathobj / 'subdir' / 'link2annex_files.txt').symlink_to(

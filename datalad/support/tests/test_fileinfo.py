@@ -18,6 +18,7 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     assert_raises,
+    known_failure_githubci_win,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -28,6 +29,7 @@ from datalad.tests.utils import (
 )
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_get_content_info(path):
     repo = GitRepo(path)

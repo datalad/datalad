@@ -312,6 +312,30 @@ with more performant implementations.
   information and save changes.
 
 
+## 0.11.8 (??? ??, 2019) -- will be better than ever
+
+bet we will fix some bugs and make a world even a better place.
+
+### Major refactoring and deprecations
+
+- hopefully none
+
+### Fixes
+
+- Our internal command runner failed to capture output in some cases.
+  ([#3656][])
+
+### Enhancements and new features
+
+- Prepared for upstream changes in git-annex, including support for
+  the latest git-annex (7.20190912) which auto-upgrades v5
+  repositories to v7.  ([#3648][]) ([#3682][])
+
+- The `cfg_text2git` procedure, as well the `--text-no-annex` option
+  of [create][], now configure .gitattributes so that empty files are
+  stored in git rather than annex.  ([#3667][])
+
+
 ## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
 Primarily bugfixes with some optimizations and refactorings.
@@ -1816,3 +1840,7 @@ publishing
 [#3626]: https://github.com/datalad/datalad/issues/3626
 [#3631]: https://github.com/datalad/datalad/issues/3631
 [#3646]: https://github.com/datalad/datalad/issues/3646
+[#3648]: https://github.com/datalad/datalad/issues/3648
+[#3656]: https://github.com/datalad/datalad/issues/3656
+[#3667]: https://github.com/datalad/datalad/issues/3667
+[#3682]: https://github.com/datalad/datalad/issues/3682

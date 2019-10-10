@@ -32,6 +32,7 @@ from datalad.tests.utils import ok_file_under_git
 from datalad.tests.utils import patch_config
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import eq_
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.support.exceptions import NoDatasetArgumentFound
 
 from datalad.api import search
@@ -178,6 +179,7 @@ def test_search_non_dataset(tdir):
     assert_in("datalad create --force", str(cme.exception))
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_within_ds_file_search(path):
     try:

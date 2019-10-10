@@ -13,6 +13,7 @@ import sys
 # OPT delay import for expensive mock until used
 #from mock import patch
 import builtins
+import lzma
 
 import logging
 import io
@@ -47,20 +48,6 @@ except Exception as exc:
     # think it is worthwhile at this point.  So let's just issue a warning
     lgr.warning(
         "Failed to import h5py, so no automagic handling for it atm: %s",
-        exc_str(exc)
-    )
-
-lzma = None
-try:
-    # Our mocking would not work with backports.lzma ATM, so only lzma
-    # would be supported
-    # from datalad.support.lzma import lzma
-    import lzma
-except ImportError:
-    pass
-except Exception as exc:
-    lgr.warning(
-        "Failed to import lzma, so no automagic handling for it atm: %s",
         exc_str(exc)
     )
 
@@ -104,10 +91,7 @@ class AutomagicIO(object):
             self._h5py_File = h5py.File
         else:
             self._h5py_File = None
-        if lzma:
-            self._lzma_LZMAFile = lzma.LZMAFile
-        else:
-            self._lzma_LZMAFile = None
+        self._lzma_LZMAFile = lzma.LZMAFile
         self._autoget = autoget
         self._in_open = False
         self._log_online = True
@@ -318,8 +302,7 @@ class AutomagicIO(object):
         os.path.isfile = self._proxy_isfile
         if h5py:
             h5py.File = self._proxy_h5py_File
-        if lzma:
-            lzma.LZMAFile = self._proxy_lzma_LZMAFile
+        lzma.LZMAFile = self._proxy_lzma_LZMAFile
         self._active = True
 
     def deactivate(self):
@@ -333,8 +316,7 @@ class AutomagicIO(object):
         os.stat = self._os_stat
         if h5py:
             h5py.File = self._h5py_File
-        if lzma:
-            lzma.LZMAFile = self._lzma_LZMAFile
+        lzma.LZMAFile = self._lzma_LZMAFile
         os.path.exists = self._builtin_exists
         os.path.isfile = self._builtin_isfile
         self._active = False

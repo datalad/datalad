@@ -125,6 +125,7 @@ class AnnexRepo(GitRepo, RepoInterface):
     GIT_ANNEX_MIN_VERSION = '7'
     git_annex_version = None
     supports_direct_mode = None
+    repository_versions = None
 
     # Class wide setting to allow insecure URLs. Used during testing, since
     # git annex 6.20180626 those will by default be not allowed for security
@@ -558,6 +559,30 @@ class AnnexRepo(GitRepo, RepoInterface):
                 cls._check_git_annex_version()
             cls.supports_direct_mode = cls.git_annex_version <= "7.20190819"
         return cls.supports_direct_mode
+
+    @classmethod
+    def check_repository_versions(cls):
+        """Get information on supported and upgradable repository versions.
+
+        The result is cached at `cls.repository_versions`.
+
+        Returns
+        -------
+        dict
+          supported -> list of supported versions (int)
+          upgradable -> list of upgradable versions (int)
+        """
+        if cls.repository_versions is None:
+            from datalad.cmd import Runner
+            key_remap = {
+                "supported repository versions": "supported",
+                "upgrade supported from repository versions": "upgradable"}
+            out, _ = Runner().run(["git", "annex", "version"])
+            kvs = (ln.split(":", 1) for ln in out.splitlines())
+            cls.repository_versions = {
+                key_remap[k]: list(map(int, v.strip().split()))
+                for k, v in kvs if k in key_remap}
+        return cls.repository_versions
 
     @staticmethod
     def get_size_from_key(key):
@@ -2035,7 +2060,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 log_online=True
             ))
         # TODO: refactor to account for possible --batch ones
-        annex_options = ['--json']
+        annex_options = ['--json', '--json-error-messages']
         if progress:
             annex_options += ['--json-progress']
 
@@ -2785,8 +2810,62 @@ class AnnexRepo(GitRepo, RepoInterface):
         else:
             return None
 
-    def fsck(self):
-        self._run_annex_command('fsck')
+    # comment out presently unnecessary functionality, bring back once needed
+    #def fsck(self, paths=None, remote=None, fast=False, incremental=False,
+    #         limit=None, annex_options=None, git_options=None):
+    def fsck(self, paths=None, remote=None, fast=False,
+             annex_options=None, git_options=None):
+        """Front-end for git-annex fsck
+
+        Parameters
+        ----------
+        paths : list
+          Limit operation to specific paths.
+        remote : str
+          If given, the identified remote will be fsck'ed instead of the
+          local repository.
+        fast : bool
+          If True, typically means that no actual content is being verified,
+          but tests are limited to the presence of files.
+        """
+        #incremental : bool or {'continue'} or SCHEDULE
+        #  If given, `fsck` is called with `--incremental`. If 'continue',
+        #  `fsck` is additionally called with `--more`, and any other argument
+        #  is given to `--incremental-schedule`.
+        #limit : str or all
+        #  If the function `all` is given, `fsck` is called with `--all`. Any
+        #  other value is passed on to `--branch`.
+        args = [] if annex_options is None else list(annex_options)
+        if fast:
+            args.append('--fast')
+        if remote:
+            args.append('--from={}'.format(remote))
+        #if limit:
+        #    # looks funky, but really is a test if the `all` function was passed
+        #    # alternatives would have been 1) a dedicated argument (would need
+        #    # a check for mutual exclusivity with --branch), or 2) a str-type
+        #    # special values that has no meaning in Git and is less confusing
+        #    if limit is all:
+        #        args.append('--all')
+        #    else:
+        #        args.append('--branch={}'.format(limit))
+        #if incremental == 'continue':
+        #    args.append('--more')
+        #elif incremental:
+        #    args.append('--incremental')
+        #    if not (incremental is True):
+        #        args.append('--incremental-schedule={}'.format(incremental))
+        return self._run_annex_command_json(
+            'fsck',
+            files=paths,
+            git_options=git_options,
+            opts=args,
+            # next two are to avoid warnings and errors due to an fsck
+            # finding any issues -- those will be reported in the
+            # JSON results, and can be acted upon
+            expect_stderr=True,
+            expect_fail=True,
+        )
 
     # TODO: we probably need to override get_file_content, since it returns the
     # symlink's target instead of the actual content.
@@ -3262,6 +3341,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     def _save_add(self, files, git=None, git_opts=None):
         """Simple helper to add files in save()"""
+        from datalad.interface.results import get_status_dict
         # alter default behavior of git-annex by considering dotfiles
         # too
         # however, this helper is controlled by save() which itself
@@ -3311,7 +3391,17 @@ class AnnexRepo(GitRepo, RepoInterface):
                 jobs=None,
                 expected_entries=expected_additions,
                 expect_stderr=True):
-            yield r
+            yield get_status_dict(
+                action=r.get('command', 'add'),
+                refds=self.pathobj,
+                type='file',
+                path=(self.pathobj / ut.PurePosixPath(r['file']))
+                if 'file' in r else None,
+                status='ok' if r.get('success', None) else 'error',
+                key=r.get('key', None),
+                message='\n'.join(r['error-messages'])
+                if 'error-messages' in r else None,
+                logger=lgr)
 
 
 # TODO: Why was this commented out?
@@ -3408,7 +3498,7 @@ class BatchedAnnex(BatchedCommand):
             ['annex'] + \
             annex_cmd + \
             (annex_options if annex_options else []) + \
-            (['--json'] if json else []) + \
+            (['--json', '--json-error-messages'] if json else []) + \
             ['--batch']  # , '--debug']
         output_proc = \
             output_proc if output_proc else readline_json if json else None

@@ -70,6 +70,7 @@ from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
@@ -168,7 +169,8 @@ def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install, None)
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
-
+# ValueError: path is on mount 'D:', start on mount 'C:
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_invalid_args(path):
     assert_raises(IncompleteResultsError, install, 'Zoidberg', source='Zoidberg')
@@ -661,7 +663,7 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1,
+    result = get(path, dataset=path, recursive=True, recursion_limit=1,
                  result_xfm='datasets')
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
@@ -693,12 +695,15 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # good and bad results together
     ok_(isinstance(result, list))
     eq_(len(result), 4)
-    # check that we have an 'impossible' status for both invalid args
+    # check that we have an 'impossible/error' status for both invalid args
     # but all the other tasks have been accomplished
-    for skipped, msg in [(opj(ds.path, 'not_existing'), "path does not exist"),
-                         (path_outside, "path not associated with any dataset")]:
-        assert_result_count(
-            result, 1, status='impossible', message=msg, path=skipped)
+    assert_result_count(
+        result, 1, status='impossible', message="path does not exist",
+        path=opj(ds.path, 'not_existing'))
+    assert_result_count(
+        result, 1, status='error',
+        message=("path not associated with dataset", ds),
+        path=path_outside)
     for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, '2'))]:
         assert_result_count(
             result, 1, status='ok',

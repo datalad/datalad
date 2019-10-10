@@ -16,6 +16,7 @@ from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import swallow_logs
 from datalad.utils import swallow_outputs
 from datalad.utils import chpwd
@@ -68,6 +69,7 @@ def test_new_relpath(topdir):
         ok_clean_git(ds, annex=False)
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_hierarchy(topdir):
     # GH 1178
