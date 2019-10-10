@@ -2545,9 +2545,10 @@ def check_commit_annex_commit_changed(unlock, path):
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'alwaysbig', annexed=True)
-    # This one is actually "questionable" since might be "correct" either way
-    # but it would be nice to have it at least consistent
-    ok_file_under_git(path, 'willnotgetshort', annexed=True)
+    # 7.20191009 included a fix to evaluate current filesize not old one.
+    # So if size got short - it will get committed to git
+    ok_file_under_git(path, 'willnotgetshort',
+                      annexed=external_versions['cmd:annex']<'7.20191009')
 
     ar.commit("message2", options=['-a']) # commit all changed
     ok_clean_git(
