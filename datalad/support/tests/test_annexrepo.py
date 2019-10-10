@@ -2496,7 +2496,7 @@ def test_error_reporting(path):
 @with_tree(tree={
     '.gitattributes': "** annex.largefiles=(largerthan=4b)",
     'alwaysbig': 'a'*10,
-    'willnotgetshort': 'b'*10,
+    'willgetshort': 'b'*10,
     'tobechanged-git': 'a',
     'tobechanged-annex': 'a'*10,
 })
@@ -2523,7 +2523,7 @@ def check_commit_annex_commit_changed(unlock, path):
         path
         , {
             'alwaysbig': 'a'*11,
-            'willnotgetshort': 'b',
+            'willgetshort': 'b',
             'tobechanged-git': 'aa',
             'tobechanged-annex': 'a'*11,
             'untracked': 'unique'
@@ -2535,10 +2535,10 @@ def check_commit_annex_commit_changed(unlock, path):
         , index_modified=files if not unannex else ['tobechanged-git']
         , untracked=['untracked'] if not unannex else
           # all but the one in git now
-          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willnotgetshort']
+          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
-    ar.commit("message", files=['alwaysbig', 'willnotgetshort'])
+    ar.commit("message", files=['alwaysbig', 'willgetshort'])
     ok_clean_git(
         path
         , index_modified=['tobechanged-git', 'tobechanged-annex']
@@ -2547,7 +2547,7 @@ def check_commit_annex_commit_changed(unlock, path):
     ok_file_under_git(path, 'alwaysbig', annexed=True)
     # 7.20191009 included a fix to evaluate current filesize not old one.
     # So if size got short - it will get committed to git
-    ok_file_under_git(path, 'willnotgetshort',
+    ok_file_under_git(path, 'willgetshort',
                       annexed=external_versions['cmd:annex']<'7.20191009')
 
     ar.commit("message2", options=['-a']) # commit all changed
