@@ -328,8 +328,9 @@ bet we will fix some bugs and make a world even a better place.
 ### Enhancements and new features
 
 - Prepared for upstream changes in git-annex, including support for
-  the latest git-annex (7.20190912) which auto-upgrades v5
-  repositories to v7.  ([#3648][]) ([#3682][])
+  the latest git-annex
+  - 7.20190912 auto-upgrades v5 repositories to v7.  ([#3648][]) ([#3682][])
+  - 7.20191009 fixed treatment of (larger/smaller)than in .gitattributes ([#3765][])
 
 - The `cfg_text2git` procedure, as well the `--text-no-annex` option
   of [create][], now configure .gitattributes so that empty files are
@@ -1844,3 +1845,4 @@ publishing
 [#3656]: https://github.com/datalad/datalad/issues/3656
 [#3667]: https://github.com/datalad/datalad/issues/3667
 [#3682]: https://github.com/datalad/datalad/issues/3682
+[#3765]: https://github.com/datalad/datalad/issues/3765
