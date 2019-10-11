@@ -996,20 +996,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self._cfg = ConfigManager(dataset=self, dataset_only=False)
         return self._cfg
 
-    def is_with_annex(self, only_remote=False):
-        """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
-
-        Parameters
-        ----------
-        only_remote: bool, optional
-            Check only remote (no local branches) for having git-annex branch
+    def is_with_annex(self):
+        """Report if GitRepo (assumed) has (remotes with) a git-annex branch
         """
-        return any((b.endswith('/git-annex') or
-                    'annex/direct' in b
-                    for b in self.get_remote_branches())) or \
-            ((not only_remote) and
-             any((b == 'git-annex' or 'annex/direct' in b
-                  for b in self.get_branches())))
+        return any(
+            b['refname:strip=2'] == 'git-annex' or b['refname:strip=2'].endswith('/git-annex')
+            for b in self.for_each_ref_(fields='refname:strip=2', pattern=['refs/heads', 'refs/remotes'])
+        )
 
     @classmethod
     def get_toppath(cls, path, follow_up=True, git_options=None):
