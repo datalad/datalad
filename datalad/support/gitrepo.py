@@ -1146,7 +1146,10 @@ class GitRepo(RepoInterface):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 files,
-                ['git', 'add'] + assure_list(git_options) +
+                # Set annex.largefiles to prevent storing files in annex when
+                # GitRepo() is instantiated with a v6+ annex repo.
+                ['git', '-c', 'annex.largefiles=nothing', 'add'] +
+                assure_list(git_options) +
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries

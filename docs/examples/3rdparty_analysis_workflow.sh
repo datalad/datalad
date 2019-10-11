@@ -1,5 +1,4 @@
 #!/bin/sh
-# SKIP_IN_V6
 
 set -e
 
@@ -116,7 +115,8 @@ datalad get src/forrest_structural/sub-01/anat/sub-01_T1w.nii.gz
 #%
 
 mkdir code
-echo "file src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "echo 'Start of really useful results' > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-01/anat/sub-*_T1w.nii.gz >> result.txt" >> code/run_analysis.sh
 
 #%
 # In order to definitively document which data file his analysis needs at this
@@ -216,7 +216,8 @@ datalad get result.txt
 # She can modify Bob's code to help him with his analysis...
 #%
 
-echo "file src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > code/run_analysis.sh
+echo "echo 'Start of improved results' > result.txt" > code/run_analysis.sh
+echo "file src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz >> result.txt" >> code/run_analysis.sh
 
 #%
 # ... and execute it.

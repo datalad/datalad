@@ -1315,21 +1315,23 @@ def test_repo_version(path1, path2, path3):
     annex = AnnexRepo(path1, create=True, version=6)
     ok_clean_git(path1, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
-    # TODO: Since git-annex 7.20181031, v6 repos upgrade to v7. Once that
-    # version or later is our minimum required version, update this test and
-    # the one below to eq_(version, 7).
-    assert_in(version, [6, 7])
+    # Since git-annex 7.20181031, v6 repos upgrade to v7.
+    supported_versions = AnnexRepo.check_repository_versions()["supported"]
+    v6_lands_on = next(i for i in supported_versions if i >= 6)
+    eq_(version, v6_lands_on)
 
     # default from config item (via env var):
     with patch.dict('os.environ', {'DATALAD_REPO_VERSION': '6'}):
         annex = AnnexRepo(path2, create=True)
         version = annex.repo.config_reader().get_value('annex', 'version')
-        assert_in(version, [6, 7])
+        eq_(version, v6_lands_on)
 
-        # parameter `version` still has priority over default config:
-        annex = AnnexRepo(path3, create=True, version=5)
-        version = annex.repo.config_reader().get_value('annex', 'version')
-        eq_(version, 5)
+        # Assuming specified version is a supported version...
+        if 5 in supported_versions:
+            # ...parameter `version` still has priority over default config:
+            annex = AnnexRepo(path3, create=True, version=5)
+            version = annex.repo.config_reader().get_value('annex', 'version')
+            eq_(version, 5)
 
 
 @with_testrepos('.*annex.*', flavors=['clone'])
@@ -2494,7 +2496,7 @@ def test_error_reporting(path):
 @with_tree(tree={
     '.gitattributes': "** annex.largefiles=(largerthan=4b)",
     'alwaysbig': 'a'*10,
-    'willnotgetshort': 'b'*10,
+    'willgetshort': 'b'*10,
     'tobechanged-git': 'a',
     'tobechanged-annex': 'a'*10,
 })
@@ -2521,7 +2523,7 @@ def check_commit_annex_commit_changed(unlock, path):
         path
         , {
             'alwaysbig': 'a'*11,
-            'willnotgetshort': 'b',
+            'willgetshort': 'b',
             'tobechanged-git': 'aa',
             'tobechanged-annex': 'a'*11,
             'untracked': 'unique'
@@ -2533,19 +2535,20 @@ def check_commit_annex_commit_changed(unlock, path):
         , index_modified=files if not unannex else ['tobechanged-git']
         , untracked=['untracked'] if not unannex else
           # all but the one in git now
-          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willnotgetshort']
+          ['alwaysbig', 'tobechanged-annex', 'untracked', 'willgetshort']
     )
 
-    ar.commit("message", files=['alwaysbig', 'willnotgetshort'])
+    ar.commit("message", files=['alwaysbig', 'willgetshort'])
     ok_clean_git(
         path
         , index_modified=['tobechanged-git', 'tobechanged-annex']
         , untracked=['untracked']
     )
     ok_file_under_git(path, 'alwaysbig', annexed=True)
-    # This one is actually "questionable" since might be "correct" either way
-    # but it would be nice to have it at least consistent
-    ok_file_under_git(path, 'willnotgetshort', annexed=True)
+    # 7.20191009 included a fix to evaluate current filesize not old one.
+    # So if size got short - it will get committed to git
+    ok_file_under_git(path, 'willgetshort',
+                      annexed=external_versions['cmd:annex']<'7.20191009')
 
     ar.commit("message2", options=['-a']) # commit all changed
     ok_clean_git(

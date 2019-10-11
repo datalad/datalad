@@ -9,6 +9,27 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
+## 0.11.8 (Oct 11, 2019) -- annex-we-are-catching-up
+
+### Fixes
+
+- Our internal command runner failed to capture output in some cases.
+  ([#3656][])
+- Workaround in the tests around python in cPython >= 3.7.5 ';' in
+  the filename confusing mimetypes ([#3769][]) ([#3770][])
+
+### Enhancements and new features
+
+- Prepared for upstream changes in git-annex, including support for
+  the latest git-annex
+  - 7.20190912 auto-upgrades v5 repositories to v7.  ([#3648][]) ([#3682][])
+  - 7.20191009 fixed treatment of (larger/smaller)than in .gitattributes ([#3765][])
+
+- The `cfg_text2git` procedure, as well the `--text-no-annex` option
+  of [create][], now configure .gitattributes so that empty files are
+  stored in git rather than annex.  ([#3667][])
+
+
 ## 0.11.7 (Sep 06, 2019) -- python2-we-still-love-you-but-...
 
 Primarily bugfixes with some optimizations and refactorings.
@@ -1461,3 +1482,10 @@ publishing
 [#3626]: https://github.com/datalad/datalad/issues/3626
 [#3631]: https://github.com/datalad/datalad/issues/3631
 [#3646]: https://github.com/datalad/datalad/issues/3646
+[#3648]: https://github.com/datalad/datalad/issues/3648
+[#3656]: https://github.com/datalad/datalad/issues/3656
+[#3667]: https://github.com/datalad/datalad/issues/3667
+[#3682]: https://github.com/datalad/datalad/issues/3682
+[#3765]: https://github.com/datalad/datalad/issues/3765
+[#3769]: https://github.com/datalad/datalad/issues/3769
+[#3770]: https://github.com/datalad/datalad/issues/3770
