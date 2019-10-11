@@ -132,7 +132,8 @@ class Dataset(object, metaclass=Flyweight):
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
             # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+            path_ = Dataset(rev_get_dataset_root(curdir)).get_superdataset(
+                topmost=True).path
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
@@ -427,8 +428,6 @@ class Dataset(object, metaclass=Flyweight):
         Dataset or None
         """
         from datalad.coreapi import subdatasets
-        # TODO: return only if self is subdataset of the superdataset
-        #       (meaning: registered as submodule)?
         path = self.path
         sds_path = path if topmost else None
 
