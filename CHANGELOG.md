@@ -15,6 +15,8 @@ We would recommend to consult log of the
 
 - Our internal command runner failed to capture output in some cases.
   ([#3656][])
+- Workaround in the tests around python in cPython >= 3.7.5 ';' in
+  the filename confusing mimetypes ([#3769][]) ([#3770][])
 
 ### Enhancements and new features
 
@@ -1485,3 +1487,5 @@ publishing
 [#3667]: https://github.com/datalad/datalad/issues/3667
 [#3682]: https://github.com/datalad/datalad/issues/3682
 [#3765]: https://github.com/datalad/datalad/issues/3765
+[#3769]: https://github.com/datalad/datalad/issues/3769
+[#3770]: https://github.com/datalad/datalad/issues/3770
