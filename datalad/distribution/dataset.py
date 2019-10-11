@@ -427,8 +427,6 @@ class Dataset(object, metaclass=Flyweight):
         Dataset or None
         """
         from datalad.coreapi import subdatasets
-        # TODO: return only if self is subdataset of the superdataset
-        #       (meaning: registered as submodule)?
         path = self.path
         sds_path = path if topmost else None
 
