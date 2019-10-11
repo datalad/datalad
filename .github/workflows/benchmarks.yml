@@ -2,6 +2,10 @@ name: Benchmarks
 
 on: [pull_request]
 
+env:
+  # fake environment to be able to reuse script for travis
+  TRAVIS_PULL_REQUEST: true
+
 jobs:
   vs-master:
 
@@ -29,9 +33,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install ".[devel-docs]"
+    - name: Setup benchmarks
+      run: tools/ci/benchmark-travis-pr.sh setup
     - name: Run benchmarks
-      env:
-        # fake environment to be able to reuse script for travis
-        TRAVIS_PULL_REQUEST: true
-      run: |
-        tools/ci/benchmark-travis-pr.sh
+      run: tools/ci/benchmark-travis-pr.sh run
+    - name: Compare benchmarks
+      run: tools/ci/benchmark-travis-pr.sh compare
