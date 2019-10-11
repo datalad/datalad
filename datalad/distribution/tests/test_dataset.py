@@ -242,7 +242,7 @@ def test_hat_dataset_more(path):
     subds = ds.install(
         'subds', source=path,
         result_xfm='datasets', return_type='item-or-list')
-    # must finds its way all the way up from an untracked dir in a subsubds
+    # must find its way all the way up from an untracked dir in a subsubds
     untracked_subdir = op.join(subds.path, 'subdir')
     os.makedirs(untracked_subdir)
     with chpwd(untracked_subdir):
