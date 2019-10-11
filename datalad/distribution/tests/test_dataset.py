@@ -235,6 +235,21 @@ def test_subdatasets(path):
 
 
 @with_tempfile(mkdir=True)
+def test_hat_dataset_more(path):
+    # from scratch
+    ds = Dataset(path).create()
+    # add itself as a subdataset (crazy, isn't it?)
+    subds = ds.install(
+        'subds', source=path,
+        result_xfm='datasets', return_type='item-or-list')
+    # must finds its way all the way up from an untracked dir in a subsubds
+    untracked_subdir = op.join(subds.path, 'subdir')
+    os.makedirs(untracked_subdir)
+    with chpwd(untracked_subdir):
+        eq_(Dataset('^'), ds)
+
+
+@with_tempfile(mkdir=True)
 def check_require_dataset(ds_path, topdir):
     path = opj(topdir, ds_path)
     os.mkdir(path)
