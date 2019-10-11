@@ -132,7 +132,8 @@ class Dataset(object, metaclass=Flyweight):
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
             # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+            path_ = Dataset(rev_get_dataset_root(curdir)).get_superdataset(
+                topmost=True).path
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
