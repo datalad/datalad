@@ -279,8 +279,7 @@ def test_notclone_known_subdataset(src, path):
     # clone is not meaningful
     res = ds.clone('subm 1', on_failure='ignore')
     assert_status('error', res)
-    assert_message('Failed to clone from any candidate source URL. '
-                   'Encountered errors per each url were: %s',
+    assert_message('Failed to clone from all attempted sources: %s',
                    res)
     # get does the job
     res = ds.get(path='subm 1', get_data=False)
@@ -301,8 +300,7 @@ def test_failed_clone(dspath):
     res = ds.clone("http://nonexistingreallyanything.datalad.org/bla", "sub",
                    on_failure='ignore')
     assert_status('error', res)
-    assert_message('Failed to clone from any candidate source URL. '
-                   'Encountered errors per each url were: %s',
+    assert_message('Failed to clone from all attempted sources: %s',
                    res)
 
 

@@ -240,9 +240,9 @@ class Clone(Interface):
                 GitRepo.clone(path=dest_path, url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
-                error_msgs[source_] = exc_str_ = exc_str(e)
+                error_msgs[source_] = e
                 lgr.debug("Failed to clone from URL: %s (%s)",
-                          source_, exc_str_)
+                          source_, exc_str(e))
                 if exists(dest_path):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
@@ -268,9 +268,18 @@ class Clone(Interface):
 
         if not destination_dataset.is_installed():
             if len(error_msgs):
-                error_msg = "Failed to clone from any candidate source URL. " \
-                            "Encountered errors per each url were: %s"
-                error_args = (error_msgs, )
+                if all(not e.stdout and not e.stderr for e in error_msgs.values()):
+                    # there is nothing we can learn from the actual exception,
+                    # the exit code is uninformative, the command is predictable
+                    error_msg = "Failed to clone from all attempted sources: %s"
+                    error_args = list(error_msgs.keys())
+                else:
+                    error_msg = "Failed to clone from any candidate source URL. " \
+                                "Encountered errors per each url were:\n- %s"
+                    error_args = '\n- '.join(
+                        '{}\n  {}'.format(url, exc_str(exc))
+                        for url, exc in error_msgs.items()
+                    )
             else:
                 # yoh: Not sure if we ever get here but I felt that there could
                 #      be a case when this might happen and original error would
