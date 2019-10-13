@@ -240,8 +240,7 @@ class SSHConnection(object):
         -------
         bool
           True when SSH reports success opening the connection, False when
-          the connection when a ControlMaster for an open connection already
-          exists.
+          a ControlMaster for an open connection already exists.
 
         Raises
         ------
