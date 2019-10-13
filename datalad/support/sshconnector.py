@@ -27,7 +27,10 @@ from shlex import quote as sh_quote
 # on initial import datalad time
 # from datalad.support.network import RI, is_ssh
 
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CommandError,
+    ConnectionOpenFailedError,
+)
 from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
@@ -244,7 +247,7 @@ class SSHConnection(object):
 
         Raises
         ------
-        CommandError
+        ConnectionOpenFailedError
           When starting the SSH ControlMaster process failed.
         """
         # the socket should vanish almost instantly when the connection closes
@@ -275,7 +278,7 @@ class SSHConnection(object):
         exit_code = proc.wait()
 
         if exit_code != 0:
-            raise CommandError(
+            raise ConnectionOpenFailedError(
                 str(cmd),
                 'Failed to open SSH connection (could not start ControlMaster process)',
                 exit_code,

@@ -331,6 +331,9 @@ class InstallFailedError(CommandError):
     pass
 
 
+class ConnectionOpenFailedError(CommandError):
+    """Exception to raise whenever opening a network connection fails"""
+    pass
 #
 # Downloaders
 #
