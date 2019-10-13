@@ -47,7 +47,7 @@ from datalad.dochelpers import single_or_plural
 
 from .dataset import Dataset
 from .dataset import datasetmethod
-from .dataset import resolve_path
+from .dataset import rev_resolve_path
 from .dataset import require_dataset
 from .dataset import EnsureDataset
 from .get import Get
@@ -323,7 +323,7 @@ class Install(Interface):
                 # yoh: path should be a local path, and mapping note within
                 #      SSHRI about mapping localhost:path to path is kinda
                 #      a peculiar use-case IMHO
-                path = resolve_path(path_ri.localpath, dataset)
+                path = rev_resolve_path(path_ri.localpath, dataset)
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
