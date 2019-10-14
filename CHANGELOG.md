@@ -401,7 +401,7 @@ with more performant implementations.
   information and save changes.
 
 
-## 0.11.8 (??? ??, 2019) -- will be better than ever
+## 0.11.9 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 
@@ -411,8 +411,21 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
+?
+
+### Enhancements and new features
+
+?
+
+
+## 0.11.8 (Oct 11, 2019) -- annex-we-are-catching-up
+
+### Fixes
+
 - Our internal command runner failed to capture output in some cases.
   ([#3656][])
+- Workaround in the tests around python in cPython >= 3.7.5 ';' in
+  the filename confusing mimetypes ([#3769][]) ([#3770][])
 
 ### Enhancements and new features
 
@@ -1958,4 +1971,6 @@ publishing
 [#3761]: https://github.com/datalad/datalad/issues/3761
 [#3765]: https://github.com/datalad/datalad/issues/3765
 [#3768]: https://github.com/datalad/datalad/issues/3768
+[#3769]: https://github.com/datalad/datalad/issues/3769
+[#3770]: https://github.com/datalad/datalad/issues/3770
 [#3772]: https://github.com/datalad/datalad/issues/3772

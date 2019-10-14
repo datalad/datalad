@@ -40,6 +40,17 @@ from .utils import (
 
 fn_in_archive_obscure = OBSCURE_FILENAME
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
+# Debian sid version of python (3.7.5rc1) introduced a bug in mimetypes
+# Reported to cPython: https://bugs.python.org/issue38449
+import mimetypes
+mimedb = mimetypes.MimeTypes(strict=False)
+if None in mimedb.guess_type(fn_archive_obscure + '.tar.gz'):
+    from . import lgr
+    lgr.warning("Buggy Python mimetypes, replacing ; in archives test filename")
+    # fails to detect due to ;
+    fn_archive_obscure = fn_archive_obscure.replace(';', '-')
+    # verify
+    assert None not in mimedb.guess_type(fn_archive_obscure + '.tar.gz')
 fn_archive_obscure_ext = fn_archive_obscure + '.tar.gz'
 
 tree_simplearchive = dict(
