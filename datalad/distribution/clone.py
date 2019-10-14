@@ -182,12 +182,30 @@ class Clone(Interface):
         # there is no other way -- my intoxicated brain tells me
         assert(path is not None)
 
-        destination_dataset = Dataset(path)
-        dest_path = path
-
         status_kwargs = dict(
-            action='install', ds=destination_dataset, logger=lgr,
-            refds=refds_path, source_url=source_url)
+            action='install',
+            logger=lgr,
+            refds=refds_path,
+            source_url=source_url)
+
+        try:
+            # this will implicitly cause pathlib to run a bunch of checks
+            # whether the present path makes any sense on the platform
+            # we are running on -- we don't care if the path actually
+            # exists at this point, but we want to abort early if the path
+            # spec is determined to be useless
+            path.exists()
+        except OSError as e:
+            yield get_status_dict(
+                status='error',
+                path=path,
+                message=('cannot handle target path: %s', exc_str(e)),
+                **status_kwargs)
+            return
+
+        destination_dataset = Dataset(path)
+        status_kwargs['ds'] = destination_dataset
+        dest_path = path
 
         # important test! based on this `rmtree` will happen below after failed clone
         if dest_path.exists() and any(dest_path.iterdir()):
