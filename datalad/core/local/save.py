@@ -297,6 +297,8 @@ class Save(Interface):
                 yield dsres
                 continue
             try:
+                # method requires str
+                version_tag = str(version_tag)
                 pds_repo.tag(version_tag)
                 dsres.update(
                     status='ok',
