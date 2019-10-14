@@ -124,6 +124,15 @@ class Dataset(object, metaclass=Flyweight):
         path_ = normpath(path_)
         kwargs['path'] = path_
         return path_, args, kwargs
+
+    def _flyweight_invalid(self):
+        """Invalidation of Flyweight instance
+
+        Dataset doesn't need to be invalidated during its lifetime at all. Instead the underlying *Repo instances are.
+        Dataset itself can represent a not yet existing path.
+        """
+        return False
+
     # End Flyweight
 
     def __hash__(self):
@@ -139,6 +148,20 @@ class Dataset(object, metaclass=Flyweight):
           Path to the dataset location. This location may or may not exist
           yet.
         """
+        # TODO: lazy but persistent pathobj!
+        # In [16]: %timeit a = '.'
+        # 8.09 ns ± 0.0628 ns per loop (mean ± std. dev. of 7 runs, 100000000 loops each)
+        #
+        # In [17]: %timeit a = pathlib.Path('.')
+        # 1.86 µs ± 29.6 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
+
+        # Also: str from Path is faster than vice versa:
+        #  In [21]: %timeit str(path)
+        # 146 ns ± 1.33 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
+        #
+        # In [22]: %timeit pathlib.Path('.')
+        # 1.78 µs ± 19.7 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
+
         if isinstance(path, ut.PurePath):
             path = str(path)
         self._path = path
@@ -291,6 +314,8 @@ class Dataset(object, metaclass=Flyweight):
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
         elif due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
 

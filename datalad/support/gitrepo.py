@@ -549,9 +549,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         kwargs['path'] = path
         return path, args, kwargs
 
-    @classmethod
-    def _flyweight_invalid(cls, id_):
-        return not cls.is_valid_repo(id_)
+    def _flyweight_invalid(self):
+        return not self.is_valid_git()
 
     @classmethod
     def _flyweight_reject(cls, id_, *args, **kwargs):
@@ -664,18 +663,25 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             git_opts.update(kwargs)
 
         self.path = path
+
+        # Note, that the following three path objects are used often and therefore
+        # are stored for performance. Path object creation comes with a cost. Most noteably,
+        # this is used for validity checking of the repository.
+        self.pathobj = ut.Path(self.path)
+        self._dot_git = self.pathobj / '.git'
+        self._valid_git_test_path = self._dot_git / 'HEAD'
+
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._repo = repo
         self._cfg = None
 
-        _valid_repo = GitRepo.is_valid_repo(path)
+        _valid_repo = self.is_valid_git()
         if create and not _valid_repo:
             if repo is not None:
                 # `repo` passed with `create`, which doesn't make sense
                 raise TypeError("argument 'repo' must not be used with 'create'")
-            self._repo = self._create_empty_repo(
-                path,
-                create_sanity_checks, **git_opts)
+            self._create_empty_repo(path,
+                                    create_sanity_checks, **git_opts)
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -705,8 +711,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self.configure_fake_dates()
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
-
-        self.pathobj = ut.Path(self.path)
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
@@ -931,18 +935,48 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         return self.realpath == obj.realpath
 
+    def is_valid_git(self):
+        """Returns whether the underlying repository appears to be still valid
+
+        Note, that this almost identical to the classmethod is_valid_repo(). However,
+        if we are testing an existing instance, we can save Path object creations. Since this testing
+        is done a lot, this is relevant. Creation of the Path objects in is_valid_repo() takes nearly half the time of
+        the entire function.
+
+        Also note, that this method is bound to an instance but still class-dependent, meaning that a subclass
+        cannot simply overwrite it. This is particularly important for the call from within __init__(),
+        which in turn is called by the subclasses' __init__. Using an overwrite would lead to the wrong thing being
+        called.
+        """
+
+        return self._dot_git.exists() and (
+            not self._dot_git.is_dir() or self._valid_git_test_path.exists()
+        )
+
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        path = Path(path) / '.git'
+        if not isinstance(path, Path):
+            path = Path(path)
+        dot_git_path = path / '.git'
+
         # the aim here is to have this test as cheap as possible, because
         # it is performed a lot
         # recognize two things as good-enough indicators of a present
-        # repo: 1) a non-empty .git directory (#3473) and 2) a pointer
-        # file or symlink
-        return path.exists() and (
-            not path.is_dir() or \
-            any(path.iterdir()))
+        # repo: 1) a non-empty .git directory (#3473)
+        #          NOTE: It's actually faster (and more accurate) to test for existence of a particular subpath.
+        #                This should be something that's there right after git-init. Going for .git/HEAD ATM.
+        #
+        #                In [11]: %timeit path.exists() and (not path.is_dir() or head_path.exists())
+        #                4.93 µs ± 34.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [12]: %timeit path.exists() and (not path.is_dir() or any(path.iterdir()))
+        #                12.8 µs ± 150 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #
+        #   and 2) a pointer file or symlink
+
+        return dot_git_path.exists() and (
+            not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
+        )
 
     @staticmethod
     def get_git_dir(repo):

@@ -88,26 +88,30 @@ class Flyweight(type):
         """
         pass
 
-    def _flyweight_invalid(cls, id):
-        """determines whether or not an instance with `id` became invalid and
-        therefore has to be instantiated again.
-
-        Subclasses can implement this method to provide an additional condition
-        on when to create a new instance besides there is none yet.
-
-        Parameter
-        ---------
-        id: hashable
-          ID of the requested instance
-
-        Returns
-        -------
-        bool
-          whether to consider an existing instance with that ID invalid and
-          therefore create a new instance. Default implementation always returns
-          False.
-        """
-        return False
+    #       TODO: - We might want to remove the classmethod from Flyweight altogether and replace by an
+    #             requirement to implement an actual method, since the purpose of it is actually about a
+    #             particular, existing instance
+    #             - Done. But update docs!
+    # def _flyweight_invalid(cls, id):
+    #     """determines whether or not an instance with `id` became invalid and
+    #     therefore has to be instantiated again.
+    #
+    #     Subclasses can implement this method to provide an additional condition
+    #     on when to create a new instance besides there is none yet.
+    #
+    #     Parameter
+    #     ---------
+    #     id: hashable
+    #       ID of the requested instance
+    #
+    #     Returns
+    #     -------
+    #     bool
+    #       whether to consider an existing instance with that ID invalid and
+    #       therefore create a new instance. Default implementation always returns
+    #       False.
+    #     """
+    #     return False
 
     def _flyweight_reject(cls, id, *args, **kwargs):
         """decides whether to reject a request for an instance
@@ -138,7 +142,7 @@ class Flyweight(type):
         id_, new_args, new_kwargs = cls._flyweight_id_from_args(*args, **kwargs)
         instance = cls._unique_instances.get(id_, None)
 
-        if instance is None or cls._flyweight_invalid(id_):
+        if instance is None or instance._flyweight_invalid():
             # we have no such instance yet or the existing one is invalidated,
             # so we instantiate:
             instance = type.__call__(cls, *new_args, **new_kwargs)
