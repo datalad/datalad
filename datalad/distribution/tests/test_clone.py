@@ -18,11 +18,7 @@ from datalad.tests.utils import (
 
 import logging
 import os
-from os.path import join as opj
-from os.path import isdir
-from os.path import exists
-from os.path import basename
-from os.path import dirname
+import os.path as op
 from os import mkdir
 from os import chmod
 
@@ -91,7 +87,7 @@ def test_invalid_args(path, otherpath, alienpath):
     ds = create(path)
     assert_raises(IncompleteResultsError, ds.clone, '/higherup.', 'Zoidberg')
     # make real dataset, try to install outside
-    ds_target = create(opj(otherpath, 'target'))
+    ds_target = create(op.join(otherpath, 'target'))
     assert_raises(ValueError, ds_target.clone, ds.path, path=ds.path)
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
@@ -110,7 +106,7 @@ def test_clone_crcns(tdir, ds_path):
     ds = create(ds_path)
     crcns = ds.clone("///crcns", result_xfm='datasets', return_type='item-or-list')
     ok_(crcns.is_installed())
-    eq_(crcns.path, opj(ds_path, "crcns"))
+    eq_(crcns.path, op.join(ds_path, "crcns"))
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
@@ -122,7 +118,7 @@ def test_clone_datasets_root(tdir):
     with chpwd(tdir):
         ds = clone("///", result_xfm='datasets', return_type='item-or-list')
         ok_(ds.is_installed())
-        eq_(ds.path, opj(tdir, get_datasets_topdir()))
+        eq_(ds.path, op.join(tdir, get_datasets_topdir()))
 
         # do it a second time:
         res = clone("///", on_failure='ignore')
@@ -132,7 +128,7 @@ def test_clone_datasets_root(tdir):
         assert_status('notneeded', res)
 
         # and a third time into an existing something, that is not a dataset:
-        with open(opj(tdir, 'sub', 'a_file.txt'), 'w') as f:
+        with open(op.join(tdir, 'sub', 'a_file.txt'), 'w') as f:
             f.write("something")
 
         res = clone('///', path="sub", on_failure='ignore')
@@ -204,7 +200,7 @@ def test_clone_dataset_from_just_source(url, path):
 @with_tempfile(mkdir=True)
 def test_clone_dataladri(src, topurl, path):
     # make plain git repo
-    ds_path = opj(src, 'ds')
+    ds_path = op.join(src, 'ds')
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
@@ -214,7 +210,7 @@ def test_clone_dataladri(src, topurl, path):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     ok_clean_git(path, annex=False)
-    ok_file_has_content(opj(path, 'test.txt'), 'some')
+    ok_file_has_content(op.join(path, 'test.txt'), 'some')
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
@@ -246,7 +242,7 @@ def test_clone_into_dataset(source, top_path):
 
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
-    ok_(isdir(opj(subds.path, '.git')))
+    ok_(op.isdir(op.join(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:
@@ -261,7 +257,7 @@ def test_clone_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
     subds_ = ds.clone(source, "sub2",
                       result_xfm='datasets', return_type='item-or-list')
-    eq_(subds_.path, opj(ds.path, "sub2"))  # for paranoid yoh ;)
+    eq_(subds_.path, op.join(ds.path, "sub2"))  # for paranoid yoh ;)
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
@@ -273,7 +269,7 @@ def test_notclone_known_subdataset(src, path):
                result_xfm='datasets', return_type='item-or-list')
 
     # subdataset not installed:
-    subds = Dataset(opj(path, 'subm 1'))
+    subds = Dataset(op.join(path, 'subm 1'))
     assert_false(subds.is_installed())
     assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
@@ -318,8 +314,8 @@ def test_reckless(path, top_path):
 @with_tempfile
 def test_install_source_relpath(src, dest):
     create(src)
-    src_ = basename(src)
-    with chpwd(dirname(src)):
+    src_ = op.basename(src)
+    with chpwd(op.dirname(src)):
         clone(src_, dest)
 
 
