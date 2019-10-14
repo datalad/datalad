@@ -712,7 +712,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             with p.open() as f:
                 line = f.readline()
                 if line.startswith("gitdir: "):
-                    return exists(opj(p, line[8:], 'annex'))
+                    return (p / line[8:] / 'annex').exists()
                 else:
                     lgr.debug("Invalid .git file: %s", p)
                     return False
