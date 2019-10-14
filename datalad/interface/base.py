@@ -36,7 +36,7 @@ from datalad.support.constraints import (
     EnsureChoice,
 )
 from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import resolve_path
+from datalad.distribution.dataset import rev_resolve_path
 from datalad.plugin import _get_plugins
 from datalad.plugin import _load_plugin
 
@@ -683,7 +683,7 @@ class Interface(object):
         refds_path = dataset.path if isinstance(dataset, Dataset) \
             else Dataset(dataset).path
         if refds_path:
-            refds_path = resolve_path(refds_path)
+            refds_path = str(rev_resolve_path(refds_path))
         return refds_path
 
 
