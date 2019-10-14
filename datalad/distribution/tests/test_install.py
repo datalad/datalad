@@ -32,12 +32,9 @@ from datalad.utils import on_windows
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
-from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import create_tree
@@ -55,7 +52,6 @@ from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -942,3 +938,14 @@ def check_datasets_datalad_org(suffix, tdir):
 def test_datasets_datalad_org():
     yield check_datasets_datalad_org, ''
     yield check_datasets_datalad_org, '/.git'
+
+
+# https://github.com/datalad/datalad/issues/3469
+@with_tempfile(mkdir=True)
+def test_relpath_semantics(path):
+    with chpwd(path):
+        super = create('super')
+        create('subsrc')
+        sub = install(
+            dataset='super', source='subsrc', path=op.join('super', 'sub'))
+        eq_(sub.path, op.join(super.path, 'sub'))
