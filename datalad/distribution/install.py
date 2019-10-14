@@ -323,7 +323,9 @@ class Install(Interface):
                 # yoh: path should be a local path, and mapping note within
                 #      SSHRI about mapping localhost:path to path is kinda
                 #      a peculiar use-case IMHO
-                path = rev_resolve_path(path_ri.localpath, dataset)
+                # TODO Stringification can be removed once PY35 is no longer
+                # supported
+                path = str(rev_resolve_path(path_ri.localpath, dataset))
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
