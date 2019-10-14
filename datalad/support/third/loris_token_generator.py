@@ -17,7 +17,7 @@ from datalad.support.exceptions import (
     AccessDeniedError,
     AccessFailedError,
 )
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 
 
 class LORISTokenGenerator(object):
@@ -44,7 +44,7 @@ class LORISTokenGenerator(object):
         except HTTPError:
             raise AccessDeniedError("Could not authenticate into LORIS")
 
-        str_response = assure_unicode(response.read())
+        str_response = ensure_unicode(response.read())
         data = json.loads(str_response)
         return data["token"]
 

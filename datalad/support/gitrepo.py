@@ -58,14 +58,14 @@ from datalad.config import ConfigManager
 import datalad.utils as ut
 from datalad.utils import Path
 from datalad.utils import PurePosixPath
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import posix_relpath
-from datalad.utils import assure_dir
+from datalad.utils import ensure_dir
 from datalad.utils import generate_file_chunks
-from ..utils import assure_unicode
+from ..utils import ensure_unicode
 
 # imports from same module:
 from .external_versions import external_versions
@@ -1094,7 +1094,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # there is no other way then to collect all files into a list
         # at this point, because we need to pass them at once to a single
         # `git add` call
-        files = [_normalize_path(self.path, f) for f in assure_list(files) if f]
+        files = [_normalize_path(self.path, f) for f in ensure_list(files) if f]
 
         if not (files or git_options or update):
             # wondering why just a warning? in cmdline this is also not an error
@@ -1108,7 +1108,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 # Set annex.largefiles to prevent storing files in annex when
                 # GitRepo() is instantiated with a v6+ annex repo.
                 ['git', '-c', 'annex.largefiles=nothing', 'add'] +
-                assure_list(git_options) +
+                ensure_list(git_options) +
                 to_options(update=update) + ['--verbose']
             )
             # get all the entries
@@ -1150,7 +1150,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         modes when ran through proxy
         """
         return [{u'file': f, u'success': True}
-                for f in re.findall("'(.*)'[\n$]", assure_unicode(stdout))]
+                for f in re.findall("'(.*)'[\n$]", ensure_unicode(stdout))]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, recursive=False, **kwargs):
@@ -1248,7 +1248,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         if not fields:
             raise ValueError('no `fields` provided, refuse to proceed')
-        fields = assure_list(fields)
+        fields = ensure_list(fields)
         cmd = [
             "git",
             "for-each-ref",
@@ -1259,10 +1259,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         if points_at:
             cmd.append('--points-at={}'.format(points_at))
         if sort:
-            for k in assure_list(sort):
+            for k in ensure_list(sort):
                 cmd.append('--sort={}'.format(k))
         if pattern:
-            cmd += assure_list(pattern)
+            cmd += ensure_list(pattern)
         if count:
             cmd.append('--count={:d}'.format(count))
 
@@ -2834,7 +2834,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           name and value items. Attribute values are either True or False,
           for set and unset attributes, or are the literal attribute value.
         """
-        path = assure_list(path)
+        path = ensure_list(path)
         cmd = ["git", "check-attr", "-z", "--all"]
         if index_only:
             cmd.append('--cached')
@@ -3717,7 +3717,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             # without --verbose git 2.9.3  add does not return anything
             add_out = self._git_custom_command(
                 list(files.keys()),
-                ['git', 'add'] + assure_list(git_opts) + ['--verbose']
+                ['git', 'add'] + ensure_list(git_opts) + ['--verbose']
             )
             # get all the entries
             for r in self._process_git_get_output(*add_out):
@@ -3774,7 +3774,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     src_dotgit = opj(path, src_dotgit)
     # move .git
     from os import rename, listdir, rmdir
-    assure_dir(subds_dotgit)
+    ensure_dir(subds_dotgit)
     for dot_git_entry in listdir(src_dotgit):
         rename(opj(src_dotgit, dot_git_entry),
                opj(subds_dotgit, dot_git_entry))

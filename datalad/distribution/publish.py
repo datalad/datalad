@@ -36,7 +36,7 @@ from datalad.support.sshconnector import sh_quote
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import URL, RI, SSHRI, is_ssh
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
@@ -266,7 +266,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     depvar = 'remote.{}.datalad-publish-depends'.format(remote)
     # list of remotes that are publication dependencies for the
     # target remote
-    publish_depends = assure_list(ds.config.get(depvar, []))
+    publish_depends = ensure_list(ds.config.get(depvar, []))
 
     # remote might be set to be ignored by annex, or we might not even know yet its uuid
     # make sure we are up-to-date on this topic on all affected remotes, before

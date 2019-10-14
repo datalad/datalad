@@ -33,7 +33,7 @@ from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..support.external_versions import external_versions
 from ..support.network import RI
 from ..support import path
-from ..utils import assure_list_from_str
+from ..utils import ensure_list_from_str
 from ..utils import auto_repr
 from ..utils import get_dataset_root
 
@@ -87,7 +87,7 @@ class Provider(object):
 
         """
         self.name = name
-        self.url_res = assure_list_from_str(url_res)
+        self.url_res = ensure_list_from_str(url_res)
         self.credential = credential
         self.authenticator = authenticator
         self._downloader = downloader
@@ -294,7 +294,7 @@ class Providers(object):
             authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = assure_list_from_str(items.pop('url_re', []))
+        url_res = ensure_list_from_str(items.pop('url_re', []))
         assert url_res, "current implementation relies on having url_re defined"
 
         credential = items.pop('credential', None)

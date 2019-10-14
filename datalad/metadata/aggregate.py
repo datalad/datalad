@@ -73,7 +73,7 @@ from datalad.support.path import split_ext
 from datalad.utils import (
     path_is_subpath,
     all_same,
-    assure_list,
+    ensure_list,
 )
 
 lgr = logging.getLogger('datalad.metadata.aggregate')
@@ -444,7 +444,7 @@ def _extract_metadata(agginto_ds, aggfrom_ds, db, to_save, objid, metasources,
     # paths to extract from
     relevant_paths = sorted(_get_metadatarelevant_paths(aggfrom_ds, subds_relpaths))
     # get extractors to engage from source dataset
-    nativetypes = ['datalad_core', 'annex'] + assure_list(get_metadata_type(aggfrom_ds))
+    nativetypes = ['datalad_core', 'annex'] + ensure_list(get_metadata_type(aggfrom_ds))
     # store esssential extraction config in dataset record
     agginfo['extractors'] = nativetypes
     agginfo['datalad_version'] = datalad.__version__
@@ -917,7 +917,7 @@ class AggregateMetaData(Interface):
         # it really doesn't work without a dataset
         ds = require_dataset(
             dataset, check_installed=True, purpose='metadata aggregation')
-        path = assure_list(path)
+        path = ensure_list(path)
         if not path:
             # then current/reference dataset is "aggregated"
             # We should not add ds.path always since then --recursive would

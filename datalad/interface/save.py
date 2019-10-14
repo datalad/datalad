@@ -22,7 +22,7 @@ from os.path import relpath
 from os.path import lexists
 
 
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.utils import unique
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.constraints import EnsureStr
@@ -232,7 +232,7 @@ class Save(Interface):
 
         if message_file:
             with open(message_file, "rb") as mfh:
-                message = assure_unicode(mfh.read())
+                message = ensure_unicode(mfh.read())
 
         to_process = []
         got_nothing = True

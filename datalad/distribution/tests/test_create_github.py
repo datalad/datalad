@@ -17,7 +17,7 @@ from datalad.api import (
     Dataset,
 )
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     chpwd,
 )
 from datalad.tests.utils import (
@@ -170,7 +170,7 @@ def check_integration1(login, keyring,
 
     ds = Dataset(path).create()
     if oauthtokens:
-        for oauthtoken in assure_list(oauthtokens):
+        for oauthtoken in ensure_list(oauthtokens):
             ds.config.add('hub.oauthtoken', oauthtoken, where='local')
 
     # so we do not pick up local repo configuration/token

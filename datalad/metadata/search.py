@@ -39,8 +39,8 @@ from datalad.support.constraints import EnsureInt
 
 from datalad.consts import SEARCH_INDEX_DOTGITDIR
 from datalad.utils import (
-    assure_list, assure_iter, unicode_srctypes, as_unicode,
-    assure_unicode,
+    ensure_list, ensure_iter, unicode_srctypes, as_unicode,
+    ensure_unicode,
     get_suggestions_msg,
     unique,
 )
@@ -293,7 +293,7 @@ class _WhooshSearch(_Search):
         self._mk_parser()
         # for convenience we accept any number of args-words from the
         # shell and put them together to a single string here
-        querystr = ' '.join(assure_list(query))
+        querystr = ' '.join(ensure_list(query))
         # this gives a formal whoosh query
         wquery = self.parser.parse(querystr)
         return wquery
@@ -449,7 +449,7 @@ class _WhooshSearch(_Search):
                 old_ds_rpath = admin['path']
                 admin['id'] = res.get('dsid', None)
 
-            doc.update({k: assure_unicode(v) for k, v in admin.items()})
+            doc.update({k: ensure_unicode(v) for k, v in admin.items()})
             lgr.debug("Adding document to search index: {}".format(doc))
             # inject into index
             idx.add_document(**doc)
@@ -515,7 +515,7 @@ class _WhooshSearch(_Search):
             for i, hit in enumerate(hits):
                 annotated_hit = dict(
                     path=normpath(opj(self.ds.path, hit['path'])),
-                    query_matched={assure_unicode(k): assure_unicode(v)
+                    query_matched={ensure_unicode(k): ensure_unicode(v)
                                    if isinstance(v, unicode_srctypes) else v
                                    for k, v in hit.matched_terms()},
                     parentds=normpath(
@@ -776,8 +776,8 @@ class _EGrepCSSearch(_Search):
             #     try:
             #         return '{}'.format(s)
             #     except UnicodeEncodeError:
-            #         return assure_unicode(s).encode('utf-8')
-            stat.uvals_str = assure_unicode(
+            #         return ensure_unicode(s).encode('utf-8')
+            stat.uvals_str = ensure_unicode(
                 "{} unique values: {}".format(
                     len(stat.uvals), ', '.join(map(repr, uvals))))
             if mode == 'short':
@@ -834,7 +834,7 @@ class _EGrepCSSearch(_Search):
                 if mode == 'name':
                     continue
                 try:
-                    kvals_set = assure_iter(kvals, set)
+                    kvals_set = ensure_iter(kvals, set)
                 except TypeError:
                     # TODO: may be do show hashable ones???
                     nunhashable = sum(
@@ -848,7 +848,7 @@ class _EGrepCSSearch(_Search):
         return keys
 
     def get_query(self, query):
-        query = assure_list(query)
+        query = ensure_list(query)
         simple_fieldspec = re.compile(r"(?P<field>\S*?):(?P<query>.*)")
         quoted_fieldspec = re.compile(r"'(?P<field>[^']+?)':(?P<query>.*)")
         query_rec_matches = [

@@ -46,7 +46,7 @@ from datalad.utils import get_dataset_root
 from datalad.utils import dlabspath
 from datalad.utils import Path
 from datalad.utils import PurePath
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -643,7 +643,7 @@ def rev_resolve_path(path, ds=None):
         ds = require_dataset(
             ds, check_installed=False, purpose='path resolution')
     out = []
-    for p in assure_list(path):
+    for p in ensure_list(path):
         if ds is None or not got_ds_instance:
             # no dataset at all or no instance provided -> CWD is always the reference
             # nothing needs to be done here. Path-conversion and absolutification

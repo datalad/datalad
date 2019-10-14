@@ -36,7 +36,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import NoDatasetArgumentFound
 from datalad.utils import maybe_shlex_quote
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 import datalad.support.ansi_colors as ac
 
 from datalad.core.local.run import Run
@@ -118,13 +118,13 @@ def _get_procedure_implementation(name='*', ds=None):
     # 1. check system and user account for procedure
     for loc in (cfg.obtain('datalad.locations.user-procedures'),
                 cfg.obtain('datalad.locations.system-procedures')):
-        for dir in assure_list(loc):
+        for dir in ensure_list(loc):
             for m, n in _get_file_match(dir, name):
                 yield (m, n,) + _get_proc_config(n)
     # 2. check dataset for procedure
     if ds is not None and ds.is_installed():
         # could be more than one
-        dirs = assure_list(
+        dirs = ensure_list(
                 ds.config.obtain('datalad.locations.dataset-procedures'))
         for dir in dirs:
             # TODO `get` dirs if necessary

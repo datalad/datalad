@@ -31,7 +31,7 @@ from ..support.external_versions import external_versions
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 from ..dochelpers import exc_str
-from ..utils import assure_unicode
+from ..utils import ensure_unicode
 from ..utils import getargspec
 
 
@@ -117,7 +117,7 @@ send () {
             lgr.debug("Commenting out previous entries")
             # comment out all the past entries
             with open(_file, 'rb') as f:
-                entries = list(map(assure_unicode, f.readlines()))
+                entries = list(map(ensure_unicode, f.readlines()))
             for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):

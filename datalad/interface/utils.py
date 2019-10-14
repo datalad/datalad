@@ -35,7 +35,7 @@ import json
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.utils import getargspec
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
@@ -223,7 +223,7 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
     filematch = False
     if isdir(basepath):
         for p in listdir(basepath):
-            p = assure_unicode(opj(basepath, p))
+            p = ensure_unicode(opj(basepath, p))
             if not isdir(p):
                 if p in targetpaths:
                     filematch = True

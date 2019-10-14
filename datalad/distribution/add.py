@@ -22,7 +22,7 @@ from os.path import pardir
 from os.path import relpath
 
 
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.utils import unique
 from datalad.utils import get_dataset_root
 from datalad.interface.base import Interface
@@ -212,7 +212,7 @@ class Add(Interface):
 
         if message_file:
             with open(message_file, "rb") as mfh:
-                message = assure_unicode(mfh.read())
+                message = ensure_unicode(mfh.read())
 
         to_add = []
         subds_to_add = {}

@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 
 
 # TODO the only reason this function is still here is that #1544
@@ -25,7 +25,7 @@ def _check_deps(repo, deps):
     ValueError
       if any of the deps is an unknown remote
     """
-    unknown_deps = set(assure_list(deps)).difference(repo.get_remotes())
+    unknown_deps = set(ensure_list(deps)).difference(repo.get_remotes())
     if unknown_deps:
         raise ValueError(
             'unknown sibling(s) specified as publication dependency: %s'

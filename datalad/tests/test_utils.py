@@ -37,7 +37,7 @@ from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
-from ..utils import assure_unicode
+from ..utils import ensure_unicode
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import unique
@@ -81,12 +81,12 @@ from datalad.tests.utils import nok_, assert_re_in
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
-from .utils import assure_dict_from_str, assure_list_from_str
-from .utils import assure_unicode
+from .utils import ensure_dict_from_str, ensure_list_from_str
+from .utils import ensure_unicode
 from .utils import as_unicode
-from .utils import assure_bool
-from .utils import assure_iter
-from .utils import assure_list
+from .utils import ensure_bool
+from .utils import ensure_iter
+from .utils import ensure_list
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import assert_raises
@@ -434,53 +434,53 @@ def test_auto_repr():
     assert_equal(buga().some(), "some")
 
 
-def test_assure_iter():
+def test_ensure_iter():
     s = {1}
-    assert assure_iter(None, set) == set()
-    assert assure_iter(1, set) == s
-    assert assure_iter(1, list) == [1]
-    assert assure_iter(s, set) is s
-    assert assure_iter(s, set, copy=True) is not s
+    assert ensure_iter(None, set) == set()
+    assert ensure_iter(1, set) == s
+    assert ensure_iter(1, list) == [1]
+    assert ensure_iter(s, set) is s
+    assert ensure_iter(s, set, copy=True) is not s
 
 
-def test_assure_list_copy():
+def test_ensure_list_copy():
     l = [1]
-    assert assure_list(l) is l
-    assert assure_list(l, copy=True) is not l
+    assert ensure_list(l) is l
+    assert ensure_list(l, copy=True) is not l
 
 
-def test_assure_list_from_str():
-    assert_equal(assure_list_from_str(''), None)
-    assert_equal(assure_list_from_str([]), None)
-    assert_equal(assure_list_from_str('somestring'), ['somestring'])
-    assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
-    assert_equal(assure_list_from_str(['something']), ['something'])
-    assert_equal(assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+def test_ensure_list_from_str():
+    assert_equal(ensure_list_from_str(''), None)
+    assert_equal(ensure_list_from_str([]), None)
+    assert_equal(ensure_list_from_str('somestring'), ['somestring'])
+    assert_equal(ensure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
+    assert_equal(ensure_list_from_str(['something']), ['something'])
+    assert_equal(ensure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
 
 
-def test_assure_dict_from_str():
-    assert_equal(assure_dict_from_str(''), None)
-    assert_equal(assure_dict_from_str({}), None)
+def test_ensure_dict_from_str():
+    assert_equal(ensure_dict_from_str(''), None)
+    assert_equal(ensure_dict_from_str({}), None)
     target_dict = dict(
         __ac_name='{user}', __ac_password='{password}',
         cookies_enabled='', submit='Log in'
     )
     string = '__ac_name={user}\n__ac_password={password}\nsubmit=Log ' \
                'in\ncookies_enabled='
-    assert_equal(assure_dict_from_str(string), target_dict)
-    assert_equal(assure_dict_from_str(
+    assert_equal(ensure_dict_from_str(string), target_dict)
+    assert_equal(ensure_dict_from_str(
         target_dict),
         target_dict)
 
 
-def test_assure_bool():
+def test_ensure_bool():
     for values, t in [
         (['True', 1, '1', 'yes', 'on'], True),
         (['False', 0, '0', 'no', 'off'], False)
     ]:
         for v in values:
-            eq_(assure_bool(v), t)
-    assert_raises(ValueError, assure_bool, "unknown")
+            eq_(ensure_bool(v), t)
+    assert_raises(ValueError, ensure_bool, "unknown")
 
 
 def test_generate_chunks():
@@ -728,29 +728,29 @@ def test_memoized_generator():
     eq_([], list(g2_))
 
 
-def test_assure_unicode():
-    ok_(isinstance(assure_unicode("m"), str))
-    ok_(isinstance(assure_unicode('grandchild_äöü東'), str))
-    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), str))
-    eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
+def test_ensure_unicode():
+    ok_(isinstance(ensure_unicode("m"), str))
+    ok_(isinstance(ensure_unicode('grandchild_äöü東'), str))
+    ok_(isinstance(ensure_unicode(u'grandchild_äöü東'), str))
+    eq_(ensure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
     # really encoded in that codepage
     mom_koi8r = u"мама".encode('koi8-r')
-    eq_(assure_unicode(mom_koi8r), u"мама")
-    eq_(assure_unicode(mom_koi8r, confidence=0.9), u"мама")
+    eq_(ensure_unicode(mom_koi8r), u"мама")
+    eq_(ensure_unicode(mom_koi8r, confidence=0.9), u"мама")
     mom_iso8859 = u'mamá'.encode('iso-8859-1')
-    eq_(assure_unicode(mom_iso8859), u'mamá')
-    eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
+    eq_(ensure_unicode(mom_iso8859), u'mamá')
+    eq_(ensure_unicode(mom_iso8859, confidence=0.5), u'mamá')
     # but when we mix, it does still guess something allowing to decode:
     mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
-    ok_(isinstance(assure_unicode(mixedin), str))
+    ok_(isinstance(ensure_unicode(mixedin), str))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
-        assure_unicode(mixedin, confidence=0.9)
+        ensure_unicode(mixedin, confidence=0.9)
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
-    assert assure_unicode(1) is 1
+    assert ensure_unicode(1) is 1
 
 
 def test_pathlib_unicode():
@@ -1179,7 +1179,7 @@ def test_get_open_files(p):
                  stdout=PIPE,
                  cwd=subd)
     # Assure that it started and we read the OK
-    eq_(assure_unicode(proc.stdout.readline().strip()), u"OK")
+    eq_(ensure_unicode(proc.stdout.readline().strip()), u"OK")
     assert time() - t0 < 5 # that we were not stuck waiting for process to finish
     eq_(get_open_files(p)[op.realpath(subd)].pid, proc.pid)
     eq_(get_open_files(subd)[op.realpath(subd)].pid, proc.pid)

@@ -34,7 +34,7 @@ import random
 from .locking import lock_if_check_fails
 from ..utils import (
     any_re_search,
-    assure_bytes,
+    ensure_bytes,
     chpwd,
     rmdir,
     unlink,
@@ -73,7 +73,7 @@ from ..cmd import Runner
 from ..consts import ARCHIVES_TEMP_DIR
 from ..utils import rmtree
 from ..utils import get_tempfile_kwargs
-from ..utils import assure_unicode
+from ..utils import ensure_unicode
 
 from ..utils import on_windows
 
@@ -155,15 +155,15 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         os.makedirs(dir_)
 
     with swallow_outputs() as cmo:
-        archive = assure_bytes(archive)
-        dir_ = assure_bytes(dir_)
+        archive = ensure_bytes(archive)
+        dir_ = ensure_bytes(dir_)
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
         outdir = unixify_path(dir_)
         # should be supplied in PY3 to avoid b''
-        outdir = assure_unicode(outdir)
-        archive = assure_unicode(archive)
+        outdir = ensure_unicode(outdir)
+        archive = ensure_unicode(archive)
 
         format_compression = patoolib.get_archive_format(archive)
         if format_compression == ('gzip', None):
@@ -259,7 +259,7 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    archive_cached = hashlib.md5(assure_bytes(realpath(archive))).hexdigest()[:10]
+    archive_cached = hashlib.md5(ensure_bytes(realpath(archive))).hexdigest()[:10]
     lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
     return archive_cached
 
@@ -477,7 +477,7 @@ class ExtractedArchive(object):
         assert (exists(path))
         # create a stamp
         with open(self.stamp_path, 'wb') as f:
-            f.write(assure_bytes(self._archive))
+            f.write(ensure_bytes(self._archive))
         # assert that stamp mtime is not older than archive's directory
         assert (self.is_extracted)
 
@@ -500,7 +500,7 @@ class ExtractedArchive(object):
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
-                yield assure_unicode(opj(root, name)[path_len:])
+                yield ensure_unicode(opj(root, name)[path_len:])
 
     def get_leading_directory(self, depth=None, consider=None, exclude=None):
         """Return leading directory of the content within archive

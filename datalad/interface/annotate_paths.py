@@ -47,7 +47,7 @@ from datalad.utils import get_dataset_root
 from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
@@ -520,7 +520,7 @@ class AnnotatePaths(Interface):
         # goal: structure in a way that makes most information on any path
         # available in a single pass, at the cheapest possible cost
         reported_paths = {}
-        requested_paths = assure_list(path)
+        requested_paths = ensure_list(path)
 
         if modified is not None:
             # modification detection would silently kill all nondataset paths

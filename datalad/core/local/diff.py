@@ -15,8 +15,8 @@ import logging
 import os.path as op
 from collections import OrderedDict
 from datalad.utils import (
-    assure_list,
-    assure_unicode,
+    ensure_list,
+    ensure_unicode,
 )
 from datalad.interface.base import (
     Interface,
@@ -115,8 +115,8 @@ class Diff(Interface):
         for r in _diff_cmd(
                 ds=ds,
                 dataset=dataset,
-                fr=assure_unicode(fr),
-                to=assure_unicode(to),
+                fr=ensure_unicode(fr),
+                to=ensure_unicode(to),
                 constant_refs=False,
                 path=path,
                 annex=annex,
@@ -150,7 +150,7 @@ def _diff_cmd(
     if path:
         ps = []
         # sort any path argument into the respective subdatasets
-        for p in sorted(assure_list(path)):
+        for p in sorted(ensure_list(path)):
             # it is important to capture the exact form of the
             # given path argument, before any normalization happens
             # distinguish rsync-link syntax to identify

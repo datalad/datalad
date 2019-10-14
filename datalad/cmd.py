@@ -34,8 +34,8 @@ from .support.protocol import (
 from .utils import (
     on_windows,
     get_tempfile_kwargs,
-    assure_unicode,
-    assure_bytes,
+    ensure_unicode,
+    ensure_bytes,
     unlink,
     auto_repr,
 )
@@ -356,13 +356,13 @@ class Runner(object):
             lgr.log(3, "Processing provided line")
         if line and log_is_callable:
             # Let it be processed
-            line = log_(assure_unicode(line))
+            line = log_(ensure_unicode(line))
             if line is not None:
                 # we are working with binary type here
-                line = assure_bytes(line)
+                line = ensure_bytes(line)
         if line:
             if out_type == 'stdout':
-                self._log_out(assure_unicode(line))
+                self._log_out(ensure_unicode(line))
             elif out_type == 'stderr':
                 self._log_err(line.decode('utf-8'),
                               expected)
@@ -689,7 +689,7 @@ class GitRunner(Runner):
             cmd, env=self.get_git_environ_adjusted(env), *args, **kwargs)
         # All communication here will be returned as unicode
         # TODO: do that instead within the super's run!
-        return assure_unicode(out), assure_unicode(err)
+        return ensure_unicode(out), ensure_unicode(err)
 
 
 def readline_rstripped(stdout):
@@ -807,7 +807,7 @@ class BatchedCommand(object):
         #       it is just a "get"er - we could resend it few times
         # The default output_proc expects a single line output.
         # TODO: timeouts etc
-        stdout = assure_unicode(self.output_proc(process.stdout)) \
+        stdout = ensure_unicode(self.output_proc(process.stdout)) \
             if not process.stdout.closed else None
         if stderr:
             lgr.warning("Received output in stderr: %r", stderr)

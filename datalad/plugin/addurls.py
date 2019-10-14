@@ -34,7 +34,7 @@ from datalad.support.network import get_url_filename
 from datalad.support.path import split_ext
 from datalad.support.s3 import get_versioned_url
 from datalad.utils import (
-    assure_list,
+    ensure_list,
     get_suggestions_msg,
     unlink,
 )
@@ -442,7 +442,7 @@ def extract(stream, input_type, url_format="{0}", filename_format="{1}",
     for each row in `stream` and the second item a list subdataset paths,
     sorted breadth-first.
     """
-    meta = assure_list(meta)
+    meta = ensure_list(meta)
 
     rows, colidx_to_name = _read(stream, input_type)
     if not rows:

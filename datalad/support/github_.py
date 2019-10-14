@@ -13,7 +13,7 @@ from ..consts import CONFIG_HUB_TOKEN_FIELD
 from ..dochelpers import exc_str
 from ..downloaders.credentials import UserPassword
 from ..ui import ui
-from ..utils import unique, assure_list, assure_tuple_or_list
+from ..utils import unique, assure_list, ensure_tuple_or_list
 
 from .exceptions import (
     AccessDeniedError,
@@ -310,7 +310,7 @@ def _make_github_repos(
                     dryrun)
                 # output will contain whatever is returned by _make_github_repo
                 # but with a dataset prepended to the record
-                res.append((ds,) + assure_tuple_or_list(res_))
+                res.append((ds,) + ensure_tuple_or_list(res_))
             except gh.BadCredentialsException as e:
                 if res:
                     # so we have succeeded with at least one repo already -

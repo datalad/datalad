@@ -23,7 +23,7 @@ from datalad.version import __version__
 
 from ..wtf import SECTION_CALLABLES
 
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import with_tree
@@ -86,7 +86,7 @@ def test_wtf(topdir):
         assert_in('## configuration', cmo.out)
         assert_in('## dataset', cmo.out)
         assert_in(u'path: {}'.format(ds.path),
-                  assure_unicode(cmo.out))
+                  ensure_unicode(cmo.out))
 
     # and if we run with all sensitive
     for sensitive in ('some', True):

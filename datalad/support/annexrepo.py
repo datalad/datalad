@@ -52,10 +52,10 @@ from datalad.utils import nothing_cm
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.utils import swallow_logs
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.utils import _path_
 from datalad.utils import CMD_MAX_ARG
-from datalad.utils import assure_unicode
+from datalad.utils import ensure_unicode
 from datalad.utils import make_tempfile
 from datalad.utils import partition
 from datalad.utils import unlink
@@ -1750,7 +1750,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                                content=content, no_content=not content,
                                all=all,
                                fast=fast))
-        args.extend(assure_list(remotes))
+        args.extend(ensure_list(remotes))
         self._run_annex_command('sync', annex_options=args)
 
     @normalize_path
@@ -1956,12 +1956,12 @@ class AnnexRepo(GitRepo, RepoInterface):
             raise InsufficientArgumentsError("drop() requires at least to "
                                              "specify 'files' or 'options'")
 
-        options = assure_list(options)
+        options = ensure_list(options)
 
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
-            files = assure_list(files)
+            files = ensure_list(files)
             options = options + ['--key']
             res = [
                 self._run_annex_command_json(
@@ -2275,7 +2275,7 @@ class AnnexRepo(GitRepo, RepoInterface):
                 % (output, ', '.join(map(repr, OUTPUTS)))
             )
 
-        options = assure_list(options, copy=True)
+        options = ensure_list(options, copy=True)
         if key:
             kwargs = {'opts': options + ["--key"] + files}
         else:
@@ -2523,7 +2523,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         self.precommit()
 
         if files:
-            files = assure_list(files)
+            files = ensure_list(files)
 
             # Raise FileNotInRepositoryError if `files` aren't tracked.
             super(AnnexRepo, self).commit(
@@ -3082,7 +3082,7 @@ class AnnexRepo(GitRepo, RepoInterface):
             return
         if batch is False:
             # we can be lazy
-            files = assure_list(files)
+            files = ensure_list(files)
         else:
             if isinstance(files, str):
                 files = [files]
@@ -3147,7 +3147,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         """Like set_metadata() but returns a generator"""
 
         def _genspec(expr, d):
-            return [expr.format(k, v) for k, vs in d.items() for v in assure_list(vs)]
+            return [expr.format(k, v) for k, vs in d.items() for v in ensure_list(vs)]
 
         args = []
         spec = []

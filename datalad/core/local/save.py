@@ -35,7 +35,7 @@ from datalad.support.constraints import (
 )
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
-    assure_list,
+    ensure_list,
 )
 import datalad.utils as ut
 
@@ -145,7 +145,7 @@ class Save(Interface):
             raise ValueError(
                 "Both a message and message file were specified for save()")
 
-        path = assure_list(path)
+        path = ensure_list(path)
 
         if message_file:
             with open(message_file) as mfh:

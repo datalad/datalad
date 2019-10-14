@@ -26,7 +26,7 @@ from datalad.support.network import DataLadRI
 from datalad.support.network import URL
 from datalad.support.network import RI
 from datalad.support.network import PathRI
-from datalad.utils import knows_annex, assure_bool
+from datalad.utils import knows_annex, ensure_bool
 
 
 lgr = logging.getLogger('datalad.distribution.utils')
@@ -161,7 +161,7 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
         sr_name = config.get('name', None)
         sr_autoenable = config.get('autoenable', False)
         try:
-            sr_autoenable = assure_bool(sr_autoenable)
+            sr_autoenable = ensure_bool(sr_autoenable)
         except ValueError:
             # Be resilient against misconfiguration.  Here it is only about
             # informing the user, so no harm would be done

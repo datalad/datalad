@@ -37,7 +37,7 @@ from datalad.support.param import Parameter
 from datalad.support.network import get_local_file_url
 from datalad.dochelpers import exc_str
 from datalad.utils import rmtree
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 
 from .dataset import Dataset
 from .dataset import datasetmethod
@@ -223,7 +223,7 @@ class Clone(Interface):
         # and hopefully be more robust than git clone
         candidate_sources = []
         # combine all given sources (incl. alternatives), maintain order
-        for s in [source] + assure_list(alt_sources):
+        for s in [source] + ensure_list(alt_sources):
             candidate_sources.extend(_get_flexible_source_candidates(s))
         candidates_str = \
             " [%d other candidates]" % (len(candidate_sources) - 1) \

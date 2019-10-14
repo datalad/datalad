@@ -41,7 +41,7 @@ from datalad.support.param import Parameter
 from datalad.support.network import RI
 from datalad.support.network import PathRI
 from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.dochelpers import exc_str
 from datalad.dochelpers import single_or_plural
 
@@ -160,7 +160,7 @@ class Install(Interface):
 
         # normalize path argument to be equal when called from cmdline and
         # python and nothing was passed into `path`
-        path = assure_list(path)
+        path = ensure_list(path)
 
         if not source and not path:
             raise InsufficientArgumentsError(

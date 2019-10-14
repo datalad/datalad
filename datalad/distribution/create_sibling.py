@@ -51,7 +51,7 @@ from datalad.support.param import Parameter
 from datalad.utils import make_tempfile
 from datalad.utils import _path_
 from datalad.utils import slash_join
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 
 
 lgr = logging.getLogger('datalad.distribution.create_sibling')
@@ -546,7 +546,7 @@ class CreateSibling(Interface):
                 # make sure dependencies are valid
                 # TODO: inherit -- we might want to automagically create
                 # those dependents as well???
-                unknown_deps = set(assure_list(publish_depends)).difference(checkds_remotes)
+                unknown_deps = set(ensure_list(publish_depends)).difference(checkds_remotes)
                 if unknown_deps:
                     ap['status'] = 'error'
                     ap['message'] = (

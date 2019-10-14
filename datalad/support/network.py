@@ -37,7 +37,7 @@ from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
 from datalad.utils import on_windows
-from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
+from datalad.utils import ensure_dir, ensure_bytes, ensure_unicode, map_items
 from datalad import consts
 from datalad import cfg
 from datalad.support.cache import lru_cache
@@ -511,7 +511,7 @@ class RI(object):
             v = fields.get(f)
             if isinstance(v, dict):
 
-                ev = urlencode(map_items(assure_bytes, v))
+                ev = urlencode(map_items(ensure_bytes, v))
                 # / is reserved char within query
                 if f == 'fragment' and '%2F' not in str(v):
                     # but seems to be ok'ish within the fragment which is
@@ -656,7 +656,7 @@ class URL(RI):
         """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
         if not s:
             return {}
-        out = map_items(assure_unicode, OrderedDict(parse_qsl(s, 1)))
+        out = map_items(ensure_unicode, OrderedDict(parse_qsl(s, 1)))
         if not auto_delist:
             return out
         for k in out:
@@ -971,7 +971,7 @@ def get_cached_url_content(url, name=None, fetcher=None, maxage=None):
             fetcher = providers.fetch
 
         doc = fetcher(url)
-        assure_dir(dirname(doc_fname))
+        ensure_dir(dirname(doc_fname))
         # use pickle to store the entire request result dict
         pickle.dump(doc, open(doc_fname, 'wb'))
         lgr.debug("stored result of request to '{}' in {}".format(url, doc_fname))

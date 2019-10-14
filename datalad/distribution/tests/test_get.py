@@ -42,7 +42,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import slow
 from datalad.utils import with_pathsep
 from datalad.utils import chpwd
-from datalad.utils import assure_list
+from datalad.utils import ensure_list
 from datalad.utils import rmtree
 
 from ..dataset import Dataset

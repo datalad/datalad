@@ -31,7 +31,7 @@ from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.exceptions import CommandError
 from .helpers import strip_arg_from_argv
 from ..utils import (
-    assure_unicode,
+    ensure_unicode,
     chpwd,
     get_suggestions_msg,
     on_msys_tainted_paths,
@@ -139,7 +139,7 @@ def setup_parser(
     parser.add_argument(
         '-f', '--output-format', dest='common_output_format',
         default='default',
-        type=assure_unicode,
+        type=ensure_unicode,
         metavar="{default,json,json_pp,tailored,'<template>'}",
         help="""select format for returned command results. 'default' give one line
         per result reporting action, status, path and an optional message;
