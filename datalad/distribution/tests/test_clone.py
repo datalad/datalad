@@ -18,46 +18,53 @@ from datalad.tests.utils import (
 
 import logging
 import os
+from os import (
+    mkdir,
+    chmod,
+)
 import os.path as op
-from os import mkdir
-from os import chmod
 
 from mock import patch
 
-from datalad.api import create
-from datalad.api import clone
-from datalad.utils import chpwd
-from datalad.utils import _path_
-from datalad.utils import on_windows
+from datalad.api import (
+    create,
+    clone,
+)
+from datalad.utils import (
+    chpwd,
+    _path_,
+    on_windows,
+)
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-from datalad.tests.utils import create_tree
-from datalad.tests.utils import with_tempfile
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_testrepos
-from datalad.tests.utils import eq_
-from datalad.tests.utils import ok_
-from datalad.tests.utils import assert_false
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import assert_not_in
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_status
-from datalad.tests.utils import assert_message
-from datalad.tests.utils import assert_result_count
-from datalad.tests.utils import assert_result_values_equal
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import use_cassette
-from datalad.tests.utils import skip_if_no_network
-from datalad.tests.utils import skip_if
-from ..clone import _get_installationpath_from_url
-
-from ..dataset import Dataset
+from datalad.tests.utils import (
+    create_tree,
+    with_tempfile,
+    assert_in,
+    with_tree,
+    with_testrepos,
+    eq_,
+    ok_,
+    assert_false,
+    ok_file_has_content,
+    assert_not_in,
+    assert_raises,
+    assert_status,
+    assert_message,
+    assert_result_count,
+    assert_result_values_equal,
+    ok_startswith,
+    ok_clean_git,
+    serve_path_via_http,
+    swallow_logs,
+    use_cassette,
+    skip_if_no_network,
+    skip_if,
+)
+from datalad.distribution.clone import _get_installationpath_from_url
+from datalad.distribution.dataset import Dataset
 
 
 @with_tempfile(mkdir=True)
