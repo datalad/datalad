@@ -236,7 +236,7 @@ class Install(Interface):
                     # should be necessary here, all done by code further
                     # down that deals with an install from an actuall `source`
                     # any necessary fixes should go there too!
-                    r.update(dict(refds=refds_path))
+                    r['refds'] = refds_path
                     yield r
 
             # 2. one or more dataset content paths
@@ -267,7 +267,7 @@ class Install(Interface):
                     # (incl. adjusting parent's gitmodules when submodules end
                     # up in an "updated" state (done in get helpers)
                     # any required fixes should go there!
-                    r.update(dict(refds=refds_path))
+                    r['refds'] = refds_path
                     yield r
 
             # we are done here
@@ -360,7 +360,7 @@ class Install(Interface):
                 # coming back
                 assert(destination_dataset is None)
                 destination_dataset = as_ds(r)
-            r.update(dict(refds=refds_path))
+            r['refds'] = refds_path
             yield r
         assert(destination_dataset)
 
@@ -383,7 +383,7 @@ class Install(Interface):
                     return_type='generator',
                     result_xfm=None,
                     **common_kwargs):
-                r.update(dict(refds=refds_path))
+                r['refds'] = refds_path
                 yield r
         # at this point no futher post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)

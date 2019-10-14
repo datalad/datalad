@@ -160,7 +160,7 @@ def _install_subds_from_flexible_source(
             ds=ds,
             status='error',
             message=(
-                "Have got no candidates to install subdataset {} from.",
+                "Have got no candidates to install subdataset %s from.",
                 sm_path),
             logger=lgr,
         )
