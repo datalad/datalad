@@ -258,7 +258,9 @@ class Clone(Interface):
             try:
                 lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
                           source_, isource_ + 1, len(candidate_sources), dest_path)
-                GitRepo.clone(path=dest_path, url=source_, create=True)
+                # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
+                # doesn't make it happen seemlessly
+                GitRepo.clone(path=str(dest_path), url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
                 error_msgs[source_] = e
@@ -269,7 +271,9 @@ class Clone(Interface):
                               dest_path)
                     # We must not just rmtree since it might be curdir etc
                     # we should remove all files/directories under it
-                    rmtree(dest_path, children_only=dest_path_existed)
+                    # TODO stringification can be removed once patlib compatible
+                    # or if PY35 is no longer supported
+                    rmtree(str(dest_path), children_only=dest_path_existed)
                 # Whenever progress reporting is enabled, as it is now,
                 # we end up without e.stderr since it is "processed" out by
                 # GitPython/our progress handler.
