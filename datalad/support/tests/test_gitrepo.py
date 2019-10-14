@@ -1368,6 +1368,25 @@ def test_get_tags(path):
     eq_(gr.describe(commitish=first_commit), None)
     eq_(gr.describe(commitish=first_commit, tags=True), tags1[0]['name'])
 
+    gr.tag('specific', commit='HEAD~1')
+    eq_(gr.get_hexsha('specific'), gr.get_hexsha('HEAD~1'))
+    assert_in('specific', gr.get_tags(output='name'))
+
+    # retag a different commit
+    assert_raises(CommandError, gr.tag, 'specific', commit='HEAD')
+    # force it
+    gr.tag('specific', commit='HEAD', options=['-f'])
+    eq_(gr.get_hexsha('specific'), gr.get_hexsha('HEAD'))
+
+    # delete
+    gr.delete_tags(['specific'])
+    eq_(gr.get_tags(), tags2)
+    # more than one
+    gr.tag('one')
+    gr.tag('two')
+    gr.delete_tags(['one', 'two'])
+    eq_(gr.get_tags(), tags2)
+
 
 @with_tree(tree={'1': ""})
 def test_get_commit_date(path):
