@@ -13,8 +13,6 @@ import logging
 import os
 import re
 from collections import OrderedDict
-from os import listdir
-import os.path as op
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -183,7 +181,7 @@ class Clone(Interface):
             refds=refds_path, source_url=source_url)
 
         # important test! based on this `rmtree` will happen below after failed clone
-        if op.exists(dest_path) and listdir(dest_path):
+        if dest_path.exists() and any(dest_path.iterdir()):
             if destination_dataset.is_installed():
                 # check if dest was cloned from the given source before
                 # this is where we would have installed this from
@@ -207,11 +205,11 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if ds is not None and op.relpath(path, start=ds.path).startswith(op.pardir):
+        if ds is not None and ds.pathobj not in dest_path.parents:
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
-                         path, ds),
+                         dest_path, ds),
                 **status_kwargs)
             return
 
@@ -227,7 +225,7 @@ class Clone(Interface):
             else ''
         lgr.info("Cloning %s%s into '%s'",
                  source, candidates_str, dest_path)
-        dest_path_existed = op.exists(dest_path)
+        dest_path_existed = dest_path.exists()
         error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
         for isource_, source_ in enumerate(candidate_sources):
             try:
@@ -239,7 +237,7 @@ class Clone(Interface):
                 error_msgs[source_] = e
                 lgr.debug("Failed to clone from URL: %s (%s)",
                           source_, exc_str(e))
-                if op.exists(dest_path):
+                if dest_path.exists():
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
                     # We must not just rmtree since it might be curdir etc
