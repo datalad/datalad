@@ -44,7 +44,7 @@ from datalad.utils import (
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
-    resolve_path,
+    rev_resolve_path,
     require_dataset,
     EnsureDataset,
 )
@@ -132,10 +132,10 @@ class Clone(Interface):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
-        dataset = require_dataset(
+        ds = require_dataset(
             dataset, check_installed=True, purpose='cloning') \
             if dataset is not None else dataset
-        refds_path = dataset.path if dataset else None
+        refds_path = ds.path if ds else None
 
         if isinstance(source, Dataset):
             source = source.path
@@ -151,7 +151,7 @@ class Clone(Interface):
                     path))
 
         if path is not None:
-            path = resolve_path(path, dataset)
+            path = rev_resolve_path(path, dataset)
 
         # Possibly do conversion from source into a git-friendly url
         # luckily GitRepo will undo any fancy file:/// url to make use of Git's
@@ -168,7 +168,7 @@ class Clone(Interface):
             # and derive the path from the source and continue
             path = _get_installationpath_from_url(source)
             # since this is a relative `path`, resolve it:
-            path = resolve_path(path, dataset)
+            path = rev_resolve_path(path, dataset)
             lgr.debug("Determined clone target path from source")
         lgr.debug("Resolved clone target path to: '%s'", path)
 
@@ -207,11 +207,11 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if dataset is not None and op.relpath(path, start=dataset.path).startswith(op.pardir):
+        if ds is not None and op.relpath(path, start=ds.path).startswith(op.pardir):
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
-                         path, dataset),
+                         path, ds),
                 **status_kwargs)
             return
 
@@ -291,10 +291,10 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if dataset is not None:
+        if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.save(
+            for r in ds.save(
                     dest_path,
                     return_type='generator',
                     result_filter=None,
