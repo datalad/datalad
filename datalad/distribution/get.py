@@ -145,10 +145,6 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
 def _install_subds_from_flexible_source(
         ds, sm_path, sm_url, reckless, description=None):
     """Tries to obtain a given subdataset from several meaningful locations"""
-    # TODO remove this assertion eventually, for now it assures intented
-    # usage of this helper function
-    assert(sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'))
-
     # compose a list of candidate clone URLs
     clone_urls = _get_flexible_source_candidates_for_submodule(
         ds, sm_path, sm_url)
