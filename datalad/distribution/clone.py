@@ -14,41 +14,47 @@ import os
 import re
 from collections import OrderedDict
 from os import listdir
-from os.path import relpath
-from os.path import pardir
-from os.path import exists
+import os.path as op
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import location_description
-# from datalad.interface.common_opts import git_opts
-# from datalad.interface.common_opts import git_clone_opts
-# from datalad.interface.common_opts import annex_opts
-# from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import reckless_opt
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureKeyChoice
+from datalad.interface.common_opts import (
+    location_description,
+    reckless_opt,
+)
+from datalad.support.gitrepo import (
+    GitRepo,
+    GitCommandError,
+)
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+    EnsureKeyChoice,
+)
 from datalad.support.param import Parameter
 from datalad.support.network import get_local_file_url
 from datalad.dochelpers import exc_str
-from datalad.utils import rmtree
-from datalad.utils import assure_list
+from datalad.utils import (
+    rmtree,
+    assure_list,
+)
 
-from .dataset import Dataset
-from .dataset import datasetmethod
-from .dataset import resolve_path
-from .dataset import require_dataset
-from .dataset import EnsureDataset
-from .utils import _get_git_url_from_source
-from .utils import _get_tracking_source
-from .utils import _get_flexible_source_candidates
-from .utils import _handle_possible_annex_dataset
-from .utils import _get_installationpath_from_url
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    resolve_path,
+    require_dataset,
+    EnsureDataset,
+)
+from datalad.distribution.utils import (
+    _get_git_url_from_source,
+    _get_tracking_source,
+    _get_flexible_source_candidates,
+    _handle_possible_annex_dataset,
+    _get_installationpath_from_url,
+)
 
 __docformat__ = 'restructuredtext'
 
@@ -110,11 +116,6 @@ class Clone(Interface):
             doc="""Alternative sources to be tried if a dataset cannot
             be obtained from the main `source`""",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO next ones should be there, but cannot go anywhere
-        # git_opts=git_opts,
-        # git_clone_opts=git_clone_opts,
-        # annex_opts=annex_opts,
-        # annex_init_opts=annex_init_opts,
     )
 
     @staticmethod
@@ -127,11 +128,6 @@ class Clone(Interface):
             description=None,
             reckless=False,
             alt_sources=None):
-            # TODO next ones should be there, but cannot go anywhere
-            # git_opts=None,
-            # git_clone_opts=None,
-            # annex_opts=None,
-            # annex_init_opts=None
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -187,7 +183,7 @@ class Clone(Interface):
             refds=refds_path, source_url=source_url)
 
         # important test! based on this `rmtree` will happen below after failed clone
-        if exists(dest_path) and listdir(dest_path):
+        if op.exists(dest_path) and listdir(dest_path):
             if destination_dataset.is_installed():
                 # check if dest was cloned from the given source before
                 # this is where we would have installed this from
@@ -211,7 +207,7 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if dataset is not None and relpath(path, start=dataset.path).startswith(pardir):
+        if dataset is not None and op.relpath(path, start=dataset.path).startswith(op.pardir):
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
@@ -231,7 +227,7 @@ class Clone(Interface):
             else ''
         lgr.info("Cloning %s%s into '%s'",
                  source, candidates_str, dest_path)
-        dest_path_existed = exists(dest_path)
+        dest_path_existed = op.exists(dest_path)
         error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
         for isource_, source_ in enumerate(candidate_sources):
             try:
@@ -243,7 +239,7 @@ class Clone(Interface):
                 error_msgs[source_] = e
                 lgr.debug("Failed to clone from URL: %s (%s)",
                           source_, exc_str(e))
-                if exists(dest_path):
+                if op.exists(dest_path):
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
                     # We must not just rmtree since it might be curdir etc
