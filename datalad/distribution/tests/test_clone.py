@@ -59,6 +59,7 @@ from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import skip_if
+from ..clone import _get_installationpath_from_url
 
 from ..dataset import Dataset
 
@@ -367,3 +368,29 @@ def test_autoenabled_remote_msg(path):
         res = clone('///repronim/containers', path)
         assert_status('ok', res)
         assert_not_in("not auto-enabled", cml.out)
+
+
+def test_installationpath_from_url():
+    for p in ('lastbit',
+              'lastbit/',
+              '/lastbit',
+              'lastbit.git',
+              'lastbit.git/',
+              'http://example.com/lastbit',
+              'http://example.com/lastbit.git',
+              'http://lastbit:8000'
+              ):
+        eq_(_get_installationpath_from_url(p), 'lastbit')
+    # we need to deal with quoted urls
+    for url in (
+        # although some docs say that space could've been replaced with +
+        'http://localhost:8000/+last%20bit',
+        'http://localhost:8000/%2Blast%20bit',
+        '///%2Blast%20bit',
+        '///d1/%2Blast%20bit',
+        '///d1/+last bit',
+    ):
+        eq_(_get_installationpath_from_url(url), '+last bit')
+    # and the hostname alone
+    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
+    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')

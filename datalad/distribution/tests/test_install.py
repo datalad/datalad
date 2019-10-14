@@ -75,38 +75,11 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_installationpath_from_url
 from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
-
-
-def test_installationpath_from_url():
-    for p in ('lastbit',
-              'lastbit/',
-              '/lastbit',
-              'lastbit.git',
-              'lastbit.git/',
-              'http://example.com/lastbit',
-              'http://example.com/lastbit.git',
-              'http://lastbit:8000'
-              ):
-        eq_(_get_installationpath_from_url(p), 'lastbit')
-    # we need to deal with quoted urls
-    for url in (
-        # although some docs say that space could've been replaced with +
-        'http://localhost:8000/+last%20bit',
-        'http://localhost:8000/%2Blast%20bit',
-        '///%2Blast%20bit',
-        '///d1/%2Blast%20bit',
-        '///d1/+last bit',
-    ):
-        eq_(_get_installationpath_from_url(url), '+last bit')
-    # and the hostname alone
-    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
-    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
