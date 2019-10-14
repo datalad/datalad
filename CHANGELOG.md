@@ -63,9 +63,9 @@ bet we will fix some bugs and make a world even a better place.
   hyphen's were incorrectly rendered in the HTML output en-dash's.
   ([#3692][])
 
-- [create][] treated paths as relative to the dataset even when the
-  string form was given, violating the new path handling rules.
-  ([#3749][])
+- [create][], [install][], and [clone][] treated paths as relative to
+  the dataset even when the string form was given, violating the new
+  path handling rules.  ([#3749][]) ([#3777][]) ([#3780][])
 
 - Providing the "^" shortcut to `--dataset` didn't work properly when
   called from a subdirectory of a subdataset.  ([#3772][])
@@ -92,6 +92,12 @@ bet we will fix some bugs and make a world even a better place.
     which `contains` arguments matched a given subdataset.
   - yields an 'impossible' result record when a `contains` argument
     wasn't matched to any of the reported subdatasets.
+
+- [install][] now shows more readable output when cloning fails.
+  ([#3775][])
+
+- `SSHConnection` now displays a more informative error message when
+  it cannot start the `ControlMaster` process.  ([#3776][])
 
 - If the new configuration option `datalad.log.result-level` is set to
   a single level, all result records will be logged at that level.  If
@@ -1974,3 +1980,7 @@ publishing
 [#3769]: https://github.com/datalad/datalad/issues/3769
 [#3770]: https://github.com/datalad/datalad/issues/3770
 [#3772]: https://github.com/datalad/datalad/issues/3772
+[#3775]: https://github.com/datalad/datalad/issues/3775
+[#3776]: https://github.com/datalad/datalad/issues/3776
+[#3777]: https://github.com/datalad/datalad/issues/3777
+[#3780]: https://github.com/datalad/datalad/issues/3780

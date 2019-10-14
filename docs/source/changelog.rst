@@ -86,10 +86,15 @@ Fixes
    hyphen’s were incorrectly rendered in the HTML output en-dash’s.
    (`#3692 <https://github.com/datalad/datalad/issues/3692>`__)
 
--  `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__
+-  `create <http://datalad.readthedocs.io/en/latest/generated/man/datalad-create.html>`__,
+   `install <http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html>`__,
+   and
+   `clone <http://datalad.readthedocs.io/en/latest/generated/man/datalad-clone.html>`__
    treated paths as relative to the dataset even when the string form
    was given, violating the new path handling rules.
    (`#3749 <https://github.com/datalad/datalad/issues/3749>`__)
+   (`#3777 <https://github.com/datalad/datalad/issues/3777>`__)
+   (`#3780 <https://github.com/datalad/datalad/issues/3780>`__)
 
 -  Providing the “^” shortcut to ``--dataset`` didn’t work properly when
    called from a subdirectory of a subdataset.
@@ -127,6 +132,14 @@ Enhancements and new features
       lists which ``contains`` arguments matched a given subdataset.
    -  yields an ‘impossible’ result record when a ``contains`` argument
       wasn’t matched to any of the reported subdatasets.
+
+-  `install <http://datalad.readthedocs.io/en/latest/generated/man/datalad-install.html>`__
+   now shows more readable output when cloning fails.
+   (`#3775 <https://github.com/datalad/datalad/issues/3775>`__)
+
+-  ``SSHConnection`` now displays a more informative error message when
+   it cannot start the ``ControlMaster`` process.
+   (`#3776 <https://github.com/datalad/datalad/issues/3776>`__)
 
 -  If the new configuration option ``datalad.log.result-level`` is set
    to a single level, all result records will be logged at that level.
