@@ -27,7 +27,10 @@ from shlex import quote as sh_quote
 # on initial import datalad time
 # from datalad.support.network import RI, is_ssh
 
-from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import (
+    CommandError,
+    ConnectionOpenFailedError,
+)
 from datalad.dochelpers import exc_str
 from datalad.utils import (
     auto_repr,
@@ -233,13 +236,19 @@ class SSHConnection(object):
     def open(self):
         """Opens the connection.
 
-        In other words: Creates the SSH controlmaster to be used by this
+        In other words: Creates the SSH ControlMaster to be used by this
         connection, if it is not there already.
 
         Returns
         -------
         bool
-          Whether SSH reports success opening the connection
+          True when SSH reports success opening the connection, False when
+          a ControlMaster for an open connection already exists.
+
+        Raises
+        ------
+        ConnectionOpenFailedError
+          When starting the SSH ControlMaster process failed.
         """
         # the socket should vanish almost instantly when the connection closes
         # sending explicit 'check' commands to the control master is expensive
@@ -248,7 +257,7 @@ class SSHConnection(object):
         # master without exiting) it should be relatively safe to just perform
         # the much cheaper check of an existing control path
         if self.ctrl_path.exists():
-            return
+            return False
 
         # set control options
         ctrl_options = ["-fN",
@@ -267,16 +276,17 @@ class SSHConnection(object):
         # wait till the command exits, connection is conclusively
         # open or not at this point
         exit_code = proc.wait()
-        ret = exit_code == 0
 
-        if not ret:
-            lgr.warning(
-                "Failed to run cmd %s. Exit code=%s\nstdout: %s\nstderr: %s",
-                cmd, exit_code, stdout, stderr
+        if exit_code != 0:
+            raise ConnectionOpenFailedError(
+                str(cmd),
+                'Failed to open SSH connection (could not start ControlMaster process)',
+                exit_code,
+                stdout,
+                stderr,
             )
-        else:
-            self._opened_by_us = True
-        return ret
+        self._opened_by_us = True
+        return True
 
     def close(self):
         """Closes the connection.
