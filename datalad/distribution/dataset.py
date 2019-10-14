@@ -263,18 +263,17 @@ class Dataset(object, metaclass=Flyweight):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
+                # TODO: Checking _unique_instances might be superfluous here
                 if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        AnnexRepo.is_valid_repo(self._repo.path,
-                                                allow_noninitialized=True):
+                        self._repo.path, None) and self._repo.is_valid_annex(allow_noninitialized=True):
                     # it's still the object registered as flyweight and it's a
                     # valid annex repo
                     return self._repo
             elif isinstance(self._repo, GitRepo):
                 # it's supposed to be a plain git
+                # TODO: Checking _unique_instances might be superfluous here
                 if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        GitRepo.is_valid_repo(self._repo.path) and not \
+                        self._repo.path, None) and self._repo.is_valid_git() and not \
                         self._repo.is_with_annex():
                     # it's still the object registered as flyweight, it's a
                     # valid git repo and it hasn't turned into an annex
@@ -288,8 +287,7 @@ class Dataset(object, metaclass=Flyweight):
         # actually new instance. This is unnecessarily costly.
         valid = False
         for cls, ckw, kw in (
-                # TODO: Do we really want to allow_noninitialized=True here?
-                # And if so, leave a proper comment!
+                # Non-initialized is okay. We want to figure the correct instance to represent waht's there - that's it.
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):
