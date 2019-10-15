@@ -631,6 +631,43 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         """
 
+        # BEGIN Repo validity test
+        # We want to fail early for tests, that would be performed a lot. In particular this is about
+        # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
+        # __init__ to then test the same things again. If we fail early we can save the additional test from outer scope.
+        self.path = path
+
+        # Note, that the following three path objects are used often and therefore
+        # are stored for performance. Path object creation comes with a cost. Most noteably,
+        # this is used for validity checking of the repository.
+        self.pathobj = ut.Path(self.path)
+        # TODO: we might want to figure out the target of a potential .git-file right here, instead of reading it
+        #       on every call to is_valid_git. Also is_valid_git and is_valid_repo come with their own implementation
+        #       while we have get_git_dir as well.
+        self._dot_git = self.pathobj / '.git'
+        self._valid_git_test_path = self._dot_git / 'HEAD'
+        _valid_repo = self.is_valid_git()
+
+        do_create = False
+        if create and not _valid_repo:
+            if repo is not None:
+                # `repo` passed with `create`, which doesn't make sense
+                raise TypeError("argument 'repo' must not be used with 'create'")
+            do_create = True
+        else:
+            # Note: We used to call gitpy.Repo(path) here, which potentially
+            # raised NoSuchPathError or InvalidGitRepositoryError. This is
+            # used by callers of GitRepo.__init__() to detect whether we have a
+            # valid repo at `path`. Now, with switching to lazy loading property
+            # `repo`, we detect those cases without instantiating a
+            # gitpy.Repo().
+
+            if not exists(path):
+                raise NoSuchPathError(path)
+            if not _valid_repo:
+                raise InvalidGitRepositoryError(path)
+        # END Repo validity test
+
         if url is not None:
             raise DeprecatedError(
                 new=".clone() class method",
@@ -662,39 +699,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         if kwargs:
             git_opts.update(kwargs)
 
-        self.path = path
-
-        # Note, that the following three path objects are used often and therefore
-        # are stored for performance. Path object creation comes with a cost. Most noteably,
-        # this is used for validity checking of the repository.
-        self.pathobj = ut.Path(self.path)
-        self._dot_git = self.pathobj / '.git'
-        self._valid_git_test_path = self._dot_git / 'HEAD'
-
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._repo = repo
         self._cfg = None
 
-        _valid_repo = self.is_valid_git()
-        if create and not _valid_repo:
-            if repo is not None:
-                # `repo` passed with `create`, which doesn't make sense
-                raise TypeError("argument 'repo' must not be used with 'create'")
-            self._create_empty_repo(path,
-                                    create_sanity_checks, **git_opts)
-
-        else:
-            # Note: We used to call gitpy.Repo(path) here, which potentially
-            # raised NoSuchPathError or InvalidGitRepositoryError. This is
-            # used by callers of GitRepo.__init__() to detect whether we have a
-            # valid repo at `path`. Now, with switching to lazy loading property
-            # `repo`, we detect those cases without instantiating a
-            # gitpy.Repo().
-
-            if not exists(path):
-                raise NoSuchPathError(path)
-            if not _valid_repo:
-                raise InvalidGitRepositoryError(path)
+        if do_create:  # we figured it out ealier
+            self._repo = self._create_empty_repo(path,
+                                                 create_sanity_checks, **git_opts)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents

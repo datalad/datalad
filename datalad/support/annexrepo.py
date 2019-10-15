@@ -187,6 +187,53 @@ class AnnexRepo(GitRepo, RepoInterface):
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        # BEGIN Repo validity test
+        # We want to fail early for tests, that would be performed a lot. In particular this is about
+        # AnnexRepo.is_valid_repo. We would use the latter to decide whether or not to call AnnexRepo() only for
+        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
+        # scope.
+        fix_it = False
+        do_init = False
+        try:
+            super(AnnexRepo, self).__init__(
+                path, url, runner=runner,
+                create=create, create_sanity_checks=create_sanity_checks,
+                repo=repo, git_opts=git_opts, fake_dates=fake_dates)
+        except GitCommandError as e:
+            # XXX Ben: This seems outdated, since cloning shouldn't happen in GitRepo() anymore.
+            #          Needs double-check whether this is true and whether it needs to be moved to the clone routine.
+            if create and "Clone succeeded, but checkout failed." in str(e):
+                lgr.warning("Experienced issues while cloning. "
+                            "Trying to fix it, using git-annex-fsck.")
+                fix_it = True
+                do_init = True
+            else:
+                raise e
+
+        # Check whether an annex already exists at destination
+        # XXX this doesn't work for a submodule!
+
+        # NOTE: We are in __init__ here and already know that GitRepo.is_valid_git is True, since super.__init__  was
+        #       called. Therefore: check_git=False
+        if not fix_it and not self.is_valid_annex(check_git=False):
+            # so either it is not annex at all or just was not yet initialized
+            # TODO: There's still potential to get a bit more performant. is_with_annex() is checking again, what
+            #       is_valid_annex did. However, this marginal here, considering the call to git-annex-init.
+            if self.is_with_annex():
+                # it is an annex repository which was not initialized yet
+                if create or init:
+                    lgr.debug('Annex repository was not yet initialized at %s.'
+                              ' Initializing ...' % self.path)
+                    do_init = True
+            elif create:
+                lgr.debug('Initializing annex repository at %s...' % self.path)
+                do_init = True
+            else:
+                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
+
+        # END Repo validity test
+
         # initialize
         self._uuid = None
         self._annex_common_options = []
@@ -197,20 +244,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                         "options received:\n"
                         "git-annex: %s\ngit-annex-init: %s" %
                         (annex_opts, annex_init_opts))
-
-        fix_it = False
-        try:
-            super(AnnexRepo, self).__init__(
-                path, url, runner=runner,
-                create=create, create_sanity_checks=create_sanity_checks,
-                repo=repo, git_opts=git_opts, fake_dates=fake_dates)
-        except GitCommandError as e:
-            if create and "Clone succeeded, but checkout failed." in str(e):
-                lgr.warning("Experienced issues while cloning. "
-                            "Trying to fix it, using git-annex-fsck.")
-                fix_it = True
-            else:
-                raise e
 
         # Below was initially introduced for setting for direct mode workaround,
         # where we changed _GIT_COMMON_OPTIONS and had to avoid passing
@@ -241,30 +274,11 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not version:
                 version = None
 
-        if fix_it:
+        if do_init:
             self._init(version=version, description=description)
-            self.fsck()
+            if fix_it:
+                self.fsck()
 
-        # Check whether an annex already exists at destination
-        # XXX this doesn't work for a submodule!
-
-        # NOTE: We are in __init__ here and already know that GitRepo.is_valid_git is True, since super.__init__  was
-        #       called.
-        if not self.is_valid_annex(check_git=False):
-            # so either it is not annex at all or just was not yet initialized
-            # TODO: There's still potential to get a bit more performant. is_with_annex() is checking again, what
-            #       is_valid_annex did. However, this marginal here, considering the call to git-annex-init.
-            if self.is_with_annex():
-                # it is an annex repository which was not initialized yet
-                if create or init:
-                    lgr.debug('Annex repository was not yet initialized at %s.'
-                              ' Initializing ...' % self.path)
-                    self._init(version=version, description=description)
-            elif create:
-                lgr.debug('Initializing annex repository at %s...' % self.path)
-                self._init(version=version, description=description)
-            else:
-                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
         # and _set_direct_mode
