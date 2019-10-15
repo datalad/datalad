@@ -719,25 +719,22 @@ class AnnexRepo(GitRepo, RepoInterface):
                     lgr.debug("Invalid .git file: %s", p)
                     return False
 
+        initialized_annex = (self.is_valid_git() if check_git else True) and (
+                (self._dot_git / 'annex').exists() or git_file_has_annex(self._dot_git)
+        )
+
         if allow_noninitialized:
             try:
-                return (self.is_valid_git() if check_git else True) and self.is_with_annex()
+                return initialized_annex or ((self.is_valid_git() if check_git else True) and self.is_with_annex())
             except (NoSuchPathError, InvalidGitRepositoryError):
                 return False
         else:
-            initialized_annex = (self.is_valid_git() if check_git else True) and (
-                    (self._dot_git / 'annex').exists() or git_file_has_annex(self._dot_git)
-            )
             return initialized_annex
 
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository
         """
-        # Note: default value for allow_noninitialized=False is important
-        # for invalidating an instance via self._flyweight_invalid. If this is
-        # changed, we also need to override _flyweight_invalid and explicitly
-        # pass allow_noninitialized=False!
 
         def git_file_has_annex(p):
             """Return True if `p` contains a .git file, that points to a git
@@ -753,15 +750,16 @@ class AnnexRepo(GitRepo, RepoInterface):
                     lgr.debug("Invalid .git file: %s", _git)
                     return False
 
+        initialized_annex = GitRepo.is_valid_repo(path) and \
+                            (exists(opj(path, '.git', 'annex')) or
+                             git_file_has_annex(path))
+
         if allow_noninitialized:
             try:
-                return GitRepo(path, create=False, init=False).is_with_annex()
+                return initialized_annex or GitRepo(path, create=False, init=False).is_with_annex()
             except (NoSuchPathError, InvalidGitRepositoryError):
                 return False
         else:
-            initialized_annex = GitRepo.is_valid_repo(path) and \
-                                (exists(opj(path, '.git', 'annex')) or
-                                 git_file_has_annex(path))
             return initialized_annex
 
     def add_remote(self, name, url, options=None):
