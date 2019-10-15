@@ -1553,3 +1553,38 @@ def test_gitrepo_add_to_git_with_annex_v7(path):
     gr.add("foo")
     gr.commit(msg="c1")
     assert_false(ar.is_under_annex("foo"))
+
+
+@with_tree({"foo": "foo", "bar": "bar"})
+def test_gitrepo_call_git_methods(path):
+    gr = GitRepo(path)
+    gr.add(["foo", "bar"])
+    gr.commit(msg="foobar")
+    gr.call_git(["mv"], files=["foo", "foo.txt"])
+    ok_(op.exists(op.join(gr.path, 'foo.txt')))
+
+    for expect_fail, check in [(False, assert_in),
+                               (True, assert_not_in)]:
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            with assert_raises(CommandError):
+                gr.call_git(["mv"], files=["notthere", "dest"],
+                            expect_fail=expect_fail)
+            check("notthere", cml.out)
+
+    eq_(list(gr.call_git_items_(["ls-files"])),
+        ["bar", "foo.txt"])
+    eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0")),
+        # Note: The custom separator has trailing empty item, but this is an
+        # arbitrary command with unknown output it isn't safe to trim it.
+        ["bar", "foo.txt", ""])
+
+    with assert_raises(AssertionError):
+        gr.call_git_oneline(["ls-files"])
+
+    eq_(gr.call_git_oneline(["ls-files"], files=["bar"]),
+        "bar")
+
+    ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
+        assert_not_in("blob", cml.out)
