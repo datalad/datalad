@@ -263,7 +263,16 @@ class Dataset(object, metaclass=Flyweight):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
-                # TODO: Checking _unique_instances might be superfluous here
+                # Note, that checking object equivalence with flyweight dict is much cheaper, than
+                # letting flyweight do the checks by calling AnnexRepo(self._repo.path). However, if we can conclude
+                # equivalence from validity it doesn't need to be there in addition.
+                # TODO: This could be just a call to self._repo._flyweight_invalid, if it wasn't for the issue with
+                #       initializing annex via parameter to AnnexRepo.__init__ (see AnnexRepo._flyweight_invalid())
+                #       That way we would do the same thing without instantiating a new one. allow_noninitialized=True
+                #       is the crucial barrier here.
+                #       Also: the call to _flyweight_invalid would be done in order to reduce code duplication.
+                #       is_valid_annex would do, but this needs to be consistent with AnnexRepo's flyweight
+                #       implementation.
                 if self._repo is AnnexRepo._unique_instances.get(
                         self._repo.path, None) and self._repo.is_valid_annex(allow_noninitialized=True):
                     # it's still the object registered as flyweight and it's a
