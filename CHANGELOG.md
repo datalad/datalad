@@ -77,6 +77,17 @@ bet we will fix some bugs and make a world even a better place.
   strings as the `cfg_proc` argument to [create][], but the string
   form was mishandled.  ([#3761][])
 
+- Incorrect command quoting for SSH calls on Windows that rendered
+  basic SSH-related functionality (e.g., [sshrun][]) on Windows
+  unusable.  ([#3688][])
+
+- Annex JSON result handling assumed platform-specific paths on Windows
+  instead of the POSIX-style that is happening across all platforms.
+  ([#3719][])
+
+- `path_is_under()` was incapable of comparing Windows paths with different
+  drive letters.  ([#3728][])
+
 ### Enhancements and new features
 
 - [status][] gained a `--report-filetype`.  Setting it to "raw" can
@@ -1958,6 +1969,7 @@ publishing
 [#3678]: https://github.com/datalad/datalad/issues/3678
 [#3680]: https://github.com/datalad/datalad/issues/3680
 [#3682]: https://github.com/datalad/datalad/issues/3682
+[#3688]: https://github.com/datalad/datalad/issues/3688
 [#3692]: https://github.com/datalad/datalad/issues/3692
 [#3693]: https://github.com/datalad/datalad/issues/3693
 [#3695]: https://github.com/datalad/datalad/issues/3695
@@ -1968,6 +1980,8 @@ publishing
 [#3705]: https://github.com/datalad/datalad/issues/3705
 [#3712]: https://github.com/datalad/datalad/issues/3712
 [#3715]: https://github.com/datalad/datalad/issues/3715
+[#3719]: https://github.com/datalad/datalad/issues/3719
+[#3728]: https://github.com/datalad/datalad/issues/3728
 [#3743]: https://github.com/datalad/datalad/issues/3743
 [#3746]: https://github.com/datalad/datalad/issues/3746
 [#3747]: https://github.com/datalad/datalad/issues/3747
