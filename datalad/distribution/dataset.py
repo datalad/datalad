@@ -287,7 +287,7 @@ class Dataset(object, metaclass=Flyweight):
         # actually new instance. This is unnecessarily costly.
         valid = False
         for cls, ckw, kw in (
-                # Non-initialized is okay. We want to figure the correct instance to represent waht's there - that's it.
+                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):

@@ -112,8 +112,10 @@ class AnnexRepo(GitRepo, RepoInterface):
     _unique_instances = WeakValueDictionary()
 
     def _flyweight_invalid(self):
-        # Non initialized annex shouldn't invalidate this AnnexRepo instance.
-        return not self.is_valid_annex(allow_noninitialized=True)
+        # TODO: Non initialized annex shouldn't invalidate this AnnexRepo instance.
+        #       However, currently needed at least in distribution/utils.py: _handle_possible_annex_dataset()
+        #       Figure out where else AnnexRepo() (and GitRepo()) are used as if there were direct calls to __init__.
+        return not self.is_valid_annex(allow_noninitialized=False)
 
     # End Flyweight:
 

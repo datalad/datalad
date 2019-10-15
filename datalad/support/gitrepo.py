@@ -682,6 +682,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 raise TypeError("argument 'repo' must not be used with 'create'")
             self._create_empty_repo(path,
                                     create_sanity_checks, **git_opts)
+
         else:
             # Note: We used to call gitpy.Repo(path) here, which potentially
             # raised NoSuchPathError or InvalidGitRepositoryError. This is
@@ -775,6 +776,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         else:
             inode = None
         if self.inode != inode:
+
+            # TODO: - what if we never had any inode? possible?
+            #       - also: call to self._repo and only afterwards checking whether it's None seems strange
+
             # reset background processes invoked by GitPython:
             self._repo.git.clear_cache()
             self.inode = inode
