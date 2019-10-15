@@ -145,10 +145,6 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
 def _install_subds_from_flexible_source(
         ds, sm_path, sm_url, reckless, description=None):
     """Tries to obtain a given subdataset from several meaningful locations"""
-    # TODO remove this assertion eventually, for now it assures intented
-    # usage of this helper function
-    assert(sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'))
-
     # compose a list of candidate clone URLs
     clone_urls = _get_flexible_source_candidates_for_submodule(
         ds, sm_path, sm_url)
@@ -158,14 +154,20 @@ def _install_subds_from_flexible_source(
     clone_urls = [src for src in clone_urls if src != dest_path]
 
     if not clone_urls:
-        raise InstallFailedError(
-            msg="Have got no candidates to install subdataset {} from".format(
-                sm_path))
+        # yield error
+        yield get_status_dict(
+            action='install',
+            ds=ds,
+            status='error',
+            message=(
+                "Have got no candidates to install subdataset %s from.",
+                sm_path),
+            logger=lgr,
+        )
+        return
 
     # now loop over all candidates and try to clone
-    subds = None
-    try:
-        subds = Clone.__call__(
+    for res in Clone.__call__(
             clone_urls[0],
             path=dest_path,
             # pretend no parent -- we don't want clone to add to ds
@@ -175,32 +177,23 @@ def _install_subds_from_flexible_source(
             # if we have more than one source, pass as alternatives
             alt_sources=clone_urls[1:],
             description=description,
-            result_xfm='datasets',
-            # not really need, but should protect against future RF
-            on_failure='stop',
+            result_xfm=None,
+            # we yield all an have the caller decide
+            on_failure='ignore',
             result_renderer='disabled',
-            return_type='item-or-list')
-        # failure will raise an exception, hence if we got here we can
-        # leave the loop and have a successful clone
-    except IncompleteResultsError:
-        # details of the failure are logged already by common code
-        pass
-    except Exception as exc:
-        lgr.warning("Something went wrong while installing %s: %s",
-                    sm_path, exc_str(exc))
-    if subds is None:
-        raise InstallFailedError(
-            msg="Failed to install dataset from{}: {}".format(
-                ' any of' if len(clone_urls) > 1 else '',
-                clone_urls))
+            return_type='generator'):
+        yield res
 
-    assert(subds.is_installed())
+    subds = Dataset(dest_path)
+    if not subds.is_installed():
+        lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
+        return
+
     _fixup_submodule_dotgit_setup(ds, sm_path)
 
     # do fancy update
     lgr.debug("Update cloned subdataset {0} in parent".format(subds))
     # TODO: move all of that into update_submodule ??
-    # TODO: direct mode ramifications?
     # track branch originally cloned
     subrepo = subds.repo
     branch = subrepo.get_active_branch()
@@ -236,7 +229,6 @@ def _install_subds_from_flexible_source(
                 "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
                 subrepo.path, branch, detached_hexsha[:8]
             )
-    return subds
 
 
 def _install_necessary_subdatasets(
@@ -271,26 +263,28 @@ def _install_necessary_subdatasets(
     while not GitRepo.is_valid_repo(cur_subds['path']):
         # install using helper that give some flexibility regarding where to
         # get the module from
-        try:
-            sd = _install_subds_from_flexible_source(
+        for res in _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
                 op.relpath(cur_subds['path'], start=cur_subds['parentds']),
                 cur_subds['gitmodule_url'],
                 reckless,
-                description=description)
-        except Exception as e:
-            # skip all of downstairs, if we didn't manage to install subdataset
-            yield get_status_dict(
-                'install', path=cur_subds['path'], type='dataset',
-                status='error', logger=lgr, refds=refds_path,
-                message=("Installation of subdatasets %s failed with exception: %s",
-                         cur_subds['path'], exc_str(e)))
-            return
-
-        # report installation, whether it helped or not
-        yield get_status_dict(
-            'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
-            message=("Installed subdataset in order to get %s", str(path)))
+                description=description):
+            if res.get('action', None) == 'install':
+                if res['status'] == 'ok':
+                    # report installation, whether it helped or not
+                    res['message'] = (
+                        "Installed subdataset in order to get %s",
+                        str(path))
+                    # next subdataset candidate
+                    sd = Dataset(res['path'])
+                    yield res
+                elif res['status'] in ('impossible', 'error'):
+                    yield res
+                    # we cannot go deeper, we need to stop
+                    return
+                else:
+                    # report unconditionally to caller
+                    yield res
 
         # now check whether the just installed subds brought us any closer to
         # the target path
@@ -330,24 +324,16 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             # does not imply that everything below it does too
         else:
             # try to get this dataset
-            try:
-                subds = _install_subds_from_flexible_source(
+            for res in _install_subds_from_flexible_source(
                     ds,
                     op.relpath(sub['path'], start=ds.path),
                     sub['gitmodule_url'],
                     reckless,
-                    description=description)
-                yield get_status_dict(
-                    'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
-                    message=("Installed subdataset %s", subds), parentds=ds.path)
-            except Exception as e:
-                # skip all of downstairs, if we didn't manage to install subdataset
-                yield get_status_dict(
-                    'install', ds=subds, status='error', logger=lgr, refds=refds_path,
-                    message=("Installation of subdatasets %s failed with exception: %s",
-                             subds, exc_str(e)))
-                continue
-        # otherwise recurse
+                    description=description):
+                # yield everything to let the caller decide how to deal with
+                # errors
+                yield res
+        # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
                 subds,
