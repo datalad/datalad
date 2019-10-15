@@ -309,11 +309,11 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             # first deletions
             for dprop in assure_list(delete_property):
                 try:
-                    out, err = repo._git_custom_command(
-                        '', ['git', 'config', '--file', '.gitmodules',
-                             '--unset-all',
-                             'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
-                            ]
+                    repo.call_git(
+                        ['config', '--file', '.gitmodules',
+                         '--unset-all',
+                         'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
+                        ]
                     )
                 except CommandError:
                     yield get_status_dict(
@@ -341,12 +341,12 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                                 sm['path'].relative_to(refds_path)
                             ).replace(os.sep, '-')))
                 try:
-                    out, err = repo._git_custom_command(
-                        '', ['git', 'config', '--file', '.gitmodules',
-                             '--replace-all',
-                             'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
-                             str(val),
-                            ]
+                    repo.call_git(
+                        ['config', '--file', '.gitmodules',
+                         '--replace-all',
+                         'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
+                         str(val),
+                        ]
                     )
                 except CommandError as e:  # pragma: no cover
                     # this conditional may not be possible to reach, as

@@ -474,9 +474,8 @@ class TestAddArchiveOptions():
     @known_failure_githubci_win
     def test_add_delete_after_and_drop_subdir(self):
         os.mkdir(opj(self.annex.path, 'subdir'))
-        mv_out = self.annex._git_custom_command(
-            [],
-            ['git', 'mv', '1.tar', 'subdir']
+        mv_out = self.annex.call_git(
+            ['mv', '1.tar', 'subdir']
         )
         self.annex.commit("moved into subdir")
         with chpwd(self.annex.path):

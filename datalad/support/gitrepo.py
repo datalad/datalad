@@ -1562,16 +1562,11 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         -------
         bool
         """
-        try:
-            # Note: The peeling operator "^{commit}" is required so that
-            # rev-parse doesn't succeed if passed a full hexsha that is valid
-            # but doesn't exist.
-            self._git_custom_command(
-                "", ["git", "rev-parse", "--verify", commitish + "^{commit}"],
-                expect_fail=True)
-        except CommandError:
-            return False
-        return True
+        # Note: The peeling operator "^{commit}" is required so that rev-parse
+        # doesn't succeed if passed a full hexsha that is valid but doesn't
+        # exist.
+        return self.call_git_success(
+            ["rev-parse", "--verify", commitish + "^{commit}"])
 
     def get_merge_base(self, commitishes):
         """Get a merge base hexsha
@@ -1620,13 +1615,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         -------
         bool
         """
-        try:
-            self._git_custom_command(
-                "", ["git", "merge-base", "--is-ancestor", reva, revb],
-                expect_fail=True)
-        except CommandError:
-            return False
-        return True
+        return self.call_git_success(
+            ["merge-base", "--is-ancestor", reva, revb])
 
     def get_commit_date(self, branch=None, date='authored'):
         """Get the date stamp of the last commit (in a branch or head otherwise)

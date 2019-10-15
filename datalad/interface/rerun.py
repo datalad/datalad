@@ -406,12 +406,10 @@ def _rerun(dset, results, explicit=False):
                         dset.repo.checkout(new_parents[0])
                     if len(new_parents) > 1:
                         msg = dset.repo.format_commit("%B", res_hexsha)
-                        dset.repo._git_custom_command(
-                            None,
-                            ["git", "merge", "-m", msg,
+                        dset.repo.call_git(
+                            ["merge", "-m", msg,
                              "--no-ff", "--allow-unrelated-histories"] +
-                            new_parents[1:],
-                            check_fake_dates=True)
+                            new_parents[1:])
                     head = dset.repo.get_hexsha()
                     new_bases[res_hexsha] = head
             yield res

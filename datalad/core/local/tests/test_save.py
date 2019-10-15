@@ -153,7 +153,7 @@ def test_renamed_file():
         ds = Dataset(path).create(no_annex=no_annex)
         create_tree(path, {'old': ''})
         ds.repo.add('old')
-        ds.repo._git_custom_command(['old', 'new'], ['git', 'mv'])
+        ds.repo.call_git(["mv"], files=["old", "new"])
         ds.save(recursive=recursive)
         assert_repo_status(path)
 
