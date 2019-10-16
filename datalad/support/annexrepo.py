@@ -716,26 +716,20 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return toppath
 
+    # TODO:
+    def is_initialized(self):
+        """quick check whether this appears to be an annex-init'ed repo
+        """
+        # intended to avoid calling self._init, when it's not needed, since this check is clearly
+        # cheaper than git-annex-init (which would be safe to just call)
+
+        # return (self.dot_git / 'annex').exists()
+        raise NotImplementedError
+
     @borrowdoc(GitRepo, 'is_valid_git')
     def is_valid_annex(self, allow_noninitialized=False, check_git=True):
 
-        def git_file_has_annex(p):
-            """Return True if `p` is a .git file, that points to a git
-            dir with a subdir 'annex'"""
-
-            if not p.is_file():
-                return False
-            with p.open() as f:
-                line = f.readline()
-                if line.startswith("gitdir: "):
-                    return (p / line[8:] / 'annex').exists()
-                else:
-                    lgr.debug("Invalid .git file: %s", p)
-                    return False
-
-        initialized_annex = (self.is_valid_git() if check_git else True) and (
-                (self._dot_git / 'annex').exists() or git_file_has_annex(self._dot_git)
-        )
+        initialized_annex = (self.is_valid_git() if check_git else True) and (self.dot_git / 'annex').exists()
 
         if allow_noninitialized:
             try:

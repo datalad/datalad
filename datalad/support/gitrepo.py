@@ -634,18 +634,31 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # BEGIN Repo validity test
         # We want to fail early for tests, that would be performed a lot. In particular this is about
         # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
-        # __init__ to then test the same things again. If we fail early we can save the additional test from outer scope.
+        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
+        # scope.
         self.path = path
 
         # Note, that the following three path objects are used often and therefore
         # are stored for performance. Path object creation comes with a cost. Most noteably,
         # this is used for validity checking of the repository.
         self.pathobj = ut.Path(self.path)
-        # TODO: we might want to figure out the target of a potential .git-file right here, instead of reading it
-        #       on every call to is_valid_git. Also is_valid_git and is_valid_repo come with their own implementation
-        #       while we have get_git_dir as well.
-        self._dot_git = self.pathobj / '.git'
-        self._valid_git_test_path = self._dot_git / 'HEAD'
+        self.dot_git = self.pathobj / '.git'
+        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
+        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
+        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
+        #       pieces.
+        if self.dot_git.is_file():
+            with self.dot_git.open() as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    self.dot_git = self.pathobj / line[7:].strip()
+                else:
+                    raise InvalidGitRepositoryError("Invalid .git file")
+
+        elif self.dot_git.is_symlink():
+            self.dot_git = self.dot_git.resolve()
+
+        self._valid_git_test_path = self.dot_git / 'HEAD'
         _valid_repo = self.is_valid_git()
 
         do_create = False
@@ -965,8 +978,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         called.
         """
 
-        return self._dot_git.exists() and (
-            not self._dot_git.is_dir() or self._valid_git_test_path.exists()
+        return self.dot_git.exists() and (
+                not self.dot_git.is_dir() or self._valid_git_test_path.exists()
         )
 
     @classmethod
@@ -3918,9 +3931,9 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # .git-file
     path = opj(ds.path, relativepath)
     subds_dotgit = opj(path, ".git")
-    src_dotgit = GitRepo.get_git_dir(path)
 
-    if src_dotgit == '.git':
+    repo = GitRepo(path, create=False)
+    if repo.dot_git.parent == repo.pathobj:
         # this is what we want
         return
 
@@ -3928,13 +3941,13 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # done by git to find the checkout at the mountpoint of the
     # submodule, if we keep that, any git command will fail
     # after we move .git
-    GitRepo(path, init=False).config.unset(
-        'core.worktree', where='local')
+    # Ben: Shouldn't we re-setup a possible worktree afterwards?
+    repo.config.unset('core.worktree', where='local')
     # what we have here is some kind of reference, remove and
     # replace by the target
     os.remove(subds_dotgit)
     # make absolute
-    src_dotgit = opj(path, src_dotgit)
+    src_dotgit = str(repo.dot_git)
     # move .git
     from os import rename, listdir, rmdir
     assure_dir(subds_dotgit)

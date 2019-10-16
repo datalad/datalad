@@ -276,7 +276,8 @@ class _WhooshSearch(_Search):
 
         self.idx_obj = None
         # where does the bunny have the eggs?
-        self.index_dir = opj(self.ds.path, GitRepo.get_git_dir(ds), SEARCH_INDEX_DOTGITDIR)
+
+        self.index_dir = opj(str(self.ds.repo.dot_git), SEARCH_INDEX_DOTGITDIR)
         self._mk_search_index(force_reindex)
 
     def show_keys(self, mode):
