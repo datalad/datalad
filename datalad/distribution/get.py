@@ -46,8 +46,6 @@ from datalad.support.gitrepo import (
 )
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
-    InstallFailedError,
-    IncompleteResultsError,
 )
 from datalad.support.network import (
     URL,
@@ -55,7 +53,6 @@ from datalad.support.network import (
     urlquote,
 )
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.utils import (
@@ -70,6 +67,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
+    rev_get_dataset_root,
 )
 from datalad.distribution.clone import Clone
 from datalad.distribution.utils import _get_flexible_source_candidates
@@ -367,7 +365,12 @@ def _install_targetpath(
         yield dict(
             action='get',
             type='dataset',
-            path=ds.path,
+            # this cannot just be the dataset path, as the original
+            # situation of datasets avail on disk can have changed due
+            # to subdataset installation. It has to be actual subdataset
+            # it resides in, because this value is used to determine which
+            # dataset to call `annex-get` on
+            path=rev_get_dataset_root(target_path),
             status='notneeded',
             contains=[target_path],
             refds=refds_path,
