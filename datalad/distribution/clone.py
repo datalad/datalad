@@ -361,16 +361,14 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
         dataset.config.add(
             'annex.hardlink', 'true', where='local', reload=True)
     lgr.debug("Initializing annex repo at %s", dataset.path)
-    # XXX this is rather convoluted, init does init, but cannot
-    # set a description without `create=True`
-    # TODO (Ben): This is actually wrong. AnnexRepo() gives an instance, but it isn't a direct call to __init__
-    #             If there already is an instance __init__ might not be executed. For now, this is mitigated by
-    #             invalidating a flyweight instance if it's not initialized. However, that's a potentially costly
-    #             solution, since it means, that for as long as annex isn't initialized, each call to AnnexRepo creates
-    #             a new instance.
+    # Note, that we cannot enforce annex-init via AnnexRepo().
+    # If such an instance already exists, its __init__ will not be executed.
+    # Therefore do quick test once we have an object and decide whether to call its _init().
+    #
+    # Additionally, call init if we need to add a description (see #1403),
+    # since AnnexRepo.__init__ can only do it with create=True
     repo = AnnexRepo(dataset.path, init=True)
-    # so do manually see #1403
-    if description:
+    if not repo.is_initialized() or description:
         repo._init(description=description)
     if reckless:
         repo._run_annex_command('untrust', annex_options=['here'])

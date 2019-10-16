@@ -263,26 +263,24 @@ class Dataset(object, metaclass=Flyweight):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
-                # Note, that checking object equivalence with flyweight dict is much cheaper, than
-                # letting flyweight do the checks by calling AnnexRepo(self._repo.path). However, if we can conclude
-                # equivalence from validity it doesn't need to be there in addition.
-                # TODO: This could be just a call to self._repo._flyweight_invalid, if it wasn't for the issue with
-                #       initializing annex via parameter to AnnexRepo.__init__ (see AnnexRepo._flyweight_invalid())
-                #       That way we would do the same thing without instantiating a new one. allow_noninitialized=True
-                #       is the crucial barrier here.
-                #       Also: the call to _flyweight_invalid would be done in order to reduce code duplication.
-                #       is_valid_annex would do, but this needs to be consistent with AnnexRepo's flyweight
-                #       implementation.
+                # Here we do the same validation that Flyweight would do beforehand if there was a call to AnnexRepo()
                 if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and self._repo.is_valid_annex(allow_noninitialized=True):
+                        self._repo.path, None) and not self._repo._flyweight_invalid():
                     # it's still the object registered as flyweight and it's a
                     # valid annex repo
                     return self._repo
             elif isinstance(self._repo, GitRepo):
                 # it's supposed to be a plain git
-                # TODO: Checking _unique_instances might be superfluous here
+                # same kind of checks as for AnnexRepo above, but additionally check whether it was changed to have an
+                # annex now.
+                # TODO: Instead of is_with_annex, we might want the cheaper check for an actually initialized annex.
+                #       However, that's not completely clear. On the one hand, if it really changed to be an annex
+                #       it seems likely that this happened locally and it would also be an initialized annex. On the
+                #       other hand, we could have added (and fetched) a remote with an annex, which would turn it into
+                #       our current notion of an uninitialized annex. Question is whether or not such a change really
+                #       need to be detected. For now stay on the safe side and detect it.
                 if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and self._repo.is_valid_git() and not \
+                        self._repo.path, None) and not self._repo._flyweight_invalid() and not \
                         self._repo.is_with_annex():
                     # it's still the object registered as flyweight, it's a
                     # valid git repo and it hasn't turned into an annex
