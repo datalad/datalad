@@ -181,7 +181,7 @@ def _guess_exec(script_file):
             reraise(e)
 
     # TODO check for exec permission and rely on interpreter
-    if is_exec:
+    if is_exec and not os.path.isdir(script_file):
         return {'type': u'executable',
                 'template': u'{script} {ds} {args}',
                 'state': state}
