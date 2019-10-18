@@ -15,6 +15,10 @@ From an interactive Python session, import `datalad.api` and inspect its
 documentation with `help`.
 """
 
+if not __debug__:
+    raise RuntimeError('DataLad cannot run in "optimized" mode, i.e. python -O')
+
+
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
