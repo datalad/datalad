@@ -696,7 +696,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             check_git_configured()
             GitRepo._config_checked = True
 
-        self.realpath = realpath(path)
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
@@ -727,8 +726,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
         # with DryRunProtocol path might still not exist
-        if exists(self.realpath):
-            self.inode = os.stat(self.realpath).st_ino
+        if exists(self.path):
+            self.inode = os.stat(self.path).st_ino
         else:
             self.inode = None
 
@@ -795,8 +794,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     @property
     def repo(self):
         # with DryRunProtocol path not exist
-        if exists(self.realpath):
-            inode = os.stat(self.realpath).st_ino
+        if exists(self.path):
+            inode = os.stat(self.path).st_ino
         else:
             inode = None
         if self.inode != inode:
@@ -962,7 +961,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         This is done by comparing the base repository path.
         """
-        return self.realpath == obj.realpath
+        return self.path == obj.path
 
     def is_valid_git(self):
         """Returns whether the underlying repository appears to be still valid
