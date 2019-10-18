@@ -26,7 +26,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import rev_resolve_path
+from datalad.distribution.dataset import resolve_path
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -81,7 +81,7 @@ class Unlock(Interface):
         paths_nondir = set()
         paths_lexist = None
         if path:
-            path = rev_resolve_path(assure_list(path), ds=dataset)
+            path = resolve_path(assure_list(path), ds=dataset)
             paths_lexist = []
             for p in path:
                 if p.exists() or p.is_symlink():

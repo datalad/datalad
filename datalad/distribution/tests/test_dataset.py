@@ -15,7 +15,7 @@ from os.path import join as opj, abspath, relpath
 
 
 from ..dataset import Dataset, EnsureDataset, require_dataset
-from ..dataset import rev_resolve_path
+from ..dataset import resolve_path
 from datalad import cfg
 from datalad.api import create
 from datalad.api import get
@@ -446,7 +446,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 
 @with_tempfile(mkdir=True)
-def test_rev_resolve_path(path):
+def test_resolve_path(path):
     if op.realpath(path) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
@@ -462,72 +462,72 @@ def test_rev_resolve_path(path):
     for d in (opath,) if on_windows else (opath, lpath):
         ds_local = Dataset(d)
         # no symlink resolution
-        eq_(str(rev_resolve_path(d)), d)
+        eq_(str(resolve_path(d)), d)
         # list comes out as a list
-        eq_(rev_resolve_path([d]), [Path(d)])
+        eq_(resolve_path([d]), [Path(d)])
         # multiple OK
-        eq_(rev_resolve_path([d, d]), [Path(d), Path(d)])
+        eq_(resolve_path([d, d]), [Path(d), Path(d)])
 
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
-            eq_(str(rev_resolve_path(d).cwd()), opath)
+            eq_(str(resolve_path(d).cwd()), opath)
             # using pathlib's `resolve()` will resolve any
             # symlinks
             # also resolve `opath`, as on old windows systems the path might
             # come in crippled (e.g. C:\Users\MIKE~1/...)
             # and comparison would fails unjustified
-            eq_(rev_resolve_path('.').resolve(), ut.Path(opath).resolve())
+            eq_(resolve_path('.').resolve(), ut.Path(opath).resolve())
             # no norming, but absolute paths, without resolving links
-            eq_(rev_resolve_path('.'), ut.Path(d))
-            eq_(str(rev_resolve_path('.')), d)
+            eq_(resolve_path('.'), ut.Path(d))
+            eq_(str(resolve_path('.')), d)
 
             # there is no concept of an "explicit" relative path anymore
             # relative is relative, regardless of the specific syntax
-            eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+            eq_(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
                 ds_global.pathobj / 'bu')
             # there is no full normpath-ing or other funky resolution of
             # parent directory back-reference
-            eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+            eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
                 op.join(ds_global.path, os.pardir, 'bu'))
 
         # resolve against a dataset given as a path/str
         # (cmdline input scenario)
-        eq_(rev_resolve_path('bu', ds=ds_local.path), Path.cwd() / 'bu')
-        eq_(rev_resolve_path('bu', ds=ds_global.path), Path.cwd() / 'bu')
+        eq_(resolve_path('bu', ds=ds_local.path), Path.cwd() / 'bu')
+        eq_(resolve_path('bu', ds=ds_global.path), Path.cwd() / 'bu')
         # resolve against a dataset given as a dataset instance
         # (object method scenario)
-        eq_(rev_resolve_path('bu', ds=ds_local), ds_local.pathobj / 'bu')
-        eq_(rev_resolve_path('bu', ds=ds_global), ds_global.pathobj / 'bu')
+        eq_(resolve_path('bu', ds=ds_local), ds_local.pathobj / 'bu')
+        eq_(resolve_path('bu', ds=ds_global), ds_global.pathobj / 'bu')
         # not being inside a dataset doesn't change the resolution result
-        eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+        eq_(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
             ds_global.pathobj / 'bu')
-        eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+        eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
             op.join(ds_global.path, os.pardir, 'bu'))
 
 
 # little brother of the test above, but actually (must) run
 # under any circumstances
 @with_tempfile(mkdir=True)
-def test_rev_resolve_path_symlink_edition(path):
+def test_resolve_path_symlink_edition(path):
     deepest = ut.Path(path) / 'one' / 'two' / 'three'
     deepest_str = str(deepest)
     os.makedirs(deepest_str)
     with chpwd(deepest_str):
         # direct absolute
-        eq_(deepest, rev_resolve_path(deepest))
-        eq_(deepest, rev_resolve_path(deepest_str))
+        eq_(deepest, resolve_path(deepest))
+        eq_(deepest, resolve_path(deepest_str))
         # explicit direct relative
-        eq_(deepest, rev_resolve_path('.'))
-        eq_(deepest, rev_resolve_path(op.join('.', '.')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', '..', 'two', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', '..', '..',
+        eq_(deepest, resolve_path('.'))
+        eq_(deepest, resolve_path(op.join('.', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', 'two', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', '..',
                                               'one', 'two', 'three')))
         # weird ones
-        eq_(deepest, rev_resolve_path(op.join('..', '.', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
-        eq_(deepest, rev_resolve_path(op.join('.', '..', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '.', 'three')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('.', '..', 'three')))
 
 
 @with_tempfile(mkdir=True)

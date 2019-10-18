@@ -54,7 +54,7 @@ from datalad.utils import (
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
-    rev_resolve_path,
+    resolve_path,
     require_dataset,
     EnsureDataset,
 )
@@ -158,7 +158,7 @@ class Clone(Interface):
                     path))
 
         if path is not None:
-            path = rev_resolve_path(path, dataset)
+            path = resolve_path(path, dataset)
 
         # Possibly do conversion from source into a git-friendly url
         # luckily GitRepo will undo any fancy file:/// url to make use of Git's
@@ -175,7 +175,7 @@ class Clone(Interface):
             # and derive the path from the source and continue
             path = _get_installationpath_from_url(source)
             # since this is a relative `path`, resolve it:
-            path = rev_resolve_path(path, dataset)
+            path = resolve_path(path, dataset)
             lgr.debug("Determined clone target path from source")
         lgr.debug("Resolved clone target path to: '%s'", path)
 

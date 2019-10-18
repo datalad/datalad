@@ -578,7 +578,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 # New helpers, courtesy of datalad-revolution.
 
 
-def rev_resolve_path(path, ds=None):
+def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
     Any path is returned as an absolute path. If, and only if, a dataset
@@ -666,6 +666,9 @@ def rev_resolve_path(path, ds=None):
         # face of the possibility of symlinks in the path
         out.append(p)
     return out[0] if isinstance(path, (str, PurePath)) else out
+
+# TODO keep this around for a while so that extensions can be updated
+rev_resolve_path = resolve_path
 
 
 def path_under_rev_dataset(ds, path):

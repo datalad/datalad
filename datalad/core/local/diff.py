@@ -28,7 +28,7 @@ from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
     require_dataset,
-    rev_resolve_path,
+    resolve_path,
     path_under_rev_dataset,
     rev_get_dataset_root,
 )
@@ -159,7 +159,7 @@ def _diff_cmd(
             # special case is the root dataset, always report its content
             # changes
             orig_path = str(p)
-            resolved_path = rev_resolve_path(p, dataset)
+            resolved_path = resolve_path(p, dataset)
             p = \
                 resolved_path, \
                 orig_path.endswith(op.sep) or resolved_path == ds.pathobj

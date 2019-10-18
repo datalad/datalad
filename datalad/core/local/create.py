@@ -47,7 +47,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     EnsureDataset,
     rev_get_dataset_root,
-    rev_resolve_path,
+    resolve_path,
     path_under_rev_dataset,
     require_dataset,
 )
@@ -200,7 +200,7 @@ class Create(Interface):
                                  "no annex repo.")
 
         if path:
-            path = rev_resolve_path(path, dataset)
+            path = resolve_path(path, dataset)
 
         path = path if path \
             else getpwd() if ds is None \
