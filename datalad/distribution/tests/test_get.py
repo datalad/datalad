@@ -491,3 +491,31 @@ def test_get_in_unavailable_subdataset(src, path):
     ok_(sub2.is_installed())
     ok_(sub2.repo.file_has_content('file_in_annex.txt') is True)
     ok_(not Dataset(opj(targetabspath, 'sub3')).is_installed())
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_gh3356(src, path):
+    # create toy version of gh-3356 scenario
+    origin = Dataset(src).create()
+    origin_sub = origin.create(origin.pathobj / 'subdir'/ 'subds')
+    for p in (
+            (origin_sub.pathobj / 'data' / 'file_in_annex.txt'),
+            (origin_sub.pathobj / 'data' / 'file_in_annex2.txt')):
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(p.name)
+    origin.save(recursive=True)
+    clone = install(
+        path, source=src, result_xfm='datasets', return_type='item-or-list')
+    targetpaths = [
+        opj('subdir', 'subds', 'data', 'file_in_annex.txt'),
+        opj('subdir', 'subds', 'data', 'file_in_annex2.txt'),
+    ]
+    with chpwd(path):
+        res = get(targetpaths)
+    # get() must report success on two files
+    assert_result_count(res, 2, action='get', type='file', status='ok')
+    # status must report content for two files
+    assert_result_count(
+        clone.status(recursive=True, annex='all', report_filetype='eval'), 2,
+        action='status', has_content=True)
