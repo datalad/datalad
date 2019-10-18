@@ -17,80 +17,81 @@ import json
 import logging
 import math
 import os
-import os.path as op
 import re
 import shlex
-import tempfile
-import time
 
 from itertools import chain
 from os import linesep
-from os.path import curdir
-from os.path import join as opj
-from os.path import exists
-from os.path import islink
-from os.path import realpath
-from os.path import lexists
-from os.path import isdir
-from os.path import isabs
-from os.path import relpath
-from os.path import normpath
-from subprocess import Popen, PIPE
+from os.path import (
+    curdir,
+    join as opj,
+    exists,
+    islink,
+    realpath,
+    lexists,
+    isdir,
+    isabs,
+    normpath
+)
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
-from datalad.dochelpers import exc_str
-from datalad.dochelpers import borrowdoc
-from datalad.dochelpers import borrowkwargs
+from datalad.dochelpers import (
+    exc_str,
+    borrowdoc,
+    borrowkwargs
+)
 from datalad.ui import ui
 import datalad.utils as ut
-from datalad.utils import linux_distribution_name
-from datalad.utils import nothing_cm
-from datalad.utils import auto_repr
-from datalad.utils import on_windows
-from datalad.utils import swallow_logs
-from datalad.utils import assure_list
-from datalad.utils import _path_
-from datalad.utils import CMD_MAX_ARG
-from datalad.utils import assure_unicode
-from datalad.utils import make_tempfile
-from datalad.utils import partition
-from datalad.utils import unlink
+from datalad.utils import (
+    linux_distribution_name,
+    auto_repr,
+    on_windows,
+    assure_list,
+    make_tempfile,
+    partition,
+    unlink
+)
 from datalad.support.json_py import loads as json_loads
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand
+)
 
 # imports from same module:
 from .repo import RepoInterface
-from .gitrepo import GitRepo
-from .gitrepo import NoSuchPathError
-from .gitrepo import _normalize_path
-from .gitrepo import normalize_path
-from .gitrepo import normalize_paths
-from .gitrepo import GitCommandError
-from .gitrepo import to_options
+from .gitrepo import (
+    GitRepo,
+    NoSuchPathError,
+    _normalize_path,
+    normalize_path,
+    normalize_paths,
+    GitCommandError,
+    to_options
+)
 from . import ansi_colors
 from .external_versions import external_versions
-from .exceptions import CommandNotAvailableError
-from .exceptions import CommandError
-from .exceptions import FileNotInAnnexError
-from .exceptions import FileInGitError
-from .exceptions import FileNotInRepositoryError
-from .exceptions import AnnexBatchCommandError
-from .exceptions import InsufficientArgumentsError
-from .exceptions import OutOfSpaceError
-from .exceptions import RemoteNotAvailableError
-from .exceptions import BrokenExternalDependency
-from .exceptions import OutdatedExternalDependency
-from .exceptions import MissingExternalDependency
-from .exceptions import IncompleteResultsError
-from .exceptions import AccessDeniedError
-from .exceptions import AccessFailedError
-from .exceptions import InvalidAnnexRepositoryError
-from .exceptions import DirectModeNoLongerSupportedError
+from .exceptions import (
+    CommandNotAvailableError,
+    CommandError,
+    FileNotInAnnexError,
+    FileInGitError,
+    AnnexBatchCommandError,
+    InsufficientArgumentsError,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+    BrokenExternalDependency,
+    OutdatedExternalDependency,
+    MissingExternalDependency,
+    IncompleteResultsError,
+    AccessDeniedError,
+    AccessFailedError,
+    InvalidAnnexRepositoryError,
+    DirectModeNoLongerSupportedError
+)
 
 lgr = logging.getLogger('datalad.annex')
 

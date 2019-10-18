@@ -12,12 +12,14 @@
 import logging
 import os
 import os.path as op
-from os.path import curdir
-from os.path import exists
-from os.path import join as opj
-from os.path import normpath, isabs
-from os.path import pardir
-from os.path import realpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    normpath, isabs,
+    pardir,
+    realpath,
+)
 from weakref import WeakValueDictionary
 import wrapt
 
@@ -30,21 +32,24 @@ from datalad.support.constraints import Constraint
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.external_versions import external_versions
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+    NoSuchPathError
+)
 from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
-from datalad.utils import getpwd
-from datalad.utils import optional_args
-from datalad.utils import get_dataset_root
-from datalad.utils import Path
-from datalad.utils import PurePath
-from datalad.utils import assure_list
+from datalad.utils import (
+    getpwd,
+    optional_args,
+    get_dataset_root,
+    Path,
+    PurePath,
+    assure_list,
+)
 
 
 lgr = logging.getLogger('datalad.dataset')

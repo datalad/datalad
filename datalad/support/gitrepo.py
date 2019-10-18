@@ -11,29 +11,37 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-from itertools import chain
-import logging
-from collections import OrderedDict
-from collections import namedtuple
+
 import re
 import shlex
 import time
 import os
 import os.path as op
 import warnings
+
+
+from itertools import chain
+import logging
+from collections import (
+    OrderedDict,
+    namedtuple
+)
 from os import linesep
-from os.path import join as opj
-from os.path import exists
-from os.path import normpath
-from os.path import isabs
-from os.path import commonprefix
-from os.path import relpath
-from os.path import realpath
-from os.path import dirname
-from os.path import basename
-from os.path import curdir
-from os.path import pardir
-from os.path import sep
+from os.path import (
+    join as opj,
+    exists,
+    normpath,
+    isabs,
+    commonprefix,
+    relpath,
+    realpath,
+    dirname,
+    basename,
+    curdir,
+    pardir,
+    sep
+)
+
 import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
@@ -41,47 +49,63 @@ from weakref import WeakValueDictionary
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
-from git.exc import GitCommandError
-from git.exc import NoSuchPathError
-from git.exc import InvalidGitRepositoryError
-from git.objects.blob import Blob
-
+from git.exc import (
+    GitCommandError,
+    NoSuchPathError,
+    InvalidGitRepositoryError
+)
 from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
-from datalad.config import _parse_gitconfig_dump
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand
+)
+from datalad.config import (
+    ConfigManager,
+    _parse_gitconfig_dump
+)
+
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
-from datalad.config import ConfigManager
 import datalad.utils as ut
-from datalad.utils import Path
-from datalad.utils import PurePosixPath
-from datalad.utils import assure_list
-from datalad.utils import optional_args
-from datalad.utils import on_windows
-from datalad.utils import getpwd
-from datalad.utils import posix_relpath
-from datalad.utils import assure_dir
-from datalad.utils import generate_file_chunks
-from ..utils import assure_unicode
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    assure_list,
+    optional_args,
+    on_windows,
+    getpwd,
+    posix_relpath,
+    assure_dir,
+    generate_file_chunks,
+    assure_unicode
+)
 
 # imports from same module:
 from .external_versions import external_versions
-from .exceptions import CommandError
-from .exceptions import DeprecatedError
-from .exceptions import FileNotInRepositoryError
-from .exceptions import GitIgnoreError
-from .exceptions import InvalidGitReferenceError
-from .exceptions import MissingBranchError
-from .exceptions import OutdatedExternalDependencyWarning
-from .exceptions import PathKnownToRepositoryError
-from .network import RI, PathRI
-from .network import is_ssh
+from .exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    GitIgnoreError,
+    InvalidGitReferenceError,
+    MissingBranchError,
+    OutdatedExternalDependencyWarning,
+    PathKnownToRepositoryError,
+)
+from .network import (
+    RI,
+    PathRI,
+    is_ssh
+)
 from .path import get_parent_paths
-from .repo import Flyweight
-from .repo import RepoInterface
+from .repo import (
+    Flyweight,
+    RepoInterface
+)
+
+#from git.objects.blob import Blob
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -2092,8 +2116,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         except CommandError:
             return False
         return True
-
-# TODO: --------------------------------------------------------------------
 
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
