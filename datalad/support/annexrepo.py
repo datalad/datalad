@@ -2906,7 +2906,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # (see return value).
         # Therefore raise telling exceptions before even calling annex:
         if len(files) == 1:
-            if not isdir(files[0]):
+            # Note, that for isdir we actually need an absolute path (which we don't get via normalize_paths)
+            if not isdir(opj(self.path, files[0])):
                 self.get_file_key(files[0])
 
         # TODO: RF -- logic is duplicated with get() -- the only difference
