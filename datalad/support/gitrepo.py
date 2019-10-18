@@ -2535,7 +2535,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 url = posixpath.join(curdir, posix_relpath(path))
             else:
                 url = path
-        cmd += [url, path]
+        cmd += [url, Path(path).as_posix()]
         self._git_custom_command('', cmd)
         # record dataset ID if possible for comprehesive metadata on
         # dataset components within the dataset itself
