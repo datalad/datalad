@@ -370,7 +370,8 @@ def _install_targetpath(
             # to subdataset installation. It has to be actual subdataset
             # it resides in, because this value is used to determine which
             # dataset to call `annex-get` on
-            path=rev_get_dataset_root(target_path),
+            # TODO stringification is a PY35 compatibility kludge
+            path=rev_get_dataset_root(str(target_path)),
             status='notneeded',
             contains=[target_path],
             refds=refds_path,
