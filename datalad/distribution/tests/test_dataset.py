@@ -10,20 +10,18 @@
 """
 
 import os
-import shutil
 import os.path as op
-from os.path import join as opj, abspath, normpath, relpath, exists
+from os.path import join as opj, abspath, relpath
 
 
-from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
+from ..dataset import Dataset, EnsureDataset, require_dataset
 from ..dataset import rev_resolve_path
 from datalad import cfg
 from datalad.api import create
 from datalad.api import get
 import datalad.utils as ut
-from datalad.utils import chpwd, getpwd, rmtree
+from datalad.utils import chpwd, rmtree
 from datalad.utils import _path_
-from datalad.utils import get_dataset_root
 from datalad.utils import on_windows
 from datalad.utils import Path
 from datalad.support.gitrepo import GitRepo
@@ -32,8 +30,7 @@ from datalad.support.annexrepo import AnnexRepo
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
     assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
-from datalad.tests.utils import assert_cwd_unchanged
+from datalad.tests.utils import with_tempfile, with_testrepos
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import assert_is
@@ -42,7 +39,6 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import OBSCURE_FILENAME
 
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathKnownToRepositoryError
 
 
 def test_EnsureDataset():
@@ -62,32 +58,6 @@ def test_EnsureDataset():
 
     # Note: Ensuring that string is valid path is not
     # part of the constraint itself, so not explicitly tested here.
-
-
-@assert_cwd_unchanged
-@with_tempfile(mkdir=True)
-def test_resolve_path(somedir):
-
-    abs_path = abspath(somedir)  # just to be sure
-    rel_path = "some"
-    expl_path_cur = opj(os.curdir, rel_path)
-    expl_path_par = opj(os.pardir, rel_path)
-
-    eq_(resolve_path(abs_path), abs_path)
-
-    current = getpwd()
-    # no Dataset => resolve using cwd:
-    eq_(resolve_path(abs_path), abs_path)
-    eq_(resolve_path(rel_path), opj(current, rel_path))
-    eq_(resolve_path(expl_path_cur), normpath(opj(current, expl_path_cur)))
-    eq_(resolve_path(expl_path_par), normpath(opj(current, expl_path_par)))
-
-    # now use a Dataset as reference:
-    ds = Dataset(abs_path)
-    eq_(resolve_path(abs_path, ds), abs_path)
-    eq_(resolve_path(rel_path, ds), opj(abs_path, rel_path))
-    eq_(resolve_path(expl_path_cur, ds), normpath(opj(current, expl_path_cur)))
-    eq_(resolve_path(expl_path_par, ds), normpath(opj(current, expl_path_par)))
 
 
 # TODO: test remember/recall more extensive?

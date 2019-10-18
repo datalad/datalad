@@ -14,9 +14,12 @@ import logging
 
 from copy import deepcopy
 
+import os
 from os.path import join as opj
 from os.path import basename
 from os.path import lexists
+from os.path import normpath
+from os.path import abspath
 
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import with_tempfile
@@ -29,13 +32,16 @@ from datalad.tests.utils import create_tree
 from datalad.tests.utils import slow
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import assert_cwd_unchanged
 
 
 from datalad.distribution.dataset import Dataset
 from datalad.api import annotate_paths
 from datalad.api import install
 from datalad.interface.annotate_paths import get_modified_subpaths
+from datalad.interface.annotate_paths import _resolve_path
 from datalad.utils import chpwd
+from datalad.utils import getpwd
 
 from datalad.interface.tests.test_utils import make_demo_hierarchy_datasets
 
@@ -370,3 +376,29 @@ def test_recurseinto(dspath, dest):
     assert_result_count(res, 1, type='dataset',
                         path=opj(dest.path, 'b', 'bb'))
     assert(Dataset(opj(dest.path, 'b', 'bb')).is_installed())
+
+
+@assert_cwd_unchanged
+@with_tempfile(mkdir=True)
+def test_resolve_path(somedir):
+
+    abs_path = abspath(somedir)  # just to be sure
+    rel_path = "some"
+    expl_path_cur = opj(os.curdir, rel_path)
+    expl_path_par = opj(os.pardir, rel_path)
+
+    eq_(_resolve_path(abs_path), abs_path)
+
+    current = getpwd()
+    # no Dataset => resolve using cwd:
+    eq_(_resolve_path(abs_path), abs_path)
+    eq_(_resolve_path(rel_path), opj(current, rel_path))
+    eq_(_resolve_path(expl_path_cur), normpath(opj(current, expl_path_cur)))
+    eq_(_resolve_path(expl_path_par), normpath(opj(current, expl_path_par)))
+
+    # now use a Dataset as reference:
+    ds = Dataset(abs_path)
+    eq_(_resolve_path(abs_path, ds), abs_path)
+    eq_(_resolve_path(rel_path, ds), opj(abs_path, rel_path))
+    eq_(_resolve_path(expl_path_cur, ds), normpath(opj(current, expl_path_cur)))
+    eq_(_resolve_path(expl_path_par, ds), normpath(opj(current, expl_path_par)))

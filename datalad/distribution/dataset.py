@@ -18,7 +18,6 @@ from os.path import join as opj
 from os.path import normpath, isabs
 from os.path import pardir
 from os.path import realpath
-from os.path import relpath
 from weakref import WeakValueDictionary
 import wrapt
 
@@ -41,9 +40,8 @@ from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
 from datalad.utils import getpwd
-from datalad.utils import optional_args, expandpath, is_explicit_path
+from datalad.utils import optional_args
 from datalad.utils import get_dataset_root
-from datalad.utils import dlabspath
 from datalad.utils import Path
 from datalad.utils import PurePath
 from datalad.utils import assure_list
@@ -51,34 +49,6 @@ from datalad.utils import assure_list
 
 lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
-
-
-# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
-#       (see normalize_path)
-def resolve_path(path, ds=None):
-    """Resolve a path specification (against a Dataset location)
-
-    Any explicit path (absolute or relative) is returned as an absolute path.
-    In case of an explicit relative path, the current working directory is
-    used as a reference. Any non-explicit relative path is resolved against
-    as dataset location, i.e. considered relative to the location of the
-    dataset. If no dataset is provided, the current working directory is
-    used.
-
-    Returns
-    -------
-    Absolute path
-    """
-    path = expandpath(path, force_absolute=False)
-    if is_explicit_path(path):
-        # normalize path consistently between two (explicit and implicit) cases
-        return dlabspath(path, norm=True)
-
-    # no dataset given, use CWD as reference
-    # note: abspath would disregard symlink in CWD
-    top_path = getpwd() \
-        if ds is None else ds.path if isinstance(ds, Dataset) else ds
-    return normpath(opj(top_path, path))
 
 
 class Dataset(object, metaclass=Flyweight):
