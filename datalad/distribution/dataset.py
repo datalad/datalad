@@ -148,20 +148,7 @@ class Dataset(object, metaclass=Flyweight):
           Path to the dataset location. This location may or may not exist
           yet.
         """
-        # TODO: lazy but persistent pathobj!
-        # In [16]: %timeit a = '.'
-        # 8.09 ns ± 0.0628 ns per loop (mean ± std. dev. of 7 runs, 100000000 loops each)
-        #
-        # In [17]: %timeit a = pathlib.Path('.')
-        # 1.86 µs ± 29.6 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
-
-        # Also: str from Path is faster than vice versa:
-        #  In [21]: %timeit str(path)
-        # 146 ns ± 1.33 ns per loop (mean ± std. dev. of 7 runs, 10000000 loops each)
-        #
-        # In [22]: %timeit pathlib.Path('.')
-        # 1.78 µs ± 19.7 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
-
+        self._pathobj = path if isinstance(path, ut.Path) else None
         if isinstance(path, ut.PurePath):
             path = str(path)
         self._path = path
@@ -175,7 +162,9 @@ class Dataset(object, metaclass=Flyweight):
         """pathobj for the dataset"""
         # XXX this relies on the assumption that self._path as managed
         # by the base class is always a native path
-        return ut.Path(self._path)
+        if not self._pathobj:
+            self._pathobj = ut.Path(self._path)
+        return self._pathobj
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
