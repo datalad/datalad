@@ -24,8 +24,8 @@ from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
-    _path_,
     Path,
+    on_windows,
 )
 from datalad.cmd import Runner
 
@@ -35,8 +35,8 @@ from datalad.tests.utils import (
     ok_,
     assert_not_in,
     assert_in,
-    assert_raises,
     assert_status,
+    assert_raises,
     assert_in_results,
     swallow_outputs,
     with_tree,
@@ -512,3 +512,16 @@ def test_create_relpath_semantics():
     yield check_create_path_semantics, 'elsewhere', 'abspath', 'abspath'
     yield check_create_path_semantics, 'elsewhere', 'instance', 'abspath'
     yield check_create_path_semantics, 'elsewhere', 'instance', 'relpath'
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_gh2927(path, linkpath):
+    if not on_windows:
+        # make it more complicated by default
+        Path(linkpath).symlink_to(path, target_is_directory=True)
+        path = linkpath
+    ds = Dataset(path).create()
+    ds.create('subds_clean')
+    assert_status('ok', ds.create(op.join('subds_clean', 'subds_lvl1_clean'),
+                                  result_xfm=None, return_type='list'))
