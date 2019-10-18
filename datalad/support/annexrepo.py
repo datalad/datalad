@@ -191,30 +191,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         # AnnexRepo.is_valid_repo. We would use the latter to decide whether or not to call AnnexRepo() only for
         # __init__ to then test the same things again. If we fail early we can save the additional test from outer
         # scope.
-        fix_it = False
         do_init = False
-        try:
-            super(AnnexRepo, self).__init__(
-                path, url, runner=runner,
-                create=create, create_sanity_checks=create_sanity_checks,
-                repo=repo, git_opts=git_opts, fake_dates=fake_dates)
-        except GitCommandError as e:
-            # XXX Ben: This seems outdated, since cloning shouldn't happen in GitRepo() anymore.
-            #          Needs double-check whether this is true and whether it needs to be moved to the clone routine.
-            if create and "Clone succeeded, but checkout failed." in str(e):
-                lgr.warning("Experienced issues while cloning. "
-                            "Trying to fix it, using git-annex-fsck.")
-                fix_it = True
-                do_init = True
-            else:
-                raise e
+        super(AnnexRepo, self).__init__(
+            path, url, runner=runner,
+            create=create, create_sanity_checks=create_sanity_checks,
+            repo=repo, git_opts=git_opts, fake_dates=fake_dates)
 
         # Check whether an annex already exists at destination
         # XXX this doesn't work for a submodule!
 
         # NOTE: We are in __init__ here and already know that GitRepo.is_valid_git is True, since super.__init__  was
         #       called. Therefore: check_git=False
-        if not fix_it and not self.is_valid_annex(check_git=False):
+        if not self.is_valid_annex(check_git=False):
             # so either it is not annex at all or just was not yet initialized
             # TODO: There's still potential to get a bit more performant. is_with_annex() is checking again, what
             #       is_valid_annex did. However, this marginal here, considering the call to git-annex-init.
@@ -274,9 +262,6 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         if do_init:
             self._init(version=version, description=description)
-            if fix_it:
-                self.fsck()
-
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
         # and _set_direct_mode

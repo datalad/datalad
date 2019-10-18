@@ -912,6 +912,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     url = new_url
             env = None
 
+        fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -941,7 +942,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         trial)
                     continue
                     (lgr.debug if expect_fail else lgr.error)(e_str)
+
+                if "Clone succeeded, but checkout failed." in str(e):
+                    fix_annex = e
+                    break
+
                 raise
+
             except ValueError as e:
                 if gitpy.__version__ == '1.0.2' \
                         and "I/O operation on closed file" in str(e):
@@ -954,6 +961,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 raise  # reraise original
 
         gr = cls(path, *args, repo=repo, **kwargs)
+        if fix_annex:
+            # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
+            # would need to import our own subclass
+            if hasattr(gr, 'is_valid_annex'):
+                lgr.warning("Experienced issues while cloning. "
+                            "Trying to fix it, using git-annex-fsck.")
+                if not gr.is_initialized():
+                    gr._init()
+                gr.fsck()
+            else:
+                lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
         return gr
 
     def __del__(self):
