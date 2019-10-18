@@ -1036,6 +1036,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         '.git' might be a  directory, a symlink or a file
 
+        Note
+        ----
+        Please try using GitRepo.dot_git instead! That one's not static, but it's cheaper and you should avoid
+        not having an instance of a repo you're working on anyway. Note, that the property in opposition to this method
+        returns an absolute path.
+
+
         Parameters
         ----------
         repo: path or Repo instance
