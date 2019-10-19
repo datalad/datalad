@@ -563,6 +563,13 @@ class Runner(object):
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
 
+            except CommandError:
+                # do not bother with reacting to "regular" CommandError
+                # exceptions.  Somehow if we also terminate here for them
+                # some processes elsewhere might stall:
+                # see https://github.com/datalad/datalad/pull/3794
+                raise
+
             except BaseException as exc:
                 exc_info = sys.exc_info()
                 # KeyboardInterrupt is subclass of BaseException
@@ -580,7 +587,7 @@ class Runner(object):
 
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                # TODO -- assure closing the files
                 _cleanup_output(outputstream, proc.stdout)
                 _cleanup_output(errstream, proc.stderr)
 
