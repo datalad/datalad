@@ -39,7 +39,6 @@ from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
 
 from datalad.distribution.dataset import Dataset
-from datalad.distribution.dataset import resolve_path
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 
@@ -48,11 +47,43 @@ from datalad.utils import with_pathsep as _with_sep
 from datalad.utils import path_startswith
 from datalad.utils import path_is_subpath
 from datalad.utils import assure_list
+from datalad.utils import dlabspath
+from datalad.utils import expandpath
+from datalad.utils import is_explicit_path
+from datalad.utils import getpwd
 
 from datalad.consts import PRE_INIT_COMMIT_SHA
 
 
 lgr = logging.getLogger('datalad.interface.annotate_paths')
+
+
+# former main implementation, no a left-over that is only used in this
+# obsolete source file
+def _resolve_path(path, ds=None):
+    """Resolve a path specification (against a Dataset location)
+
+    Any explicit path (absolute or relative) is returned as an absolute path.
+    In case of an explicit relative path, the current working directory is
+    used as a reference. Any non-explicit relative path is resolved against
+    as dataset location, i.e. considered relative to the location of the
+    dataset. If no dataset is provided, the current working directory is
+    used.
+
+    Returns
+    -------
+    Absolute path
+    """
+    path = expandpath(path, force_absolute=False)
+    if is_explicit_path(path):
+        # normalize path consistently between two (explicit and implicit) cases
+        return dlabspath(path, norm=True)
+
+    # no dataset given, use CWD as reference
+    # note: abspath would disregard symlink in CWD
+    top_path = getpwd() \
+        if ds is None else ds.path if isinstance(ds, Dataset) else ds
+    return normpath(opj(top_path, path))
 
 
 def annotated2content_by_ds(annotated, refds_path):
@@ -279,7 +310,7 @@ def get_modified_subpaths(aps, refds, revision, recursion_limit=None,
 def rawpath2ap(path, refds_path):
     orig_path_request = path
     # this is raw, resolve
-    path = resolve_path(path, refds_path)
+    path = _resolve_path(path, refds_path)
     # collect info on this path
     path_props = dict(
         path=path,
@@ -528,7 +559,7 @@ class AnnotatePaths(Interface):
             if requested_paths and refds_path:
                 for r in requested_paths:
                     p = r['path'] if isinstance(r, dict) else r
-                    p = resolve_path(p, ds=refds_path)
+                    p = _resolve_path(p, ds=refds_path)
                     if path_startswith(p, refds_path):
                         # all good
                         continue

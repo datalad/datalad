@@ -42,7 +42,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
-    rev_resolve_path,
+    resolve_path,
     path_under_rev_dataset,
     rev_get_dataset_root,
 )
@@ -301,7 +301,7 @@ class Status(Interface):
                 # given path argument, before any normalization happens
                 # for further decision logic below
                 orig_path = str(p)
-                p = rev_resolve_path(p, dataset)
+                p = resolve_path(p, dataset)
                 root = rev_get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds

@@ -44,7 +44,7 @@ from datalad.dochelpers import exc_str
 
 from datalad.distribution.dataset import (
     datasetmethod,
-    rev_resolve_path,
+    resolve_path,
     require_dataset,
     EnsureDataset,
 )
@@ -308,7 +308,7 @@ class Install(Interface):
                 #      a peculiar use-case IMHO
                 # TODO Stringification can be removed once PY35 is no longer
                 # supported
-                path = str(rev_resolve_path(path_ri.localpath, dataset))
+                path = str(resolve_path(path_ri.localpath, dataset))
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
