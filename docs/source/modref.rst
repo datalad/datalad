@@ -124,6 +124,7 @@ Support functionality
    log
    utils
    version
+   support.gitrepo
    support.annexrepo
    support.archives
    support.configparserinc
