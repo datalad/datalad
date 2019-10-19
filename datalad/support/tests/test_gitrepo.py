@@ -1379,12 +1379,12 @@ def test_get_tags(path):
     eq_(gr.get_hexsha('specific'), gr.get_hexsha('HEAD'))
 
     # delete
-    gr.delete_tags(['specific'])
+    gr.call_git(['tag', '-d', 'specific'])
     eq_(gr.get_tags(), tags2)
     # more than one
     gr.tag('one')
     gr.tag('two')
-    gr.delete_tags(['one', 'two'])
+    gr.call_git(['tag', '-d', 'one', 'two'])
     eq_(gr.get_tags(), tags2)
 
 

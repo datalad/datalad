@@ -2746,12 +2746,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
-    def _tag(self, args):
-        return self._git_custom_command(
-            '', ['git', 'tag'] + args,
-            check_fake_dates=True
-        )
-
     def tag(self, tag, message=None, commit=None, options=None):
         """Tag a commit
 
@@ -2773,7 +2767,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # TODO: call in save.py complains about extensive logging. When does it
         # happen in what way? Figure out, whether to just silence it or raise or
         # whatever else.
-        args = []
+        args = ['tag']
         if message:
             args += ['-m', message]
         if options is not None:
@@ -2781,17 +2775,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         args.append(tag)
         if commit:
             args.append(commit)
-        self._tag(args)
-
-    def delete_tags(self, tags):
-        """Delete one or more tags
-
-        Parameters
-        ----------
-        tags : list
-          Names of tags to delete.
-        """
-        self._tag(['-d'] + tags)
+        self.call_git(args)
 
     def get_tags(self, output=None):
         """Get list of tags
