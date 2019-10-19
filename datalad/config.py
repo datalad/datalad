@@ -25,6 +25,9 @@ from os.path import getmtime
 from os.path import abspath
 from time import time
 
+import logging
+lgr = logging.getLogger('datalad.config')
+
 cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
@@ -163,6 +166,9 @@ class ConfigManager(object):
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
     """
+
+    _checked_git_identity = False
+
     def __init__(self, dataset=None, dataset_only=False, overrides=None):
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
@@ -274,6 +280,19 @@ class ConfigManager(object):
 
         # override with environment variables
         self._store = _parse_env(self._store)
+
+        if not ConfigManager._checked_git_identity:
+            for cfg, envs in (
+                    ('user.name', ('GIT_AUTHOR_NAME', 'GIT_COMMITTER_NAME')),
+                    ('user.email', ('GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_EMAIL'))):
+                if cfg not in self._store \
+                        and not any(e in os.environ for e in envs):
+                    lgr.warning(
+                        "It is highly recommended to configure Git before using "
+                        "DataLad. Set both 'user.name' and 'user.email' "
+                        "configuration variables."
+                    )
+            ConfigManager._checked_git_identity = True
 
     @_where_reload
     def obtain(self, var, default=None, dialog_type=None, valtype=None,
