@@ -5,6 +5,8 @@
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                Change Log
 
+bogus
+
 This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
