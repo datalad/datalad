@@ -43,10 +43,7 @@ def _cat_blob(repo, obj, bad_ok=False):
         kwds = {}
 
     try:
-        out_cat, _ = repo._git_custom_command(
-            None,
-            ["git", "cat-file", "blob", obj],
-            **kwds)
+        out_cat = repo.call_git(["cat-file", "blob", obj], **kwds)
     except CommandError as exc:
         if bad_ok and "bad file" in exc.stderr:
             out_cat = None
@@ -71,10 +68,9 @@ def branch_blobs(repo, branch):
     """
     # Note: This might be nicer with rev-list's --filter and
     # --filter-print-omitted, but those aren't available until Git v2.16.
-    out_rev, _ = repo._git_custom_command(
-        None, ["git", "rev-list", "--objects"] + [branch])
+    lines = repo.call_git_items_(["rev-list", "--objects"] + [branch])
     # Trees and blobs have an associated path printed.
-    objects = (ln.split() for ln in out_rev.splitlines())
+    objects = (ln.split() for ln in lines)
     blob_trees = [obj for obj in objects if len(obj) == 2]
 
     num_objects = len(blob_trees)
@@ -111,10 +107,9 @@ def branch_blobs_in_tree(repo, branch):
     entry per blob is yielded).
     """
     seen_blobs = set()
-    out, _ = repo._git_custom_command(
-        None, ["git", "ls-tree", "-z", "-r", branch])
-    if out:
-        lines = out.strip("\0").split("\0")
+    lines = list(repo.call_git_items_(["ls-tree", "-z", "-r", branch],
+                                      sep="\0"))
+    if lines:
         num_lines = len(lines)
         log_progress(lgr.info,
                      "repodates_blobs_in_tree",
@@ -122,6 +117,8 @@ def branch_blobs_in_tree(repo, branch):
                      label="Checking objects", total=num_lines,
                      unit=" objects")
         for line in lines:
+            if not line:
+                continue
             _, obj_type, obj, fname = line.split()
             log_progress(lgr.info, "repodates_blobs_in_tree",
                          "Checking %s", obj,

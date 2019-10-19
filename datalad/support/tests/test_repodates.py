@@ -35,9 +35,8 @@ def test_check_dates(path):
             """
             # We can't use ar.get_tags because that returns the commit's hexsha,
             # not the tag's, and ar.get_hexsha is limited to commit objects.
-            return ar._git_custom_command(
-                None,
-                ["git", "rev-parse", "refs/tags/{}".format(tag)])[0].strip()
+            return ar.call_git_oneline(
+                ["rev-parse", "refs/tags/{}".format(tag)])
 
         ar.add("foo")
         ar.commit("add foo")

@@ -2019,9 +2019,7 @@ def test_fake_dates(path):
     for commit in ar.get_branch_commits("git-annex"):
         eq_(timestamp, commit.committed_date)
     assert_in("timestamp={}s".format(timestamp),
-              ar._git_custom_command(
-                  None,
-                  ["git", "cat-file", "blob", "git-annex:uuid.log"])[0])
+              ar.call_git(["cat-file", "blob", "git-annex:uuid.log"]))
 
 
 def test_get_size_from_perc_complete():
