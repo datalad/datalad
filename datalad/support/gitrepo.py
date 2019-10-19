@@ -950,8 +950,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         '.git' might be a  directory, a symlink or a file
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         repo: path or Repo instance
           currently expected to be the repos base dir
 
@@ -1755,8 +1755,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         Returns
         -------
-        [str]
-          content of file_ as a list of lines.
+        str
+          content of `file_` as a list of lines.
         """
         content_str = self.repo.commit(branch).tree[file_].data_stream.read()
 
@@ -2082,19 +2082,19 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     # TODO: document **kwargs passed to gitpython
     @guard_BadName
     def fetch(self, remote=None, refspec=None, all_=False, **kwargs):
-        """Fetches changes from a remote (or all_ remotes).
+        """Fetches changes from a remote (or all remotes).
 
         Parameters
         ----------
-        remote: str
-          (optional) name of the remote to fetch from. If no remote is given and
+        remote : str, optional
+          name of the remote to fetch from. If no remote is given and
           `all_` is not set, the tracking branch is fetched.
-        refspec: str
-          (optional) refspec to fetch.
-        all_: bool
-          fetch all_ remotes (and all_ of their branches).
+        refspec : str, optional
+          refspec to fetch.
+        all_ : bool, optional
+          fetch all remotes (and all of their branches).
           Fails if `remote` was given.
-        kwargs:
+        kwargs :
           passed to gitpython. TODO: Figure it out, make consistent use of it
           and document it.
 
@@ -2805,8 +2805,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     def describe(self, commitish=None, **kwargs):
         """ Quick and dirty implementation to call git-describe
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         kwargs:
             transformed to cmdline options for git-describe;
             see __init__ for description of the transformation
