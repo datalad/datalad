@@ -12,7 +12,10 @@
 import re
 from os import linesep
 
+import six
 
+
+@six.python_2_unicode_compatible
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
