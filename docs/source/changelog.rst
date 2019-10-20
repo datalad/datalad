@@ -75,8 +75,23 @@ Major refactoring and deprecations
    committer date for lightweight tags.
    (`#3715 <https://github.com/datalad/datalad/issues/3715>`__)
 
+-  The ``rev_resolve_path`` substituted ``resolve_path`` helper.
+   (`#3797 <https://github.com/datalad/datalad/issues/3797>`__)
+
 Fixes
 ~~~~~
+
+-  Correctly handle relative paths in
+   `publish <http://datalad.readthedocs.io/en/latest/generated/man/datalad-publish.html>`__.
+   (`#3799 <https://github.com/datalad/datalad/issues/3799>`__)
+   (`#3102 <https://github.com/datalad/datalad/issues/3102>`__)
+
+-  Do not errorneously discover directory as a procedure.
+   (`#3793 <https://github.com/datalad/datalad/issues/3793>`__)
+
+-  Correctly extract version from manpage to trigger use of manpages for
+   ``--help``.
+   (`#3798 <https://github.com/datalad/datalad/issues/3798>`__)
 
 -  The ``cfg_yoda`` procedure saved all modifications in the repository
    rather than saving only the files it modified.
@@ -110,8 +125,27 @@ Fixes
    but the string form was mishandled.
    (`#3761 <https://github.com/datalad/datalad/issues/3761>`__)
 
+-  Incorrect command quoting for SSH calls on Windows that rendered
+   basic SSH-related functionality (e.g.,
+   `sshrun <http://datalad.readthedocs.io/en/latest/generated/man/datalad-sshrun.html>`__)
+   on Windows unusable.
+   (`#3688 <https://github.com/datalad/datalad/issues/3688>`__)
+
+-  Annex JSON result handling assumed platform-specific paths on Windows
+   instead of the POSIX-style that is happening across all platforms.
+   (`#3719 <https://github.com/datalad/datalad/issues/3719>`__)
+
+-  ``path_is_under()`` was incapable of comparing Windows paths with
+   different drive letters.
+   (`#3728 <https://github.com/datalad/datalad/issues/3728>`__)
+
 Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-  Provide a collection of “public” ``call_git*`` helpers within GitRepo
+   and replace use of “private” and less specific
+   ``_git_custom_command`` calls.
+   (`#3791 <https://github.com/datalad/datalad/issues/3791>`__)
 
 -  `status <http://datalad.readthedocs.io/en/latest/generated/man/datalad-status.html>`__
    gained a ``--report-filetype``. Setting it to “raw” can give a
@@ -166,6 +200,10 @@ Enhancements and new features
    ``git for-each-ref``, which is used in various spots that used to
    rely on GitPython functionality.
    (`#3705 <https://github.com/datalad/datalad/issues/3705>`__)
+
+-  Do not pretend to be able to work in optimized (``python -O``) mode,
+   crash early with an informative message.
+   (`#3803 <https://github.com/datalad/datalad/issues/3803>`__)
 
 0.12.0rc5 (September 04, 2019) – .
 ----------------------------------
@@ -1581,7 +1619,7 @@ A number of fixes did not make it into the 0.9.x series:
 -  ``add`` now correctly saves staged subdataset additions.
 -  Running ``datalad save`` in a dataset no longer adds untracked
    content to the dataset. In order to add content a path has to be
-   given, e.g. ``datalad save .``
+   given, e.g. \ ``datalad save .``
 -  ``wtf`` now works reliably with a DataLad that wasn’t installed from
    Git (but, e.g., via pip)
 -  More robust URL handling in ``simple_with_archives`` crawler
@@ -1593,7 +1631,7 @@ Enhancements and new features
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 -  Support for DataLad extension that can contribute API components from
-   3rd-party sources, incl. commands, metadata extractors, and test case
+   3rd-party sources, incl. commands, metadata extractors, and test case
    implementations. See
    https://github.com/datalad/datalad-extension-template for a demo
    extension.
@@ -2077,7 +2115,7 @@ Enhancements and new features
    aggregates meta-data for the datasets from datacite
 -  overall optimisations to benefit from the aforementioned refactoring
    and improve user-experience
--  a few stub and not (yet) implemented commands (e.g. ``move``) were
+-  a few stub and not (yet) implemented commands (e.g. ``move``) were
    removed from the interface
 -  Web frontend got proper coloring for the breadcrumbs and some
    additional caching to speed up interactions. See

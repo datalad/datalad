@@ -54,7 +54,17 @@ bet we will fix some bugs and make a world even a better place.
   date.  It now sorts them by the tagger date for annotated tags and
   the committer date for lightweight tags.  ([#3715][])
 
+- The `rev_resolve_path` substituted `resolve_path` helper. ([#3797][])
+
+
 ### Fixes
+
+- Correctly handle relative paths in [publish][]. ([#3799][]) ([#3102][])
+
+- Do not errorneously discover directory as a procedure. ([#3793][])
+
+- Correctly extract version from manpage to trigger use of manpages for
+  `--help`. ([#3798][])
 
 - The `cfg_yoda` procedure saved all modifications in the repository
   rather than saving only the files it modified.  ([#3680][])
@@ -89,6 +99,10 @@ bet we will fix some bugs and make a world even a better place.
   drive letters.  ([#3728][])
 
 ### Enhancements and new features
+
+- Provide a collection of "public" `call_git*` helpers within GitRepo
+  and replace use of "private" and less specific `_git_custom_command`
+  calls.  ([#3791][])
 
 - [status][] gained a `--report-filetype`.  Setting it to "raw" can
   give a performance boost for the price of no longer distinguishing
@@ -130,6 +144,8 @@ bet we will fix some bugs and make a world even a better place.
   for-each-ref`, which is used in various spots that used to rely on
   GitPython functionality.  ([#3705][])
 
+- Do not pretend to be able to work in optimized (`python -O`) mode,
+  crash early with an informative message. ([#3803][])
 
 ## 0.12.0rc5 (September 04, 2019) -- .
 
@@ -1838,6 +1854,7 @@ publishing
 [#3091]: https://github.com/datalad/datalad/issues/3091
 [#3098]: https://github.com/datalad/datalad/issues/3098
 [#3099]: https://github.com/datalad/datalad/issues/3099
+[#3102]: https://github.com/datalad/datalad/issues/3102
 [#3104]: https://github.com/datalad/datalad/issues/3104
 [#3106]: https://github.com/datalad/datalad/issues/3106
 [#3109]: https://github.com/datalad/datalad/issues/3109
@@ -1998,3 +2015,9 @@ publishing
 [#3776]: https://github.com/datalad/datalad/issues/3776
 [#3777]: https://github.com/datalad/datalad/issues/3777
 [#3780]: https://github.com/datalad/datalad/issues/3780
+[#3791]: https://github.com/datalad/datalad/issues/3791
+[#3793]: https://github.com/datalad/datalad/issues/3793
+[#3797]: https://github.com/datalad/datalad/issues/3797
+[#3798]: https://github.com/datalad/datalad/issues/3798
+[#3799]: https://github.com/datalad/datalad/issues/3799
+[#3803]: https://github.com/datalad/datalad/issues/3803
