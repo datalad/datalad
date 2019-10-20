@@ -1793,19 +1793,32 @@ def get_dataset_root(path):
     The root path is returned in the same absolute or relative form
     as the input argument. If no associated dataset exists, or the
     input path doesn't exist, None is returned.
+
+    If `path` is a symlink or something other than a directory, its
+    the root dataset containing its parent directory will be reported.
+    If none can be found, at a symlink at `path` is pointing to a
+    dataset, `path` itself will be reported as the root.
     """
     suffix = '.git'
-    if not isdir(path):
-        path = dirname(path)
-    apath = abspath(path)
+    altered = None
+    if op.islink(path) or not op.isdir(path):
+        altered = path
+        path = op.dirname(path)
+    apath = op.abspath(path)
     # while we can still go up
-    while psplit(apath)[1]:
-        if exists(opj(path, suffix)):
+    while op.split(apath)[1]:
+        if op.exists(op.join(path, suffix)):
             return path
         # new test path in the format we got it
-        path = normpath(opj(path, os.pardir))
+        path = op.normpath(op.join(path, os.pardir))
         # no luck, next round
-        apath = abspath(path)
+        apath = op.abspath(path)
+    # if we applied dirname() at the top, we give it another go with
+    # the actual path, if it was itself a symlink, it could be the
+    # top-level dataset itself
+    if altered and op.exists(op.join(altered, suffix)):
+        return altered
+
     return None
 
 

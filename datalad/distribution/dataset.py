@@ -10,7 +10,6 @@
 """
 
 import logging
-import os
 import os.path as op
 from os.path import (
     curdir,
@@ -46,6 +45,9 @@ from datalad.utils import (
     getpwd,
     optional_args,
     get_dataset_root,
+    # TODO remove after a while, when external consumers have adjusted
+    # to use get_dataset_root()
+    get_dataset_root as rev_get_dataset_root,
     Path,
     PurePath,
     assure_list,
@@ -107,7 +109,7 @@ class Dataset(object, metaclass=Flyweight):
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
             # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(rev_get_dataset_root(curdir)).get_superdataset(
+            path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
                 topmost=True).path
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
@@ -706,54 +708,17 @@ def path_under_rev_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = rev_get_dataset_root(str(path))
+    root = get_dataset_root(str(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
         # to jump in the the next directory up, but we have
         # to use ./.. and get_dataset_root() will handle
         # the rest just fine
-        root = rev_get_dataset_root(op.join(root, op.pardir))
+        root = get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
     return ds_path / op.relpath(str(path), root)
-
-
-# XXX this is a copy of the change proposed in
-# https://github.com/datalad/datalad/pull/2944
-def rev_get_dataset_root(path):
-    """Return the root of an existent dataset containing a given path
-
-    The root path is returned in the same absolute or relative form
-    as the input argument. If no associated dataset exists, or the
-    input path doesn't exist, None is returned.
-
-    If `path` is a symlink or something other than a directory, its
-    the root dataset containing its parent directory will be reported.
-    If none can be found, at a symlink at `path` is pointing to a
-    dataset, `path` itself will be reported as the root.
-    """
-    suffix = '.git'
-    altered = None
-    if op.islink(path) or not op.isdir(path):
-        altered = path
-        path = op.dirname(path)
-    apath = op.abspath(path)
-    # while we can still go up
-    while op.split(apath)[1]:
-        if op.exists(op.join(path, suffix)):
-            return path
-        # new test path in the format we got it
-        path = op.normpath(op.join(path, os.pardir))
-        # no luck, next round
-        apath = op.abspath(path)
-    # if we applied dirname() at the top, we give it another go with
-    # the actual path, if it was itself a symlink, it could be the
-    # top-level dataset itself
-    if altered and op.exists(op.join(altered, suffix)):
-        return altered
-
-    return None
 
 
 lgr.log(5, "Done importing dataset")

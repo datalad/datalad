@@ -58,6 +58,7 @@ from datalad.dochelpers import (
 from datalad.utils import (
     unique,
     Path,
+    get_dataset_root,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -67,7 +68,6 @@ from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
     require_dataset,
-    rev_get_dataset_root,
 )
 from datalad.distribution.clone import Clone
 from datalad.distribution.utils import _get_flexible_source_candidates
@@ -371,7 +371,7 @@ def _install_targetpath(
             # it resides in, because this value is used to determine which
             # dataset to call `annex-get` on
             # TODO stringification is a PY35 compatibility kludge
-            path=rev_get_dataset_root(str(target_path)),
+            path=get_dataset_root(str(target_path)),
             status='notneeded',
             contains=[target_path],
             refds=refds_path,
