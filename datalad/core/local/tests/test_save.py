@@ -382,7 +382,17 @@ def test_add_subdataset(path, other):
     # to ds
     res = ds.save(subds.path)
     assert_in_results(res, action="add", path=subds.path, refds=ds.path)
-    assert_in('dir', ds.subdatasets(result_xfm='relpaths'))
+    res = ds.subdatasets()
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1,
+        # essentials
+        path=op.join(ds.path, 'dir'),
+        gitmodule_url='./dir',
+        gitmodule_name='dir',
+        # but also the branch, by default
+        gitmodule_branch='master',
+    )
     #  create another one
     other = create(other)
     # install into superdataset, but don't add

@@ -3842,7 +3842,10 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 try:
                     self.add_submodule(
                         str(cand_sm.relative_to(self.pathobj)),
-                        url=None, name=None)
+                        url=None,
+                        name=None,
+                        branch=self.get_active_branch()
+                        )
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         action='add_submodule',
