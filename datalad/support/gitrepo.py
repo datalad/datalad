@@ -11,29 +11,37 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-from itertools import chain
-import logging
-from collections import OrderedDict
-from collections import namedtuple
+
 import re
 import shlex
 import time
 import os
 import os.path as op
 import warnings
+
+
+from itertools import chain
+import logging
+from collections import (
+    OrderedDict,
+    namedtuple
+)
 from os import linesep
-from os.path import join as opj
-from os.path import exists
-from os.path import normpath
-from os.path import isabs
-from os.path import commonprefix
-from os.path import relpath
-from os.path import realpath
-from os.path import dirname
-from os.path import basename
-from os.path import curdir
-from os.path import pardir
-from os.path import sep
+from os.path import (
+    join as opj,
+    exists,
+    normpath,
+    isabs,
+    commonprefix,
+    relpath,
+    realpath,
+    dirname,
+    basename,
+    curdir,
+    pardir,
+    sep
+)
+
 import posixpath
 from functools import wraps
 from weakref import WeakValueDictionary
@@ -41,47 +49,63 @@ from weakref import WeakValueDictionary
 import git as gitpy
 from git import RemoteProgress
 from gitdb.exc import BadName
-from git.exc import GitCommandError
-from git.exc import NoSuchPathError
-from git.exc import InvalidGitRepositoryError
-from git.objects.blob import Blob
-
+from git.exc import (
+    GitCommandError,
+    NoSuchPathError,
+    InvalidGitRepositoryError
+)
 from datalad.support.due import due, Doi
 
 from datalad import ssh_manager
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
-from datalad.config import _parse_gitconfig_dump
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand
+)
+from datalad.config import (
+    ConfigManager,
+    _parse_gitconfig_dump
+)
+
 from datalad.consts import GIT_SSH_COMMAND
 from datalad.dochelpers import exc_str
-from datalad.config import ConfigManager
 import datalad.utils as ut
-from datalad.utils import Path
-from datalad.utils import PurePosixPath
-from datalad.utils import assure_list
-from datalad.utils import optional_args
-from datalad.utils import on_windows
-from datalad.utils import getpwd
-from datalad.utils import posix_relpath
-from datalad.utils import assure_dir
-from datalad.utils import generate_file_chunks
-from ..utils import assure_unicode
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    assure_list,
+    optional_args,
+    on_windows,
+    getpwd,
+    posix_relpath,
+    assure_dir,
+    generate_file_chunks,
+    assure_unicode
+)
 
 # imports from same module:
 from .external_versions import external_versions
-from .exceptions import CommandError
-from .exceptions import DeprecatedError
-from .exceptions import FileNotInRepositoryError
-from .exceptions import GitIgnoreError
-from .exceptions import InvalidGitReferenceError
-from .exceptions import MissingBranchError
-from .exceptions import OutdatedExternalDependencyWarning
-from .exceptions import PathKnownToRepositoryError
-from .network import RI, PathRI
-from .network import is_ssh
+from .exceptions import (
+    CommandError,
+    DeprecatedError,
+    FileNotInRepositoryError,
+    GitIgnoreError,
+    InvalidGitReferenceError,
+    MissingBranchError,
+    OutdatedExternalDependencyWarning,
+    PathKnownToRepositoryError,
+)
+from .network import (
+    RI,
+    PathRI,
+    is_ssh
+)
 from .path import get_parent_paths
-from .repo import Flyweight
-from .repo import RepoInterface
+from .repo import (
+    Flyweight,
+    RepoInterface
+)
+
+#from git.objects.blob import Blob
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -549,9 +573,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         kwargs['path'] = path
         return path, args, kwargs
 
-    @classmethod
-    def _flyweight_invalid(cls, id_):
-        return not cls.is_valid_repo(id_)
+    def _flyweight_invalid(self):
+        return not self.is_valid_git()
 
     @classmethod
     def _flyweight_reject(cls, id_, *args, **kwargs):
@@ -632,6 +655,56 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         """
 
+        # BEGIN Repo validity test
+        # We want to fail early for tests, that would be performed a lot. In particular this is about
+        # GitRepo.is_valid_repo. We would use the latter to decide whether or not to call GitRepo() only for
+        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
+        # scope.
+        self.path = path
+
+        # Note, that the following three path objects are used often and therefore
+        # are stored for performance. Path object creation comes with a cost. Most noteably,
+        # this is used for validity checking of the repository.
+        self.pathobj = ut.Path(self.path)
+        self.dot_git = self.pathobj / '.git'
+        # Read a potential .git file in order to not do that over and over again, when testing is_valid_git() etc.
+        # TODO: There's still some code duplication with static method GitRepo.get_git_dir()
+        #       However, it's returning relative path. So, the logic in usage needs to be unified in order to melt both
+        #       pieces.
+        if self.dot_git.is_file():
+            with self.dot_git.open() as f:
+                line = f.readline()
+                if line.startswith("gitdir: "):
+                    self.dot_git = self.pathobj / line[7:].strip()
+                else:
+                    raise InvalidGitRepositoryError("Invalid .git file")
+
+        elif self.dot_git.is_symlink():
+            self.dot_git = self.dot_git.resolve()
+
+        self._valid_git_test_path = self.dot_git / 'HEAD'
+        _valid_repo = self.is_valid_git()
+
+        do_create = False
+        if create and not _valid_repo:
+            if repo is not None:
+                # `repo` passed with `create`, which doesn't make sense
+                raise TypeError("argument 'repo' must not be used with 'create'")
+            do_create = True
+        else:
+            # Note: We used to call gitpy.Repo(path) here, which potentially
+            # raised NoSuchPathError or InvalidGitRepositoryError. This is
+            # used by callers of GitRepo.__init__() to detect whether we have a
+            # valid repo at `path`. Now, with switching to lazy loading property
+            # `repo`, we detect those cases without instantiating a
+            # gitpy.Repo().
+
+            if not exists(path):
+                raise NoSuchPathError(path)
+            if not _valid_repo:
+                raise InvalidGitRepositoryError(path)
+        # END Repo validity test
+
         if url is not None:
             raise DeprecatedError(
                 new=".clone() class method",
@@ -647,7 +720,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             check_git_configured()
             GitRepo._config_checked = True
 
-        self.realpath = realpath(path)
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
 
@@ -663,31 +735,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         if kwargs:
             git_opts.update(kwargs)
 
-        self.path = path
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         self._repo = repo
         self._cfg = None
 
-        _valid_repo = GitRepo.is_valid_repo(path)
-        if create and not _valid_repo:
-            if repo is not None:
-                # `repo` passed with `create`, which doesn't make sense
-                raise TypeError("argument 'repo' must not be used with 'create'")
-            self._repo = self._create_empty_repo(
-                path,
-                create_sanity_checks, **git_opts)
-        else:
-            # Note: We used to call gitpy.Repo(path) here, which potentially
-            # raised NoSuchPathError or InvalidGitRepositoryError. This is
-            # used by callers of GitRepo.__init__() to detect whether we have a
-            # valid repo at `path`. Now, with switching to lazy loading property
-            # `repo`, we detect those cases without instantiating a
-            # gitpy.Repo().
-
-            if not exists(path):
-                raise NoSuchPathError(path)
-            if not _valid_repo:
-                raise InvalidGitRepositoryError(path)
+        if do_create:  # we figured it out ealier
+            self._repo = self._create_empty_repo(path,
+                                                 create_sanity_checks, **git_opts)
 
         # inject git options into GitPython's git call wrapper:
         # Note: `None` currently can happen, when Runner's protocol prevents
@@ -696,8 +750,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self._repo.git._persistent_git_options = self._GIT_COMMON_OPTIONS
 
         # with DryRunProtocol path might still not exist
-        if exists(self.realpath):
-            self.inode = os.stat(self.realpath).st_ino
+        if exists(self.path):
+            self.inode = os.stat(self.path).st_ino
         else:
             self.inode = None
 
@@ -705,8 +759,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             self.configure_fake_dates()
         # Set by fake_dates_enabled to cache config value across this instance.
         self._fake_dates_enabled = None
-
-        self.pathobj = ut.Path(self.path)
 
     def _create_empty_repo(self, path, sanity_checks=True, **kwargs):
         if not op.lexists(path):
@@ -766,11 +818,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     @property
     def repo(self):
         # with DryRunProtocol path not exist
-        if exists(self.realpath):
-            inode = os.stat(self.realpath).st_ino
+        if exists(self.path):
+            inode = os.stat(self.path).st_ino
         else:
             inode = None
         if self.inode != inode:
+
+            # TODO: - what if we never had any inode? possible?
+            #       - also: call to self._repo and only afterwards checking whether it's None seems strange
+
             # reset background processes invoked by GitPython:
             self._repo.git.clear_cache()
             self.inode = inode
@@ -856,6 +912,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     url = new_url
             env = None
 
+        fix_annex = None
         ntries = 5  # 3 is not enough for robust workaround
         for trial in range(ntries):
             try:
@@ -885,7 +942,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                         trial)
                     continue
                     (lgr.debug if expect_fail else lgr.error)(e_str)
+
+                if "Clone succeeded, but checkout failed." in str(e):
+                    fix_annex = e
+                    break
+
                 raise
+
             except ValueError as e:
                 if gitpy.__version__ == '1.0.2' \
                         and "I/O operation on closed file" in str(e):
@@ -898,6 +961,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 raise  # reraise original
 
         gr = cls(path, *args, repo=repo, **kwargs)
+        if fix_annex:
+            # cheap check whether we deal with an AnnexRepo - we can't check the class of `gr` itself, since we then
+            # would need to import our own subclass
+            if hasattr(gr, 'is_valid_annex'):
+                lgr.warning("Experienced issues while cloning. "
+                            "Trying to fix it, using git-annex-fsck.")
+                if not gr.is_initialized():
+                    gr._init()
+                gr.fsck()
+            else:
+                lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
         return gr
 
     def __del__(self):
@@ -929,26 +1003,63 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         This is done by comparing the base repository path.
         """
-        return self.realpath == obj.realpath
+        return self.path == obj.path
+
+    def is_valid_git(self):
+        """Returns whether the underlying repository appears to be still valid
+
+        Note, that this almost identical to the classmethod is_valid_repo(). However,
+        if we are testing an existing instance, we can save Path object creations. Since this testing
+        is done a lot, this is relevant. Creation of the Path objects in is_valid_repo() takes nearly half the time of
+        the entire function.
+
+        Also note, that this method is bound to an instance but still class-dependent, meaning that a subclass
+        cannot simply overwrite it. This is particularly important for the call from within __init__(),
+        which in turn is called by the subclasses' __init__. Using an overwrite would lead to the wrong thing being
+        called.
+        """
+
+        return self.dot_git.exists() and (
+                not self.dot_git.is_dir() or self._valid_git_test_path.exists()
+        )
 
     @classmethod
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
-        path = Path(path) / '.git'
+        if not isinstance(path, Path):
+            path = Path(path)
+        dot_git_path = path / '.git'
+
         # the aim here is to have this test as cheap as possible, because
         # it is performed a lot
         # recognize two things as good-enough indicators of a present
-        # repo: 1) a non-empty .git directory (#3473) and 2) a pointer
-        # file or symlink
-        return path.exists() and (
-            not path.is_dir() or \
-            any(path.iterdir()))
+        # repo: 1) a non-empty .git directory (#3473)
+        #          NOTE: It's actually faster (and more accurate) to test for existence of a particular subpath.
+        #                This should be something that's there right after git-init. Going for .git/HEAD ATM.
+        #
+        #                In [11]: %timeit path.exists() and (not path.is_dir() or head_path.exists())
+        #                4.93 µs ± 34.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #                In [12]: %timeit path.exists() and (not path.is_dir() or any(path.iterdir()))
+        #                12.8 µs ± 150 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+        #
+        #   and 2) a pointer file or symlink
+
+        return dot_git_path.exists() and (
+            not dot_git_path.is_dir() or (dot_git_path / 'HEAD').exists()
+        )
 
     @staticmethod
     def get_git_dir(repo):
         """figure out a repo's gitdir
 
         '.git' might be a  directory, a symlink or a file
+
+        Note
+        ----
+        Please try using GitRepo.dot_git instead! That one's not static, but it's cheaper and you should avoid
+        not having an instance of a repo you're working on anyway. Note, that the property in opposition to this method
+        returns an absolute path.
+
 
         Parameters
         ----------
@@ -2030,8 +2141,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         except CommandError:
             return False
         return True
-
-# TODO: --------------------------------------------------------------------
 
     def add_remote(self, name, url, options=None):
         """Register remote pointing to a url
@@ -3868,9 +3977,9 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # .git-file
     path = opj(ds.path, relativepath)
     subds_dotgit = opj(path, ".git")
-    src_dotgit = GitRepo.get_git_dir(path)
 
-    if src_dotgit == '.git':
+    repo = GitRepo(path, create=False)
+    if repo.dot_git.parent == repo.pathobj:
         # this is what we want
         return
 
@@ -3878,13 +3987,13 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # done by git to find the checkout at the mountpoint of the
     # submodule, if we keep that, any git command will fail
     # after we move .git
-    GitRepo(path, init=False).config.unset(
-        'core.worktree', where='local')
+    # Ben: Shouldn't we re-setup a possible worktree afterwards?
+    repo.config.unset('core.worktree', where='local')
     # what we have here is some kind of reference, remove and
     # replace by the target
     os.remove(subds_dotgit)
     # make absolute
-    src_dotgit = opj(path, src_dotgit)
+    src_dotgit = str(repo.dot_git)
     # move .git
     from os import rename, listdir, rmdir
     assure_dir(subds_dotgit)

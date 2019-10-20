@@ -448,16 +448,22 @@ def test_cfg_passthrough(path):
 
 
 @with_tree({"empty": {".git": {}, "ds": {}},
-            "nonempty": {".git": {"bogus": "content"}, "ds": {}}})
+            "nonempty": {".git": {"bogus": "content"}, "ds": {}},
+            "git_with_head": {".git": {"HEAD": ""}, "ds": {}}
+            })
 def test_empty_git_upstairs(topdir):
     # create() doesn't get confused by an empty .git/ upstairs (gh-3473)
     assert_in_results(
         create(op.join(topdir, "empty", "ds"), **raw),
         status="ok", type="dataset", action="create")
-    # ... but it will stop short of checking that a directory with a .git path
-    # is a valid repo.
+    # ... and it will ignore non-meaningful content in .git
+    assert_in_results(
+        create(op.join(topdir, "nonempty", "ds"), **raw),
+        status="ok", type="dataset", action="create")
+    # ... but it will raise if it detects a valid repo
+    # (by existence of .git/HEAD as defined in GitRepo._valid_git_test_path)
     with assert_raises(CommandError):
-        create(op.join(topdir, "nonempty", "ds"), **raw)
+        create(op.join(topdir, "git_with_head", "ds"), **raw)
 
 
 @with_tempfile(mkdir=True)

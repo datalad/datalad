@@ -12,12 +12,14 @@
 import logging
 import os
 import os.path as op
-from os.path import curdir
-from os.path import exists
-from os.path import join as opj
-from os.path import normpath, isabs
-from os.path import pardir
-from os.path import realpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    normpath, isabs,
+    pardir,
+    realpath,
+)
 from weakref import WeakValueDictionary
 import wrapt
 
@@ -30,21 +32,24 @@ from datalad.support.constraints import Constraint
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.external_versions import external_versions
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+    NoSuchPathError
+)
 from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
-from datalad.utils import getpwd
-from datalad.utils import optional_args
-from datalad.utils import get_dataset_root
-from datalad.utils import Path
-from datalad.utils import PurePath
-from datalad.utils import assure_list
+from datalad.utils import (
+    getpwd,
+    optional_args,
+    get_dataset_root,
+    Path,
+    PurePath,
+    assure_list,
+)
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -124,6 +129,15 @@ class Dataset(object, metaclass=Flyweight):
         path_ = normpath(path_)
         kwargs['path'] = path_
         return path_, args, kwargs
+
+    def _flyweight_invalid(self):
+        """Invalidation of Flyweight instance
+
+        Dataset doesn't need to be invalidated during its lifetime at all. Instead the underlying *Repo instances are.
+        Dataset itself can represent a not yet existing path.
+        """
+        return False
+
     # End Flyweight
 
     def __hash__(self):
@@ -139,6 +153,7 @@ class Dataset(object, metaclass=Flyweight):
           Path to the dataset location. This location may or may not exist
           yet.
         """
+        self._pathobj = path if isinstance(path, ut.Path) else None
         if isinstance(path, ut.PurePath):
             path = str(path)
         self._path = path
@@ -152,7 +167,9 @@ class Dataset(object, metaclass=Flyweight):
         """pathobj for the dataset"""
         # XXX this relies on the assumption that self._path as managed
         # by the base class is always a native path
-        return ut.Path(self._path)
+        if not self._pathobj:
+            self._pathobj = ut.Path(self._path)
+        return self._pathobj
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -240,18 +257,24 @@ class Dataset(object, metaclass=Flyweight):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
+                # Here we do the same validation that Flyweight would do beforehand if there was a call to AnnexRepo()
                 if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        AnnexRepo.is_valid_repo(self._repo.path,
-                                                allow_noninitialized=True):
+                        self._repo.path, None) and not self._repo._flyweight_invalid():
                     # it's still the object registered as flyweight and it's a
                     # valid annex repo
                     return self._repo
             elif isinstance(self._repo, GitRepo):
                 # it's supposed to be a plain git
+                # same kind of checks as for AnnexRepo above, but additionally check whether it was changed to have an
+                # annex now.
+                # TODO: Instead of is_with_annex, we might want the cheaper check for an actually initialized annex.
+                #       However, that's not completely clear. On the one hand, if it really changed to be an annex
+                #       it seems likely that this happened locally and it would also be an initialized annex. On the
+                #       other hand, we could have added (and fetched) a remote with an annex, which would turn it into
+                #       our current notion of an uninitialized annex. Question is whether or not such a change really
+                #       need to be detected. For now stay on the safe side and detect it.
                 if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        GitRepo.is_valid_repo(self._repo.path) and not \
+                        self._repo.path, None) and not self._repo._flyweight_invalid() and not \
                         self._repo.is_with_annex():
                     # it's still the object registered as flyweight, it's a
                     # valid git repo and it hasn't turned into an annex
@@ -265,8 +288,7 @@ class Dataset(object, metaclass=Flyweight):
         # actually new instance. This is unnecessarily costly.
         valid = False
         for cls, ckw, kw in (
-                # TODO: Do we really want to allow_noninitialized=True here?
-                # And if so, leave a proper comment!
+                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):
@@ -291,6 +313,8 @@ class Dataset(object, metaclass=Flyweight):
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
         elif due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
 
