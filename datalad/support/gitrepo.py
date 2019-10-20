@@ -337,37 +337,6 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False,
     return newfunc
 
 
-def check_git_configured():
-    """Do a check if git is configured (user.name and user.email are set)
-
-    Raises
-    ------
-    RuntimeError if any of those two variables are not set
-
-    Returns
-    -------
-    dict with user.name and user.email entries
-    """
-
-    check_runner = GitRunner()
-    vals = {}
-    exc_ = ""
-    for c in 'user.name', 'user.email':
-        try:
-            v, err = check_runner.run(['git', 'config', c])
-            vals[c] = v.rstrip('\n')
-        except CommandError as exc:
-            exc_ += exc_str(exc)
-    if exc_:
-        lgr.warning(
-            "It is highly recommended to configure git first (set both "
-            "user.name and user.email) before using DataLad. Failed to "
-            "verify that git is configured: %s.  Some operations might fail or "
-            "not perform correctly." % exc_
-        )
-    return vals
-
-
 def _remove_empty_items(list_):
     """Remove empty entries from list
 
@@ -715,10 +684,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # So that we "share" control paths with git/git-annex
         if ssh_manager:
             ssh_manager.assure_initialized()
-
-        if not GitRepo._config_checked:
-            check_git_configured()
-            GitRepo._config_checked = True
 
         # note: we may also want to distinguish between a path to the worktree
         # and the actual repository
