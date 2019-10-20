@@ -47,7 +47,6 @@ from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -763,7 +762,6 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-@known_failure_githubci_win
 @with_tree(tree={
     'd1': {'f1': 'content1',
            'f2': 'content2'},
