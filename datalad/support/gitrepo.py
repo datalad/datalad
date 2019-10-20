@@ -2669,7 +2669,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # parent
         # gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
         # going git native instead
-        cmd = ['git', 'submodule', 'add', '--name', name]
+        cmd = ['submodule', 'add', '--name', name]
         if branch is not None:
             cmd += ['-b', branch]
         if url is None:
@@ -2695,15 +2695,14 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             else:
                 url = path
         cmd += [url, Path(path).as_posix()]
-        self._git_custom_command('', cmd)
+        self.call_git(cmd)
         # record dataset ID if possible for comprehesive metadata on
         # dataset components within the dataset itself
         subm_id = GitRepo(op.join(self.path, path)).config.get(
             'datalad.dataset.id', None)
         if subm_id:
-            self._git_custom_command(
-                '',
-                ['git', 'config', '--file', '.gitmodules', '--replace-all',
+            self.call_git(
+                ['config', '--file', '.gitmodules', '--replace-all',
                  'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
