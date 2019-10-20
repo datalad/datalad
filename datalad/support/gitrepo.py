@@ -2855,27 +2855,36 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             ['git', 'symbolic-ref' if symbolic else 'update-ref', ref, value]
         )
 
-    def tag(self, tag, message=None):
-        """Assign a tag to current commit
+    def tag(self, tag, message=None, commit=None, options=None):
+        """Tag a commit
 
         Parameters
         ----------
         tag : str
-          Custom tag label.
+          Custom tag label. Must be a valid tag name.
         message : str, optional
-          If provided, would create an annotated tag with that message
+          If provided, adds ['-m', <message>] to the list of `git tag`
+          arguments.
+        commit : str, optional
+          If provided, will be appended as last argument to the `git tag` call,
+          and can be used to identify the commit that shall be tagged, if
+          not HEAD.
+        options : list, optional
+          Additional command options, inserted prior a potential `commit`
+          argument.
         """
-        # TODO later to be extended with tagging particular commits and signing
         # TODO: call in save.py complains about extensive logging. When does it
         # happen in what way? Figure out, whether to just silence it or raise or
         # whatever else.
-        options = []
+        args = ['tag']
         if message:
-            options += ['-m', message]
-        self._git_custom_command(
-            '', ['git', 'tag'] + options + [str(tag)],
-            check_fake_dates=True
-        )
+            args += ['-m', message]
+        if options is not None:
+            args.extend(options)
+        args.append(tag)
+        if commit:
+            args.append(commit)
+        self.call_git(args)
 
     def get_tags(self, output=None):
         """Get list of tags
