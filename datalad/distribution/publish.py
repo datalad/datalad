@@ -76,8 +76,7 @@ def _push(ds, remote, things2push, force=False):
         return 'ok', ('pushed to %s: %s', remote, successes)
 
 
-def has_diff(ds, refspec, remote, paths):
-    """Return bool if a dataset was modified wrt to a given remote state"""
+def _get_remote_branch(ds, refspec=None):
     if refspec:
         remote_branch_name = refspec[11:] \
             if refspec.startswith('refs/heads/') \
@@ -85,7 +84,11 @@ def has_diff(ds, refspec, remote, paths):
     else:
         # there was no tracking branch, check the push target
         remote_branch_name = ds.repo.get_active_branch()
+    return remote_branch_name
 
+
+def has_diff(ds, remote_branch_name, remote, paths):
+    """Return bool if a dataset was modified wrt to a given remote state"""
     remote_ref = '/'.join((remote, remote_branch_name))
     if remote_ref not in ds.repo.get_remote_branches():
         lgr.debug("Remote '%s' has no branch matching %r. Will publish",
@@ -258,6 +261,17 @@ def _check_and_update_remote_server_info(ds, remote):
 
 def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False, jobs=None,
                      transfer_data='auto', **kwargs):
+    remote_branch_name = _get_remote_branch(ds, refspec)
+    if not remote_branch_name:
+        yield get_status_dict(
+            ds=ds,
+            status='impossible',
+            message=(
+                'Cannot determine remote branch name from %s',
+                'HEAD' if not refspec else refspec,
+            ),
+            **kwargs)
+        return
     # TODO: this setup is now quite ugly. The only way `refspec` can come
     # in, is when there is a tracking branch, and we get its state via
     # `refspec`
@@ -304,7 +318,7 @@ def _publish_dataset(ds, remote, refspec, paths, annex_copy_options, force=False
     # dizzy in the forehead....
 
     # if forced -- we push regardless if there are differences or not
-    diff = True if force else has_diff(ds, refspec, remote, paths)
+    diff = True if force else has_diff(ds, remote_branch_name, remote, paths)
 
     # We might have got new information in git-annex branch although no other
     # changes
