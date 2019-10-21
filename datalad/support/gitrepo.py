@@ -1843,23 +1843,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return conv_str.splitlines()
         # TODO: keep splitlines?
 
-    def _get_files_history(self, files, branch='HEAD'):
-        """
-
-        Parameters
-        ----------
-        files: list
-          list of files, only commits with queried files are considered
-        branch: str
-          Name of the branch to query. Default: HEAD.
-
-        Returns
-        -------
-        [iterator]
-        yielding Commit items generator from branch history associated with files
-        """
-        return gitpy.objects.commit.Commit.iter_items(self.repo, branch, paths=files)
-
     def _get_remotes_having_commit(self, commit_hexsha, with_urls_only=True):
         """Traverse all branches of the remote and check if commit in any of their ancestry
 

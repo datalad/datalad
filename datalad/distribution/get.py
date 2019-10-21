@@ -94,7 +94,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
     try:
-        last_commit = next(ds_repo._get_files_history(sm_path)).hexsha
+        last_commit = ds_repo.get_last_commit_hash(sm_path)
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
         candidate_remotes += list(ds_repo._get_remotes_having_commit(last_commit))
