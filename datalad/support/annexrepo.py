@@ -2887,9 +2887,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             expect_fail=True,
         )
 
-    # TODO: we probably need to override get_file_content, since it returns the
-    # symlink's target instead of the actual content.
-
     # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
     def copy_to(self, files, remote, options=None, jobs=None):

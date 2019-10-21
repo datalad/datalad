@@ -1826,23 +1826,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
 
-    def get_file_content(self, file_, branch='HEAD'):
-        """
-
-        Returns
-        -------
-        str
-          content of `file_` as a list of lines.
-        """
-        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
-
-        # in python3 a byte string is returned. Need to convert it:
-        conv_str = u''
-        for b in bytes(content_str):
-            conv_str += chr(b)
-        return conv_str.splitlines()
-        # TODO: keep splitlines?
-
     def _get_remotes_having_commit(self, commit_hexsha, with_urls_only=True):
         """Traverse all branches of the remote and check if commit in any of their ancestry
 
