@@ -21,6 +21,7 @@ from .utils import (
     eq_,
     assert_is,
     assert_equal,
+    assert_not_equal,
     assert_false,
     assert_true,
     assert_greater,
@@ -374,3 +375,41 @@ def test_runner_remaining_output_two_pipes(path):
             eq_(expected,
                 runner(cmd, log_online=True, stdin=fh,
                        log_stdout=True, log_stderr=log_stderr)[0])
+
+
+@skip_if_on_windows  # unlikely windows shell supports "for"
+def test_no_processes_left_behind():
+    import psutil
+    import random
+    import signal
+    import subprocess
+    import time
+    t = str(random.randint(1000, 2000))
+
+    # race condition is possible but unlikely
+    def get_sleep_ppids():
+        return [
+            p.ppid()
+            for p in psutil.process_iter()
+            if p.cmdline() == ["sleep", t]
+        ]
+    if get_sleep_ppids():
+        raise SkipTest("There are magical sleep processes running, cannot run "
+                       "the test")
+
+    proc = subprocess.Popen(
+        [sys.executable,
+         '-c',
+           'from datalad.cmd import Runner; '
+           'r=Runner(); '
+           'r("bash -c \\"for i in 1 2 3; do sleep %s & done; wait\\"")' % t
+         ]
+    )
+    time.sleep(1)
+    ppids = get_sleep_ppids()
+    ppid = ppids[0]
+    assert_equal(ppids, [ppid] * 3)  # have three identical pointing to bash
+    os.kill(ppid, signal.SIGKILL)
+    # even if we kill the bash process -- sleep processes do not die/get killed
+    # they get disowned
+    assert_equal(get_sleep_ppids(), [])
