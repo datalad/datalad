@@ -71,4 +71,4 @@ PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 CONFIG_HUB_TOKEN_FIELD = 'hub.oauthtoken'
 
 # format of git-annex adjusted branch names
-ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/([^(]+)\(.*\)$')
+ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')

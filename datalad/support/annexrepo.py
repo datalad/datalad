@@ -3447,7 +3447,7 @@ class AnnexRepo(GitRepo, RepoInterface):
         branch = self.get_active_branch()
         adjusted_match = ADJUSTED_BRANCH_EXPR.match(branch if branch else '')
         if adjusted_match:
-            orig_branch = adjusted_match.group(1)
+            orig_branch = adjusted_match.group('name')
             synced_branch = 'synced/{}'.format(orig_branch)
             had_synced_branch = synced_branch in self.get_branches()
             lgr.debug(
