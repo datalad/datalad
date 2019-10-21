@@ -3839,13 +3839,17 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if sm_props.get('type', None) == 'directory']
             to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
+                branch = self.get_active_branch()
+                adjusted_match = ADJUSTED_BRANCH_EXPR.match(
+                    branch if branch else '')
                 try:
                     self.add_submodule(
                         str(cand_sm.relative_to(self.pathobj)),
                         url=None,
                         name=None,
-                        branch=self.get_active_branch()
-                        )
+                        branch=adjusted_match.group('name') if adjusted_match
+                        else branch
+                    )
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         action='add_submodule',
