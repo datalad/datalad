@@ -180,6 +180,19 @@ def get_cmd_doc(interface):
     return intf_doc
 
 
+def get_cmd_ex(interface):
+    """Return the examples for the command defined by 'interface'.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_ex = "\n\n*Examples*\n"
+    for example in interface._examples_:
+        intf_ex += build_example(example, api=False)
+    return intf_ex
+
+
 def dedent_docstring(text):
     """Remove uniform indentation from a multiline docstring"""
     # Problem is that first line might often have no offset, so might
@@ -358,6 +371,41 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     # assign the amended docs
     func.__doc__ = doc
     return func
+
+
+def build_example(example, api=True):
+    """Build a code example.
+
+    Take a dict from a classes _example_ specification (list of dicts) and
+    build a string with an api or cmd example (for use in cmd help or
+    docstring).
+
+    Parameters
+    ----------
+    api : bool
+        If True, build Python example for docstring. If False, build cmd
+        example.
+
+    Returns
+    -------
+    ex : str
+        Concatenated examples for the given class.
+    """
+    if api:
+        code_field='code_py'
+        indicator=''
+    else:
+        code_field='code_cmd'
+        indicator='% '
+    description = dedent_docstring(example.get('text'))
+    code = example.get(code_field)
+
+    ex = """{}::\n\n   {}{}\n\n""".format(description,
+                                        indicator,
+                                        code)
+    return ex
+
+
 
 
 def build_doc(cls, **kwargs):
