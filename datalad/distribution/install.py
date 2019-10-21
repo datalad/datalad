@@ -96,6 +96,33 @@ class Install(Interface):
     # datasets
     result_filter = is_result_matching_pathsource_argument
 
+    _examples_ = [
+        dict(text="Install a dataset from Github into the current directory",
+             code_py="install("
+             "source='https://github.com/datalad-datasets/longnow"
+             "-podcasts.git')",
+             code_cmd="datalad install "
+             "https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install a dataset as a subdataset into the current dataset",
+             code_py="install(dataset='.', "
+             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
+             code_cmd="datalad install -d . "
+             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+        dict(text="Install a dataset, and get all contents right away",
+             code_py="install(source="
+             "'https://github.com/datalad-datasets/longnow-podcasts.git', "
+             "get_data=True')",
+             code_cmd="datalad install --get-data "
+             "--source https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install a dataset with all its subdatasets",
+             code_py="install("
+             "source='https://github.com/datalad-datasets/longnow-podcasts.git', "
+             "recursive=True)",
+             code_cmd="datalad install "
+             "https://github.com/datalad-datasets/longnow-podcasts.git "
+             "--recursive"),
+    ]
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),

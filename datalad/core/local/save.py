@@ -87,6 +87,31 @@ class Save(Interface):
     # note above documents that out behavior is like that of `git add`, but
     # does not explicitly mention the connection to keep it simple.
 
+    _examples_ = [
+        dict(text="""Save any content underneath the current directory, without
+             altering any potential subdataset""",
+             code_py="ds.save()",
+             code_cmd="datalad save ."),
+        dict(text="""Save specific content in the dataset""",
+             code_py="ds.save(path='myfile.txt')",
+             code_cmd="datalad save myfile.txt"),
+        dict(text="""Attach a commit message to save""",
+             code_py="ds.save(path='myfile.txt', message='add a file')",
+             code_cmd="datalad save -m 'add file' myfile.txt"),
+        dict(text="""Save any content underneath the current directory, and
+             recurse into any potential subdatasets""",
+             code_py="ds.save(recursive=True)",
+             code_cmd="datalad save . --recursive"),
+        dict(text="""Save any modification of known dataset content in the
+             current directory, but leave untracked files (e.g. temporary files)
+             untouched""",
+             code_py="""ds.save(updated=True, path='.')""",
+             code_cmd="""datalad save -u -d ."""),
+        dict(text="Tag the most recent saved state of a dataset",
+             code_py="ds.save(version_tag='bestyet')",
+             code_cmd="datalad save -d . --version-tag 'bestyet'"),
+    ]
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),

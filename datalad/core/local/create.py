@@ -105,6 +105,28 @@ class Create(Interface):
         EnsureKeyChoice('action', ('create',)) & \
         EnsureKeyChoice('status', ('ok', 'notneeded'))
 
+    _examples_ = [
+        dict(text="""Create a dataset 'mydataset' in the current directory""",
+             code_py="create(path='mydataset')",
+             code_cmd="datalad create mydataset",
+             setup_py="python -c 'from datalad.api import create, remove'",
+             setup_cmd="datalad create mydataset",
+             teardown_py="remove(path='mydataset')",
+             teardown_cmd="datalad remove mydataset"),
+        dict(text="""Apply the text2git procedure upon creation of a dataset""",
+             code_py="create(path='mydataset', cfg_proc='text2git')",
+             code_cmd="datalad create -c text2git mydataset"),
+        dict(text="""Create a subdataset in the root of an existing dataset""",
+             code_py="create(dataset='.', path='mysubdataset')",
+             code_cmd="datalad create -d . mysubdataset"),
+        dict(text="Create a dataset in an existing, non-empty directory",
+             code_py="create(force=True, path='.')",
+             code_cmd="datalad create --force"),
+        dict(text="Create a plain Git repository",
+             code_py="create(path='mydataset', no_annex=True)",
+             code_cmd="datalad create --no-annex"),
+    ]
+
     _params_ = dict(
         path=Parameter(
             args=("path",),
