@@ -66,7 +66,10 @@ from datalad.config import (
     _parse_gitconfig_dump
 )
 
-from datalad.consts import GIT_SSH_COMMAND
+from datalad.consts import (
+    GIT_SSH_COMMAND,
+    ADJUSTED_BRANCH_EXPR,
+)
 from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
