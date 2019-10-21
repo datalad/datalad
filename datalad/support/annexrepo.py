@@ -39,6 +39,7 @@ from weakref import WeakValueDictionary
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
+from datalad.consts import ADJUSTED_BRANCH_EXPR
 from datalad.dochelpers import (
     exc_str,
     borrowdoc,
@@ -3437,6 +3438,29 @@ class AnnexRepo(GitRepo, RepoInterface):
                 message='\n'.join(r['error-messages'])
                 if 'error-messages' in r else None,
                 logger=lgr)
+
+    def _save_post(self, message, status, partial_commit):
+        # first do standard GitRepo business
+        super(AnnexRepo, self)._save_post(
+            message, status, partial_commit)
+        # check if we have to deal with adjusted branch
+        branch = self.get_active_branch()
+        adjusted_match = ADJUSTED_BRANCH_EXPR.match(branch if branch else '')
+        if adjusted_match:
+            orig_branch = adjusted_match.group(1)
+            synced_branch = 'synced/{}'.format(orig_branch)
+            had_synced_branch = synced_branch in self.get_branches()
+            lgr.debug(
+                "Git-annex adjusted branch detected, sync'ing %s",
+                orig_branch)
+            self.call_git(
+                ['annex', 'sync', '--no-commit', '--no-push', '--no-pull'],
+            )
+            # cleanup sync'ed branch if we caused it
+            if not had_synced_branch:
+                self.call_git(
+                    ['branch', '-d', 'synced/{}'.format(orig_branch)],
+                )
 
 
 # TODO: Why was this commented out?
