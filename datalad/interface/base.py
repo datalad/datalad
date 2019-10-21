@@ -412,6 +412,24 @@ def build_example(example, api=True):
     return ex
 
 
+def update_docstring_with_examples(cls_doc, ex):
+    """Update a commands docstring with examples.
+
+    Take _examples_ of a command, build the Python examples, and append
+    them to the docstring.
+
+    cls_doc: docstring
+    ex: list
+        list of dicts with examples
+    """
+    if len(cls_doc):
+        cls_doc += "\n"
+    cls_doc += "Examples\n--------\n"
+    # loop though provided examples
+    for example in ex:
+        cls_doc += build_example(example, api=True)
+
+    return cls_doc
 
 
 def build_doc(cls, **kwargs):
@@ -446,7 +464,9 @@ def build_doc(cls, **kwargs):
     if hasattr(cls, '_docs_'):
         # expand docs
         cls_doc = cls_doc.format(**cls._docs_)
-
+    # get examples
+    ex = getattr(cls, '_examples_', [])
+    cls_doc = update_docstring_with_examples(cls_doc, ex)
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
