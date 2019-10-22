@@ -1708,16 +1708,14 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         int or None
           None if no commit
         """
-        try:
-            if branch:
-                commit = next(self.get_branch_commits(branch))
-            else:
-                commit = self.repo.head.commit
-        except Exception as exc:
-            lgr.debug("Got exception while trying to get last commit: %s",
-                      exc_str(exc))
-            return None
-        return getattr(commit, "%s_date" % date)
+        if date == 'committed':
+            format = '%ct'
+        elif date == 'authored':
+            format = '%at'
+        else:
+            raise ValueError('unknow date type: {}'.format(date))
+        d = self.format_commit(format, commitish=branch)
+        return int(d) if d else None
 
     def get_active_branch(self):
         """Get the name of the active branch
