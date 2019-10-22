@@ -307,12 +307,6 @@ def alter_interface_docs_for_cmdline(docs):
         lambda match: match.group(0)[3:-2].upper(),
         docs,
         flags=re.MULTILINE)
-    # remove RST simple code block markup (::) with single colon
-    docs = re.sub(
-        r'::$',
-        ':',
-        docs,
-        flags=re.MULTILINE)
     docs = re.sub(
         r'\|\| REFLOW \>\>\n(.*?)\<\< REFLOW \|\|',
         lambda match: textwrap.fill(match.group(1)),
