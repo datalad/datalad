@@ -40,13 +40,13 @@ from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
     assure_list,
+    get_dataset_root,
 )
 
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
     EnsureDataset,
-    rev_get_dataset_root,
     resolve_path,
     path_under_rev_dataset,
     require_dataset,
@@ -241,7 +241,7 @@ class Create(Interface):
         # a potentially absent/uninstalled subdataset of the parent
         # in this location
         # it will cost some filesystem traversal though...
-        parentds_path = rev_get_dataset_root(
+        parentds_path = get_dataset_root(
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)

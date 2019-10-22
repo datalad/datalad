@@ -20,6 +20,7 @@ from datalad.utils import (
     assure_list,
     assure_unicode,
     bytes2human,
+    get_dataset_root,
 )
 from datalad.interface.base import (
     Interface,
@@ -44,7 +45,6 @@ from datalad.distribution.dataset import (
     require_dataset,
     resolve_path,
     path_under_rev_dataset,
-    rev_get_dataset_root,
 )
 
 import datalad.utils as ut
@@ -302,7 +302,7 @@ class Status(Interface):
                 # for further decision logic below
                 orig_path = str(p)
                 p = resolve_path(p, dataset)
-                root = rev_get_dataset_root(str(p))
+                root = get_dataset_root(str(p))
                 if root is None:
                     # no root, not possibly underneath the refds
                     yield dict(
@@ -321,7 +321,7 @@ class Status(Interface):
                         # distinguish rsync-link syntax to identify
                         # the dataset as whole (e.g. 'ds') vs its
                         # content (e.g. 'ds/')
-                        super_root = rev_get_dataset_root(op.dirname(root))
+                        super_root = get_dataset_root(op.dirname(root))
                         if super_root:
                             # the dataset identified by the path argument
                             # is contained in a superdataset, and no
