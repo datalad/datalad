@@ -187,7 +187,7 @@ def get_cmd_ex(interface):
     ----------
     interface : subclass of Interface
     """
-    intf_ex = "\n\n*Examples*\n"
+    intf_ex = "\n\n*Examples*\n\n"
     for example in interface._examples_:
         intf_ex += build_example(example, api=False)
     return intf_ex
@@ -407,8 +407,8 @@ def build_example(example, api=True):
     code = example.get(code_field)
 
     ex = """{}::\n\n   {}{}\n\n""".format(description,
-                                        indicator,
-                                        code)
+                                          indicator,
+                                          code)
     return ex
 
 
@@ -422,12 +422,13 @@ def update_docstring_with_examples(cls_doc, ex):
     ex: list
         list of dicts with examples
     """
+    from textwrap import indent
     if len(cls_doc):
         cls_doc += "\n"
-    cls_doc += "Examples\n--------\n"
+    cls_doc += "    Examples\n    --------\n"
     # loop though provided examples
     for example in ex:
-        cls_doc += build_example(example, api=True)
+        cls_doc += indent(build_example(example, api=True), ' '*4)
 
     return cls_doc
 
