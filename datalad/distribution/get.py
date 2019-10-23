@@ -105,7 +105,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
 
     ds_repo = ds.repo
 
-    # should be our first candidate
+    # CANDIDATE: tracking remote of the current branch
     tracking_remote, tracking_branch = ds_repo.get_tracking_branch()
     candidate_remotes = [tracking_remote] if tracking_remote else []
 
@@ -113,6 +113,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     # for the presence of the desired submodule
     last_commit = ds_repo.get_last_commit_hexsha(sm_path)
     if last_commit:
+        # CANDIDATE: any remote that has the commit when the submodule was
+        # last modified
+
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
         candidate_remotes += list(_get_remotes_having_commit(ds_repo, last_commit))
@@ -145,7 +148,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
                     alternate_suffix=False
                 )
 
-    # Do based on the ds.path as the last resort
+    # CANDIDATE: relative to the local dataset path... more hope than plan
     if sm_url:
         clone_urls += _get_flexible_source_candidates(
             sm_url,
