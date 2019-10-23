@@ -1582,12 +1582,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             assert(len(stdout) == 1)
             return stdout[0]
 
-    # TODO should likely be
-    #   get_last_commit_hexsha()
-    # or even
-    #   get_last_commit()
     @normalize_paths(match_return_type=False)
-    def get_last_commit_hash(self, files):
+    def get_last_commit_hexsha(self, files):
         """Return the hash of the last commit the modified any of the given
         paths"""
         try:
