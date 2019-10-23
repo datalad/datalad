@@ -1582,19 +1582,23 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             assert(len(stdout) == 1)
             return stdout[0]
 
+    # TODO should likely be
+    #   get_last_commit_hexsha()
+    # or even
+    #   get_last_commit()
     @normalize_paths(match_return_type=False)
     def get_last_commit_hash(self, files):
         """Return the hash of the last commit the modified any of the given
         paths"""
         try:
-            stdout, stderr = self._git_custom_command(
-                files,
-                ['git', 'log', '-n', '1', '--pretty=format:%H'],
-                expect_fail=True)
-            commit = stdout.strip()
-            return commit
+            commit = self.call_git(
+                ['rev-list', '-n1', 'HEAD'],
+                files=files,
+            )
+            commit = commit.strip()
+            return commit if commit else None
         except CommandError as e:
-            if 'does not have any commits' in e.stderr:
+            if 'unknown revision or path not in the working tree' in e.stderr:
                 return None
             raise
 
