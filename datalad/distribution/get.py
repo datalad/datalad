@@ -77,6 +77,24 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.get')
 
 
+def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
+    """Traverse all branches of the remote and check if commit in any of their ancestry
+
+    It is a generator yielding names of the remotes
+    """
+    remote_branches = [
+        b['refname:strip=2']
+        for b in repo.for_each_ref_(
+            fields='refname:strip=2',
+            pattern='refs/remotes',
+            contains=commit_hexsha)]
+    return [
+        remote
+        for remote in repo.get_remotes(with_urls_only=with_urls_only)
+        if any(rb.startswith(remote + '/') for rb in remote_branches)
+    ]
+
+
 def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     """Retrieve candidates from where to install the submodule
 
@@ -97,7 +115,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
         last_commit = ds_repo.get_last_commit_hash(sm_path)
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
-        candidate_remotes += list(ds_repo._get_remotes_having_commit(last_commit))
+        candidate_remotes += list(_get_remotes_having_commit(ds_repo, last_commit))
     except StopIteration:
         # no commit for it known yet, ... oh well
         pass

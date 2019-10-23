@@ -1830,23 +1830,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
 
-    def _get_remotes_having_commit(self, commit_hexsha, with_urls_only=True):
-        """Traverse all branches of the remote and check if commit in any of their ancestry
-
-        It is a generator yielding names of the remotes
-        """
-        remote_branches = [
-            b['refname:strip=2']
-            for b in self.for_each_ref_(
-                fields='refname:strip=2',
-                pattern='refs/remotes',
-                contains=commit_hexsha)]
-        return [
-            remote
-            for remote in self.get_remotes(with_urls_only=with_urls_only)
-            if any(rb.startswith(remote + '/') for rb in remote_branches)
-        ]
-
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
                             log_stdout=True, log_stderr=True, log_online=False,

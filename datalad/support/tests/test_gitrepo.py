@@ -470,15 +470,16 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     ok_(op.exists(op.join(clone_path, filename)))
 
     # While at it, let's test _get_remotes_having_commit a bit
+    from datalad.distribution.get import _get_remotes_having_commit
     clone.add_remote("very_origin", test_path)
     clone.fetch("very_origin")
     eq_(
-        clone._get_remotes_having_commit(clone.get_hexsha()),
+        _get_remotes_having_commit(clone, clone.get_hexsha()),
         ['origin']
     )
     prev_commit = clone.get_hexsha('HEAD^')
     eq_(
-        set(clone._get_remotes_having_commit(prev_commit)),
+        set(_get_remotes_having_commit(clone, prev_commit)),
         {'origin', 'very_origin'}
     )
 
