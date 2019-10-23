@@ -95,15 +95,18 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
     ]
 
 
-def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
+def _get_flexible_source_candidates_for_submodule(ds, sm):
     """Retrieve candidates from where to install the submodule
 
     Even if url for submodule is provided explicitly -- first tries urls under
     parent's module tracking branch remote.
     """
-    clone_urls = []
-
+    # short cuts
     ds_repo = ds.repo
+    sm_url = sm.get('gitmodule_url', None)
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
+
+    clone_urls = []
 
     # CANDIDATE: tracking remote of the current branch
     tracking_remote, tracking_branch = ds_repo.get_tracking_branch()
@@ -158,12 +161,21 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
     return unique(clone_urls)
 
 
-def _install_subds_from_flexible_source(
-        ds, sm_path, sm_url, reckless, description=None):
-    """Tries to obtain a given subdataset from several meaningful locations"""
+def _install_subds_from_flexible_source(ds, sm, **kwargs):
+    """Tries to obtain a given subdataset from several meaningful locations
+
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+    **kwargs
+      Passed onto clone()
+    """
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
     # compose a list of candidate clone URLs
-    clone_urls = _get_flexible_source_candidates_for_submodule(
-        ds, sm_path, sm_url)
+    clone_urls = _get_flexible_source_candidates_for_submodule(ds, sm)
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
@@ -189,15 +201,14 @@ def _install_subds_from_flexible_source(
             # pretend no parent -- we don't want clone to add to ds
             # because this is a submodule already!
             dataset=None,
-            reckless=reckless,
             # if we have more than one source, pass as alternatives
             alt_sources=clone_urls[1:],
-            description=description,
             result_xfm=None,
             # we yield all an have the caller decide
             on_failure='ignore',
             result_renderer='disabled',
-            return_type='generator'):
+            return_type='generator',
+            **kwargs):
         yield res
 
     subds = Dataset(dest_path)
@@ -281,9 +292,8 @@ def _install_necessary_subdatasets(
         # get the module from
         for res in _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
-                op.relpath(cur_subds['path'], start=cur_subds['parentds']),
-                cur_subds['gitmodule_url'],
-                reckless,
+                cur_subds,
+                reckless=reckless,
                 description=description):
             if res.get('action', None) == 'install':
                 if res['status'] == 'ok':
@@ -342,9 +352,8 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             # try to get this dataset
             for res in _install_subds_from_flexible_source(
                     ds,
-                    op.relpath(sub['path'], start=ds.path),
-                    sub['gitmodule_url'],
-                    reckless,
+                    sub,
+                    reckless=reckless,
                     description=description):
                 # yield everything to let the caller decide how to deal with
                 # errors

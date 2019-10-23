@@ -78,20 +78,18 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
     # Expansion with '/.git' no longer done in this helper
     #sm_httpurls = [httpurl, httpurl + '/.git']
     sm_httpurls = [httpurl]
-    eq_(f(ds, 'sub'), [])
-    eq_(f(ds, 'sub', sshurl), [sshurl])
-    eq_(f(ds, 'sub', httpurl), sm_httpurls)
-    eq_(f(ds, 'sub', None), [])  # otherwise really we have no clue were to get from
+    subpath = str(ds.pathobj / 'sub')
+    eq_(f(ds, dict(path=subpath, parentds=ds.path)), [])
+    eq_(f(ds, dict(path=subpath, parentds=ds.path, gitmodule_url=sshurl)), [sshurl])
+    eq_(f(ds, dict(path=subpath, parentds=ds.path, gitmodule_url=httpurl)), sm_httpurls)
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
     subpath = op.sep.join((t, 'sub'))
-    eq_(f(clone, 'sub'), [subpath])
-    eq_(f(clone, 'sub', sshurl), [subpath, sshurl])
-    eq_(f(clone, 'sub', httpurl), [subpath] + sm_httpurls)
-    eq_(f(clone, 'sub'), [subpath])  # otherwise really we have no clue were to get from
+    eq_(f(clone, dict(path=subpath, parentds=t)), [subpath])
+    eq_(f(clone, dict(path=subpath, parentds=t, gitmodule_url=sshurl)), [subpath, sshurl])
+    eq_(f(clone, dict(path=subpath, parentds=t, gitmodule_url=httpurl)), [subpath] + sm_httpurls)
     # TODO: check that http:// urls for the dataset itself get resolved
-
     # TODO: many more!!
 
 
