@@ -1284,7 +1284,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
     def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
-                      pattern=None, points_at=None, sort=None, count=None):
+                      pattern=None, points_at=None, sort=None, count=None,
+                      contains=None):
         """Wrapper for `git for-each-ref`
 
         Please see manual page git-for-each-ref(1) for a complete overview
@@ -1308,6 +1309,9 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           descending order.
         count : int, optional
           Stop iteration after the given number of matches.
+        contains : str, optional
+          Only list refs which contain the specified commit (HEAD if not
+          specified).
 
         Yields
         ------
@@ -1334,6 +1338,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         ]
         if points_at:
             cmd.append('--points-at={}'.format(points_at))
+        if contains:
+            cmd.append('--contains={}'.format(contains))
         if sort:
             for k in assure_list(sort):
                 cmd.append('--sort={}'.format(k))
@@ -1829,15 +1835,12 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         It is a generator yielding names of the remotes
         """
-        out, err = self._git_custom_command(
-            '', 'git branch -r --contains ' + commit_hexsha
-        )
-        # sanitize a bit (all the spaces and new lines)
         remote_branches = [
-            b  # could be origin/HEAD -> origin/master, we just skip ->
-            for b in filter(bool, out.split())
-            if b != '->'
-        ]
+            b['refname:strip=2']
+            for b in self.for_each_ref_(
+                fields='refname:strip=2',
+                pattern='refs/remotes',
+                contains=commit_hexsha)]
         return [
             remote
             for remote in self.get_remotes(with_urls_only=with_urls_only)
