@@ -128,7 +128,11 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
 
     Returns
     -------
-    list
+    list of tuples
+      Where each tuples consists of a name and a URL. Names are not unique
+      and either derived from the name of the respective remote, template
+      configuration variable, or 'origin' for the candidate URL that was
+      obtained from the .gitmodule record.
     """
     # short cuts
     ds_repo = ds.repo
@@ -174,19 +178,23 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                _get_flexible_source_candidates(
+                (remote, url)
+                for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
-                    sm_path_url, remote_url, alternate_suffix=False))
+                    sm_path_url, remote_url, alternate_suffix=False)
+            )
 
             # attempt: provided (configured?) submodule URL
             # TODO: consider supporting DataLadRI here?  or would confuse
             #  git and we wouldn't want that (i.e. not allow pure git clone
             #  --recursive)
             if sm_url:
-                clone_urls += _get_flexible_source_candidates(
-                    sm_url,
-                    remote_url,
-                    alternate_suffix=False
+                clone_urls.extend(
+                    (remote, url)
+                    for url in _get_flexible_source_candidates(
+                        sm_url,
+                        remote_url,
+                        alternate_suffix=False)
                 )
 
         for name, tmpl in [(c[40:], ds_repo.config[c])
@@ -197,14 +205,17 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
             # we don't want "flexible_source_candidates" here, this is
             # configuration that can be made arbitrarily precise from the
             # outside. Additional guesswork can only make it slower
-            clone_urls.append(url)
+            clone_urls.append((name, url))
 
-    # CANDIDATE: relative to the local dataset path... more hope than plan
+    # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
-        clone_urls += _get_flexible_source_candidates(
-            sm_url,
-            ds.path,
-            alternate_suffix=False)
+        clone_urls.extend(
+            ('origin', url)
+            for url in _get_flexible_source_candidates(
+                sm_url,
+                ds.path,
+                alternate_suffix=False)
+        )
 
     return unique(clone_urls)
 
@@ -227,7 +238,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
-    clone_urls = [src for src in clone_urls if src != dest_path]
+    clone_urls = [src for name, src in clone_urls if src != dest_path]
 
     if not clone_urls:
         # yield error
