@@ -677,12 +677,12 @@ def test_surprise_subds(path):
     if adjusted or fixed_git:
         if adjusted:
             # adjusted branch: #datalad/3178 (that would have a commit)
-            modified = [subds.pathobj, somerepo.pathobj]
+            modified = [subds.repo.pathobj, somerepo.pathobj]
             untracked = []
         else:
             # Newer Git versions refuse to add a sub-repository with no commits
             # checked out.
-            modified = [subds.pathobj]
+            modified = [subds.repo.pathobj]
             untracked = ['d1']
         assert_repo_status(ds.path, modified=modified, untracked=untracked)
         assert_not_in(ds.repo.pathobj / 'd1' / 'subrepo' / 'subfile',
