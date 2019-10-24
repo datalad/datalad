@@ -2685,11 +2685,8 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         var = 'remote.{0}.{1}'.format(name, 'pushurl' if push else 'url')
         self.config.set(var, url, where='local', reload=True)
 
-    def get_branch_commits(self, branch=None, limit=None, stop=None, value=None):
-        """Return GitPython's commits for the branch
-
-        Pretty much similar to what 'git log <branch>' does.
-        It is a generator which returns top commits first
+    def get_branch_commits_(self, branch=None, limit=None, stop=None):
+        """Return commit hexshas for a branch
 
         Parameters
         ----------
@@ -2702,44 +2699,21 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         stop: str, optional
           hexsha of the commit at which stop reporting (matched one is not
           reported either)
-        value: None | 'hexsha', optional
-          What to yield.  If None - entire commit object is yielded, if 'hexsha'
-          only its hexsha
-        """
 
+        Yields
+        ------
+        str
+        """
+        cmd = ['rev-list']
+        if limit == 'left-only':
+            cmd.append('--left-only')
         if not branch:
             branch = self.get_active_branch()
-
-        try:
-            _branch = self.repo.branches[branch]
-        except IndexError:
-            raise MissingBranchError(self, branch,
-                                     [b.name for b in self.repo.branches])
-
-        fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
-
-        if not limit:
-            def gen():
-                # traverse doesn't yield original commit
-                co = _branch.commit
-                yield co
-                for co_ in co.traverse():
-                    yield co_
-        elif limit == 'left-only':
-            # we need a custom implementation since couldn't figure out how to
-            # do with .traversal
-            def gen():
-                co = _branch.commit
-                while co:
-                    yield co
-                    co = co.parents[0] if co.parents else None
-        else:
-            raise ValueError(limit)
-
-        for c in gen():
-            if stop and c.hexsha == stop:
+        cmd.append(branch)
+        for r in self.call_git_items_(cmd):
+            if stop and stop == r:
                 return
-            yield fvalue(c)
+            yield r
 
     def checkout(self, name, options=None):
         """

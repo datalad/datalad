@@ -88,4 +88,4 @@ def test_hierarchy(topdir):
         # each one should have 2 commits (but the last one)-- one for file and
         # another one for sub-dataset
         repo = GitRepo(ds)
-        eq_(len(list(repo.get_branch_commits())), 1 + int(ids<2))
+        eq_(len(list(repo.get_branch_commits_())), 1 + int(ids<2))

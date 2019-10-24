@@ -470,9 +470,9 @@ class TestAddArchiveOptions():
         with assert_raises(Exception), \
                 swallow_logs():
             self.annex.whereis(key1, key=True, output='full')
-        commits_prior = list(self.annex.get_branch_commits('git-annex'))
+        commits_prior = list(self.annex.get_branch_commits_('git-annex'))
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
-        commits_after = list(self.annex.get_branch_commits('git-annex'))
+        commits_after = list(self.annex.get_branch_commits_('git-annex'))
         # There should be a single commit for all additions +1 to initiate datalad-archives gh-1258
         # If faking dates, there should be another +1 because
         # annex.alwayscommit isn't set to false.
@@ -504,15 +504,15 @@ class TestAddArchiveOptions():
         with chpwd(self.annex.path):
             # was failing since deleting without considering if tarball
             # was extracted in that tarball directory
-            commits_prior_master = list(self.annex.get_branch_commits())
-            commits_prior = list(self.annex.get_branch_commits('git-annex'))
+            commits_prior_master = list(self.annex.get_branch_commits_())
+            commits_prior = list(self.annex.get_branch_commits_('git-annex'))
             add_out = add_archive_content(
                 opj('subdir', '1.tar'),
                 delete_after=True,
                 drop_after=True)
             ok_clean_git(self.annex.path)
-            commits_after_master = list(self.annex.get_branch_commits())
-            commits_after = list(self.annex.get_branch_commits('git-annex'))
+            commits_after_master = list(self.annex.get_branch_commits_())
+            commits_after = list(self.annex.get_branch_commits_('git-annex'))
             # There should be a single commit for all additions +1 to
             # initiate datalad-archives gh-1258.  If faking dates,
             # there should be another +1 because annex.alwayscommit
@@ -534,7 +534,7 @@ class TestAddArchiveOptions():
                 drop_after=True,
                 allow_dirty=True)
             ok_clean_git(self.annex.path, untracked=['dummy.txt'])
-            assert_equal(len(list(self.annex.get_branch_commits())),
+            assert_equal(len(list(self.annex.get_branch_commits_())),
                          len(commits_prior_master))
 
             # there should be no .datalad temporary files hanging around

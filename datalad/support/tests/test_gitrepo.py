@@ -670,7 +670,10 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.push(remote="ssh-remote", refspec="ssh-test", force=True)
     # correct commit message in remote:
     assert_in("amended",
-              list(remote_repo.get_branch_commits('ssh-test'))[-1].summary)
+              remote_repo.format_commit(
+                  '%s',
+                  list(remote_repo.get_branch_commits_('ssh-test'))[-1]
+              ))
 
 
 @with_tempfile
@@ -900,7 +903,7 @@ def test_GitRepo_get_merge_base(src):
 
 
 @with_tempfile(mkdir=True)
-def test_GitRepo_git_get_branch_commits(src):
+def test_GitRepo_git_get_branch_commits_(src):
 
     repo = GitRepo(src, create=True)
     with open(op.join(src, 'file.txt'), 'w') as f:
@@ -908,20 +911,10 @@ def test_GitRepo_git_get_branch_commits(src):
     repo.add('*')
     repo.commit('committing')
 
-    commits_default = list(repo.get_branch_commits())
-    commits = list(repo.get_branch_commits('master'))
+    commits_default = list(repo.get_branch_commits_())
+    commits = list(repo.get_branch_commits_('master'))
     eq_(commits, commits_default)
-
     eq_(len(commits), 1)
-    commits_stop0 = list(repo.get_branch_commits(stop=commits[0].hexsha))
-    eq_(commits_stop0, [])
-    commits_hexsha = list(repo.get_branch_commits(value='hexsha'))
-    commits_hexsha_left = list(repo.get_branch_commits(value='hexsha', limit='left-only'))
-    eq_([commits[0].hexsha], commits_hexsha)
-    # our unittest is rudimentary ;-)
-    eq_(commits_hexsha_left, commits_hexsha)
-    repo.precommit()  # to stop all the batched processes for swallow_outputs
-    raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 
 @with_testrepos(flavors=['local'])
