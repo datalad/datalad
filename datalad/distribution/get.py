@@ -96,10 +96,39 @@ def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
 
 
 def _get_flexible_source_candidates_for_submodule(ds, sm):
-    """Retrieve candidates from where to install the submodule
+    """Assemble candidates from where to install a submodule
 
-    Even if url for submodule is provided explicitly -- first tries urls under
+    Even if a URL for submodule is provided explicitly -- first tries urls under
     parent's module tracking branch remote.
+
+    Additional candidate URLs can be generate based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that a inferred from
+    the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respecive .gitmodules
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+
+    Returns
+    -------
+    list
     """
     # short cuts
     ds_repo = ds.repo
@@ -123,11 +152,20 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
         # the same branch checked out I guess
         candidate_remotes += list(_get_remotes_having_commit(ds_repo, last_commit))
 
+    # prepare a dict to generate URL candidates from templates
+    sm_candidate_props = {
+        k[10:].replace('datalad-id', 'id'): v
+        for k, v in sm.items()
+        if k.startswith('gitmodule_')
+    }
+
     for remote in unique(candidate_remotes):
         remote_url = ds_repo.get_remote_url(remote, push=False)
 
         # Directly on parent's ds url
         if remote_url:
+            # make remotes and their URLs available to template rendering
+            sm_candidate_props['remoteurl-{}'.format(remote)] = remote_url
             # attempt: submodule checkout at parent remote URL
             # We might need to quote sm_path portion, e.g. for spaces etc
             if isinstance(RI(remote_url), URL):
@@ -150,6 +188,16 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
                     remote_url,
                     alternate_suffix=False
                 )
+
+        for name, tmpl in [(c[40:], ds_repo.config[c])
+                           for c in ds_repo.config.keys()
+                           if c.startswith(
+                               'datalad.get.subdataset-source-candidate-')]:
+            url = tmpl.format(**sm_candidate_props)
+            # we don't want "flexible_source_candidates" here, this is
+            # configuration that can be made arbitrarily precise from the
+            # outside. Additional guesswork can only make it slower
+            clone_urls.append(url)
 
     # CANDIDATE: relative to the local dataset path... more hope than plan
     if sm_url:
