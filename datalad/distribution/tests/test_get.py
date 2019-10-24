@@ -15,6 +15,7 @@ from os import curdir
 import os.path as op
 from os.path import join as opj, basename
 from glob import glob
+from mock import patch
 
 from datalad.api import create
 from datalad.api import get
@@ -64,10 +65,12 @@ def _make_dataset_hierarchy(path):
 
 @with_tempfile
 @with_tempfile
-def test_get_flexible_source_candidates_for_submodule(t, t2):
+@with_tempfile
+def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     f = _get_flexible_source_candidates_for_submodule
     # for now without mocking -- let's just really build a dataset
     ds = create(t)
+    sub = ds.create('sub')
     clone = install(
         t2, source=t,
         result_xfm='datasets', return_type='item-or-list')
@@ -78,21 +81,75 @@ def test_get_flexible_source_candidates_for_submodule(t, t2):
     # Expansion with '/.git' no longer done in this helper
     #sm_httpurls = [httpurl, httpurl + '/.git']
     sm_httpurls = [('origin', httpurl)]
-    subpath = str(ds.pathobj / 'sub')
-    eq_(f(ds, dict(path=subpath, parentds=ds.path)), [])
-    eq_(f(ds, dict(path=subpath, parentds=ds.path, gitmodule_url=sshurl)),
+    ds_subpath = str(ds.pathobj / 'sub')
+    eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
+    eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
         [('origin', sshurl)])
-    eq_(f(ds, dict(path=subpath, parentds=ds.path, gitmodule_url=httpurl)),
+    eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
         sm_httpurls)
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
-    subpath = op.sep.join((t, 'sub'))
-    eq_(f(clone, dict(path=subpath, parentds=t)), [('origin', subpath)])
-    eq_(f(clone, dict(path=subpath, parentds=t, gitmodule_url=sshurl)),
-        [('origin', subpath), ('origin', sshurl)])
-    eq_(f(clone, dict(path=subpath, parentds=t, gitmodule_url=httpurl)),
-        [('origin', subpath)] + sm_httpurls)
+    eq_(f(clone, dict(path=ds_subpath, parentds=t)), [('origin', ds_subpath)])
+    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=sshurl)),
+        [('origin', ds_subpath), ('origin', sshurl)])
+    eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=httpurl)),
+        [('origin', ds_subpath)] + sm_httpurls)
+
+    # make sure it does meaningful things in an actual clone with an actual
+    # record of a subdataset
+    clone_subpath = str(clone.pathobj / 'sub')
+    eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+        [
+            ('origin', ds_subpath),
+            ('origin', clone_subpath),
+    ])
+
+    # check that a configured remote WITHOUT the desired submodule commit
+    # does not show up as a candidate
+    clone.siblings('add', name='myremote', url='http://example.com',
+                   result_renderer='disabled')
+    eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+        [
+            ('origin', ds_subpath),
+            ('origin', clone_subpath),
+    ])
+    # inject a source URL config, should alter the result accordingly
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'youredead'}):
+        eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+            [
+                ('origin', ds_subpath),
+                ('bang', 'youredead'),
+                ('origin', clone_subpath),
+        ])
+    # verify template instantiation works
+    with patch.dict(
+            'os.environ',
+            {'DATALAD_GET_SUBDATASET__SOURCE__CANDIDATE__BANG': 'pre-{id}-post'}):
+        eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
+            [
+                ('origin', ds_subpath),
+                ('bang', 'pre-{}-post'.format(sub.id)),
+                ('origin', clone_subpath),
+        ])
+    # now again, but have an additional remote besides origin that
+    # actually has the relevant commit
+    clone3 = install(
+        t3, source=t2,
+        result_xfm='datasets', return_type='item-or-list')
+    clone3.siblings('add', name='myremote', url=ds.path,
+                    result_renderer='disabled')
+    clone3.update(sibling='myremote')
+    # we should end up with three pieces
+    eq_(f(clone3, clone3.subdatasets(return_type='item-or-list')),
+        [
+            ('origin', clone_subpath),
+            ('myremote', ds_subpath),
+            ('origin', str(clone3.pathobj / 'sub')),
+    ])
+
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
 
