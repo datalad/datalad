@@ -14,6 +14,7 @@ jobs:
             datalad_neuroimaging,
             datalad_container,
             datalad_metalad,
+            datalad_crawler,
         ]
     steps:
     - name: Set up system
