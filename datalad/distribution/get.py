@@ -279,42 +279,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
 
     # do fancy update
     lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-    # TODO: move all of that into update_submodule ??
-    # track branch originally cloned
-    subrepo = subds.repo
-    branch = subrepo.get_active_branch()
-    branch_hexsha = subrepo.get_hexsha(branch)
     ds.repo.update_submodule(sm_path, init=True)
-    updated_branch = subrepo.get_active_branch()
-    if branch and not updated_branch:
-        # got into 'detached' mode
-        # trace if current state is a predecessor of the branch_hexsha
-        lgr.debug(
-            "Detected detached HEAD after updating submodule %s which was "
-            "in %s branch before", subds.path, branch)
-        detached_hexsha = subrepo.get_hexsha()
-        if subrepo.get_merge_base(
-                [branch_hexsha, detached_hexsha]) == detached_hexsha:
-            # TODO: config option?
-            # in all likely event it is of the same branch since
-            # it is an ancestor -- so we could update that original branch
-            # to point to the state desired by the submodule, and update
-            # HEAD to point to that location
-            lgr.info(
-                "Submodule HEAD got detached. Resetting branch %s to point "
-                "to %s. Original location was %s",
-                branch, detached_hexsha[:8], branch_hexsha[:8]
-            )
-            branch_ref = 'refs/heads/%s' % branch
-            subrepo.update_ref(branch_ref, detached_hexsha)
-            assert(subrepo.get_hexsha(branch) == detached_hexsha)
-            subrepo.update_ref('HEAD', branch_ref, symbolic=True)
-            assert(subrepo.get_active_branch() == branch)
-        else:
-            lgr.warning(
-                "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
-                subrepo.path, branch, detached_hexsha[:8]
-            )
 
 
 def _install_necessary_subdatasets(
