@@ -1310,8 +1310,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         count : int, optional
           Stop iteration after the given number of matches.
         contains : str, optional
-          Only list refs which contain the specified commit (HEAD if not
-          specified).
+          Only list refs which contain the specified commit.
 
         Yields
         ------
