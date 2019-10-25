@@ -78,15 +78,12 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     # first one could just know about itself or explicit url provided
     sshurl = 'ssh://e.c'
     httpurl = 'http://e.c'
-    # Expansion with '/.git' no longer done in this helper
-    #sm_httpurls = [httpurl, httpurl + '/.git']
-    sm_httpurls = [('origin', httpurl)]
     ds_subpath = str(ds.pathobj / 'sub')
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path)), [])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=sshurl)),
-        [('origin', sshurl)])
+        [('local', sshurl)])
     eq_(f(ds, dict(path=ds_subpath, parentds=ds.path, gitmodule_url=httpurl)),
-        sm_httpurls)
+        [('local', httpurl)])
 
     # but if we work on dsclone then it should also add urls deduced from its
     # own location default remote for current branch
@@ -94,7 +91,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=sshurl)),
         [('origin', ds_subpath), ('origin', sshurl)])
     eq_(f(clone, dict(path=ds_subpath, parentds=t, gitmodule_url=httpurl)),
-        [('origin', ds_subpath)] + sm_httpurls)
+        [('origin', ds_subpath), ('origin', httpurl)])
 
     # make sure it does meaningful things in an actual clone with an actual
     # record of a subdataset
@@ -102,7 +99,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
             ('origin', ds_subpath),
-            ('origin', clone_subpath),
+            ('local', clone_subpath),
     ])
 
     # check that a configured remote WITHOUT the desired submodule commit
@@ -112,7 +109,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     eq_(f(clone, clone.subdatasets(return_type='item-or-list')),
         [
             ('origin', ds_subpath),
-            ('origin', clone_subpath),
+            ('local', clone_subpath),
     ])
     # inject a source URL config, should alter the result accordingly
     with patch.dict(
@@ -122,7 +119,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             [
                 ('origin', ds_subpath),
                 ('bang', 'youredead'),
-                ('origin', clone_subpath),
+                ('local', clone_subpath),
         ])
     # verify template instantiation works
     with patch.dict(
@@ -132,7 +129,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
             [
                 ('origin', ds_subpath),
                 ('bang', 'pre-{}-post'.format(sub.id)),
-                ('origin', clone_subpath),
+                ('local', clone_subpath),
         ])
     # now again, but have an additional remote besides origin that
     # actually has the relevant commit
@@ -147,7 +144,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
         [
             ('origin', clone_subpath),
             ('myremote', ds_subpath),
-            ('origin', str(clone3.pathobj / 'sub')),
+            ('local', str(clone3.pathobj / 'sub')),
     ])
 
     # TODO: check that http:// urls for the dataset itself get resolved

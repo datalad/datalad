@@ -210,14 +210,14 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
         clone_urls.extend(
-            ('origin', url)
+            ('local', url)
             for url in _get_flexible_source_candidates(
                 sm_url,
                 ds.path,
                 alternate_suffix=False)
         )
 
-    return unique(clone_urls)
+    return unique(clone_urls, lambda x: x[1])
 
 
 def _install_subds_from_flexible_source(ds, sm, **kwargs):
