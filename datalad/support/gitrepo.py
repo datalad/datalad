@@ -1590,11 +1590,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             commit = self.call_git(
                 ['rev-list', '-n1', 'HEAD'],
                 files=files,
+                expect_fail=True,
             )
             commit = commit.strip()
             return commit if commit else None
-        except CommandError as e:
-            if 'unknown revision or path not in the working tree' in e.stderr:
+        except CommandError:
+            if self.get_hexsha() is None:
+                # unborn branch, don't freak out
                 return None
             raise
 
