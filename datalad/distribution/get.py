@@ -101,7 +101,7 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     Even if a URL for submodule is provided explicitly -- first tries urls under
     parent's module tracking branch remote.
 
-    Additional candidate URLs can be generate based on templates specified as
+    Additional candidate URLs can be generated based on templates specified as
     configuration variables with the pattern
 
       `datalad.get.subdataset-source-candidate-<name>`
@@ -109,9 +109,9 @@ def _get_flexible_source_candidates_for_submodule(ds, sm):
     where `name` is an arbitrary identifier.
 
     A template string assigned to such a variable can utilize the Python format
-    mini language and may reference a number of properties that a inferred from
-    the parent dataset's knowledge about the target subdataset. Properties
-    include any submodule property specified in the respecive .gitmodules
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective .gitmodules
     record. For convenience, an existing `datalad-id` record is made available
     under the shortened name `id`.
 
