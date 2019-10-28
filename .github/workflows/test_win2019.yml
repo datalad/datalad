@@ -31,7 +31,7 @@ jobs:
         python-version: 3.7
     - name: Set up git-annex
       run: |
-        powershell.exe Import-Module BitsTransfer; Start-BitsTransfer -Source https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe -Destination C:\\git-annex-installer.exe
+        python -c "import urllib.request as r; r.urlretrieve('https://downloads.kitenet.net/git-annex/windows/current/git-annex-installer.exe', 'C:\\git-annex-installer.exe')"
         7z x -o"C:\\Program Files\Git" C:\\git-annex-installer.exe
     - name: Install dependencies
       run: |
