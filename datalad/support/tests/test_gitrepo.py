@@ -972,6 +972,50 @@ def test_GitRepo_update_submodule():
     raise SkipTest("TODO")
 
 
+@with_tempfile(mkdir=True)
+def check_update_submodule_init_adjust_branch(is_ancestor, path):
+    src = GitRepo(op.join(path, "src"), create=True)
+    src_sub = GitRepo(op.join(src.path, "sub"), create=True)
+    src_sub.commit(msg="c0", options=["--allow-empty"])
+    src_sub.commit(msg="c1", options=["--allow-empty"])
+    src.add_submodule('sub', name='sub')
+    src.commit(msg="Add submodule")
+
+    # Move subdataset past the registered commit...
+    hexsha_registered = src_sub.get_hexsha()
+    if is_ancestor:
+        # ... where the registered commit is an ancestor of the new one.
+        src_sub.commit(msg="c2", options=["--allow-empty"])
+    else:
+        # ... where the registered commit is NOT an ancestor of the new one.
+        src_sub.call_git(["reset", "--hard", "master~1"])  # c0
+    hexsha_sub = src_sub.get_hexsha()
+
+    clone = GitRepo.clone(url=src.path,
+                          path=op.join(path, "clone"),
+                          create=True)
+    clone_sub = GitRepo.clone(url=src_sub.path,
+                              path=op.join(clone.path, "sub"),
+                              create=True)
+    ok_(clone.dirty)
+    eq_(clone_sub.get_active_branch(), "master")
+    eq_(hexsha_sub, clone_sub.get_hexsha())
+
+    clone.update_submodule("sub", init=True)
+
+    assert_false(clone.dirty)
+    eq_(hexsha_registered, clone_sub.get_hexsha())
+    if is_ancestor:
+        eq_(clone_sub.get_active_branch(), "master")
+    else:
+        assert_false(clone_sub.get_active_branch())
+
+
+def test_GitRepo_update_submodule_init_adjust_branch():
+    yield check_update_submodule_init_adjust_branch, True
+    yield check_update_submodule_init_adjust_branch, False
+
+
 def test_GitRepo_get_submodules():
     raise SkipTest("TODO")
 
