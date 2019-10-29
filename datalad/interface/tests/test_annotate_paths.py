@@ -371,8 +371,9 @@ def test_recurseinto(dspath, dest):
     # explicitly -- must get it installed
     dest = install(source=ds.path, path=dest)
     res = dest.get(['.', opj('b', 'bb')], get_data=False, recursive=True)
-    assert_result_count(res, 7)
-    assert_result_count(res, 7, type='dataset')
+    assert_result_count(res, 8)
+    assert_result_count(res, 8, type='dataset')
+    assert_result_count(res, 1, type='dataset', status='notneeded', path=dest.path)
     assert_result_count(res, 1, type='dataset',
                         path=opj(dest.path, 'b', 'bb'))
     assert(Dataset(opj(dest.path, 'b', 'bb')).is_installed())
