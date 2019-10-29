@@ -58,6 +58,7 @@ from datalad.dochelpers import (
 from datalad.utils import (
     unique,
     Path,
+    assure_list,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -68,6 +69,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
     rev_get_dataset_root,
+    resolve_path,
 )
 from datalad.distribution.clone import Clone
 from datalad.distribution.utils import _get_flexible_source_candidates
@@ -582,7 +584,13 @@ class Get(Interface):
         refds = require_dataset(
             dataset, check_installed=True, purpose='get content')
 
+        path = assure_list(path)
+        # resolve input paths against dataset in order to compare absolute paths in results
+        # to the given paths later on
+        # TODO: Not yet clear whether to use dataset or refds here. Why is dataset used in the call to Subdatasets?
+        input_paths = [str(resolve_path(p, dataset)) for p in path]
         content_by_ds = {}
+        yielded_dataset_paths = []
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
         for sdsres in Subdatasets.__call__(
@@ -634,11 +642,19 @@ class Get(Interface):
                             dsrec = content_by_ds.get(res['path'], set())
                             dsrec.update(res['contains'])
                             content_by_ds[res['path']] = dsrec
-                        if res.get('status', None) != 'notneeded':
-                            # all those messages on not having installed anything
-                            # are a bit pointless
-                            # "notneeded" for annex get comes below
+
+                        # we want to yield dataset results only once (not on every input path) and
+                        # in addition "notneeded" results are relevant only, if those paths were
+                        # actually requested:
+                        if res['path'] not in yielded_dataset_paths and \
+                                (res.get('status', None) != 'notneeded' or res.get('path', None) in input_paths):
                             yield res
+                            # record that we have a dataset-type result for that path already
+                            # to avoid following up with an additional directory-type result
+                            # via annex-get or just another notneeded dataset-type result as
+                            # we deal with another input path
+                            yielded_dataset_paths.append(res['path'])
+
                 else:
                     # dunno what this is, send upstairs
                     yield sdsres
@@ -668,11 +684,18 @@ class Get(Interface):
                         dsrec = content_by_ds.get(res['path'], set())
                         dsrec.update(res['contains'])
                         content_by_ds[res['path']] = dsrec
-                    if res.get('status', None) != 'notneeded':
-                        # all those messages on not having installed anything
-                        # are a bit pointless
-                        # "notneeded" for annex get comes below
+
+                    # we want to yield dataset results only once (not on every input path) and
+                    # in addition "notneeded" results are relevant only, if those paths were
+                    # actually requested:
+                    if res['path'] not in yielded_dataset_paths and \
+                            (res.get('status', None) != 'notneeded' or res.get('path', None) in input_paths):
                         yield res
+                        # record that we have a dataset-type result for that path already
+                        # to avoid following up with an additional directory-type result
+                        # via annex-get or just another notneeded dataset-type result as
+                        # we deal with another input path
+                        yielded_dataset_paths.append(res['path'])
 
         if not get_data:
             # done already
@@ -686,6 +709,11 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
+
+                if res.get('status', None) == 'notneeded' and \
+                        res.get('path', None) in yielded_dataset_paths:
+                    # don't yield notneeded results about paths that we already reported on.
+                    continue
                 yield res
 
     @staticmethod
