@@ -738,9 +738,9 @@ class Addurls(Interface):
             args=("--version-urls",),
             action="store_true",
             doc="""Try to add a version ID to the URL. This currently only has
-            an effect on HTTP URLs for AWS S3 buckets. s3:// urls versioning
-            is not yet supported, but urls with versionId= will be used as is
-            """),
+            an effect on HTTP URLs for AWS S3 buckets. s3:// URL versioning is
+            not yet supported, but any URL that already contains a "versionId="
+            parameter will be used as is."""),
     )
 
     @staticmethod
