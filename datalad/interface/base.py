@@ -189,7 +189,7 @@ def get_cmd_ex(interface):
     """
     intf_ex = "\n\n*Examples*\n\n"
     for example in interface._examples_:
-        intf_ex += build_example(example, api=False)
+        intf_ex += build_example(example, api='cmdline')
     return intf_ex
 
 
@@ -373,7 +373,7 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     return func
 
 
-def build_example(example, api=True):
+def build_example(example, api='python'):
     """Build a code example.
 
     Take a dict from a classes _example_ specification (list of dicts) and
@@ -382,21 +382,23 @@ def build_example(example, api=True):
 
     Parameters
     ----------
-    api : bool
-        If True, build Python example for docstring. If False, build cmd
-        example.
+    api : {'python', 'cmdline'}
+        If 'python', build Python example for docstring. If 'cmdline', build
+        cmd example.
 
     Returns
     -------
     ex : str
         Concatenated examples for the given class.
     """
-    if api:
+    if api == 'python' :
         code_field='code_py'
-        indicator=''
-    else:
+        indicator='>'
+    elif api == 'cmdline':
         code_field='code_cmd'
-        indicator='% '
+        indicator='%'
+    else:
+        raise ValueError("unknown API selection: {}".format(api))
     description = dedent_docstring(example.get('text'))
     code = example.get(code_field)
 
@@ -422,7 +424,7 @@ def update_docstring_with_examples(cls_doc, ex):
     cls_doc += "    Examples\n    --------\n"
     # loop though provided examples
     for example in ex:
-        cls_doc += indent(build_example(example, api=True), ' '*4)
+        cls_doc += indent(build_example(example, api='python'), ' '*4)
 
     return cls_doc
 
