@@ -400,11 +400,16 @@ def build_example(example, api='python'):
     else:
         raise ValueError("unknown API selection: {}".format(api))
     description = dedent_docstring(example.get('text'))
-    code = example.get(code_field)
+    # this indent the code snippet to get it properly rendered as code
+    # we are not using textwrap.fill(), because it would not acknowledge
+    # any meaningful structure/formatting of code snippets. Instead, we
+    # maintain line content as is.
+    code = dedent_docstring(example.get(code_field))
+    code = textwrap.indent(code, '     ').lstrip()
 
-    ex = """{}::\n\n   {}{}\n\n""".format(description,
-                                          indicator,
-                                          code)
+    ex = """{}::\n\n   {} {}\n\n""".format(description,
+                                           indicator,
+                                           code)
     return ex
 
 
