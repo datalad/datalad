@@ -140,6 +140,21 @@ class Drop(Interface):
         ~/some/dataset$ datalad drop --recursive
 
     """
+    _examples_ = [
+        dict(text="Drop single file content",
+             code_py="drop('path/to/file')",
+             code_cmd="datalad drop <path/to/file>"),
+        dict(text="Drop all file content in the current dataset",
+             code_py="drop('.')",
+             code_cmd="datalad drop"),
+        dict(text="Drop all file content in a dataset and all its subdatasets",
+             code_py="drop(dataset='.', recursive=True)",
+             code_cmd="datalad drop --dataset <path/to/dataset> --recursive"),
+        dict(text="""Disable check to assure the configured minimum number of
+             remote sources for dropped data""",
+             code_py="drop(path='path/to/content', check=False)",
+             code_cmd="datalad drop <path/to/content> --nocheck"),
+    ]
     _action = 'drop'
 
     _params_ = dict(

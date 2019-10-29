@@ -59,3 +59,25 @@ All these methods take care of raising appropriate exceptions when expected
 conditions are not met. Whenever desired functionality can be achieved
 using simple custom calls to Git via these methods, their use is preferred
 over the implementation of additional, dedicated wrapper methods.
+
+Command examples
+================
+
+Examples of Python and commandline invocations of DataLad's user-oriented
+commands are defined in the class of the respective command as dictionaries
+within `_examples_`:
+
+.. code-block:: python
+
+   _examples_ = [
+    dict(text="""Create a dataset 'mydataset' in the current directory""",
+         code_py="create(path='mydataset')",
+         code_cmd="datalad create mydataset",
+    dict(text="""Apply the text2git procedure upon creation of a dataset""",
+         code_py="create(path='mydataset', cfg_proc='text2git')",
+         code_cmd="datalad create -c text2git mydataset")
+         ]
+
+The formatting of code lines is preserved. Changes to existing examples and
+new contributions should provide examples for Python and commandline API, as
+well as a consise description.

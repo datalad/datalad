@@ -597,6 +597,17 @@ class Get(Interface):
       Power-user info: This command uses :command:`git annex get` to fulfill
       file handles.
     """
+    _examples_ = [
+        dict(text="Get a single file",
+             code_py="get('path/to/file')",
+             code_cmd="datalad get <path/to/file>"),
+        dict(text="Get contents of a directory",
+             code_py="get('path/to/dir/')",
+             code_cmd="datalad get <path/to/dir/>"),
+        dict(text="Get all contents of the current dataset and its subdatasets",
+             code_py="get(dataset='.', recursive=True)",
+             code_cmd="datalad get . --recursive"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
