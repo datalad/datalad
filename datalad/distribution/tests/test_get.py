@@ -310,9 +310,12 @@ def test_get_recurse_subdatasets(src, path):
 
     # now, the very same call, but without recursive:
     result = ds.get('.', recursive=False)
-    assert_status('ok', result)
-    # one report is on the requested dir
-    eq_(len(result) - 1, 1)
+    # we get to "ok" results. the file itself and a directory-type result, since this is what we were asking to get.
+    assert_result_count(result, 2, status='ok')
+    # However, that directory also is a dataset (that we explicitly asked to get), therefore we get a notneeded result
+    # for the dataset:
+    assert_result_count(result, 1, status='notneeded')
+    assert_result_count(result, 3)
     assert_result_count(
         result, 1, path=opj(ds.path, 'test-annex.dat'), status='ok')
     ok_(ds.repo.file_has_content('test-annex.dat') is True)
