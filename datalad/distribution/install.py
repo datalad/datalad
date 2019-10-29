@@ -363,6 +363,13 @@ class Install(Interface):
                     result_xfm=None,
                     **common_kwargs):
                 r['refds'] = refds_path
+
+                if r['type'] == 'dataset' and \
+                        r['path'] == destination_dataset.path:
+                    # we have a result for that dataset from above. It's pointless to yield
+                    # that Get also figured it out.
+                    continue
+
                 yield r
         # at this point no futher post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)
