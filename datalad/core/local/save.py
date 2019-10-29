@@ -62,22 +62,6 @@ class Save(Interface):
     saved state. Such tag enables straightforward retrieval of past versions at
     a later point in time.
 
-    Examples:
-
-      Save any content underneath the current directory, without altering
-      any potential subdataset (use --recursive for that)::
-
-        % datalad save .
-
-      Save any modification of known dataset content, but leave untracked
-      files (e.g. temporary files) untouched::
-
-        % dataset save -u -d <path_to_dataset>
-
-      Tag the most recent saved state of a dataset::
-
-        % dataset save -d <path_to_dataset> --version-tag bestyet
-
     .. note::
       Before Git v2.22, any Git repository without an initial commit located
       inside a Dataset is ignored, and content underneath it will be saved to
