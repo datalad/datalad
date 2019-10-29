@@ -80,4 +80,4 @@ within `_examples_`:
 
 The formatting of code lines is preserved. Changes to existing examples and
 new contributions should provide examples for Python and commandline API, as
-well as a consise description.
+well as a concise description.
