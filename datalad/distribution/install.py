@@ -108,7 +108,7 @@ class Install(Interface):
              "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
              code_cmd="datalad install -d . "
              "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
-        dict(text="Install a dataset, and get all contents right away",
+        dict(text="Install a dataset, and get all content right away",
              code_py="install(source="
              "'https://github.com/datalad-datasets/longnow-podcasts.git', "
              "get_data=True')",

@@ -108,11 +108,7 @@ class Create(Interface):
     _examples_ = [
         dict(text="""Create a dataset 'mydataset' in the current directory""",
              code_py="create(path='mydataset')",
-             code_cmd="datalad create mydataset",
-             setup_py="python -c 'from datalad.api import create, remove'",
-             setup_cmd="datalad create mydataset",
-             teardown_py="remove(path='mydataset')",
-             teardown_cmd="datalad remove mydataset"),
+             code_cmd="datalad create mydataset"),
         dict(text="""Apply the text2git procedure upon creation of a dataset""",
              code_py="create(path='mydataset', cfg_proc='text2git')",
              code_cmd="datalad create -c text2git mydataset"),
