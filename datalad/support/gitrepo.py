@@ -1284,7 +1284,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
 
     def for_each_ref_(self, fields=('objectname', 'objecttype', 'refname'),
-                      pattern=None, points_at=None, sort=None, count=None):
+                      pattern=None, points_at=None, sort=None, count=None,
+                      contains=None):
         """Wrapper for `git for-each-ref`
 
         Please see manual page git-for-each-ref(1) for a complete overview
@@ -1308,6 +1309,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           descending order.
         count : int, optional
           Stop iteration after the given number of matches.
+        contains : str, optional
+          Only list refs which contain the specified commit.
 
         Yields
         ------
@@ -1334,6 +1337,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         ]
         if points_at:
             cmd.append('--points-at={}'.format(points_at))
+        if contains:
+            cmd.append('--contains={}'.format(contains))
         if sort:
             for k in assure_list(sort):
                 cmd.append('--sort={}'.format(k))
@@ -1577,18 +1582,20 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             return stdout[0]
 
     @normalize_paths(match_return_type=False)
-    def get_last_commit_hash(self, files):
+    def get_last_commit_hexsha(self, files):
         """Return the hash of the last commit the modified any of the given
         paths"""
         try:
-            stdout, stderr = self._git_custom_command(
-                files,
-                ['git', 'log', '-n', '1', '--pretty=format:%H'],
-                expect_fail=True)
-            commit = stdout.strip()
-            return commit
-        except CommandError as e:
-            if 'does not have any commits' in e.stderr:
+            commit = self.call_git(
+                ['rev-list', '-n1', 'HEAD'],
+                files=files,
+                expect_fail=True,
+            )
+            commit = commit.strip()
+            return commit if commit else None
+        except CommandError:
+            if self.get_hexsha() is None:
+                # unborn branch, don't freak out
                 return None
             raise
 
@@ -1708,16 +1715,14 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         int or None
           None if no commit
         """
-        try:
-            if branch:
-                commit = next(self.get_branch_commits(branch))
-            else:
-                commit = self.repo.head.commit
-        except Exception as exc:
-            lgr.debug("Got exception while trying to get last commit: %s",
-                      exc_str(exc))
-            return None
-        return getattr(commit, "%s_date" % date)
+        if date == 'committed':
+            format = '%ct'
+        elif date == 'authored':
+            format = '%at'
+        else:
+            raise ValueError('unknow date type: {}'.format(date))
+        d = self.format_commit(format, commitish=branch)
+        return int(d) if d else None
 
     def get_active_branch(self):
         """Get the name of the active branch
@@ -1825,26 +1830,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             for p in self.get_content_info(
                 paths=None, ref=branch, untracked='no', eval_file_type=False)
             ]
-
-    def _get_remotes_having_commit(self, commit_hexsha, with_urls_only=True):
-        """Traverse all branches of the remote and check if commit in any of their ancestry
-
-        It is a generator yielding names of the remotes
-        """
-        out, err = self._git_custom_command(
-            '', 'git branch -r --contains ' + commit_hexsha
-        )
-        # sanitize a bit (all the spaces and new lines)
-        remote_branches = [
-            b  # could be origin/HEAD -> origin/master, we just skip ->
-            for b in filter(bool, out.split())
-            if b != '->'
-        ]
-        return [
-            remote
-            for remote in self.get_remotes(with_urls_only=with_urls_only)
-            if any(rb.startswith(remote + '/') for rb in remote_branches)
-        ]
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,

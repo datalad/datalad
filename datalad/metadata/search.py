@@ -320,7 +320,7 @@ class _WhooshSearch(_Search):
         from .metadata import get_ds_aggregate_db_locations
         dbloc, db_base_path = get_ds_aggregate_db_locations(self.ds)
         # what is the lastest state of aggregated metadata
-        metadata_state = self.ds.repo.get_last_commit_hash(relpath(dbloc, start=self.ds.path))
+        metadata_state = self.ds.repo.get_last_commit_hexsha(relpath(dbloc, start=self.ds.path))
         # use location common to all index types, they would all invalidate
         # simultaneously
         stamp_fname = opj(self.index_dir, 'datalad_metadata_state')

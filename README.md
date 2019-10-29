@@ -18,7 +18,8 @@ data from online portals and exposing it in readily usable form as Git(-annex)
 repositories, so-called datasets. The actual data storage and permission
 management, however, remains with the original data providers.
 
-The full documentation is available at: http://docs.datalad.org
+The full documentation is available at http://docs.datalad.org and
+http://handbook.datalad.org provides a hands-on crash-course on DataLad.
 
 # Extensions
 
@@ -66,6 +67,11 @@ provide recent releases of DataLad. Once enabled, just do:
 
     conda install -c conda-forge datalad
 
+will install released released version, and release candidates are available
+via
+
+    conda install -c conda-forge/label/rc datalad
+
 ## Other Linux'es, OSX via pip
 
 Before you install this package, please make sure that you [install a recent
@@ -96,6 +102,8 @@ The latest release version can be obtained by running:
 
     singularity pull shub://datalad/datalad
 
+More details on installation and initial configuration could be found in the
+[DataLad Handbook: Installation].
 
 # License
 
@@ -125,3 +133,5 @@ project (NIH 1P41EB019936-01A1).
 [Git-annex]: http://git-annex.branchable.com
 [setup.py]: https://github.com/datalad/datalad/blob/master/setup.py
 [NeuroDebian]: http://neuro.debian.net
+
+[DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html

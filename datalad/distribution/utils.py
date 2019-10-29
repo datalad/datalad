@@ -95,10 +95,4 @@ def _get_flexible_source_candidates(src, base_url=None, alternate_suffix=True):
                 candidates.append(
                     '{0}/.git'.format(src.rstrip('/')))
 
-    # TODO:
-    # We need to provide some error msg with InstallFailedError, since now
-    # it just swallows everything.
-    # yoh: not sure if this comment applies here, but could be still applicable
-    # outisde
-
     return candidates
