@@ -119,7 +119,7 @@ def common_root_ds(paths):
     from datalad.distribution.dataset import get_dataset_root
 
     paths = assure_list(paths)
-    paths = [p.resolve() for p in paths]
+    paths = [p.resolve() if p.exists() else p for p in paths]
     counter = Counter()
     # Note, we need the stringified paths for sorting as well as to pass the common_parent into get_dataset_root
     counter.update([str(p) for p in paths])
