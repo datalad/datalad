@@ -103,11 +103,8 @@ class DownloadURL(Interface):
         common_report = {"action": "download_url",
                          "ds": ds}
 
-        if isinstance(dataset, Dataset):
-            got_ds_instance = True
-            path = op.normpath(op.join(ds.path, path or op.curdir))
-        else:
-            got_ds_instance = False
+        got_ds_instance = isinstance(dataset, Dataset)
+        path = str(resolve_path(path or op.curdir, ds=dataset))
         urls = assure_list_from_str(urls)
 
         if len(urls) > 1 and path and not op.isdir(path):
