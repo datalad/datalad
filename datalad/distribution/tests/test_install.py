@@ -632,13 +632,14 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(path, dataset=path, recursive=True, recursion_limit=1,
-                 result_xfm='datasets')
-    # top-level dataset was not reobtained
-    assert_not_in(top_ds, result)
-    assert_in(sub1, result)
-    assert_in(sub2, result)
-    assert_not_in(subsub, result)
+    result = get(path, dataset=path, recursive=True, recursion_limit=1)
+    result_paths = [r['path'] for r in result]
+    assert_result_count(result, 3, type='dataset')
+    assert_result_count(result, 1, status='notneeded', type='dataset', path=path)
+    assert_result_count(result, 2, status='ok', type='dataset')
+    assert_in(sub1.path, result_paths)
+    assert_in(sub2.path, result_paths)
+    assert_not_in(subsub.path, result_paths)
     ok_(top_ds.repo.file_has_content('top_file.txt') is True)
     ok_(sub1.repo.file_has_content('sub1file.txt') is True)
     ok_(sub2.repo.file_has_content('sub2file.txt') is True)
@@ -706,7 +707,7 @@ def test_install_skip_failed_recursive(src, path):
             on_failure='ignore', result_xfm=None)
         # toplevel dataset was in the house already
         assert_result_count(
-            result, 0, path=ds.path, type='dataset')
+            result, 1, path=ds.path, type='dataset', status='notneeded')
         # subm 1 should fail to install. [1] since comes after '2' submodule
         assert_in_results(
             result, status='error', path=sub1.path, type='dataset',
