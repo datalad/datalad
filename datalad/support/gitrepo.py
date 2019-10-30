@@ -2732,6 +2732,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
           since would result in not so annex-friendly .git symlinks/references
           instead of full featured .git/ directories in the submodules
         """
+        if GitRepo.is_valid_repo(self.pathobj / path):
+            subrepo = GitRepo(self.pathobj / path, create=False)
+            subbranch = subrepo.get_active_branch() if subrepo else None
+            subbranch_hexsha = subrepo.get_hexsha(subbranch) if subrepo else None
+        else:
+            subrepo = None
+            subbranch = None
+            subbranch_hexsha = None
+
         cmd = ['git', 'submodule', 'update', '--%s' % mode]
         if init:
             cmd.append('--init')
@@ -2747,6 +2756,41 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             #  an artifact from running submodule update --init manually at
             #  some point, but looking at this code now I worry that it was not
         self._git_custom_command(path, cmd)
+
+        if not init:
+            return
+
+        # track branch originally cloned, only if we had a valid repo at the start
+        updated_subbranch = subrepo.get_active_branch() if subrepo else None
+        if subbranch and not updated_subbranch:
+            # got into 'detached' mode
+            # trace if current state is a predecessor of the branch_hexsha
+            lgr.debug(
+                "Detected detached HEAD after updating submodule %s which was "
+                "in %s branch before", self.path, subbranch)
+            detached_hexsha = subrepo.get_hexsha()
+            if subrepo.get_merge_base(
+                    [subbranch_hexsha, detached_hexsha]) == detached_hexsha:
+                # TODO: config option?
+                # in all likely event it is of the same branch since
+                # it is an ancestor -- so we could update that original branch
+                # to point to the state desired by the submodule, and update
+                # HEAD to point to that location
+                lgr.info(
+                    "Submodule HEAD got detached. Resetting branch %s to point "
+                    "to %s. Original location was %s",
+                    subbranch, detached_hexsha[:8], subbranch_hexsha[:8]
+                )
+                branch_ref = 'refs/heads/%s' % subbranch
+                subrepo.update_ref(branch_ref, detached_hexsha)
+                assert(subrepo.get_hexsha(subbranch) == detached_hexsha)
+                subrepo.update_ref('HEAD', branch_ref, symbolic=True)
+                assert(subrepo.get_active_branch() == subbranch)
+            else:
+                lgr.warning(
+                    "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
+                    subrepo.path, subbranch, detached_hexsha[:8]
+                )
         # TODO: return value
 
     def update_ref(self, ref, value, symbolic=False):
