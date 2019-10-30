@@ -672,10 +672,10 @@ class Get(Interface):
 
         path = assure_list(path)
         # resolve input paths against dataset in order to compare absolute paths in results
-        # to the given paths later on
-        # TODO: Not yet clear whether to use dataset or refds here. Why is dataset used in the call to Subdatasets?
+        # to the given paths later on:
         input_paths = [str(resolve_path(p, dataset)) for p in path]
         content_by_ds = {}
+        # keep a record of what datasets we reported on already:
         yielded_dataset_paths = []
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
