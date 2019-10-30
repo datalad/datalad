@@ -641,8 +641,16 @@ class Get(Interface):
             path = refds_path
 
         # we have to have a single dataset to operate on
-        refds = require_dataset(
-            dataset, check_installed=True, purpose='get content')
+        from datalad.interface.utils import common_root_ds
+        from datalad.distribution.dataset import resolve_path
+
+        if dataset is None:
+            # if we have paths suggesting a common root ds to operate on,
+            # behave as if that ds was given
+            root_ds = common_root_ds(resolve_path(path))
+            if root_ds:
+                dataset = root_ds
+        refds = require_dataset(dataset, check_installed=True, purpose='get content')
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not

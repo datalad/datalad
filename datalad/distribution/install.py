@@ -207,6 +207,14 @@ class Install(Interface):
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             common_kwargs['dataset'] = dataset
+        else:
+            from datalad.interface.utils import common_root_ds
+            parent_ds = common_root_ds(resolve_path(path))
+            lgr.debug("common_root: %s", parent_ds)
+            if parent_ds:
+                ds = require_dataset(parent_ds, check_installed=True,
+                                     purpose='installation')
+                common_kwargs['dataset'] = parent_ds
         # pre-compute for results below
         refds_path = Interface.get_refds_path(ds)
 
