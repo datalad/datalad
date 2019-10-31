@@ -592,14 +592,15 @@ def _yield_dataset_result(ds_record, result, in_paths):
     # we want to yield dataset results only once (not on every input path) and
     # in addition "notneeded" results are relevant only, if those paths were
     # actually requested:
-    if result['path'] not in ds_record and \
-            (result.get('status', None) != 'notneeded' or result.get('path', None) in in_paths):
+    result_tuple = (result['path'], result.get('status', None))
+    if result_tuple not in ds_record and \
+            (result.get('status', None) != 'notneeded' or result['path'] in in_paths):
         yield result
         # record that we have a dataset-type result for that path already
         # to avoid following up with an additional directory-type result
         # via annex-get or just another notneeded dataset-type result as
         # we deal with another input path
-        ds_record.append(result['path'])
+        ds_record.append(result_tuple)
 
 
 @build_doc
@@ -793,7 +794,7 @@ class Get(Interface):
                     jobs):
 
                 if res.get('status', None) == 'notneeded' and \
-                        res.get('path', None) in yielded_datasets:
+                        res['path'] in [p for p, s in yielded_datasets]:
                     # don't yield notneeded results about paths that we already reported on.
                     continue
                 yield res
