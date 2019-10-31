@@ -27,7 +27,10 @@ from datalad.interface.results import (
     YieldDatasets,
     is_result_matching_pathsource_argument,
 )
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    dataset_from_args,
+)
 from datalad.interface.base import build_doc
 from datalad.support.constraints import (
     EnsureNone,
@@ -202,19 +205,12 @@ class Install(Interface):
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
+        dataset = dataset_from_args(dataset, path)
         ds = None
         if dataset is not None:
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             common_kwargs['dataset'] = dataset
-        else:
-            from datalad.interface.utils import common_root_ds
-            parent_ds = common_root_ds(resolve_path(path))
-            lgr.debug("common_root: %s", parent_ds)
-            if parent_ds:
-                ds = require_dataset(parent_ds, check_installed=True,
-                                     purpose='installation')
-                common_kwargs['dataset'] = parent_ds
         # pre-compute for results below
         refds_path = Interface.get_refds_path(ds)
 

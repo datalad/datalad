@@ -107,31 +107,18 @@ def handle_dirty_dataset(ds, mode, msg=None):
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
 
-def common_root_ds(paths):
-    """Return a common root dataset for a set of absolute paths
+def dataset_from_args(dataset=None, path=None):
 
-    Note, that in opposition to get_tree_roots, this will figure a *common* root, not a set of roots.
-    In addition, this currently does actually resolve the paths rather than performing pure path operations.
-    """
-
-    from collections import Counter
-    from datalad.utils import assure_list
+    from datalad.support.path import common_prefix
+    from datalad.distribution.dataset import resolve_path
     from datalad.distribution.dataset import get_dataset_root
 
-    paths = assure_list(paths)
-    paths = [p.resolve() if p.exists() else p for p in paths]
-    counter = Counter()
-    # Note, we need the stringified paths for sorting as well as to pass the common_parent into get_dataset_root
-    counter.update([str(p) for p in paths])
-    for p in paths:
-        [counter.update(str(par)) for par in p.parents]
-    try:
-        common_parent = sorted((x for x, count in counter.items() if count >= len(paths)),
-                               key=lambda x: len(x))[-1]
-    except LookupError:
-        common_parent = None
-
-    return get_dataset_root(common_parent) if common_parent else None
+    if dataset == 'auto':
+        # deduct a common root dataset from given paths
+        # (None otherwise)
+        return get_dataset_root(str(common_prefix(resolve_path(path))))
+    else:
+        return dataset
 
 
 def get_tree_roots(paths):

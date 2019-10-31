@@ -14,6 +14,7 @@ One of the reasons is also to robustify operation with unicode filenames
 # TODO: RF and move all paths related functions from datalad.utils in here
 import os
 import os.path as op
+from pathlib import Path
 
 # to not pollute API importing as _
 from collections import defaultdict as _defaultdict
@@ -23,6 +24,7 @@ from itertools import dropwhile
 
 from ..utils import (
     assure_bytes,
+    assure_list,
     getpwd,
 )
 
@@ -114,6 +116,31 @@ def split_ext(filename):
     file_parts = parts[:1] + tail[::-1]
     ext_parts = parts[1+len(tail):]
     return ".".join(file_parts), "." + ".".join(ext_parts)
+
+
+def common_prefix(paths):
+    """Return the longest common parent path of `paths`
+
+    This is pretty much a common_prefix (like the one from os.path),
+    that can handle Path objects.
+    Note, that this does pure path operation - no symlink resolution
+    or anything else that involves actual FS access.
+    """
+
+    paths = [Path(p) for p in assure_list(paths)]
+    if len(paths) == 1:
+        return paths[0]
+
+    parents = set()
+    parents.update(paths[0].parents)
+    for p in paths[1:]:
+        parents = parents.intersection(p.parents)
+        if not parents:
+            # return as soon as there are no candidates left
+            return None
+
+    # we got some candidate(s), pick the longest one:
+    return sorted(parents, key=lambda x: len(str(x)))[-1]
 
 
 def get_parent_paths(paths, parents, only_with_parents=False):

@@ -15,7 +15,10 @@ import logging
 import os.path as op
 
 from datalad.interface.base import Interface
-from datalad.interface.utils import eval_results
+from datalad.interface.utils import (
+    eval_results,
+    dataset_from_args,
+)
 from datalad.interface.base import build_doc
 from datalad.interface.results import (
     get_status_dict,
@@ -641,16 +644,9 @@ class Get(Interface):
             path = refds_path
 
         # we have to have a single dataset to operate on
-        from datalad.interface.utils import common_root_ds
-        from datalad.distribution.dataset import resolve_path
-
-        if dataset is None:
-            # if we have paths suggesting a common root ds to operate on,
-            # behave as if that ds was given
-            root_ds = common_root_ds(resolve_path(path))
-            if root_ds:
-                dataset = root_ds
-        refds = require_dataset(dataset, check_installed=True, purpose='get content')
+        dataset = dataset_from_args(dataset, path)
+        refds = require_dataset(
+            dataset, check_installed=True, purpose='get content')
 
         content_by_ds = {}
         # use subdatasets() to discover any relevant content that is not
