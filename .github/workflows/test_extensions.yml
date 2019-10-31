@@ -1,4 +1,4 @@
-name: Extension
+name: Extensions
 
 on: [pull_request]
 
@@ -37,14 +37,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+    - name: Install ${{ matrix.extension }} extension
+      run: |
         pip install ${{ matrix.extension }}
-    - name: Install singularity
+    - name: Install Singularity
       run: sudo eatmydata apt-get install singularity-container
       if: matrix.extension == 'datalad_container'
     - name: WTF!?
       run: |
         datalad wtf
-    - name: ${{ matrix.module }} tests
+    - name: ${{ matrix.extension }} tests
       run: |
         mkdir -p __testhome__
         cd __testhome__
