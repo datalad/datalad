@@ -3590,9 +3590,25 @@ class AnnexRepo(GitRepo, RepoInterface):
             out,
             re.MULTILINE | re.DOTALL | re.IGNORECASE)
 
+
+class SafeDelCloseMixin(object):
+    """A helper class to use where __del__ would call .close() which might
+    fail if "too late in GC game"
+    """
+    def __del__(self):
+        try:
+            self.close()
+        except TypeError:
+            if os.fdopen is None or lgr.debug is None:
+                # if we are late in the game and things already gc'ed in py3,
+                # it is Ok
+                return
+            raise
+
+
 # TODO: Why was this commented out?
 # @auto_repr
-class BatchedAnnexes(dict):
+class BatchedAnnexes(SafeDelCloseMixin, dict):
     """Class to contain the registry of active batch'ed instances of annex for
     a repository
     """
@@ -3642,9 +3658,6 @@ class BatchedAnnexes(dict):
         for p in self.values():
             p.close()
 
-    def __del__(self):
-        self.close()
-
 
 def readline_rstripped(stdout):
     #return iter(stdout.readline, b'').next().rstrip()
@@ -3675,7 +3688,7 @@ def readline_json(stdout):
 
 
 @auto_repr
-class BatchedAnnex(object):
+class BatchedAnnex(SafeDelCloseMixin):
     """Container for an annex process which would allow for persistent communication
     """
 
@@ -3790,9 +3803,6 @@ class BatchedAnnex(object):
             output.append(stdout)
 
         return output if input_multiple else output[0]
-
-    def __del__(self):
-        self.close()
 
     def close(self, return_stderr=False):
         """Close communication and wait for process to terminate
