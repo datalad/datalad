@@ -577,6 +577,31 @@ def _get_targetpaths(ds, content, refds_path, source, jobs):
         yield r
 
 
+def _update_content_dict(cont_ds, result):
+    # fish out the datasets that 'contains' a targetpath
+    # and store them for later
+    if result.get('status', None) in ('ok', 'notneeded') and \
+            'contains' in result.keys():
+        dsrec = cont_ds.get(result['path'], set())
+        dsrec.update(result['contains'])
+        cont_ds[result['path']] = dsrec
+
+
+def _yield_dataset_result(ds_record, result, in_paths):
+
+    # we want to yield dataset results only once (not on every input path) and
+    # in addition "notneeded" results are relevant only, if those paths were
+    # actually requested:
+    if result['path'] not in ds_record and \
+            (result.get('status', None) != 'notneeded' or result.get('path', None) in in_paths):
+        yield result
+        # record that we have a dataset-type result for that path already
+        # to avoid following up with an additional directory-type result
+        # via annex-get or just another notneeded dataset-type result as
+        # we deal with another input path
+        ds_record.append(result['path'])
+
+
 @build_doc
 class Get(Interface):
     """Get any dataset content (files/directories/subdatasets).
@@ -676,7 +701,7 @@ class Get(Interface):
         input_paths = [str(resolve_path(p, dataset)) for p in path]
         content_by_ds = {}
         # keep a record of what datasets we reported on already:
-        yielded_dataset_paths = []
+        yielded_datasets = []
         # use subdatasets() to discover any relevant content that is not
         # already present in the root dataset (refds)
         for sdsres in Subdatasets.__call__(
@@ -721,26 +746,10 @@ class Get(Interface):
                             reckless,
                             refds_path,
                             description):
-                        # fish out the datasets that 'contains' a targetpath
-                        # and store them for later
-                        if res.get('status', None) in ('ok', 'notneeded') and \
-                                'contains' in res:
-                            dsrec = content_by_ds.get(res['path'], set())
-                            dsrec.update(res['contains'])
-                            content_by_ds[res['path']] = dsrec
 
-                        # we want to yield dataset results only once (not on every input path) and
-                        # in addition "notneeded" results are relevant only, if those paths were
-                        # actually requested:
-                        if res['path'] not in yielded_dataset_paths and \
-                                (res.get('status', None) != 'notneeded' or res.get('path', None) in input_paths):
-                            yield res
-                            # record that we have a dataset-type result for that path already
-                            # to avoid following up with an additional directory-type result
-                            # via annex-get or just another notneeded dataset-type result as
-                            # we deal with another input path
-                            yielded_dataset_paths.append(res['path'])
-
+                        _update_content_dict(content_by_ds, res)
+                        for r in _yield_dataset_result(yielded_datasets, res, input_paths):
+                            yield r
                 else:
                     # dunno what this is, send upstairs
                     yield sdsres
@@ -765,23 +774,10 @@ class Get(Interface):
                         reckless,
                         refds_path,
                         description):
-                    if res.get('status', None) in ('ok', 'notneeded') and \
-                            'contains' in res:
-                        dsrec = content_by_ds.get(res['path'], set())
-                        dsrec.update(res['contains'])
-                        content_by_ds[res['path']] = dsrec
 
-                    # we want to yield dataset results only once (not on every input path) and
-                    # in addition "notneeded" results are relevant only, if those paths were
-                    # actually requested:
-                    if res['path'] not in yielded_dataset_paths and \
-                            (res.get('status', None) != 'notneeded' or res.get('path', None) in input_paths):
-                        yield res
-                        # record that we have a dataset-type result for that path already
-                        # to avoid following up with an additional directory-type result
-                        # via annex-get or just another notneeded dataset-type result as
-                        # we deal with another input path
-                        yielded_dataset_paths.append(res['path'])
+                    _update_content_dict(content_by_ds, res)
+                    for r in _yield_dataset_result(yielded_datasets, res, input_paths):
+                        yield r
 
         if not get_data:
             # done already
@@ -797,7 +793,7 @@ class Get(Interface):
                     jobs):
 
                 if res.get('status', None) == 'notneeded' and \
-                        res.get('path', None) in yielded_dataset_paths:
+                        res.get('path', None) in yielded_datasets:
                     # don't yield notneeded results about paths that we already reported on.
                     continue
                 yield res
