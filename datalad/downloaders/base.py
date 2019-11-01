@@ -407,12 +407,8 @@ class BaseDownloader(object, metaclass=ABCMeta):
                 # TODO.  also logic below would clean it up atm
 
             download_dir = op.dirname(temp_filepath)
-            if download_dir and not exists(download_dir):
-                # We use the "not exist then makedirs" pattern across our
-                # codebase. This is racy in a way that is unlikely to matter
-                # here, but when we drop Python 2, we might as well switch the
-                # code below to use exist_ok=True.
-                os.makedirs(download_dir)
+            if download_dir:
+                os.makedirs(download_dir, exist_ok=True)
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
