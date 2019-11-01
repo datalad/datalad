@@ -61,8 +61,8 @@ class DownloadURL(Interface):
             metavar='PATH',
             doc="""specify the dataset to add files to. If no dataset is given,
             an attempt is made to identify the dataset based on the current
-            working directory and/or the `path` given. Use [CMD: --nosave
-            CMD][PY: save=False PY] to prevent adding files to the dataset.""",
+            working directory. Use [CMD: --nosave CMD][PY: save=False PY] to
+            prevent adding files to the dataset.""",
             constraints=EnsureDataset() | EnsureNone()),
         overwrite=Parameter(
             args=("-o", "--overwrite"),
