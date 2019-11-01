@@ -379,6 +379,9 @@ class BaseDownloader(object, metaclass=ABCMeta):
 
         #### Specific to download
         if path:
+            download_dir = op.dirname(path)
+            if download_dir:
+                os.makedirs(download_dir, exist_ok=True)
             if isdir(path):
                 # provided path is a directory under which to save
                 filename = downloader_session.filename
@@ -406,9 +409,6 @@ class BaseDownloader(object, metaclass=ABCMeta):
                     "It will be overriden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
-            download_dir = op.dirname(temp_filepath)
-            if download_dir:
-                os.makedirs(download_dir, exist_ok=True)
             with open(temp_filepath, 'wb') as fp:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
