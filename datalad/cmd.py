@@ -720,8 +720,23 @@ def readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
 
+class SafeDelCloseMixin(object):
+    """A helper class to use where __del__ would call .close() which might
+    fail if "too late in GC game"
+    """
+    def __del__(self):
+        try:
+            self.close()
+        except TypeError:
+            if os.fdopen is None or lgr.debug is None:
+                # if we are late in the game and things already gc'ed in py3,
+                # it is Ok
+                return
+            raise
+
+
 @auto_repr
-class BatchedCommand(object):
+class BatchedCommand(SafeDelCloseMixin):
     """Container for a process which would allow for persistent communication
     """
 
@@ -836,9 +851,6 @@ class BatchedCommand(object):
             lgr.warning("Received output in stderr: %r", stderr)
         lgr.log(5, "Received output: %r" % stdout)
         return stdout
-
-    def __del__(self):
-        self.close()
 
     def close(self, return_stderr=False):
         """Close communication and wait for process to terminate

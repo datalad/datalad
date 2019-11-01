@@ -58,7 +58,8 @@ from datalad.utils import (
 from datalad.support.json_py import loads as json_loads
 from datalad.cmd import (
     GitRunner,
-    BatchedCommand
+    BatchedCommand,
+    SafeDelCloseMixin
 )
 
 # imports from same module:
@@ -3424,7 +3425,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
 # TODO: Why was this commented out?
 # @auto_repr
-class BatchedAnnexes(dict):
+class BatchedAnnexes(SafeDelCloseMixin, dict):
     """Class to contain the registry of active batch'ed instances of annex for
     a repository
     """
@@ -3473,9 +3474,6 @@ class BatchedAnnexes(dict):
         """
         for p in self.values():
             p.close()
-
-    def __del__(self):
-        self.close()
 
 
 def readlines_until_ok_or_failed(stdout, maxlines=100):
