@@ -15,16 +15,44 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Major refactoring and deprecations
 
-- hopefully none
+- The `get_file_content` method of `GitRepo` was no longer used
+  internally or in any known DataLad extensions and has been removed.
+  ([#3812][])
+
+- The function `get_dataset_root` has been replaced by
+  `rev_get_dataset_root`.  `rev_get_dataset_root` remains as a
+  compatibility alias and will be removed in a later release.  ([#3815][])
 
 ### Fixes
 
-?
+- [publish][] crashed when called with a detached HEAD.  It now aborts
+  with an informative message.  ([#3804][])
 
 ### Enhancements and new features
 
-?
+- The command interface classes learned to use a new `_examples_`
+  attribute to render documentation examples for both the Python and
+  command-line API.  ([#3821][])
 
+- Candidate URLs for cloning a submodule can now be generated based on
+  configured templates that have access to various properties of the
+  submodule, including its dataset ID.  ([#3828][])
+
+- DataLad's check that the user's Git identity is configured has been
+  sped up and now considers the appropriate environment variables as
+  well.  ([#3807][])
+
+- The `tag` method of `GitRepo` can now tag revisions other than
+  `HEAD` and accepts a list of arbitrary `git tag` options.
+  ([#3787][])
+
+- When `get` clones a subdataset and the subdataset's HEAD differs
+  from the commit that is registered in the parent, the active branch
+  of the subdataset is moved to the registered commit if the
+  registered commit is an ancestor of the subdataset's HEAD commit.
+  This handling has been moved to a more central location within
+  `GitRepo`, and now applies to any `update_submodule(..., init=True)`
+  call.  ([#3831][])
 
 ## 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
 
@@ -2042,6 +2070,7 @@ publishing
 [#3776]: https://github.com/datalad/datalad/issues/3776
 [#3777]: https://github.com/datalad/datalad/issues/3777
 [#3780]: https://github.com/datalad/datalad/issues/3780
+[#3787]: https://github.com/datalad/datalad/issues/3787
 [#3791]: https://github.com/datalad/datalad/issues/3791
 [#3793]: https://github.com/datalad/datalad/issues/3793
 [#3794]: https://github.com/datalad/datalad/issues/3794
@@ -2049,5 +2078,12 @@ publishing
 [#3798]: https://github.com/datalad/datalad/issues/3798
 [#3799]: https://github.com/datalad/datalad/issues/3799
 [#3803]: https://github.com/datalad/datalad/issues/3803
+[#3804]: https://github.com/datalad/datalad/issues/3804
+[#3807]: https://github.com/datalad/datalad/issues/3807
+[#3812]: https://github.com/datalad/datalad/issues/3812
+[#3815]: https://github.com/datalad/datalad/issues/3815
+[#3821]: https://github.com/datalad/datalad/issues/3821
+[#3828]: https://github.com/datalad/datalad/issues/3828
+[#3831]: https://github.com/datalad/datalad/issues/3831
 [#3842]: https://github.com/datalad/datalad/issues/3842
 [#3851]: https://github.com/datalad/datalad/issues/3851
