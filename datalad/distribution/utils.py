@@ -172,7 +172,7 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
                 sr_autoenable, sr_name, dataset.path)
             continue
 
-        # determine either there is a registered remote with matching UUID
+        # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
                 remote_uuids = {
