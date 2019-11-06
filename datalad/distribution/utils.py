@@ -182,7 +182,12 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
         if uuid:
             if remote_uuids is None:
                 remote_uuids = {
-                    repo.config.get('remote.%s.annex-uuid' % r)
+                    # Check annex-config-uuid first. For sameas annex remotes,
+                    # this will point to the UUID for the configuration (i.e.
+                    # the key returned by get_special_remotes) rather than the
+                    # shared UUID.
+                    (repo.config.get('remote.%s.annex-config-uuid' % r) or
+                     repo.config.get('remote.%s.annex-uuid' % r))
                     for r in repo.get_remotes()
                 }
             if uuid not in remote_uuids:
