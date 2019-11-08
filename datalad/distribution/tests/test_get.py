@@ -15,7 +15,7 @@ from os import curdir
 import os.path as op
 from os.path import join as opj, basename
 from glob import glob
-from mock import patch
+from unittest.mock import patch
 
 from datalad.api import create
 from datalad.api import get

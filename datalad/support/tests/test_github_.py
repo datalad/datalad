@@ -9,7 +9,7 @@
 """Tests for github helpers"""
 
 import logging
-import mock
+import unittest.mock as mock
 
 import github as gh
 

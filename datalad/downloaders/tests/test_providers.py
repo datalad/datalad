@@ -12,7 +12,7 @@ import os.path as op
 
 import logging
 
-from mock import patch
+from unittest.mock import patch
 
 from ..providers import Provider
 from ..providers import Providers

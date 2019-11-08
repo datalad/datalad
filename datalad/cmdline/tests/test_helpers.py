@@ -10,7 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_is_instance
 
 from os import mkdir

@@ -11,7 +11,7 @@
 
 import logging
 from shutil import copy
-from mock import patch
+from unittest.mock import patch
 from os import makedirs
 from os.path import join as opj
 from os.path import dirname

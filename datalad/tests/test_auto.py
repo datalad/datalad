@@ -13,7 +13,7 @@ import io
 import os
 from os.path import join as opj, dirname
 
-from mock import patch
+from unittest.mock import patch
 
 from io import StringIO
 from .utils import with_testrepos

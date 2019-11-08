@@ -11,7 +11,7 @@ import sys
 from io import StringIO
 from nose.tools import assert_raises, assert_equal
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.api import sshrun
 from datalad.cmd import Runner

@@ -9,7 +9,7 @@
 """Tests for S3 downloader"""
 
 import os
-from mock import patch
+from unittest.mock import patch
 
 from ..s3 import S3Authenticator
 from ..s3 import S3Downloader

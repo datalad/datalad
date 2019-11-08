@@ -13,7 +13,7 @@ import logging
 import os
 import os.path as op
 from os.path import exists, isdir, getmtime, join as opj
-from mock import patch
+from unittest.mock import patch
 
 from nose import SkipTest
 

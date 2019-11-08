@@ -9,7 +9,7 @@
 """Test ANSI color tools """
 
 import os
-from mock import patch
+from unittest.mock import patch
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import patch_config
 

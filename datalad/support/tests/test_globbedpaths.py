@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 import logging
-from mock import patch
+from unittest.mock import patch
 import os.path as op
 
 from datalad.support.globbedpaths import GlobbedPaths

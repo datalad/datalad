@@ -33,7 +33,7 @@ from urllib.parse import urlsplit
 
 import git
 from git import GitCommandError
-from mock import patch
+from unittest.mock import patch
 import gc
 
 from datalad.cmd import Runner

@@ -24,7 +24,7 @@ from os.path import exists, join as opj, basename
 
 from urllib.request import urlopen
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
 

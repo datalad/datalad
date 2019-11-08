@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 from io import StringIO
 import builtins
 
-from mock import (
+from unittest.mock import (
     call,
     patch,
 )

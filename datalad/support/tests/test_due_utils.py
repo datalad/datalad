@@ -22,7 +22,7 @@ from ...tests.utils import (
     with_tempfile,
 )
 import logging
-from mock import patch
+from unittest.mock import patch
 
 
 @with_tempfile(mkdir=True)

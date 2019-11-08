@@ -75,7 +75,7 @@ class ExportArchive(Interface):
         import os
         import tarfile
         import zipfile
-        from mock import patch
+        from unittest.mock import patch
         from os.path import join as opj, dirname, normpath, isabs
         import os.path as op
 

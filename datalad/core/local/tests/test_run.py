@@ -23,7 +23,7 @@ from os import (
 )
 import sys
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import (
     assure_unicode,

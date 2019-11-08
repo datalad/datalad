@@ -48,7 +48,7 @@ except (ImportError, AttributeError):
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
 
-from mock import patch
+from unittest.mock import patch
 from ...tests.utils import SkipTest
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in

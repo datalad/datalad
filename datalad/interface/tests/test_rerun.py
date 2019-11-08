@@ -21,7 +21,7 @@ from os import (
 )
 
 from io import StringIO
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import (
     chpwd,

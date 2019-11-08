@@ -14,7 +14,7 @@ from datalad.tests.utils import on_windows
 import re
 import sys
 from io import StringIO
-from mock import patch
+from unittest.mock import patch
 
 import datalad
 from ..main import (
