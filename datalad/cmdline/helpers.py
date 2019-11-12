@@ -17,6 +17,7 @@ import re
 import sys
 import gzip
 from tempfile import NamedTemporaryFile
+from textwrap import wrap
 
 from ..cmd import Runner
 from ..log import is_interactive
@@ -64,8 +65,22 @@ class HelpAction(argparse.Action):
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
                 lgr.debug("Did not use manpage since %s", exc_str(e))
         if option_string == '-h':
+            usage = parser.format_usage()
+            ucomps = re.match(
+                r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
+                usage,
+                re.DOTALL).groupdict()
+            indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
+            usage = '{pre}{{{cmds}}}{post}'.format(
+                pre=ucomps['pre'],
+                cmds='\n'.join(wrap(
+                    ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
+                    break_on_hyphens=False,
+                    subsequent_indent=' ' * indent_level)),
+                post=ucomps['post'],
+            )
             helpstr = "%s\n%s" % (
-                parser.format_usage(),
+                usage,
                 "Use '--help' to get more comprehensive information.")
         else:
             helpstr = parser.format_help()
