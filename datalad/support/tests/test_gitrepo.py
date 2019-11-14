@@ -46,6 +46,7 @@ from datalad.tests.utils import local_testrepo_flavors
 from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
+from datalad.tests.utils import integration
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -1476,3 +1477,21 @@ def test_gitrepo_add_to_git_with_annex_v7(path):
     gr.add("foo")
     gr.commit(msg="c1")
     assert_false(ar.is_under_annex("foo"))
+
+
+@skip_if_no_network
+@with_tempfile
+def _test_protocols(proto, destdir):
+    GitRepo.clone('%s://github.com/datalad-tester/testtt' % proto, destdir)
+
+
+@integration
+def test_protocols():
+    # git-annex-standalone build can get git bundle which would fail to
+    # download via https, resulting in messages such as
+    #  fatal: unable to find remote helper for 'https'
+    # which happened with git-annex-standalone 7.20191017+git2-g7b13db551-1~ndall+1
+
+    # http is well tested already
+    for proto in 'git', 'https':
+        yield _test_protocols, proto
