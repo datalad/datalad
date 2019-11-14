@@ -292,7 +292,8 @@ class CompositeCredential(Credential):
 
 def _nda_adapter(composite, user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
-    gen = NDATokenGenerator()
+    from .. import cfg
+    gen = NDATokenGenerator(cfg.obtain('datalad.externals.nda.dbserver'))
     token = gen.generate_token(user, password)
     # There are also session and expiration we ignore... TODO anything about it?!!!
     # we could create a derived AWS_S3 which would also store session and expiration
