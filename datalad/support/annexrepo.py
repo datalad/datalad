@@ -1057,6 +1057,14 @@ class AnnexRepo(GitRepo, RepoInterface):
           configuration information git-annex has for the remote. This should
           include the 'type' and 'name' as well as any `initremote` parameters
           that git-annex stores.
+
+          Note: This is a faithful translation of git-annex:remote.log with one
+          exception. For a special remote initialized with the --sameas flag,
+          git-annex stores the special remote name under the "sameas-name" key,
+          we copy this value under the "name" key so that callers don't have to
+          check two places for the name. If you need to detect whether you're
+          working with a sameas remote, the presence of either "sameas-name" or
+          "sameas-uuid" is a reliable indicator.
         """
         try:
             stdout, stderr = self._git_custom_command(
@@ -1078,6 +1086,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             sr_id = fields[0]
             # the rest are config args for enableremote
             sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            if "name" not in sr_info:
+                name = sr_info.get("sameas-name")
+                if name is None:
+                    lgr.warning(
+                        "Encountered git-annex remote without a name or "
+                        "sameas-name value: %s",
+                        sr_info)
+                else:
+                    sr_info["name"] = name
             srs[sr_id] = sr_info
         return srs
 
