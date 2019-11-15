@@ -1053,11 +1053,10 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Keys are special remote UUIDs, values are dicts with arguments
-          for `git-annex enableremote`. This includes at least the 'type'
-          and 'name' of a special remote. Each type of special remote
-          may require addition arguments that will be available in the
-          respective dictionary.
+          Keys are special remote UUIDs. Each value is a dictionary with
+          configuration information git-annex has for the remote. This should
+          include the 'type' and 'name' as well as any `initremote` parameters
+          that git-annex stores.
         """
         try:
             stdout, stderr = self._git_custom_command(
