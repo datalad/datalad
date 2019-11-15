@@ -805,6 +805,48 @@ with_testrepos.__test__ = False
 
 
 @optional_args
+def with_sameas_remote(func, autoenabled=False):
+    """Provide a repository with a git-annex sameas remote configured.
+
+    The repository will have two special remotes: r_dir (type=directory) and
+    r_rsync (type=rsync). The rsync remote will be configured with
+    --sameas=r_dir, and autoenabled if `autoenabled` is true.
+    """
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.exceptions import CommandError
+
+    @wraps(func)
+    @attr('with_sameas_remotes')
+    @skip_if_on_windows
+    @skip_ssh
+    @with_tempfile(mkdir=True)
+    @with_tempfile(mkdir=True)
+    def newfunc(*args, **kwargs):
+        sr_path, repo_path = args[-2:]
+        fn_args = args[:-2]
+        repo = AnnexRepo(repo_path)
+        repo.init_remote("r_dir",
+                         options=["type=directory",
+                                  "encryption=none",
+                                  "directory=" + sr_path])
+        options = ["type=rsync",
+                   "rsyncurl=datalad-test:" + sr_path]
+        if autoenabled:
+            options.append("autoenable=true")
+        options.append("--sameas=r_dir")
+
+        try:
+            repo.init_remote("r_rsync", options=options)
+        except CommandError:
+            if repo.git_annex_version < "7.20191017":
+                raise SkipTest("git-annex lacks --sameas support")
+            # This should have --sameas support.
+            raise
+        return func(*(fn_args + (repo,)), **kwargs)
+    return newfunc
+
+
+@optional_args
 def with_fake_cookies_db(func, cookies={}):
     """mock original cookies db with a fake one for the duration of the test
     """
