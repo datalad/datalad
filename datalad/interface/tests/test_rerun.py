@@ -136,6 +136,15 @@ def test_rerun(path, nodspath):
     # We can get back a report of what would happen rather than actually
     # rerunning anything.
     report = ds.rerun(since="", report=True, return_type="list")
+    # The "diff" section of the report doesn't include the unchanged files that
+    # would come in "-f json diff" output.
+    for entry in report:
+        if entry["rerun_action"] == "run":
+            # None of the run commits touch .datalad/config or any other config
+            # file.
+            assert_false(any(r["path"].endswith("config")
+                             for r in entry["diff"]))
+
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
     assert_result_count(report, 1, rerun_action="skip-or-pick")
