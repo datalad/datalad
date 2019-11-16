@@ -22,7 +22,10 @@ import sys
 import textwrap
 import os
 
-from six import text_type
+from six import (
+    text_type,
+    PY3,
+)
 
 import datalad
 
@@ -432,6 +435,19 @@ def _fix_datalad_ri(s):
 
 
 def main(args=None):
+    cwd = None
+    try:
+        cwd = os.getcwd()
+    except (FileNotFoundError if PY3 else OSError):
+        cwd = None
+
+    if cwd is None:
+        from ..ui import ui
+        ui.error(
+            "Running datalad from a non-existing directory is not supported. \n"
+            "Change current directory and try again."
+        )
+        sys.exit(1)
     lgr.log(5, "Starting main(%r)", args)
     args = args or sys.argv
     if on_msys_tainted_paths:

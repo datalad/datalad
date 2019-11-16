@@ -27,7 +27,10 @@ from datalad import __version__
 from datalad.cmd import Runner
 from datalad.ui.utils import get_console_width
 from datalad.api import create
-from datalad.utils import chpwd
+from datalad.utils import (
+    chpwd,
+    rmtree,
+)
 from datalad.tests.utils import with_tempfile
 from datalad.tests.utils import assert_equal, assert_raises, in_, ok_startswith
 from datalad.tests.utils import assert_in
@@ -83,6 +86,16 @@ def test_version():
     # since https://github.com/datalad/datalad/pull/2733 no license in --version
     assert_not_in("Copyright", out)
     assert_not_in("Permission is hereby granted", out)
+
+
+@with_tempfile(mkdir=True)
+def test_nonexisting_dir(path):
+    with chpwd(path):
+        rmtree(path)
+        stdout, stderr = run_main(['--version'], exit_code=1, expect_stderr=True)
+        assert_not_in("FileNotFoundError", stderr)
+        # unfortunately run_main fails to capture it
+        # assert_in("not supported", stdout)
 
 
 def test_help_np():
