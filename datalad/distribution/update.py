@@ -58,7 +58,7 @@ class Update(Interface):
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to update.  If
+            doc="""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the input and/or the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
