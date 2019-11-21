@@ -37,6 +37,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import slow
+from datalad.tests.utils import skip_if_on_windows
 
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -88,6 +89,7 @@ def test_version():
     assert_not_in("Permission is hereby granted", out)
 
 
+@skip_if_on_windows  # cannot tolerate removing CWD
 @with_tempfile(mkdir=True)
 def test_nonexisting_dir(path):
     with chpwd(path):
