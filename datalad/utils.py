@@ -51,7 +51,7 @@ from os.path import split as psplit
 import posixpath
 
 
-from six import PY2, text_type, binary_type, string_types
+from six import PY2, PY3, text_type, binary_type, string_types
 from six.moves import shlex_quote
 
 # from datalad.dochelpers import get_docstring_split
@@ -1395,7 +1395,7 @@ def _switch_to_getcwd(msg, *args):
     # repos and tuning up their .paths to be resolved?
 
 
-def getpwd():
+def getpwd(allow_non_existing_cwd=True):
     """Try to return a CWD without dereferencing possible symlinks
 
     This function will try to use PWD environment variable to provide a current
@@ -1411,6 +1411,11 @@ def getpwd():
 
     Initial decision to either use PWD env variable or os.getcwd() is done upon
     the first call of this function.
+
+    Parameters
+    ----------
+    allow_non_existing_cwd: bool, optional
+      In PWD mode, do not use environment variable if cwd is None.
     """
     global _pwd_mode
     if _pwd_mode is None:
@@ -1438,14 +1443,16 @@ def getpwd():
     elif _pwd_mode == 'PWD':
         try:
             cwd = os.getcwd()
-        except OSError as exc:
-            if "o such file" in str(exc):
+        except (FileNotFoundError if PY3 else OSError) as exc:
+            if PY3 or "o such file" in str(exc):
                 # directory was removed but we promised to be robust and
                 # still report the path we might know since we are still in PWD
                 # mode
                 cwd = None
             else:
                 raise
+        if cwd is None and not allow_non_existing_cwd:
+            return cwd
         try:
             pwd = os.environ['PWD']
             pwd_real = op.realpath(pwd)
