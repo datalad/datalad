@@ -54,7 +54,15 @@ from .log import lgr
 from datalad.utils import get_encoding_info, get_envvars_info, getpwd
 
 # To analyze/initiate our decision making on what current directory to return
-getpwd()
+if not getpwd(allow_non_existing_cwd=False):
+    import sys
+    from .ui import ui
+    ui.error(
+        "Running datalad from a non-existing directory is not supported. \n"
+        "Change current directory and try again."
+    )
+    sys.exit(1)
+
 
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager

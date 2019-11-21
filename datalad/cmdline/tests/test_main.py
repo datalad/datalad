@@ -93,11 +93,16 @@ def test_version():
 @with_tempfile(mkdir=True)
 def test_nonexisting_dir(path):
     with chpwd(path):
+        runner = Runner()
         rmtree(path)
-        stdout, stderr = run_main(['--version'], exit_code=1, expect_stderr=True)
-        assert_not_in("FileNotFoundError", stderr)
-        # unfortunately run_main fails to capture it
-        # assert_in("not supported", stdout)
+        from datalad.cmd import CommandError
+        with assert_raises(CommandError) as cmr:
+            runner(['datalad', '--version'])
+        exc = cmr.exception
+        assert_not_in("FileNotFoundError", exc.stderr)
+        assert_in("not supported", exc.stdout)
+        # but we still show error
+        assert_in("getcwd() failed", exc.stderr)
 
 
 def test_help_np():
