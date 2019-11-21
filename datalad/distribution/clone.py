@@ -22,6 +22,7 @@ from datalad.interface.results import get_status_dict
 from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
+    save_message_opt,
 )
 from datalad.support.gitrepo import (
     GitRepo,
@@ -123,6 +124,7 @@ class Clone(Interface):
             doc="""Alternative sources to be tried if a dataset cannot
             be obtained from the main `source`""",
             constraints=EnsureStr() | EnsureNone()),
+        message=save_message_opt,
     )
 
     @staticmethod
@@ -134,7 +136,8 @@ class Clone(Interface):
             dataset=None,
             description=None,
             reckless=False,
-            alt_sources=None):
+            alt_sources=None,
+            message=None):
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -325,6 +328,7 @@ class Clone(Interface):
             # -> make submodule
             for r in ds.save(
                     dest_path,
+                    message = message,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
