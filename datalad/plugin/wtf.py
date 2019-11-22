@@ -234,6 +234,7 @@ def _describe_dataset(ds, sensitive):
         infos = {
             'path': ds.path,
             'repo': ds.repo.__class__.__name__ if ds.repo else None,
+            'id': ds.id,
         }
         if not sensitive:
             infos['metadata'] = _HIDDEN
