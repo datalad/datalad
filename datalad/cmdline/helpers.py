@@ -69,16 +69,18 @@ class HelpAction(argparse.Action):
             ucomps = re.match(
                 r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
                 usage,
-                re.DOTALL).groupdict()
-            indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
-            usage = '{pre}{{{cmds}}}{post}'.format(
-                pre=ucomps['pre'],
-                cmds='\n'.join(wrap(
-                    ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
-                    break_on_hyphens=False,
-                    subsequent_indent=' ' * indent_level)),
-                post=ucomps['post'],
-            )
+                re.DOTALL)
+            if ucomps:
+                ucomps = ucomps.groupdict()
+                indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
+                usage = '{pre}{{{cmds}}}{post}'.format(
+                    pre=ucomps['pre'],
+                    cmds='\n'.join(wrap(
+                        ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
+                        break_on_hyphens=False,
+                        subsequent_indent=' ' * indent_level)),
+                    post=ucomps['post'],
+                )
             helpstr = "%s\n%s" % (
                 usage,
                 "Use '--help' to get more comprehensive information.")
