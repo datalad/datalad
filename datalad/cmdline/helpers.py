@@ -17,6 +17,7 @@ import re
 import sys
 import gzip
 from tempfile import NamedTemporaryFile
+from textwrap import wrap
 
 from ..cmd import Runner
 from ..log import is_interactive
@@ -52,7 +53,7 @@ class HelpAction(argparse.Action):
                     raise IOError("manfile is not found")
                 with gzip.open(manfile) as f:
                     man_th = [line for line in f if line.startswith(b".TH")][0]
-                man_version = man_th.split(b' ')[5].strip(b" '\"\t\n").decode('utf-8')
+                man_version = man_th.split(b' ')[-1].strip(b" '\"\t\n").decode('utf-8')
 
                 # don't show manpage if man_version not equal to current datalad_version
                 if __version__ != man_version:
@@ -64,8 +65,24 @@ class HelpAction(argparse.Action):
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
                 lgr.debug("Did not use manpage since %s", exc_str(e))
         if option_string == '-h':
+            usage = parser.format_usage()
+            ucomps = re.match(
+                r'(?P<pre>.*){(?P<cmds>.*)}(?P<post>....*)',
+                usage,
+                re.DOTALL)
+            if ucomps:
+                ucomps = ucomps.groupdict()
+                indent_level = len(ucomps['post']) - len(ucomps['post'].lstrip())
+                usage = '{pre}{{{cmds}}}{post}'.format(
+                    pre=ucomps['pre'],
+                    cmds='\n'.join(wrap(
+                        ', '.join(sorted(c.strip() for c in ucomps['cmds'].split(','))),
+                        break_on_hyphens=False,
+                        subsequent_indent=' ' * indent_level)),
+                    post=ucomps['post'],
+                )
             helpstr = "%s\n%s" % (
-                parser.format_usage(),
+                usage,
                 "Use '--help' to get more comprehensive information.")
         else:
             helpstr = parser.format_help()

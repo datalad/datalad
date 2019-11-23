@@ -62,22 +62,6 @@ class Save(Interface):
     saved state. Such tag enables straightforward retrieval of past versions at
     a later point in time.
 
-    Examples:
-
-      Save any content underneath the current directory, without altering
-      any potential subdataset (use --recursive for that)::
-
-        % datalad save .
-
-      Save any modification of known dataset content, but leave untracked
-      files (e.g. temporary files) untouched::
-
-        % dataset save -u -d <path_to_dataset>
-
-      Tag the most recent saved state of a dataset::
-
-        % dataset save -d <path_to_dataset> --version-tag bestyet
-
     .. note::
       Before Git v2.22, any Git repository without an initial commit located
       inside a Dataset is ignored, and content underneath it will be saved to
@@ -86,6 +70,31 @@ class Save(Interface):
     """
     # note above documents that out behavior is like that of `git add`, but
     # does not explicitly mention the connection to keep it simple.
+
+    _examples_ = [
+        dict(text="""Save any content underneath the current directory, without
+             altering any potential subdataset""",
+             code_py="ds.save()",
+             code_cmd="datalad save ."),
+        dict(text="""Save specific content in the dataset""",
+             code_py="ds.save(path='myfile.txt')",
+             code_cmd="datalad save myfile.txt"),
+        dict(text="""Attach a commit message to save""",
+             code_py="ds.save(path='myfile.txt', message='add a file')",
+             code_cmd="datalad save -m 'add file' myfile.txt"),
+        dict(text="""Save any content underneath the current directory, and
+             recurse into any potential subdatasets""",
+             code_py="ds.save(recursive=True)",
+             code_cmd="datalad save . --recursive"),
+        dict(text="""Save any modification of known dataset content in the
+             current directory, but leave untracked files (e.g. temporary files)
+             untouched""",
+             code_py="""ds.save(updated=True, path='.')""",
+             code_cmd="""datalad save -u -d ."""),
+        dict(text="Tag the most recent saved state of a dataset",
+             code_py="ds.save(version_tag='bestyet')",
+             code_cmd="datalad save -d . --version-tag 'bestyet'"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
@@ -297,6 +306,8 @@ class Save(Interface):
                 yield dsres
                 continue
             try:
+                # method requires str
+                version_tag = str(version_tag)
                 pds_repo.tag(version_tag)
                 dsres.update(
                     status='ok',

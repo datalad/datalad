@@ -24,7 +24,6 @@ from datalad.consts import TIMESTAMP_FMT
 from datalad.dochelpers import exc_str
 from datalad.distribution.siblings import Siblings
 from datalad.distribution.siblings import _DelayedSuper
-from datalad.distribution.add_sibling import _check_deps
 from datalad.distribution.dataset import EnsureDataset, Dataset, \
     datasetmethod, require_dataset
 from datalad.interface.annotate_paths import AnnotatePaths

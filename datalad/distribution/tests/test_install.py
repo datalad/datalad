@@ -32,12 +32,9 @@ from datalad.utils import on_windows
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
-from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import create_tree
@@ -55,7 +52,6 @@ from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -75,38 +71,11 @@ from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_installationpath_from_url
 from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
-
-
-def test_installationpath_from_url():
-    for p in ('lastbit',
-              'lastbit/',
-              '/lastbit',
-              'lastbit.git',
-              'lastbit.git/',
-              'http://example.com/lastbit',
-              'http://example.com/lastbit.git',
-              'http://lastbit:8000'
-              ):
-        eq_(_get_installationpath_from_url(p), 'lastbit')
-    # we need to deal with quoted urls
-    for url in (
-        # although some docs say that space could've been replaced with +
-        'http://localhost:8000/+last%20bit',
-        'http://localhost:8000/%2Blast%20bit',
-        '///%2Blast%20bit',
-        '///d1/%2Blast%20bit',
-        '///d1/+last bit',
-    ):
-        eq_(_get_installationpath_from_url(url), '+last bit')
-    # and the hostname alone
-    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
-    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
@@ -739,17 +708,11 @@ def test_install_skip_failed_recursive(src, path):
         assert_result_count(
             result, 0, path=ds.path, type='dataset')
         # subm 1 should fail to install. [1] since comes after '2' submodule
-        assert_in_results(result, status='error', path=sub1.path)
+        assert_in_results(
+            result, status='error', path=sub1.path, type='dataset',
+            message='target path already exists and not empty, refuse to '
+                    'clone into target path')
         assert_in_results(result, status='ok', path=sub2.path)
-
-        cml.assert_logged(
-            msg="target path already exists and not empty".format(sub1.path),
-            regex=False, level='ERROR')
-    # this is not in effect that this message is not propagated up
-    # assert_in(
-    #     "destination path '{}' already exists and is not an empty directory".format(
-    #         sub1.path),
-    #     result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',
@@ -942,3 +905,14 @@ def check_datasets_datalad_org(suffix, tdir):
 def test_datasets_datalad_org():
     yield check_datasets_datalad_org, ''
     yield check_datasets_datalad_org, '/.git'
+
+
+# https://github.com/datalad/datalad/issues/3469
+@with_tempfile(mkdir=True)
+def test_relpath_semantics(path):
+    with chpwd(path):
+        super = create('super')
+        create('subsrc')
+        sub = install(
+            dataset='super', source='subsrc', path=op.join('super', 'sub'))
+        eq_(sub.path, op.join(super.path, 'sub'))

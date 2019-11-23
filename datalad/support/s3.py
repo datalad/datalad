@@ -399,6 +399,9 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
 
     s3_bucket, fpath = None, url_rec.path.lstrip('/')
 
+    was_versioned = False
+    all_versions = []
+
     if url_rec.hostname.endswith('.s3.amazonaws.com'):
         if url_rec.scheme not in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
@@ -411,13 +414,15 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
         s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
         s3_bucket = url_rec.hostname  # must be
-        # and for now implement magical conversion to URL
-        # TODO: wouldn't work if needs special permissions etc
-        # actually for now
-        raise NotImplementedError
+        if url_rec.query and 'versionId=' in url_rec.query:
+            was_versioned = True
+            all_versions.append(url)
+        else:
+            # and for now implement magical conversion to URL
+            # TODO: wouldn't work if needs special permissions etc
+            # actually for now
+            raise NotImplementedError
 
-    was_versioned = False
-    all_versions = []
     if s3_bucket:
         # TODO: cache
         if s3conn is None:

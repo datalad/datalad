@@ -10,15 +10,15 @@
 """
 
 import logging
-import os
 import os.path as op
-from os.path import curdir
-from os.path import exists
-from os.path import join as opj
-from os.path import normpath, isabs
-from os.path import pardir
-from os.path import realpath
-from os.path import relpath
+from os.path import (
+    curdir,
+    exists,
+    join as opj,
+    normpath, isabs,
+    pardir,
+    realpath,
+)
 from weakref import WeakValueDictionary
 import wrapt
 
@@ -31,54 +31,31 @@ from datalad.support.constraints import Constraint
 from datalad.support.due import due
 from datalad.support.due_utils import duecredit_dataset
 from datalad.support.exceptions import NoDatasetArgumentFound
-from datalad.support.external_versions import external_versions
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError
-from datalad.support.gitrepo import NoSuchPathError
+from datalad.support.gitrepo import (
+    GitRepo,
+    InvalidGitRepositoryError,
+    NoSuchPathError
+)
 from datalad.support.repo import Flyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
 
 import datalad.utils as ut
-from datalad.utils import getpwd
-from datalad.utils import optional_args, expandpath, is_explicit_path
-from datalad.utils import get_dataset_root
-from datalad.utils import dlabspath
-from datalad.utils import Path
-from datalad.utils import PurePath
-from datalad.utils import assure_list
+from datalad.utils import (
+    getpwd,
+    optional_args,
+    get_dataset_root,
+    # TODO remove after a while, when external consumers have adjusted
+    # to use get_dataset_root()
+    get_dataset_root as rev_get_dataset_root,
+    Path,
+    PurePath,
+    assure_list,
+)
 
 
 lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
-
-
-# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
-#       (see normalize_path)
-def resolve_path(path, ds=None):
-    """Resolve a path specification (against a Dataset location)
-
-    Any explicit path (absolute or relative) is returned as an absolute path.
-    In case of an explicit relative path, the current working directory is
-    used as a reference. Any non-explicit relative path is resolved against
-    as dataset location, i.e. considered relative to the location of the
-    dataset. If no dataset is provided, the current working directory is
-    used.
-
-    Returns
-    -------
-    Absolute path
-    """
-    path = expandpath(path, force_absolute=False)
-    if is_explicit_path(path):
-        # normalize path consistently between two (explicit and implicit) cases
-        return dlabspath(path, norm=True)
-
-    # no dataset given, use CWD as reference
-    # note: abspath would disregard symlink in CWD
-    top_path = getpwd() \
-        if ds is None else ds.path if isinstance(ds, Dataset) else ds
-    return normpath(opj(top_path, path))
 
 
 class Dataset(object, metaclass=Flyweight):
@@ -132,7 +109,8 @@ class Dataset(object, metaclass=Flyweight):
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
             # might have its ideas on what to do with ^, so better use as -d^
-            path_ = Dataset(curdir).get_superdataset(topmost=True).path
+            path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
+                topmost=True).path
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?
@@ -153,6 +131,15 @@ class Dataset(object, metaclass=Flyweight):
         path_ = normpath(path_)
         kwargs['path'] = path_
         return path_, args, kwargs
+
+    def _flyweight_invalid(self):
+        """Invalidation of Flyweight instance
+
+        Dataset doesn't need to be invalidated during its lifetime at all. Instead the underlying *Repo instances are.
+        Dataset itself can represent a not yet existing path.
+        """
+        return False
+
     # End Flyweight
 
     def __hash__(self):
@@ -168,6 +155,7 @@ class Dataset(object, metaclass=Flyweight):
           Path to the dataset location. This location may or may not exist
           yet.
         """
+        self._pathobj = path if isinstance(path, ut.Path) else None
         if isinstance(path, ut.PurePath):
             path = str(path)
         self._path = path
@@ -181,7 +169,9 @@ class Dataset(object, metaclass=Flyweight):
         """pathobj for the dataset"""
         # XXX this relies on the assumption that self._path as managed
         # by the base class is always a native path
-        return ut.Path(self._path)
+        if not self._pathobj:
+            self._pathobj = ut.Path(self._path)
+        return self._pathobj
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -269,18 +259,24 @@ class Dataset(object, metaclass=Flyweight):
             # we got a repo and path references still match
             if isinstance(self._repo, AnnexRepo):
                 # it's supposed to be an annex
+                # Here we do the same validation that Flyweight would do beforehand if there was a call to AnnexRepo()
                 if self._repo is AnnexRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        AnnexRepo.is_valid_repo(self._repo.path,
-                                                allow_noninitialized=True):
+                        self._repo.path, None) and not self._repo._flyweight_invalid():
                     # it's still the object registered as flyweight and it's a
                     # valid annex repo
                     return self._repo
             elif isinstance(self._repo, GitRepo):
                 # it's supposed to be a plain git
+                # same kind of checks as for AnnexRepo above, but additionally check whether it was changed to have an
+                # annex now.
+                # TODO: Instead of is_with_annex, we might want the cheaper check for an actually initialized annex.
+                #       However, that's not completely clear. On the one hand, if it really changed to be an annex
+                #       it seems likely that this happened locally and it would also be an initialized annex. On the
+                #       other hand, we could have added (and fetched) a remote with an annex, which would turn it into
+                #       our current notion of an uninitialized annex. Question is whether or not such a change really
+                #       need to be detected. For now stay on the safe side and detect it.
                 if self._repo is GitRepo._unique_instances.get(
-                        self._repo.path, None) and \
-                        GitRepo.is_valid_repo(self._repo.path) and not \
+                        self._repo.path, None) and not self._repo._flyweight_invalid() and not \
                         self._repo.is_with_annex():
                     # it's still the object registered as flyweight, it's a
                     # valid git repo and it hasn't turned into an annex
@@ -294,8 +290,7 @@ class Dataset(object, metaclass=Flyweight):
         # actually new instance. This is unnecessarily costly.
         valid = False
         for cls, ckw, kw in (
-                # TODO: Do we really want to allow_noninitialized=True here?
-                # And if so, leave a proper comment!
+                # Non-initialized is okay. We want to figure the correct instance to represent what's there - that's it.
                 (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
                 (GitRepo, {}, {})
         ):
@@ -320,6 +315,8 @@ class Dataset(object, metaclass=Flyweight):
             # at DEBUG level and if necessary "complaint upstairs"
             lgr.log(5, "Failed to detect a valid repo at %s", self.path)
         elif due.active:
+            # TODO: Figure out, when exactly this is needed. Don't think it makes sense to do this for every dataset,
+            #       no matter what => we want .repo to be as cheap as it gets.
             # Makes sense only on installed dataset - @never_fail'ed
             duecredit_dataset(self)
 
@@ -427,8 +424,6 @@ class Dataset(object, metaclass=Flyweight):
         Dataset or None
         """
         from datalad.coreapi import subdatasets
-        # TODO: return only if self is subdataset of the superdataset
-        #       (meaning: registered as submodule)?
         path = self.path
         sds_path = path if topmost else None
 
@@ -609,7 +604,7 @@ def require_dataset(dataset, check_installed=True, purpose=None):
 # New helpers, courtesy of datalad-revolution.
 
 
-def rev_resolve_path(path, ds=None):
+def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
     Any path is returned as an absolute path. If, and only if, a dataset
@@ -698,6 +693,9 @@ def rev_resolve_path(path, ds=None):
         out.append(p)
     return out[0] if isinstance(path, (str, PurePath)) else out
 
+# TODO keep this around for a while so that extensions can be updated
+rev_resolve_path = resolve_path
+
 
 def path_under_rev_dataset(ds, path):
     ds_path = ds.pathobj
@@ -710,54 +708,17 @@ def path_under_rev_dataset(ds, path):
         # whatever went wrong, we gotta play save
         pass
 
-    root = rev_get_dataset_root(str(path))
+    root = get_dataset_root(str(path))
     while root is not None and not ds_path.samefile(root):
         # path and therefore root could be relative paths,
         # hence in the next round we cannot use dirname()
         # to jump in the the next directory up, but we have
         # to use ./.. and get_dataset_root() will handle
         # the rest just fine
-        root = rev_get_dataset_root(op.join(root, op.pardir))
+        root = get_dataset_root(op.join(root, op.pardir))
     if root is None:
         return None
     return ds_path / op.relpath(str(path), root)
-
-
-# XXX this is a copy of the change proposed in
-# https://github.com/datalad/datalad/pull/2944
-def rev_get_dataset_root(path):
-    """Return the root of an existent dataset containing a given path
-
-    The root path is returned in the same absolute or relative form
-    as the input argument. If no associated dataset exists, or the
-    input path doesn't exist, None is returned.
-
-    If `path` is a symlink or something other than a directory, its
-    the root dataset containing its parent directory will be reported.
-    If none can be found, at a symlink at `path` is pointing to a
-    dataset, `path` itself will be reported as the root.
-    """
-    suffix = '.git'
-    altered = None
-    if op.islink(path) or not op.isdir(path):
-        altered = path
-        path = op.dirname(path)
-    apath = op.abspath(path)
-    # while we can still go up
-    while op.split(apath)[1]:
-        if op.exists(op.join(path, suffix)):
-            return path
-        # new test path in the format we got it
-        path = op.normpath(op.join(path, os.pardir))
-        # no luck, next round
-        apath = op.abspath(path)
-    # if we applied dirname() at the top, we give it another go with
-    # the actual path, if it was itself a symlink, it could be the
-    # top-level dataset itself
-    if altered and op.exists(op.join(altered, suffix)):
-        return altered
-
-    return None
 
 
 lgr.log(5, "Done importing dataset")

@@ -17,80 +17,82 @@ import json
 import logging
 import math
 import os
-import os.path as op
 import re
 import shlex
-import tempfile
-import time
 
 from itertools import chain
 from os import linesep
-from os.path import curdir
-from os.path import join as opj
-from os.path import exists
-from os.path import islink
-from os.path import realpath
-from os.path import lexists
-from os.path import isdir
-from os.path import isabs
-from os.path import relpath
-from os.path import normpath
-from subprocess import Popen, PIPE
+from os.path import (
+    curdir,
+    join as opj,
+    exists,
+    islink,
+    realpath,
+    lexists,
+    isdir,
+    isabs,
+    normpath
+)
 from multiprocessing import cpu_count
 from weakref import WeakValueDictionary
 
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
-from datalad.dochelpers import exc_str
-from datalad.dochelpers import borrowdoc
-from datalad.dochelpers import borrowkwargs
+from datalad.dochelpers import (
+    exc_str,
+    borrowdoc,
+    borrowkwargs
+)
 from datalad.ui import ui
 import datalad.utils as ut
-from datalad.utils import linux_distribution_name
-from datalad.utils import nothing_cm
-from datalad.utils import auto_repr
-from datalad.utils import on_windows
-from datalad.utils import swallow_logs
-from datalad.utils import assure_list
-from datalad.utils import _path_
-from datalad.utils import CMD_MAX_ARG
-from datalad.utils import assure_unicode
-from datalad.utils import make_tempfile
-from datalad.utils import partition
-from datalad.utils import unlink
+from datalad.utils import (
+    linux_distribution_name,
+    auto_repr,
+    on_windows,
+    assure_list,
+    make_tempfile,
+    partition,
+    unlink
+)
 from datalad.support.json_py import loads as json_loads
-from datalad.cmd import GitRunner
-from datalad.cmd import BatchedCommand
+from datalad.cmd import (
+    GitRunner,
+    BatchedCommand,
+    SafeDelCloseMixin
+)
 
 # imports from same module:
 from .repo import RepoInterface
-from .gitrepo import GitRepo
-from .gitrepo import NoSuchPathError
-from .gitrepo import _normalize_path
-from .gitrepo import normalize_path
-from .gitrepo import normalize_paths
-from .gitrepo import GitCommandError
-from .gitrepo import to_options
+from .gitrepo import (
+    GitRepo,
+    NoSuchPathError,
+    _normalize_path,
+    normalize_path,
+    normalize_paths,
+    GitCommandError,
+    to_options
+)
 from . import ansi_colors
 from .external_versions import external_versions
-from .exceptions import CommandNotAvailableError
-from .exceptions import CommandError
-from .exceptions import FileNotInAnnexError
-from .exceptions import FileInGitError
-from .exceptions import FileNotInRepositoryError
-from .exceptions import AnnexBatchCommandError
-from .exceptions import InsufficientArgumentsError
-from .exceptions import OutOfSpaceError
-from .exceptions import RemoteNotAvailableError
-from .exceptions import BrokenExternalDependency
-from .exceptions import OutdatedExternalDependency
-from .exceptions import MissingExternalDependency
-from .exceptions import IncompleteResultsError
-from .exceptions import AccessDeniedError
-from .exceptions import AccessFailedError
-from .exceptions import InvalidAnnexRepositoryError
-from .exceptions import DirectModeNoLongerSupportedError
+from .exceptions import (
+    CommandNotAvailableError,
+    CommandError,
+    FileNotInAnnexError,
+    FileInGitError,
+    AnnexBatchCommandError,
+    InsufficientArgumentsError,
+    OutOfSpaceError,
+    RemoteNotAvailableError,
+    BrokenExternalDependency,
+    OutdatedExternalDependency,
+    MissingExternalDependency,
+    IncompleteResultsError,
+    AccessDeniedError,
+    AccessFailedError,
+    InvalidAnnexRepositoryError,
+    DirectModeNoLongerSupportedError
+)
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -110,6 +112,10 @@ class AnnexRepo(GitRepo, RepoInterface):
 
     # Begin Flyweight:
     _unique_instances = WeakValueDictionary()
+
+    def _flyweight_invalid(self):
+        return not self.is_valid_annex(allow_noninitialized=True)
+
     # End Flyweight:
 
     # Web remote has a hard-coded UUID we might (ab)use
@@ -180,6 +186,41 @@ class AnnexRepo(GitRepo, RepoInterface):
           Short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        # BEGIN Repo validity test
+        # We want to fail early for tests, that would be performed a lot. In particular this is about
+        # AnnexRepo.is_valid_repo. We would use the latter to decide whether or not to call AnnexRepo() only for
+        # __init__ to then test the same things again. If we fail early we can save the additional test from outer
+        # scope.
+        do_init = False
+        super(AnnexRepo, self).__init__(
+            path, url, runner=runner,
+            create=create, create_sanity_checks=create_sanity_checks,
+            repo=repo, git_opts=git_opts, fake_dates=fake_dates)
+
+        # Check whether an annex already exists at destination
+        # XXX this doesn't work for a submodule!
+
+        # NOTE: We are in __init__ here and already know that GitRepo.is_valid_git is True, since super.__init__  was
+        #       called. Therefore: check_git=False
+        if not self.is_valid_annex(check_git=False):
+            # so either it is not annex at all or just was not yet initialized
+            # TODO: There's still potential to get a bit more performant. is_with_annex() is checking again, what
+            #       is_valid_annex did. However, this marginal here, considering the call to git-annex-init.
+            if self.is_with_annex():
+                # it is an annex repository which was not initialized yet
+                if create or init:
+                    lgr.debug('Annex repository was not yet initialized at %s.'
+                              ' Initializing ...' % self.path)
+                    do_init = True
+            elif create:
+                lgr.debug('Initializing annex repository at %s...' % self.path)
+                do_init = True
+            else:
+                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
+
+        # END Repo validity test
+
         # initialize
         self._uuid = None
         self._annex_common_options = []
@@ -190,20 +231,6 @@ class AnnexRepo(GitRepo, RepoInterface):
                         "options received:\n"
                         "git-annex: %s\ngit-annex-init: %s" %
                         (annex_opts, annex_init_opts))
-
-        fix_it = False
-        try:
-            super(AnnexRepo, self).__init__(
-                path, url, runner=runner,
-                create=create, create_sanity_checks=create_sanity_checks,
-                repo=repo, git_opts=git_opts, fake_dates=fake_dates)
-        except GitCommandError as e:
-            if create and "Clone succeeded, but checkout failed." in str(e):
-                lgr.warning("Experienced issues while cloning. "
-                            "Trying to fix it, using git-annex-fsck.")
-                fix_it = True
-            else:
-                raise e
 
         # Below was initially introduced for setting for direct mode workaround,
         # where we changed _GIT_COMMON_OPTIONS and had to avoid passing
@@ -234,30 +261,8 @@ class AnnexRepo(GitRepo, RepoInterface):
             if not version:
                 version = None
 
-        if fix_it:
+        if do_init:
             self._init(version=version, description=description)
-            self.fsck()
-
-        # Check whether an annex already exists at destination
-        # XXX this doesn't work for a submodule!
-
-        # NOTE/TODO: following should be cheaper. We are in __init__ here and
-        # already know that GitRepo.is_valid_repo is True, since super.__init__
-        # was called. Calling AnnexRepo.is_valid will unnecessarily check that
-        # again:
-        if not AnnexRepo.is_valid_repo(self.path):
-            # so either it is not annex at all or just was not yet initialized
-            if self.is_with_annex():
-                # it is an annex repository which was not initialized yet
-                if create or init:
-                    lgr.debug('Annex repository was not yet initialized at %s.'
-                              ' Initializing ...' % self.path)
-                    self._init(version=version, description=description)
-            elif create:
-                lgr.debug('Initializing annex repository at %s...' % self.path)
-                self._init(version=version, description=description)
-            else:
-                raise InvalidAnnexRepositoryError("No annex found at %s." % self.path)
 
         # TODO: RM DIRECT  eventually, but should remain while we have is_direct_mode
         # and _set_direct_mode
@@ -695,14 +700,31 @@ class AnnexRepo(GitRepo, RepoInterface):
 
         return toppath
 
+    def is_initialized(self):
+        """quick check whether this appears to be an annex-init'ed repo
+        """
+        # intended to avoid calling self._init, when it's not needed, since this check is clearly
+        # cheaper than git-annex-init (which would be safe to just call)
+
+        return (self.dot_git / 'annex').exists()
+
+    @borrowdoc(GitRepo, 'is_valid_git')
+    def is_valid_annex(self, allow_noninitialized=False, check_git=True):
+
+        initialized_annex = (self.is_valid_git() if check_git else True) and (self.dot_git / 'annex').exists()
+
+        if allow_noninitialized:
+            try:
+                return initialized_annex or ((self.is_valid_git() if check_git else True) and self.is_with_annex())
+            except (NoSuchPathError, InvalidGitRepositoryError):
+                return False
+        else:
+            return initialized_annex
+
     @classmethod
     def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository
         """
-        # Note: default value for allow_noninitialized=False is important
-        # for invalidating an instance via self._flyweight_invalid. If this is
-        # changed, we also need to override _flyweight_invalid and explicitly
-        # pass allow_noninitialized=False!
 
         def git_file_has_annex(p):
             """Return True if `p` contains a .git file, that points to a git
@@ -719,13 +741,12 @@ class AnnexRepo(GitRepo, RepoInterface):
                     return False
 
         initialized_annex = GitRepo.is_valid_repo(path) and \
-            (exists(opj(path, '.git', 'annex')) or
-             git_file_has_annex(path))
+                            (exists(opj(path, '.git', 'annex')) or
+                             git_file_has_annex(path))
 
         if allow_noninitialized:
             try:
-                return initialized_annex \
-                    or GitRepo(path, create=False, init=False).is_with_annex()
+                return initialized_annex or GitRepo(path, create=False, init=False).is_with_annex()
             except (NoSuchPathError, InvalidGitRepositoryError):
                 return False
         else:
@@ -2867,9 +2888,6 @@ class AnnexRepo(GitRepo, RepoInterface):
             expect_fail=True,
         )
 
-    # TODO: we probably need to override get_file_content, since it returns the
-    # symlink's target instead of the actual content.
-
     # We need --auto and --fast having exposed  TODO
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
     def copy_to(self, files, remote, options=None, jobs=None):
@@ -2906,7 +2924,8 @@ class AnnexRepo(GitRepo, RepoInterface):
         # (see return value).
         # Therefore raise telling exceptions before even calling annex:
         if len(files) == 1:
-            if not isdir(files[0]):
+            # Note, that for isdir we actually need an absolute path (which we don't get via normalize_paths)
+            if not isdir(opj(self.path, files[0])):
                 self.get_file_key(files[0])
 
         # TODO: RF -- logic is duplicated with get() -- the only difference
@@ -3406,7 +3425,7 @@ class AnnexRepo(GitRepo, RepoInterface):
 
 # TODO: Why was this commented out?
 # @auto_repr
-class BatchedAnnexes(dict):
+class BatchedAnnexes(SafeDelCloseMixin, dict):
     """Class to contain the registry of active batch'ed instances of annex for
     a repository
     """
@@ -3455,9 +3474,6 @@ class BatchedAnnexes(dict):
         """
         for p in self.values():
             p.close()
-
-    def __del__(self):
-        self.close()
 
 
 def readlines_until_ok_or_failed(stdout, maxlines=100):

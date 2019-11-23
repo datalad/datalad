@@ -545,9 +545,32 @@ class Runner(object):
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
+
+            except CommandError:
+                # do not bother with reacting to "regular" CommandError
+                # exceptions.  Somehow if we also terminate here for them
+                # some processes elsewhere might stall:
+                # see https://github.com/datalad/datalad/pull/3794
+                raise
+
+            except BaseException as exc:
+                exc_info = sys.exc_info()
+                # KeyboardInterrupt is subclass of BaseException
+                lgr.debug("Terminating process for %s upon exception: %s",
+                          cmd, exc_str(exc))
+                try:
+                    # there are still possible (although unlikely) cases when
+                    # we fail to interrupt but we
+                    # should not crash if we fail to terminate the process
+                    proc.terminate()
+                except BaseException as exc2:
+                    lgr.warning("Failed to terminate process for %s: %s",
+                                cmd, exc_str(exc2))
+                raise exc_info[1]
+
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                # TODO -- assure closing the files
                 _cleanup_output(outputstream, proc.stdout)
                 _cleanup_output(errstream, proc.stderr)
 
@@ -697,8 +720,23 @@ def readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
 
+class SafeDelCloseMixin(object):
+    """A helper class to use where __del__ would call .close() which might
+    fail if "too late in GC game"
+    """
+    def __del__(self):
+        try:
+            self.close()
+        except TypeError:
+            if os.fdopen is None or lgr.debug is None:
+                # if we are late in the game and things already gc'ed in py3,
+                # it is Ok
+                return
+            raise
+
+
 @auto_repr
-class BatchedCommand(object):
+class BatchedCommand(SafeDelCloseMixin):
     """Container for a process which would allow for persistent communication
     """
 
@@ -813,9 +851,6 @@ class BatchedCommand(object):
             lgr.warning("Received output in stderr: %r", stderr)
         lgr.log(5, "Received output: %r" % stdout)
         return stdout
-
-    def __del__(self):
-        self.close()
 
     def close(self, return_stderr=False):
         """Close communication and wait for process to terminate

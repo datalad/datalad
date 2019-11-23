@@ -133,7 +133,10 @@ from datalad.api import add, Dataset
 with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
     f.write('hello\\n')
 add(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-"""}})
+""",
+             'testdir': {}
+
+             }})
 @with_tempfile
 def test_procedure_discovery(path, super_path):
     with chpwd(path):
@@ -180,6 +183,8 @@ def test_procedure_discovery(path, super_path):
         len(ps))
     # dataset's procedure needs to be in the results
     assert_in_results(ps, path=op.join(ds.path, 'code', 'datalad_test_proc.py'))
+    # a subdir shouldn't be considered a procedure just because it's "executable"
+    assert_not_in_results(ps, path=op.join(ds.path, 'code', 'testdir'))
 
     # make it a subdataset and try again:
     # first we need to save the beast to make install work

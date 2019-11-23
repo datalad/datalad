@@ -10,48 +10,46 @@
 
 """
 
-
 import logging
 from os import curdir
-from os.path import relpath
 
 from datalad.interface.base import Interface
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
-from datalad.interface.common_opts import location_description
-from datalad.interface.common_opts import jobs_opt
-# from datalad.interface.common_opts import git_opts
-# from datalad.interface.common_opts import git_clone_opts
-# from datalad.interface.common_opts import annex_opts
-# from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import nosave_opt
-from datalad.interface.common_opts import reckless_opt
-from datalad.interface.results import get_status_dict
-from datalad.interface.results import YieldDatasets
-from datalad.interface.results import is_result_matching_pathsource_argument
+from datalad.interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+    location_description,
+    jobs_opt,
+    nosave_opt,
+    reckless_opt,
+)
+from datalad.interface.results import (
+    get_status_dict,
+    YieldDatasets,
+    is_result_matching_pathsource_argument,
+)
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+)
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
-from datalad.support.exceptions import IncompleteResultsError
-from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.param import Parameter
-from datalad.support.network import RI
-from datalad.support.network import PathRI
-from datalad.support.network import is_datalad_compat_ri
+from datalad.support.network import (
+    RI,
+    PathRI,
+)
 from datalad.utils import assure_list
 from datalad.dochelpers import exc_str
-from datalad.dochelpers import single_or_plural
 
-from .dataset import Dataset
-from .dataset import datasetmethod
-from .dataset import resolve_path
-from .dataset import require_dataset
-from .dataset import EnsureDataset
-from .get import Get
-from .clone import Clone
+from datalad.distribution.dataset import (
+    datasetmethod,
+    resolve_path,
+    require_dataset,
+    EnsureDataset,
+)
+from datalad.distribution.get import Get
+from datalad.distribution.clone import Clone
 
 __docformat__ = 'restructuredtext'
 
@@ -98,6 +96,33 @@ class Install(Interface):
     # datasets
     result_filter = is_result_matching_pathsource_argument
 
+    _examples_ = [
+        dict(text="Install a dataset from Github into the current directory",
+             code_py="install("
+             "source='https://github.com/datalad-datasets/longnow"
+             "-podcasts.git')",
+             code_cmd="datalad install "
+             "https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install a dataset as a subdataset into the current dataset",
+             code_py="install(dataset='.', "
+             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
+             code_cmd="datalad install -d . "
+             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+        dict(text="Install a dataset, and get all content right away",
+             code_py="install(source="
+             "'https://github.com/datalad-datasets/longnow-podcasts.git', "
+             "get_data=True')",
+             code_cmd="datalad install --get-data "
+             "--source https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install a dataset with all its subdatasets",
+             code_py="install("
+             "source='https://github.com/datalad-datasets/longnow-podcasts.git', "
+             "recursive=True)",
+             code_cmd="datalad install "
+             "https://github.com/datalad-datasets/longnow-podcasts.git "
+             "--recursive"),
+    ]
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -132,10 +157,6 @@ class Install(Interface):
         recursion_limit=recursion_limit,
         save=nosave_opt,
         reckless=reckless_opt,
-        # git_opts=git_opts,
-        # git_clone_opts=git_clone_opts,
-        # annex_opts=annex_opts,
-        # annex_init_opts=annex_init_opts,
         jobs=jobs_opt,
     )
 
@@ -152,10 +173,6 @@ class Install(Interface):
             recursion_limit=None,
             save=True,
             reckless=False,
-            # git_opts=None,
-            # git_clone_opts=None,
-            # annex_opts=None,
-            # annex_init_opts=None,
             jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and
@@ -182,9 +199,6 @@ class Install(Interface):
             jobs=jobs,
         )
 
-        #installed_items = []
-        #failed_items = []
-
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
@@ -193,6 +207,8 @@ class Install(Interface):
             ds = require_dataset(dataset, check_installed=True,
                                  purpose='installation')
             common_kwargs['dataset'] = dataset
+        # pre-compute for results below
+        refds_path = Interface.get_refds_path(ds)
 
         # switch into the two scenarios without --source:
         # 1. list of URLs
@@ -220,8 +236,6 @@ class Install(Interface):
                         source=s,
                         description=description,
                         save=save,
-                        # git_clone_opts=git_clone_opts,
-                        # annex_init_opts=annex_init_opts,
                         # we need to disable error handling in order to have it done at
                         # the very top, otherwise we are not able to order a global
                         # "ignore-and-keep-going"
@@ -234,7 +248,7 @@ class Install(Interface):
                     # should be necessary here, all done by code further
                     # down that deals with an install from an actuall `source`
                     # any necessary fixes should go there too!
-                    # TODO generator: possibly adjust refds
+                    r['refds'] = refds_path
                     yield r
 
             # 2. one or more dataset content paths
@@ -249,9 +263,6 @@ class Install(Interface):
                         to_get,
                         # TODO should pass-through description, not sure why disabled
                         # description=description,
-                        # save=save,
-                        # git_clone_opts=git_clone_opts,
-                        # annex_init_opts=annex_init_opts,
                         # we need to disable error handling in order to have it done at
                         # the very top, otherwise we are not able to order a global
                         # "ignore-and-keep-going"
@@ -265,6 +276,7 @@ class Install(Interface):
                     # (incl. adjusting parent's gitmodules when submodules end
                     # up in an "updated" state (done in get helpers)
                     # any required fixes should go there!
+                    r['refds'] = refds_path
                     yield r
 
             # we are done here
@@ -288,8 +300,6 @@ class Install(Interface):
 
         # code below deals with a single path only
         path = path[0] if path else None
-        # pre-compute for results below
-        refds_path = Interface.get_refds_path(ds)
 
         if source == path:
             # even if they turn out to be identical after resolving symlinks
@@ -323,7 +333,9 @@ class Install(Interface):
                 # yoh: path should be a local path, and mapping note within
                 #      SSHRI about mapping localhost:path to path is kinda
                 #      a peculiar use-case IMHO
-                path = resolve_path(path_ri.localpath, dataset)
+                # TODO Stringification can be removed once PY35 is no longer
+                # supported
+                path = str(resolve_path(path_ri.localpath, dataset))
                 # any `path` argument that point to something local now
                 # resolved and is no longer a URL
             except ValueError:
@@ -357,6 +369,7 @@ class Install(Interface):
                 # coming back
                 assert(destination_dataset is None)
                 destination_dataset = as_ds(r)
+            r['refds'] = refds_path
             yield r
         assert(destination_dataset)
 
@@ -369,9 +382,6 @@ class Install(Interface):
             for r in destination_dataset.get(
                     curdir,
                     description=description,
-                    # TODO expose this
-                    # yoh: exactly!
-                    #annex_get_opts=annex_get_opts,
                     # we need to disable error handling in order to have it done at
                     # the very top, otherwise we are not able to order a global
                     # "ignore-and-keep-going"
@@ -379,86 +389,9 @@ class Install(Interface):
                     return_type='generator',
                     result_xfm=None,
                     **common_kwargs):
+                r['refds'] = refds_path
                 yield r
         # at this point no futher post-processing should be necessary,
         # `clone` and `get` must have done that (incl. parent handling)
         # if not, bugs should be fixed in those commands
         return
-
-
-#    # TODO generator: dissolve, keep some bits for a renderer
-#    @staticmethod
-#    def _handle_and_return_installed_items(ds, installed_items, failed_items, save):
-#        if save and ds is not None:
-#            _save_installed_datasets(ds, installed_items)
-#        if failed_items:
-#            msg = ''
-#            for act, l in (("succeeded", installed_items), ("failed", failed_items)):
-#                if not l:
-#                    continue
-#                if msg:
-#                    msg += ', and '
-#                msg += "%s %s" % (
-#                  single_or_plural("dataset", "datasets", len(l),
-#                                   include_count=True),
-#                  act)
-#                if ds:
-#                    paths = [relpath(i.path, ds.path)
-#                             if hasattr(i, 'path')
-#                             else i if not i.startswith(ds.path) else relpath(i, ds.path)
-#                             for i in l]
-#                else:
-#                    paths = l
-#                msg += " (%s)" % (", ".join(map(str, paths)))
-#            msg += ' to install'
-#
-#            # we were asked for multiple installations
-#            if installed_items or len(failed_items) > 1:
-#                raise IncompleteResultsError(
-#                    results=installed_items, failed=failed_items, msg=msg)
-#            else:
-#                raise InstallFailedError(msg=msg)
-#
-#        return installed_items[0] \
-#            if len(installed_items) == 1 else installed_items
-#
-#    @staticmethod
-#    def result_renderer_cmdline(res, args):
-#        from datalad.ui import ui
-#        if res is None:
-#            res = []
-#        if not isinstance(res, list):
-#            res = [res]
-#        if not len(res):
-#            ui.message("Nothing was installed")
-#            return
-#        items = '\n'.join(map(str, res))
-#        msg = "{n} installed {obj} available at\n{items}".format(
-#            obj='items are' if len(res) > 1 else 'item is',
-#            n=len(res),
-#            items=items)
-#        ui.message(msg)
-#
-#
-## TODO when `install` is RF'ed, this should be replaced by a more general
-## implementation
-#def _save_installed_datasets(ds, installed_datasets):
-#    paths = [relpath(subds.path, ds.path) for subds in installed_datasets]
-#    paths_str = ", ".join(paths)
-#    msg = "installed subdataset{}: {}".format(
-#        "s" if len(paths) > 1 else "", paths_str)
-#    lgr.info("Saving possible changes to {0} - {1}".format(
-#        ds, msg))
-#    try:
-#        ds.save(
-#            files=paths + ['.gitmodules'],
-#            message='[DATALAD] ' + msg,
-#            all_updated=False,
-#            recursive=False)
-#    except ValueError as e:
-#        if "did not match any file(s) known to git" in str(e):
-#            # install doesn't add; therefore save call might included
-#            # not yet added paths.
-#            pass
-#        else:
-#            raise

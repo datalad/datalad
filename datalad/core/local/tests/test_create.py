@@ -24,8 +24,8 @@ from datalad.api import create
 from datalad.support.exceptions import CommandError
 from datalad.utils import (
     chpwd,
-    _path_,
     Path,
+    on_windows,
 )
 from datalad.cmd import Runner
 
@@ -35,8 +35,8 @@ from datalad.tests.utils import (
     ok_,
     assert_not_in,
     assert_in,
-    assert_raises,
     assert_status,
+    assert_raises,
     assert_in_results,
     swallow_outputs,
     with_tree,
@@ -200,9 +200,8 @@ def test_create_sub(path):
     assert_in(
         'submodule.some/what/deeper.datalad-id={}'.format(
             subds.id),
-        ds.repo._git_custom_command(
-            '',
-            ['git', 'config', '--file', '.gitmodules', '--list'])[0]
+        list(ds.repo.call_git_items_(['config', '--file', '.gitmodules',
+                                      '--list']))
     )
 
     # subdataset is known to superdataset:
@@ -449,16 +448,22 @@ def test_cfg_passthrough(path):
 
 
 @with_tree({"empty": {".git": {}, "ds": {}},
-            "nonempty": {".git": {"bogus": "content"}, "ds": {}}})
+            "nonempty": {".git": {"bogus": "content"}, "ds": {}},
+            "git_with_head": {".git": {"HEAD": ""}, "ds": {}}
+            })
 def test_empty_git_upstairs(topdir):
     # create() doesn't get confused by an empty .git/ upstairs (gh-3473)
     assert_in_results(
         create(op.join(topdir, "empty", "ds"), **raw),
         status="ok", type="dataset", action="create")
-    # ... but it will stop short of checking that a directory with a .git path
-    # is a valid repo.
+    # ... and it will ignore non-meaningful content in .git
+    assert_in_results(
+        create(op.join(topdir, "nonempty", "ds"), **raw),
+        status="ok", type="dataset", action="create")
+    # ... but it will raise if it detects a valid repo
+    # (by existence of .git/HEAD as defined in GitRepo._valid_git_test_path)
     with assert_raises(CommandError):
-        create(op.join(topdir, "nonempty", "ds"), **raw)
+        create(op.join(topdir, "git_with_head", "ds"), **raw)
 
 
 @with_tempfile(mkdir=True)
@@ -512,3 +517,16 @@ def test_create_relpath_semantics():
     yield check_create_path_semantics, 'elsewhere', 'abspath', 'abspath'
     yield check_create_path_semantics, 'elsewhere', 'instance', 'abspath'
     yield check_create_path_semantics, 'elsewhere', 'instance', 'relpath'
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_gh2927(path, linkpath):
+    if not on_windows:
+        # make it more complicated by default
+        Path(linkpath).symlink_to(path, target_is_directory=True)
+        path = linkpath
+    ds = Dataset(path).create()
+    ds.create('subds_clean')
+    assert_status('ok', ds.create(op.join('subds_clean', 'subds_lvl1_clean'),
+                                  result_xfm=None, return_type='list'))

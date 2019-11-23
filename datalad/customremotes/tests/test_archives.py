@@ -58,12 +58,11 @@ from ...utils import (
 from . import _get_custom_runner
 
 
-# both files will have the same content
-# fn_inarchive_obscure = 'test.dat'
-# fn_extracted_obscure = 'test2.dat'
-fn_inarchive_obscure = get_most_obscure_supported_name()
-fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b') + '.tar.gz'
-fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
+from ...tests.test_archives import (
+    fn_in_archive_obscure,
+    fn_archive_obscure,
+    fn_archive_obscure_ext,
+)
 
 #import line_profiler
 #prof = line_profiler.LineProfiler()
@@ -73,13 +72,13 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
 @known_failure_githubci_win
 @with_tree(
-    tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
+    tree=(('a.tar.gz', {'d': {fn_in_archive_obscure: '123'}}),
           ('simple.txt', '123'),
-          (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
-          (fn_extracted_obscure, '123')))
+          (fn_archive_obscure_ext, (('d', ((fn_in_archive_obscure, '123'),)),)),
+          (fn_archive_obscure, '123')))
 @with_tempfile()
 def test_basic_scenario(d, d2):
-    fn_archive, fn_extracted = fn_archive_obscure, fn_extracted_obscure
+    fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
     annex = AnnexRepo(d, runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
@@ -88,7 +87,7 @@ def test_basic_scenario(d, d2):
          ])
     assert annex.is_special_annex_remote(ARCHIVES_SPECIAL_REMOTE)
     # We want two maximally obscure names, which are also different
-    assert(fn_extracted != fn_inarchive_obscure)
+    assert(fn_extracted != fn_in_archive_obscure)
     annex.add(fn_archive)
     annex.commit(msg="Added tarball")
     annex.add(fn_extracted)
@@ -111,7 +110,7 @@ def test_basic_scenario(d, d2):
 
     file_url = annexcr.get_file_url(
         archive_file=fn_archive,
-        file=fn_archive.replace('.tar.gz', '') + '/d/' + fn_inarchive_obscure)
+        file=fn_archive.replace('.tar.gz', '') + '/d/' + fn_in_archive_obscure)
 
     annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
     annex.drop(fn_extracted)
@@ -161,7 +160,7 @@ def test_basic_scenario(d, d2):
 
 @known_failure_githubci_win
 @with_tree(
-    tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
+    tree={'a.tar.gz': {'d': {fn_in_archive_obscure: '123'}}}
 )
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
@@ -169,13 +168,13 @@ def test_annex_get_from_subdir(topdir):
     annex.add('a.tar.gz')
     annex.commit()
     add_archive_content('a.tar.gz', annex=annex, delete=True)
-    fpath = op.join(topdir, 'a', 'd', fn_inarchive_obscure)
+    fpath = op.join(topdir, 'a', 'd', fn_in_archive_obscure)
 
     with chpwd(op.join(topdir, 'a', 'd')):
         runner = Runner()
-        runner(['git', 'annex', 'drop', '--', fn_inarchive_obscure])  # run git annex drop
+        runner(['git', 'annex', 'drop', '--', fn_in_archive_obscure])  # run git annex drop
         assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
-        runner(['git', 'annex', 'get', '--', fn_inarchive_obscure])   # run git annex get
+        runner(['git', 'annex', 'get', '--', fn_in_archive_obscure])   # run git annex get
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 

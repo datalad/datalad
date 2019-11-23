@@ -180,6 +180,19 @@ def get_cmd_doc(interface):
     return intf_doc
 
 
+def get_cmd_ex(interface):
+    """Return the examples for the command defined by 'interface'.
+
+    Parameters
+    ----------
+    interface : subclass of Interface
+    """
+    intf_ex = "\n\n*Examples*\n\n"
+    for example in interface._examples_:
+        intf_ex += build_example(example, api='cmdline')
+    return intf_ex
+
+
 def dedent_docstring(text):
     """Remove uniform indentation from a multiline docstring"""
     # Problem is that first line might often have no offset, so might
@@ -360,6 +373,67 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None,
     return func
 
 
+def build_example(example, api='python'):
+    """Build a code example.
+
+    Take a dict from a classes _example_ specification (list of dicts) and
+    build a string with an api or cmd example (for use in cmd help or
+    docstring).
+
+    Parameters
+    ----------
+    api : {'python', 'cmdline'}
+        If 'python', build Python example for docstring. If 'cmdline', build
+        cmd example.
+
+    Returns
+    -------
+    ex : str
+        Concatenated examples for the given class.
+    """
+    if api == 'python' :
+        code_field='code_py'
+        indicator='>'
+    elif api == 'cmdline':
+        code_field='code_cmd'
+        indicator='%'
+    else:
+        raise ValueError("unknown API selection: {}".format(api))
+    description = dedent_docstring(example.get('text'))
+    # this indent the code snippet to get it properly rendered as code
+    # we are not using textwrap.fill(), because it would not acknowledge
+    # any meaningful structure/formatting of code snippets. Instead, we
+    # maintain line content as is.
+    code = dedent_docstring(example.get(code_field))
+    code = textwrap.indent(code, '     ').lstrip()
+
+    ex = """{}::\n\n   {} {}\n\n""".format(description,
+                                           indicator,
+                                           code)
+    return ex
+
+
+def update_docstring_with_examples(cls_doc, ex):
+    """Update a commands docstring with examples.
+
+    Take _examples_ of a command, build the Python examples, and append
+    them to the docstring.
+
+    cls_doc: docstring
+    ex: list
+        list of dicts with examples
+    """
+    from textwrap import indent
+    if len(cls_doc):
+        cls_doc += "\n"
+    cls_doc += "    Examples\n    --------\n"
+    # loop though provided examples
+    for example in ex:
+        cls_doc += indent(build_example(example, api='python'), ' '*4)
+
+    return cls_doc
+
+
 def build_doc(cls, **kwargs):
     """Decorator to build docstrings for datalad commands
 
@@ -392,7 +466,9 @@ def build_doc(cls, **kwargs):
     if hasattr(cls, '_docs_'):
         # expand docs
         cls_doc = cls_doc.format(**cls._docs_)
-
+    # get examples
+    ex = getattr(cls, '_examples_', [])
+    cls_doc = update_docstring_with_examples(cls_doc, ex)
     call_doc = None
     # suffix for update_docstring_with_parameters:
     if cls.__call__.__doc__:
@@ -683,7 +759,7 @@ class Interface(object):
         refds_path = dataset.path if isinstance(dataset, Dataset) \
             else Dataset(dataset).path
         if refds_path:
-            refds_path = resolve_path(refds_path)
+            refds_path = str(resolve_path(refds_path))
         return refds_path
 
 

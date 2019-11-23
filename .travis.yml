@@ -160,51 +160,6 @@ matrix:
 #    - DATALAD_TESTS_SSH=1
 #    - _DL_CRON=1
 
-
-  # TODO: The current release of datalad-crawler (0.4) relies on the
-  # old create, making it incompatible with the current DataLad.
-  # Uncomment once a fix for this makes it into a crawler release.
-  # - python: 3.5
-  #   # test with extension datalad-crawler
-  #   env:
-  #   - BUILD_DATALAD_EXTENSION=datalad-crawler
-  #   - TESTS_TO_PERFORM=datalad_crawler
-  #   # Use a selector that will always be true.
-  #   - NOSE_SELECTION_OP=not
-  #   - NOSE_SELECTION=
-
-  - python: 3.5
-    # test with extension datalad-neuroimaging
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-neuroimaging
-    - TESTS_TO_PERFORM=datalad_neuroimaging
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
-
-  - python: 3.5
-    # test with extension datalad-container
-    env:
-    - BUILD_DATALAD_EXTENSION=datalad-container
-    - TESTS_TO_PERFORM=datalad_container
-    # Use a selector that will always be true.
-    - NOSE_SELECTION_OP=not
-    - NOSE_SELECTION=
-
-  # TODO: The current release of datalad-revolution (0.10.0) is
-  # incompatible with the current DataLad.  Uncomment this onnce a
-  # -revolution release has 13b01c2 and PR 128.
-  #
-  # - python: 3.5
-  #   # test with extension datalad-revolution
-  #   env:
-  #   - BUILD_DATALAD_EXTENSION=datalad-revolution
-  #   - DATALAD_REPO_VERSION=6
-  #   - TESTS_TO_PERFORM=datalad_revolution
-  #   # Use a selector that will always be true.
-  #   - NOSE_SELECTION_OP=not
-  #   - NOSE_SELECTION=
-
   allow_failures:
   # Test under NFS mount  (full, only in master)
   - python: 3.5
@@ -277,12 +232,10 @@ install:
   # Install grunt to test run javascript frontend tests
   - npm install grunt
   - npm install grunt-contrib-qunit@>=3.0.1
-  - if [ "${BUILD_DATALAD_EXTENSION:-}"x = "datalad-container"x ]; then travis_retry sudo eatmydata apt-get install singularity-container; fi
 
 script:
   # Test installation system-wide
   - sudo pip install .
-  - if [ ! -z "${BUILD_DATALAD_EXTENSION:-}" ]; then pip install "$BUILD_DATALAD_EXTENSION"; fi
   - mkdir -p __testhome__
   - cd __testhome__
   # Run tests
@@ -295,8 +248,7 @@ script:
       --logging-level=INFO
       $TESTS_TO_PERFORM
   # Run doc examples if no spaces in the TMPDIR and SSH is allowed
-  # Also: don't run it in extension builds
-  - if [ ${DATALAD_TESTS_SSH:-0} != 1 -o -n "${BUILD_DATALAD_EXTENSION:-}" ] || echo "${TMPDIR:-}" | grep -q ' '; then
+  - if [ ${DATALAD_TESTS_SSH:-0} != 1 ] || echo "${TMPDIR:-}" | grep -q ' '; then
       echo "Testing examples is disabled by configuration";
     else
       $NOSE_WRAPPER ../tools/testing/run_doc_examples;

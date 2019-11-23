@@ -136,6 +136,15 @@ def test_rerun(path, nodspath):
     # We can get back a report of what would happen rather than actually
     # rerunning anything.
     report = ds.rerun(since="", report=True, return_type="list")
+    # The "diff" section of the report doesn't include the unchanged files that
+    # would come in "-f json diff" output.
+    for entry in report:
+        if entry["rerun_action"] == "run":
+            # None of the run commits touch .datalad/config or any other config
+            # file.
+            assert_false(any(r["path"].endswith("config")
+                             for r in entry["diff"]))
+
     # Nothing changed.
     eq_('xxxxxxxxxx\n', open(probe_path).read())
     assert_result_count(report, 1, rerun_action="skip-or-pick")
@@ -259,7 +268,7 @@ def test_rerun_chain(path):
 def test_rerun_just_one_commit(path):
     ds = Dataset(path).create()
     ds.repo.checkout("orph", options=["--orphan"])
-    ds.repo._git_custom_command(None, ["git", "reset", "--hard"])
+    ds.repo.call_git(["reset", "--hard"])
     ds.repo.config.reload()
 
     ds.run('echo static-content > static')
@@ -404,18 +413,16 @@ def test_rerun_invalid_merge_run_commit(path):
     ds.run("echo invalid >>invalid")
     run_msg = ds.repo.format_commit("%B")
     run_hexsha = ds.repo.get_hexsha()
-    ds.repo._git_custom_command(None, ["git", "reset", "--hard", "master~"])
+    ds.repo.call_git(["reset", "--hard", "master~"])
     with open(op.join(ds.path, "non-run"), "w") as nrfh:
         nrfh.write("non-run")
     ds.save()
     # Assign two parents to the invalid run commit.
-    commit = ds.repo._git_custom_command(
-        None,
-        ["git", "commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
+    commit = ds.repo.call_git_oneline(
+        ["commit-tree", run_hexsha + "^{tree}", "-m", run_msg,
          "-p", run_hexsha + "^",
-         "-p", ds.repo.get_hexsha()])[0].strip()
-
-    ds.repo._git_custom_command(None, ["git", "reset", "--hard", commit])
+         "-p", ds.repo.get_hexsha()])
+    ds.repo.call_git(["reset", "--hard", commit])
     hexsha_orig = ds.repo.get_hexsha()
     with swallow_logs(new_level=logging.WARN) as cml:
         ds.rerun(since="")
@@ -704,7 +711,7 @@ def test_run_inputs_outputs(src, path):
             eq_(fh.read(), " appended\n" )
 
     # --input can be combined with --output.
-    ds.repo._git_custom_command(None, ["git", "reset", "--hard", "HEAD~2"])
+    ds.repo.call_git(["reset", "--hard", "HEAD~2"])
     ds.run("echo ' appended' >>a.dat", inputs=["a.dat"], outputs=["a.dat"])
     if not on_windows:
         # MIH doesn't yet understand how to port this

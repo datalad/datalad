@@ -40,14 +40,14 @@ from datalad.support.param import Parameter
 from datalad.utils import (
     getpwd,
     assure_list,
+    get_dataset_root,
 )
 
 from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
     EnsureDataset,
-    rev_get_dataset_root,
-    rev_resolve_path,
+    resolve_path,
     path_under_rev_dataset,
     require_dataset,
 )
@@ -104,6 +104,24 @@ class Create(Interface):
     result_filter = \
         EnsureKeyChoice('action', ('create',)) & \
         EnsureKeyChoice('status', ('ok', 'notneeded'))
+
+    _examples_ = [
+        dict(text="""Create a dataset 'mydataset' in the current directory""",
+             code_py="create(path='mydataset')",
+             code_cmd="datalad create mydataset"),
+        dict(text="""Apply the text2git procedure upon creation of a dataset""",
+             code_py="create(path='mydataset', cfg_proc='text2git')",
+             code_cmd="datalad create -c text2git mydataset"),
+        dict(text="""Create a subdataset in the root of an existing dataset""",
+             code_py="create(dataset='.', path='mysubdataset')",
+             code_cmd="datalad create -d . mysubdataset"),
+        dict(text="Create a dataset in an existing, non-empty directory",
+             code_py="create(force=True, path='.')",
+             code_cmd="datalad create --force"),
+        dict(text="Create a plain Git repository",
+             code_py="create(path='mydataset', no_annex=True)",
+             code_cmd="datalad create --no-annex"),
+    ]
 
     _params_ = dict(
         path=Parameter(
@@ -200,7 +218,7 @@ class Create(Interface):
                                  "no annex repo.")
 
         if path:
-            path = rev_resolve_path(path, dataset)
+            path = resolve_path(path, dataset)
 
         path = path if path \
             else getpwd() if ds is None \
@@ -241,7 +259,7 @@ class Create(Interface):
         # a potentially absent/uninstalled subdataset of the parent
         # in this location
         # it will cost some filesystem traversal though...
-        parentds_path = rev_get_dataset_root(
+        parentds_path = get_dataset_root(
             op.normpath(op.join(str(path), os.pardir)))
         if parentds_path:
             prepo = GitRepo(parentds_path)

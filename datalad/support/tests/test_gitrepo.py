@@ -470,15 +470,16 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     ok_(op.exists(op.join(clone_path, filename)))
 
     # While at it, let's test _get_remotes_having_commit a bit
+    from datalad.distribution.get import _get_remotes_having_commit
     clone.add_remote("very_origin", test_path)
     clone.fetch("very_origin")
     eq_(
-        clone._get_remotes_having_commit(clone.get_hexsha()),
+        _get_remotes_having_commit(clone, clone.get_hexsha()),
         ['origin']
     )
     prev_commit = clone.get_hexsha('HEAD^')
     eq_(
-        set(clone._get_remotes_having_commit(prev_commit)),
+        set(_get_remotes_having_commit(clone, prev_commit)),
         {'origin', 'very_origin'}
     )
 
@@ -763,46 +764,6 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
-@known_failure_githubci_win
-@with_tree(tree={
-    'd1': {'f1': 'content1',
-           'f2': 'content2'},
-    'file': 'content3',
-    'd2': {'f1': 'content1',
-           'f2': 'content2'},
-    'file2': 'content3'
-
-    })
-def test_GitRepo__get_files_history(path):
-
-    gr = GitRepo(path, create=True)
-    gr.add('d1')
-    gr.commit("commit d1")
-    #import pdb; pdb.set_trace()
-
-    gr.add(['d2', 'file'])
-    gr.commit("commit d2")
-
-    # commit containing files of d1
-    d1_commit = next(gr._get_files_history([op.join(path, 'd1', 'f1'), op.join(path, 'd1', 'f1')]))
-    eq_(str(d1_commit.message), 'commit d1\n')
-
-    # commit containing files of d2
-    d2_commit_gen = gr._get_files_history([op.join(path, 'd2', 'f1'), op.join(path, 'd2', 'f1')])
-    eq_(str(next(d2_commit_gen).message), 'commit d2\n')
-    assert_raises(StopIteration, next, d2_commit_gen)  # no more commits with files of d2
-
-    # union of commits containing passed objects
-    commits_union = gr._get_files_history([op.join(path, 'd1', 'f1'), op.join(path, 'd2', 'f1'), op.join(path, 'file')])
-    eq_(str(next(commits_union).message), 'commit d2\n')
-    eq_(str(next(commits_union).message), 'commit d1\n')
-    assert_raises(StopIteration, next, commits_union)
-
-    # file2 not commited, so shouldn't exist in commit history
-    no_such_commits = gr._get_files_history([op.join(path, 'file2')])
-    assert_raises(StopIteration, next, no_such_commits)
-
-
 @with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile
@@ -1009,6 +970,50 @@ def test_GitRepo_add_submodule(source, path):
 
 def test_GitRepo_update_submodule():
     raise SkipTest("TODO")
+
+
+@with_tempfile(mkdir=True)
+def check_update_submodule_init_adjust_branch(is_ancestor, path):
+    src = GitRepo(op.join(path, "src"), create=True)
+    src_sub = GitRepo(op.join(src.path, "sub"), create=True)
+    src_sub.commit(msg="c0", options=["--allow-empty"])
+    src_sub.commit(msg="c1", options=["--allow-empty"])
+    src.add_submodule('sub', name='sub')
+    src.commit(msg="Add submodule")
+
+    # Move subdataset past the registered commit...
+    hexsha_registered = src_sub.get_hexsha()
+    if is_ancestor:
+        # ... where the registered commit is an ancestor of the new one.
+        src_sub.commit(msg="c2", options=["--allow-empty"])
+    else:
+        # ... where the registered commit is NOT an ancestor of the new one.
+        src_sub.call_git(["reset", "--hard", "master~1"])  # c0
+    hexsha_sub = src_sub.get_hexsha()
+
+    clone = GitRepo.clone(url=src.path,
+                          path=op.join(path, "clone"),
+                          create=True)
+    clone_sub = GitRepo.clone(url=src_sub.path,
+                              path=op.join(clone.path, "sub"),
+                              create=True)
+    ok_(clone.dirty)
+    eq_(clone_sub.get_active_branch(), "master")
+    eq_(hexsha_sub, clone_sub.get_hexsha())
+
+    clone.update_submodule("sub", init=True)
+
+    assert_false(clone.dirty)
+    eq_(hexsha_registered, clone_sub.get_hexsha())
+    if is_ancestor:
+        eq_(clone_sub.get_active_branch(), "master")
+    else:
+        assert_false(clone_sub.get_active_branch())
+
+
+def test_GitRepo_update_submodule_init_adjust_branch():
+    yield check_update_submodule_init_adjust_branch, True
+    yield check_update_submodule_init_adjust_branch, False
 
 
 def test_GitRepo_get_submodules():
@@ -1368,6 +1373,25 @@ def test_get_tags(path):
     eq_(gr.describe(commitish=first_commit), None)
     eq_(gr.describe(commitish=first_commit, tags=True), tags1[0]['name'])
 
+    gr.tag('specific', commit='HEAD~1')
+    eq_(gr.get_hexsha('specific'), gr.get_hexsha('HEAD~1'))
+    assert_in('specific', gr.get_tags(output='name'))
+
+    # retag a different commit
+    assert_raises(CommandError, gr.tag, 'specific', commit='HEAD')
+    # force it
+    gr.tag('specific', commit='HEAD', options=['-f'])
+    eq_(gr.get_hexsha('specific'), gr.get_hexsha('HEAD'))
+
+    # delete
+    gr.call_git(['tag', '-d', 'specific'])
+    eq_(gr.get_tags(), tags2)
+    # more than one
+    gr.tag('one')
+    gr.tag('two')
+    gr.call_git(['tag', '-d', 'one', 'two'])
+    eq_(gr.get_tags(), tags2)
+
 
 @with_tree(tree={'1': ""})
 def test_get_commit_date(path):
@@ -1553,3 +1577,38 @@ def test_gitrepo_add_to_git_with_annex_v7(path):
     gr.add("foo")
     gr.commit(msg="c1")
     assert_false(ar.is_under_annex("foo"))
+
+
+@with_tree({"foo": "foo", "bar": "bar"})
+def test_gitrepo_call_git_methods(path):
+    gr = GitRepo(path)
+    gr.add(["foo", "bar"])
+    gr.commit(msg="foobar")
+    gr.call_git(["mv"], files=["foo", "foo.txt"])
+    ok_(op.exists(op.join(gr.path, 'foo.txt')))
+
+    for expect_fail, check in [(False, assert_in),
+                               (True, assert_not_in)]:
+        with swallow_logs(new_level=logging.DEBUG) as cml:
+            with assert_raises(CommandError):
+                gr.call_git(["mv"], files=["notthere", "dest"],
+                            expect_fail=expect_fail)
+            check("notthere", cml.out)
+
+    eq_(list(gr.call_git_items_(["ls-files"])),
+        ["bar", "foo.txt"])
+    eq_(list(gr.call_git_items_(["ls-files", "-z"], sep="\0")),
+        # Note: The custom separator has trailing empty item, but this is an
+        # arbitrary command with unknown output it isn't safe to trim it.
+        ["bar", "foo.txt", ""])
+
+    with assert_raises(AssertionError):
+        gr.call_git_oneline(["ls-files"])
+
+    eq_(gr.call_git_oneline(["ls-files"], files=["bar"]),
+        "bar")
+
+    ok_(gr.call_git_success(["rev-parse", "HEAD^{commit}"]))
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
+        assert_not_in("blob", cml.out)

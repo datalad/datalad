@@ -26,7 +26,7 @@ from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
 from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import rev_resolve_path
+from datalad.distribution.dataset import resolve_path
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
@@ -81,7 +81,7 @@ class Unlock(Interface):
         paths_nondir = set()
         paths_lexist = None
         if path:
-            path = rev_resolve_path(assure_list(path), ds=dataset)
+            path = resolve_path(assure_list(path), ds=dataset)
             paths_lexist = []
             for p in path:
                 if p.exists() or p.is_symlink():
@@ -110,6 +110,7 @@ class Unlock(Interface):
                 dataset=dataset,
                 path=paths_lexist,
                 untracked="normal" if paths_nondir else "no",
+                report_filetype=False,
                 annex="availability",
                 recursive=recursive,
                 recursion_limit=recursion_limit,
@@ -144,9 +145,11 @@ class Unlock(Interface):
         # Do the actual unlocking.
         for ds_path, files in to_unlock.items():
             ds = Dataset(ds_path)
-            for r in ds.repo.unlock(files):
+            for r in ds.repo._run_annex_command_json(
+                    "unlock",
+                    files=files):
                 yield get_status_dict(
-                    path=op.join(ds.path, r),
-                    status='ok',
+                    path=op.join(ds.path, r['file']),
+                    status='ok' if r['success'] else 'error',
                     type='file',
                     **res_kwargs)

@@ -680,3 +680,22 @@ def test_gh1763(src, target1, target2):
         assert_in(
             'probe1',
             Dataset(target).repo.get_annexed_files(with_content_only=True))
+
+
+@with_tempfile()
+@with_tempfile()
+def test_gh1811(srcpath, clonepath):
+    orig = Dataset(srcpath).create()
+    (orig.pathobj / 'some').write_text('some')
+    orig.save()
+    clone = install(source=orig.path, path=clonepath)
+    (clone.pathobj / 'somemore').write_text('somemore')
+    clone.save()
+    clone.repo.call_git(['checkout', 'HEAD~1'])
+    res = clone.publish(to='origin', on_failure='ignore')
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1,
+        path=clone.path, type='dataset', action='publish',
+        status='impossible',
+        message=('Cannot determine remote branch name from %s', 'HEAD'))

@@ -406,12 +406,10 @@ def _rerun(dset, results, explicit=False):
                         dset.repo.checkout(new_parents[0])
                     if len(new_parents) > 1:
                         msg = dset.repo.format_commit("%B", res_hexsha)
-                        dset.repo._git_custom_command(
-                            None,
-                            ["git", "merge", "-m", msg,
+                        dset.repo.call_git(
+                            ["merge", "-m", msg,
                              "--no-ff", "--allow-unrelated-histories"] +
-                            new_parents[1:],
-                            check_fake_dates=True)
+                            new_parents[1:])
                     head = dset.repo.get_hexsha()
                     new_bases[res_hexsha] = head
             yield res
@@ -640,8 +638,13 @@ def diff_revision(dataset, revision="HEAD"):
         # No other commits are reachable from this revision.  Diff
         # with an empty tree instead.
         fr = PRE_INIT_COMMIT_SHA
+
+    def changed(res):
+        return res.get("action") == "diff" and res.get("state") != "clean"
+
     diff = dataset.diff(recursive=True,
                         fr=fr, to=revision,
+                        result_filter=changed,
                         return_type='generator', result_renderer=None)
     for r in diff:
         yield r

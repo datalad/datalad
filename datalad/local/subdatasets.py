@@ -44,7 +44,7 @@ from datalad.utils import (
 from datalad.distribution.dataset import (
     EnsureDataset,
     datasetmethod,
-    rev_resolve_path,
+    resolve_path,
 )
 
 lgr = logging.getLogger('datalad.local.subdatasets')
@@ -53,9 +53,9 @@ lgr = logging.getLogger('datalad.local.subdatasets')
 valid_key = re.compile(r'^[A-Za-z][-A-Za-z0-9]*$')
 
 
-def _parse_git_submodules(ds, paths):
+def _parse_git_submodules(ds_pathobj, repo, paths):
     """All known ones with some properties"""
-    if not (ds.pathobj / ".gitmodules").exists():
+    if not (ds_pathobj / ".gitmodules").exists():
         # easy way out. if there is no .gitmodules file
         # we cannot have (functional) subdatasets
         return
@@ -63,22 +63,22 @@ def _parse_git_submodules(ds, paths):
     if paths:
         paths_outside, paths_at_or_in = partition(
             paths,
-            lambda p: ds.pathobj == p or ds.pathobj in p.parents)
-        paths = [p.relative_to(ds.pathobj) for p in paths_at_or_in]
+            lambda p: ds_pathobj == p or ds_pathobj in p.parents)
+        paths = [p.relative_to(ds_pathobj) for p in paths_at_or_in]
         if not paths:
-            if any(p for p in paths_outside if p in ds.pathobj.parents):
+            if any(p for p in paths_outside if p in ds_pathobj.parents):
                 # The dataset is directly under some specified path, so include
                 # it.
                 paths = None
             else:
                 # we had path contraints, but none matched this dataset
                 return
-    for props in ds.repo.get_submodules_(paths=paths):
+    for props in repo.get_submodules_(paths=paths):
         path = props["path"]
         if props.get('type', None) != 'dataset':
             continue
-        if ds.pathobj != ds.repo.pathobj:
-            props['path'] = ds.pathobj / path.relative_to(ds.repo.pathobj)
+        if ds_pathobj != repo.pathobj:
+            props['path'] = ds_pathobj / path.relative_to(repo.pathobj)
         else:
             props['path'] = path
         if not path.exists() or not GitRepo.is_valid_repo(str(path)):
@@ -221,7 +221,7 @@ class Subdatasets(Interface):
         # no constraints given -> query subdatasets under curdir
         if not path and dataset is None:
             path = os.curdir
-        paths = [rev_resolve_path(p, dataset) for p in assure_list(path)] \
+        paths = [resolve_path(p, dataset) for p in assure_list(path)] \
             if path else None
 
         ds = require_dataset(
@@ -247,7 +247,7 @@ class Subdatasets(Interface):
                         "key '%s' is invalid (alphanumeric plus '-' only, must "
                         "start with a letter)" % k)
         if contains:
-            contains = [rev_resolve_path(c, dataset) for c in assure_list(contains)]
+            contains = [resolve_path(c, dataset) for c in assure_list(contains)]
         contains_hits = set()
         for r in _get_submodules(
                 ds, paths, fulfilled, recursive, recursion_limit,
@@ -286,10 +286,11 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                     contains, bottomup, set_property, delete_property,
                     refds_path):
     dspath = ds.path
+    repo = ds.repo
     if not GitRepo.is_valid_repo(dspath):
         return
     # put in giant for-loop to be able to yield results before completion
-    for sm in _parse_git_submodules(ds, paths):
+    for sm in _parse_git_submodules(ds.pathobj, repo, paths):
         contains_hits = []
         if contains:
             contains_hits = [
@@ -308,11 +309,11 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
             # first deletions
             for dprop in assure_list(delete_property):
                 try:
-                    out, err = ds.repo._git_custom_command(
-                        '', ['git', 'config', '--file', '.gitmodules',
-                             '--unset-all',
-                             'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
-                            ]
+                    repo.call_git(
+                        ['config', '--file', '.gitmodules',
+                         '--unset-all',
+                         'submodule.{}.{}'.format(sm['gitmodule_name'], dprop),
+                        ]
                     )
                 except CommandError:
                     yield get_status_dict(
@@ -340,12 +341,12 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
                                 sm['path'].relative_to(refds_path)
                             ).replace(os.sep, '-')))
                 try:
-                    out, err = ds.repo._git_custom_command(
-                        '', ['git', 'config', '--file', '.gitmodules',
-                             '--replace-all',
-                             'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
-                             str(val),
-                            ]
+                    repo.call_git(
+                        ['config', '--file', '.gitmodules',
+                         '--replace-all',
+                         'submodule.{}.{}'.format(sm['gitmodule_name'], prop),
+                         str(val),
+                        ]
                     )
                 except CommandError as e:  # pragma: no cover
                     # this conditional may not be possible to reach, as
@@ -366,7 +367,7 @@ def _get_submodules(ds, paths, fulfilled, recursive, recursion_limit,
 
                 # also add to the info we just read above
                 sm['gitmodule_{}'.format(prop)] = val
-            Dataset(dspath).save(
+            ds.save(
                 '.gitmodules', to_git=True,
                 message='[DATALAD] modified subdataset properties')
 

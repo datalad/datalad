@@ -10,20 +10,18 @@
 """
 
 import os
-import shutil
 import os.path as op
-from os.path import join as opj, abspath, normpath, relpath, exists
+from os.path import join as opj, abspath, relpath
 
 
-from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
-from ..dataset import rev_resolve_path
+from ..dataset import Dataset, EnsureDataset, require_dataset
+from ..dataset import resolve_path
 from datalad import cfg
 from datalad.api import create
 from datalad.api import get
 import datalad.utils as ut
-from datalad.utils import chpwd, getpwd, rmtree
+from datalad.utils import chpwd, rmtree
 from datalad.utils import _path_
-from datalad.utils import get_dataset_root
 from datalad.utils import on_windows
 from datalad.utils import Path
 from datalad.support.gitrepo import GitRepo
@@ -32,8 +30,7 @@ from datalad.support.annexrepo import AnnexRepo
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true, \
     assert_is_instance, assert_is_none, assert_is_not, assert_is_not_none
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
-from datalad.tests.utils import assert_cwd_unchanged
+from datalad.tests.utils import with_tempfile, with_testrepos
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import assert_is
@@ -42,7 +39,6 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import OBSCURE_FILENAME
 
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import PathKnownToRepositoryError
 
 
 def test_EnsureDataset():
@@ -62,32 +58,6 @@ def test_EnsureDataset():
 
     # Note: Ensuring that string is valid path is not
     # part of the constraint itself, so not explicitly tested here.
-
-
-@assert_cwd_unchanged
-@with_tempfile(mkdir=True)
-def test_resolve_path(somedir):
-
-    abs_path = abspath(somedir)  # just to be sure
-    rel_path = "some"
-    expl_path_cur = opj(os.curdir, rel_path)
-    expl_path_par = opj(os.pardir, rel_path)
-
-    eq_(resolve_path(abs_path), abs_path)
-
-    current = getpwd()
-    # no Dataset => resolve using cwd:
-    eq_(resolve_path(abs_path), abs_path)
-    eq_(resolve_path(rel_path), opj(current, rel_path))
-    eq_(resolve_path(expl_path_cur), normpath(opj(current, expl_path_cur)))
-    eq_(resolve_path(expl_path_par), normpath(opj(current, expl_path_par)))
-
-    # now use a Dataset as reference:
-    ds = Dataset(abs_path)
-    eq_(resolve_path(abs_path, ds), abs_path)
-    eq_(resolve_path(rel_path, ds), opj(abs_path, rel_path))
-    eq_(resolve_path(expl_path_cur, ds), normpath(opj(current, expl_path_cur)))
-    eq_(resolve_path(expl_path_par, ds), normpath(opj(current, expl_path_par)))
 
 
 # TODO: test remember/recall more extensive?
@@ -232,6 +202,21 @@ def test_subdatasets(path):
         eq_(dstop, ds)
 
     # TODO actual submodule checkout is still there
+
+
+@with_tempfile(mkdir=True)
+def test_hat_dataset_more(path):
+    # from scratch
+    ds = Dataset(path).create()
+    # add itself as a subdataset (crazy, isn't it?)
+    subds = ds.install(
+        'subds', source=path,
+        result_xfm='datasets', return_type='item-or-list')
+    # must find its way all the way up from an untracked dir in a subsubds
+    untracked_subdir = op.join(subds.path, 'subdir')
+    os.makedirs(untracked_subdir)
+    with chpwd(untracked_subdir):
+        eq_(Dataset('^'), ds)
 
 
 @with_tempfile(mkdir=True)
@@ -461,7 +446,7 @@ def test_symlinked_dataset_properties(repo1, repo2, repo3, non_repo, symlink):
 
 
 @with_tempfile(mkdir=True)
-def test_rev_resolve_path(path):
+def test_resolve_path(path):
     if op.realpath(path) != path:
         raise SkipTest("Test assumptions require non-symlinked parent paths")
     # initially ran into on OSX https://github.com/datalad/datalad/issues/2406
@@ -477,72 +462,72 @@ def test_rev_resolve_path(path):
     for d in (opath,) if on_windows else (opath, lpath):
         ds_local = Dataset(d)
         # no symlink resolution
-        eq_(str(rev_resolve_path(d)), d)
+        eq_(str(resolve_path(d)), d)
         # list comes out as a list
-        eq_(rev_resolve_path([d]), [Path(d)])
+        eq_(resolve_path([d]), [Path(d)])
         # multiple OK
-        eq_(rev_resolve_path([d, d]), [Path(d), Path(d)])
+        eq_(resolve_path([d, d]), [Path(d), Path(d)])
 
         with chpwd(d):
             # be aware: knows about cwd, but this CWD has symlinks resolved
-            eq_(str(rev_resolve_path(d).cwd()), opath)
+            eq_(str(resolve_path(d).cwd()), opath)
             # using pathlib's `resolve()` will resolve any
             # symlinks
             # also resolve `opath`, as on old windows systems the path might
             # come in crippled (e.g. C:\Users\MIKE~1/...)
             # and comparison would fails unjustified
-            eq_(rev_resolve_path('.').resolve(), ut.Path(opath).resolve())
+            eq_(resolve_path('.').resolve(), ut.Path(opath).resolve())
             # no norming, but absolute paths, without resolving links
-            eq_(rev_resolve_path('.'), ut.Path(d))
-            eq_(str(rev_resolve_path('.')), d)
+            eq_(resolve_path('.'), ut.Path(d))
+            eq_(str(resolve_path('.')), d)
 
             # there is no concept of an "explicit" relative path anymore
             # relative is relative, regardless of the specific syntax
-            eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+            eq_(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
                 ds_global.pathobj / 'bu')
             # there is no full normpath-ing or other funky resolution of
             # parent directory back-reference
-            eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+            eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
                 op.join(ds_global.path, os.pardir, 'bu'))
 
         # resolve against a dataset given as a path/str
         # (cmdline input scenario)
-        eq_(rev_resolve_path('bu', ds=ds_local.path), Path.cwd() / 'bu')
-        eq_(rev_resolve_path('bu', ds=ds_global.path), Path.cwd() / 'bu')
+        eq_(resolve_path('bu', ds=ds_local.path), Path.cwd() / 'bu')
+        eq_(resolve_path('bu', ds=ds_global.path), Path.cwd() / 'bu')
         # resolve against a dataset given as a dataset instance
         # (object method scenario)
-        eq_(rev_resolve_path('bu', ds=ds_local), ds_local.pathobj / 'bu')
-        eq_(rev_resolve_path('bu', ds=ds_global), ds_global.pathobj / 'bu')
+        eq_(resolve_path('bu', ds=ds_local), ds_local.pathobj / 'bu')
+        eq_(resolve_path('bu', ds=ds_global), ds_global.pathobj / 'bu')
         # not being inside a dataset doesn't change the resolution result
-        eq_(rev_resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
+        eq_(resolve_path(op.join(os.curdir, 'bu'), ds=ds_global),
             ds_global.pathobj / 'bu')
-        eq_(str(rev_resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
+        eq_(str(resolve_path(op.join(os.pardir, 'bu'), ds=ds_global)),
             op.join(ds_global.path, os.pardir, 'bu'))
 
 
 # little brother of the test above, but actually (must) run
 # under any circumstances
 @with_tempfile(mkdir=True)
-def test_rev_resolve_path_symlink_edition(path):
+def test_resolve_path_symlink_edition(path):
     deepest = ut.Path(path) / 'one' / 'two' / 'three'
     deepest_str = str(deepest)
     os.makedirs(deepest_str)
     with chpwd(deepest_str):
         # direct absolute
-        eq_(deepest, rev_resolve_path(deepest))
-        eq_(deepest, rev_resolve_path(deepest_str))
+        eq_(deepest, resolve_path(deepest))
+        eq_(deepest, resolve_path(deepest_str))
         # explicit direct relative
-        eq_(deepest, rev_resolve_path('.'))
-        eq_(deepest, rev_resolve_path(op.join('.', '.')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', '..', 'two', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', '..', '..',
+        eq_(deepest, resolve_path('.'))
+        eq_(deepest, resolve_path(op.join('.', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', 'two', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '..', '..',
                                               'one', 'two', 'three')))
         # weird ones
-        eq_(deepest, rev_resolve_path(op.join('..', '.', 'three')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
-        eq_(deepest, rev_resolve_path(op.join('..', 'three', '.')))
-        eq_(deepest, rev_resolve_path(op.join('.', '..', 'three')))
+        eq_(deepest, resolve_path(op.join('..', '.', 'three')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('..', 'three', '.')))
+        eq_(deepest, resolve_path(op.join('.', '..', 'three')))
 
 
 @with_tempfile(mkdir=True)

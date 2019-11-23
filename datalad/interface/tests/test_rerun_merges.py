@@ -707,10 +707,8 @@ def test_rerun_octopus(path):
     ds.repo.checkout("master~", options=["-b", "topic-2"])
     ds.run("echo baz >baz")
     ds.repo.checkout("master")
-    ds.repo._git_custom_command(
-        None,
-        ["git", "merge", "-m", "Merge octopus", "topic-1", "topic-2"],
-        check_fake_dates=True)
+    ds.repo.call_git(
+        ["merge", "-m", "Merge octopus", "topic-1", "topic-2"])
     # o-.               f_M
     # |\ \
     # | | o             e_r

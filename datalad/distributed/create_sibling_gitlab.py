@@ -37,7 +37,7 @@ from ..distribution.dataset import (
     datasetmethod,
     EnsureDataset,
     require_dataset,
-    rev_resolve_path,
+    resolve_path,
 )
 from ..dochelpers import exc_str
 
@@ -216,7 +216,7 @@ class CreateSiblingGitlab(Interface):
             publish_depends=None,
             description=None,
             dryrun=False):
-        path = rev_resolve_path(assure_list(path), ds=dataset) \
+        path = resolve_path(assure_list(path), ds=dataset) \
             if path else None
 
         if project and (recursive or (path and len(path) > 1)):

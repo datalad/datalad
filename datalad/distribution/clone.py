@@ -13,42 +13,55 @@ import logging
 import os
 import re
 from collections import OrderedDict
-from os import listdir
-from os.path import relpath
-from os.path import pardir
-from os.path import exists
+from urllib.parse import unquote as urlunquote
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.common_opts import location_description
-# from datalad.interface.common_opts import git_opts
-# from datalad.interface.common_opts import git_clone_opts
-# from datalad.interface.common_opts import annex_opts
-# from datalad.interface.common_opts import annex_init_opts
-from datalad.interface.common_opts import reckless_opt
-from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
-from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureStr
-from datalad.support.constraints import EnsureKeyChoice
+from datalad.interface.common_opts import (
+    location_description,
+    reckless_opt,
+)
+from datalad.support.gitrepo import (
+    GitRepo,
+    GitCommandError,
+)
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.constraints import (
+    EnsureNone,
+    EnsureStr,
+    EnsureKeyChoice,
+)
 from datalad.support.param import Parameter
-from datalad.support.network import get_local_file_url
-from datalad.dochelpers import exc_str
-from datalad.utils import rmtree
-from datalad.utils import assure_list
+from datalad.support.network import (
+    get_local_file_url,
+    URL,
+    RI,
+    DataLadRI,
+)
+from datalad.dochelpers import (
+    exc_str,
+    single_or_plural,
+)
+from datalad.utils import (
+    rmtree,
+    assure_list,
+    assure_bool,
+    knows_annex,
+)
 
-from .dataset import Dataset
-from .dataset import datasetmethod
-from .dataset import resolve_path
-from .dataset import require_dataset
-from .dataset import EnsureDataset
-from .utils import _get_git_url_from_source
-from .utils import _get_tracking_source
-from .utils import _get_flexible_source_candidates
-from .utils import _handle_possible_annex_dataset
-from .utils import _get_installationpath_from_url
+from datalad.distribution.dataset import (
+    Dataset,
+    datasetmethod,
+    resolve_path,
+    require_dataset,
+    EnsureDataset,
+)
+from datalad.distribution.utils import (
+    _get_git_url_from_source,
+    _get_flexible_source_candidates,
+)
 
 __docformat__ = 'restructuredtext'
 
@@ -110,11 +123,6 @@ class Clone(Interface):
             doc="""Alternative sources to be tried if a dataset cannot
             be obtained from the main `source`""",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO next ones should be there, but cannot go anywhere
-        # git_opts=git_opts,
-        # git_clone_opts=git_clone_opts,
-        # annex_opts=annex_opts,
-        # annex_init_opts=annex_init_opts,
     )
 
     @staticmethod
@@ -127,19 +135,14 @@ class Clone(Interface):
             description=None,
             reckless=False,
             alt_sources=None):
-            # TODO next ones should be there, but cannot go anywhere
-            # git_opts=None,
-            # git_clone_opts=None,
-            # annex_opts=None,
-            # annex_init_opts=None
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
         # Otherwise path will be resolved first.
-        dataset = require_dataset(
+        ds = require_dataset(
             dataset, check_installed=True, purpose='cloning') \
             if dataset is not None else dataset
-        refds_path = dataset.path if dataset else None
+        refds_path = ds.path if ds else None
 
         if isinstance(source, Dataset):
             source = source.path
@@ -179,15 +182,33 @@ class Clone(Interface):
         # there is no other way -- my intoxicated brain tells me
         assert(path is not None)
 
+        status_kwargs = dict(
+            action='install',
+            logger=lgr,
+            refds=refds_path,
+            source_url=source_url)
+
+        try:
+            # this will implicitly cause pathlib to run a bunch of checks
+            # whether the present path makes any sense on the platform
+            # we are running on -- we don't care if the path actually
+            # exists at this point, but we want to abort early if the path
+            # spec is determined to be useless
+            path.exists()
+        except OSError as e:
+            yield get_status_dict(
+                status='error',
+                path=path,
+                message=('cannot handle target path: %s', exc_str(e)),
+                **status_kwargs)
+            return
+
         destination_dataset = Dataset(path)
+        status_kwargs['ds'] = destination_dataset
         dest_path = path
 
-        status_kwargs = dict(
-            action='install', ds=destination_dataset, logger=lgr,
-            refds=refds_path, source_url=source_url)
-
         # important test! based on this `rmtree` will happen below after failed clone
-        if exists(dest_path) and listdir(dest_path):
+        if dest_path.exists() and any(dest_path.iterdir()):
             if destination_dataset.is_installed():
                 # check if dest was cloned from the given source before
                 # this is where we would have installed this from
@@ -211,11 +232,11 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if dataset is not None and relpath(path, start=dataset.path).startswith(pardir):
+        if ds is not None and ds.pathobj not in dest_path.parents:
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
-                         path, dataset),
+                         dest_path, ds),
                 **status_kwargs)
             return
 
@@ -231,24 +252,28 @@ class Clone(Interface):
             else ''
         lgr.info("Cloning %s%s into '%s'",
                  source, candidates_str, dest_path)
-        dest_path_existed = exists(dest_path)
+        dest_path_existed = dest_path.exists()
         error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
         for isource_, source_ in enumerate(candidate_sources):
             try:
                 lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
                           source_, isource_ + 1, len(candidate_sources), dest_path)
-                GitRepo.clone(path=dest_path, url=source_, create=True)
+                # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
+                # doesn't make it happen seemlessly
+                GitRepo.clone(path=str(dest_path), url=source_, create=True)
                 break  # do not bother with other sources if succeeded
             except GitCommandError as e:
-                error_msgs[source_] = exc_str_ = exc_str(e)
+                error_msgs[source_] = e
                 lgr.debug("Failed to clone from URL: %s (%s)",
-                          source_, exc_str_)
-                if exists(dest_path):
+                          source_, exc_str(e))
+                if dest_path.exists():
                     lgr.debug("Wiping out unsuccessful clone attempt at: %s",
                               dest_path)
                     # We must not just rmtree since it might be curdir etc
                     # we should remove all files/directories under it
-                    rmtree(dest_path, children_only=dest_path_existed)
+                    # TODO stringification can be removed once patlib compatible
+                    # or if PY35 is no longer supported
+                    rmtree(str(dest_path), children_only=dest_path_existed)
                 # Whenever progress reporting is enabled, as it is now,
                 # we end up without e.stderr since it is "processed" out by
                 # GitPython/our progress handler.
@@ -268,9 +293,18 @@ class Clone(Interface):
 
         if not destination_dataset.is_installed():
             if len(error_msgs):
-                error_msg = "Failed to clone from any candidate source URL. " \
-                            "Encountered errors per each url were: %s"
-                error_args = (error_msgs, )
+                if all(not e.stdout and not e.stderr for e in error_msgs.values()):
+                    # there is nothing we can learn from the actual exception,
+                    # the exit code is uninformative, the command is predictable
+                    error_msg = "Failed to clone from all attempted sources: %s"
+                    error_args = list(error_msgs.keys())
+                else:
+                    error_msg = "Failed to clone from any candidate source URL. " \
+                                "Encountered errors per each url were:\n- %s"
+                    error_args = '\n- '.join(
+                        '{}\n  {}'.format(url, exc_str(exc))
+                        for url, exc in error_msgs.items()
+                    )
             else:
                 # yoh: Not sure if we ever get here but I felt that there could
                 #      be a case when this might happen and original error would
@@ -286,10 +320,10 @@ class Clone(Interface):
                 **status_kwargs)
             return
 
-        if dataset is not None:
+        if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
-            for r in dataset.save(
+            for r in ds.save(
                     dest_path,
                     return_type='generator',
                     result_filter=None,
@@ -306,3 +340,126 @@ class Clone(Interface):
         # subdataset clone down below will not alter the Git-state of the
         # parent
         yield get_status_dict(status='ok', **status_kwargs)
+
+
+def _handle_possible_annex_dataset(dataset, reckless, description=None):
+    """If dataset "knows annex" -- annex init it, set into reckless etc
+
+    Provides additional tune up to a possibly an annex repo, e.g.
+    "enables" reckless mode, sets up description
+    """
+    # in any case check whether we need to annex-init the installed thing:
+    if not knows_annex(dataset.path):
+        # not for us
+        return
+
+    # init annex when traces of a remote annex can be detected
+    if reckless:
+        lgr.debug(
+            "Instruct annex to hardlink content in %s from local "
+            "sources, if possible (reckless)", dataset.path)
+        dataset.config.add(
+            'annex.hardlink', 'true', where='local', reload=True)
+    lgr.debug("Initializing annex repo at %s", dataset.path)
+    # Note, that we cannot enforce annex-init via AnnexRepo().
+    # If such an instance already exists, its __init__ will not be executed.
+    # Therefore do quick test once we have an object and decide whether to call its _init().
+    #
+    # Additionally, call init if we need to add a description (see #1403),
+    # since AnnexRepo.__init__ can only do it with create=True
+    repo = AnnexRepo(dataset.path, init=True)
+    if not repo.is_initialized() or description:
+        repo._init(description=description)
+    if reckless:
+        repo._run_annex_command('untrust', annex_options=['here'])
+
+    srs = {True: [], False: []}  # special remotes by "autoenable" key
+    remote_uuids = None  # might be necessary to discover known UUIDs
+
+    for uuid, config in repo.get_special_remotes().items():
+        sr_name = config.get('name', None)
+        sr_autoenable = config.get('autoenable', False)
+        try:
+            sr_autoenable = assure_bool(sr_autoenable)
+        except ValueError:
+            # Be resilient against misconfiguration.  Here it is only about
+            # informing the user, so no harm would be done
+            lgr.warning(
+                'Failed to process "autoenable" value %r for sibling %s in '
+                'dataset %s as bool.  You might need to enable it later '
+                'manually and/or fix it up to avoid this message in the future.',
+                sr_autoenable, sr_name, dataset.path)
+            continue
+
+        # determine either there is a registered remote with matching UUID
+        if uuid:
+            if remote_uuids is None:
+                remote_uuids = {
+                    repo.config.get('remote.%s.annex-uuid' % r)
+                    for r in repo.get_remotes()
+                }
+            if uuid not in remote_uuids:
+                srs[sr_autoenable].append(sr_name)
+
+    if srs[True]:
+        lgr.debug(
+            "configuration for %s %s added because of autoenable,"
+            " but no UUIDs for them yet known for dataset %s",
+            # since we are only at debug level, we could call things their
+            # proper names
+            single_or_plural("special remote", "special remotes", len(srs[True]), True),
+            ", ".join(srs[True]),
+            dataset.path
+        )
+
+    if srs[False]:
+        # if has no auto-enable special remotes
+        lgr.info(
+            'access to %s %s not auto-enabled, enable with:\n\t\tdatalad siblings -d "%s" enable -s %s',
+            # but since humans might read it, we better confuse them with our
+            # own terms!
+            single_or_plural("dataset sibling", "dataset siblings", len(srs[False]), True),
+            ", ".join(srs[False]),
+            dataset.path,
+            srs[False][0] if len(srs[False]) == 1 else "SIBLING",
+        )
+
+
+def _get_tracking_source(ds):
+    """Returns name and url of a potential configured source
+    tracking remote"""
+    vcs = ds.repo
+    # if we have a remote, let's check the location of that remote
+    # for the presence of the desired submodule
+
+    remote_name, tracking_branch = vcs.get_tracking_branch()
+    # TODO: better default `None`? Check where we might rely on '':
+    remote_url = ''
+    if remote_name:
+        remote_url = vcs.get_remote_url(remote_name, push=False)
+
+    return remote_name, remote_url
+
+
+def _get_installationpath_from_url(url):
+    """Returns a relative path derived from the trailing end of a URL
+
+    This can be used to determine an installation path of a Dataset
+    from a URL, analog to what `git clone` does.
+    """
+    ri = RI(url)
+    if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
+        path = ri.path.rstrip('/')
+        path = urlunquote(path) if path else ri.hostname
+    else:
+        path = url
+    path = path.rstrip('/')
+    if '/' in path:
+        path = path.split('/')
+        if path[-1] == '.git':
+            path = path[-2]
+        else:
+            path = path[-1]
+    if path.endswith('.git'):
+        path = path[:-4]
+    return path

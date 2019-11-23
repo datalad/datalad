@@ -569,7 +569,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
     if not relevant_paths:
         return None
 
-    return ds.repo.get_last_commit_hash(relevant_paths)
+    return ds.repo.get_last_commit_hexsha(relevant_paths)
 
 
 def _get_obj_location(hash_str, ref_type, dumper):

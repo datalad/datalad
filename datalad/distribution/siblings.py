@@ -445,8 +445,7 @@ def _configure_remote(
         if fetch:
             # fetch the remote so we are up to date
             for r in Update.__call__(
-                    dataset=res_kwargs['refds'],
-                    path=[dict(path=ds.path, type='dataset')],
+                    dataset=ds.path,
                     sibling=name,
                     merge=False,
                     recursive=False,

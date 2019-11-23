@@ -17,6 +17,7 @@ from collections import OrderedDict
 from datalad.utils import (
     assure_list,
     assure_unicode,
+    get_dataset_root,
 )
 from datalad.interface.base import (
     Interface,
@@ -28,9 +29,8 @@ from datalad.distribution.dataset import (
     Dataset,
     datasetmethod,
     require_dataset,
-    rev_resolve_path,
+    resolve_path,
     path_under_rev_dataset,
-    rev_get_dataset_root,
 )
 
 from datalad.support.constraints import (
@@ -159,12 +159,12 @@ def _diff_cmd(
             # special case is the root dataset, always report its content
             # changes
             orig_path = str(p)
-            resolved_path = rev_resolve_path(p, dataset)
+            resolved_path = resolve_path(p, dataset)
             p = \
                 resolved_path, \
                 orig_path.endswith(op.sep) or resolved_path == ds.pathobj
             str_path = str(p[0])
-            root = rev_get_dataset_root(str_path)
+            root = get_dataset_root(str_path)
             if root is None:
                 # no root, not possibly underneath the refds
                 yield dict(

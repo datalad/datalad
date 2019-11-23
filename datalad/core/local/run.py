@@ -127,6 +127,35 @@ class Run(Interface):
 
         % datalad run "echo my name is {name} >me"
     """
+    _examples_ = [
+        dict(text="Run an executable script and record the impact on a dataset",
+             code_py="ds.run(message='run my script', cmd='code/script.sh')",
+             code_cmd="datalad run -m 'run my script' 'code/script.sh'"),
+        dict(text="""Run a command and specify a directory as a dependency
+             for the run. The contents of the dependency will be retrieved
+             prior to running the script""",
+             code_cmd="datalad run -m 'run my script' --input 'data/*' "
+             "'code/script.sh'",
+             code_py="ds.run(cmd='code/script.sh', message='run my script', "
+             "inputs='data/*')"),
+        dict(text="""Run an executable script and specify output files of the
+             script to be unlocked prior to running the script""",
+             code_py="ds.run(cmd='code/script.sh', message='run my script', "
+             "inputs='data/*', outputs='output_dir')",
+             code_cmd="datalad run -m 'run my script' --input 'data/*' "
+             "--output 'output_dir/*' 'code/script.sh'"),
+        dict(text="Specify multiple inputs and outputs",
+             code_py="""\
+             ds.run(cmd='code/script.sh',
+                    message='run my script',
+                    inputs=['data/*', 'datafile.txt'],
+                    outputs=['output_dir', 'outfile.txt'])""",
+             code_cmd="""\
+             datalad run -m 'run my script' --input 'data/*'
+               --input 'datafile.txt' --output 'output_dir/*' --output
+               'outfile.txt' 'code/script.sh'""")
+    ]
+
     _params_ = dict(
         cmd=Parameter(
             args=("cmd",),
@@ -659,8 +688,7 @@ def run_command(cmd, dataset=None, inputs=None, outputs=None, expand=None,
     if not rerun_info and cmd_exitcode:
         if do_save:
             repo = ds.repo
-            msg_path = relpath(opj(repo.path, repo.get_git_dir(repo),
-                                   "COMMIT_EDITMSG"))
+            msg_path = relpath(opj(str(repo.dot_git), "COMMIT_EDITMSG"))
             with open(msg_path, "wb") as ofh:
                 ofh.write(assure_bytes(msg))
             lgr.info("The command had a non-zero exit code. "

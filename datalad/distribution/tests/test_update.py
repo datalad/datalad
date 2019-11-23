@@ -262,9 +262,9 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[0], 'first!')
 
     # and now we destroy the remote annex
-    origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
+    origin.call_git(['config', '--remove-section', 'annex'])
     rmtree(opj(origin.path, '.git', 'annex'), chmod_files=True)
-    origin._git_custom_command([], ['git', 'branch', '-D', 'git-annex'])
+    origin.call_git(['branch', '-D', 'git-annex'])
     origin = GitRepo(originpath)
     assert_false(knows_annex(originpath))
 

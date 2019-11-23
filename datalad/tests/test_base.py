@@ -20,8 +20,8 @@ from .utils import (
     assert_equal,
     assert_in,
     ok_file_has_content,
+    SkipTest,
 )
-from datalad.support.gitrepo import check_git_configured
 
 from mock import patch
 
@@ -62,21 +62,6 @@ def test_not_under_git(path):
         )
 
 
-def test_git_config_fixture():
-    # in the setup_package we setup a new HOME with custom config
-    if 'GIT_HOME' not in os.environ:
-        assert_equal(
-            check_git_configured(),
-            {
-                'user.name': 'DataLad Tester',
-                'user.email': 'test@example.com'
-             }
-        )
-    else:
-        # we pick up the ones in the 'GIT_HOME' which might differ
-        assert_equal(sorted(check_git_configured()), ['user.email', 'user.name'])
-
-
 def test_no_empty_http_proxy():
     # in __init__ we might prune http_proxy if it is empty, so it must not be
     # empty if present
@@ -86,9 +71,16 @@ def test_no_empty_http_proxy():
 
 @with_tree(tree={})
 def test_git_config_warning(path):
+    if 'GIT_AUTHOR_NAME' in os.environ:
+        raise SkipTest("Found existing explicit identity config")
     with chpwd(path), \
             patch.dict('os.environ', {'HOME': path}), \
             swallow_logs(new_level=30) as cml:
         # no configs in that empty HOME
-        assert_equal(check_git_configured(), {})
-        assert_in("configure git first", cml.out)
+        from datalad.api import Dataset
+        from datalad.config import ConfigManager
+        # reach into the class and disable the "checked" flag that
+        # has already been tripped before we get here
+        ConfigManager._checked_git_identity = False
+        Dataset(path).config.reload()
+        assert_in("configure Git before", cml.out)

@@ -22,7 +22,7 @@ import string
 
 from urllib.parse import urlparse
 
-from datalad.distribution.dataset import rev_resolve_path
+from datalad.distribution.dataset import resolve_path
 from datalad.dochelpers import exc_str
 from datalad.log import log_progress, with_result_progress
 from datalad.interface.base import Interface
@@ -748,7 +748,9 @@ class Addurls(Interface):
             args=("--version-urls",),
             action="store_true",
             doc="""Try to add a version ID to the URL. This currently only has
-            an effect on URLs for AWS S3 buckets."""),
+            an effect on HTTP URLs for AWS S3 buckets. s3:// URL versioning is
+            not yet supported, but any URL that already contains a "versionId="
+            parameter will be used as is."""),
         cfg_proc=Parameter(
             args=("-c", "--cfg-proc"),
             metavar="PROC",
@@ -785,7 +787,7 @@ class Addurls(Interface):
                                   message="not an annex repo")
             return
 
-        url_file = str(rev_resolve_path(url_file, dataset))
+        url_file = str(resolve_path(url_file, dataset))
 
         if input_type == "ext":
             extension = os.path.splitext(url_file)[1]

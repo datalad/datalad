@@ -46,8 +46,6 @@ from datalad.support.gitrepo import (
 )
 from datalad.support.exceptions import (
     InsufficientArgumentsError,
-    InstallFailedError,
-    IncompleteResultsError,
 )
 from datalad.support.network import (
     URL,
@@ -55,12 +53,12 @@ from datalad.support.network import (
     urlquote,
 )
 from datalad.dochelpers import (
-    exc_str,
     single_or_plural,
 )
 from datalad.utils import (
     unique,
     Path,
+    get_dataset_root,
 )
 
 from datalad.local.subdatasets import Subdatasets
@@ -79,36 +77,99 @@ __docformat__ = 'restructuredtext'
 lgr = logging.getLogger('datalad.distribution.get')
 
 
-def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
-    """Retrieve candidates from where to install the submodule
+def _get_remotes_having_commit(repo, commit_hexsha, with_urls_only=True):
+    """Traverse all branches of the remote and check if commit in any of their ancestry
 
-    Even if url for submodule is provided explicitly -- first tries urls under
-    parent's module tracking branch remote.
+    It is a generator yielding names of the remotes
     """
+    remote_branches = [
+        b['refname:strip=2']
+        for b in repo.for_each_ref_(
+            fields='refname:strip=2',
+            pattern='refs/remotes',
+            contains=commit_hexsha)]
+    return [
+        remote
+        for remote in repo.get_remotes(with_urls_only=with_urls_only)
+        if any(rb.startswith(remote + '/') for rb in remote_branches)
+    ]
+
+
+def _get_flexible_source_candidates_for_submodule(ds, sm):
+    """Assemble candidates from where to install a submodule
+
+    Even if a URL for submodule is provided explicitly -- first tries urls under
+    parent's module tracking branch remote.
+
+    Additional candidate URLs can be generated based on templates specified as
+    configuration variables with the pattern
+
+      `datalad.get.subdataset-source-candidate-<name>`
+
+    where `name` is an arbitrary identifier.
+
+    A template string assigned to such a variable can utilize the Python format
+    mini language and may reference a number of properties that are inferred
+    from the parent dataset's knowledge about the target subdataset. Properties
+    include any submodule property specified in the respective .gitmodules
+    record. For convenience, an existing `datalad-id` record is made available
+    under the shortened name `id`.
+
+    Additionally, the URL of any configured remote that contains the respective
+    submodule commit is available as `remote-<name>` properties, where `name`
+    is the configured remote name.
+
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+
+    Returns
+    -------
+    list of tuples
+      Where each tuples consists of a name and a URL. Names are not unique
+      and either derived from the name of the respective remote, template
+      configuration variable, or 'origin' for the candidate URL that was
+      obtained from the .gitmodule record.
+    """
+    # short cuts
+    ds_repo = ds.repo
+    sm_url = sm.get('gitmodule_url', None)
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
+
     clone_urls = []
 
-    ds_repo = ds.repo
-
-    # should be our first candidate
+    # CANDIDATE: tracking remote of the current branch
     tracking_remote, tracking_branch = ds_repo.get_tracking_branch()
     candidate_remotes = [tracking_remote] if tracking_remote else []
 
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
-    try:
-        last_commit = next(ds_repo._get_files_history(sm_path)).hexsha
+    last_commit = ds_repo.get_last_commit_hexsha(sm_path)
+    if last_commit:
+        # CANDIDATE: any remote that has the commit when the submodule was
+        # last modified
+
         # ideally should also give preference to the remotes which have
         # the same branch checked out I guess
-        candidate_remotes += list(ds_repo._get_remotes_having_commit(last_commit))
-    except StopIteration:
-        # no commit for it known yet, ... oh well
-        pass
+        candidate_remotes += list(_get_remotes_having_commit(ds_repo, last_commit))
+
+    # prepare a dict to generate URL candidates from templates
+    sm_candidate_props = {
+        k[10:].replace('datalad-id', 'id'): v
+        for k, v in sm.items()
+        if k.startswith('gitmodule_')
+    }
 
     for remote in unique(candidate_remotes):
         remote_url = ds_repo.get_remote_url(remote, push=False)
 
         # Directly on parent's ds url
         if remote_url:
+            # make remotes and their URLs available to template rendering
+            sm_candidate_props['remoteurl-{}'.format(remote)] = remote_url
             # attempt: submodule checkout at parent remote URL
             # We might need to quote sm_path portion, e.g. for spaces etc
             if isinstance(RI(remote_url), URL):
@@ -117,126 +178,108 @@ def _get_flexible_source_candidates_for_submodule(ds, sm_path, sm_url=None):
                 sm_path_url = sm_path
 
             clone_urls.extend(
-                _get_flexible_source_candidates(
+                (remote, url)
+                for url in _get_flexible_source_candidates(
                     # alternate suffixes are tested by `clone` anyways
-                    sm_path_url, remote_url, alternate_suffix=False))
+                    sm_path_url, remote_url, alternate_suffix=False)
+            )
 
             # attempt: provided (configured?) submodule URL
             # TODO: consider supporting DataLadRI here?  or would confuse
             #  git and we wouldn't want that (i.e. not allow pure git clone
             #  --recursive)
             if sm_url:
-                clone_urls += _get_flexible_source_candidates(
-                    sm_url,
-                    remote_url,
-                    alternate_suffix=False
+                clone_urls.extend(
+                    (remote, url)
+                    for url in _get_flexible_source_candidates(
+                        sm_url,
+                        remote_url,
+                        alternate_suffix=False)
                 )
 
-    # Do based on the ds.path as the last resort
+        for name, tmpl in [(c[40:], ds_repo.config[c])
+                           for c in ds_repo.config.keys()
+                           if c.startswith(
+                               'datalad.get.subdataset-source-candidate-')]:
+            url = tmpl.format(**sm_candidate_props)
+            # we don't want "flexible_source_candidates" here, this is
+            # configuration that can be made arbitrarily precise from the
+            # outside. Additional guesswork can only make it slower
+            clone_urls.append((name, url))
+
+    # CANDIDATE: the actual configured gitmodule URL
     if sm_url:
-        clone_urls += _get_flexible_source_candidates(
-            sm_url,
-            ds.path,
-            alternate_suffix=False)
+        clone_urls.extend(
+            ('local', url)
+            for url in _get_flexible_source_candidates(
+                sm_url,
+                ds.path,
+                alternate_suffix=False)
+        )
 
-    return unique(clone_urls)
+    return unique(clone_urls, lambda x: x[1])
 
 
-def _install_subds_from_flexible_source(
-        ds, sm_path, sm_url, reckless, description=None):
-    """Tries to obtain a given subdataset from several meaningful locations"""
-    # TODO remove this assertion eventually, for now it assures intented
-    # usage of this helper function
-    assert(sm_path in ds.subdatasets(recursive=False, result_xfm='relpaths'))
+def _install_subds_from_flexible_source(ds, sm, **kwargs):
+    """Tries to obtain a given subdataset from several meaningful locations
 
+    Parameters
+    ----------
+    ds : Dataset
+      Parent dataset of to-be-installed subdataset.
+    sm : dict
+      Submodule record as produced by `subdatasets()`.
+    **kwargs
+      Passed onto clone()
+    """
+    sm_path = op.relpath(sm['path'], start=sm['parentds'])
     # compose a list of candidate clone URLs
-    clone_urls = _get_flexible_source_candidates_for_submodule(
-        ds, sm_path, sm_url)
+    clone_urls = _get_flexible_source_candidates_for_submodule(ds, sm)
 
     # prevent inevitable exception from `clone`
     dest_path = op.join(ds.path, sm_path)
-    clone_urls = [src for src in clone_urls if src != dest_path]
+    clone_urls = [src for name, src in clone_urls if src != dest_path]
 
     if not clone_urls:
-        raise InstallFailedError(
-            msg="Have got no candidates to install subdataset {} from".format(
-                sm_path))
+        # yield error
+        yield get_status_dict(
+            action='install',
+            ds=ds,
+            status='error',
+            message=(
+                "Have got no candidates to install subdataset %s from.",
+                sm_path),
+            logger=lgr,
+        )
+        return
 
     # now loop over all candidates and try to clone
-    subds = None
-    try:
-        subds = Clone.__call__(
+    for res in Clone.__call__(
             clone_urls[0],
             path=dest_path,
             # pretend no parent -- we don't want clone to add to ds
             # because this is a submodule already!
             dataset=None,
-            reckless=reckless,
             # if we have more than one source, pass as alternatives
             alt_sources=clone_urls[1:],
-            description=description,
-            result_xfm='datasets',
-            # not really need, but should protect against future RF
-            on_failure='stop',
+            result_xfm=None,
+            # we yield all an have the caller decide
+            on_failure='ignore',
             result_renderer='disabled',
-            return_type='item-or-list')
-        # failure will raise an exception, hence if we got here we can
-        # leave the loop and have a successful clone
-    except IncompleteResultsError:
-        # details of the failure are logged already by common code
-        pass
-    except Exception as exc:
-        lgr.warning("Something went wrong while installing %s: %s",
-                    sm_path, exc_str(exc))
-    if subds is None:
-        raise InstallFailedError(
-            msg="Failed to install dataset from{}: {}".format(
-                ' any of' if len(clone_urls) > 1 else '',
-                clone_urls))
+            return_type='generator',
+            **kwargs):
+        yield res
 
-    assert(subds.is_installed())
+    subds = Dataset(dest_path)
+    if not subds.is_installed():
+        lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
+        return
+
     _fixup_submodule_dotgit_setup(ds, sm_path)
 
     # do fancy update
     lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-    # TODO: move all of that into update_submodule ??
-    # TODO: direct mode ramifications?
-    # track branch originally cloned
-    subrepo = subds.repo
-    branch = subrepo.get_active_branch()
-    branch_hexsha = subrepo.get_hexsha(branch)
     ds.repo.update_submodule(sm_path, init=True)
-    updated_branch = subrepo.get_active_branch()
-    if branch and not updated_branch:
-        # got into 'detached' mode
-        # trace if current state is a predecessor of the branch_hexsha
-        lgr.debug(
-            "Detected detached HEAD after updating submodule %s which was "
-            "in %s branch before", subds.path, branch)
-        detached_hexsha = subrepo.get_hexsha()
-        if subrepo.get_merge_base(
-                [branch_hexsha, detached_hexsha]) == detached_hexsha:
-            # TODO: config option?
-            # in all likely event it is of the same branch since
-            # it is an ancestor -- so we could update that original branch
-            # to point to the state desired by the submodule, and update
-            # HEAD to point to that location
-            lgr.info(
-                "Submodule HEAD got detached. Resetting branch %s to point "
-                "to %s. Original location was %s",
-                branch, detached_hexsha[:8], branch_hexsha[:8]
-            )
-            branch_ref = 'refs/heads/%s' % branch
-            subrepo.update_ref(branch_ref, detached_hexsha)
-            assert(subrepo.get_hexsha(branch) == detached_hexsha)
-            subrepo.update_ref('HEAD', branch_ref, symbolic=True)
-            assert(subrepo.get_active_branch() == branch)
-        else:
-            lgr.warning(
-                "%s has a detached HEAD since cloned branch %s has another common ancestor with %s",
-                subrepo.path, branch, detached_hexsha[:8]
-            )
-    return subds
 
 
 def _install_necessary_subdatasets(
@@ -271,26 +314,27 @@ def _install_necessary_subdatasets(
     while not GitRepo.is_valid_repo(cur_subds['path']):
         # install using helper that give some flexibility regarding where to
         # get the module from
-        try:
-            sd = _install_subds_from_flexible_source(
+        for res in _install_subds_from_flexible_source(
                 Dataset(cur_subds['parentds']),
-                op.relpath(cur_subds['path'], start=cur_subds['parentds']),
-                cur_subds['gitmodule_url'],
-                reckless,
-                description=description)
-        except Exception as e:
-            # skip all of downstairs, if we didn't manage to install subdataset
-            yield get_status_dict(
-                'install', path=cur_subds['path'], type='dataset',
-                status='error', logger=lgr, refds=refds_path,
-                message=("Installation of subdatasets %s failed with exception: %s",
-                         cur_subds['path'], exc_str(e)))
-            return
-
-        # report installation, whether it helped or not
-        yield get_status_dict(
-            'install', ds=sd, status='ok', logger=lgr, refds=refds_path,
-            message=("Installed subdataset in order to get %s", str(path)))
+                cur_subds,
+                reckless=reckless,
+                description=description):
+            if res.get('action', None) == 'install':
+                if res['status'] == 'ok':
+                    # report installation, whether it helped or not
+                    res['message'] = (
+                        "Installed subdataset in order to get %s",
+                        str(path))
+                    # next subdataset candidate
+                    sd = Dataset(res['path'])
+                    yield res
+                elif res['status'] in ('impossible', 'error'):
+                    yield res
+                    # we cannot go deeper, we need to stop
+                    return
+                else:
+                    # report unconditionally to caller
+                    yield res
 
         # now check whether the just installed subds brought us any closer to
         # the target path
@@ -330,24 +374,15 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
             # does not imply that everything below it does too
         else:
             # try to get this dataset
-            try:
-                subds = _install_subds_from_flexible_source(
+            for res in _install_subds_from_flexible_source(
                     ds,
-                    op.relpath(sub['path'], start=ds.path),
-                    sub['gitmodule_url'],
-                    reckless,
-                    description=description)
-                yield get_status_dict(
-                    'install', ds=subds, status='ok', logger=lgr, refds=refds_path,
-                    message=("Installed subdataset %s", subds), parentds=ds.path)
-            except Exception as e:
-                # skip all of downstairs, if we didn't manage to install subdataset
-                yield get_status_dict(
-                    'install', ds=subds, status='error', logger=lgr, refds=refds_path,
-                    message=("Installation of subdatasets %s failed with exception: %s",
-                             subds, exc_str(e)))
-                continue
-        # otherwise recurse
+                    sub,
+                    reckless=reckless,
+                    description=description):
+                # yield everything to let the caller decide how to deal with
+                # errors
+                yield res
+        # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
                 subds,
@@ -381,7 +416,13 @@ def _install_targetpath(
         yield dict(
             action='get',
             type='dataset',
-            path=ds.path,
+            # this cannot just be the dataset path, as the original
+            # situation of datasets avail on disk can have changed due
+            # to subdataset installation. It has to be actual subdataset
+            # it resides in, because this value is used to determine which
+            # dataset to call `annex-get` on
+            # TODO stringification is a PY35 compatibility kludge
+            path=get_dataset_root(str(target_path)),
             status='notneeded',
             contains=[target_path],
             refds=refds_path,
@@ -521,6 +562,17 @@ class Get(Interface):
       Power-user info: This command uses :command:`git annex get` to fulfill
       file handles.
     """
+    _examples_ = [
+        dict(text="Get a single file",
+             code_py="get('path/to/file')",
+             code_cmd="datalad get <path/to/file>"),
+        dict(text="Get contents of a directory",
+             code_py="get('path/to/dir/')",
+             code_cmd="datalad get <path/to/dir/>"),
+        dict(text="Get all contents of the current dataset and its subdatasets",
+             code_py="get(dataset='.', recursive=True)",
+             code_cmd="datalad get . --recursive"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
