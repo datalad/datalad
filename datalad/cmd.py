@@ -28,6 +28,7 @@ from six import (
     string_types,
     binary_type,
     text_type,
+    reraise,
 )
 from .support import path as op
 from .consts import GIT_SSH_COMMAND
@@ -561,9 +562,32 @@ class Runner(object):
                 else:
                     self.log("Finished running %r with status %s" % (cmd, status),
                              level=8)
+
+            except CommandError:
+                # do not bother with reacting to "regular" CommandError
+                # exceptions.  Somehow if we also terminate here for them
+                # some processes elsewhere might stall:
+                # see https://github.com/datalad/datalad/pull/3794
+                raise
+
+            except BaseException as exc:
+                exc_info = sys.exc_info()
+                # KeyboardInterrupt is subclass of BaseException
+                lgr.debug("Terminating process for %s upon exception: %s",
+                          cmd, exc_str(exc))
+                try:
+                    # there are still possible (although unlikely) cases when
+                    # we fail to interrupt but we
+                    # should not crash if we fail to terminate the process
+                    proc.terminate()
+                except BaseException as exc2:
+                    lgr.warning("Failed to terminate process for %s: %s",
+                                cmd, exc_str(exc2))
+                reraise(*exc_info)
+
             finally:
                 # Those streams are for us to close if we asked for a PIPE
-                # TODO -- assure closing the files import pdb; pdb.set_trace()
+                # TODO -- assure closing the files
                 _cleanup_output(outputstream, proc.stdout)
                 _cleanup_output(errstream, proc.stderr)
 

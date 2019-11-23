@@ -19,7 +19,17 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Fixes
 
-?
+- [run-procedure][] mistakenly reported a directory as a procedure.
+  ([#3793][])
+
+- The cleanup for batched git-annex processes has been improved.
+  ([#3794][]) ([#3851][])
+
+- The function for adding a version ID to an AWS S3 URL doesn't
+  support URLs with an "s3://" scheme and raises a
+  `NotImplementedError` exception when it encounters one.  The
+  function learned to return a URL untouched if an "s3://" URL comes
+  in with a version ID.  ([#3842][])
 
 ### Enhancements and new features
 
@@ -1506,3 +1516,7 @@ publishing
 [#3765]: https://github.com/datalad/datalad/issues/3765
 [#3769]: https://github.com/datalad/datalad/issues/3769
 [#3770]: https://github.com/datalad/datalad/issues/3770
+[#3793]: https://github.com/datalad/datalad/issues/3793
+[#3794]: https://github.com/datalad/datalad/issues/3794
+[#3842]: https://github.com/datalad/datalad/issues/3842
+[#3851]: https://github.com/datalad/datalad/issues/3851
