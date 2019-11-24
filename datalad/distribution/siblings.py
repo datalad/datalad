@@ -646,7 +646,7 @@ def _query_remotes(
                               if k.startswith('remote.{}.'.format(remote))]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
         if get_annex_info and info.get('annex-uuid', None):
-            ainfo = annex_info.get(info['annex-uuid'])
+            ainfo = annex_info.get(info['annex-uuid'], {})
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description

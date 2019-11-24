@@ -233,6 +233,17 @@ def test_here(path):
     here = res[0]
     eq_('very special', here['annex-description'])
 
+    # does not die when here is dead
+    res = ds.siblings('query', name='here', return_type='item-or-list')
+    # gone when dead
+    res.pop('annex-description', None)
+    # volatile prop
+    res.pop('available_local_disk_space', None)
+    ds.repo._run_annex_command('dead', annex_options=['here'])
+    newres = ds.siblings('query', name='here', return_type='item-or-list')
+    newres.pop('available_local_disk_space', None)
+    eq_(res, newres)
+
 
 @with_tempfile()
 @with_tempfile()
