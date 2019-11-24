@@ -19,7 +19,7 @@ from os.path import realpath
 from os.path import basename
 from os.path import dirname
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import getpwd
 

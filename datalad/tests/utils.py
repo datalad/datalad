@@ -27,7 +27,7 @@ from fnmatch import fnmatch
 import time
 from difflib import unified_diff
 from contextlib import contextmanager
-from mock import patch
+from unittest.mock import patch
 
 from http.server import SimpleHTTPRequestHandler
 from http.server import HTTPServer

@@ -15,7 +15,7 @@ import os, os.path as op
 import shutil
 import sys
 import logging
-from mock import patch
+from unittest.mock import patch
 import builtins
 
 from operator import itemgetter

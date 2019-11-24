@@ -9,7 +9,7 @@
 """Test invocation of datalad utilities "as is installed"
 """
 
-from mock import patch
+from unittest.mock import patch
 from .utils import ok_startswith, eq_, assert_cwd_unchanged
 
 from datalad.cmd import Runner

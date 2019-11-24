@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for credentials"""
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.tests.utils import with_testsui
 from datalad.tests.utils import assert_equal

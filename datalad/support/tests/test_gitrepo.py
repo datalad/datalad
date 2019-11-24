@@ -1328,7 +1328,7 @@ def test_get_hexsha_tag(path):
 
 @with_tempfile(mkdir=True)
 def test_get_tags(path):
-    from mock import patch
+    from unittest.mock import patch
 
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])

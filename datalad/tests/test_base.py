@@ -23,7 +23,7 @@ from .utils import (
     SkipTest,
 )
 
-from mock import patch
+from unittest.mock import patch
 
 
 # verify that any target platform can deal with forward slashes

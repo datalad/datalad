@@ -25,7 +25,7 @@ from ...tests.utils import (
     swallow_logs,
 )
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import (
     assert_true, assert_false,
     assert_equal, assert_greater_equal, assert_greater,

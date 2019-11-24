@@ -20,7 +20,7 @@ import datalad.api
 from datalad import cfg
 
 from nose.tools import ok_
-from mock import patch
+from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.utils import swallow_logs

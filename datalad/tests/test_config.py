@@ -14,7 +14,7 @@ import os
 from os.path import exists
 from os.path import join as opj
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_false, assert_true, assert_equal
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in, assert_not_in

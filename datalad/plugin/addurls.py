@@ -546,7 +546,7 @@ def add_urls(rows, ifexists=None, options=None):
 def add_meta(rows):
     """Call `git annex metadata --set` using information in `rows`.
     """
-    from mock import patch
+    from unittest.mock import patch
 
     for row in rows:
         ds, filename = row["ds"], row["ds_filename"]

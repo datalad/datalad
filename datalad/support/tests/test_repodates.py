@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo

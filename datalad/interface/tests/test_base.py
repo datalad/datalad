@@ -10,7 +10,7 @@
 
 """
 
-import mock
+import unittest.mock as mock
 from datalad.tests.utils import *
 from datalad.utils import updated
 from ..base import (

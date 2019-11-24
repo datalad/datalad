@@ -11,7 +11,7 @@
 
 import sys
 # OPT delay import for expensive mock until used
-#from mock import patch
+#from unittest.mock import patch
 import builtins
 import lzma
 
@@ -95,7 +95,7 @@ class AutomagicIO(object):
         self._autoget = autoget
         self._in_open = False
         self._log_online = True
-        from mock import patch
+        from unittest.mock import patch
         self._patch = patch
         self._paths_cache = set() if check_once else None
         self._repos_cache = {} if check_once else None

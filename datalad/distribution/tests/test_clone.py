@@ -24,7 +24,7 @@ from os import (
 )
 import os.path as op
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.api import (
     create,
