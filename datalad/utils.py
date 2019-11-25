@@ -2319,4 +2319,15 @@ def maybe_shlex_quote(val):
     return val if on_windows else shlex_quote(val)
 
 
+def edit_text_in_file(path, content=None):
+    """TODO"""
+    if content:
+        with open(path, 'wb') as f:
+            f.write(content.encode())
+    from .ui import ui
+    ui.edit_file(path)
+    with open(path) as f:
+        return f.read()
+
+
 lgr.log(5, "Done importing datalad.utils")

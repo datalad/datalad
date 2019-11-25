@@ -116,7 +116,9 @@ nosave_opt = Parameter(
 save_message_opt = Parameter(
     args=("-m", "--message",),
     metavar='MESSAGE',
-    doc="""a description of the state or the changes made to a dataset.""",
+    doc="""a description of the state or the changes made to a dataset. If empty 
+    value is explicitly specified, it would bring up an editor to enter the
+    message.""",
     constraints=EnsureStr() | EnsureNone())
 
 message_file_opt = Parameter(

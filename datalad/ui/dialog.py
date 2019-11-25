@@ -19,6 +19,7 @@ lgr.log(5, "Starting importing ui.dialog")
 
 import os
 import sys
+import subprocess
 import time
 
 import getpass
@@ -108,6 +109,10 @@ class ConsoleLog(object):
     @property
     def is_interactive(self):
         return isinstance(self, InteractiveUI)
+
+    def edit_file(self, path):
+        raise NotImplementedError(
+            "%s backend does not support editing files" % self.__class__)
 
 
 @auto_repr
@@ -255,6 +260,22 @@ class DialogUI(ConsoleLog, InteractiveUI):
         self._prev_title_time = time.time()
 
         return response
+
+    def edit_file(self, path):
+        # Check with env first
+        editor = None
+        for envvar in 'GIT_EDITOR', 'VISUAL', 'EDITOR':
+            editor = os.environ.get(envvar, editor)
+            if editor:
+                break
+        # we could check for 'editor' command being available
+        # Git also, after GIT_EDITOR checks core.editor config!
+        # but then we would ideally do it per dataset/repo
+
+        if not editor:
+            raise RuntimeError("no editor could be deduced.")
+
+        subprocess.call([editor, path])
 
 
 class IPythonUI(DialogUI):

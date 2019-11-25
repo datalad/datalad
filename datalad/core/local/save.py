@@ -267,6 +267,18 @@ class Save(Interface):
                 for p, props in paths_by_ds.pop(pdspath).items()}
             start_commit = pds_repo.get_hexsha()
             if not all(p['state'] == 'clean' for p in pds_status.values()):
+                if message == '':
+                    # ask the user
+                    # TODO: RF to pre-do once the analysis of the mighty
+                    #   paths_by_ds_orig which has everything to be saved or not
+                    #  to provide useful information about which datasets
+                    #  and what changes to them (stats at least) would be saved,
+                    #  to incorporate that into the comment of the commit message
+                    #  to be edited by the user
+                    message = get_commit_message(
+                        repo=pds_repo,
+                        recursive=recursive
+                    )
                 for res in pds_repo.save_(
                         message=message,
                         # make sure to have the `path` arg be None, as we want
@@ -322,3 +334,40 @@ class Save(Interface):
                     status='error',
                     message=('cannot tag this version: %s', e.stderr.strip()))
                 yield dsres
+
+
+def get_commit_message(repo, recursive):
+    import os
+    from ...utils import edit_text_in_file
+    msg_file = repo.pathobj / '.git' / 'COMMIT_EDITMSG'
+    # There could be a file from previous commit
+    if os.path.exists(msg_file):
+        os.unlink(msg_file)
+    message = edit_text_in_file(
+        msg_file,
+        """
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+"""
+        + ("""\
+#
+# You are performing recursive save.  This commit message
+# will be used across multiple datasets.\n""" if recursive else '')
+        + """\
+#
+# On branch {branch}
+#
+# Changes to be committed:
+#   ???  X new files
+#        Y changed files
+#        Z deleted files
+#        W changed subdatasets
+#        A git files
+#        B annexed files
+""".format(branch=repo.get_active_branch()))
+    os.unlink(msg_file)
+    message = os.linesep.join(
+        l for l in message.split(os.linesep) if not l.startswith('#')).rstrip()
+    import pdb; pdb.set_trace()
+    return message
