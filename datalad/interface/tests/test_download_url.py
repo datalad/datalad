@@ -162,3 +162,16 @@ def test_download_url_archive(toppath, topurl, path):
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))
+
+
+@known_failure_githubci_win
+@with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_download_url_archive_from_subdir(toppath, topurl, path):
+    ds = Dataset(path).create()
+    subdir_path = opj(ds.path, "subdir")
+    os.mkdir(subdir_path)
+    with chpwd(subdir_path):
+        download_url([topurl + "archive.tar.gz"], archive=True)
+    ok_(ds.repo.file_has_content(opj("subdir", "archive", "file1.txt")))
