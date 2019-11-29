@@ -725,15 +725,16 @@ class Get(Interface):
                         reckless,
                         refds_path,
                         description):
+                    known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \
                             'contains' in res:
                         dsrec = content_by_ds.get(res['path'], set())
                         dsrec.update(res['contains'])
                         content_by_ds[res['path']] = dsrec
-                    if res.get('status', None) != 'notneeded':
-                        # all those messages on not having installed anything
-                        # are a bit pointless
-                        # "notneeded" for annex get comes below
+                    # prevent double-reporting of datasets that have been
+                    # installed by explorative installation to get to target
+                    # paths, prior in this loop
+                    if res.get('status', None) != 'notneeded' or not known_ds:
                         yield res
 
         if not get_data:
@@ -748,7 +749,10 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                yield res
+                if res['path'] not in content_by_ds:
+                    # we had reports on datasets and subdatasets already
+                    # before the annex stage
+                    yield res
 
     @staticmethod
     def custom_result_summary_renderer(res):

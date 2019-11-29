@@ -368,6 +368,11 @@ def test_install_recursive(src, path_nr, path_r):
     for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subsub.is_installed())
 
+    # check that we get subdataset instances manufactored from notneeded results
+    # to install existing subdatasets again
+    eq_(subds, ds.install('recursive-in-ds'))
+
+
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_recursive_with_data(src, path):
@@ -377,8 +382,8 @@ def test_install_recursive_with_data(src, path):
                   result_filter=None, result_xfm=None)
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
-    # each, plus the report that we got all content in each dataset's root dir
-    eq_(len(res), 9)
+    # each
+    eq_(len(res), 6)
     assert_result_count(res, 3, type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
