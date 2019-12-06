@@ -191,7 +191,7 @@ def test_get_invalid_call(path, file_outside):
     assert_message("path does not exist", res)
 
     # path outside repo errors as with most other commands:
-    res = ds.get(file_outside, on_failure='ignore')
+    res = ds.get(file_outside, on_failure='ignore', result_renderer='default')
     assert_in_results(
         res, status='error',
         message=('path not associated with dataset', ds))
