@@ -353,44 +353,49 @@ def eval_results(func):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
-                return spec, proc_cfg
-
-            if not proc_cfg:
-                # .is_installed and .config can be costly, so ensure we do
-                # it only once. See https://github.com/datalad/datalad/issues/3575
-                from datalad.distribution.dataset import Dataset
-                ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-                # do not reuse a dataset's existing config manager here
-                # they are configured to read the committed dataset configuration
-                # too. That means a datalad update can silently bring in new
-                # procedure definitions from the outside, and in some sense enable
-                # remote code execution by a 3rd-party
-                # To avoid that, create a new config manager that only reads local
-                # config (system and .git/config), plus any overrides given to this
-                # datalad session
-                proc_cfg = ConfigManager(
-                    ds, source='local', overrides=dlcfg.overrides
-                ) if ds and ds.is_installed() else dlcfg
+                return spec
 
             spec = proc_cfg.get(cfg_key, None)
             if spec is None:
-                return None, proc_cfg
+                return None
             elif not isinstance(spec, tuple):
                 spec = [spec]
-            return [shlex.split(s) for s in spec], proc_cfg
+            return [shlex.split(s) for s in spec]
 
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
-        proc_pre, proc_cfg = _get_procedure_specs(
+
+        # .is_installed and .config can be costly, so ensure we do
+        # it only once. See https://github.com/datalad/datalad/issues/3575
+        from datalad.distribution.dataset import Dataset
+        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
+            else Dataset(dataset_arg) if dataset_arg else None
+        # do not reuse a dataset's existing config manager here
+        # they are configured to read the committed dataset configuration
+        # too. That means a datalad update can silently bring in new
+        # procedure definitions from the outside, and in some sense enable
+        # remote code execution by a 3rd-party
+        # To avoid that, create a new config manager that only reads local
+        # config (system and .git/config), plus any overrides given to this
+        # datalad session
+        proc_cfg = ConfigManager(
+            ds, source='local', overrides=dlcfg.overrides
+        ) if ds and ds.is_installed() else dlcfg
+
+        proc_pre = _get_procedure_specs(
             'proc_pre',
             'datalad.{}.proc-pre'.format(cmdline_name),
-            ds=dataset_arg)
-        proc_post, proc_cfg = _get_procedure_specs(
+            ds=dataset_arg,
+            proc_cfg=proc_cfg)
+        proc_post = _get_procedure_specs(
             'proc_post',
             'datalad.{}.proc-post'.format(cmdline_name),
             ds=dataset_arg,
             proc_cfg=proc_cfg)
+
+        # look for hooks
+        hooks = get_hooks_from_config(proc_cfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -430,6 +435,20 @@ def eval_results(func):
                     on_failure, incomplete_results,
                     result_renderer, result_xfm, _result_filter,
                     result_log_level, **_kwargs):
+                for hook, spec in hooks.items():
+                    # run the hooks before we yield the result
+                    # this ensures that they are executed before
+                    # a potentially wrapper command gets to act
+                    # on them
+                    if hook_match_result(hook, r, spec['match']):
+                        lgr.debug('Result %s matches hook %s', r, hook)
+                        # a hook is also a command that yields results
+                        # so yield them outside too
+                        # users need to pay attention to void infinite
+                        # loops, i.e. when a hook yields a result that
+                        # triggers that same hook again
+                        for hr in run_hook(hook, spec, r, dataset_arg):
+                            yield hr
                 yield r
                 # collect if summary is desired
                 if do_custom_result_summary:
@@ -612,3 +631,81 @@ def _process_results(
                 continue
 
         yield res
+
+
+def get_hooks_from_config(cfg):
+    hooks = {}
+    for h in (k for k in cfg.keys()
+              if k.startswith('datalad.result-hook.')
+              and k.endswith('.match')):
+        proc = cfg.get('{}.proc'.format(h[:-6]), None)
+        if not proc:
+            lgr.warning(
+                'Incomplete result hook configuration %s in %s' % (
+                    h[:-6], cfg))
+            continue
+        sep = proc.index(' ')
+        hooks[h[20:-6]] = dict(
+            cmd=proc[:sep],
+            args=proc[sep + 1:],
+            match=json.loads(cfg.get(h)),
+        )
+    return hooks
+
+
+def hook_match_result(hook, res, match):
+    for k, v in match.items():
+        # do not test 'k not in res', because we could have a match that
+        # wants to make sure that a particular value is not present, and
+        # not having the key would be OK in that case
+
+        # in case the target value is an actual list, an explicit action 'eq'
+        # must be given
+        action, val = (v[0], v[1]) if isinstance(v, list) else ('eq', v)
+        if action == 'eq':
+            if k in res and res[k] == val:
+                continue
+        elif action == 'neq':
+            if k not in res or res[k] != val:
+                continue
+        elif action == 'in':
+            if k in res and res[k] in val:
+                continue
+        elif action == 'nin':
+            if k not in res or res[k] not in val:
+                continue
+        else:
+            lgr.warning(
+                'Unknown result comparison operation %s for hook %s, skipped',
+                action, hook)
+        # indentation level is intended!
+        return False
+    return True
+
+
+def run_hook(hook, spec, r, dataset_arg):
+    import datalad.api as dl
+    cmd_name = spec['cmd']
+    if not hasattr(dl, cmd_name):
+        # TODO maybe a proper error result?
+        lgr.warning(
+            'Hook %s requires unknown command %s, skipped',
+            hook, cmd_name)
+        return
+    cmd = getattr(dl, cmd_name)
+    # apply potential substitutions on the string form of the args
+    # for this particular result
+    args = spec['args'].format(
+        # we cannot use a dataset instance directly but must take the
+        # detour over the path location in order to have string substitution
+        # be possible
+        dsarg='' if dataset_arg is None else dataset_arg.path
+        if isinstance(dataset_arg, dl.Dataset) else dataset_arg,
+        **r)
+    # now load
+    args = json.loads(args)
+    # only debug level, the hook can issue its own results and communicate
+    # through them
+    lgr.debug('Running hook %s: %s%s', hook, cmd_name, args)
+    for r in cmd(**args):
+        yield r
