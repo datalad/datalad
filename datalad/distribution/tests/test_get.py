@@ -194,7 +194,7 @@ def test_get_invalid_call(path, file_outside):
     res = ds.get(file_outside, on_failure='ignore', result_renderer='default')
     assert_in_results(
         res, status='error',
-        message=('path not associated with dataset', ds))
+        message=('path not associated with dataset %s', ds))
 
 
 @with_testrepos('basic_annex', flavors='clone')

@@ -671,7 +671,7 @@ def test_install_skip_list_arguments(src, path, path_outside):
         path=opj(ds.path, 'not_existing'))
     assert_result_count(
         result, 1, status='error',
-        message=("path not associated with dataset", ds),
+        message=("path not associated with dataset %s", ds),
         path=path_outside)
     for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, '2'))]:
         assert_result_count(
