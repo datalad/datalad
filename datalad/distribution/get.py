@@ -674,7 +674,7 @@ class Get(Interface):
                             action='get',
                             path=str(target_path),
                             status='error',
-                            message=('path not associated with dataset',
+                            message=('path not associated with dataset %s',
                                      refds),
                         )
                         continue
