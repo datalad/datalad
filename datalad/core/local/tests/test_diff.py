@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import os
 import os.path as op
+from datalad.support.external_versions import external_versions
 from datalad.support.exceptions import (
     NoDatasetArgumentFound,
 )
@@ -341,8 +342,14 @@ def test_path_diff(_path, linkpath):
     # duplicate paths do not change things
     eq_(plain_recursive, ds.diff(path=['.', '.'], recursive=True, annex='all'))
     # neither do nested paths
-    eq_(plain_recursive,
-        ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all'))
+    if external_versions["cmd:git"] < "2.24.0":
+        # TODO: The link below points to discussion of this behavioral change
+        # in Git. If the behavior is addressed in a future release, update the
+        # condition above with a ceiling. If it's not, think more about how to
+        # handle this change on our side.
+        # https://lore.kernel.org/git/87fti15agv.fsf@kyleam.com/T/#u
+        eq_(plain_recursive,
+            ds.diff(path=['.', 'subds_modified'], recursive=True, annex='all'))
     # when invoked in a subdir of a dataset it still reports on the full thing
     # just like `git status`, as long as there are no paths specified
     with chpwd(op.join(path, 'directory_untracked')):
