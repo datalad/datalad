@@ -29,7 +29,6 @@ from datalad.tests.utils import (
     known_failure_appveyor,
     known_failure_windows,
     swallow_outputs,
-    has_symlink_capability,
 )
 
 from datalad.distribution.dataset import Dataset
@@ -104,7 +103,7 @@ def test_basics(src, dst):
     eq_(clone_sub.config.get('datalad.metadata.nativetype'), 'bids')
 
     # hook auto-unlocks the file
-    if has_symlink_capability():
+    if not on_windows:
         ok_((clone.pathobj / 'file1').is_symlink())
     clone.get('file1')
     ok_(not (clone.pathobj / 'file1').is_symlink())
