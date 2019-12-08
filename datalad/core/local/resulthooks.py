@@ -19,6 +19,19 @@ lgr = logging.getLogger('datalad.core.local.hooks')
 
 
 def get_hooks_from_config(cfg):
+    """Parse out hook definitions given a ConfigManager instance
+
+    Returns
+    -------
+    dict
+      where keys are hook names/labels, and each value is a dict with
+      three keys: 'cmd' contains the name of the to-be-executed DataLad
+      command; 'args' has a JSON-encoded string with a dict of keyword
+      arguments for the command (format()-language based placeholders
+      can be present; 'match' hold a JSON-encoded string representing
+      a dict with key/value pairs that need to match a result in order
+      for a hook to be triggered.
+    """
     hooks = {}
     for h in (k for k in cfg.keys()
               if k.startswith('datalad.result-hook.')
@@ -39,6 +52,37 @@ def get_hooks_from_config(cfg):
 
 
 def match_hook2result(hook, res, match):
+    """Evaluate a hook's result match definition against a concrete result
+
+    A match definition is a dict that can contain any number of keys. For each
+    key it is tested, if the value matches the one in a given result.
+    If all present key/value pairs match, the hook is executed. In addition to
+    ``==`` tests, ``in``, ``not in``, and ``!=`` tests are supported. The
+    test operation can be given by wrapping the test value into a list, the
+    first item is the operation label 'eq', 'neq', 'in', 'nin'; the second value
+    is the test value (set). Example::
+
+        {
+          "type": ["in", ["file", "directory"]],
+          "action": "get",
+          "status": "notneeded"
+        }
+
+    Parameters
+    ----------
+    hook : str
+      Name of the hook
+    res : dict
+      Result dictionary
+    match : dict
+      Match definition (see above for details).
+
+    Returns
+    -------
+    bool
+      True if the given result matches the hook's match definition, or
+      False otherwise.
+    """
     for k, v in match.items():
         # do not test 'k not in res', because we could have a match that
         # wants to make sure that a particular value is not present, and
@@ -68,7 +112,35 @@ def match_hook2result(hook, res, match):
     return True
 
 
-def run_hook(hook, spec, r, dataset_arg):
+def run_hook(hook, spec, res, dsarg=None):
+    """Execute a hook on a given result
+
+    A hook definition's 'proc' specification may contain placeholders that
+    will be expanded using matching values in the given result record. In
+    addition to keys in the result an '{dsarg}' placeholder is supported.
+    The characters '{' and '}' in the 'proc' specification that are not part
+    of format() placeholders have to be escaped as '{{' and '}}'. Example
+    'proc' specification to execute the DataLad ``unlock`` command::
+
+        unlock {{"dataset": "{dsarg}", "path": "{path}"}}
+
+    Parameters
+    ----------
+    hook : str
+      Name of the hook
+    spec : dict
+      Hook definition as returned by `get_hooks_from_config()`
+    res : dict
+      Result records that was found to match the hook definition.
+    dsarg : Dataset or str or None, optional
+      Value to substitute a {dsarg} placeholder in a hook 'proc' specification
+      with. Non-string values are automatically converted.
+
+    Yields
+    ------
+    dict
+      Any result yielded by the command executed as hook.
+    """
     import datalad.api as dl
     cmd_name = spec['cmd']
     if not hasattr(dl, cmd_name):
@@ -89,10 +161,10 @@ def run_hook(hook, spec, r, dataset_arg):
         # we cannot use a dataset instance directly but must take the
         # detour over the path location in order to have string substitution
         # be possible
-        dsarg='' if dataset_arg is None else enc(dataset_arg.path).strip('"')
-        if isinstance(dataset_arg, dl.Dataset) else enc(dataset_arg).strip('"'),
+        dsarg='' if dsarg is None else enc(dsarg.path).strip('"')
+        if isinstance(dsarg, dl.Dataset) else enc(dsarg).strip('"'),
         # skip any present logger that we only carry for internal purposes
-        **{k: enc(str(v)).strip('"') for k, v in r.items() if k != 'logger'})
+        **{k: enc(str(v)).strip('"') for k, v in res.items() if k != 'logger'})
     # now load
     args = json.loads(args)
     # only debug level, the hook can issue its own results and communicate
