@@ -358,6 +358,27 @@ def _remove_empty_items(list_):
     return [file_ for file_ in list_ if file_]
 
 
+if external_versions["cmd:git"] >= "2.24.0":
+    # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
+    # into untracked submodules when multiple pathspecs are given, returning
+    # repositories that are deeper than the first level. This helper filters
+    # these deeper levels out so that save_() doesn't fail trying to add them.
+    #
+    # TODO: Once an upstream release includes a fix, either set a ceiling on
+    # the Git version above or remove _prune_deeper_repos() entirely.
+    def _prune_deeper_repos(repos):
+        firstlevel_repos = []
+        prev = None
+        for repo in sorted(repos):
+            if not (prev and str(repo).startswith(prev)):
+                prev = str(repo)
+                firstlevel_repos.append(repo)
+        return firstlevel_repos
+else:
+    def _prune_deeper_repos(repos):
+        return repos
+
+
 def Repo(*args, **kwargs):
     """Factory method around gitpy.Repo to consistently initiate with different
     backend
@@ -3817,6 +3838,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     # still reported as a directory must be its own repository
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
+            to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
                 try:
                     self.add_submodule(
