@@ -12,26 +12,10 @@ from datalad.utils import (
     on_windows,
 )
 from datalad.tests.utils import (
-    assert_status,
-    assert_repo_status,
-    assert_result_count,
-    assert_in,
-    assert_in_results,
-    assert_not_in,
-    assert_raises,
-    create_tree,
     with_tempfile,
-    with_tree,
-    with_testrepos,
     eq_,
     ok_,
-    chpwd,
-    known_failure_appveyor,
-    known_failure_windows,
-    swallow_outputs,
 )
-
-from datalad.distribution.dataset import Dataset
 from datalad.api import (
     Dataset,
     install,
