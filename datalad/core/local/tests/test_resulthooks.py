@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     with_tempfile,
     eq_,
     ok_,
+    assert_result_count,
 )
 from datalad.api import (
     Dataset,
@@ -89,7 +90,9 @@ def test_basics(src, dst):
     # hook auto-unlocks the file
     if not on_windows:
         ok_((clone.pathobj / 'file1').is_symlink())
-    clone.get('file1')
+    # we get to see the results from the hook too!
+    assert_result_count(
+        clone.get('file1'), 1, action='unlock', path=str(clone.pathobj / 'file1'))
     ok_(not (clone.pathobj / 'file1').is_symlink())
 
     if not on_windows:
