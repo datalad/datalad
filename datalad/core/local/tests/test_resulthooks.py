@@ -90,9 +90,11 @@ def test_basics(src, dst):
     # hook auto-unlocks the file
     if not on_windows:
         ok_((clone.pathobj / 'file1').is_symlink())
-    # we get to see the results from the hook too!
-    assert_result_count(
-        clone.get('file1'), 1, action='unlock', path=str(clone.pathobj / 'file1'))
+    res = clone.get('file1')
+    if not on_windows:
+        # we get to see the results from the hook too!
+        assert_result_count(
+            res, 1, action='unlock', path=str(clone.pathobj / 'file1'))
     ok_(not (clone.pathobj / 'file1').is_symlink())
 
     if not on_windows:
