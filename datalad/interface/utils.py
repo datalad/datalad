@@ -695,13 +695,19 @@ def run_hook(hook, spec, r, dataset_arg):
     cmd = getattr(dl, cmd_name)
     # apply potential substitutions on the string form of the args
     # for this particular result
+    # take care of proper JSON encoding for each value
+    enc = json.JSONEncoder().encode
+    # we have to ensure JSON encoding of all values (some might be Path instances),
+    # we are taking off the outer quoting, to enable flexible combination
+    # of individual items in supplied command and argument templates
     args = spec['args'].format(
         # we cannot use a dataset instance directly but must take the
         # detour over the path location in order to have string substitution
         # be possible
-        dsarg='' if dataset_arg is None else dataset_arg.path
-        if isinstance(dataset_arg, dl.Dataset) else dataset_arg,
-        **r)
+        dsarg='' if dataset_arg is None else enc(dataset_arg.path).strip('"')
+        if isinstance(dataset_arg, dl.Dataset) else enc(dataset_arg).strip('"'),
+        # skip any present logger that we only carry for internal purposes
+        **{k: enc(str(v)).strip('"') for k, v in r.items() if k != 'logger'})
     # now load
     args = json.loads(args)
     # only debug level, the hook can issue its own results and communicate
