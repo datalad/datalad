@@ -68,6 +68,9 @@ def match_hook2result(hook, res, match):
           "status": "notneeded"
         }
 
+    If a to be tested value is a list, an 'eq' operation needs to be specified
+    explicitly in order to disambiguate the definition.
+
     Parameters
     ----------
     hook : str
