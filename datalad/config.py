@@ -159,6 +159,10 @@ class ConfigManager(object):
       If provided, all `git config` calls are executed in this dataset's
       directory. Moreover, any modifications are, by default, directed to
       this dataset's configuration file (which will be created on demand)
+    dataset_only : bool
+      Legacy option, do not use.
+    overrides : dict, optional
+      Variable overrides, see general class documentation for details.
     source : {'any', 'local', 'dataset'}, optional
       Which sources of configuration setting to consider. If 'dataset',
       configuration items are only read from a dataset's persistent
@@ -166,16 +170,20 @@ class ConfigManager(object):
       ``.git/config``); if 'local' any non-committed source is considered
       (local and global configuration in Git config's terminology); if 'any'
       all possible sources of configuration are considered.
-    overrides : dict, optional
-      Variable overrides, see general class documentation for details.
     """
 
     _checked_git_identity = False
 
-    def __init__(self, dataset=None, source='any', overrides=None):
+    def __init__(self, dataset=None, dataset_only=False, overrides=None, source='any'):
         if source not in ('any', 'local', 'dataset'):
             raise ValueError(
                 'Unkown ConfigManager(source=) setting: {}'.format(source))
+            # legacy compat
+        if dataset_only:
+            if source != 'any':
+                raise ValueError('Refuse to combine legacy dataset_only flag, with '
+                                 'source setting')
+            source = 'dataset'
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
