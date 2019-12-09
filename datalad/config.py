@@ -160,22 +160,39 @@ class ConfigManager(object):
       directory. Moreover, any modifications are, by default, directed to
       this dataset's configuration file (which will be created on demand)
     dataset_only : bool
-      If True, configuration items are only read from a datasets persistent
-      configuration file, if any present (the one in ``.datalad/config``, not
-      ``.git/config``).
+      Legacy option, do not use.
     overrides : dict, optional
       Variable overrides, see general class documentation for details.
+    source : {'any', 'local', 'dataset'}, optional
+      Which sources of configuration setting to consider. If 'dataset',
+      configuration items are only read from a dataset's persistent
+      configuration file, if any is present (the one in ``.datalad/config``, not
+      ``.git/config``); if 'local' any non-committed source is considered
+      (local and global configuration in Git config's terminology); if 'any'
+      all possible sources of configuration are considered.
     """
 
     _checked_git_identity = False
 
-    def __init__(self, dataset=None, dataset_only=False, overrides=None):
+    def __init__(self, dataset=None, dataset_only=False, overrides=None, source='any'):
+        if source not in ('any', 'local', 'dataset'):
+            raise ValueError(
+                'Unkown ConfigManager(source=) setting: {}'.format(source))
+            # legacy compat
+        if dataset_only:
+            if source != 'any':
+                raise ValueError('Refuse to combine legacy dataset_only flag, with '
+                                 'source setting')
+            source = 'dataset'
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately
         self._store = {}
         self._cfgfiles = set()
         self._cfgmtimes = None
+        self._dataset_path = None
+        self._dataset_cfgfname = None
+        self._repo_cfgfname = None
         # public dict to store variables that always override any setting
         # read from a file
         # `hasattr()` is needed because `datalad.cfg` is generated upon first module
@@ -185,15 +202,18 @@ class ConfigManager(object):
         if overrides is not None:
             self.overrides.update(overrides)
         if dataset is None:
-            self._dataset_path = None
-            self._dataset_cfgfname = None
-            self._repo_cfgfname = None
+            if source == 'dataset':
+                raise ValueError(
+                    'ConfigManager configured to read dataset only, '
+                    'but no dataset given')
         else:
             self._dataset_path = dataset.path
-            self._dataset_cfgfname = opj(self._dataset_path, DATASET_CONFIG_FILE)
-            if not dataset_only:
+            if source != 'local':
+                self._dataset_cfgfname = opj(self._dataset_path,
+                                             DATASET_CONFIG_FILE)
+            if source != 'dataset':
                 self._repo_cfgfname = opj(self._dataset_path, '.git', 'config')
-        self._dataset_only = dataset_only
+        self._src_mode = source
         # Since configs could contain sensitive information, to prevent
         # any "facilitated" leakage -- just disable logging of outputs for
         # this runner
@@ -206,7 +226,7 @@ class ConfigManager(object):
         try:
             self._gitconfig_has_showorgin = \
                 LooseVersion(get_git_version(self._runner)) >= '2.8.0'
-        except:
+        except Exception:
             # no git something else broken, assume git is present anyway
             # to not delay this, but assume it is old
             self._gitconfig_has_showorgin = False
@@ -260,8 +280,8 @@ class ConfigManager(object):
                 self._store, self._cfgfiles = _parse_gitconfig_dump(
                     stdout, self._store, self._cfgfiles, replace=False)
 
-        if self._dataset_only:
-            # superimpose overrides
+        if self._src_mode == 'dataset':
+            # superimpose overrides, and stop early
             self._store.update(self.overrides)
             return
 
