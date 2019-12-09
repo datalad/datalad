@@ -550,23 +550,7 @@ def _process_results(
                 res_lgr(msg, *msgargs)
             else:
                 res_lgr(msg)
-        ## error handling
-        # looks for error status, and report at the end via
-        # an exception
-        if on_failure in ('continue', 'stop') \
-                and res['status'] in ('impossible', 'error'):
-            incomplete_results.append(res)
-            if on_failure == 'stop':
-                # first fail -> that's it
-                # raise will happen after the loop
-                break
-        if result_filter:
-            try:
-                if not result_filter(res):
-                    raise ValueError('excluded by filter')
-            except ValueError as e:
-                lgr.debug('not reporting result (%s)', exc_str(e))
-                continue
+
         ## output rendering
         # TODO RF this in a simple callable that gets passed into this function
         if result_renderer is None or result_renderer == 'disabled':
@@ -592,8 +576,28 @@ def _process_results(
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
+        ## error handling
+        # looks for error status, and report at the end via
+        # an exception
+        if on_failure in ('continue', 'stop') \
+                and res['status'] in ('impossible', 'error'):
+            incomplete_results.append(res)
+            if on_failure == 'stop':
+                # first fail -> that's it
+                # raise will happen after the loop
+                break
+
+        if result_filter:
+            try:
+                if not result_filter(res):
+                    raise ValueError('excluded by filter')
+            except ValueError as e:
+                lgr.debug('not reporting result (%s)', exc_str(e))
+                continue
+
         if result_xfm:
             res = result_xfm(res)
             if res is None:
                 continue
+
         yield res
