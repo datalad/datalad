@@ -173,6 +173,9 @@ class ConfigManager(object):
     _checked_git_identity = False
 
     def __init__(self, dataset=None, source='any', overrides=None):
+        if source not in ('any', 'local', 'dataset'):
+            raise ValueError(
+                'Unkown ConfigManager(source=) setting: {}'.format(source))
         # store in a simple dict
         # no subclassing, because we want to be largely read-only, and implement
         # config writing separately

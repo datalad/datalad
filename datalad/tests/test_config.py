@@ -205,6 +205,15 @@ def test_something(path, new_home):
 def test_crazy_cfg(path):
     cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
     assert_in('crazy.padry', cfg)
+    # make sure crazy config is not read when in local mode
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
+    assert_not_in('crazy.padry', cfg)
+    # it will make it in in 'any' mode though
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='any')
+    assert_in('crazy.padry', cfg)
+    # typos in the source mode arg will not have silent side-effects
+    assert_raises(
+        ValueError, ConfigManager, Dataset(opj(path, 'ds')), source='locale')
 
 
 @with_tempfile
