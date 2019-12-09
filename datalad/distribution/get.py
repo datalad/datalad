@@ -268,18 +268,24 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             result_renderer='disabled',
             return_type='generator',
             **kwargs):
+        # make sure to fix a detached HEAD before yielding the install success
+        # result. The resetting of the branch would undo any change done
+        # to the repo by processing in response to the result
+        if res.get('action', None) == 'install' and \
+                res.get('status', None) == 'ok' and \
+                res.get('type', None) == 'dataset' and \
+                res.get('path', None) == dest_path:
+            _fixup_submodule_dotgit_setup(ds, sm_path)
+
+            # do fancy update
+            lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
+            ds.repo.update_submodule(sm_path, init=True)
         yield res
 
     subds = Dataset(dest_path)
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
         return
-
-    _fixup_submodule_dotgit_setup(ds, sm_path)
-
-    # do fancy update
-    lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-    ds.repo.update_submodule(sm_path, init=True)
 
 
 def _install_necessary_subdatasets(
