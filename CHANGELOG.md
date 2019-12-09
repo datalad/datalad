@@ -31,6 +31,10 @@ bet we will fix some bugs and make a world even a better place.
   function learned to return a URL untouched if an "s3://" URL comes
   in with a version ID.  ([#3842][])
 
+- A few spots needed to be adjusted for compatibility with git-annex's
+  new `--sameas` [feature][gx-sameas], which allows special remotes to
+  share a data store. ([#3856][])
+
 ### Enhancements and new features
 
 ?
@@ -1276,6 +1280,7 @@ Release primarily focusing on interface functionality including initial
 publishing
 
 [git-annex]: http://git-annex.branchable.com/
+[gx-sameas]: https://git-annex.branchable.com/tips/multiple_remotes_accessing_the_same_data_store/
 [duecredit]: https://github.com/duecredit/duecredit
 
 [Kaggle]: https://www.kaggle.com
@@ -1520,3 +1525,4 @@ publishing
 [#3794]: https://github.com/datalad/datalad/issues/3794
 [#3842]: https://github.com/datalad/datalad/issues/3842
 [#3851]: https://github.com/datalad/datalad/issues/3851
+[#3856]: https://github.com/datalad/datalad/issues/3856
