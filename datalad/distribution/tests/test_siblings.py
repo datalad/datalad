@@ -10,19 +10,25 @@
 """
 
 from os.path import join as opj, basename
+
+from datalad.api import clone
 from datalad.api import create
+from datalad.api import Dataset
 from datalad.api import install
 from datalad.api import siblings
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.tests.utils import chpwd
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_tempfile, with_testrepos
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import with_sameas_remote
 
 from nose.tools import eq_, ok_
 
@@ -249,3 +255,22 @@ def test_arg_missing(path, path2):
         'ok',
         ds.siblings(
             'add', url=path2, name='somename'))
+
+
+@with_sameas_remote
+@with_tempfile(mkdir=True)
+def test_sibling_enable_sameas(repo, clone_path):
+    ds = Dataset(repo.path)
+    create_tree(ds.path, {"f0": "0"})
+    ds.save(path="f0")
+    ds.repo.copy_to(["f0"], remote="r_dir")
+    ds.repo.drop(["f0"])
+
+    ds_cloned = clone(ds.path, clone_path,
+                      result_xfm="datasets", return_type="item-or-list")
+
+    assert_false(ds_cloned.repo.file_has_content("f0"))
+    res = ds_cloned.siblings(action="enable", name="r_rsync")
+    assert_status("ok", res)
+    ds_cloned.get(path=["f0"])
+    ok_(ds_cloned.repo.file_has_content("f0"))
