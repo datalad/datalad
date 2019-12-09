@@ -54,7 +54,7 @@ def test_basics(src, dst):
     )
     # configure another one that will unlock any obtained file
     # {dsarg} is substituted by the dataset arg of the command that
-    # the eval_func() decorator belongs too
+    # the eval_func() decorator belongs to
     # but it may not have any, as this is not the outcome of a
     # require_dataset(), but rather the verbatim input
     # it could be more useful to use {refds}

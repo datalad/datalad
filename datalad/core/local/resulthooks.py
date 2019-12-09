@@ -28,7 +28,7 @@ def get_hooks_from_config(cfg):
       three keys: 'cmd' contains the name of the to-be-executed DataLad
       command; 'args' has a JSON-encoded string with a dict of keyword
       arguments for the command (format()-language based placeholders
-      can be present; 'match' hold a JSON-encoded string representing
+      can be present); 'match' holds a JSON-encoded string representing
       a dict with key/value pairs that need to match a result in order
       for a hook to be triggered.
     """
@@ -120,7 +120,7 @@ def run_hook(hook, spec, res, dsarg=None):
 
     A hook definition's 'proc' specification may contain placeholders that
     will be expanded using matching values in the given result record. In
-    addition to keys in the result an '{dsarg}' placeholder is supported.
+    addition to keys in the result a '{dsarg}' placeholder is supported.
     The characters '{' and '}' in the 'proc' specification that are not part
     of format() placeholders have to be escaped as '{{' and '}}'. Example
     'proc' specification to execute the DataLad ``unlock`` command::
@@ -134,7 +134,7 @@ def run_hook(hook, spec, res, dsarg=None):
     spec : dict
       Hook definition as returned by `get_hooks_from_config()`
     res : dict
-      Result records that was found to match the hook definition.
+      Result records that were found to match the hook definition.
     dsarg : Dataset or str or None, optional
       Value to substitute a {dsarg} placeholder in a hook 'proc' specification
       with. Non-string values are automatically converted.
