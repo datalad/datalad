@@ -52,11 +52,10 @@ _dataset_config_template = {
 @with_tree(tree=_dataset_config_template)
 @with_tempfile(mkdir=True)
 def test_something(path, new_home):
-    # read nothing, has nothing
-    cfg = ConfigManager(dataset_only=True)
-    assert_false(len(cfg))
+    # will refuse to work on dataset without a dataset
+    assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
     assert_equal(len(cfg), 3)
     assert_in('something.user', cfg)
     # multi-value
@@ -154,7 +153,7 @@ def test_something(path, new_home):
                     {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
-        globalcfg = ConfigManager(dataset_only=False)
+        globalcfg = ConfigManager()
         assert_not_in('datalad.unittest.youcan', globalcfg)
         assert_in('datalad.sneaky.addition', globalcfg)
         cfg.add('datalad.unittest.youcan', 'removeme', where='global')
@@ -184,7 +183,7 @@ def test_something(path, new_home):
 
     cfg = ConfigManager(
         Dataset(opj(path, 'ds')),
-        dataset_only=True,
+        source='dataset',
         overrides={'datalad.godgiven': True})
     assert_equal(cfg.get('datalad.godgiven'), True)
     # setter has no effect
@@ -204,7 +203,7 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
     assert_in('crazy.padry', cfg)
 
 
@@ -309,7 +308,7 @@ def test_from_env():
     assert_in('datalad.crazy.cfg', cfg)
     assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
     # not in dataset-only mode
-    cfg = ConfigManager(Dataset('nowhere'), dataset_only=True)
+    cfg = ConfigManager(Dataset('nowhere'), source='dataset')
     assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()

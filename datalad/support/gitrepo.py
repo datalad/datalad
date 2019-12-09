@@ -1090,7 +1090,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         if self._cfg is None:
             # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            self._cfg = ConfigManager(dataset=self, source='any')
         return self._cfg
 
     def is_with_annex(self):
