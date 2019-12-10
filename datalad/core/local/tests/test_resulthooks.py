@@ -38,7 +38,7 @@ def test_basics(src, dst):
     # and configure it, such that it modifies each obtained subdataset
     # on install to have 'bids' listed as a metadata type
     clone.config.set(
-        'datalad.result-hook.alwaysbids.proc',
+        'datalad.result-hook.alwaysbids.call-json',
         # the spec is like --proc-post/pre, but has the dataset to run on as
         # the first element
         # string substitutions based on the result record are supported
@@ -47,7 +47,7 @@ def test_basics(src, dst):
     )
     # config on which kind of results this hook should operate
     clone.config.set(
-        'datalad.result-hook.alwaysbids.match',
+        'datalad.result-hook.alwaysbids.match-json',
         # any successfully installed dataset
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
         where='local',
@@ -59,25 +59,25 @@ def test_basics(src, dst):
     # require_dataset(), but rather the verbatim input
     # it could be more useful to use {refds}
     clone.config.set(
-        'datalad.result-hook.unlockfiles.proc',
+        'datalad.result-hook.unlockfiles.call-json',
         'unlock {{"dataset":"{dsarg}","path":"{path}"}}',
         where='local',
     )
     clone.config.set(
-        'datalad.result-hook.unlockfiles.match',
+        'datalad.result-hook.unlockfiles.match-json',
         '{"type":"file","action":"get","status":"ok"}',
         where='local',
     )
     if not on_windows:
         # and one that runs a shell command on any notneeded file-get
         clone.config.set(
-            'datalad.result-hook.annoy.proc',
+            'datalad.result-hook.annoy.call-json',
             'run {{"cmd":"touch {path}_annoyed",'
             '"dataset":"{dsarg}","explicit":true}}',
             where='local',
         )
         clone.config.set(
-            'datalad.result-hook.annoy.match',
+            'datalad.result-hook.annoy.match-json',
             '{"type":["in", ["file"]],"action":"get","status":"notneeded"}',
             where='local',
         )

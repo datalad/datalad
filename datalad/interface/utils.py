@@ -55,9 +55,9 @@ from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
 from datalad.config import ConfigManager
 from datalad.core.local.resulthooks import (
-    get_hooks_from_config,
-    match_hook2result,
-    run_hook,
+    get_jsonhooks_from_config,
+    match_jsonhook2result,
+    run_jsonhook,
 )
 
 
@@ -400,7 +400,7 @@ def eval_results(func):
             proc_cfg=proc_cfg)
 
         # look for hooks
-        hooks = get_hooks_from_config(proc_cfg)
+        hooks = get_jsonhooks_from_config(proc_cfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -445,14 +445,14 @@ def eval_results(func):
                     # this ensures that they are executed before
                     # a potentially wrapper command gets to act
                     # on them
-                    if match_hook2result(hook, r, spec['match']):
+                    if match_jsonhook2result(hook, r, spec['match']):
                         lgr.debug('Result %s matches hook %s', r, hook)
                         # a hook is also a command that yields results
                         # so yield them outside too
                         # users need to pay attention to void infinite
                         # loops, i.e. when a hook yields a result that
                         # triggers that same hook again
-                        for hr in run_hook(hook, spec, r, dataset_arg):
+                        for hr in run_jsonhook(hook, spec, r, dataset_arg):
                             yield hr
                 yield r
                 # collect if summary is desired

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface utility functions
+"""Utility functions for result hooks
 
 """
 
@@ -15,10 +15,10 @@ __docformat__ = 'restructuredtext'
 import logging
 import json
 
-lgr = logging.getLogger('datalad.core.local.hooks')
+lgr = logging.getLogger('datalad.core.local.resulthooks')
 
 
-def get_hooks_from_config(cfg):
+def get_jsonhooks_from_config(cfg):
     """Parse out hook definitions given a ConfigManager instance
 
     Returns
@@ -35,23 +35,23 @@ def get_hooks_from_config(cfg):
     hooks = {}
     for h in (k for k in cfg.keys()
               if k.startswith('datalad.result-hook.')
-              and k.endswith('.match')):
-        proc = cfg.get('{}.proc'.format(h[:-6]), None)
-        if not proc:
+              and k.endswith('.match-json')):
+        call = cfg.get('{}.call-json'.format(h[:-11]), None)
+        if not call:
             lgr.warning(
                 'Incomplete result hook configuration %s in %s' % (
-                    h[:-6], cfg))
+                    h[:-11], cfg))
             continue
-        sep = proc.index(' ')
-        hooks[h[20:-6]] = dict(
-            cmd=proc[:sep],
-            args=proc[sep + 1:],
+        sep = call.index(' ')
+        hooks[h[20:-11]] = dict(
+            cmd=call[:sep],
+            args=call[sep + 1:],
             match=json.loads(cfg.get(h)),
         )
     return hooks
 
 
-def match_hook2result(hook, res, match):
+def match_jsonhook2result(hook, res, match):
     """Evaluate a hook's result match definition against a concrete result
 
     A match definition is a dict that can contain any number of keys. For each
@@ -115,15 +115,15 @@ def match_hook2result(hook, res, match):
     return True
 
 
-def run_hook(hook, spec, res, dsarg=None):
+def run_jsonhook(hook, spec, res, dsarg=None):
     """Execute a hook on a given result
 
-    A hook definition's 'proc' specification may contain placeholders that
+    A hook definition's 'call' specification may contain placeholders that
     will be expanded using matching values in the given result record. In
     addition to keys in the result a '{dsarg}' placeholder is supported.
-    The characters '{' and '}' in the 'proc' specification that are not part
+    The characters '{' and '}' in the 'call' specification that are not part
     of format() placeholders have to be escaped as '{{' and '}}'. Example
-    'proc' specification to execute the DataLad ``unlock`` command::
+    'call' specification to execute the DataLad ``unlock`` command::
 
         unlock {{"dataset": "{dsarg}", "path": "{path}"}}
 
@@ -136,7 +136,7 @@ def run_hook(hook, spec, res, dsarg=None):
     res : dict
       Result records that were found to match the hook definition.
     dsarg : Dataset or str or None, optional
-      Value to substitute a {dsarg} placeholder in a hook 'proc' specification
+      Value to substitute a {dsarg} placeholder in a hook 'call' specification
       with. Non-string values are automatically converted.
 
     Yields
