@@ -33,9 +33,9 @@ def get_jsonhooks_from_config(cfg):
       for a hook to be triggered.
     """
     hooks = {}
-    for h in (k for k in cfg.keys()
-              if k.startswith('datalad.result-hook.')
-              and k.endswith('.match-json')):
+    for h in cfg.keys():
+        if not (h.startswith('datalad.result-hook.') and h.endswith('.match-json')):
+            continue
         call = cfg.get('{}.call-json'.format(h[:-11]), None)
         if not call:
             lgr.warning(
