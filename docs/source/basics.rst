@@ -185,6 +185,8 @@ There are also some useful pre-defined "shortcut" values for dataset arguments:
    For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
    to search metadata of the entire superdataset you are under (in this case
    ``///``), run ``datalad search -d^ [something to search]``.
+``^.``
+   the dataset the current directory is part of.
 
 Commands `install` vs `get`
 ---------------------------
