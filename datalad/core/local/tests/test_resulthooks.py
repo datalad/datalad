@@ -52,6 +52,13 @@ def test_basics(src, dst):
         '{"type":"dataset","action":"install","status":["eq", "ok"]}',
         where='local',
     )
+    # a smoke test to see if a hook definition without any call args works too
+    clone.config.set('datalad.result-hook.wtf.call-json', 'wtf', where='local')
+    clone.config.set(
+        'datalad.result-hook.wtf.match-json',
+        '{"type":"dataset","action":"install","status":["eq", "ok"]}',
+        where='local',
+    )
     # configure another one that will unlock any obtained file
     # {dsarg} is substituted by the dataset arg of the command that
     # the eval_func() decorator belongs to
