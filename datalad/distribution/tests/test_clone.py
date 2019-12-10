@@ -62,6 +62,7 @@ from datalad.tests.utils import (
     use_cassette,
     skip_if_no_network,
     skip_if,
+    with_sameas_remote,
 )
 from datalad.distribution.clone import _get_installationpath_from_url
 from datalad.distribution.dataset import Dataset
@@ -371,6 +372,23 @@ def test_autoenabled_remote_msg(path):
         res = clone('///repronim/containers', path)
         assert_status('ok', res)
         assert_not_in("not auto-enabled", cml.out)
+
+
+@with_sameas_remote(autoenabled=True)
+@with_tempfile(mkdir=True)
+def test_clone_autoenable_msg_handles_sameas(repo, clone_path):
+    ds = Dataset(repo.path)
+    with swallow_logs(new_level=logging.INFO) as cml:
+        res = clone(ds, clone_path)
+        assert_status('ok', res)
+        assert_in("r_dir", cml.out)
+        assert_in("not auto-enabled", cml.out)
+        # The rsyncurl remote was enabled.
+        assert_not_in("r_rsync", cml.out)
+    ds_cloned = Dataset(clone_path)
+    remotes = ds_cloned.repo.get_remotes()
+    assert_in("r_rsync", remotes)
+    assert_not_in("r_dir", remotes)
 
 
 def test_installationpath_from_url():

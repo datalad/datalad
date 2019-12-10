@@ -262,13 +262,14 @@ class AutomagicIO(object):
             # might fail.  TODO: troubleshoot when it does e.g.
             # datalad/tests/test_auto.py:test_proxying_open_testrepobased
             under_annex = annex.is_under_annex(filepath, batch=True)
-        except:  # MIH: really? what if MemoryError
+        except Exception as exc:  # MIH: really? what if MemoryError
+            lgr.log(5, " cannot determine if %s under annex: %s", filepath, exc_str(exc))
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("AutomagicIO: retrieving file content of %s", filepath)
             out = annex.get(filepath)
-            if not out.get('success', False):
+            if out and not out.get('success', False):
                 # to assure that it is present and without trailing/leading new lines
                 out['note'] = out.get('note', '').strip()
                 lgr.error("Failed to retrieve %(file)s: %(note)s", out)
