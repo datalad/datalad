@@ -36,17 +36,32 @@ def get_jsonhooks_from_config(cfg):
     for h in cfg.keys():
         if not (h.startswith('datalad.result-hook.') and h.endswith('.match-json')):
             continue
-        call = cfg.get('{}.call-json'.format(h[:-11]), None)
+        hook_basevar = h[:-11]
+        hook_name = hook_basevar[20:]
+        call = cfg.get('{}.call-json'.format(hook_basevar), None)
         if not call:
             lgr.warning(
                 'Incomplete result hook configuration %s in %s' % (
-                    h[:-11], cfg))
+                    hook_basevar, cfg))
             continue
-        sep = call.index(' ')
-        hooks[h[20:-11]] = dict(
-            cmd=call[:sep],
-            args=call[sep + 1:],
-            match=json.loads(cfg.get(h)),
+        # split command from any args
+        call = call.split(maxsplit=1)
+        # get the match specification in JSON format
+        try:
+            match = json.loads(cfg.get(h))
+        except Exception as e:
+            from datalad.dochelpers import exc_str
+            lgr.warning(
+                'Invalid match specification in %s: %s [%s], '
+                'hook will be skipped',
+                h, cfg.get(h), exc_str(e))
+            continue
+
+        hooks[hook_name] = dict(
+            cmd=call[0],
+            # support no-arg calls too
+            args=call[1] if len(call) > 1 else '{{}}',
+            match=match,
         )
     return hooks
 
@@ -169,7 +184,16 @@ def run_jsonhook(hook, spec, res, dsarg=None):
         # skip any present logger that we only carry for internal purposes
         **{k: enc(str(v)).strip('"') for k, v in res.items() if k != 'logger'})
     # now load
-    args = json.loads(args)
+    try:
+        args = json.loads(args)
+    except Exception as e:
+        from datalad.dochelpers import exc_str
+        lgr.warning(
+            'Invalid argument specification for hook %s '
+            '(after parameter substitutions): %s [%s], '
+            'hook will be skipped',
+            hook, args, exc_str(e))
+        return
     # only debug level, the hook can issue its own results and communicate
     # through them
     lgr.debug('Running hook %s: %s%s', hook, cmd_name, args)
