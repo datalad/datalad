@@ -27,14 +27,12 @@ from os import mkdir
 from os import chmod
 
 from mock import patch
-from nose import SkipTest
 
 from datalad.api import create
 from datalad.api import clone
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.utils import on_windows
-from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
