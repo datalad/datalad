@@ -220,7 +220,9 @@ URLs:
                                 url,
                                 # avoid batch mode for single files
                                 # https://github.com/datalad/datalad/issues/2849
-                                batch=len(annex_paths) > 1)
+                                batch=len(annex_paths) > 1,
+                                # bypass URL size check, we already have the file
+                                options=['--relaxed'])
                         except AnnexBatchCommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
                                         path, url, exc_str(exc))
