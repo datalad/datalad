@@ -448,6 +448,11 @@ class ConfigManager(object):
             self.add(var, '{}'.format(_value), where=where, reload=reload)
         return value
 
+    def __str__(self):
+        return "ConfigManager({}{})".format(
+            self._cfgfiles,
+            '+ overrides' if self.overrides else '',
+        )
     #
     # Compatibility with dict API
     #

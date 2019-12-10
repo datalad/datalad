@@ -54,6 +54,11 @@ from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
 from datalad.config import ConfigManager
+from datalad.core.local.resulthooks import (
+    get_jsonhooks_from_config,
+    match_jsonhook2result,
+    run_jsonhook,
+)
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -353,44 +358,49 @@ def eval_results(func):
             spec = common_params.get(param_key, None)
             if spec is not None:
                 # this is already a list of lists
-                return spec, proc_cfg
-
-            if not proc_cfg:
-                # .is_installed and .config can be costly, so ensure we do
-                # it only once. See https://github.com/datalad/datalad/issues/3575
-                from datalad.distribution.dataset import Dataset
-                ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-                # do not reuse a dataset's existing config manager here
-                # they are configured to read the committed dataset configuration
-                # too. That means a datalad update can silently bring in new
-                # procedure definitions from the outside, and in some sense enable
-                # remote code execution by a 3rd-party
-                # To avoid that, create a new config manager that only reads local
-                # config (system and .git/config), plus any overrides given to this
-                # datalad session
-                proc_cfg = ConfigManager(
-                    ds, source='local', overrides=dlcfg.overrides
-                ) if ds and ds.is_installed() else dlcfg
+                return spec
 
             spec = proc_cfg.get(cfg_key, None)
             if spec is None:
-                return None, proc_cfg
+                return None
             elif not isinstance(spec, tuple):
                 spec = [spec]
-            return [shlex.split(s) for s in spec], proc_cfg
+            return [shlex.split(s) for s in spec]
 
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
-        proc_pre, proc_cfg = _get_procedure_specs(
+
+        # .is_installed and .config can be costly, so ensure we do
+        # it only once. See https://github.com/datalad/datalad/issues/3575
+        from datalad.distribution.dataset import Dataset
+        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
+            else Dataset(dataset_arg) if dataset_arg else None
+        # do not reuse a dataset's existing config manager here
+        # they are configured to read the committed dataset configuration
+        # too. That means a datalad update can silently bring in new
+        # procedure definitions from the outside, and in some sense enable
+        # remote code execution by a 3rd-party
+        # To avoid that, create a new config manager that only reads local
+        # config (system and .git/config), plus any overrides given to this
+        # datalad session
+        proc_cfg = ConfigManager(
+            ds, source='local', overrides=dlcfg.overrides
+        ) if ds and ds.is_installed() else dlcfg
+
+        proc_pre = _get_procedure_specs(
             'proc_pre',
             'datalad.{}.proc-pre'.format(cmdline_name),
-            ds=dataset_arg)
-        proc_post, proc_cfg = _get_procedure_specs(
+            ds=dataset_arg,
+            proc_cfg=proc_cfg)
+        proc_post = _get_procedure_specs(
             'proc_post',
             'datalad.{}.proc-post'.format(cmdline_name),
             ds=dataset_arg,
             proc_cfg=proc_cfg)
+
+        # look for hooks
+        hooks = get_jsonhooks_from_config(proc_cfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -430,6 +440,20 @@ def eval_results(func):
                     on_failure, incomplete_results,
                     result_renderer, result_xfm, _result_filter,
                     result_log_level, **_kwargs):
+                for hook, spec in hooks.items():
+                    # run the hooks before we yield the result
+                    # this ensures that they are executed before
+                    # a potentially wrapper command gets to act
+                    # on them
+                    if match_jsonhook2result(hook, r, spec['match']):
+                        lgr.debug('Result %s matches hook %s', r, hook)
+                        # a hook is also a command that yields results
+                        # so yield them outside too
+                        # users need to pay attention to void infinite
+                        # loops, i.e. when a hook yields a result that
+                        # triggers that same hook again
+                        for hr in run_jsonhook(hook, spec, r, dataset_arg):
+                            yield hr
                 yield r
                 # collect if summary is desired
                 if do_custom_result_summary:
