@@ -376,7 +376,7 @@ def ok_archives_caches(repopath, n=1, persistent=None):
 
 
 def ok_exists(path):
-    assert exists(path), 'path %s does not exist' % path
+    assert exists(path), 'path %s does not exist (or dangling symlink)' % path
 
 
 def ok_file_has_content(path, content, strip=False, re_=False,
