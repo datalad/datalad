@@ -30,6 +30,22 @@ bet we will fix some bugs and make a world even a better place.
    can rely on it being in the standard library now that our minimum
    required Python version is 3.5. ([#3860][])
 
+- [download-url][] now requires that directories be indicated with a
+  trailing slash rather than interpreting a path as directory when it
+  doesn't exist.  This avoids confusion that can result from typos and
+  makes it possible to support directory targets that do not exist.
+  ([#3854][])
+
+- The `dataset_only` argument of the `ConfigManager` class is
+  deprecated.  Use `source="dataset"` instead.  ([#3907][])
+
+- The configuration values `datalad.COMMAND.proc-pre` and
+  `datalad.COMMAND.proc-post` must be defined in standard Git
+  configuration files and are no longer read from a dataset's tracked
+  `.datalad/config` file.  This avoids the security risk of
+  unknowingly executing a procedure due to configuration that was
+  brought in by a dataset update.  (#3907)
+
 ### Fixes
 
 - [publish][] crashed when called with a detached HEAD.  It now aborts
@@ -51,7 +67,30 @@ bet we will fix some bugs and make a world even a better place.
   adjusted, resulting in incorrect path handling when the called from
   a dataset subdirectory.  ([#3850][])
 
+- [download-url][] called `git annex addurl` in a way that failed to
+  register a URL when its header didn't report the content size.
+  ([#3911][])
+
+- With Git v2.24.0, saving new subdatasets failed due to a bug in that
+  Git release.  ([#3904][])
+
+- With DataLad configured to stop on failure (e.g., specifying
+  `--on-failure=stop` from the command line), a failing result record
+  was not rendered.  ([#3863][])
+
+- Installing a subdataset yielded an "ok" status in cases where the
+  repository was not yet in its final state, making it ineffective for
+  a caller to operate on the repository in response to the result.
+  ([#3906][])
+
 ### Enhancements and new features
+
+- The new result hooks mechanism allows callers to specify, via local
+  Git configuration values, DataLad command calls that will be
+  triggered in response to matching result records (i.e., what you see
+  when you call a command with `-f json_pp`).  ([#3903][])
+
+  TODO: Add link to what comes from datalad-handbook/book#304.
 
 - The command interface classes learned to use a new `_examples_`
   attribute to render documentation examples for both the Python and
@@ -84,6 +123,11 @@ bet we will fix some bugs and make a world even a better place.
 
 - [wtf][] now reports the dataset ID if the current working directory
   is visiting a dataset.  ([#3888][])
+
+- The `ConfigManager` class learned to exclude ``.datalad/config`` as
+  a source of configuration values, restricting the sources to
+  standard Git configuration files, when called with `source="local"`.
+  ([#3907][])
 
 ## 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
 
@@ -2124,12 +2168,19 @@ publishing
 [#3842]: https://github.com/datalad/datalad/issues/3842
 [#3850]: https://github.com/datalad/datalad/issues/3850
 [#3851]: https://github.com/datalad/datalad/issues/3851
+[#3854]: https://github.com/datalad/datalad/issues/3854
 [#3856]: https://github.com/datalad/datalad/issues/3856
 [#3860]: https://github.com/datalad/datalad/issues/3860
 [#3862]: https://github.com/datalad/datalad/issues/3862
+[#3863]: https://github.com/datalad/datalad/issues/3863
 [#3871]: https://github.com/datalad/datalad/issues/3871
 [#3873]: https://github.com/datalad/datalad/issues/3873
 [#3877]: https://github.com/datalad/datalad/issues/3877
 [#3880]: https://github.com/datalad/datalad/issues/3880
 [#3888]: https://github.com/datalad/datalad/issues/3888
 [#3892]: https://github.com/datalad/datalad/issues/3892
+[#3903]: https://github.com/datalad/datalad/issues/3903
+[#3904]: https://github.com/datalad/datalad/issues/3904
+[#3906]: https://github.com/datalad/datalad/issues/3906
+[#3907]: https://github.com/datalad/datalad/issues/3907
+[#3911]: https://github.com/datalad/datalad/issues/3911
