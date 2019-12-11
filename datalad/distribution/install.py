@@ -223,15 +223,15 @@ class Install(Interface):
                 if isinstance(ri, PathRI):
                     # make sure we obey standard conventions on
                     # interpreting relative paths
-                    urlpath = resolve_path(urlpath, dataset)
+                    up = resolve_path(urlpath, dataset)
                 # check if it is:
                 # - a real URL
                 # - no reference dataset given and a path outside CWD
                 # - a reference dataset given and no path underneath it
                 refpath = cwd if ds is None else ds.pathobj
                 if not isinstance(ri, PathRI) or (
-                        refpath not in Path(urlpath).absolute().parents
-                        and refpath != Path(urlpath).absolute()):
+                        refpath not in Path(up).absolute().parents
+                        and refpath != Path(up).absolute()):
                     # 1. source URL
                     lgr.debug("Install passes into install source=%s", urlpath)
                     for r in Install.__call__(
