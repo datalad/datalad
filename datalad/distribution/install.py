@@ -39,7 +39,10 @@ from datalad.support.network import (
     RI,
     PathRI,
 )
-from datalad.utils import assure_list
+from datalad.utils import (
+    assure_list,
+    Path,
+)
 from datalad.dochelpers import exc_str
 
 from datalad.distribution.dataset import (
@@ -214,70 +217,67 @@ class Install(Interface):
         # 1. list of URLs
         # 2. list of (sub)dataset content
         if source is None:
-            # we need to collect URLs and paths
-            to_install = []
-            to_get = []
-            # TODO: this approach is problematic, it disrupts the order of input args.
-            # consequently results will be returned in an unexpected order when a
-            # mixture of source URL and paths is given. Reordering is only possible when
-            # everything in here is fully processed before any results can be yielded.
-            # moreover, I think the semantics of the status quo implementation are a
-            # bit complicated: in a mixture list a source URL will lead to a new dataset
-            # at a generated default location, but a path will lead to a subdataset
-            # at that exact location
+            cwd = Path.cwd()
             for urlpath in path:
                 ri = RI(urlpath)
-                (to_get if isinstance(ri, PathRI) else to_install).append(urlpath)
-
-            # 1. multiple source URLs
-            for s in to_install:
-                lgr.debug("Install passes into install source=%s", s)
-                for r in Install.__call__(
-                        source=s,
-                        description=description,
-                        save=save,
-                        # we need to disable error handling in order to have it done at
-                        # the very top, otherwise we are not able to order a global
-                        # "ignore-and-keep-going"
-                        on_failure='ignore',
-                        return_type='generator',
-                        result_xfm=None,
-                        result_filter=None,
-                        **common_kwargs):
-                    # no post-processing of the installed content on disk
-                    # should be necessary here, all done by code further
-                    # down that deals with an install from an actuall `source`
-                    # any necessary fixes should go there too!
-                    r['refds'] = refds_path
-                    yield r
-
-            # 2. one or more dataset content paths
-            if to_get:
-                lgr.debug("Install passes into get %d items", len(to_get))
-                # all commented out hint on inability to pass those options
-                # into underlying install-related calls.
-                # Also need to pass from get:
-                #  annex_get_opts
-
-                for r in Get.__call__(
-                        to_get,
-                        # TODO should pass-through description, not sure why disabled
-                        # description=description,
-                        # we need to disable error handling in order to have it done at
-                        # the very top, otherwise we are not able to order a global
-                        # "ignore-and-keep-going"
-                        on_failure='ignore',
-                        return_type='generator',
-                        result_xfm=None,
-                        result_filter=None,
-                        **common_kwargs):
-                    # no post-processing of get'ed content on disk should be
-                    # necessary here, this is the responsibility of `get`
-                    # (incl. adjusting parent's gitmodules when submodules end
-                    # up in an "updated" state (done in get helpers)
-                    # any required fixes should go there!
-                    r['refds'] = refds_path
-                    yield r
+                if isinstance(ri, PathRI):
+                    # make sure we obey standard conventions on
+                    # interpreting relative paths
+                    urlpath = resolve_path(urlpath, dataset)
+                # check if it is:
+                # - a real URL
+                # - no reference dataset given and a path outside CWD
+                # - a reference dataset given and no path underneath it
+                refpath = cwd if ds is None else ds.pathobj
+                if not isinstance(ri, PathRI) or (
+                        refpath not in Path(urlpath).absolute().parents
+                        and refpath != Path(urlpath).absolute()):
+                    # 1. source URL
+                    lgr.debug("Install passes into install source=%s", urlpath)
+                    for r in Install.__call__(
+                            source=urlpath,
+                            description=description,
+                            save=save,
+                            # we need to disable error handling in order to have it done at
+                            # the very top, otherwise we are not able to order a global
+                            # "ignore-and-keep-going"
+                            on_failure='ignore',
+                            return_type='generator',
+                            result_xfm=None,
+                            result_filter=None,
+                            **common_kwargs):
+                        # no post-processing of the installed content on disk
+                        # should be necessary here, all done by code further
+                        # down that deals with an install from an actuall `source`
+                        # any necessary fixes should go there too!
+                        r['refds'] = refds_path
+                        yield r
+                else:
+                    # 2. dataset content paths
+                    lgr.debug("Install passes into '%s' to get", urlpath)
+                    # all commented out hint on inability to pass those options
+                    # into underlying install-related calls.
+                    # Also need to pass from get:
+                    #  annex_get_opts
+                    for r in Get.__call__(
+                            urlpath,
+                            # TODO should pass-through description, not sure why disabled
+                            # description=description,
+                            # we need to disable error handling in order to have it done at
+                            # the very top, otherwise we are not able to order a global
+                            # "ignore-and-keep-going"
+                            on_failure='ignore',
+                            return_type='generator',
+                            result_xfm=None,
+                            result_filter=None,
+                            **common_kwargs):
+                        # no post-processing of get'ed content on disk should be
+                        # necessary here, this is the responsibility of `get`
+                        # (incl. adjusting parent's gitmodules when submodules end
+                        # up in an "updated" state (done in get helpers)
+                        # any required fixes should go there!
+                        r['refds'] = refds_path
+                        yield r
 
             # we are done here
             # the rest is about install from a `source`
