@@ -215,7 +215,14 @@ URLs:
                         try:
                             # The file is already present. This is just to
                             # register the URL.
-                            ds.repo.add_url_to_file(path, url, batch=True)
+                            ds.repo.add_url_to_file(
+                                path,
+                                url,
+                                # avoid batch mode for single files
+                                # https://github.com/datalad/datalad/issues/2849
+                                batch=len(annex_paths) > 1,
+                                # bypass URL size check, we already have the file
+                                options=['--relaxed'])
                         except AnnexBatchCommandError as exc:
                             lgr.warning("Registering %s with %s failed: %s",
                                         path, url, exc_str(exc))
