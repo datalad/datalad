@@ -674,6 +674,11 @@ def test_install_skip_list_arguments(src, path, path_outside):
     assert_result_count(
         result, 1, status='impossible', message="path does not exist",
         path=opj(ds.path, 'not_existing'))
+    # TODO unclear to me why this error should be like this
+    # we are asking install to pull from multiple sources, this one doesn't
+    # work, but not because it is not "associated" with a dataset, but
+    # because it doesn't exist. If it would, we would expect it to
+    # install the source as a subdataset, wouldn't we?
     assert_result_count(
         result, 1, status='error',
         message=("path not associated with dataset %s", ds),
