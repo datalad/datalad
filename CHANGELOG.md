@@ -44,7 +44,7 @@ bet we will fix some bugs and make a world even a better place.
   configuration files and are no longer read from a dataset's tracked
   `.datalad/config` file.  This avoids the security risk of
   unknowingly executing a procedure due to configuration that was
-  brought in by a dataset update.  (#3907)
+  brought in by a dataset update.  ([#3907][])
 
 ### Fixes
 
