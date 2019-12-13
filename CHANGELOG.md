@@ -129,6 +129,9 @@ bet we will fix some bugs and make a world even a better place.
   standard Git configuration files, when called with `source="local"`.
   ([#3907][])
 
+- Commands now accept a `dataset` value of "^."  as shorthand for "the
+  dataset to which the current directory belongs".  ([#3242][])
+
 ## 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
 
 bet we will fix some bugs and make a world even a better place.
@@ -2021,6 +2024,7 @@ publishing
 [#3223]: https://github.com/datalad/datalad/issues/3223
 [#3238]: https://github.com/datalad/datalad/issues/3238
 [#3241]: https://github.com/datalad/datalad/issues/3241
+[#3242]: https://github.com/datalad/datalad/issues/3242
 [#3249]: https://github.com/datalad/datalad/issues/3249
 [#3250]: https://github.com/datalad/datalad/issues/3250
 [#3255]: https://github.com/datalad/datalad/issues/3255
