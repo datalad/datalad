@@ -203,6 +203,23 @@ def test_subdatasets(path):
 
     # TODO actual submodule checkout is still there
 
+    # Test ^. (the dataset for curdir) shortcut
+    # At the top should point to the top
+    with chpwd(ds.path):
+        dstop = Dataset('^.')
+        eq_(dstop, ds)
+
+    # and still does within subdir
+    os.mkdir(opj(ds.path, 'subdir'))
+    with chpwd(opj(ds.path, 'subdir')):
+        dstop = Dataset('^.')
+        eq_(dstop, ds)
+
+    # within submodule will point to submodule
+    with chpwd(subsubds.path):
+        dstop = Dataset('^.')
+        eq_(dstop, subsubds)
+
 
 @with_tempfile(mkdir=True)
 def test_hat_dataset_more(path):
