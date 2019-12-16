@@ -1290,7 +1290,8 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         # TODO: if file_ and there was an exception -- most probably worth logging it?
         # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
-        lgr.handlers, lgr.level = old_handlers, old_level
+        lgr.handlers = old_handlers
+        lgr.setLevel(old_level)
         adapter.cleanup()
 
 
