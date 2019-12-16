@@ -63,6 +63,7 @@ from datalad.tests.utils import (
     skip_if_no_network,
     skip_if,
     with_sameas_remote,
+    known_failure_windows,
 )
 from datalad.distribution.clone import _get_installationpath_from_url
 from datalad.distribution.dataset import Dataset
@@ -362,6 +363,9 @@ def test_clone_report_permission_issue(tdir):
         )
 
 
+# Started to hang on appveyor, only in the first run
+# (no DATALAD_REPO_VERSION=6 defined)
+@known_failure_windows  #FIXME - hangs
 @skip_if_no_network
 @with_tempfile
 def test_autoenabled_remote_msg(path):
