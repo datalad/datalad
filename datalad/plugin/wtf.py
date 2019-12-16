@@ -411,7 +411,7 @@ def _render_report(res):
 
     def _unwind(text, val, top):
         if isinstance(val, dict):
-            for k in val:
+            for k in sorted(val):
                 text += u'\n{}{} {}{} '.format(
                     '##' if not top else top,
                     '-' if top else '',
