@@ -212,6 +212,7 @@ def annexjson2result(d, ds, **kwargs):
       Passes as-is to `get_status_dict`. Must not contain `refds`.
     """
     lgr.debug('received JSON result from annex: %s', d)
+    messages = []
     res = get_status_dict(**kwargs)
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
     # we cannot rely on any of these to be available as the feed from
@@ -227,13 +228,18 @@ def annexjson2result(d, ds, **kwargs):
         res['metadata'] = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
-    # avoid meaningless standard messages
-    if 'note' in d:
+    if d.get('error-messages', None):
+        messages.extend(d['error-messages'])
+    # avoid meaningless standard messages, and collision with actual error
+    # messages
+    elif 'note' in d:
         note = "; ".join(ln for ln in d['note'].splitlines()
                          if ln != 'checksum...'
                          and not ln.startswith('checking file'))
         if note:
-            res['message'] = translate_annex_notes.get(note, note)
+            messages.append(translate_annex_notes.get(note, note))
+    if messages:
+        res['message'] = '\n'.join(m.strip() for m in messages)
     return res
 
 
