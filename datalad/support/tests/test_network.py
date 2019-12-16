@@ -12,6 +12,8 @@ import logging
 from os.path import join as opj
 from collections import OrderedDict
 
+from datalad.utils import PurePosixPath
+
 from datalad.tests.utils import eq_, neq_, ok_, nok_, assert_raises
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import swallow_logs
@@ -133,7 +135,8 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         murl = RI(ri)
         eq_(murl.__class__, cls)  # not just a subclass
         eq_(murl, ri_)
-        eq_(str(RI(ri)), ri)
+        if isinstance(ri, str):
+            eq_(str(RI(ri)), ri)
         eq_(eval(repr(ri_)), ri)  # repr leads back to identical ri_
         eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
@@ -256,6 +259,8 @@ def test_url_samples():
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
+    _check_ri(PurePosixPath("f"), PathRI, localpath='f', path='f', exact_str=False)
+    _check_ri(PurePosixPath("f/s1"), PathRI, localpath='f/s1', path='f/s1', exact_str=False)
     # colons are problematic and might cause confusion into SSHRI
     _check_ri("f/s:1", PathRI, localpath='f/s:1', path='f/s:1')
     _check_ri("f/s:", PathRI, localpath='f/s:', path='f/s:')
