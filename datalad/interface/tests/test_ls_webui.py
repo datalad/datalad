@@ -133,6 +133,9 @@ def test_fs_traverse(topdir):
             assert_equal(brokenlink['size']['total'], '3 Bytes')
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '123',

@@ -55,6 +55,9 @@ _dataset_hierarchy_template = {
 }"""}}}}
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_basic_aggregate(path):
     # TODO give datasets some more metadata to actually aggregate stuff
@@ -297,6 +300,9 @@ def test_aggregate_removal(path):
     assert_result_count(res, 1)
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(tree=_dataset_hierarchy_template)
 def test_update_strategy(path):
     base = Dataset(opj(path, 'origin')).create(force=True)
