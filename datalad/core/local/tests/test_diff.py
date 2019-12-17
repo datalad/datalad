@@ -68,15 +68,23 @@ def test_repo_diff(path, norepo):
     ds = Dataset(path).create()
     assert_repo_status(ds.path)
     assert_raises(ValueError, ds.repo.diff, fr='WTF', to='MIKE')
+
+    if ds.repo.is_managed_branch():
+        fr_base = "master"
+        to = "master"
+    else:
+        fr_base = "HEAD"
+        to = None
+
     # no diff
-    eq_(ds.repo.diff('HEAD', None), {})
+    eq_(ds.repo.diff(fr_base, to), {})
     # bogus path makes no difference
-    eq_(ds.repo.diff('HEAD', None, paths=['THIS']), {})
+    eq_(ds.repo.diff(fr_base, to, paths=['THIS']), {})
     # let's introduce a known change
     create_tree(ds.path, {'new': 'empty'})
     ds.save(to_git=True)
     assert_repo_status(ds.path)
-    eq_(ds.repo.diff(fr='HEAD~1', to='HEAD'),
+    eq_(ds.repo.diff(fr=fr_base + '~1', to=to),
         {ut.Path(ds.repo.pathobj / 'new'): {
             'state': 'added',
             'type': 'file',
@@ -92,13 +100,13 @@ def test_repo_diff(path, norepo):
             'gitshasum': '7b4d68d70fcae134d5348f5e118f5e9c9d3f05f6',
             'prev_gitshasum': '7b4d68d70fcae134d5348f5e118f5e9c9d3f05f6'}})
     # per path query gives the same result
-    eq_(ds.repo.diff(fr='HEAD', to=None),
-        ds.repo.diff(fr='HEAD', to=None, paths=['new']))
+    eq_(ds.repo.diff(fr=fr_base, to=to),
+        ds.repo.diff(fr=fr_base, to=to, paths=['new']))
     # also given a directory as a constraint does the same
-    eq_(ds.repo.diff(fr='HEAD', to=None),
-        ds.repo.diff(fr='HEAD', to=None, paths=['.']))
+    eq_(ds.repo.diff(fr=fr_base, to=to),
+        ds.repo.diff(fr=fr_base, to=to, paths=['.']))
     # but if we give another path, it doesn't show up
-    eq_(ds.repo.diff(fr='HEAD', to=None, paths=['other']), {})
+    eq_(ds.repo.diff(fr=fr_base, to=to, paths=['other']), {})
 
     # make clean
     ds.save()
@@ -163,14 +171,22 @@ def test_diff(path, norepo):
     create_tree(ds.path, {'new': 'empty'})
     ds.save(to_git=True)
     assert_repo_status(ds.path)
-    res = _dirty_results(ds.diff(fr='HEAD~1'))
+
+    if ds.repo.is_managed_branch():
+        fr_base = "master"
+        to = "master"
+    else:
+        fr_base = "HEAD"
+        to = None
+
+    res = _dirty_results(ds.diff(fr=fr_base + '~1', to=to))
     assert_result_count(res, 1)
     assert_result_count(
         res, 1, action='diff', path=op.join(ds.path, 'new'), state='added')
     # we can also find the diff without going through the dataset explicitly
     with chpwd(ds.path):
         assert_result_count(
-            _dirty_results(diff(fr='HEAD~1')), 1,
+            _dirty_results(diff(fr=fr_base + '~1', to=to)), 1,
             action='diff', path=op.join(ds.path, 'new'), state='added')
     # no diff against HEAD
     assert_result_count(_dirty_results(ds.diff()), 0)
@@ -230,11 +246,11 @@ def test_diff_recursive(path):
     ds = Dataset(path).create()
     sub = ds.create('sub')
     # look at the last change, and confirm a dataset was added
-    res = ds.diff(fr='HEAD~1', to='HEAD')
+    res = ds.diff(fr='master~1', to='master')
     assert_result_count(
         res, 1, action='diff', state='added', path=sub.path, type='dataset')
     # now recursive
-    res = ds.diff(recursive=True, fr='HEAD~1', to='HEAD')
+    res = ds.diff(recursive=True, fr='master~1', to='master')
     # we also get the entire diff of the subdataset from scratch
     assert_status('ok', res)
     ok_(len(res) > 3)
