@@ -84,7 +84,7 @@ def test_repo_diff(path, norepo):
     create_tree(ds.path, {'new': 'empty'})
     ds.save(to_git=True)
     assert_repo_status(ds.path)
-    eq_(ds.repo.diff(fr=fr_base + '~1', to=to),
+    eq_(ds.repo.diff(fr=fr_base + '~1', to=fr_base),
         {ut.Path(ds.repo.pathobj / 'new'): {
             'state': 'added',
             'type': 'file',
