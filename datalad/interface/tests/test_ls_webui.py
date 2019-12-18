@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     assert_equal, assert_raises, assert_in, assert_false,
     assert_not_in, ok_startswith,
     serve_path_via_http,
+    known_failure_githubci_win,
 )
 from os.path import join as opj
 
