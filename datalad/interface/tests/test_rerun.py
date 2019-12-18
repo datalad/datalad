@@ -814,7 +814,7 @@ def test_rerun_explicit(path):
 
 # underlying code cannot deal with adjusted branches
 # https://github.com/datalad/datalad/pull/3817
-@known_failure_githubci_win
+@known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):
