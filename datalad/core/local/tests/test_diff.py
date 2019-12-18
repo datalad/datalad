@@ -36,6 +36,7 @@ from datalad.tests.utils import (
     assert_result_count,
     OBSCURE_FILENAME,
     known_failure_githubci_win,
+    SkipTest,
 )
 
 import datalad.utils as ut
@@ -300,6 +301,9 @@ def test_diff_recursive(path):
         res, 1, action='diff', state='added', path=op.join(ds.path, 'onefile'),
         type='file')
 
+    if ds.repo.is_managed_branch():
+        raise SkipTest(
+            "Test assumption broken: https://github.com/datalad/datalad/issues/3818")
     # one further back brings in the modified subdataset, and the added file
     # within it
     res = ds.diff(recursive=True, fr=head_ref + '~2', to=head_ref)
