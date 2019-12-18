@@ -1,66 +1,62 @@
 Source: datalad
+Maintainer: NeuroDebian Team <team@datalad.org>
+Uploaders: Yaroslav Halchenko <debian@onerussian.com>,
+           Michael Hanke <mih@debian.org>
 Section: science
 Priority: optional
-Maintainer: NeuroDebian Team <team@datalad.org>
-Uploaders:
- Yaroslav Halchenko <debian@onerussian.com>,
- Michael Hanke <mih@debian.org>
-Build-Depends:
- debhelper (>= 9),
- dh-python,
- git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
- help2man,
- patool,
- python3-all,
- python3-appdirs,
- python3-argcomplete,
- python3-boto,
- python3-dateutil,
- python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
- python3-exif,
- python3-fasteners,
- python3-iso8601,
- python3-jsmin,
- python3-git (>= 2.1.6~),
- python3-github,
- python3-html5lib,
- python3-httpretty,
- python3-humanize,
- python3-keyrings.alt | python3-keyring (<=8),
- python3-keyring,
- python3-secretstorage,
- python3-nose (>= 1.3.7-2) | python3-libxmp,
- python3-mock,
- python3-msgpack,
- python3-mutagen,
- python3-nose,
- python3-pil,
- python3-pyperclip,
- python3-requests,
- python3-setuptools,
- python3-simplejson,
- python3-six (>= 1.8.0~),
- python3-tqdm,
- python3-vcr,
- python3-whoosh,
- python3-wrapt,
-Standards-Version: 4.1.4
-Homepage: http://datalad.org
-Vcs-Git: https://github.com/datalad/datalad -b debian
+Build-Depends: debhelper (>= 9),
+               dh-python,
+               git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
+               help2man,
+               patool,
+               python3-all,
+               python3-appdirs,
+               python3-argcomplete,
+               python3-boto,
+               python3-dateutil,
+               python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
+               python3-exif,
+               python3-fasteners,
+               python3-iso8601,
+               python3-jsmin,
+               python3-git (>= 2.1.6~),
+               python3-github,
+               python3-html5lib,
+               python3-httpretty,
+               python3-humanize,
+               python3-keyrings.alt | python3-keyring (<=8),
+               python3-keyring,
+               python3-secretstorage,
+               python3-nose (>= 1.3.7-2) | python3-libxmp,
+               python3-mock,
+               python3-msgpack,
+               python3-mutagen,
+               python3-nose,
+               python3-pil,
+               python3-pyperclip,
+               python3-requests,
+               python3-setuptools,
+               python3-simplejson,
+               python3-six,
+               python3-tqdm,
+               python3-vcr,
+               python3-whoosh,
+               python3-wrapt
+Standards-Version: 4.3.0
 Vcs-Browser: https://github.com/datalad/datalad/
+Vcs-Git: https://github.com/datalad/datalad -b debian
+Homepage: http://datalad.org
 
 Package: datalad
 Architecture: all
 Section: science
-Depends:
- python3-datalad (= ${binary:Version}),
- python3-argcomplete,
- ${misc:Depends},
- ${python3:Depends}
-Suggests:
- datalad-containers,
- datalad-crawler,
- datalad-neuroimaging,
+Depends: python3-datalad (= ${binary:Version}),
+         python3-argcomplete,
+         ${misc:Depends},
+         ${python3:Depends}
+Suggests: datalad-containers,
+          datalad-crawler,
+          datalad-neuroimaging
 Description: data files management and distribution platform
  DataLad is a data management and distribution platform providing
  access to a wide range of data resources already available online.
@@ -69,7 +65,7 @@ Description: data files management and distribution platform
  .
   - command line and Python interfaces for manipulation of collections of
     datasets (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get)
+ separate files/directories (add, get)
   - extract, aggregate, and search through various sources of metadata
     (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
     support)
@@ -83,50 +79,47 @@ Description: data files management and distribution platform
 Package: python3-datalad
 Architecture: all
 Section: python
+Depends: git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
+         patool,
+         python3-appdirs,
+         python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
+         python3-fasteners,
+         python3-git (>= 2.1.6~),
+         python3-humanize,
+         python3-iso8601,
+         python3-keyrings.alt | python3-keyring (<=8),
+         python3-secretstorage,
+         python3-keyring,
+         python3-mock,
+         python3-msgpack,
+         python3-pil,
+         python3-requests,
+         python3-simplejson,
+         python3-six,
+         python3-tqdm,
+         python3-wrapt,
+         ${misc:Depends},
+         ${python3:Depends}
+Recommends: python3-exif,
+            python3-github,
+            python3-jsmin,
+            python3-html5lib,
+            python3-httpretty,
+            python3-libxmp,
+            python3-lzma,
+            python3-mutagen,
+            python3-nose,
+            python3-pyperclip,
+            python3-requests-ftp,
+            python3-vcr,
+            python3-whoosh
+Suggests: python3-duecredit,
+          python3-bs4,
+          python3-numpy,
+          datalad-containers,
+          datalad-crawler,
+          datalad-neuroimaging
 Provides: ${python3:Provides}
-Depends:
- git-annex (>= 6.20180913~) | git-annex-standalone (>= 6.20180913~),
- patool,
- python3-appdirs,
- python3-distutils | libpython3-stdlib (<=3.6.4~rc1-2),
- python3-fasteners,
- python3-git (>= 2.1.6~),
- python3-humanize,
- python3-iso8601,
- python3-keyrings.alt | python3-keyring (<=8),
- python3-secretstorage,
- python3-keyring,
- python3-mock,
- python3-msgpack,
- python3-pil,
- python3-requests,
- python3-simplejson,
- python3-six (>= 1.8.0~),
- python3-tqdm,
- python3-wrapt,
- ${misc:Depends},
- ${python3:Depends}
-Recommends:
- python3-exif,
- python3-github,
- python3-jsmin,
- python3-html5lib,
- python3-httpretty,
- python3-libxmp,
- python3-lzma,
- python3-mutagen,
- python3-nose,
- python3-pyperclip,
- python3-requests-ftp,
- python3-vcr,
- python3-whoosh,
-Suggests:
- python3-duecredit,
- python3-bs4,
- python3-numpy,
- datalad-containers,
- datalad-crawler,
- datalad-neuroimaging,
 Description: data files management and distribution platform
  DataLad is a data management and distribution platform providing
  access to a wide range of data resources already available online.
@@ -135,7 +128,7 @@ Description: data files management and distribution platform
  .
   - command line and Python interfaces for manipulation of collections of
     datasets (install, uninstall, update, publish, save, etc.) and
-	separate files/directories (add, get)
+ separate files/directories (add, get)
   - extract, aggregate, and search through various sources of metadata
     (xmp, EXIF, etc; install datalad-neuroimaging for DICOM, BIDS, NIfTI
     support)
