@@ -310,7 +310,7 @@ class Install(Interface):
                 'install', path=path, status='impossible', logger=lgr,
                 source_url=source, refds=refds_path,
                 message="installation `source` and destination `path` are identical. "
-                "If you are trying to add a subdataset simply use the `add` command")
+                "If you are trying to add a subdataset simply use the `save` command")
             return
 
         # resolve the target location (if local) against the provided dataset

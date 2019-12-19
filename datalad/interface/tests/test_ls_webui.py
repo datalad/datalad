@@ -15,6 +15,7 @@ from datalad.tests.utils import (
     assert_equal, assert_raises, assert_in, assert_false,
     assert_not_in, ok_startswith,
     serve_path_via_http,
+    known_failure_githubci_win,
 )
 from os.path import join as opj
 
@@ -133,6 +134,9 @@ def test_fs_traverse(topdir):
             assert_equal(brokenlink['size']['total'], '3 Bytes')
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_githubci_win
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
                   'subdir': {'file1.txt': '123',
