@@ -363,8 +363,7 @@ def test_clone_report_permission_issue(tdir):
         )
 
 
-# Started to hang on appveyor, only in the first run
-# (no DATALAD_REPO_VERSION=6 defined)
+# Started to hang on appveyor.
 @known_failure_windows  #FIXME - hangs
 @skip_if_no_network
 @with_tempfile
