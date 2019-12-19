@@ -1002,10 +1002,11 @@ class _PyEvalSearch(_Search):
             max_nresults = 0
         # separate ones are considered to be independent clauses for "and"
         composite_query = ' and '.join(['(%s)' % q for q in query])
+        composite_query_ = compile(composite_query, 'query', 'eval')
 
         def matcher(doc):
             try:
-                return eval(composite_query, {}, doc)
+                return eval(composite_query_, {}, doc)
             except (KeyError, NameError) as exc:
                 # lgr.debug("Something was missing in the record -- should be generally ok")
                 # TODO: record if ANY matching resulted in not hitting this.
