@@ -267,6 +267,7 @@ class Siblings(Interface):
         # layout?
         replicate_local_structure = url and "%NAME" not in url
 
+        subds_pushurl = None
         for subds in dataset.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
@@ -274,7 +275,8 @@ class Siblings(Interface):
             subds_name = op.relpath(subds.path, start=dataset.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
-                subds_pushurl = slash_join(pushurl, subds_name)
+                if pushurl:
+                    subds_pushurl = slash_join(pushurl, subds_name)
             else:
                 subds_url = \
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))

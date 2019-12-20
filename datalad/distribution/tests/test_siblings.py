@@ -9,7 +9,12 @@
 
 """
 
-from os.path import join as opj, basename
+from datalad.support.path import (
+    basename,
+    join as opj,
+    normpath,
+    relpath,
+)
 
 from datalad.api import clone
 from datalad.api import create
@@ -36,7 +41,8 @@ from nose.tools import eq_, ok_
 # work on cloned repos to be safer
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
-def test_siblings(origin, repo_path):
+@with_tempfile
+def test_siblings(origin, repo_path, local_clone_path):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -208,6 +214,28 @@ def test_siblings(origin, repo_path):
         eq_(url, r['url'])
         eq_(pushurl, r['pushurl'])
 
+    # recursively without template and pushurl but full "hierarchy"
+    # to a local clone
+    for r in siblings(
+            'configure',
+            dataset=source,
+            name="test-remote-3",
+            url=local_clone_path,
+            recursive=True,
+            # we need to disable annex queries, as it will try to access
+            # the fake URL configured above
+            get_annex_info=False,
+            result_renderer=None):
+        repo = GitRepo(r['path'], create=False)
+        assert_in("test-remote-3", repo.get_remotes())
+        url = repo.get_remote_url("test-remote-3")
+        pushurl = repo.get_remote_url("test-remote-3", push=True)
+
+        eq_(normpath(url),
+            normpath(opj(local_clone_path,
+                         relpath(str(r['path']), source.path))))
+        # https://github.com/datalad/datalad/issues/3951
+        ok_(not pushurl)  # no pushurl should be defined
 
 @with_tempfile(mkdir=True)
 def test_here(path):
