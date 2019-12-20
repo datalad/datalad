@@ -383,7 +383,7 @@ def test_add_subdataset(path, other):
     'file.txt': 'some text',
     'empty': '',
     'file2.txt': 'some text to go to annex',
-    '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
+    '.gitattributes': '* annex.largefiles=((mimeencoding=binary))'}
 )
 @known_failure_direct_mode  #FIXME
 def test_add_mimetypes(path):
