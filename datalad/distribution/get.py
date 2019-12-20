@@ -388,6 +388,12 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 # yield everything to let the caller decide how to deal with
                 # errors
                 yield res
+        if not subds.is_installed():
+            # an error result was emitted, and the external consumer can decide
+            # what to do with it, but there is no point in recursing into
+            # something that should be there, but isn't
+            lgr.debug('Subdataset %s could not be installed, skipped', subds)
+            continue
         # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
