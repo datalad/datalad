@@ -469,7 +469,8 @@ def _configure_remote(
             # makes sense only if current AND super are annexes, so it is
             # kinda a boomer, since then forbids having a super a pure git
             if isinstance(ds.repo, AnnexRepo) and \
-                    isinstance(delayed_super.repo, AnnexRepo):
+                    isinstance(delayed_super.repo, AnnexRepo) and \
+                    name in delayed_super.repo.get_remotes():
                 if annex_wanted is None:
                     annex_wanted = _inherit_annex_var(
                         delayed_super, name, 'wanted')

@@ -583,6 +583,15 @@ bet we will fix some bugs and make a world even a better place.
   new `--sameas` [feature][gx-sameas], which allows special remotes to
   share a data store. ([#3856][])
 
+- The `swallow_logs` utility failed to capture some log messages due
+  to an incompatibility with Python 3.7.  ([#3935][])
+
+- [siblings][]
+  - crashed if `--inherit` was passed but the parent dataset did not
+    have a remote with a matching name.  ([#3954][])
+  - configured the wrong pushurl and annexurl values in some
+    cases. ([#3955][])
+
 ### Enhancements and new features
 
 ?
@@ -2188,3 +2197,6 @@ publishing
 [#3906]: https://github.com/datalad/datalad/issues/3906
 [#3907]: https://github.com/datalad/datalad/issues/3907
 [#3911]: https://github.com/datalad/datalad/issues/3911
+[#3935]: https://github.com/datalad/datalad/issues/3935
+[#3954]: https://github.com/datalad/datalad/issues/3954
+[#3955]: https://github.com/datalad/datalad/issues/3955

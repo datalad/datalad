@@ -313,3 +313,35 @@ def test_sibling_enable_sameas(repo, clone_path):
     assert_status("ok", res)
     ds_cloned.get(path=["f0"])
     ok_(ds_cloned.repo.file_has_content("f0"))
+
+
+@with_tempfile(mkdir=True)
+def test_sibling_inherit(basedir):
+    ds_source = Dataset(opj(basedir, "source")).create()
+
+    # In superdataset, set up remote "source" that has git-annex group "grp".
+    ds_super = Dataset(opj(basedir, "super")).create()
+    ds_super.siblings(action="add", name="source", url=ds_source.path,
+                      annex_group="grp", result_renderer=None)
+
+    ds_clone = ds_super.clone(
+        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+    # In a subdataset, adding a "source" sibling with inherit=True pulls in
+    # that configuration.
+    ds_clone.siblings(action="add", name="source", url=ds_source.path,
+                      inherit=True, result_renderer=None)
+    res = ds_clone.siblings(action="query", name="source",
+                            result_renderer=None)
+    eq_(res[0]["annex-group"], "grp")
+
+
+@with_tempfile(mkdir=True)
+def test_sibling_inherit_no_super_remote(basedir):
+    ds_source = Dataset(opj(basedir, "source")).create()
+    ds_super = Dataset(opj(basedir, "super")).create()
+    ds_clone = ds_super.clone(
+        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+    # Adding a sibling with inherit=True doesn't crash when the superdataset
+    # doesn't have a remote `name`.
+    ds_clone.siblings(action="add", name="donotexist", inherit=True,
+                      url=ds_source.path, result_renderer=None)
