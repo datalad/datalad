@@ -222,8 +222,11 @@ def test_procedure_discovery(path, super_path):
         assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                            'broken_link_proc.py'),
                           state='absent')
-        assert_not_in_results(ps, path=op.join(super.path, 'sub', 'code',
-                                               'unknwon_broken_link'))
+        assert_in_results(
+            ps,
+            path=op.join(super.path, 'sub', 'code',
+                         'unknwon_broken_link'),
+            state='absent')
 
 
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
