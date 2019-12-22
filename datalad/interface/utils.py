@@ -353,20 +353,6 @@ def eval_results(func):
                 def _result_filter(res):
                     return result_filter(res, **allkwargs)
 
-        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None, proc_cfg=None):
-            lgr.log(2, "Getting procedure specs for %s of %s", param_key, ds)
-            spec = common_params.get(param_key, None)
-            if spec is not None:
-                # this is already a list of lists
-                return spec
-
-            spec = proc_cfg.get(cfg_key, None)
-            if spec is None:
-                return None
-            elif not isinstance(spec, tuple):
-                spec = [spec]
-            return [shlex.split(s) for s in spec]
-
         # query cfg for defaults
         cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
@@ -388,17 +374,6 @@ def eval_results(func):
             ds, source='local', overrides=dlcfg.overrides
         ) if ds and ds.is_installed() else dlcfg
 
-        proc_pre = _get_procedure_specs(
-            'proc_pre',
-            'datalad.{}.proc-pre'.format(cmdline_name),
-            ds=dataset_arg,
-            proc_cfg=proc_cfg)
-        proc_post = _get_procedure_specs(
-            'proc_post',
-            'datalad.{}.proc-post'.format(cmdline_name),
-            ds=dataset_arg,
-            proc_cfg=proc_cfg)
-
         # look for hooks
         hooks = get_jsonhooks_from_config(proc_cfg)
 
@@ -410,22 +385,6 @@ def eval_results(func):
             incomplete_results = []
             # track what actions were performed how many times
             action_summary = {}
-
-            if proc_pre and cmdline_name != 'run-procedure':
-                from datalad.interface.run_procedure import RunProcedure
-                for procspec in proc_pre:
-                    lgr.debug('Running configured pre-procedure %s', procspec)
-                    for r in _process_results(
-                            RunProcedure.__call__(
-                                procspec,
-                                dataset=dataset_arg,
-                                return_type='generator'),
-                            _func_class, action_summary,
-                            on_failure, incomplete_results,
-                            result_renderer, result_xfm, result_filter,
-                            result_log_level,
-                            **_kwargs):
-                        yield r
 
             # if a custom summary is to be provided, collect the results
             # of the command execution
@@ -458,21 +417,6 @@ def eval_results(func):
                 # collect if summary is desired
                 if do_custom_result_summary:
                     results.append(r)
-
-            if proc_post and cmdline_name != 'run-procedure':
-                from datalad.interface.run_procedure import RunProcedure
-                for procspec in proc_post:
-                    lgr.debug('Running configured post-procedure %s', procspec)
-                    for r in _process_results(
-                            RunProcedure.__call__(
-                                procspec,
-                                dataset=dataset_arg,
-                                return_type='generator'),
-                            _func_class, action_summary,
-                            on_failure, incomplete_results,
-                            result_renderer, result_xfm, result_filter,
-                            result_log_level, **_kwargs):
-                        yield r
 
             # result summary before a potential exception
             # custom first

@@ -70,57 +70,6 @@ def test_dirty(path):
     assert_repo_status(ds.path)
 
 
-@known_failure_windows  #FIXME
-@with_tree(tree={
-    'code': {'datalad_test_proc.py': """\
-import sys
-import os.path as op
-from datalad.api import save, Dataset
-
-with open(op.join(sys.argv[1], 'fromproc.txt'), 'w') as f:
-    f.write('hello\\n')
-save(dataset=Dataset(sys.argv[1]), path='fromproc.txt')
-"""}})
-@with_tempfile
-def test_basics(path, super_path):
-    ds = Dataset(path).create(force=True)
-    ds.run_procedure('cfg_yoda')
-    assert_false(ds.repo.is_under_annex("README.md"))
-    # save the procedure
-    ds.save('code')
-    # configure dataset to look for procedures in its code folder
-    ds.config.add(
-        'datalad.locations.dataset-procedures',
-        'code',
-        where='dataset')
-    # commit this procedure config for later use in a clone:
-    ds.save(op.join('.datalad', 'config'))
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='local')
-    # run command that should trigger the demo procedure
-    ds.clean()
-    # look for traces
-    ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-
-    # make a fresh dataset:
-    super = Dataset(super_path).create()
-    # configure dataset to run the demo procedure prior to the clean command
-    super.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
-        where='local')
-    # 'super' doesn't know any procedures but should get to know one by
-    # installing the above as a subdataset
-    super.install('sub', source=ds.path)
-    # run command that should trigger the demo procedure
-    super.clean()
-    # look for traces
-    ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-
-
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
 @with_tree(tree={
     'code': {'datalad_test_proc.py': """\
@@ -159,11 +108,6 @@ def test_procedure_discovery(path, super_path):
     ds.config.add(
         'datalad.locations.dataset-procedures',
         'code',
-        where='dataset')
-    # configure dataset to run the demo procedure prior to the clean command
-    ds.config.add(
-        'datalad.clean.proc-pre',
-        'datalad_test_proc',
         where='dataset')
     ds.save(op.join('.datalad', 'config'))
 

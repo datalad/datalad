@@ -41,8 +41,6 @@ def test_basics(src, dst):
     # on install to have 'bids' listed as a metadata type
     clone.config.set(
         'datalad.result-hook.alwaysbids.call-json',
-        # the spec is like --proc-post/pre, but has the dataset to run on as
-        # the first element
         # string substitutions based on the result record are supported
         'run_procedure {{"dataset":"{path}","spec":"cfg_metadatatypes bids"}}',
         where='local',
