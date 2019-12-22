@@ -347,14 +347,11 @@ def eval_results(func):
         result_filter = common_params['result_filter']
         _result_filter = result_filter
         if result_filter:
-            if isinstance(result_filter, Constraint):
-                _result_filter = result_filter.__call__
-            if getargspec(_result_filter).keywords:
-                def _result_filter(res):
-                    return result_filter(res, **allkwargs)
+            if not getargspec(_result_filter).keywords:
+                def _result_filter(res, **kwargs):
+                    return result_filter(res)
 
         # query cfg for defaults
-        cmdline_name = cls2cmdlinename(_func_class)
         dataset_arg = allkwargs.get('dataset', None)
 
         # .is_installed and .config can be costly, so ensure we do
@@ -397,7 +394,7 @@ def eval_results(func):
                     wrapped(*_args, **_kwargs),
                     _func_class, action_summary,
                     on_failure, incomplete_results,
-                    result_renderer, result_xfm, _result_filter,
+                    result_renderer,
                     result_log_level, **_kwargs):
                 for hook, spec in hooks.items():
                     # run the hooks before we yield the result
@@ -412,8 +409,26 @@ def eval_results(func):
                         # loops, i.e. when a hook yields a result that
                         # triggers that same hook again
                         for hr in run_jsonhook(hook, spec, r, dataset_arg):
-                            yield hr
-                yield r
+                            # apply same logic as for main results, otherwise
+                            # any filters would only tackle the primary results
+                            # and a mixture of return values could happen
+                            if not keep_result(hr, _result_filter, **allkwargs):
+                                continue
+                            hr = xfm_result(hr, result_xfm)
+                            # rational for conditional is a few lines down
+                            if hr:
+                                yield hr
+                if not keep_result(r, _result_filter, **allkwargs):
+                    continue
+                r = xfm_result(r, result_xfm)
+                # in case the result_xfm decided to not give us anything
+                # exclude it from the results. There is no particular reason
+                # to do so other than that it was established behavior when
+                # this comment was written. This will not affect any real
+                # result record
+                if r:
+                    yield r
+
                 # collect if summary is desired
                 if do_custom_result_summary:
                     results.append(r)
@@ -487,7 +502,7 @@ def default_result_renderer(res):
 def _process_results(
         results, cmd_class,
         action_summary, on_failure, incomplete_results,
-        result_renderer, result_xfm, result_filter,
+        result_renderer,
         result_log_level, **kwargs):
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
@@ -565,18 +580,27 @@ def _process_results(
                 # first fail -> that's it
                 # raise will happen after the loop
                 break
-
-        if result_filter:
-            try:
-                if not result_filter(res):
-                    raise ValueError('excluded by filter')
-            except ValueError as e:
-                lgr.debug('not reporting result (%s)', exc_str(e))
-                continue
-
-        if result_xfm:
-            res = result_xfm(res)
-            if res is None:
-                continue
-
         yield res
+
+
+def keep_result(res, rfilter, **kwargs):
+    if not rfilter:
+        return True
+    try:
+        if not rfilter(res, **kwargs):
+            # give the slightest indication which filter was employed
+            raise ValueError(
+                'excluded by filter {} with arguments {}'.format(rfilter, kwargs))
+    except ValueError as e:
+        # make sure to report the excluded result to massively improve
+        # debugging experience
+        lgr.debug('Not reporting result (%s): %s', exc_str(e), res)
+        return False
+    return True
+
+
+def xfm_result(res, xfm):
+    if not xfm:
+        return res
+
+    return xfm(res)
