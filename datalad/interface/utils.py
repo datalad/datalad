@@ -398,12 +398,18 @@ def eval_results(func):
 
             # process main results
             for r in _process_results(
-                    # execute the wrapped function
+                    # execution
                     wrapped(*_args, **_kwargs),
-                    wrapped_class, action_summary,
-                    common_params['on_failure'], incomplete_results,
+                    wrapped_class,
+                    common_params['on_failure'],
+                    # bookkeeping
+                    action_summary,
+                    incomplete_results,
+                    # communication
                     result_renderer,
-                    result_log_level, **_kwargs):
+                    result_log_level,
+                    # let renderers get to see how a command was called
+                    allkwargs):
                 for hook, spec in hooks.items():
                     # run the hooks before we yield the result
                     # this ensures that they are executed before
@@ -508,10 +514,14 @@ def default_result_renderer(res):
 
 
 def _process_results(
-        results, cmd_class,
-        action_summary, on_failure, incomplete_results,
+        results,
+        cmd_class,
+        on_failure,
+        action_summary,
+        incomplete_results,
         result_renderer,
-        result_log_level, **kwargs):
+        result_log_level,
+        allkwargs):
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
@@ -568,10 +578,10 @@ def _process_results(
                 default=lambda x: str(x)))
         elif result_renderer == 'tailored':
             if hasattr(cmd_class, 'custom_result_renderer'):
-                cmd_class.custom_result_renderer(res, **kwargs)
+                cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
             try:
-                result_renderer(res, **kwargs)
+                result_renderer(res, **allkwargs)
             except Exception as e:
                 lgr.warning('Result rendering failed for: %s [%s]',
                             res, exc_str(e))
