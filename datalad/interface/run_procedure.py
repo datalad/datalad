@@ -481,10 +481,7 @@ class RunProcedure(Interface):
         if kwargs.get('discover', None):
             ui.message('{name} ({path}){msg}'.format(
                 name=ac.color_word(res['procedure_name'], ac.BOLD),
-                path=op.relpath(
-                    res['path'],
-                    res['refds'])
-                if res.get('refds', None) else res['path'],
+                path=res['path'],
                 msg=' [{}]'.format(
                     res['message'][0] % res['message'][1:]
                     if isinstance(res['message'], tuple) else res['message'])
