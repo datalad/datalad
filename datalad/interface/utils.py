@@ -33,17 +33,18 @@ import json
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
-from datalad.utils import path_startswith
-from datalad.utils import path_is_subpath
-from datalad.utils import assure_unicode
-from datalad.utils import getargspec
+from datalad.utils import (
+    path_startswith,
+    path_is_subpath,
+    assure_unicode,
+    getargspec,
+    get_wrapped_class,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
-
-from datalad.support.constraints import Constraint
 
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
@@ -309,24 +310,30 @@ def eval_results(func):
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
         lgr.log(2, "Entered eval_func for %s", func)
-        # for result filters and pre/post procedures
+        # for result filters
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
         allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
-        # determine class, the __call__ method of which we are decorating:
-        mod = sys.modules[wrapped.__module__]
-        command_class_name = wrapped.__qualname__.split('.')[-2]
-        _func_class = mod.__dict__[command_class_name]
-        lgr.debug("Determined class of decorated function: %s", _func_class)
+
+        # determine the command class associated with `wrapped`
+        wrapped_class = get_wrapped_class(wrapped)
 
         # retrieve common options from kwargs, and fall back on the command
         # class attributes, or general defaults if needed
         kwargs = kwargs.copy()  # we will pop, which might cause side-effect
         common_params = {
             p_name: kwargs.pop(
+                # go way a any explicitly given default
                 p_name,
-                getattr(_func_class, p_name, eval_defaults[p_name]))
+                # otherwise determine the command class and pull any
+                # default set in that class
+                getattr(
+                    wrapped_class,
+                    p_name,
+                    # or the common default
+                    eval_defaults[p_name]))
             for p_name in eval_params}
+
         # short cuts and configured setup for common options
         on_failure = common_params['on_failure']
         return_type = common_params['return_type']
@@ -387,12 +394,12 @@ def eval_results(func):
             # of the command execution
             results = []
             do_custom_result_summary = result_renderer == 'tailored' \
-                and hasattr(_func_class, 'custom_result_summary_renderer')
+                and hasattr(wrapped_class, 'custom_result_summary_renderer')
 
             # process main results
             for r in _process_results(
                     wrapped(*_args, **_kwargs),
-                    _func_class, action_summary,
+                    wrapped_class, action_summary,
                     on_failure, incomplete_results,
                     result_renderer,
                     result_log_level, **_kwargs):
@@ -436,7 +443,7 @@ def eval_results(func):
             # result summary before a potential exception
             # custom first
             if do_custom_result_summary:
-                _func_class.custom_result_summary_renderer(results)
+                wrapped_class.custom_result_summary_renderer(results)
             elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
@@ -455,7 +462,7 @@ def eval_results(func):
 
         if return_type == 'generator':
             # hand over the generator
-            lgr.log(2, "Returning generator_func from eval_func for %s", _func_class)
+            lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
             return generator_func(*args, **kwargs)
         else:
             @wrapt.decorator
@@ -468,14 +475,14 @@ def eval_results(func):
                 # render summaries
                 if not result_xfm and result_renderer == 'tailored':
                     # cannot render transformed results
-                    if hasattr(_func_class, 'custom_result_summary_renderer'):
-                        _func_class.custom_result_summary_renderer(results)
+                    if hasattr(wrapped_class, 'custom_result_summary_renderer'):
+                        wrapped_class.custom_result_summary_renderer(results)
                 if return_type == 'item-or-list' and \
                         len(results) < 2:
                     return results[0] if results else None
                 else:
                     return results
-            lgr.log(2, "Returning return_func from eval_func for %s", _func_class)
+            lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
