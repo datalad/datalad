@@ -266,6 +266,16 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                 undiscovered_ds)
 
 
+def get_result_filter(fx):
+    """Wrap a filter into a helper to be able to accept additional
+    arguments, if the filter doesn't support it already"""
+    _fx = fx
+    if fx and not getargspec(fx).keywords:
+        def _fx(res, **kwargs):
+            return fx(res)
+    return _fx
+
+
 def eval_results(func):
     """Decorator for return value evaluation of datalad commands.
 
@@ -335,34 +345,24 @@ def eval_results(func):
             for p_name in eval_params}
 
         # short cuts and configured setup for common options
-        on_failure = common_params['on_failure']
         return_type = common_params['return_type']
+        result_filter = get_result_filter(common_params['result_filter'])
         # resolve string labels for transformers too
-        result_xfm = common_params['result_xfm']
-        if result_xfm in known_result_xfms:
-            result_xfm = known_result_xfms[result_xfm]
+        result_xfm = known_result_xfms.get(
+            common_params['result_xfm'],
+            # use verbatim, if not a known label
+            common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
         # TODO remove this conditional branch entirely, done outside
         if not result_renderer:
             result_renderer = dlcfg.get('datalad.api.result-renderer', None)
         # look for potential override of logging behavior
         result_log_level = dlcfg.get('datalad.log.result-level', None)
-        # wrap the filter into a helper to be able to pass additional arguments
-        # if the filter supports it, but at the same time keep the required interface
-        # as minimal as possible. Also do this here, in order to avoid this test
-        # to be performed for each return value
-        result_filter = common_params['result_filter']
-        _result_filter = result_filter
-        if result_filter:
-            if not getargspec(_result_filter).keywords:
-                def _result_filter(res, **kwargs):
-                    return result_filter(res)
 
         # query cfg for defaults
-        dataset_arg = allkwargs.get('dataset', None)
-
         # .is_installed and .config can be costly, so ensure we do
         # it only once. See https://github.com/datalad/datalad/issues/3575
+        dataset_arg = allkwargs.get('dataset', None)
         from datalad.distribution.dataset import Dataset
         ds = dataset_arg if isinstance(dataset_arg, Dataset) \
             else Dataset(dataset_arg) if dataset_arg else None
@@ -398,9 +398,10 @@ def eval_results(func):
 
             # process main results
             for r in _process_results(
+                    # execute the wrapped function
                     wrapped(*_args, **_kwargs),
                     wrapped_class, action_summary,
-                    on_failure, incomplete_results,
+                    common_params['on_failure'], incomplete_results,
                     result_renderer,
                     result_log_level, **_kwargs):
                 for hook, spec in hooks.items():
@@ -419,13 +420,13 @@ def eval_results(func):
                             # apply same logic as for main results, otherwise
                             # any filters would only tackle the primary results
                             # and a mixture of return values could happen
-                            if not keep_result(hr, _result_filter, **allkwargs):
+                            if not keep_result(hr, result_filter, **allkwargs):
                                 continue
                             hr = xfm_result(hr, result_xfm)
                             # rational for conditional is a few lines down
                             if hr:
                                 yield hr
-                if not keep_result(r, _result_filter, **allkwargs):
+                if not keep_result(r, result_filter, **allkwargs):
                     continue
                 r = xfm_result(r, result_xfm)
                 # in case the result_xfm decided to not give us anything
