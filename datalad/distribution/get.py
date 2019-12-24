@@ -268,18 +268,24 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
             result_renderer='disabled',
             return_type='generator',
             **kwargs):
+        # make sure to fix a detached HEAD before yielding the install success
+        # result. The resetting of the branch would undo any change done
+        # to the repo by processing in response to the result
+        if res.get('action', None) == 'install' and \
+                res.get('status', None) == 'ok' and \
+                res.get('type', None) == 'dataset' and \
+                res.get('path', None) == dest_path:
+            _fixup_submodule_dotgit_setup(ds, sm_path)
+
+            # do fancy update
+            lgr.debug("Update cloned subdataset {0} in parent".format(dest_path))
+            ds.repo.update_submodule(sm_path, init=True)
         yield res
 
     subds = Dataset(dest_path)
     if not subds.is_installed():
         lgr.debug('Desired subdataset %s did not materialize, stopping', subds)
         return
-
-    _fixup_submodule_dotgit_setup(ds, sm_path)
-
-    # do fancy update
-    lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-    ds.repo.update_submodule(sm_path, init=True)
 
 
 def _install_necessary_subdatasets(
@@ -382,6 +388,12 @@ def _recursive_install_subds_underneath(ds, recursion_limit, reckless, start=Non
                 # yield everything to let the caller decide how to deal with
                 # errors
                 yield res
+        if not subds.is_installed():
+            # an error result was emitted, and the external consumer can decide
+            # what to do with it, but there is no point in recursing into
+            # something that should be there, but isn't
+            lgr.debug('Subdataset %s could not be installed, skipped', subds)
+            continue
         # recurse
         # we can skip the start expression, we know we are within
         for res in _recursive_install_subds_underneath(
@@ -674,7 +686,7 @@ class Get(Interface):
                             action='get',
                             path=str(target_path),
                             status='error',
-                            message=('path not associated with dataset',
+                            message=('path not associated with dataset %s',
                                      refds),
                         )
                         continue
@@ -725,15 +737,16 @@ class Get(Interface):
                         reckless,
                         refds_path,
                         description):
+                    known_ds = res['path'] in content_by_ds
                     if res.get('status', None) in ('ok', 'notneeded') and \
                             'contains' in res:
                         dsrec = content_by_ds.get(res['path'], set())
                         dsrec.update(res['contains'])
                         content_by_ds[res['path']] = dsrec
-                    if res.get('status', None) != 'notneeded':
-                        # all those messages on not having installed anything
-                        # are a bit pointless
-                        # "notneeded" for annex get comes below
+                    # prevent double-reporting of datasets that have been
+                    # installed by explorative installation to get to target
+                    # paths, prior in this loop
+                    if res.get('status', None) != 'notneeded' or not known_ds:
                         yield res
 
         if not get_data:
@@ -748,7 +761,10 @@ class Get(Interface):
                     refds.path,
                     source,
                     jobs):
-                yield res
+                if res['path'] not in content_by_ds:
+                    # we had reports on datasets and subdatasets already
+                    # before the annex stage
+                    yield res
 
     @staticmethod
     def custom_result_summary_renderer(res):

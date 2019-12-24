@@ -24,7 +24,7 @@ from ...tests.utils import (
     with_testsui,
 )
 
-from mock import patch
+from unittest.mock import patch
 
 
 def test_ui_switcher():

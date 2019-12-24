@@ -121,7 +121,9 @@ def test_wtf(topdir):
                     '## %s' % s.lower(), cmo.out.lower()
                 )
             # order should match our desired one, not alphabetical
-            assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
+            # but because of https://github.com/datalad/datalad/issues/3915
+            # alphanum is now desired
+            assert cmo.out.index('## git-annex') > cmo.out.index('## configuration')
 
     # not achievable from cmdline is to pass an empty list of sections.
     with chpwd(path):

@@ -21,7 +21,7 @@ from os import (
 )
 
 from io import StringIO
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import (
     chpwd,
@@ -812,6 +812,9 @@ def test_rerun_explicit(path):
         ds.rerun(onto="", since="", explicit=True)
 
 
+# underlying code cannot deal with adjusted branches
+# https://github.com/datalad/datalad/pull/3817
+@known_failure_windows
 @with_tree(tree={"a.in": "a", "b.in": "b", "c.out": "c",
                  "subdir": {}})
 def test_placeholders(path):

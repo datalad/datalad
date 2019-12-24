@@ -99,12 +99,11 @@ def test_basics(path, super_path):
     ds.config.add(
         'datalad.clean.proc-pre',
         'datalad_test_proc',
-        where='dataset')
+        where='local')
     # run command that should trigger the demo procedure
     ds.clean()
     # look for traces
     ok_file_has_content(op.join(ds.path, 'fromproc.txt'), 'hello\n')
-    assert_repo_status(ds.path, modified=[op.join('.datalad', 'config')])
 
     # make a fresh dataset:
     super = Dataset(super_path).create()
@@ -112,7 +111,7 @@ def test_basics(path, super_path):
     super.config.add(
         'datalad.clean.proc-pre',
         'datalad_test_proc',
-        where='dataset')
+        where='local')
     # 'super' doesn't know any procedures but should get to know one by
     # installing the above as a subdataset
     super.install('sub', source=ds.path)
@@ -120,7 +119,6 @@ def test_basics(path, super_path):
     super.clean()
     # look for traces
     ok_file_has_content(op.join(super.path, 'fromproc.txt'), 'hello\n')
-    assert_repo_status(super.path, modified=[op.join('.datalad', 'config')])
 
 
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)
@@ -224,8 +222,11 @@ def test_procedure_discovery(path, super_path):
         assert_in_results(ps, path=op.join(super.path, 'sub', 'code',
                                            'broken_link_proc.py'),
                           state='absent')
-        assert_not_in_results(ps, path=op.join(super.path, 'sub', 'code',
-                                               'unknwon_broken_link'))
+        assert_in_results(
+            ps,
+            path=op.join(super.path, 'sub', 'code',
+                         'unknwon_broken_link'),
+            state='absent')
 
 
 @skip_if(cond=on_windows and cfg.obtain("datalad.repo.version") < 6)

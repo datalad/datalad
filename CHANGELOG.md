@@ -23,12 +23,74 @@ bet we will fix some bugs and make a world even a better place.
   `rev_get_dataset_root`.  `rev_get_dataset_root` remains as a
   compatibility alias and will be removed in a later release.  ([#3815][])
 
+- The `add_sibling` module, marked obsolete in v0.6.0, has been
+  removed.  ([#3871][])
+
+- `mock` is no longer declared as an external dependency because we
+   can rely on it being in the standard library now that our minimum
+   required Python version is 3.5. ([#3860][])
+
+- [download-url][] now requires that directories be indicated with a
+  trailing slash rather than interpreting a path as directory when it
+  doesn't exist.  This avoids confusion that can result from typos and
+  makes it possible to support directory targets that do not exist.
+  ([#3854][])
+
+- The `dataset_only` argument of the `ConfigManager` class is
+  deprecated.  Use `source="dataset"` instead.  ([#3907][])
+
+- The configuration values `datalad.COMMAND.proc-pre` and
+  `datalad.COMMAND.proc-post` must be defined in standard Git
+  configuration files and are no longer read from a dataset's tracked
+  `.datalad/config` file.  This avoids the security risk of
+  unknowingly executing a procedure due to configuration that was
+  brought in by a dataset update.  ([#3907][])
+
 ### Fixes
 
 - [publish][] crashed when called with a detached HEAD.  It now aborts
   with an informative message.  ([#3804][])
 
+- Since 0.12.0rc6 the call to [update][] in [siblings][] resulted in a
+  spurious warning.  ([#3877][])
+
+- [siblings][] crashed if it encountered an annex repository that was
+  marked as dead.  ([#3892][])
+
+- The update of [rerun][] in v0.12.0rc3 for the rewritten [diff][]
+  command didn't account for a change in the output of `diff`, leading
+  to `rerun --report` unintentionally including unchanged files in its
+  diff values.  ([#3873][])
+
+- In 0.12.0rc5 [download-url][] was updated to follow the new path
+  handling logic, but its calls to AnnexRepo weren't properly
+  adjusted, resulting in incorrect path handling when the called from
+  a dataset subdirectory.  ([#3850][])
+
+- [download-url][] called `git annex addurl` in a way that failed to
+  register a URL when its header didn't report the content size.
+  ([#3911][])
+
+- With Git v2.24.0, saving new subdatasets failed due to a bug in that
+  Git release.  ([#3904][])
+
+- With DataLad configured to stop on failure (e.g., specifying
+  `--on-failure=stop` from the command line), a failing result record
+  was not rendered.  ([#3863][])
+
+- Installing a subdataset yielded an "ok" status in cases where the
+  repository was not yet in its final state, making it ineffective for
+  a caller to operate on the repository in response to the result.
+  ([#3906][])
+
 ### Enhancements and new features
+
+- The new result hooks mechanism allows callers to specify, via local
+  Git configuration values, DataLad command calls that will be
+  triggered in response to matching result records (i.e., what you see
+  when you call a command with `-f json_pp`).  ([#3903][])
+
+  TODO: Add link to what comes from datalad-handbook/book#304.
 
 - The command interface classes learned to use a new `_examples_`
   attribute to render documentation examples for both the Python and
@@ -53,6 +115,22 @@ bet we will fix some bugs and make a world even a better place.
   This handling has been moved to a more central location within
   `GitRepo`, and now applies to any `update_submodule(..., init=True)`
   call.  ([#3831][])
+
+- The output of `datalad -h` has been reformatted to improve
+  readability.  ([#3862][])
+
+- [unlock][] has been sped up.  ([#3880][])
+
+- [wtf][] now reports the dataset ID if the current working directory
+  is visiting a dataset.  ([#3888][])
+
+- The `ConfigManager` class learned to exclude ``.datalad/config`` as
+  a source of configuration values, restricting the sources to
+  standard Git configuration files, when called with `source="local"`.
+  ([#3907][])
+
+- Commands now accept a `dataset` value of "^."  as shorthand for "the
+  dataset to which the current directory belongs".  ([#3242][])
 
 ## 0.12.0rc6 (Oct 19, 2019) -- some releases are better than the others
 
@@ -500,6 +578,19 @@ bet we will fix some bugs and make a world even a better place.
   `NotImplementedError` exception when it encounters one.  The
   function learned to return a URL untouched if an "s3://" URL comes
   in with a version ID.  ([#3842][])
+
+- A few spots needed to be adjusted for compatibility with git-annex's
+  new `--sameas` [feature][gx-sameas], which allows special remotes to
+  share a data store. ([#3856][])
+
+- The `swallow_logs` utility failed to capture some log messages due
+  to an incompatibility with Python 3.7.  ([#3935][])
+
+- [siblings][]
+  - crashed if `--inherit` was passed but the parent dataset did not
+    have a remote with a matching name.  ([#3954][])
+  - configured the wrong pushurl and annexurl values in some
+    cases. ([#3955][])
 
 ### Enhancements and new features
 
@@ -1746,6 +1837,7 @@ Release primarily focusing on interface functionality including initial
 publishing
 
 [git-annex]: http://git-annex.branchable.com/
+[gx-sameas]: https://git-annex.branchable.com/tips/multiple_remotes_accessing_the_same_data_store/
 [duecredit]: https://github.com/duecredit/duecredit
 
 [Kaggle]: https://www.kaggle.com
@@ -1941,6 +2033,7 @@ publishing
 [#3223]: https://github.com/datalad/datalad/issues/3223
 [#3238]: https://github.com/datalad/datalad/issues/3238
 [#3241]: https://github.com/datalad/datalad/issues/3241
+[#3242]: https://github.com/datalad/datalad/issues/3242
 [#3249]: https://github.com/datalad/datalad/issues/3249
 [#3250]: https://github.com/datalad/datalad/issues/3250
 [#3255]: https://github.com/datalad/datalad/issues/3255
@@ -2086,4 +2179,24 @@ publishing
 [#3828]: https://github.com/datalad/datalad/issues/3828
 [#3831]: https://github.com/datalad/datalad/issues/3831
 [#3842]: https://github.com/datalad/datalad/issues/3842
+[#3850]: https://github.com/datalad/datalad/issues/3850
 [#3851]: https://github.com/datalad/datalad/issues/3851
+[#3854]: https://github.com/datalad/datalad/issues/3854
+[#3856]: https://github.com/datalad/datalad/issues/3856
+[#3860]: https://github.com/datalad/datalad/issues/3860
+[#3862]: https://github.com/datalad/datalad/issues/3862
+[#3863]: https://github.com/datalad/datalad/issues/3863
+[#3871]: https://github.com/datalad/datalad/issues/3871
+[#3873]: https://github.com/datalad/datalad/issues/3873
+[#3877]: https://github.com/datalad/datalad/issues/3877
+[#3880]: https://github.com/datalad/datalad/issues/3880
+[#3888]: https://github.com/datalad/datalad/issues/3888
+[#3892]: https://github.com/datalad/datalad/issues/3892
+[#3903]: https://github.com/datalad/datalad/issues/3903
+[#3904]: https://github.com/datalad/datalad/issues/3904
+[#3906]: https://github.com/datalad/datalad/issues/3906
+[#3907]: https://github.com/datalad/datalad/issues/3907
+[#3911]: https://github.com/datalad/datalad/issues/3911
+[#3935]: https://github.com/datalad/datalad/issues/3935
+[#3954]: https://github.com/datalad/datalad/issues/3954
+[#3955]: https://github.com/datalad/datalad/issues/3955

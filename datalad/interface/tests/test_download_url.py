@@ -31,8 +31,8 @@ def test_download_url_exceptions():
     res0 = download_url(['url1', 'url2'], path=__file__,
                         save=False, on_failure='ignore')
     assert_result_count(res0, 1, status='error')
-    assert_message('When specifying multiple urls, --path should point to '
-                   'an existing directory. Got %r',
+    assert_message("When specifying multiple urls, --path should point to "
+                   "a directory target (with a trailing separator). Got %r",
                    res0)
 
     res1 = download_url('http://example.com/bogus',
@@ -51,6 +51,16 @@ def test_download_url_exceptions():
         assert_in('http://example.com/bogus', msg)
 
 
+@with_tree(tree={"dir": {}})
+def test_download_url_existing_dir_no_slash_exception(path):
+    with chpwd(path):
+        res = download_url('url', path="dir", save=False, on_failure='ignore')
+        assert_result_count(res, 1, status='error')
+        assert_message("Non-directory path given (no trailing separator) "
+                       "but a directory with that name exists",
+                       res)
+
+
 @known_failure_githubci_win
 @assert_cwd_unchanged
 @with_tree(tree=[
@@ -60,6 +70,8 @@ def test_download_url_exceptions():
 @serve_path_via_http
 @with_tempfile(mkdir=True)
 def test_download_url_return(toppath, topurl, outdir):
+    # Ensure that out directory has trailing slash.
+    outdir = opj(outdir, "")
     files = ['file1.txt', 'file2.txt']
     urls = [topurl + f for f in files]
     outfiles = [opj(outdir, f) for f in files]
@@ -124,7 +136,7 @@ def test_download_url_dataset(toppath, topurl, path):
     ds.download_url([opj(topurl, "file1.txt")], path=subdir_target)
     ok_(ds.repo.file_has_content(subdir_target))
 
-    subdir_path = opj(ds.path, "subdir")
+    subdir_path = opj(ds.path, "subdir", "")
     os.mkdir(subdir_path)
     with chpwd(subdir_path):
         download_url(topurl + "file4.txt")
@@ -162,3 +174,36 @@ def test_download_url_archive(toppath, topurl, path):
     ok_(ds.repo.file_has_content(opj("archive", "file1.txt")))
     assert_not_in(opj(ds.path, "archive.tar.gz"),
                   ds.repo.format_commit("%B"))
+
+
+@known_failure_githubci_win
+@with_tree(tree={"archive.tar.gz": {'file1.txt': 'abc'}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_download_url_archive_from_subdir(toppath, topurl, path):
+    ds = Dataset(path).create()
+    subdir_path = opj(ds.path, "subdir", "")
+    os.mkdir(subdir_path)
+    with chpwd(subdir_path):
+        download_url([topurl + "archive.tar.gz"], archive=True)
+    ok_(ds.repo.file_has_content(opj("subdir", "archive", "file1.txt")))
+
+
+@known_failure_githubci_win
+@with_tree(tree={"a0.tar.gz": {'f0.txt': 'abc'},
+                 "a1.tar.gz": {'f1.txt': 'def'}})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_download_url_archive_trailing_separator(toppath, topurl, path):
+    ds = Dataset(path).create()
+    # Archives will be extracted in the specified subdirectory, which doesn't
+    # need to exist.
+    ds.download_url([topurl + "a0.tar.gz"], path=opj("with-slash", ""),
+                    archive=True)
+    ok_(ds.repo.file_has_content(opj("with-slash", "a0", "f0.txt")))
+    # But if the path doesn't have a trailing separator, it will not be
+    # considered a directory. The archive will be downloaded to that path and
+    # then extracted in the top-level of the dataset.
+    ds.download_url([topurl + "a1.tar.gz"], path="no-slash",
+                    archive=True)
+    ok_(ds.repo.file_has_content(opj("a1", "f1.txt")))

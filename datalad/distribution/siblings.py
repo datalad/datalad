@@ -267,6 +267,7 @@ class Siblings(Interface):
         # layout?
         replicate_local_structure = url and "%NAME" not in url
 
+        subds_pushurl = None
         for subds in dataset.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
@@ -274,7 +275,8 @@ class Siblings(Interface):
             subds_name = op.relpath(subds.path, start=dataset.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
-                subds_pushurl = slash_join(pushurl, subds_name)
+                if pushurl:
+                    subds_pushurl = slash_join(pushurl, subds_name)
             else:
                 subds_url = \
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))
@@ -467,7 +469,8 @@ def _configure_remote(
             # makes sense only if current AND super are annexes, so it is
             # kinda a boomer, since then forbids having a super a pure git
             if isinstance(ds.repo, AnnexRepo) and \
-                    isinstance(delayed_super.repo, AnnexRepo):
+                    isinstance(delayed_super.repo, AnnexRepo) and \
+                    name in delayed_super.repo.get_remotes():
                 if annex_wanted is None:
                     annex_wanted = _inherit_annex_var(
                         delayed_super, name, 'wanted')
@@ -646,7 +649,7 @@ def _query_remotes(
                               if k.startswith('remote.{}.'.format(remote))]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
         if get_annex_info and info.get('annex-uuid', None):
-            ainfo = annex_info.get(info['annex-uuid'])
+            ainfo = annex_info.get(info['annex-uuid'], {})
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description

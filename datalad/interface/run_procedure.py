@@ -110,7 +110,7 @@ def _get_procedure_implementation(name='*', ds=None):
     Returns
     -------
     tuple
-      path, format string, help message
+      path, name, format string, help message
     """
 
     ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
@@ -164,18 +164,10 @@ def _guess_exec(script_file):
         is_exec = os.stat(script_file).st_mode & stat.S_IEXEC
     except OSError as e:
         from errno import ENOENT
-        if e.errno == ENOENT:
-            # path does not exist or is a broken symlink
-            state = 'absent'
-            if op.islink(script_file):
-                # broken symlink;
-                # we can't figure whether it's executable:
-                is_exec = False
-                # apart from that proceed, since we can still tell in case of
-                # .py or .sh
-            else:
-                # does not exist; there's nothing to detect at all
-                return {'type': None, 'template': None, 'state': None}
+        if e.errno == ENOENT and op.islink(script_file):
+            # broken symlink
+            # does not exist; there's nothing to detect at all
+            return {'type': None, 'template': None, 'state': 'absent'}
         else:
             raise e
 
@@ -183,16 +175,16 @@ def _guess_exec(script_file):
     if is_exec and not os.path.isdir(script_file):
         return {'type': u'executable',
                 'template': u'{script} {ds} {args}',
-                'state': state}
+                'state': 'executable'}
     elif script_file.endswith('.sh'):
         return {'type': u'bash_script',
                 'template': u'bash {script} {ds} {args}',
-                'state': state}
+                'state': 'executable'}
     elif script_file.endswith('.py'):
         ex = maybe_shlex_quote(sys.executable)
         return {'type': u'python_script',
                 'template': u'%s {script} {ds} {args}' % ex,
-                'state': state}
+                'state': 'executable'}
     else:
         return {'type': None, 'template': None, 'state': None}
 
@@ -349,7 +341,11 @@ class RunProcedure(Interface):
             ds = None
 
         if discover:
+            # specific path of procedures that were already reported
             reported = set()
+            # specific names of procedure for which an active one has been
+            # found
+            active = set()
             for m, cmd_name, cmd_tmpl, cmd_help in \
                     _get_procedure_implementation('*', ds=ds):
                 if m in reported:
@@ -358,13 +354,13 @@ class RunProcedure(Interface):
                 # configured template (call-format string) takes precedence:
                 if cmd_tmpl:
                     ex['template'] = cmd_tmpl
-                if ex['type'] is None and ex['template'] is None:
+                if ex['state'] is None:
                     # doesn't seem like a match
-                    lgr.debug("Neither type nor execution template found for "
-                              "%s. Ignored.", m)
+                    lgr.debug("%s does not look like a procedure, ignored.", m)
                     continue
+                state = 'overridden' if cmd_name in active else ex['state']
                 message = ex['type'] if ex['type'] else 'unknown type'
-                message += ' (missing)' if ex['state'] == 'absent' else ''
+                message += ' ({})'.format(state) if state != 'executable' else ''
                 res = get_status_dict(
                     action='discover_procedure',
                     path=m,
@@ -372,13 +368,15 @@ class RunProcedure(Interface):
                     logger=lgr,
                     refds=ds.path if ds else None,
                     status='ok',
-                    state=ex['state'],
+                    state=state,
                     procedure_name=cmd_name,
                     procedure_type=ex['type'],
                     procedure_callfmt=ex['template'],
                     procedure_help=cmd_help,
                     message=message)
                 reported.add(m)
+                if state == 'executable':
+                    active.add(cmd_name)
                 yield res
             return
 
@@ -480,11 +478,10 @@ class RunProcedure(Interface):
 
         if kwargs.get('discover', None):
             ui.message('{name} ({path}){msg}'.format(
-                name=ac.color_word(res['procedure_name'], ac.BOLD),
-                path=op.relpath(
-                    res['path'],
-                    res['refds'])
-                if res.get('refds', None) else res['path'],
+                # bold-faced name, if active
+                name=ac.color_word(res['procedure_name'], ac.BOLD)
+                if res['state'] == 'executable' else res['procedure_name'],
+                path=res['path'],
                 msg=' [{}]'.format(
                     res['message'][0] % res['message'][1:]
                     if isinstance(res['message'], tuple) else res['message'])

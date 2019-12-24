@@ -40,6 +40,11 @@ jobs:
     - name: Install ${{ matrix.extension }} extension
       run: |
         pip install ${{ matrix.extension }}
+      if: matrix.extension != 'datalad_crawler'
+    - name: Install ${{ matrix.extension }} extension
+      run: |
+        pip install ${{ matrix.extension }}[devel]
+      if: matrix.extension == 'datalad_crawler'
     - name: Install Singularity
       run: sudo eatmydata apt-get install singularity-container
       if: matrix.extension == 'datalad_container'

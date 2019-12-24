@@ -168,7 +168,7 @@ def get_func_kwargs_doc(func):
 
 def any_re_search(regexes, value):
     """Return if any of regexes (list or str) searches succesfully for value"""
-    for regex in assure_tuple_or_list(regexes):
+    for regex in ensure_tuple_or_list(regexes):
         if re.search(regex, value):
             return True
     return False
@@ -600,7 +600,7 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
-def assure_tuple_or_list(obj):
+def ensure_tuple_or_list(obj):
     """Given an object, wrap into a tuple if not list or tuple
     """
     if isinstance(obj, (list, tuple)):
@@ -608,14 +608,14 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
-def assure_iter(s, cls, copy=False, iterate=True):
+def ensure_iter(s, cls, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
     ----------
     s: list or anything
     cls: class
-      Which iterable class to assure
+      Which iterable class to ensure
     copy: bool, optional
       If correct iterable is passed, it would generate its shallow copy
     iterate: bool, optional
@@ -635,7 +635,7 @@ def assure_iter(s, cls, copy=False, iterate=True):
         return cls((s,))
 
 
-def assure_list(s, copy=False, iterate=True):
+def ensure_list(s, copy=False, iterate=True):
     """Given not a list, would place it into a list. If None - empty list is returned
 
     Parameters
@@ -647,10 +647,10 @@ def assure_list(s, copy=False, iterate=True):
       If it is not a list, but something iterable (but not a str)
       iterate over it.
     """
-    return assure_iter(s, list, copy=copy, iterate=iterate)
+    return ensure_iter(s, list, copy=copy, iterate=iterate)
 
 
-def assure_list_from_str(s, sep='\n'):
+def ensure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -666,7 +666,7 @@ def assure_list_from_str(s, sep='\n'):
     return s.split(sep)
 
 
-def assure_dict_from_str(s, **kwargs):
+def ensure_dict_from_str(s, **kwargs):
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -683,7 +683,7 @@ def assure_dict_from_str(s, **kwargs):
         return s
 
     out = {}
-    for value_str in assure_list_from_str(s, **kwargs):
+    for value_str in ensure_list_from_str(s, **kwargs):
         if '=' not in value_str:
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)
@@ -694,7 +694,7 @@ def assure_dict_from_str(s, **kwargs):
     return out
 
 
-def assure_bytes(s, encoding='utf-8'):
+def ensure_bytes(s, encoding='utf-8'):
     """Convert/encode unicode string to bytes.
 
     If `s` isn't a string, return it as is.
@@ -709,7 +709,7 @@ def assure_bytes(s, encoding='utf-8'):
     return s.encode(encoding)
 
 
-def assure_unicode(s, encoding=None, confidence=None):
+def ensure_unicode(s, encoding=None, confidence=None):
     """Convert/decode bytestring to unicode.
 
     If `s` isn't a bytestring, return it as is.
@@ -755,7 +755,7 @@ def assure_unicode(s, encoding=None, confidence=None):
         return s.decode(encoding)
 
 
-def assure_bool(s):
+def ensure_bool(s):
     """Convert value into boolean following convention for strings
 
     to recognize on,True,yes as True, off,False,no as False
@@ -777,7 +777,7 @@ def as_unicode(val, cast_types=object):
     """Given an arbitrary value, would try to obtain unicode value of it
     
     For unicode it would return original value, for python2 str or python3
-    bytes it would use assure_unicode, for None - an empty (unicode) string,
+    bytes it would use ensure_unicode, for None - an empty (unicode) string,
     and for any other type (see `cast_types`) - would apply the unicode 
     constructor.  If value is not an instance of `cast_types`, TypeError
     is thrown
@@ -792,7 +792,7 @@ def as_unicode(val, cast_types=object):
     elif isinstance(val, str):
         return val
     elif isinstance(val, unicode_srctypes):
-        return assure_unicode(val)
+        return ensure_unicode(val)
     elif isinstance(val, cast_types):
         return str(val)
     else:
@@ -864,7 +864,7 @@ def map_items(func, v):
     No type checking of values passed to func is done, so `func`
     should be resilient to values which it should not handle
 
-    Initial usecase - apply_recursive(url_fragment, assure_unicode)
+    Initial usecase - apply_recursive(url_fragment, ensure_unicode)
     """
     # map all elements within item
     return v.__class__(
@@ -918,8 +918,8 @@ def generate_file_chunks(files, cmd=None):
     cmd: str or list of str, optional
       Command to account for as well
     """
-    files = assure_list(files)
-    cmd = assure_list(cmd)
+    files = ensure_list(files)
+    cmd = ensure_list(cmd)
 
     maxl = max(map(len, files)) if files else 0
     chunk_size = max(
@@ -1299,7 +1299,8 @@ def swallow_logs(new_level=None, file_=None, name='datalad'):
         # TODO: if file_ and there was an exception -- most probably worth logging it?
         # although ideally it should be the next log outside added to that file_ ... oh well
     finally:
-        lgr.handlers, lgr.level = old_handlers, old_level
+        lgr.handlers = old_handlers
+        lgr.setLevel(old_level)
         adapter.cleanup()
 
 
@@ -1367,7 +1368,7 @@ def setup_exceptionhook(ipython=False):
         sys.excepthook = _datalad_pdb_excepthook
 
 
-def assure_dir(*args):
+def ensure_dir(*args):
     """Make sure directory exists.
 
     Joins the list of arguments to an os-specific path to the desired
@@ -1727,7 +1728,7 @@ def get_logfilename(dspath, cmd='datalad'):
     """
     assert(exists(dspath))
     assert(isdir(dspath))
-    ds_logdir = assure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
+    ds_logdir = ensure_dir(dspath, '.git', 'datalad', 'logs')  # TODO: use WEB_META_LOG whenever #789 merged
     return opj(ds_logdir, 'crawl-%s.log' % get_timestamp_suffix())
 
 
@@ -2013,7 +2014,7 @@ def read_csv_lines(fname, dialect=None, readahead=16384, **kwargs):
         header = None
         for row in csv_reader:
             # decode UTF-8 back to Unicode, cell by cell:
-            row_unicode = map(assure_unicode, row)
+            row_unicode = map(ensure_unicode, row)
             if header is None:
                 header = list(row_unicode)
             else:
@@ -2245,7 +2246,7 @@ def create_tree(path, tree, archives_leading_dir=True, remove_existing=False):
             if full_name.endswith('.gz'):
                 open_func = gzip.open
             with open_func(full_name, "wb") as f:
-                f.write(assure_bytes(load, 'utf-8'))
+                f.write(ensure_bytes(load, 'utf-8'))
         if executable:
             os.chmod(full_name, os.stat(full_name).st_mode | stat.S_IEXEC)
 
@@ -2255,7 +2256,7 @@ def get_suggestions_msg(values, known, sep="\n        "):
     """
     import difflib
     suggestions = []
-    for value in assure_list(values):  # might not want to do it if we change presentation below
+    for value in ensure_list(values):  # might not want to do it if we change presentation below
         suggestions += difflib.get_close_matches(value, known)
     suggestions = unique(suggestions)
     msg = "Did you mean any of these?"
@@ -2317,6 +2318,18 @@ def maybe_shlex_quote(val):
     """
 
     return val if on_windows else shlex_quote(val)
+
+
+# TODO whenever we feel ready for English kill the compat block below
+assure_tuple_or_list = ensure_tuple_or_list
+assure_iter = ensure_iter
+assure_list = ensure_list
+assure_list_from_str = ensure_list_from_str
+assure_dict_from_str = ensure_dict_from_str
+assure_bytes = ensure_bytes
+assure_unicode = ensure_unicode
+assure_bool = ensure_bool
+assure_dir = ensure_dir
 
 
 lgr.log(5, "Done importing datalad.utils")

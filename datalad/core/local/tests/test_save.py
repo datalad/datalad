@@ -143,7 +143,9 @@ def test_save_message_file(path):
                        "msg": "add foo"})
     ds.repo.add("foo")
     ds.save(message_file=op.join(ds.path, "msg"))
-    eq_(ds.repo.format_commit("%s"),
+    # ATTN: Use master explicitly so that this check works when we're on an
+    # adjusted branch too (e.g., when this test is executed under Windows).
+    eq_(ds.repo.format_commit("%s", "master"),
         "add foo")
 
 
@@ -382,7 +384,17 @@ def test_add_subdataset(path, other):
     # to ds
     res = ds.save(subds.path)
     assert_in_results(res, action="add", path=subds.path, refds=ds.path)
-    assert_in('dir', ds.subdatasets(result_xfm='relpaths'))
+    res = ds.subdatasets()
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1,
+        # essentials
+        path=op.join(ds.path, 'dir'),
+        gitmodule_url='./dir',
+        gitmodule_name='dir',
+        # but also the branch, by default
+        gitmodule_branch='master',
+    )
     #  create another one
     other = create(other)
     # install into superdataset, but don't add

@@ -225,16 +225,11 @@ class Subdatasets(Interface):
             if path else None
 
         ds = require_dataset(
-            dataset, check_installed=False, purpose='subdataset reporting/modification')
+            dataset, check_installed=True, purpose='subdataset reporting/modification')
         lgr.debug('Query subdatasets of %s', dataset)
         if paths is not None:
             lgr.debug('Query subdatasets underneath paths: %s', paths)
         refds_path = ds.path
-
-        # XXX this seems strange, but is tested to be the case -- I'd rather set
-        # `check_installed` to true above and fail
-        if not GitRepo.is_valid_repo(refds_path):
-            return
 
         # return as quickly as possible
         if isinstance(recursion_limit, int) and (recursion_limit <= 0):

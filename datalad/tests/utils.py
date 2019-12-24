@@ -27,7 +27,7 @@ from fnmatch import fnmatch
 import time
 from difflib import unified_diff
 from contextlib import contextmanager
-from mock import patch
+from unittest.mock import patch
 
 from http.server import SimpleHTTPRequestHandler
 from http.server import HTTPServer
@@ -376,7 +376,7 @@ def ok_archives_caches(repopath, n=1, persistent=None):
 
 
 def ok_exists(path):
-    assert exists(path), 'path %s does not exist' % path
+    assert exists(path), 'path %s does not exist (or dangling symlink)' % path
 
 
 def ok_file_has_content(path, content, strip=False, re_=False,
@@ -789,6 +789,48 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
+
+
+@optional_args
+def with_sameas_remote(func, autoenabled=False):
+    """Provide a repository with a git-annex sameas remote configured.
+
+    The repository will have two special remotes: r_dir (type=directory) and
+    r_rsync (type=rsync). The rsync remote will be configured with
+    --sameas=r_dir, and autoenabled if `autoenabled` is true.
+    """
+    from datalad.support.annexrepo import AnnexRepo
+    from datalad.support.exceptions import CommandError
+
+    @wraps(func)
+    @attr('with_sameas_remotes')
+    @skip_if_on_windows
+    @skip_ssh
+    @with_tempfile(mkdir=True)
+    @with_tempfile(mkdir=True)
+    def newfunc(*args, **kwargs):
+        sr_path, repo_path = args[-2:]
+        fn_args = args[:-2]
+        repo = AnnexRepo(repo_path)
+        repo.init_remote("r_dir",
+                         options=["type=directory",
+                                  "encryption=none",
+                                  "directory=" + sr_path])
+        options = ["type=rsync",
+                   "rsyncurl=datalad-test:" + sr_path]
+        if autoenabled:
+            options.append("autoenable=true")
+        options.append("--sameas=r_dir")
+
+        try:
+            repo.init_remote("r_rsync", options=options)
+        except CommandError:
+            if repo.git_annex_version < "7.20191017":
+                raise SkipTest("git-annex lacks --sameas support")
+            # This should have --sameas support.
+            raise
+        return func(*(fn_args + (repo,)), **kwargs)
+    return newfunc
 
 
 @optional_args

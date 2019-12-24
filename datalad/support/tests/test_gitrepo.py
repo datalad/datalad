@@ -48,6 +48,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import integration
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
 from datalad.utils import getpwd, chpwd
@@ -1328,7 +1329,7 @@ def test_get_hexsha_tag(path):
 
 @with_tempfile(mkdir=True)
 def test_get_tags(path):
-    from mock import patch
+    from unittest.mock import patch
 
     gr = GitRepo(path, create=True)
     eq_(gr.get_tags(), [])
@@ -1612,3 +1613,21 @@ def test_gitrepo_call_git_methods(path):
     with swallow_logs(new_level=logging.DEBUG) as cml:
         assert_false(gr.call_git_success(["rev-parse", "HEAD^{blob}"]))
         assert_not_in("blob", cml.out)
+
+
+@skip_if_no_network
+@with_tempfile
+def _test_protocols(proto, destdir):
+    GitRepo.clone('%s://github.com/datalad-tester/testtt' % proto, destdir)
+
+
+@integration
+def test_protocols():
+    # git-annex-standalone build can get git bundle which would fail to
+    # download via https, resulting in messages such as
+    #  fatal: unable to find remote helper for 'https'
+    # which happened with git-annex-standalone 7.20191017+git2-g7b13db551-1~ndall+1
+
+    # http is well tested already
+    for proto in 'git', 'https':
+        yield _test_protocols, proto

@@ -147,7 +147,7 @@ def test_subdatasets(path):
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
-    eq_(ds.subdatasets(), [])
+    assert_raises(ValueError, ds.subdatasets)
     ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.subdatasets(), [])
@@ -202,6 +202,23 @@ def test_subdatasets(path):
         eq_(dstop, ds)
 
     # TODO actual submodule checkout is still there
+
+    # Test ^. (the dataset for curdir) shortcut
+    # At the top should point to the top
+    with chpwd(ds.path):
+        dstop = Dataset('^.')
+        eq_(dstop, ds)
+
+    # and still does within subdir
+    os.mkdir(opj(ds.path, 'subdir'))
+    with chpwd(opj(ds.path, 'subdir')):
+        dstop = Dataset('^.')
+        eq_(dstop, ds)
+
+    # within submodule will point to submodule
+    with chpwd(subsubds.path):
+        dstop = Dataset('^.')
+        eq_(dstop, subsubds)
 
 
 @with_tempfile(mkdir=True)

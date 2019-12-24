@@ -66,7 +66,10 @@ from datalad.config import (
     _parse_gitconfig_dump
 )
 
-from datalad.consts import GIT_SSH_COMMAND
+from datalad.consts import (
+    GIT_SSH_COMMAND,
+    ADJUSTED_BRANCH_EXPR,
+)
 from datalad.dochelpers import exc_str
 import datalad.utils as ut
 from datalad.utils import (
@@ -356,6 +359,27 @@ def _remove_empty_items(list_):
             "_remove_empty_items() called with non-list type: %s" % type(list_))
         return list_
     return [file_ for file_ in list_ if file_]
+
+
+if external_versions["cmd:git"] >= "2.24.0":
+    # An unintentional change in Git 2.24.0 led to `ls-files -o` traversing
+    # into untracked submodules when multiple pathspecs are given, returning
+    # repositories that are deeper than the first level. This helper filters
+    # these deeper levels out so that save_() doesn't fail trying to add them.
+    #
+    # TODO: Once an upstream release includes a fix, either set a ceiling on
+    # the Git version above or remove _prune_deeper_repos() entirely.
+    def _prune_deeper_repos(repos):
+        firstlevel_repos = []
+        prev = None
+        for repo in sorted(repos):
+            if not (prev and str(repo).startswith(prev)):
+                prev = str(repo)
+                firstlevel_repos.append(repo)
+        return firstlevel_repos
+else:
+    def _prune_deeper_repos(repos):
+        return repos
 
 
 def Repo(*args, **kwargs):
@@ -1069,7 +1093,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         """
         if self._cfg is None:
             # associate with this dataset and read the entire config hierarchy
-            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+            self._cfg = ConfigManager(dataset=self, source='any')
         return self._cfg
 
     def is_with_annex(self):
@@ -2648,7 +2672,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
         # parent
         # gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
         # going git native instead
-        cmd = ['git', 'submodule', 'add', '--name', name]
+        cmd = ['submodule', 'add', '--name', name]
         if branch is not None:
             cmd += ['-b', branch]
         if url is None:
@@ -2674,15 +2698,14 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
             else:
                 url = path
         cmd += [url, Path(path).as_posix()]
-        self._git_custom_command('', cmd)
+        self.call_git(cmd)
         # record dataset ID if possible for comprehesive metadata on
         # dataset components within the dataset itself
         subm_id = GitRepo(op.join(self.path, path)).config.get(
             'datalad.dataset.id', None)
         if subm_id:
-            self._git_custom_command(
-                '',
-                ['git', 'config', '--file', '.gitmodules', '--replace-all',
+            self.call_git(
+                ['config', '--file', '.gitmodules', '--replace-all',
                  'submodule.{}.datalad-id'.format(name), subm_id])
         # ensure supported setup
         _fixup_submodule_dotgit_setup(self, path)
@@ -3817,11 +3840,19 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                     # still reported as a directory must be its own repository
                     untracked='all').items()
                 if sm_props.get('type', None) == 'directory']
+            to_add_submodules = _prune_deeper_repos(to_add_submodules)
             for cand_sm in to_add_submodules:
+                branch = self.get_active_branch()
+                adjusted_match = ADJUSTED_BRANCH_EXPR.match(
+                    branch if branch else '')
                 try:
                     self.add_submodule(
                         str(cand_sm.relative_to(self.pathobj)),
-                        url=None, name=None)
+                        url=None,
+                        name=None,
+                        branch=adjusted_match.group('name') if adjusted_match
+                        else branch
+                    )
                 except (CommandError, InvalidGitRepositoryError) as e:
                     yield get_status_dict(
                         action='add_submodule',

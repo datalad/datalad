@@ -23,7 +23,7 @@ from os import (
 )
 import sys
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import (
     assure_unicode,
@@ -105,7 +105,9 @@ def test_basics(path, nodspath):
         assert_result_count(res, 1, action='add',
                             path=op.join(ds.path, 'empty'), type='file')
         assert_result_count(res, 1, action='save', path=ds.path)
-        commit_msg = ds.repo.format_commit("%B")
+        # ATTN: Use master explicitly so that this check works when we're on an
+        # adjusted branch too (e.g., when this test is executed under Windows).
+        commit_msg = ds.repo.format_commit("%B", "master")
         ok_(commit_msg.startswith('[DATALAD RUNCMD] TEST'))
         # crude test that we have a record for the PWD
         assert_in('"pwd": "."', commit_msg)
@@ -177,18 +179,24 @@ def test_sidecar(path):
 
     ds.config.set("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy1", message="sidecar config")
-    assert_in('"cmd":', ds.repo.format_commit("%B"))
+
+    def last_commit_msg():
+        # ATTN: Use master explicitly so that this check works when we're on an
+        # adjusted branch too (e.g., when this test is executed under Windows).
+        return ds.repo.format_commit("%B", "master")
+
+    assert_in('"cmd":', last_commit_msg())
 
     ds.config.set("datalad.run.record-sidecar", "true", where="local")
     ds.run("cd .> dummy2", message="sidecar config")
-    assert_not_in('"cmd":', ds.repo.format_commit("%B"))
+    assert_not_in('"cmd":', last_commit_msg())
 
     # Don't break when config.get() returns multiple values. Here it's two
     # values in .gitconfig, but a more realistic scenario is a value in
     # $repo/.git/config that overrides a setting in ~/.config/git/config.
     ds.config.add("datalad.run.record-sidecar", "false", where="local")
     ds.run("cd .> dummy3", message="sidecar config")
-    assert_in('"cmd":', ds.repo.format_commit("%B"))
+    assert_in('"cmd":', last_commit_msg())
 
 
 @with_tree(tree={"to_remove": "abc"})
@@ -333,7 +341,9 @@ def test_inject(path):
                      dataset=ds,
                      inject=True,
                      extra_info={"custom_key": "custom_field"}))
-    msg = ds.repo.format_commit("%B")
+    # ATTN: Use master explicitly so that this check works when we're on an
+    # adjusted branch too (e.g., when this test is executed under Windows).
+    msg = ds.repo.format_commit("%B", "master")
     assert_in("custom_key", msg)
     assert_in("nonsense command", msg)
 

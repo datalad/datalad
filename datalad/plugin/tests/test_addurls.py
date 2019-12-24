@@ -16,7 +16,7 @@ import os.path as op
 import shutil
 import tempfile
 
-from mock import patch
+from unittest.mock import patch
 
 from io import StringIO
 

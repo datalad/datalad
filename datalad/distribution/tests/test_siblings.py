@@ -9,20 +9,31 @@
 
 """
 
-from os.path import join as opj, basename
+from datalad.support.path import (
+    basename,
+    join as opj,
+    normpath,
+    relpath,
+)
+
+from datalad.api import clone
 from datalad.api import create
+from datalad.api import Dataset
 from datalad.api import install
 from datalad.api import siblings
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 
 from datalad.tests.utils import chpwd
+from datalad.tests.utils import create_tree
 from datalad.tests.utils import with_tempfile, with_testrepos
+from datalad.tests.utils import assert_false
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import with_sameas_remote
 
 from nose.tools import eq_, ok_
 
@@ -30,7 +41,8 @@ from nose.tools import eq_, ok_
 # work on cloned repos to be safer
 @with_testrepos('submodule_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
-def test_siblings(origin, repo_path):
+@with_tempfile
+def test_siblings(origin, repo_path, local_clone_path):
 
     sshurl = "ssh://push-remote.example.com"
     httpurl1 = "http://remote1.example.com/location"
@@ -202,6 +214,28 @@ def test_siblings(origin, repo_path):
         eq_(url, r['url'])
         eq_(pushurl, r['pushurl'])
 
+    # recursively without template and pushurl but full "hierarchy"
+    # to a local clone
+    for r in siblings(
+            'configure',
+            dataset=source,
+            name="test-remote-3",
+            url=local_clone_path,
+            recursive=True,
+            # we need to disable annex queries, as it will try to access
+            # the fake URL configured above
+            get_annex_info=False,
+            result_renderer=None):
+        repo = GitRepo(r['path'], create=False)
+        assert_in("test-remote-3", repo.get_remotes())
+        url = repo.get_remote_url("test-remote-3")
+        pushurl = repo.get_remote_url("test-remote-3", push=True)
+
+        eq_(normpath(url),
+            normpath(opj(local_clone_path,
+                         relpath(str(r['path']), source.path))))
+        # https://github.com/datalad/datalad/issues/3951
+        ok_(not pushurl)  # no pushurl should be defined
 
 @with_tempfile(mkdir=True)
 def test_here(path):
@@ -233,6 +267,17 @@ def test_here(path):
     here = res[0]
     eq_('very special', here['annex-description'])
 
+    # does not die when here is dead
+    res = ds.siblings('query', name='here', return_type='item-or-list')
+    # gone when dead
+    res.pop('annex-description', None)
+    # volatile prop
+    res.pop('available_local_disk_space', None)
+    ds.repo._run_annex_command('dead', annex_options=['here'])
+    newres = ds.siblings('query', name='here', return_type='item-or-list')
+    newres.pop('available_local_disk_space', None)
+    eq_(res, newres)
+
 
 @with_tempfile()
 @with_tempfile()
@@ -249,3 +294,54 @@ def test_arg_missing(path, path2):
         'ok',
         ds.siblings(
             'add', url=path2, name='somename'))
+
+
+@with_sameas_remote
+@with_tempfile(mkdir=True)
+def test_sibling_enable_sameas(repo, clone_path):
+    ds = Dataset(repo.path)
+    create_tree(ds.path, {"f0": "0"})
+    ds.save(path="f0")
+    ds.repo.copy_to(["f0"], remote="r_dir")
+    ds.repo.drop(["f0"])
+
+    ds_cloned = clone(ds.path, clone_path,
+                      result_xfm="datasets", return_type="item-or-list")
+
+    assert_false(ds_cloned.repo.file_has_content("f0"))
+    res = ds_cloned.siblings(action="enable", name="r_rsync")
+    assert_status("ok", res)
+    ds_cloned.get(path=["f0"])
+    ok_(ds_cloned.repo.file_has_content("f0"))
+
+
+@with_tempfile(mkdir=True)
+def test_sibling_inherit(basedir):
+    ds_source = Dataset(opj(basedir, "source")).create()
+
+    # In superdataset, set up remote "source" that has git-annex group "grp".
+    ds_super = Dataset(opj(basedir, "super")).create()
+    ds_super.siblings(action="add", name="source", url=ds_source.path,
+                      annex_group="grp", result_renderer=None)
+
+    ds_clone = ds_super.clone(
+        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+    # In a subdataset, adding a "source" sibling with inherit=True pulls in
+    # that configuration.
+    ds_clone.siblings(action="add", name="source", url=ds_source.path,
+                      inherit=True, result_renderer=None)
+    res = ds_clone.siblings(action="query", name="source",
+                            result_renderer=None)
+    eq_(res[0]["annex-group"], "grp")
+
+
+@with_tempfile(mkdir=True)
+def test_sibling_inherit_no_super_remote(basedir):
+    ds_source = Dataset(opj(basedir, "source")).create()
+    ds_super = Dataset(opj(basedir, "super")).create()
+    ds_clone = ds_super.clone(
+        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+    # Adding a sibling with inherit=True doesn't crash when the superdataset
+    # doesn't have a remote `name`.
+    ds_clone.siblings(action="add", name="donotexist", inherit=True,
+                      url=ds_source.path, result_renderer=None)

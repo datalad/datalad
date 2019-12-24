@@ -39,6 +39,7 @@ from weakref import WeakValueDictionary
 from git import InvalidGitRepositoryError
 
 from datalad import ssh_manager
+from datalad.consts import ADJUSTED_BRANCH_EXPR
 from datalad.dochelpers import (
     exc_str,
     borrowdoc,
@@ -834,11 +835,18 @@ class AnnexRepo(GitRepo, RepoInterface):
         Returns
         -------
         dict
-          Keys are special remote UUIDs, values are dicts with arguments
-          for `git-annex enableremote`. This includes at least the 'type'
-          and 'name' of a special remote. Each type of special remote
-          may require addition arguments that will be available in the
-          respective dictionary.
+          Keys are special remote UUIDs. Each value is a dictionary with
+          configuration information git-annex has for the remote. This should
+          include the 'type' and 'name' as well as any `initremote` parameters
+          that git-annex stores.
+
+          Note: This is a faithful translation of git-annex:remote.log with one
+          exception. For a special remote initialized with the --sameas flag,
+          git-annex stores the special remote name under the "sameas-name" key,
+          we copy this value under the "name" key so that callers don't have to
+          check two places for the name. If you need to detect whether you're
+          working with a sameas remote, the presence of either "sameas-name" or
+          "sameas-uuid" is a reliable indicator.
         """
         try:
             stdout, stderr = self._git_custom_command(
@@ -860,6 +868,15 @@ class AnnexRepo(GitRepo, RepoInterface):
             sr_id = fields[0]
             # the rest are config args for enableremote
             sr_info = dict(argspec.match(arg).groups()[:2] for arg in fields[1:])
+            if "name" not in sr_info:
+                name = sr_info.get("sameas-name")
+                if name is None:
+                    lgr.warning(
+                        "Encountered git-annex remote without a name or "
+                        "sameas-name value: %s",
+                        sr_info)
+                else:
+                    sr_info["name"] = name
             srs[sr_id] = sr_info
         return srs
 
@@ -3421,6 +3438,29 @@ class AnnexRepo(GitRepo, RepoInterface):
                 message='\n'.join(r['error-messages'])
                 if 'error-messages' in r else None,
                 logger=lgr)
+
+    def _save_post(self, message, status, partial_commit):
+        # first do standard GitRepo business
+        super(AnnexRepo, self)._save_post(
+            message, status, partial_commit)
+        # check if we have to deal with adjusted branch
+        branch = self.get_active_branch()
+        adjusted_match = ADJUSTED_BRANCH_EXPR.match(branch if branch else '')
+        if adjusted_match:
+            orig_branch = adjusted_match.group('name')
+            synced_branch = 'synced/{}'.format(orig_branch)
+            had_synced_branch = synced_branch in self.get_branches()
+            lgr.debug(
+                "Git-annex adjusted branch detected, sync'ing %s",
+                orig_branch)
+            self.call_git(
+                ['annex', 'sync', '--no-commit', '--no-push', '--no-pull'],
+            )
+            # cleanup sync'ed branch if we caused it
+            if not had_synced_branch:
+                self.call_git(
+                    ['branch', '-d', 'synced/{}'.format(orig_branch)],
+                )
 
 
 # TODO: Why was this commented out?

@@ -111,6 +111,9 @@ class Dataset(object, metaclass=Flyweight):
             # might have its ideas on what to do with ^, so better use as -d^
             path_ = Dataset(get_dataset_root(curdir)).get_superdataset(
                 topmost=True).path
+        elif path == '^.':
+            # get the dataset containing current directory
+            path_ = get_dataset_root(curdir)
         elif path == '///':
             # TODO: logic/UI on installing a default dataset could move here
             # from search?

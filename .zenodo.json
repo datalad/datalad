@@ -1,28 +1,33 @@
 {
   "creators": [
     {
-      "affiliation": "Dartmouth College: Hanover, NH, United States",
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
       "name": "Halchenko, Yaroslav O.",
       "orcid": "0000-0003-3456-2493"
     },
     {
-      "affiliation": "Otto-von-Guericke-University Magdeburg, Germany",
+      "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany and Institute of Systems Neuroscience, Medical Faculty, Heinrich Heine University Düsseldorf, Düsseldorf, Germany",
       "name": "Hanke, Michael",
       "orcid": "0000-0001-6398-6370"
     },
-    { 
-      "name": "Poldrack, Benjamin"
+    {
+      "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany",
+      "name": "Poldrack, Benjamin",
+      "orcid": "0000-0001-7628-0801"
     },
-    { 
+    {
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
       "name": "Meyer, Kyle"
     },
     { 
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
       "name": "Solanky, Debanjum Singh"
     },
     { 
       "name": "Alteva, Gergana"
     },
     { 
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
       "name": "Gors, Jason"
     },
     { 
@@ -34,7 +39,8 @@
     { 
       "name": "Olson, Taylor"
     },
-    { 
+    {
+      "affiliation": "Institute of Neuroscience and Medicine, Brain & Behaviour (INM-7), Research Centre Jülich, Jülich, Germany",
       "name": "Waite, Alex"
     },
     {
@@ -50,7 +56,8 @@
       "name": "Keshavan, Anisha",
       "orcid": "0000-0003-3554-043X"
     },
-    { 
+    {
+      "affiliation": "Dartmouth College, Hanover, NH, United States",
       "name": "Ma, Feilong"
     },
     { 
@@ -77,18 +84,25 @@
       "name": "C Lau, Vicky"
     },
     {
+      "affiliation": "Stanford University, Stanford, CA, United States",
       "name": "Markiewicz, Christopher J.",
-      "affiliation": "Department of Psychology, Stanford University",
       "orcid": "0000-0002-6533-164X"
+    },
+    {
+      "affiliation": "Psychoinformatics Lab, INM-7, Research Centre Juelich",
+      "name": "Wagner, Adina S.",
+      "orcid": "0000-0003-2917-3450"
     }
   ],
   "grants": [
-    {"id": "10.13039/100000001::1429999"}
+    {"id": "10.13039/100000001::1429999"},
+    {"id": "10.13039/100000001::1912266"}
   ],
   "keywords": [
-    "data version control",
+    "data management",
     "data distribution",
-    "execution provenance tracking"
+    "execution provenance tracking",
+    "version control"
   ],
   "access_right": "open",
   "license": "MIT",

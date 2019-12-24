@@ -34,7 +34,6 @@ requires = {
         'iso8601',
         'humanize',
         'fasteners',
-        'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
         'tqdm',
         'wrapt',
@@ -59,7 +58,6 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.8.14',
-        'mock',
         'nose>=1.3.4',
         'vcrpy',
     ],

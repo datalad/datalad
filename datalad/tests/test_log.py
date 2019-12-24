@@ -17,7 +17,7 @@ from logging import makeLogRecord
 from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.log import LoggerHelper
 from datalad.log import TraceBack

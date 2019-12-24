@@ -36,7 +36,10 @@ from urllib.parse import urlencode
 from urllib.error import URLError
 
 from datalad.dochelpers import exc_str
-from datalad.utils import on_windows
+from datalad.utils import (
+    on_windows,
+    PurePath,
+)
 from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
 from datalad import consts
 from datalad import cfg
@@ -318,6 +321,9 @@ def _guess_ri_cls(ri):
         'file': PathRI,
         'datalad': DataLadRI
     }
+    if isinstance(ri, PurePath):
+        lgr.log(5, "Detected file ri")
+        return TYPES['file']
     if is_windows_path(ri):
         # OMG we got something from windows
         lgr.log(5, "Detected file ri")
@@ -412,7 +418,7 @@ class RI(object):
 
         ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
-        ri_obj._str = ri
+        ri_obj._str = str(ri) if isinstance(ri, PurePath) else ri
         return ri_obj
 
     def __init__(self, ri=None, **fields):
@@ -693,7 +699,8 @@ class PathRI(RI):
 
     @classmethod
     def _str_to_fields(cls, url_str):
-        return dict(path=url_str)
+        # str() to be compatible with pathlib objects
+        return dict(path=str(url_str))
 
     @property
     def localpath(self):

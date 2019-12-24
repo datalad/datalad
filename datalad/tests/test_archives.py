@@ -10,7 +10,7 @@
 import os
 from os.path import join as opj, exists
 
-from mock import patch
+from unittest.mock import patch
 from .utils import (
     assert_true, assert_false, eq_,
     with_tree, with_tempfile, swallow_outputs, on_windows,

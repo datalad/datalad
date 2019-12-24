@@ -16,7 +16,7 @@ import sys
 
 from glob import glob
 from collections import Counter
-from mock import patch
+from unittest.mock import patch
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo

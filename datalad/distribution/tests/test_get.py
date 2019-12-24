@@ -15,7 +15,7 @@ from os import curdir
 import os.path as op
 from os.path import join as opj, basename
 from glob import glob
-from mock import patch
+from unittest.mock import patch
 
 from datalad.api import create
 from datalad.api import get
@@ -191,10 +191,10 @@ def test_get_invalid_call(path, file_outside):
     assert_message("path does not exist", res)
 
     # path outside repo errors as with most other commands:
-    res = ds.get(file_outside, on_failure='ignore')
+    res = ds.get(file_outside, on_failure='ignore', result_renderer='default')
     assert_in_results(
         res, status='error',
-        message=('path not associated with dataset', ds))
+        message=('path not associated with dataset %s', ds))
 
 
 @with_testrepos('basic_annex', flavors='clone')
@@ -333,8 +333,17 @@ def test_get_recurse_subdatasets(src, path):
     # MIH: Nope, we fulfill the dataset handle, but that doesn't
     #      imply fulfilling all file handles
     result = ds.get(rel_path_sub1, recursive=True)
-    # all good actions
-    assert_status('ok', result)
+    # the subdataset was already present
+    assert_in_results(
+        result,
+        type='dataset',
+        path=subds1.path,
+        status='notneeded')
+    # we got the file
+    assert_in_results(
+        result,
+        path=opj(ds.path, rel_path_sub1),
+        status='ok')
 
     assert_in_results(result, path=opj(ds.path, rel_path_sub1), status='ok')
     ok_(subds1.repo.file_has_content('test-annex.dat') is True)
@@ -367,8 +376,9 @@ def test_get_recurse_subdatasets(src, path):
     # now, the very same call, but without recursive:
     result = ds.get('.', recursive=False)
     assert_status('ok', result)
-    # one report is on the requested dir
-    eq_(len(result) - 1, 1)
+    # no duplicate reporting on subdataset install and annex-get of its
+    # directory
+    eq_(len(result), 1)
     assert_result_count(
         result, 1, path=opj(ds.path, 'test-annex.dat'), status='ok')
     ok_(ds.repo.file_has_content('test-annex.dat') is True)

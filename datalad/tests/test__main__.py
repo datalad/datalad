@@ -9,7 +9,7 @@
 
 import sys
 
-from mock import patch
+from unittest.mock import patch
 from io import StringIO
 from tempfile import NamedTemporaryFile
 from nose.tools import assert_raises, assert_equal
