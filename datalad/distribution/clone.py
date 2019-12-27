@@ -205,141 +205,178 @@ class Clone(Interface):
 
         destination_dataset = Dataset(path)
         status_kwargs['ds'] = destination_dataset
-        dest_path = path
 
-        # important test! based on this `rmtree` will happen below after failed clone
-        if dest_path.exists() and any(dest_path.iterdir()):
-            if destination_dataset.is_installed():
-                # check if dest was cloned from the given source before
-                # this is where we would have installed this from
-                guessed_sources = _get_flexible_source_candidates(
-                    source, dest_path)
-                # this is where it was actually installed from
-                track_name, track_url = _get_tracking_source(destination_dataset)
-                if track_url in guessed_sources or \
-                        get_local_file_url(track_url) in guessed_sources:
-                    yield get_status_dict(
-                        status='notneeded',
-                        message=("dataset %s was already cloned from '%s'",
-                                 destination_dataset,
-                                 source),
-                        **status_kwargs)
-                    return
-            # anything else is an error
-            yield get_status_dict(
-                status='error',
-                message='target path already exists and not empty, refuse to clone into target path',
-                **status_kwargs)
-            return
-
-        if ds is not None and ds.pathobj not in dest_path.parents:
+        if ds is not None and ds.pathobj not in path.parents:
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
-                         dest_path, ds),
+                         path, ds),
                 **status_kwargs)
             return
 
-        # generate candidate URLs from source argument to overcome a few corner cases
-        # and hopefully be more robust than git clone
-        candidate_sources = []
-        # combine all given sources (incl. alternatives), maintain order
-        for s in [source] + assure_list(alt_sources):
-            candidate_sources.extend(_get_flexible_source_candidates(s))
-        candidates_str = \
-            " [%d other candidates]" % (len(candidate_sources) - 1) \
-            if len(candidate_sources) > 1 \
-            else ''
-        lgr.info("Cloning %s%s into '%s'",
-                 source, candidates_str, dest_path)
-        dest_path_existed = dest_path.exists()
-        error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
-        for isource_, source_ in enumerate(candidate_sources):
-            try:
-                lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
-                          source_, isource_ + 1, len(candidate_sources), dest_path)
-                # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
-                # doesn't make it happen seemlessly
-                GitRepo.clone(path=str(dest_path), url=source_, create=True)
-                break  # do not bother with other sources if succeeded
-            except GitCommandError as e:
-                error_msgs[source_] = e
-                lgr.debug("Failed to clone from URL: %s (%s)",
-                          source_, exc_str(e))
-                if dest_path.exists():
-                    lgr.debug("Wiping out unsuccessful clone attempt at: %s",
-                              dest_path)
-                    # We must not just rmtree since it might be curdir etc
-                    # we should remove all files/directories under it
-                    # TODO stringification can be removed once patlib compatible
-                    # or if PY35 is no longer supported
-                    rmtree(str(dest_path), children_only=dest_path_existed)
-                # Whenever progress reporting is enabled, as it is now,
-                # we end up without e.stderr since it is "processed" out by
-                # GitPython/our progress handler.
-                e_stderr = e.stderr
-                from datalad.support.gitrepo import GitPythonProgressBar
-                if not e_stderr and GitPythonProgressBar._last_error_lines:
-                    e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
-                if 'could not create work tree' in e_stderr.lower():
-                    # this cannot be fixed by trying another URL
-                    re_match = re.match(r".*fatal: (.*)$", e_stderr,
-                                        flags=re.MULTILINE | re.DOTALL)
-                    yield get_status_dict(
-                        status='error',
-                        message=re_match.group(1) if re_match else "stderr: " + e_stderr,
-                        **status_kwargs)
-                    return
-
-        if not destination_dataset.is_installed():
-            if len(error_msgs):
-                if all(not e.stdout and not e.stderr for e in error_msgs.values()):
-                    # there is nothing we can learn from the actual exception,
-                    # the exit code is uninformative, the command is predictable
-                    error_msg = "Failed to clone from all attempted sources: %s"
-                    error_args = list(error_msgs.keys())
-                else:
-                    error_msg = "Failed to clone from any candidate source URL. " \
-                                "Encountered errors per each url were:\n- %s"
-                    error_args = '\n- '.join(
-                        '{}\n  {}'.format(url, exc_str(exc))
-                        for url, exc in error_msgs.items()
-                    )
-            else:
-                # yoh: Not sure if we ever get here but I felt that there could
-                #      be a case when this might happen and original error would
-                #      not be sufficient to troubleshoot what is going on.
-                error_msg = "Awkward error -- we failed to clone properly. " \
-                            "Although no errors were encountered, target " \
-                            "dataset at %s seems to be not fully installed. " \
-                            "The 'succesful' source was: %s"
-                error_args = (destination_dataset.path, source_)
-            yield get_status_dict(
-                status='error',
-                message=(error_msg, error_args),
-                **status_kwargs)
-            return
+        # perform the actual cloning operation
+        yield from _clone_dataset(
+            [source] + assure_list(alt_sources),
+            destination_dataset,
+            reckless,
+            description,
+            status_kwargs,
+        )
 
         if ds is not None:
             # we created a dataset in another dataset
             # -> make submodule
             for r in ds.save(
-                    dest_path,
+                    path,
                     return_type='generator',
                     result_filter=None,
                     result_xfm=None,
                     on_failure='ignore'):
                 yield r
 
-        _handle_possible_annex_dataset(
-            destination_dataset,
-            reckless,
-            description=description)
 
-        # yield successful clone of the base dataset now, as any possible
-        # subdataset clone down below will not alter the Git-state of the
-        # parent
-        yield get_status_dict(status='ok', **status_kwargs)
+def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
+    """Internal helper to perform cloning without sanity checks (assumed done)
+
+    This helper does not handle any saving of subdataset modification or adding
+    in a superdataset.
+
+    Parameters
+    ----------
+    srcs : list
+      Any suitable clone source specifications (paths, URLs)
+    destds : Dataset
+      Dataset instance for the clone destination
+
+    Yields
+    ------
+    dict
+      DataLad result records
+    """
+    if not status_kwargs:
+        # in case the caller had no specific idea on how results should look
+        # like, provide sensible defaults
+        status_kwargs = dict(
+            action='install',
+            logger=lgr,
+            ds=destds,
+        )
+
+    dest_path = destds.pathobj
+    # important test! based on this `rmtree` will happen below after failed clone
+    if dest_path.exists() and any(dest_path.iterdir()):
+        if destds.is_installed():
+            # check if dest was cloned from the given source before
+            # this is where we would have installed this from
+            guessed_sources = _get_flexible_source_candidates(
+                srcs[0], dest_path)
+            # this is where it was actually installed from
+            track_name, track_url = _get_tracking_source(destds)
+            if track_url in guessed_sources or \
+                    get_local_file_url(track_url) in guessed_sources:
+                yield get_status_dict(
+                    status='notneeded',
+                    message=("dataset %s was already cloned from '%s'",
+                             destds,
+                             srcs[0]),
+                    **status_kwargs)
+                return
+        # anything else is an error
+        yield get_status_dict(
+            status='error',
+            message='target path already exists and not empty, refuse to clone into target path',
+            **status_kwargs)
+        return
+
+    # generate candidate URLs from source argument to overcome a few corner cases
+    # and hopefully be more robust than git clone
+    candidate_sources = []
+    # combine all given sources (incl. alternatives), maintain order
+    for s in srcs:
+        candidate_sources.extend(_get_flexible_source_candidates(s))
+    candidates_str = \
+        " [%d other candidates]" % (len(candidate_sources) - 1) \
+        if len(candidate_sources) > 1 \
+        else ''
+    lgr.info("Cloning %s%s into '%s'",
+             srcs[0], candidates_str, dest_path)
+    dest_path_existed = dest_path.exists()
+    error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
+    for isource_, source_ in enumerate(candidate_sources):
+        try:
+            lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
+                      source_, isource_ + 1, len(candidate_sources), dest_path)
+            # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
+            # doesn't make it happen seemlessly
+            GitRepo.clone(path=str(dest_path), url=source_, create=True)
+            break  # do not bother with other sources if succeeded
+        except GitCommandError as e:
+            error_msgs[source_] = e
+            lgr.debug("Failed to clone from URL: %s (%s)",
+                      source_, exc_str(e))
+            if dest_path.exists():
+                lgr.debug("Wiping out unsuccessful clone attempt at: %s",
+                          dest_path)
+                # We must not just rmtree since it might be curdir etc
+                # we should remove all files/directories under it
+                # TODO stringification can be removed once patlib compatible
+                # or if PY35 is no longer supported
+                rmtree(str(dest_path), children_only=dest_path_existed)
+            # Whenever progress reporting is enabled, as it is now,
+            # we end up without e.stderr since it is "processed" out by
+            # GitPython/our progress handler.
+            e_stderr = e.stderr
+            from datalad.support.gitrepo import GitPythonProgressBar
+            if not e_stderr and GitPythonProgressBar._last_error_lines:
+                e_stderr = os.linesep.join(GitPythonProgressBar._last_error_lines)
+            if 'could not create work tree' in e_stderr.lower():
+                # this cannot be fixed by trying another URL
+                re_match = re.match(r".*fatal: (.*)$", e_stderr,
+                                    flags=re.MULTILINE | re.DOTALL)
+                yield get_status_dict(
+                    status='error',
+                    message=re_match.group(1) if re_match else "stderr: " + e_stderr,
+                    **status_kwargs)
+                return
+
+    if not destds.is_installed():
+        if len(error_msgs):
+            if all(not e.stdout and not e.stderr for e in error_msgs.values()):
+                # there is nothing we can learn from the actual exception,
+                # the exit code is uninformative, the command is predictable
+                error_msg = "Failed to clone from all attempted sources: %s"
+                error_args = list(error_msgs.keys())
+            else:
+                error_msg = "Failed to clone from any candidate source URL. " \
+                            "Encountered errors per each url were:\n- %s"
+                error_args = '\n- '.join(
+                    '{}\n  {}'.format(url, exc_str(exc))
+                    for url, exc in error_msgs.items()
+                )
+        else:
+            # yoh: Not sure if we ever get here but I felt that there could
+            #      be a case when this might happen and original error would
+            #      not be sufficient to troubleshoot what is going on.
+            error_msg = "Awkward error -- we failed to clone properly. " \
+                        "Although no errors were encountered, target " \
+                        "dataset at %s seems to be not fully installed. " \
+                        "The 'succesful' source was: %s"
+            error_args = (destds.path, source_)
+        yield get_status_dict(
+            status='error',
+            message=(error_msg, error_args),
+            **status_kwargs)
+        return
+
+    _handle_possible_annex_dataset(
+        destds,
+        reckless,
+        description)
+
+    # yield successful clone of the base dataset now, as any possible
+    # subdataset clone down below will not alter the Git-state of the
+    # parent
+    yield get_status_dict(status='ok', **status_kwargs)
 
 
 def _handle_possible_annex_dataset(dataset, reckless, description=None):
