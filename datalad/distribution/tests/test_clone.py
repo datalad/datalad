@@ -18,7 +18,6 @@ from datalad.tests.utils import (
 
 import logging
 import os
-import os.path as op
 
 from unittest.mock import patch
 
@@ -92,7 +91,7 @@ def test_invalid_args(path, otherpath, alienpath):
     ds = create(path)
     assert_raises(IncompleteResultsError, ds.clone, '/higherup.', 'Zoidberg')
     # make real dataset, try to install outside
-    ds_target = create(op.join(otherpath, 'target'))
+    ds_target = create(Path(otherpath) / 'target')
     assert_raises(ValueError, ds_target.clone, ds.path, path=ds.path)
     assert_status('error', ds_target.clone(ds.path, path=alienpath, on_failure='ignore'))
 
@@ -111,7 +110,7 @@ def test_clone_crcns(tdir, ds_path):
     ds = create(ds_path)
     crcns = ds.clone("///crcns", result_xfm='datasets', return_type='item-or-list')
     ok_(crcns.is_installed())
-    eq_(crcns.path, op.join(ds_path, "crcns"))
+    eq_(crcns.pathobj, ds.pathobj / "crcns")
     assert_in(crcns.path, ds.subdatasets(result_xfm='paths'))
 
 
@@ -120,10 +119,11 @@ def test_clone_crcns(tdir, ds_path):
 @use_cassette('test_install_crcns')
 @with_tree(tree={'sub': {}})
 def test_clone_datasets_root(tdir):
+    tdir = Path(tdir)
     with chpwd(tdir):
         ds = clone("///", result_xfm='datasets', return_type='item-or-list')
         ok_(ds.is_installed())
-        eq_(ds.path, op.join(tdir, get_datasets_topdir()))
+        eq_(ds.pathobj, tdir / get_datasets_topdir())
 
         # do it a second time:
         res = clone("///", on_failure='ignore')
@@ -133,8 +133,7 @@ def test_clone_datasets_root(tdir):
         assert_status('notneeded', res)
 
         # and a third time into an existing something, that is not a dataset:
-        with open(op.join(tdir, 'sub', 'a_file.txt'), 'w') as f:
-            f.write("something")
+        (tdir / 'sub' / 'a_file.txt').write_text("something")
 
         res = clone('///', path="sub", on_failure='ignore')
         assert_message(
@@ -205,7 +204,7 @@ def test_clone_dataset_from_just_source(url, path):
 @with_tempfile(mkdir=True)
 def test_clone_dataladri(src, topurl, path):
     # make plain git repo
-    ds_path = op.join(src, 'ds')
+    ds_path = Path(src) / 'ds'
     gr = GitRepo(ds_path, create=True)
     gr.add('test.txt')
     gr.commit('demo')
@@ -215,7 +214,7 @@ def test_clone_dataladri(src, topurl, path):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
     assert_repo_status(path, annex=False)
-    ok_file_has_content(op.join(path, 'test.txt'), 'some')
+    ok_file_has_content(ds.pathobj / 'test.txt', 'some')
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
@@ -247,7 +246,7 @@ def test_clone_into_dataset(source, top_path):
 
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
-    ok_(op.isdir(op.join(subds.path, '.git')))
+    ok_((subds.pathobj / '.git').is_dir())
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:
@@ -262,7 +261,7 @@ def test_clone_into_dataset(source, top_path):
     assert_repo_status(ds.path, untracked=['dummy.txt'])
     subds_ = ds.clone(source, "sub2",
                       result_xfm='datasets', return_type='item-or-list')
-    eq_(subds_.path, op.join(ds.path, "sub2"))  # for paranoid yoh ;)
+    eq_(subds_.pathobj, ds.pathobj / "sub2")  # for paranoid yoh ;)
     assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
@@ -274,7 +273,7 @@ def test_notclone_known_subdataset(src, path):
                result_xfm='datasets', return_type='item-or-list')
 
     # subdataset not installed:
-    subds = Dataset(op.join(path, 'subm 1'))
+    subds = Dataset(ds.pathobj / 'subm 1')
     assert_false(subds.is_installed())
     assert_in('subm 1', ds.subdatasets(fulfilled=False, result_xfm='relpaths'))
     assert_not_in('subm 1', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
@@ -318,9 +317,10 @@ def test_reckless(path, top_path):
 @with_tempfile
 @with_tempfile
 def test_install_source_relpath(src, dest):
+    src = Path(src)
     create(src)
-    src_ = op.basename(src)
-    with chpwd(op.dirname(src)):
+    src_ = src.name
+    with chpwd(src.parent):
         clone(src_, dest)
 
 
