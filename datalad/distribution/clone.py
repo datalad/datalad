@@ -115,14 +115,6 @@ class Clone(Interface):
             similar to :command:`git clone`"""),
         description=location_description,
         reckless=reckless_opt,
-        alt_sources=Parameter(
-            args=('--alternative-sources',),
-            dest='alt_sources',
-            metavar='SOURCE',
-            nargs='+',
-            doc="""Alternative sources to be tried if a dataset cannot
-            be obtained from the main `source`""",
-            constraints=EnsureStr() | EnsureNone()),
     )
 
     @staticmethod
@@ -133,8 +125,7 @@ class Clone(Interface):
             path=None,
             dataset=None,
             description=None,
-            reckless=False,
-            alt_sources=None):
+            reckless=False):
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.
@@ -216,7 +207,7 @@ class Clone(Interface):
 
         # perform the actual cloning operation
         yield from _clone_dataset(
-            [source] + assure_list(alt_sources),
+            [source],
             destination_dataset,
             reckless,
             description,
