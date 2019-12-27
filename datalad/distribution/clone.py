@@ -154,7 +154,7 @@ class Clone(Interface):
             # obviously pointless input combination
             raise ValueError(
                 "clone `source` and destination `path` are identical [{}]. "
-                "If you are trying to add a subdataset simply use `add`".format(
+                "If you are trying to add a subdataset simply use `save`".format(
                     path))
 
         if path is not None:
