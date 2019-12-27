@@ -46,7 +46,6 @@ from datalad.dochelpers import (
 )
 from datalad.utils import (
     rmtree,
-    assure_list,
     assure_bool,
     knows_annex,
 )
@@ -254,24 +253,31 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
         )
 
     dest_path = destds.pathobj
+
+    # generate candidate URLs from source argument to overcome a few corner cases
+    # and hopefully be more robust than git clone
+    candidate_sources = [
+        s for src in srcs
+        for s in _get_flexible_source_candidates(src)
+    ]
+
     # important test! based on this `rmtree` will happen below after failed clone
-    if dest_path.exists() and any(dest_path.iterdir()):
+    dest_path_existed = dest_path.exists()
+    if dest_path_existed and any(dest_path.iterdir()):
         if destds.is_installed():
             # check if dest was cloned from the given source before
             # this is where we would have installed this from
-            guessed_sources = _get_flexible_source_candidates(
-                srcs[0], dest_path)
             # this is where it was actually installed from
             track_name, track_url = _get_tracking_source(destds)
-            if track_url in guessed_sources or \
-                    get_local_file_url(track_url) in guessed_sources:
-                yield get_status_dict(
-                    status='notneeded',
-                    message=("dataset %s was already cloned from '%s'",
-                             destds,
-                             srcs[0]),
-                    **status_kwargs)
-                return
+            for src in candidate_sources:
+                if track_url == src or get_local_file_url(track_url) == src:
+                    yield get_status_dict(
+                        status='notneeded',
+                        message=("dataset %s was already cloned from '%s'",
+                                 destds,
+                                 src),
+                        **status_kwargs)
+                    return
         # anything else is an error
         yield get_status_dict(
             status='error',
@@ -279,19 +285,14 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
             **status_kwargs)
         return
 
-    # generate candidate URLs from source argument to overcome a few corner cases
-    # and hopefully be more robust than git clone
-    candidate_sources = []
-    # combine all given sources (incl. alternatives), maintain order
-    for s in srcs:
-        candidate_sources.extend(_get_flexible_source_candidates(s))
-    candidates_str = \
+    lgr.info(
+        "Cloning %s%s into '%s'",
+        srcs[0],
         " [%d other candidates]" % (len(candidate_sources) - 1) \
         if len(candidate_sources) > 1 \
-        else ''
-    lgr.info("Cloning %s%s into '%s'",
-             srcs[0], candidates_str, dest_path)
-    dest_path_existed = dest_path.exists()
+        else '',
+        dest_path)
+
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
     for isource_, source_ in enumerate(candidate_sources):
         try:
