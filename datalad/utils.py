@@ -1498,6 +1498,8 @@ class chpwd(object):
     def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
+            # PY35 has no auto-conversion of Path to str
+            path = str(path)
             pwd = getpwd()
             self._prev_pwd = pwd
         else:
