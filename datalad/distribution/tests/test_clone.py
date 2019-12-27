@@ -18,10 +18,6 @@ from datalad.tests.utils import (
 
 import logging
 import os
-from os import (
-    mkdir,
-    chmod,
-)
 import os.path as op
 
 from unittest.mock import patch
@@ -32,7 +28,7 @@ from datalad.api import (
 )
 from datalad.utils import (
     chpwd,
-    _path_,
+    Path,
     on_windows,
 )
 from datalad.support.exceptions import IncompleteResultsError
@@ -349,10 +345,10 @@ def test_clone_isnt_a_smartass(origin_path, path):
 @skip_if(on_windows or not os.geteuid(), "Will fail under super-user")
 @with_tempfile(mkdir=True)
 def test_clone_report_permission_issue(tdir):
-    pdir = _path_(tdir, 'protected')
-    mkdir(pdir)
+    pdir = Path(tdir) / 'protected'
+    pdir.mkdir()
     # make it read-only
-    chmod(pdir, 0o555)
+    pdir.chmod(0o555)
     with chpwd(pdir):
         res = clone('///', result_xfm=None, return_type='list', on_failure='ignore')
         assert_status('error', res)
