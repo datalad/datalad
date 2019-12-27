@@ -56,7 +56,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_result_values_equal,
     ok_startswith,
-    ok_clean_git,
+    assert_repo_status,
     serve_path_via_http,
     swallow_logs,
     use_cassette,
@@ -166,14 +166,14 @@ def test_clone_simple_local(src, path):
         ok_(GitRepo.is_valid_repo(ds.path))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt'})
-        ok_clean_git(path, annex=False)
+        assert_repo_status(path, annex=False)
     else:
         # must be an annex
         ok_(isinstance(ds.repo, AnnexRepo))
         ok_(AnnexRepo.is_valid_repo(ds.path, allow_noninitialized=False))
         eq_(set(ds.repo.get_indexed_files()),
             {'test.dat', 'INFO.txt', 'test-annex.dat'})
-        ok_clean_git(path, annex=True)
+        assert_repo_status(path, annex=True)
         # no content was installed:
         ok_(not ds.repo.file_has_content('test-annex.dat'))
         uuid_before = ds.repo.uuid
@@ -198,7 +198,7 @@ def test_clone_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_(GitRepo.is_valid_repo(ds.path))
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
@@ -218,7 +218,7 @@ def test_clone_dataladri(src, topurl, path):
     with patch('datalad.consts.DATASETS_TOPURL', topurl):
         ds = clone('///ds', path, result_xfm='datasets', return_type='item-or-list')
     eq_(ds.path, path)
-    ok_clean_git(path, annex=False)
+    assert_repo_status(path, annex=False)
     ok_file_has_content(op.join(path, 'test.txt'), 'some')
 
 
@@ -247,7 +247,7 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
 def test_clone_into_dataset(source, top_path):
 
     ds = create(top_path)
-    ok_clean_git(ds.path)
+    assert_repo_status(ds.path)
 
     subds = ds.clone(source, "sub",
                      result_xfm='datasets', return_type='item-or-list')
@@ -255,19 +255,19 @@ def test_clone_into_dataset(source, top_path):
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(fulfilled=True, result_xfm='relpaths'))
     # sub is clean:
-    ok_clean_git(subds.path, annex=None)
+    assert_repo_status(subds.path, annex=None)
     # top is clean:
-    ok_clean_git(ds.path, annex=None)
+    assert_repo_status(ds.path, annex=None)
 
     # but we could also save while installing and there should be no side-effect
     # of saving any other changes if we state to not auto-save changes
     # Create a dummy change
     create_tree(ds.path, {'dummy.txt': 'buga'})
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
     subds_ = ds.clone(source, "sub2",
                       result_xfm='datasets', return_type='item-or-list')
     eq_(subds_.path, op.join(ds.path, "sub2"))  # for paranoid yoh ;)
-    ok_clean_git(ds.path, untracked=['dummy.txt'])
+    assert_repo_status(ds.path, untracked=['dummy.txt'])
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
