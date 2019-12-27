@@ -103,7 +103,8 @@ def test_invalid_args(path, otherpath, alienpath):
 @with_tempfile(mkdir=True)
 def test_clone_crcns(tdir, ds_path):
     with chpwd(tdir):
-        res = clone('///', path="all-nonrecursive", on_failure='ignore')
+        res = clone('///', path="all-nonrecursive", on_failure='ignore',
+                    result_xfm=None, return_type='list')
         assert_status('ok', res)
 
     # again, but into existing dataset:
@@ -121,12 +122,12 @@ def test_clone_crcns(tdir, ds_path):
 def test_clone_datasets_root(tdir):
     tdir = Path(tdir)
     with chpwd(tdir):
-        ds = clone("///", result_xfm='datasets', return_type='item-or-list')
+        ds = clone("///")
         ok_(ds.is_installed())
         eq_(ds.pathobj, tdir / get_datasets_topdir())
 
         # do it a second time:
-        res = clone("///", on_failure='ignore')
+        res = clone("///", on_failure='ignore', result_xfm=None, return_type='list')
         assert_message(
             "dataset %s was already cloned from '%s'",
             res)
@@ -175,7 +176,7 @@ def test_clone_simple_local(src, path):
         eq_(ds.repo.get_description(), 'mydummy')
 
     # installing it again, shouldn't matter:
-    res = clone(src, path)
+    res = clone(src, path, result_xfm=None, return_type='list')
     assert_result_values_equal(res, 'source_url', [src])
     assert_status('notneeded', res)
     assert_message("dataset %s was already cloned from '%s'", res)
@@ -368,7 +369,7 @@ def test_autoenabled_remote_msg(path):
     # whenever the remote we clone is the  type=git special remote, so the name
     # of the remote might not match
     with swallow_logs(new_level=logging.INFO) as cml:
-        res = clone('///repronim/containers', path)
+        res = clone('///repronim/containers', path, result_xfm=None, return_type='list')
         assert_status('ok', res)
         assert_not_in("not auto-enabled", cml.out)
 

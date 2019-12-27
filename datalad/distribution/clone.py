@@ -91,6 +91,13 @@ class Clone(Interface):
     # by default ignore everything but install results
     # i.e. no "add to super dataset"
     result_filter = EnsureKeyChoice('action', ('install',))
+    # very frequently this command will yield exactly one installed dataset
+    # spare people the pain of going through a list by default
+    return_type = 'item-or-list'
+    # as discussed in #1409 and #1470, we want to return dataset instances
+    # matching what is actually available after command completion (and
+    # None for any failed dataset installation)
+    result_xfm = 'successdatasets-or-none'
 
     _params_ = dict(
         dataset=Parameter(
