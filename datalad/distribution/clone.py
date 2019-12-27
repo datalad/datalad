@@ -23,6 +23,7 @@ from datalad.interface.common_opts import (
     location_description,
     reckless_opt,
 )
+from datalad.log import log_progress
 from datalad.support.gitrepo import (
     GitRepo,
     GitCommandError,
@@ -285,19 +286,23 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
             **status_kwargs)
         return
 
-    lgr.info(
-        "Cloning %s%s into '%s'",
-        srcs[0],
-        " [%d other candidates]" % (len(candidate_sources) - 1) \
-        if len(candidate_sources) > 1 \
-        else '',
-        dest_path)
-
+    log_progress(
+        lgr.info,
+        'cloneds',
+        'Cloning dataset to %s', destds,
+        total=len(candidate_sources),
+        label='Clone attempt',
+        unit=' Candidate locations',
+    )
     error_msgs = OrderedDict()  # accumulate all error messages formatted per each url
     for isource_, source_ in enumerate(candidate_sources):
         try:
-            lgr.debug("Attempting to clone %s (%d out of %d candidates) to '%s'",
-                      source_, isource_ + 1, len(candidate_sources), dest_path)
+            log_progress(
+                lgr.info,
+                'cloneds',
+                'Attempting to clone from %s to $s', (source_, dest_path),
+                update=1,
+                increment=True)
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
             # doesn't make it happen seemlessly
             GitRepo.clone(path=str(dest_path), url=source_, create=True)
@@ -325,11 +330,22 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
                 # this cannot be fixed by trying another URL
                 re_match = re.match(r".*fatal: (.*)$", e_stderr,
                                     flags=re.MULTILINE | re.DOTALL)
+                # cancel progress bar
+                log_progress(
+                    lgr.info,
+                    'cloneds',
+                    'Completed clone attempts for %s', destds
+                )
                 yield get_status_dict(
                     status='error',
                     message=re_match.group(1) if re_match else "stderr: " + e_stderr,
                     **status_kwargs)
                 return
+    log_progress(
+        lgr.info,
+        'cloneds',
+        'Completed clone attempts for %s', destds
+    )
 
     if not destds.is_installed():
         if len(error_msgs):
