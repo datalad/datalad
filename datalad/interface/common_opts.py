@@ -127,7 +127,11 @@ message_file_opt = Parameter(
 
 reckless_opt = Parameter(
     args=("--reckless",),
-    action="store_true",
+    # if no specific mode is given, set to auto
+    const='auto',
+    nargs='?',
+    # boolean types only for backward compatibility
+    constraints=EnsureChoice(None, True, False, 'auto'),
     doc="""Set up the dataset to be able to obtain content in the
     cheapest/fastest possible way, even if this poses a potential
     risk the data integrity (e.g. hardlink files from a local clone

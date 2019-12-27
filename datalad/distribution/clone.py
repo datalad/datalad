@@ -132,7 +132,11 @@ class Clone(Interface):
             path=None,
             dataset=None,
             description=None,
-            reckless=False):
+            reckless=None):
+        # legacy compatibility
+        if reckless is True:
+            # so that we can forget about how things used to be
+            reckless = 'auto'
 
         # did we explicitly get a dataset to install into?
         # if we got a dataset, path will be resolved against it.

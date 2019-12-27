@@ -172,7 +172,7 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             save=True,
-            reckless=False,
+            reckless=None,
             jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and

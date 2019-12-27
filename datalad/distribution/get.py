@@ -630,7 +630,7 @@ class Get(Interface):
             recursion_limit=None,
             get_data=True,
             description=None,
-            reckless=False,
+            reckless=None,
             jobs='auto',
     ):
         refds_path = Interface.get_refds_path(dataset)
