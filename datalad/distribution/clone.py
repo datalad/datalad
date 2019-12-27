@@ -12,6 +12,7 @@
 import logging
 import os
 import re
+from os.path import expanduser
 from collections import OrderedDict
 from urllib.parse import unquote as urlunquote
 
@@ -282,7 +283,9 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
             # this is where it was actually installed from
             track_name, track_url = _get_tracking_source(destds)
             for src in candidate_sources:
-                if track_url == src or get_local_file_url(track_url) == src:
+                if track_url == src \
+                        or get_local_file_url(track_url) == src \
+                        or track_url == expanduser(src):
                     yield get_status_dict(
                         status='notneeded',
                         message=("dataset %s was already cloned from '%s'",

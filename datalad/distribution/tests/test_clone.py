@@ -18,12 +18,14 @@ from datalad.tests.utils import (
 
 import logging
 import os
+import os.path as op
 
 from unittest.mock import patch
 
 from datalad.api import (
     create,
     clone,
+    remove,
 )
 from datalad.utils import (
     chpwd,
@@ -415,3 +417,30 @@ def test_installationpath_from_url():
     # and the hostname alone
     eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
     eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
+
+
+# https://github.com/datalad/datalad/issues/3958
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_expanduser(srcpath, destpath):
+    src = Dataset(Path(srcpath) / 'src').create()
+    dest = Dataset(Path(destpath) / 'dest').create()
+
+    with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
+        res = clone('~/src', 'dest', result_xfm=None, return_type='list',
+                    on_failure='ignore')
+        assert_result_count(res, 1)
+        assert_result_count(
+            res, 1, action='install', status='error', path=dest.path,
+            message='target path already exists and not empty, refuse to '
+            'clone into target path')
+        # wipe out destination, and try again
+        assert_status('ok', remove(dataset=dest, check=False))
+        # now it should do it, and clone the right one
+        cloneds = clone(op.join('~', 'src'), 'dest')
+        eq_(cloneds.pathobj, Path(destpath) / 'dest')
+        eq_(src.id, cloneds.id)
+        # and it shouldn't fail when doing it again, because it detects
+        # the re-clone
+        cloneds = clone(op.join('~', 'src'), 'dest')
+        eq_(cloneds.pathobj, Path(destpath) / 'dest')
