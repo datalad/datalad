@@ -50,6 +50,7 @@ from datalad.utils import (
     rmtree,
     assure_bool,
     knows_annex,
+    Path,
 )
 
 from datalad.distribution.dataset import (
@@ -282,10 +283,22 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
             # this is where we would have installed this from
             # this is where it was actually installed from
             track_name, track_url = _get_tracking_source(destds)
+            try:
+                # this will get us track_url in system native path conventions,
+                # whenever it is a path (and not a URL)
+                # this is needed to match it to any potentially incoming local
+                # source path in the 'notneeded' test below
+                track_path = str(Path(track_url))
+            except Exception:
+                # this should never happen, because Path() will let any non-path stringification
+                # pass through unmodified, but we do not want any potential crash due to
+                # pathlib behavior changes
+                lgr.debug("Unexpected behavior of pathlib!")
+                track_path = None
             for src in candidate_sources:
                 if track_url == src \
                         or get_local_file_url(track_url) == src \
-                        or track_url == expanduser(src):
+                        or track_path == expanduser(src):
                     yield get_status_dict(
                         status='notneeded',
                         message=("dataset %s was already cloned from '%s'",
@@ -503,6 +516,11 @@ def _get_tracking_source(ds):
     # for the presence of the desired submodule
 
     remote_name, tracking_branch = vcs.get_tracking_branch()
+    if not remote_name and isinstance(vcs, AnnexRepo):
+        # maybe cloned from a source repo that was in adjusted mode
+        # https://github.com/datalad/datalad/issues/3969
+        remote_name, tracking_branch = vcs.get_tracking_branch(
+            corresponding=False)
     # TODO: better default `None`? Check where we might rely on '':
     remote_url = ''
     if remote_name:
