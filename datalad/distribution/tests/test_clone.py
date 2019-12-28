@@ -401,7 +401,11 @@ def test_installationpath_from_url():
               'lastbit.git/',
               'http://example.com/lastbit',
               'http://example.com/lastbit.git',
-              'http://lastbit:8000'
+              'http://lastbit:8000',
+              'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit',
+              'C:\\Users\\mih\\AppData\\Local\\Temp\\lastbit\\',
+              'Temp\\lastbit',
+              'Temp\\lastbit\\',
               ):
         eq_(_get_installationpath_from_url(p), 'lastbit')
     # we need to deal with quoted urls
