@@ -539,15 +539,14 @@ def _get_installationpath_from_url(url):
     if isinstance(ri, (URL, DataLadRI)):  # decode only if URL
         path = ri.path.rstrip('/')
         path = urlunquote(path) if path else ri.hostname
+        if '/' in path:
+            path = path.split('/')
+            if path[-1] == '.git':
+                path = path[-2]
+            else:
+                path = path[-1]
     else:
-        path = url
-    path = path.rstrip('/')
-    if '/' in path:
-        path = path.split('/')
-        if path[-1] == '.git':
-            path = path[-2]
-        else:
-            path = path[-1]
+        path = Path(url).parts[-1]
     if path.endswith('.git'):
         path = path[:-4]
     return path
