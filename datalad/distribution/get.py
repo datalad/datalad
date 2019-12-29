@@ -69,7 +69,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.distribution.clone import _clone_dataset
+from datalad.distribution.clone import clone_dataset
 from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'
@@ -253,7 +253,7 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         )
         return
 
-    for res in _clone_dataset(
+    for res in clone_dataset(
             clone_urls,
             Dataset(dest_path),
             **kwargs):

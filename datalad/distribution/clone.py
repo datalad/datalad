@@ -186,7 +186,7 @@ class Clone(Interface):
         # there is no other way -- my intoxicated brain tells me
         assert(path is not None)
 
-        status_kwargs = dict(
+        result_props = dict(
             action='install',
             logger=lgr,
             refds=refds_path,
@@ -204,27 +204,27 @@ class Clone(Interface):
                 status='error',
                 path=path,
                 message=('cannot handle target path: %s', exc_str(e)),
-                **status_kwargs)
+                **result_props)
             return
 
         destination_dataset = Dataset(path)
-        status_kwargs['ds'] = destination_dataset
+        result_props['ds'] = destination_dataset
 
         if ds is not None and ds.pathobj not in path.parents:
             yield get_status_dict(
                 status='error',
                 message=("clone target path '%s' not in specified target dataset '%s'",
                          path, ds),
-                **status_kwargs)
+                **result_props)
             return
 
         # perform the actual cloning operation
-        yield from _clone_dataset(
+        yield from clone_dataset(
             [source],
             destination_dataset,
             reckless,
             description,
-            status_kwargs,
+            result_props,
         )
 
         if ds is not None:
@@ -239,7 +239,12 @@ class Clone(Interface):
                 yield r
 
 
-def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
+def clone_dataset(
+        srcs,
+        destds,
+        reckless=None,
+        description=None,
+        result_props=None):
     """Internal helper to perform cloning without sanity checks (assumed done)
 
     This helper does not handle any saving of subdataset modification or adding
@@ -251,16 +256,23 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
       Any suitable clone source specifications (paths, URLs)
     destds : Dataset
       Dataset instance for the clone destination
+    reckless : {None, 'auto'}, optional
+      Mode switch to put cloned dataset into throw-away configurations, i.e.
+      sacrifice data safety for performance or reesource footprint.
+    description : str, optional
+      Location description for the annex of the dataset clone (if there is any).
+    result_props : dict, optional
+      Default properties for any yielded result, pass on to get_status_dict().
 
     Yields
     ------
     dict
       DataLad result records
     """
-    if not status_kwargs:
+    if not result_props:
         # in case the caller had no specific idea on how results should look
         # like, provide sensible defaults
-        status_kwargs = dict(
+        result_props = dict(
             action='install',
             logger=lgr,
             ds=destds,
@@ -304,13 +316,13 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
                         message=("dataset %s was already cloned from '%s'",
                                  destds,
                                  src),
-                        **status_kwargs)
+                        **result_props)
                     return
         # anything else is an error
         yield get_status_dict(
             status='error',
             message='target path already exists and not empty, refuse to clone into target path',
-            **status_kwargs)
+            **result_props)
         return
 
     log_progress(
@@ -366,7 +378,7 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
                 yield get_status_dict(
                     status='error',
                     message=re_match.group(1) if re_match else "stderr: " + e_stderr,
-                    **status_kwargs)
+                    **result_props)
                 return
     log_progress(
         lgr.info,
@@ -400,7 +412,7 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
         yield get_status_dict(
             status='error',
             message=(error_msg, error_args),
-            **status_kwargs)
+            **result_props)
         return
 
     _handle_possible_annex_dataset(
@@ -411,7 +423,7 @@ def _clone_dataset(srcs, destds, reckless, description, status_kwargs=None):
     # yield successful clone of the base dataset now, as any possible
     # subdataset clone down below will not alter the Git-state of the
     # parent
-    yield get_status_dict(status='ok', **status_kwargs)
+    yield get_status_dict(status='ok', **result_props)
 
 
 def _handle_possible_annex_dataset(dataset, reckless, description=None):
