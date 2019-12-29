@@ -475,9 +475,9 @@ def test_cfg_originorigin(path):
     )
     eq_((clone_clone.pathobj / 'file1.txt').read_text(), 'content')
     eq_(
-        clone_clone.siblings(
+        Path(clone_clone.siblings(
             'query',
             name='origin-origin',
-            return_type='item-or-list')['url'],
-        origin.path
+            return_type='item-or-list')['url']),
+        origin.pathobj
     )
