@@ -454,3 +454,30 @@ def test_expanduser(srcpath, destpath):
         # the re-clone
         cloneds = clone(op.join('~', 'src'), 'dest')
         eq_(cloneds.pathobj, Path(destpath) / 'dest')
+
+
+@with_tempfile(mkdir=True)
+def test_cfg_originorigin(path):
+    path = Path(path)
+    origin = Dataset(path / 'origin').create()
+    (origin.pathobj / 'file1.txt').write_text('content')
+    origin.save()
+    clone_direct = clone(origin, path / 'clone_direct')
+    clone_clone = clone(clone_direct, path / 'clone_clone')
+    # the goal is to be able to get file content from origin without
+    # the need to configure it manually
+    assert_result_count(
+        clone_clone.get('file1.txt', on_failure='ignore'),
+        1,
+        action='get',
+        status='ok',
+        path=str(clone_clone.pathobj / 'file1.txt'),
+    )
+    eq_((clone_clone.pathobj / 'file1.txt').read_text(), 'content')
+    eq_(
+        clone_clone.siblings(
+            'query',
+            name='origin-origin',
+            return_type='item-or-list')['url'],
+        origin.path
+    )

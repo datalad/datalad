@@ -337,4 +337,13 @@ definitions = {
         'default': 'auto',
         'type': EnsureChoice('on', 'off', 'auto'),
     },
+    'datalad.install.inherit-local-origin': {
+        'ui': ('question', {
+            'title': 'Inherit local origin of dataset source',
+            'text': "If enabled, a local 'origin' remote of a local dataset "
+                    "clone source is configured as an 'origin-origin' remote "
+                    "to makes its annex automatically available"}),
+        'default': True,
+        'type': EnsureBool(),
+    },
 }

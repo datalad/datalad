@@ -41,6 +41,7 @@ from datalad.support.network import (
     URL,
     RI,
     DataLadRI,
+    PathRI,
 )
 from datalad.dochelpers import (
     exc_str,
@@ -415,7 +416,7 @@ def clone_dataset(
             **result_props)
         return
 
-    _handle_possible_annex_dataset(
+    yield from _handle_possible_annex_dataset(
         destds,
         reckless,
         description)
@@ -444,6 +445,30 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
             "sources, if possible (reckless)", ds.path)
         ds.config.add(
             'annex.hardlink', 'true', where='local', reload=True)
+
+    # we have just cloned the repo, so it has 'origin'
+    # let's look at the URL for that remote and see if it is a local
+    # dataset
+    origin_url = ds.config.get('remote.origin.url')
+    if origin_url and ds.config.obtain(
+            'datalad.install.inherit-local-origin',
+            default=True) and isinstance(RI(origin_url), PathRI):
+        # given the clone source is a local dataset, we can have a
+        # cheap look at it, and configure its own 'origin' as a remote
+        # (if there is any), and benefit from additional annex availability
+        originorigin_url = Dataset(origin_url).config.get('remote.origin.url')
+        if originorigin_url:
+            yield from ds.siblings(
+                'configure',
+                # no chance for config, can only be the second configured remote
+                name='origin-origin',
+                url=originorigin_url,
+                # fetch to get all annex info
+                fetch=True,
+                result_renderer='disabled',
+                on_failure='ignore',
+            )
+
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
     # If such an instance already exists, its __init__ will not be executed.
