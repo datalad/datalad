@@ -334,21 +334,21 @@ def test_install_recursive(src, path_nr, path_r):
 
     # now recursively:
     # don't filter implicit results so we can inspect them
-    ds_list = install(path_r, source=src, recursive=True, result_filter=None)
+    res = install(path_r, source=src, recursive=True,
+                  result_xfm=None, result_filter=None)
     # installed a dataset and two subdatasets
-    eq_(len(ds_list), 3)
-    eq_(sum([isinstance(i, Dataset) for i in ds_list]), 3)
+    assert_result_count(res, 3, action='install', type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
-    eq_(ds_list[0].path, path_r)
-    top_ds = ds_list[0]
+    eq_(res[0]['path'], path_r)
+    top_ds = Dataset(res[0]['path'])
     ok_(top_ds.is_installed())
 
     # the subdatasets are contained in returned list:
     # (Note: Until we provide proper (singleton) instances for Datasets,
     # need to check for their paths)
-    assert_in(opj(top_ds.path, 'subm 1'), [i.path for i in ds_list])
-    assert_in(opj(top_ds.path, '2'), [i.path for i in ds_list])
+    assert_in_results(res, path=opj(top_ds.path, 'subm 1'), type='dataset')
+    assert_in_results(res, path=opj(top_ds.path, '2'), type='dataset')
 
     eq_(len(top_ds.subdatasets(recursive=True)), 2)
 
@@ -383,8 +383,8 @@ def test_install_recursive_with_data(src, path):
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
     # each
-    eq_(len(res), 6)
-    assert_result_count(res, 3, type='dataset')
+    assert_result_count(res, 3, type='dataset', action='install')
+    assert_result_count(res, 3, type='file', action='get')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
     eq_(res[0]['path'], path)

@@ -139,13 +139,13 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     clone3.siblings('add', name='myremote', url=ds.path,
                     result_renderer='disabled')
     clone3.update(sibling='myremote')
-    # we should end up with three pieces
-    eq_(f(clone3, clone3.subdatasets(return_type='item-or-list')),
-        [
-            ('origin', clone_subpath),
-            ('myremote', ds_subpath),
-            ('local', str(clone3.pathobj / 'sub')),
-    ])
+    # we should end up with this addition piece
+    # we are not checking for the name of the remote, because it is actually
+    # registered under two different names
+    assert_in(
+        ds_subpath,
+        [i[1] for i in f(clone3, clone3.subdatasets(return_type='item-or-list'))]
+    )
 
     # TODO: check that http:// urls for the dataset itself get resolved
     # TODO: many more!!
