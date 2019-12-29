@@ -426,14 +426,14 @@ def clone_dataset(
     yield get_status_dict(status='ok', **result_props)
 
 
-def _handle_possible_annex_dataset(dataset, reckless, description=None):
-    """If dataset "knows annex" -- annex init it, set into reckless etc
+def _handle_possible_annex_dataset(ds, reckless, description=None):
+    """If ds "knows annex" -- annex init it, set into reckless etc
 
     Provides additional tune up to a possibly an annex repo, e.g.
     "enables" reckless mode, sets up description
     """
     # in any case check whether we need to annex-init the installed thing:
-    if not knows_annex(dataset.path):
+    if not knows_annex(ds.path):
         # not for us
         return
 
@@ -441,17 +441,17 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
     if reckless:
         lgr.debug(
             "Instruct annex to hardlink content in %s from local "
-            "sources, if possible (reckless)", dataset.path)
-        dataset.config.add(
+            "sources, if possible (reckless)", ds.path)
+        ds.config.add(
             'annex.hardlink', 'true', where='local', reload=True)
-    lgr.debug("Initializing annex repo at %s", dataset.path)
+    lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
     # If such an instance already exists, its __init__ will not be executed.
     # Therefore do quick test once we have an object and decide whether to call its _init().
     #
     # Additionally, call init if we need to add a description (see #1403),
     # since AnnexRepo.__init__ can only do it with create=True
-    repo = AnnexRepo(dataset.path, init=True)
+    repo = AnnexRepo(ds.path, init=True)
     if not repo.is_initialized() or description:
         repo._init(description=description)
     if reckless:
@@ -478,7 +478,7 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
                 'Failed to process "autoenable" value %r for sibling %s in '
                 'dataset %s as bool.  You might need to enable it later '
                 'manually and/or fix it up to avoid this message in the future.',
-                sr_autoenable, sr_name, dataset.path)
+                sr_autoenable, sr_name, ds.path)
             continue
 
         # determine whether there is a registered remote with matching UUID
@@ -504,7 +504,7 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
             # proper names
             single_or_plural("special remote", "special remotes", len(srs[True]), True),
             ", ".join(srs[True]),
-            dataset.path
+            ds.path
         )
 
     if srs[False]:
@@ -515,7 +515,7 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
             # own terms!
             single_or_plural("dataset sibling", "dataset siblings", len(srs[False]), True),
             ", ".join(srs[False]),
-            dataset.path,
+            ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
 
