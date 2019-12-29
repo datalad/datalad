@@ -262,6 +262,11 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     # we either have any non-zero number of "paths" (that could be anything), or
     # we have one path and one source
     # we don't do any error checking here, done by the command itself
+    if res.get('action', None) not in ('install', 'get'):
+        # this filter is only used in install, reject anything that comes
+        # in that could not possibly be a 'install'-like result
+        # e.g. a sibgling being added in the process
+        return False
     source = kwargs.get('source', None)
     if source is not None:
         # we want to be able to deal with Dataset instances given as 'source':

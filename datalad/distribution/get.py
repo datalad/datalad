@@ -489,7 +489,8 @@ def _install_targetpath(
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
-            action='get',
+            # do not override reported action, could be anything
+            #action='get',
             contains=[Path(res['path'])],
         )
         yield res
