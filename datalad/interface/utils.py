@@ -333,7 +333,7 @@ def eval_results(func):
         kwargs = kwargs.copy()  # we will pop, which might cause side-effect
         common_params = {
             p_name: kwargs.pop(
-                # go way a any explicitly given default
+                # go with any explicitly given default
                 p_name,
                 # otherwise determine the command class and pull any
                 # default set in that class
@@ -429,7 +429,7 @@ def eval_results(func):
                             if not keep_result(hr, result_filter, **allkwargs):
                                 continue
                             hr = xfm_result(hr, result_xfm)
-                            # rational for conditional is a few lines down
+                            # rationale for conditional is a few lines down
                             if hr:
                                 yield hr
                 if not keep_result(r, result_filter, **allkwargs):
