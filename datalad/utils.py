@@ -2320,6 +2320,15 @@ def maybe_shlex_quote(val):
     return val if on_windows else shlex_quote(val)
 
 
+def get_wrapped_class(wrapped):
+    """Determine the command class a wrapped __call__ belongs to"""
+    mod = sys.modules[wrapped.__module__]
+    command_class_name = wrapped.__qualname__.split('.')[-2]
+    _func_class = mod.__dict__[command_class_name]
+    lgr.debug("Determined class of decorated function: %s", _func_class)
+    return _func_class
+
+
 # TODO whenever we feel ready for English kill the compat block below
 assure_tuple_or_list = ensure_tuple_or_list
 assure_iter = ensure_iter

@@ -386,24 +386,6 @@ def test_saving_prior(topdir):
 
 
 @with_tempfile(mkdir=True)
-def test_create_withprocedure(path):
-    # first without
-    ds = create(path)
-    assert(not op.lexists(op.join(ds.path, 'README.rst')))
-    ds.remove()
-    assert(not op.lexists(ds.path))
-    # now for reals...
-    ds = create(
-        # needs to identify the dataset, otherwise post-proc
-        # procedure doesn't know what to run on
-        dataset=path,
-        proc_post=[['cfg_metadatatypes', 'xmp', 'datacite']])
-    assert_repo_status(path)
-    ds.config.reload()
-    eq_(ds.config['datalad.metadata.nativetype'], ('xmp', 'datacite'))
-
-
-@with_tempfile(mkdir=True)
 def test_create_withcfg(path):
     ds = create(
         dataset=path,
