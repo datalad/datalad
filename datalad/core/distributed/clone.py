@@ -68,7 +68,7 @@ from datalad.distribution.utils import (
 
 __docformat__ = 'restructuredtext'
 
-lgr = logging.getLogger('datalad.distribution.clone')
+lgr = logging.getLogger('datalad.core.distributed.clone')
 
 
 @build_doc

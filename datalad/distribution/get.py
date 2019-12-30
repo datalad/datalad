@@ -69,7 +69,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.distribution.clone import clone_dataset
+from datalad.core.distributed.clone import clone_dataset
 from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'

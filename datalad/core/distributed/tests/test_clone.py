@@ -62,7 +62,7 @@ from datalad.tests.utils import (
     with_sameas_remote,
     known_failure_appveyor,
 )
-from datalad.distribution.clone import _get_installationpath_from_url
+from datalad.core.distributed.clone import _get_installationpath_from_url
 from datalad.distribution.dataset import Dataset
 
 
