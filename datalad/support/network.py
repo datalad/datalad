@@ -900,8 +900,6 @@ def is_ssh(ri):
         or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
-#### windows workaround ###
-# TODO: There should be a better way
 def get_local_file_url(fname):
     """Return OS specific URL pointing to a local file
 
