@@ -39,12 +39,11 @@ bet we will fix some bugs and make a world even a better place.
 - The `dataset_only` argument of the `ConfigManager` class is
   deprecated.  Use `source="dataset"` instead.  ([#3907][])
 
-- The configuration values `datalad.COMMAND.proc-pre` and
-  `datalad.COMMAND.proc-post` must be defined in standard Git
-  configuration files and are no longer read from a dataset's tracked
-  `.datalad/config` file.  This avoids the security risk of
-  unknowingly executing a procedure due to configuration that was
-  brought in by a dataset update.  ([#3907][])
+- The `--proc-pre` and `--proc-post` options have been removed, and
+  configuration values for `datalad.COMMAND.proc-pre` and
+  `datalad.COMMAND.proc-post` are no longer honored.  The new result
+  hook mechanism provides an alternative for `proc-post`
+  procedures. ([#3963][])
 
 ### Fixes
 
@@ -82,6 +81,13 @@ bet we will fix some bugs and make a world even a better place.
   repository was not yet in its final state, making it ineffective for
   a caller to operate on the repository in response to the result.
   ([#3906][])
+
+- The internal helper for converting git-annex's JSON output did not
+  relay information from the "error-messages" field.  ([#3931][])
+
+- [run-procedure][] reported relative paths that were confusingly not
+  relative to the current directory in some cases.  It now always
+  reports absolute paths. ([#3959][])
 
 ### Enhancements and new features
 
@@ -121,8 +127,23 @@ bet we will fix some bugs and make a world even a better place.
 
 - [unlock][] has been sped up.  ([#3880][])
 
-- [wtf][] now reports the dataset ID if the current working directory
-  is visiting a dataset.  ([#3888][])
+- [run-procedure][] learned to provide and render more information
+  about discovered procedures, including whether the procedure is
+  overridden by another procedure with the same base name.  ([#3960][])
+
+- [save][] now ([#3817][])
+  - records the active branch in the superdataset when registering a
+    new subdataset.
+  - calls `git annex sync` when saving a dataset on an adjusted branch
+    so that the changes are brought into the mainline branch.
+
+- [subdatasets][] now aborts when its `dataset` argument points to a
+  non-existent dataset.  ([#3940][])
+
+- [wtf][] now
+  - reports the dataset ID if the current working directory is
+    visiting a dataset.  ([#3888][])
+  - outputs entries deterministically.  ([#3927][])
 
 - The `ConfigManager` class learned to exclude ``.datalad/config`` as
   a source of configuration values, restricting the sources to
@@ -2175,6 +2196,7 @@ publishing
 [#3807]: https://github.com/datalad/datalad/issues/3807
 [#3812]: https://github.com/datalad/datalad/issues/3812
 [#3815]: https://github.com/datalad/datalad/issues/3815
+[#3817]: https://github.com/datalad/datalad/issues/3817
 [#3821]: https://github.com/datalad/datalad/issues/3821
 [#3828]: https://github.com/datalad/datalad/issues/3828
 [#3831]: https://github.com/datalad/datalad/issues/3831
@@ -2197,6 +2219,12 @@ publishing
 [#3906]: https://github.com/datalad/datalad/issues/3906
 [#3907]: https://github.com/datalad/datalad/issues/3907
 [#3911]: https://github.com/datalad/datalad/issues/3911
+[#3927]: https://github.com/datalad/datalad/issues/3927
+[#3931]: https://github.com/datalad/datalad/issues/3931
 [#3935]: https://github.com/datalad/datalad/issues/3935
+[#3940]: https://github.com/datalad/datalad/issues/3940
 [#3954]: https://github.com/datalad/datalad/issues/3954
 [#3955]: https://github.com/datalad/datalad/issues/3955
+[#3959]: https://github.com/datalad/datalad/issues/3959
+[#3960]: https://github.com/datalad/datalad/issues/3960
+[#3963]: https://github.com/datalad/datalad/issues/3963
