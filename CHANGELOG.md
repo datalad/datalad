@@ -91,10 +91,10 @@ bet we will fix some bugs and make a world even a better place.
 
 ### Enhancements and new features
 
-- The new result hooks mechanism allows callers to specify, via local
-  Git configuration values, DataLad command calls that will be
-  triggered in response to matching result records (i.e., what you see
-  when you call a command with `-f json_pp`).  ([#3903][])
+- The new [result hooks mechanism][hooks] allows callers to specify,
+  via local Git configuration values, DataLad command calls that will
+  be triggered in response to matching result records (i.e., what you
+  see when you call a command with `-f json_pp`).  ([#3903][])
 
   TODO: Add link to what comes from datalad-handbook/book#304.
 
@@ -1921,6 +1921,7 @@ publishing
 [wtf]: http://datalad.readthedocs.io/en/latest/generated/man/datalad-wtf.html
 
 [handbook]: http://handbook.datalad.org
+[hooks]: http://handbook.datalad.org/en/latest/basics/101-145-hooks.html
 [Flyweight pattern]: https://en.wikipedia.org/wiki/Flyweight_pattern
 [NO_COLOR]: https://no-color.org/
 
