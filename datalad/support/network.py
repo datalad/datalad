@@ -39,6 +39,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import (
     on_windows,
     PurePath,
+    Path,
 )
 from datalad.utils import assure_dir, assure_bytes, assure_unicode, map_items
 from datalad import consts
@@ -908,14 +909,16 @@ def get_local_file_url(fname):
     fname : string
         Filename.  If not absolute, abspath is used
     """
-    fname = fname if isabs(fname) else abspath(fname)
+    path = Path(fname).absolute()
     if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+        path = path.as_posix()
+        furl = 'file://{}'.format(
+            urlquote(
+                re.sub(r'([a-zA-Z]):', r'\1', path)
+            ))
     else:
         # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=fname))
+        furl = str(URL(scheme='file', path=str(path)))
     return furl
 
 

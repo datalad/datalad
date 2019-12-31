@@ -436,7 +436,9 @@ def test_get_local_file_url():
                 ('/a', 'file:///a'),
                 ('/a/b/c', 'file:///a/b/c'),
                 ('/a~', 'file:///a~'),
-                ('/a b/', 'file:///a%20b/'),
+                # there are no files with trailing slashes in the name
+                #('/a b/', 'file:///a%20b/'),
+                ('/a b/name', 'file:///a%20b/name'),
             ):
         if isabs(path):
             eq_(get_local_file_url(path), url)
