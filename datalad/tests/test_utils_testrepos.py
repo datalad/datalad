@@ -18,10 +18,6 @@ from .utils import swallow_outputs
 from .utils import on_windows
 from .utils import SkipTest
 
-# TODO: still true?
-if on_windows:
-    raise SkipTest("experiencing issues on windows -- disabled for now")
-
 
 def _test_BasicAnnexTestRepo(repodir):
     trepo = BasicAnnexTestRepo(repodir)
