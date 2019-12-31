@@ -96,8 +96,6 @@ bet we will fix some bugs and make a world even a better place.
   be triggered in response to matching result records (i.e., what you
   see when you call a command with `-f json_pp`).  ([#3903][])
 
-  TODO: Add link to what comes from datalad-handbook/book#304.
-
 - The command interface classes learned to use a new `_examples_`
   attribute to render documentation examples for both the Python and
   command-line API.  ([#3821][])
