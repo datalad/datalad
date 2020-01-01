@@ -214,6 +214,8 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:360
+@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -253,6 +255,8 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:298
+@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -318,6 +322,8 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -398,6 +404,8 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
+@known_failure_windows
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -467,6 +475,8 @@ def test_failed_install_multiple(top_path):
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:318
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):

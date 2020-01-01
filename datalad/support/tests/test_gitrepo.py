@@ -47,7 +47,7 @@ from datalad.tests.utils import get_most_obscure_supported_name
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if
 from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import integration
 from datalad.utils import rmtree
 from datalad.tests.utils_testrepos import BasicAnnexTestRepo
@@ -187,6 +187,8 @@ def test_GitRepo_equals(path1, path2):
     ok_(repo1 != repo2)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:515
+@known_failure_windows
 @assert_cwd_unchanged
 @with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -443,6 +445,8 @@ def test_GitRepo_remote_remove(orig_path, path):
     assert_in('origin', out)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:491
+@known_failure_windows
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_remote_url(orig_path, path):
@@ -765,6 +769,8 @@ def test_GitRepo_get_files(url, path):
     eq_(set([filename]), branch_files.difference(local_files))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:505
+@known_failure_windows
 @with_testrepos('.*git.*', flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 @with_tempfile

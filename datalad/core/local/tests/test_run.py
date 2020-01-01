@@ -253,8 +253,9 @@ def test_run_from_subds_gh3551(path):
         ok_(subds.repo.file_has_content("f"))
 
 
+#https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789009#step:8:644
+@known_failure_windows
 @slow  # ~10s
-# use of testrepos is broken on Windows and causes this test to be skipped there
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_run_explicit(path):
     ds = Dataset(path)

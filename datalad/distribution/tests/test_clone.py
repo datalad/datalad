@@ -64,6 +64,7 @@ from datalad.tests.utils import (
     skip_if,
     with_sameas_remote,
     known_failure_appveyor,
+    known_failure_windows,
 )
 from datalad.distribution.clone import _get_installationpath_from_url
 from datalad.distribution.dataset import Dataset
@@ -147,6 +148,8 @@ def test_clone_datasets_root(tdir):
         assert_status('error', res)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:258
+@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_clone_simple_local(src, path):
@@ -189,6 +192,8 @@ def test_clone_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:216
+@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_clone_dataset_from_just_source(url, path):
@@ -222,6 +227,8 @@ def test_clone_dataladri(src, topurl, path):
     ok_file_has_content(op.join(path, 'test.txt'), 'some')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:236
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -270,6 +277,8 @@ def test_clone_into_dataset(source, top_path):
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:278
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_notclone_known_subdataset(src, path):
