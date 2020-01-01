@@ -19,6 +19,7 @@ from ..support.network import get_local_file_url
 from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
+from ..utils import on_windows
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
@@ -159,9 +160,9 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         annex.create()
         kw = dict(cwd=self.path, expect_stderr=True)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
+            '', ['git', 'submodule', 'add', annex.path if on_windows else annex.url, 'subm 1'], **kw)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.url, '2'], **kw)
+            '', ['git', 'submodule', 'add', annex.path if on_windows else annex.url, '2'], **kw)
         self.repo.commit('Added subm 1 and 2.')
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
@@ -178,10 +179,10 @@ class NestedDataset(BasicAnnexTestRepo):
         ds.create()
         kw = dict(expect_stderr=True)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.url, 'sub dataset1'],
+            '', ['git', 'submodule', 'add', ds.path if on_windows else ds.url, 'sub dataset1'],
             cwd=self.path, **kw)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
+            '', ['git', 'submodule', 'add', ds.path if on_windows else ds.url, 'sub sub dataset1'],
             cwd=opj(self.path, 'sub dataset1'), **kw)
         GitRepo(opj(self.path, 'sub dataset1')).commit('Added sub dataset.')
         self.repo.commit('Added subdatasets.', options=["-a"])
