@@ -11,11 +11,10 @@ import os
 import tempfile
 
 from abc import ABCMeta, abstractmethod
-from os.path import dirname, join as opj, exists, pardir
+from os.path import join as opj, exists
 
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
-from ..cmd import Runner
 from ..support.network import get_local_file_url
 from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
@@ -105,7 +104,6 @@ class BasicAnnexTestRepo(TestRepo):
         self.create_file('test.dat', '123\n', annex=False)
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
-        from .utils import on_windows
         fileurl = get_local_file_url(remote_file_path)
         # Note:
         # The line above used to be conditional:
