@@ -692,12 +692,11 @@ def _get_testrepos_uris(regex, flavors):
                       }
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
-        if not on_windows:
-            _basic_annex_test_repo.create()
-            _basic_git_test_repo.create()
-            _submodule_annex_test_repo.create()
-            _nested_submodule_annex_test_repo.create()
-            _inner_submodule_annex_test_repo.create()
+        _basic_annex_test_repo.create()
+        _basic_git_test_repo.create()
+        _submodule_annex_test_repo.create()
+        _nested_submodule_annex_test_repo.create()
+        _inner_submodule_annex_test_repo.create()
     uris = []
     for name, spec in _TESTREPOS.items():
         if not re.match(regex, name):
@@ -708,7 +707,9 @@ def _get_testrepos_uris(regex, flavors):
         if 'clone' in flavors and 'clone' not in spec:
             uris.append(clone_url(spec['local']))
 
-        if 'network-clone' in flavors and 'network-clone' not in spec:
+        if 'network-clone' in flavors \
+                and 'network' in spec \
+                and 'network-clone' not in spec:
             uris.append(clone_url(spec['network']))
 
     return uris
@@ -750,8 +751,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     @wraps(t)
     @attr('with_testrepos')
     def newfunc(*arg, **kw):
-        if on_windows:
-            raise SkipTest("Testrepo setup is broken on Windows")
+        #if on_windows:
+        #    raise SkipTest("Testrepo setup is broken on Windows")
 
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
