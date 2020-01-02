@@ -20,9 +20,12 @@ from distutils.version import LooseVersion
 
 import re
 import os
-from os.path import join as opj, exists
-from os.path import getmtime
-from os.path import abspath
+from os.path import (
+    join as opj,
+    exists,
+    getmtime,
+    abspath,
+)
 from time import time
 
 import logging
@@ -34,12 +37,14 @@ cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
 
 _where_reload_doc = """
-        where : {'dataset', 'local', 'global'}, optional
+        where : {'dataset', 'local', 'global', 'override'}, optional
           Indicator which configuration file to modify. 'dataset' indicates the
           persistent configuration in .datalad/config of a dataset; 'local'
           the configuration of a dataset's Git repository in .git/config;
           'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig).
+          a single repository (usually in $USER/.gitconfig); 'override'
+          limits the modification to the ConfigManager instance, and the
+          assigned value overrides any setting from any other source.
         reload : bool
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
@@ -453,6 +458,7 @@ class ConfigManager(object):
             self._cfgfiles,
             '+ overrides' if self.overrides else '',
         )
+
     #
     # Compatibility with dict API
     #
@@ -579,7 +585,7 @@ class ConfigManager(object):
     def _get_location_args(self, where, args=None):
         if args is None:
             args = []
-        cfg_labels = ('dataset', 'local', 'global')
+        cfg_labels = ('dataset', 'local', 'global', 'override')
         if where not in cfg_labels:
             raise ValueError(
                 "unknown configuration label '{}' (not in {})".format(
@@ -591,7 +597,7 @@ class ConfigManager(object):
                     'none specified')
             # create an empty config file if none exists, `git config` will
             # fail otherwise
-            dscfg_dirname = opj(self._dataset_path,  DATALAD_DOTDIR)
+            dscfg_dirname = opj(self._dataset_path, DATALAD_DOTDIR)
             if not exists(dscfg_dirname):
                 os.makedirs(dscfg_dirname)
             if not exists(self._dataset_cfgfname):
@@ -615,6 +621,15 @@ class ConfigManager(object):
         value : str
           Variable value
         %s"""
+        if where == 'override':
+            from datalad.utils import assure_list
+            val = assure_list(self.overrides.pop(var, None))
+            val.append(value)
+            self.overrides[var] = val[0] if len(val) == 1 else val
+            if reload:
+                self.reload()
+            return
+
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
     @_where_reload
@@ -636,6 +651,12 @@ class ConfigManager(object):
           given `value`. Otherwise raise if multiple entries for `var` exist
           already
         %s"""
+        if where == 'override':
+            self.overrides[var] = value
+            if reload:
+                self.reload()
+            return
+
         from datalad.support.gitrepo import to_options
 
         self._run(to_options(replace_all=force) + [var, value],
@@ -652,6 +673,15 @@ class ConfigManager(object):
         new : str
           Name of the section to rename to.
         %s"""
+        if where == 'override':
+            self.overrides = {
+                (new + k[len(old):]) if k.startswith(old + '.') else k: v
+                for k, v in self.overrides.items()
+            }
+            if reload:
+                self.reload()
+            return
+
         self._run(['--rename-section', old, new], where=where, reload=reload)
 
     @_where_reload
@@ -663,6 +693,16 @@ class ConfigManager(object):
         sec : str
           Name of the section to remove.
         %s"""
+        if where == 'override':
+            self.overrides = {
+                k: v
+                for k, v in self.overrides.items()
+                if not k.startswith(sec + '.')
+            }
+            if reload:
+                self.reload()
+            return
+
         self._run(['--remove-section', sec], where=where, reload=reload)
 
     @_where_reload
@@ -674,5 +714,11 @@ class ConfigManager(object):
         var : str
           Name of the variable to remove
         %s"""
+        if where == 'override':
+            self.overrides.pop(var, None)
+            if reload:
+                self.reload()
+            return
+
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)

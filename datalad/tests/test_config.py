@@ -15,12 +15,19 @@ from os.path import exists
 from os.path import join as opj
 
 from unittest.mock import patch
-from nose.tools import assert_false, assert_true, assert_equal
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_in, assert_not_in
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import (
+    assert_raises,
+    assert_false,
+    assert_true,
+    assert_equal,
+    assert_not_equal,
+    assert_in,
+    assert_not_in,
+    ok_file_has_content,
+    with_tree,
+    with_tempfile,
+    with_testsui,
+)
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
@@ -28,7 +35,6 @@ from datalad.api import create
 from datalad.config import ConfigManager
 from datalad.cmd import CommandError
 
-from datalad.tests.utils import with_testsui
 from datalad.support.external_versions import external_versions
 
 # XXX tabs are intentional (part of the format)!
@@ -322,9 +328,40 @@ def test_from_env():
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
-    cfg.overrides['datalad.crazy.override'] = 'fromoverride'
+    cfg.set('datalad.crazy.override', 'fromoverride', where='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
     os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+
+
+def test_overrides():
+    cfg = ConfigManager()
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', cfg)
+    # set
+    cfg.set('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # unset just removes override, not entire config
+    cfg.unset('user.name', where='override')
+    assert_in('user.name', cfg)
+    assert_not_equal('user.name', 'myoverride')
+    # add
+    # there is no initial increment
+    cfg.add('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # same as with add, not a list
+    assert_equal(cfg['user.name'], 'myoverride')
+    # but then there is
+    cfg.add('user.name', 'myother', where='override')
+    assert_equal(cfg['user.name'], ['myoverride', 'myother'])
+    # rename
+    cfg.rename_section('user', 'ups', where='override')
+    # original variable still there
+    assert_in('user.name', cfg)
+    # rename of override in effect
+    assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
+    # remove entirely by section
+    cfg.remove_section('ups', where='override')
+    assert_not_in('ups.name', cfg)
