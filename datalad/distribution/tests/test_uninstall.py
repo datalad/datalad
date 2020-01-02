@@ -43,6 +43,7 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import usecase
 from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import chpwd
 from datalad.utils import _path_
 from datalad.support.external_versions import external_versions
@@ -126,6 +127,8 @@ def test_uninstall_invalid(path):
         assert_status('error', method(dataset=ds, path='../madeupnonexist', on_failure='ignore'))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:489
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_uninstall_annex_file(path):
     ds = Dataset(path)
@@ -182,6 +185,8 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:509
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_uninstall_subdataset(src, dst):

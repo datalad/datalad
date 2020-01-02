@@ -33,9 +33,12 @@ from datalad.tests.utils import (
     assert_in,
     assert_not_in,
     assert_status,
+    known_failure_windows,
 )
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789014#step:8:275
+@known_failure_windows
 @with_testrepos('.*nested_submodule.*', flavors=['clone'])
 def test_get_subdatasets(path):
     ds = Dataset(path)

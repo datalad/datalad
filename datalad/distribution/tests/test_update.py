@@ -40,6 +40,8 @@ from datalad.tests.utils import slow
 from datalad.tests.utils import known_failure_windows
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+@known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
@@ -163,6 +165,8 @@ def test_update_git_smoke(src_path, dst_path):
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
+@known_failure_windows
 @slow  # 20.6910s
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)

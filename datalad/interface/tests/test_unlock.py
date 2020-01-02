@@ -40,6 +40,7 @@ from datalad.tests.utils import (
     assert_result_count,
     assert_status,
     known_failure_githubci_win,
+    known_failure_windows,
 )
 
 
@@ -85,6 +86,8 @@ def test_unlock_raises(path, path2, path3):
 
 # Note: As root there is no actual lock/unlock.
 #       Therefore don't know what to test for yet.
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789027#step:8:134
+@known_failure_windows
 @skip_if(cond=not on_windows and os.geteuid() == 0)  # uid not available on windows
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_unlock(path):

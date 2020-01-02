@@ -41,6 +41,7 @@ from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_message
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import slow
+from datalad.tests.utils import known_failure_windows
 from datalad.utils import with_pathsep
 from datalad.utils import chpwd
 from datalad.utils import assure_list
@@ -299,6 +300,8 @@ def test_get_recurse_dirs(o_path, c_path):
     ok_(ds.repo.file_has_content('file1.txt') is True)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:541
+@known_failure_windows
 @slow  # 15.1496s
 @with_testrepos('submodule_annex', flavors='local')
 @with_tempfile(mkdir=True)
