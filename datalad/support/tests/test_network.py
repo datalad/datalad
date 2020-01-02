@@ -474,10 +474,14 @@ def test_get_local_file_url_compatibility(path):
     testfile.write_text('some')
 
     # compat with annex addurl
-    ds1.repo.add_url_to_file('test.txt', get_local_file_url(testfile))
+    ds1.repo.add_url_to_file(
+        'test.txt',
+        get_local_file_url(testfile, compatibility='git-annex'))
 
     # compat with git clone/submodule
-    assert_status('ok', ds1.clone(get_local_file_url(ds2.path)))
+    assert_status(
+        'ok',
+        ds1.clone(get_local_file_url(ds2.path, compatibility='git')))
 
 
 def test_is_ssh():

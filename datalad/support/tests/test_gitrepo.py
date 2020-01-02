@@ -1149,7 +1149,7 @@ def test_optimized_cloning(path):
     # now clone it in different ways and see what happens to the object storage
     from datalad.support.network import get_local_file_url
     clonepath = op.join(path, 'clone')
-    for src in (originpath, get_local_file_url(originpath)):
+    for src in (originpath, get_local_file_url(originpath, compatibility='git')):
         # deprecated
         assert_raises(DeprecatedError, GitRepo, url=src, path=clonepath)
         clone = GitRepo.clone(url=src, path=clonepath, create=True)
