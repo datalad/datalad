@@ -40,6 +40,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import (
     RI,
+    PathRI,
     URL,
 )
 from datalad.support.gitrepo import GitRepo
@@ -65,6 +66,7 @@ from datalad.distribution.update import Update
 from datalad.utils import (
     assure_list,
     slash_join,
+    Path,
 )
 from datalad.dochelpers import exc_str
 
@@ -367,6 +369,10 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    if isinstance(RI(url), PathRI):
+        # make sure any path URL is stored in POSIX conventions for consistency
+        # with git's behavior (e.g. origin configured by clone)
+        url = Path(url).as_posix()
     # this remote is fresh: make it known
     # just minimalistic name and URL, the rest is coming from `configure`
     ds.repo.add_remote(name, url)
