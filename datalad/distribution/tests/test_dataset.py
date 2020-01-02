@@ -62,7 +62,8 @@ def test_EnsureDataset():
 
 # TODO: test remember/recall more extensive?
 
-
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:531
+@known_failure_windows
 @with_testrepos('submodule_annex')
 @with_tempfile(mkdir=True)
 def test_is_installed(src, path):

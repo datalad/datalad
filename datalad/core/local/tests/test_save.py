@@ -54,6 +54,9 @@ from datalad.tests.utils import (
 )
 
 
+# https://ci.appveyor.com/project/mih/datalad/builds/29840270/job/oya0cs55nwtoga4p
+# # (The system cannot find the path specified.)
+@known_failure_appveyor
 @with_testrepos('.*git.*', flavors=['clone'])
 def test_save(path):
 

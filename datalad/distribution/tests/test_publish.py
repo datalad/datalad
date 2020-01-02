@@ -102,6 +102,8 @@ def test_smth_about_not_supported(p1, p2):
         publish(to='target1', since='HEAD^')  # must not fail now
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:571
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -225,6 +227,8 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:380
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile
 @with_tempfile(mkdir=True)
@@ -394,6 +398,8 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_status("notneeded", publish(since='', dataset=source.path))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

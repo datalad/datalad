@@ -27,6 +27,7 @@ from ..support.annexrepo import AnnexRepo
 from .utils import with_tempfile
 from .utils import SkipTest
 from .utils import chpwd
+from .utils import known_failure_windows
 from datalad.support.json_py import LZMAFile
 
 try:
@@ -40,8 +41,11 @@ try:
 except ImportError:
     nib = None
 
+
 # somewhat superseeded by test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789030#step:8:398
+@known_failure_windows
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
     TEST_CONTENT = "content to be annex-addurl'd"

@@ -9,10 +9,17 @@
 
 import logging
 
-from os.path import join as opj
+import os
+from os.path import (
+    join as opj,
+    isabs,
+)
 from collections import OrderedDict
 
-from datalad.utils import PurePosixPath
+from datalad.utils import (
+    PurePosixPath,
+    on_windows,
+)
 
 from datalad.tests.utils import eq_, neq_, ok_, nok_, assert_raises
 from datalad.tests.utils import skip_if_on_windows
@@ -415,12 +422,32 @@ def test_is_datalad_compat_ri():
     nok_(is_datalad_compat_ri(123))
 
 
-@skip_if_on_windows
-def test_get_local_file_url_linux():
-    eq_(get_local_file_url('/a'), 'file:///a')
-    eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    eq_(get_local_file_url('/a~'), 'file:///a~')
-    eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
+def test_get_local_file_url():
+    for path, url in (
+                # relpaths are special-cased below
+                ('test.txt', 'test.txt'),
+                # static copy of "most_obscore_name"
+                (' "\';a&b&cΔЙקم๗あ `| ',
+                 # and translation by google chrome
+                 "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
+            ) + (
+                ('C:\\Windows\\Notepad.exe', 'file://C/Windows/Notepad.exe'),
+            ) if on_windows else (
+                ('/a', 'file:///a'),
+                ('/a/b/c', 'file:///a/b/c'),
+                ('/a~', 'file:///a~'),
+                # there are no files with trailing slashes in the name
+                #('/a b/', 'file:///a%20b/'),
+                ('/a b/name', 'file:///a%20b/name'),
+            ):
+        if isabs(path):
+            eq_(get_local_file_url(path), url)
+        else:
+            eq_(get_local_file_url(path),
+                '/'.join((
+                    get_local_file_url(os.getcwd()),
+                    url))
+            )
 
 
 def test_is_ssh():
