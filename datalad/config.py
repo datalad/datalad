@@ -627,7 +627,7 @@ class ConfigManager(object):
             val.append(value)
             self.overrides[var] = val[0] if len(val) == 1 else val
             if reload:
-                self.reload()
+                self.reload(force=True)
             return
 
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
@@ -654,7 +654,7 @@ class ConfigManager(object):
         if where == 'override':
             self.overrides[var] = value
             if reload:
-                self.reload()
+                self.reload(force=True)
             return
 
         from datalad.support.gitrepo import to_options
@@ -679,7 +679,7 @@ class ConfigManager(object):
                 for k, v in self.overrides.items()
             }
             if reload:
-                self.reload()
+                self.reload(force=True)
             return
 
         self._run(['--rename-section', old, new], where=where, reload=reload)
@@ -700,7 +700,7 @@ class ConfigManager(object):
                 if not k.startswith(sec + '.')
             }
             if reload:
-                self.reload()
+                self.reload(force=True)
             return
 
         self._run(['--remove-section', sec], where=where, reload=reload)
@@ -717,7 +717,7 @@ class ConfigManager(object):
         if where == 'override':
             self.overrides.pop(var, None)
             if reload:
-                self.reload()
+                self.reload(force=True)
             return
 
         # use unset all as it is simpler for now
