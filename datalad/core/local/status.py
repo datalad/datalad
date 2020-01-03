@@ -244,7 +244,7 @@ class Status(Interface):
              code_cmd="datalad status --dataset . mysubdataset/"),
         dict(text="""Report on the state of a subdataset in a superdataset and
              on the state within the subdataset""",
-             code_py=" ds.status(path=['mysubdataset', 'mysubdataset/'])",
+             code_py="ds.status(path=['mysubdataset', 'mysubdataset/'])",
              code_cmd="datalad status --dataset . mysubdataset mysubdataset/"),
         dict(text="""Report the file size of annexed content in a dataset""",
              code_py="ds.status(annex=True)",
@@ -276,8 +276,7 @@ class Status(Interface):
             and the 'state' result property only reflects this
             aspect. With 'full' any other modification is considered
             too (see the 'untracked' option for further tailoring
-            modification testing).
-            """),
+            modification testing)."""),
         report_filetype=Parameter(
             args=("-t", "--report-filetype",),
             constraints=EnsureChoice('raw', 'eval'),
@@ -306,8 +305,8 @@ class Status(Interface):
         # To the next white knight that comes in to re-implement `status` as a
         # special case of `diff`. There is one fundamental difference between
         # the two commands: `status` can always use the worktree as evident on
-        # disk as a contraint (e.g. to figure out which subdataset a path is in)
-        # `diff` cannot do that (everything need to be handled based on a
+        # disk as a contsraint (e.g. to figure out which subdataset a path is
+        # in) `diff` cannot do that (everything need to be handled based on a
         # "virtual" representation of a dataset hierarchy).
         # MIH concludes that while `status` can be implemented as a special case
         # of `diff` doing so would complicate and slow down both `diff` and
@@ -421,8 +420,8 @@ class Status(Interface):
 
     @staticmethod
     def custom_result_renderer(res, **kwargs):  # pragma: more cover
-        if not (res['status'] == 'ok' \
-                and res['action'] in ('status', 'diff') \
+        if not (res['status'] == 'ok'
+                and res['action'] in ('status', 'diff')
                 and res.get('state', None) != 'clean'):
             # logging reported already
             return
