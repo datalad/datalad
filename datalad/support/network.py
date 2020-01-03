@@ -901,18 +901,26 @@ def is_ssh(ri):
         or (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
-def get_local_file_url(fname):
+def get_local_file_url(fname, compatibility='git-annex'):
     """Return OS specific URL pointing to a local file
 
     Parameters
     ----------
     fname : string
         Filename.  If not absolute, abspath is used
+    compatibility : {'git', 'git-annex'}, optional
+        On Windows, and only on that platform, file:// URLs may need to look
+        different depending on the use case or consuming application. This
+        switch selects different compatibility modes: 'git' for use with
+        Git commands (e.g. `clone` or `submodule add`); 'git-annex` for
+        Git-annex command input (e.g. `addurl`). On any other platform this
+        setting has no effect.
     """
     path = Path(fname).absolute()
     if on_windows:
         path = path.as_posix()
-        furl = 'file://{}'.format(
+        furl = 'file://{}{}'.format(
+            '/' if compatibility == 'git' else '',
             urlquote(
                 re.sub(r'([a-zA-Z]):', r'\1', path)
             ))

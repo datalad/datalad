@@ -217,7 +217,8 @@ class Clone(Interface):
                 # this is where it was actually installed from
                 track_name, track_url = _get_tracking_source(destination_dataset)
                 if track_url in guessed_sources or \
-                        get_local_file_url(track_url) in guessed_sources:
+                        get_local_file_url(
+                            track_url, compatibility='git') in guessed_sources:
                     yield get_status_dict(
                         status='notneeded',
                         message=("dataset %s was already cloned from '%s'",

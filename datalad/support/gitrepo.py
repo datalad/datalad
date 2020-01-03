@@ -879,12 +879,18 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
 
         # Massage URL
         url_ri = RI(url) if not isinstance(url, RI) else url
-        # try to get a local path from `url`:
-        try:
-            url = url_ri.localpath
-            url_ri = RI(url)
-        except ValueError:
-            pass
+        if not on_windows:
+            # if we are on windows, the local path of a URL
+            # would not end up being a proper local path and cloning
+            # would fail. Don't try to be smart and just pass the
+            # URL along unmodified
+
+            # try to get a local path from `url`:
+            try:
+                url = url_ri.localpath
+                url_ri = RI(url)
+            except ValueError:
+                pass
 
         if is_ssh(url_ri):
             ssh_manager.get_connection(url).open()
