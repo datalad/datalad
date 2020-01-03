@@ -88,7 +88,7 @@ class Flyweight(type):
         hashable, args, kwargs
           id, optionally manipulated args and kwargs to be passed to __init__
         """
-        pass
+        raise NotImplementedError
 
     def _flyweight_invalid(cls, id):
         """determines whether or not an instance with `id` became invalid and
