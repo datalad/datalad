@@ -357,6 +357,7 @@ def test_overrides():
     cfg.add('user.name', 'myother', where='override')
     assert_equal(cfg['user.name'], ['myoverride', 'myother'])
     # rename
+    assert_not_in('ups.name', cfg)
     cfg.rename_section('user', 'ups', where='override')
     # original variable still there
     assert_in('user.name', cfg)
@@ -364,4 +365,11 @@ def test_overrides():
     assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
     # remove entirely by section
     cfg.remove_section('ups', where='override')
-    assert_not_in('ups.name', cfg)
+    from datalad.utils import Path
+    assert_not_in(
+        'ups.name', cfg,
+        (cfg._store,
+         cfg.overrides,
+         cfg._cfgfiles,
+         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
+    ))
