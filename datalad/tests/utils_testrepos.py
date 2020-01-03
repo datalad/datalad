@@ -67,7 +67,7 @@ class TestRepo(object, metaclass=ABCMeta):
 
     @property
     def url(self):
-        return get_local_file_url(self.path)
+        return get_local_file_url(self.path, compatibility='git')
 
     def create_file(self, name, content, add=True, annex=False):
         filename = opj(self.path, name)
@@ -105,7 +105,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.create_file('test.dat', '123\n', annex=False)
         self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
-        fileurl = get_local_file_url(remote_file_path)
+        fileurl = get_local_file_url(remote_file_path, compatibility='git-annex')
         # Note:
         # The line above used to be conditional:
         # if not on_windows \
@@ -160,9 +160,9 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         annex.create()
         kw = dict(cwd=self.path, expect_stderr=True)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.path if on_windows else annex.url, 'subm 1'], **kw)
+            '', ['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', annex.path if on_windows else annex.url, '2'], **kw)
+            '', ['git', 'submodule', 'add', annex.url, '2'], **kw)
         self.repo.commit('Added subm 1 and 2.')
         self.repo._git_custom_command(
             '', ['git', 'submodule', 'update', '--init', '--recursive'], **kw)
@@ -179,10 +179,10 @@ class NestedDataset(BasicAnnexTestRepo):
         ds.create()
         kw = dict(expect_stderr=True)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.path if on_windows else ds.url, 'sub dataset1'],
+            '', ['git', 'submodule', 'add', ds.url, 'sub dataset1'],
             cwd=self.path, **kw)
         self.repo._git_custom_command(
-            '', ['git', 'submodule', 'add', ds.path if on_windows else ds.url, 'sub sub dataset1'],
+            '', ['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
             cwd=opj(self.path, 'sub dataset1'), **kw)
         GitRepo(opj(self.path, 'sub dataset1')).commit('Added sub dataset.')
         self.repo.commit('Added subdatasets.', options=["-a"])
@@ -205,7 +205,7 @@ class InnerSubmodule(object):
 
     @property
     def url(self):
-        return get_local_file_url(self.path)
+        return get_local_file_url(self.path, compatibility='git')
 
     def create(self):
         self._ds.create()

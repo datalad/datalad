@@ -310,7 +310,7 @@ def clone_dataset(
                 track_path = None
             for src in candidate_sources:
                 if track_url == src \
-                        or get_local_file_url(track_url) == src \
+                        or get_local_file_url(track_url, compatibility='git') == src \
                         or track_path == expanduser(src):
                     yield get_status_dict(
                         status='notneeded',

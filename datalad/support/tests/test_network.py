@@ -16,36 +16,49 @@ from os.path import (
 )
 from collections import OrderedDict
 
+from datalad.distribution.dataset import Dataset
+
 from datalad.utils import (
+    Path,
     PurePosixPath,
     on_windows,
 )
 
-from datalad.tests.utils import eq_, neq_, ok_, nok_, assert_raises
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import SkipTest
-from datalad.tests.utils import known_failure_githubci_win
+from datalad.tests.utils import (
+    eq_,
+    neq_,
+    ok_,
+    nok_,
+    assert_raises,
+    skip_if_on_windows,
+    swallow_logs,
+    assert_in,
+    get_most_obscure_supported_name,
+    SkipTest,
+    known_failure_githubci_win,
+    with_tempfile,
+    assert_status,
+)
 
-from ..network import same_website, dlurljoin
-from ..network import get_tld
-from ..network import get_url_straight_filename
-from ..network import get_response_disposition_filename
-from ..network import parse_url_opts
-from ..network import RI
-from ..network import SSHRI
-from ..network import PathRI
-from ..network import DataLadRI
-from ..network import URL
-from ..network import _split_colon
-from ..network import is_url
-from ..network import is_datalad_compat_ri
-from ..network import get_local_file_url
-from ..network import is_ssh
-from ..network import iso8601_to_epoch
+from datalad.support.network import (
+    same_website,
+    dlurljoin,
+    get_tld,
+    get_url_straight_filename,
+    get_response_disposition_filename,
+    parse_url_opts,
+    RI,
+    SSHRI,
+    PathRI,
+    DataLadRI,
+    URL,
+    _split_colon,
+    is_url,
+    is_datalad_compat_ri,
+    get_local_file_url,
+    is_ssh,
+    iso8601_to_epoch,
+)
 
 
 def test_same_website():
@@ -448,6 +461,27 @@ def test_get_local_file_url():
                     get_local_file_url(os.getcwd()),
                     url))
             )
+
+
+@with_tempfile(mkdir=True)
+def test_get_local_file_url_compatibility(path):
+    # smoke test for file:// URL compatibility with other datalad/git/annex
+    # pieces
+    path = Path(path)
+    ds1 = Dataset(path / 'ds1').create()
+    ds2 = Dataset(path / 'ds2').create()
+    testfile = path / 'testfile.txt'
+    testfile.write_text('some')
+
+    # compat with annex addurl
+    ds1.repo.add_url_to_file(
+        'test.txt',
+        get_local_file_url(testfile, compatibility='git-annex'))
+
+    # compat with git clone/submodule
+    assert_status(
+        'ok',
+        ds1.clone(get_local_file_url(ds2.path, compatibility='git')))
 
 
 def test_is_ssh():
