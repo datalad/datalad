@@ -1864,7 +1864,15 @@ def test_AnnexRepo_dirty(path):
         ok_(repo.dirty)
         # commit
         repo.commit("file2.txt annexed")
-    ok_(not repo.dirty)
+
+    try:
+        ok_(not repo.dirty)
+    except AssertionError:
+        if "7.20191024" <= external_versions['cmd:annex'] < "7.20191230":
+            raise SkipTest(
+                "Test known to trigger git-to-annex content conversion "
+                "with this git-annex version (see gh-3890)")
+        raise
 
     # TODO: unlock/modify
 
