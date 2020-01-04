@@ -10,9 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_windows
-
-
 import os
 import os.path as op
 
@@ -272,11 +269,6 @@ def test_create_sub_dataset_dot_no_path(path):
     assert_repo_status(ds.path, untracked=[subds0.path, sub1_path])
 
 
-# windows failure triggered by
-# File "C:\Miniconda35\envs\test-environment\lib\site-packages\datalad\tests\utils.py", line 421, in newfunc
-#    rmtemp(d)
-# PermissionError: [WinError 32] The process cannot access the file because it is being used by another process: 'C:\\Users\\appveyor\\AppData\\Local\\Temp\\1\\datalad_temp_tree_h43urkyc\\origin'
-@known_failure_windows
 @with_tree(tree=_dataset_hierarchy_template)
 def test_create_subdataset_hierarchy_from_top(path):
     # how it would look like to overlay a subdataset hierarchy onto
@@ -308,9 +300,6 @@ def test_create_subdataset_hierarchy_from_top(path):
     ok_(ds.id != subds.id != subsubds.id)
 
 
-# CommandError: command '['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'init', '--version', '6']' failed with exitcode 1
-# Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'annex', 'init', '--version', '6'] under 'C:\\Users\\appveyor\\AppData\\Local\\Temp\\1\\datalad_temp_okvmx7gq\\lvl1\\subds'. Exit code=1.
-@known_failure_windows
 @with_tempfile
 def test_nested_create(path):
     # to document some more organic usage pattern
