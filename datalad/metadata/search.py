@@ -800,7 +800,7 @@ class _EGrepCSSearch(_Search):
                     "Unknown value for stats. Know full and short")
 
             print(
-                '{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
+                u'{k}\n in  {stat.ndatasets} datasets\n has {stat.uvals_str}'.format(
                 k=k, stat=stat
             ))
         # After #2156 datasets may not necessarily carry all

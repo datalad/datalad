@@ -87,6 +87,7 @@ from datalad.tests.utils import skip_ssh
 from datalad.tests.utils import find_files
 from datalad.tests.utils import slow
 from datalad.tests.utils import set_annex_version
+from datalad.tests.utils import with_sameas_remote
 
 from datalad.support.exceptions import CommandError
 from datalad.support.exceptions import CommandNotAvailableError
@@ -313,6 +314,18 @@ def test_AnnexRepo_get_remote_na(path):
     with assert_raises(RemoteNotAvailableError) as cme:
         ar.get('test-annex.dat', remote="NotExistingRemote")
     eq_(cme.exception.remote, "NotExistingRemote")
+
+
+@with_sameas_remote
+def test_annex_repo_sameas_special(repo):
+    remotes = repo.get_special_remotes()
+    eq_(len(remotes), 2)
+    rsync_info = [v for v in remotes.values()
+                  if v.get("sameas-name") == "r_rsync"]
+    eq_(len(rsync_info), 1)
+    # r_rsync is a sameas remote that points to r_dir. Its sameas-name value
+    # has been copied under "name".
+    eq_(rsync_info[0]["name"], rsync_info[0]["sameas-name"])
 
 
 # 1 is enough to test file_has_content
@@ -1851,7 +1864,15 @@ def test_AnnexRepo_dirty(path):
         ok_(repo.dirty)
         # commit
         repo.commit("file2.txt annexed")
-    ok_(not repo.dirty)
+
+    try:
+        ok_(not repo.dirty)
+    except AssertionError:
+        if "7.20191024" <= external_versions['cmd:annex'] < "7.20191230":
+            raise SkipTest(
+                "Test known to trigger git-to-annex content conversion "
+                "with this git-annex version (see gh-3890)")
+        raise
 
     # TODO: unlock/modify
 

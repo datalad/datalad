@@ -157,14 +157,20 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
     srs = {True: [], False: []}  # special remotes by "autoenable" key
     remote_uuids = None  # might be necessary to discover known UUIDs
 
+    # Note: The purpose of this function is to inform the user. So if something
+    # looks misconfigured, we'll warn and move on to the next item.
     for uuid, config in repo.get_special_remotes().items():
         sr_name = config.get('name', None)
+        if sr_name is None:
+            lgr.warning(
+                'Ignoring special remote %s because it does not have a name. '
+                'Known information: %s',
+                uuid, config)
+            continue
         sr_autoenable = config.get('autoenable', False)
         try:
             sr_autoenable = assure_bool(sr_autoenable)
         except ValueError:
-            # Be resilient against misconfiguration.  Here it is only about
-            # informing the user, so no harm would be done
             lgr.warning(
                 'Failed to process "autoenable" value %r for sibling %s in '
                 'dataset %s as bool.  You might need to enable it later '
@@ -172,11 +178,16 @@ def _handle_possible_annex_dataset(dataset, reckless, description=None):
                 sr_autoenable, sr_name, dataset.path)
             continue
 
-        # determine either there is a registered remote with matching UUID
+        # determine whether there is a registered remote with matching UUID
         if uuid:
             if remote_uuids is None:
                 remote_uuids = {
-                    repo.config.get('remote.%s.annex-uuid' % r)
+                    # Check annex-config-uuid first. For sameas annex remotes,
+                    # this will point to the UUID for the configuration (i.e.
+                    # the key returned by get_special_remotes) rather than the
+                    # shared UUID.
+                    (repo.config.get('remote.%s.annex-config-uuid' % r) or
+                     repo.config.get('remote.%s.annex-uuid' % r))
                     for r in repo.get_remotes()
                 }
             if uuid not in remote_uuids:
