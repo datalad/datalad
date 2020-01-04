@@ -77,7 +77,7 @@ from .exceptions import OutdatedExternalDependencyWarning
 from .exceptions import PathKnownToRepositoryError
 from .network import RI, PathRI
 from .network import is_ssh
-from .repo import Flyweight
+from .repo import PathBasedFlyweight
 from .repo import RepoInterface
 
 # shortcuts
@@ -547,7 +547,7 @@ class GitPythonProgressBar(RemoteProgress):
         self._pbar.refresh()
 
 
-@add_metaclass(Flyweight)
+@add_metaclass(PathBasedFlyweight)
 class GitRepo(RepoInterface):
     """Representation of a git repository
 
@@ -564,35 +564,6 @@ class GitRepo(RepoInterface):
     # Begin Flyweight:
 
     _unique_instances = WeakValueDictionary()
-
-    @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-        # resolve symlinks to make sure we have exactly one instance per
-        # physical repository at a time
-        path = realpath(path)
-        kwargs['path'] = path
-        return path, args, kwargs
 
     @classmethod
     def _flyweight_invalid(cls, id_):

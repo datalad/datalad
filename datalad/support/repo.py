@@ -12,7 +12,9 @@
 
 import logging
 
-from.exceptions import InvalidInstanceRequestError
+from .exceptions import InvalidInstanceRequestError
+from . import path as op
+from .network import RI
 
 lgr = logging.getLogger('datalad.repo')
 
@@ -162,6 +164,56 @@ class Flyweight(type):
                 raise InvalidInstanceRequestError(id_, msg)
 
         return instance
+
+
+class PathBasedFlyweight(Flyweight):
+
+    @classmethod
+    def _flyweight_preproc_path(cls, path):
+        """perform any desired path preprocessing (e.g., aliases)
+
+        By default nothing is done
+        """
+        return path
+
+    @classmethod
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            lgr.debug("path is None. args: %s, kwargs: %s", args, kwargs)
+            raise ValueError("path must not be None")
+
+        # Custom handling for few special abbreviations if defined by the class
+        path_ = cls._flyweight_preproc_path(path)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        path_ = RI(path_).localpath
+
+        # we want an absolute path, but no resolved symlinks
+        if not op.isabs(path_):
+            path_ = op.join(op.getpwd(), path_)
+
+        # use canonical paths only:
+        path_ = op.normpath(path_)
+        kwargs['path'] = path_
+        return path_, args, kwargs
+    # End Flyweight
+
 
 
 # TODO: see issue #1100
