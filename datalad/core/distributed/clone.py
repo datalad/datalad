@@ -73,23 +73,28 @@ lgr = logging.getLogger('datalad.core.distributed.clone')
 
 @build_doc
 class Clone(Interface):
-    """Obtain a dataset copy from a URL or local source (path)
+    """Obtain a dataset (copy) from a URL or local directory
 
     The purpose of this command is to obtain a new clone (copy) of a dataset
     and place it into a not-yet-existing or empty directory. As such `clone`
     provides a strict subset of the functionality offered by `install`. Only a
-    single dataset can be obtained, recursion is not supported. However, once
-    installed, arbitrary dataset components can be obtained via a subsequent
-    `get` command.
+    single dataset can be obtained, and immediate recursive installation of
+    subdatasets is not supported. However, once a (super)dataset is installed
+    via `clone`, any content, including subdatasets can be obtained by a
+    subsequent `get` command.
 
     Primary differences over a direct `git clone` call are 1) the automatic
     initialization of a dataset annex (pure Git repositories are equally
     supported); 2) automatic registration of the newly obtained dataset
-    as a subdataset (submodule), if a parent dataset is specified;
-    3) support for datalad's resource identifiers and automatic generation of
-    alternative access URL for common cases (such as appending '.git' to the
-    URL in case the accessing the base URL failed); and 4) ability to
-    take additional alternative source locations as an argument.
+    as a subdataset (submodule), if a parent dataset is specified; and
+    3) support for datalad's resource identifiers and automatic configurable
+    generation of alternative access URL for common cases (such as appending
+    '.git' to the URL in case the accessing the base URL failed).
+
+    || PYTHON >>By default, the command returns a single Dataset instance for
+    an installed dataset, regardless of whether it was newly installed ('ok'
+    result), or found already installed from the specified source ('notneeded'
+    result).<< PYTHON ||
     """
     # by default ignore everything but install results
     # i.e. no "add to super dataset"
@@ -101,6 +106,27 @@ class Clone(Interface):
     # matching what is actually available after command completion (and
     # None for any failed dataset installation)
     result_xfm = 'successdatasets-or-none'
+
+    _examples_ = [
+        dict(text="Install a dataset from Github into the current directory",
+             code_py="clone("
+             "source='https://github.com/datalad-datasets/longnow"
+             "-podcasts.git')",
+             code_cmd="datalad clone "
+             "https://github.com/datalad-datasets/longnow-podcasts.git"),
+        dict(text="Install a dataset into a specific directory",
+             code_py="clone("
+             "source='https://github.com/datalad-datasets/longnow"
+             "-podcasts.git', path='myfavpodcasts')",
+             code_cmd="datalad clone "
+             "https://github.com/datalad-datasets/longnow-podcasts.git "
+             "myfavpodcasts"),
+        dict(text="Install a dataset as a subdataset into the current dataset",
+             code_py="clone(dataset='.', "
+             "source='https://github.com/datalad-datasets/longnow-podcasts.git')",
+             code_cmd="datalad clone -d . "
+             "--source='https://github.com/datalad-datasets/longnow-podcasts.git'"),
+    ]
 
     _params_ = dict(
         dataset=Parameter(
