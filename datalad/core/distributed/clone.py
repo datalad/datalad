@@ -472,28 +472,9 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
         ds.config.add(
             'annex.hardlink', 'true', where='local', reload=True)
 
-    # we have just cloned the repo, so it has 'origin'
-    # let's look at the URL for that remote and see if it is a local
-    # dataset
-    origin_url = ds.config.get('remote.origin.url')
-    if origin_url and ds.config.obtain(
-            'datalad.install.inherit-local-origin',
-            default=True) and isinstance(RI(origin_url), PathRI):
-        # given the clone source is a local dataset, we can have a
-        # cheap look at it, and configure its own 'origin' as a remote
-        # (if there is any), and benefit from additional annex availability
-        originorigin_url = Dataset(origin_url).config.get('remote.origin.url')
-        if originorigin_url:
-            yield from ds.siblings(
-                'configure',
-                # no chance for config, can only be the second configured remote
-                name='origin-origin',
-                url=originorigin_url,
-                # fetch to get all annex info
-                fetch=True,
-                result_renderer='disabled',
-                on_failure='ignore',
-            )
+    # we have just cloned the repo, so it has 'origin', configure any
+    # reachable origin of origins
+    yield from configure_origins(ds, ds, label=None)
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -569,6 +550,35 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
             ds.path,
             srs[False][0] if len(srs[False]) == 1 else "SIBLING",
         )
+
+
+def configure_origins(cfgds, probds, label):
+    if label is None:
+        label = 2
+    # let's look at the URL for that remote and see if it is a local
+    # dataset
+    origin_url = probds.config.get('remote.origin.url')
+    if origin_url and cfgds.config.obtain(
+            'datalad.install.inherit-local-origin',
+            default=True) and isinstance(RI(origin_url), PathRI):
+        # given the clone source is a local dataset, we can have a
+        # cheap look at it, and configure its own 'origin' as a remote
+        # (if there is any), and benefit from additional annex availability
+        originorigin_ds = Dataset(origin_url)
+        originorigin_url = originorigin_ds.config.get('remote.origin.url')
+        if originorigin_url:
+            yield from cfgds.siblings(
+                'configure',
+                # no chance for config, can only be the second configured remote
+                name='origin-{}'.format(label),
+                url=originorigin_url,
+                # fetch to get all annex info
+                fetch=True,
+                result_renderer='disabled',
+                on_failure='ignore',
+            )
+        # and dive deeper
+        yield from configure_origins(cfgds, originorigin_ds, label=label + 1)
 
 
 def _get_tracking_source(ds):

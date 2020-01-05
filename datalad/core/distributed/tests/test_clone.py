@@ -477,7 +477,7 @@ def test_cfg_originorigin(path):
     eq_(
         Path(clone_clone.siblings(
             'query',
-            name='origin-origin',
+            name='origin-2',
             return_type='item-or-list')['url']),
         origin.pathobj
     )
