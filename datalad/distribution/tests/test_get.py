@@ -140,7 +140,7 @@ def test_get_flexible_source_candidates_for_submodule(t, t2, t3):
     clone3.siblings('add', name='myremote', url=ds.path,
                     result_renderer='disabled')
     clone3.update(sibling='myremote')
-    # we should end up with this addition piece
+    # we should end up with this additional piece
     # we are not checking for the name of the remote, because it is actually
     # registered under two different names
     assert_in(

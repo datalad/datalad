@@ -285,11 +285,11 @@ def clone_dataset(
       Dataset instance for the clone destination
     reckless : {None, 'auto'}, optional
       Mode switch to put cloned dataset into throw-away configurations, i.e.
-      sacrifice data safety for performance or reesource footprint.
+      sacrifice data safety for performance or resource footprint.
     description : str, optional
       Location description for the annex of the dataset clone (if there is any).
     result_props : dict, optional
-      Default properties for any yielded result, pass on to get_status_dict().
+      Default properties for any yielded result, passed on to get_status_dict().
 
     Yields
     ------

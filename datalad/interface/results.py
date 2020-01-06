@@ -265,7 +265,7 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     if res.get('action', None) not in ('install', 'get'):
         # this filter is only used in install, reject anything that comes
         # in that could not possibly be a 'install'-like result
-        # e.g. a sibgling being added in the process
+        # e.g. a sibling being added in the process
         return False
     source = kwargs.get('source', None)
     if source is not None:
