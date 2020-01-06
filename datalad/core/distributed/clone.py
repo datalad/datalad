@@ -366,7 +366,7 @@ def clone_dataset(
             log_progress(
                 lgr.info,
                 'cloneds',
-                'Attempting to clone from %s to $s', (source_, dest_path),
+                'Attempting to clone from %s to %s', source_, dest_path,
                 update=1,
                 increment=True)
             # TODO for now GitRepo.clone() cannot handle Path instances, and PY35
