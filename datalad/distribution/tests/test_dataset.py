@@ -128,7 +128,7 @@ def test_is_installed(src, path):
 def test_dataset_contructor(path):
     # dataset needs a path
     assert_raises(TypeError, Dataset)
-    assert_raises(AttributeError, Dataset, None)
+    assert_raises(ValueError, Dataset, None)
     dsabs = Dataset(path)
     # always abspath
     ok_(os.path.isabs(dsabs.path))
