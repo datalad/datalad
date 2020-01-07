@@ -168,7 +168,6 @@ class Flyweight(type):
 
 class PathBasedFlyweight(Flyweight):
 
-    @classmethod
     def _flyweight_preproc_path(cls, path):
         """perform any desired path preprocessing (e.g., aliases)
 
@@ -176,7 +175,6 @@ class PathBasedFlyweight(Flyweight):
         """
         return path
 
-    @classmethod
     def _flyweight_postproc_path(cls, path):
         """perform any desired path post-processing (e.g., dereferencing etc)
 
@@ -188,7 +186,6 @@ class PathBasedFlyweight(Flyweight):
         # physical repository at a time
         return op.realpath(path)
 
-    @classmethod
     def _flyweight_id_from_args(cls, *args, **kwargs):
 
         if args:
