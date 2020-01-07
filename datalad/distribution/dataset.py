@@ -39,6 +39,7 @@ from datalad.support.gitrepo import NoSuchPathError
 from datalad.support.repo import PathBasedFlyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
+from datalad.support import path as op
 
 from datalad.utils import assure_unicode
 from datalad.utils import getpwd
@@ -118,6 +119,15 @@ class Dataset(object):
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
         return path_
+
+    @classmethod
+    def _flyweight_postproc_path(cls, path):
+        # we want an absolute path, but no resolved symlinks
+        if not op.isabs(path):
+            path = op.join(op.getpwd(), path)
+
+        # use canonical paths only:
+        return op.normpath(path)
     # End Flyweight
 
     def __init__(self, path):

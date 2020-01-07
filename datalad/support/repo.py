@@ -177,6 +177,18 @@ class PathBasedFlyweight(Flyweight):
         return path
 
     @classmethod
+    def _flyweight_postproc_path(cls, path):
+        """perform any desired path post-processing (e.g., dereferencing etc)
+
+        By default - realpath to guarantee reuse. Derived classes (e.g.,
+        Dataset) could override to allow for symlinked datasets to have
+        individual instances for multiple symlinks
+        """
+        # resolve symlinks to make sure we have exactly one instance per
+        # physical repository at a time
+        return op.realpath(path)
+
+    @classmethod
     def _flyweight_id_from_args(cls, *args, **kwargs):
 
         if args:
@@ -202,16 +214,12 @@ class PathBasedFlyweight(Flyweight):
         # Sanity check for argument `path`:
         # raise if we cannot deal with `path` at all or
         # if it is not a local thing:
-        path_ = RI(path_).localpath
+        localpath = RI(path_).localpath
 
-        # we want an absolute path, but no resolved symlinks
-        if not op.isabs(path_):
-            path_ = op.join(op.getpwd(), path_)
+        path_postproc = cls._flyweight_postproc_path(localpath)
 
-        # use canonical paths only:
-        path_ = op.normpath(path_)
-        kwargs['path'] = path_
-        return path_, args, kwargs
+        kwargs['path'] = path_postproc
+        return path_postproc, args, kwargs
     # End Flyweight
 
 
