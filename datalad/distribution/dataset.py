@@ -98,7 +98,8 @@ class Dataset(object, metaclass=Flyweight):
             raise TypeError("__init__() requires argument `path`")
 
         if path is None:
-            raise AttributeError
+            lgr.debug("path is None. args: %s, kwargs: %s", args, kwargs)
+            raise ValueError("path must not be None")
 
         # mirror what is happening in __init__
         if isinstance(path, ut.PurePath):
