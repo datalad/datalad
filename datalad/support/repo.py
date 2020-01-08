@@ -12,7 +12,9 @@
 
 import logging
 
-from.exceptions import InvalidInstanceRequestError
+from .exceptions import InvalidInstanceRequestError
+from . import path as op
+from .network import RI
 
 lgr = logging.getLogger('datalad.repo')
 
@@ -88,7 +90,7 @@ class Flyweight(type):
         hashable, args, kwargs
           id, optionally manipulated args and kwargs to be passed to __init__
         """
-        pass
+        raise NotImplementedError
 
     def _flyweight_invalid(cls, id):
         """determines whether or not an instance with `id` became invalid and
@@ -162,6 +164,61 @@ class Flyweight(type):
                 raise InvalidInstanceRequestError(id_, msg)
 
         return instance
+
+
+class PathBasedFlyweight(Flyweight):
+
+    def _flyweight_preproc_path(cls, path):
+        """perform any desired path preprocessing (e.g., aliases)
+
+        By default nothing is done
+        """
+        return path
+
+    def _flyweight_postproc_path(cls, path):
+        """perform any desired path post-processing (e.g., dereferencing etc)
+
+        By default - realpath to guarantee reuse. Derived classes (e.g.,
+        Dataset) could override to allow for symlinked datasets to have
+        individual instances for multiple symlinks
+        """
+        # resolve symlinks to make sure we have exactly one instance per
+        # physical repository at a time
+        return op.realpath(path)
+
+    def _flyweight_id_from_args(cls, *args, **kwargs):
+
+        if args:
+            # to a certain degree we need to simulate an actual call to __init__
+            # and make sure, passed arguments are fitting:
+            # TODO: Figure out, whether there is a cleaner way to do this in a
+            # generic fashion
+            assert('path' not in kwargs)
+            path = args[0]
+            args = args[1:]
+        elif 'path' in kwargs:
+            path = kwargs.pop('path')
+        else:
+            raise TypeError("__init__() requires argument `path`")
+
+        if path is None:
+            lgr.debug("path is None. args: %s, kwargs: %s", args, kwargs)
+            raise ValueError("path must not be None")
+
+        # Custom handling for few special abbreviations if defined by the class
+        path_ = cls._flyweight_preproc_path(path)
+
+        # Sanity check for argument `path`:
+        # raise if we cannot deal with `path` at all or
+        # if it is not a local thing:
+        localpath = RI(path_).localpath
+
+        path_postproc = cls._flyweight_postproc_path(localpath)
+
+        kwargs['path'] = path_postproc
+        return path_postproc, args, kwargs
+    # End Flyweight
+
 
 
 # TODO: see issue #1100
