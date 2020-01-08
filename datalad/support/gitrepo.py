@@ -3192,7 +3192,7 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 pass
             else:
                 raise ValueError(
-                    'unknown value for `untracked`: %s', untracked)
+                    'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
 
