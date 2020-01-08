@@ -35,6 +35,7 @@ from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_direct_mode
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import ok_file_under_git
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
@@ -354,17 +355,51 @@ def test_quoting(path):
         with assert_raises(CommandError):
             runner.run("datalad run-procedure just2args 'still-one arg'")
 
+
 @skip_if_on_windows
-@with_tempfile
-def test_text2git_empty(path):
-    """
-    Tests that empty files are not annexed in a ds configured with text2git.
-    """
+@with_tree(tree={
+    # "TEXT" ones
+    'empty': '',  # we have special rule to treat empty ones as text
+    # check various structured files - libmagic might change its decisions which
+    # can effect git-annex. https://github.com/datalad/datalad/issues/3361
+    'JSON': """\
+{
+    "name": "John Smith",
+    "age": 33
+}
+""",
+    'YAML': """\
+--- # The Smiths
+- {name: John Smith, age: 33}
+- name: Mary Smith
+  age: 27
+""",
+    'MARKDOWN': """\
+# Title
+
+## Section1
+
+When the earth was flat
+
+## Section2
+""",
+    # BINARY ones
+    '0blob': '\x00',
+    'emptyline': '\n',  # libmagic: "binary" "application/octet-stream"
+})
+def test_text2git(path):
+    # Test if files being correctly annexed in a ds configured with text2git.
+    TEXT_FILES = ('JSON', 'YAML', 'MARKDOWN', 'empty')
+    BINARY_FILES = ('0blob', 'emptyline')
+
     ds = Dataset(path).create(force=True)
     ds.run_procedure('cfg_text2git')
+    ds.save(path=TEXT_FILES + BINARY_FILES, message="added all files")
     ok_clean_git(ds.path)
-    # create an empty file, no extension
-    open(op.join(path, 'emptyfile'), 'a').close()
-    ds.save(message="add empty file")
-    # check that it's not annexed
-    assert_false(ds.repo.is_under_annex("emptyfile"))
+
+    # check that text files are not annexed
+    for f in TEXT_FILES:
+        ok_file_under_git(path, f, annexed=False)
+    # and trivial binaries - annexed
+    for f in BINARY_FILES:
+        ok_file_under_git(path, f, annexed=True)
