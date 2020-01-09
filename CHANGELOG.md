@@ -9,9 +9,54 @@ This is a high level and scarce summary of the changes between releases.
 We would recommend to consult log of the 
 [DataLad git repository](http://github.com/datalad/datalad) for more details.
 
-## 0.12.0rc7 (??? ??, 2019) -- will be better than ever
+## 0.12.0 (Jan 11, 2020) -- Krakatoa
 
-bet we will fix some bugs and make a world even a better place.
+This release is the result of more than a year of development that includes
+fixes for a large number of issues, yielding more robust behavior across a
+wider range of use cases, and introduces major changes in API and behavior. It
+is the first release for which extensive user documentation is available in a
+dedicated [DataLad Handbook][handbook].  Python 3 (3.5 and later) is now the
+only supported Python flavor.
+
+### Major changes 0.12 vs 0.11
+
+- [save][] fully replaces [add][] (which is obsolete now, and will be removed
+  in a future release.
+
+- A new Git-annex aware [status][] command enables detailed inspection of dataset
+  hierarchies. The previously available [diff][] command has been adjusted to
+  match [status][] in argument semantics and behavior.
+
+- The ability to configure dataset procedures prior and after the execution of
+  particular commands has been replaced by a flexible "hook" mechanism that is able
+  to run arbitrary DataLad commands whenever command results are detected that match
+  a specification.
+
+- Support of the Windows platform has been improved substantially. While performance
+  and feature coverage on Windows still falls behind Unix-like systems, typical data
+  consumer use cases, and standard dataset operations, such as [create][] and [save][],
+  are now working. Basic support for data provenance capture via [run][] is also
+  functional.
+
+- Support for Git-annex direct mode repositories has been removed, following the
+  end of support in Git-annex itself.
+
+- The semantics of relative paths in command line arguments have changed. Previously,
+  a call `datalad save --dataset /tmp/myds some/relpath` would have been interpreted
+  as saving a file at `/tmp/myds/some/relpath` into dataset `/tmp/myds`. This has
+  changed to saving `$PWD/some/relpath` into dataset `/tmp/myds`. More generally,
+  relative paths are now always treated as relative to the current working directory,
+  except for path arguments of [Dataset][] class instance methods of the Python API.
+  The resulting partial duplication of path specifications between path and dataset
+  arguments is mitigated by the introduction of two special symbols that can be given
+  as dataset argument: `^` and `^.`, which identify the topmost superdataset and the
+  closest dataset that contains the working directory, respectively.
+
+- The concept of a "core API" has been introduced. Commands situated in the module
+  `datalad.core` (such as [create][], [save][], [run][], [status][], [diff][])
+  receive additional scrutiny regarding API and implementation, and are
+  meant to provide longer-term stability. Application developers are encouraged to
+  preferentially build on these commands.
 
 ### Major refactoring and deprecations
 
