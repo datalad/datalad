@@ -474,7 +474,7 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
 
     # we have just cloned the repo, so it has 'origin', configure any
     # reachable origin of origins
-    yield from configure_origins(ds, ds, label=None)
+    yield from configure_origins(ds, ds)
 
     lgr.debug("Initializing annex repo at %s", ds.path)
     # Note, that we cannot enforce annex-init via AnnexRepo().
@@ -552,12 +552,25 @@ def _handle_possible_annex_dataset(ds, reckless, description=None):
         )
 
 
-def configure_origins(cfgds, probds, label):
+def configure_origins(cfgds, probeds, label=None):
+    """Configure any discoverable local dataset 'origin' sibling as a remote
+
+    Parameters
+    ----------
+    cfgds : Dataset
+      Dataset to receive the remote configurations
+    probeds : Dataset
+      Dataset to start looking for 'origin' remotes. May be identical with `cfgds`.
+    label : int, optional
+      Each discovered 'origin' will be configured as a remote under the name
+      'origin-<label>'. If no label is given, '2' will be used by default, given that
+      there is typically a 'origin' remote already.
+    """
     if label is None:
         label = 2
     # let's look at the URL for that remote and see if it is a local
     # dataset
-    origin_url = probds.config.get('remote.origin.url')
+    origin_url = probeds.config.get('remote.origin.url')
     if origin_url and cfgds.config.obtain(
             'datalad.install.inherit-local-origin',
             default=True) and isinstance(RI(origin_url), PathRI):
