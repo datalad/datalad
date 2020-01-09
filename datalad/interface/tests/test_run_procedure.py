@@ -34,7 +34,6 @@ from datalad.tests.utils import OBSCURE_FILENAME
 from datalad.tests.utils import on_windows
 from datalad.tests.utils import known_failure_windows
 from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import ok_file_under_git
 from datalad.distribution.dataset import Dataset
 from datalad.support.exceptions import (
     CommandError,
