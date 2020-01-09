@@ -58,7 +58,7 @@ only supported Python flavor.
   meant to provide longer-term stability. Application developers are encouraged to
   preferentially build on these commands.
 
-### Major refactoring and deprecations
+### Major refactoring and deprecations since 0.12.0rc6
 
 - The `get_file_content` method of `GitRepo` was no longer used
   internally or in any known DataLad extensions and has been removed.
@@ -90,7 +90,7 @@ only supported Python flavor.
   hook mechanism provides an alternative for `proc-post`
   procedures. ([#3963][])
 
-### Fixes
+### Fixes since 0.12.0rc6
 
 - [publish][] crashed when called with a detached HEAD.  It now aborts
   with an informative message.  ([#3804][])
@@ -134,7 +134,7 @@ only supported Python flavor.
   relative to the current directory in some cases.  It now always
   reports absolute paths. ([#3959][])
 
-### Enhancements and new features
+### Enhancements and new features since 0.12.0rc6
 
 - The new [result hooks mechanism][hooks] allows callers to specify,
   via local Git configuration values, DataLad command calls that will
