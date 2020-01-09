@@ -21,7 +21,7 @@ only supported Python flavor.
 ### Major changes 0.12 vs 0.11
 
 - [save][] fully replaces [add][] (which is obsolete now, and will be removed
-  in a future release.
+  in a future release).
 
 - A new Git-annex aware [status][] command enables detailed inspection of dataset
   hierarchies. The previously available [diff][] command has been adjusted to
