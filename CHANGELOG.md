@@ -134,6 +134,12 @@ only supported Python flavor.
   relative to the current directory in some cases.  It now always
   reports absolute paths. ([#3959][])
 
+- [diff][] inappropriately reported files as deleted in some cases
+  when `to` was a value other than `None`.  ([#3999][])
+
+- An assortment of fixes for Windows compatibility.  ([#3976][])
+  ([#3974][]) ([#3979][])
+
 ### Enhancements and new features since 0.12.0rc6
 
 - The new [result hooks mechanism][hooks] allows callers to specify,
@@ -188,10 +194,14 @@ only supported Python flavor.
     visiting a dataset.  ([#3888][])
   - outputs entries deterministically.  ([#3927][])
 
-- The `ConfigManager` class learned to exclude ``.datalad/config`` as
-  a source of configuration values, restricting the sources to
-  standard Git configuration files, when called with `source="local"`.
-  ([#3907][])
+- The `ConfigManager` class
+  - learned to exclude ``.datalad/config`` as a source of
+    configuration values, restricting the sources to standard Git
+    configuration files, when called with `source="local"`.
+    ([#3907][])
+  - accepts a value of "override" for its `where` argument to allow
+    Python callers to more convenient override configuration.
+    ([#3970][])
 
 - Commands now accept a `dataset` value of "^."  as shorthand for "the
   dataset to which the current directory belongs".  ([#3242][])
@@ -2272,3 +2282,8 @@ publishing
 [#3959]: https://github.com/datalad/datalad/issues/3959
 [#3960]: https://github.com/datalad/datalad/issues/3960
 [#3963]: https://github.com/datalad/datalad/issues/3963
+[#3970]: https://github.com/datalad/datalad/issues/3970
+[#3974]: https://github.com/datalad/datalad/issues/3974
+[#3976]: https://github.com/datalad/datalad/issues/3976
+[#3979]: https://github.com/datalad/datalad/issues/3979
+[#3999]: https://github.com/datalad/datalad/issues/3999
