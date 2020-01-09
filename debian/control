@@ -43,7 +43,7 @@ Build-Depends: debhelper (>= 9),
                python3-vcr,
                python3-whoosh,
                python3-wrapt
-Standards-Version: 4.3.0
+Standards-Version: 4.4.1
 Vcs-Browser: https://github.com/datalad/datalad/
 Vcs-Git: https://github.com/datalad/datalad -b debian
 Homepage: http://datalad.org
