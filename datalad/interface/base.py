@@ -574,7 +574,9 @@ class Interface(object):
                 # showing the Default: (likely boolean).
                 #   See https://github.com/datalad/datalad/issues/3203
                 if not parser_kwargs.get('action', '').startswith('store_'):
-                    help += " [Default: %r]" % (defaults[defaults_idx],)
+                    # [Default: None] also makes little sense for cmdline
+                    if defaults[defaults_idx] is not None:
+                        help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
             # conversion
             parser.add_argument(*parser_args, help=help,
