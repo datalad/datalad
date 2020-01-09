@@ -3546,6 +3546,13 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
+                        # at this point we know that the reported object ids
+                        # for this file are identical in the to and from
+                        # records.  If to is None, we're comparing to the
+                        # working tree and a deleted file will still have an
+                        # identical id, so we need to check whether the file is
+                        # gone before declaring it clean. This working tree
+                        # check is irrelevant and wrong if to is a ref.
                         state='clean' if to is not None or (f.exists() or \
                               f.is_symlink()) else 'deleted',
                         type=to_state_r['type'],
