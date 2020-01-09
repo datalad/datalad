@@ -1069,7 +1069,7 @@ class AggregateMetaData(Interface):
             return
         lgr.info('Attempting to save %i files/datasets', len(to_save))
         for res in Save.__call__(
-                # rev-save does not need any pre-annotated path hints
+                # save does not need any pre-annotated path hints
                 path=[r['path'] for r in to_save],
                 dataset=refds_path,
                 message='[DATALAD] Dataset aggregate metadata update',

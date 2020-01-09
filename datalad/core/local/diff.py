@@ -66,7 +66,7 @@ class Diff(Interface):
     difference report. As with Git's diff, it will not result in an error when
     a path is specified that does not exist on the filesystem.
 
-    Reports are very similar to those of the `rev-status` command, with the
+    Reports are very similar to those of the `status` command, with the
     distinguished content types and states being identical.
     """
     # make the custom renderer the default one, as the global default renderer
@@ -198,7 +198,7 @@ def _diff_cmd(
     # paradigm for this command. If we gather all information first, we
     # could do post-processing and detect when a file (same gitsha, or same
     # key) was copied/moved from another dataset. Another command (e.g.
-    # rev-save) could act on this information and also move/copy
+    # save) could act on this information and also move/copy
     # availability information or at least enhance the respective commit
     # message with cross-dataset provenance info
 
