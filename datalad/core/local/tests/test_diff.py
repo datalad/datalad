@@ -481,3 +481,31 @@ def test_diff_nonexistent_ref_unicode(path):
         1,
         path=ds.path,
         status="impossible")
+
+
+# https://github.com/datalad/datalad/issues/3997
+@with_tempfile(mkdir=True)
+def test_no_worktree_impact_false_deletions(path):
+    ds = Dataset(path).create()
+    # create a branch that has no new content
+    ds.repo.call_git(['checkout', '-b', 'test'])
+    # place to successive commits with file additions into the master branch
+    ds.repo.call_git(['checkout', 'master'])
+    (ds.pathobj / 'identical').write_text('should be')
+    ds.save()
+    (ds.pathobj / 'new').write_text('yes')
+    ds.save()
+    # now perform a diff for the last commit, there is one file that remained
+    # identifical
+    ds.repo.call_git(['checkout', 'test'])
+    res = ds.diff(fr='master~1', to='master')
+    # under no circumstances can there be any reports on deleted files
+    # because we never deleted anything
+    assert_result_count(res, 0, state='deleted')
+    # the identical file must be reported clean
+    assert_result_count(
+        ds.diff(fr='master~1', to='master'),
+        1,
+        state='clean',
+        path=str(ds.pathobj / 'identical'),
+    )
