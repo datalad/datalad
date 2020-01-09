@@ -94,6 +94,7 @@ class Update(Interface):
             reobtain_data=False):
         """
         """
+        from datalad.api import save
         if fetch_all is not None:
             lgr.warning('update(fetch_all=...) called. Option has no effect, and will be removed')
 
@@ -186,15 +187,18 @@ class Update(Interface):
             res['status'] = 'ok'
             yield res
             save_paths.append(ap['path'])
-        if recursive:
+        # we need to save updated states only if merge was requested -- otherwise
+        # it was a pure fetch
+        if merge and recursive:
             save_paths = [p for p in save_paths if p != refds_path]
             if not save_paths:
                 return
             lgr.debug(
                 'Subdatasets where updated state may need to be '
                 'saved in the parent dataset: %s', save_paths)
-            for r in Dataset(refds_path).add(
+            for r in save(
                     path=save_paths,
+                    dataset=refds_path,
                     recursive=False,
                     message='[DATALAD] Save updated subdatasets'):
                 yield r
