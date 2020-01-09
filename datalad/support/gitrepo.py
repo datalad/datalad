@@ -3546,8 +3546,8 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
-                        state='clean' if f.exists() or \
-                              f.is_symlink() else 'deleted',
+                        state='clean' if to is not None or (f.exists() or \
+                              f.is_symlink()) else 'deleted',
                         type=to_state_r['type'],
                     )
                 else:
