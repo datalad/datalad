@@ -504,7 +504,7 @@ def test_no_worktree_impact_false_deletions(path):
     assert_result_count(res, 0, state='deleted')
     # the identical file must be reported clean
     assert_result_count(
-        ds.diff(fr='master~1', to='master'),
+        res,
         1,
         state='clean',
         path=str(ds.pathobj / 'identical'),
