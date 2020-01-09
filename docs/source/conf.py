@@ -14,7 +14,6 @@
 
 import sys
 import os
-import shlex
 import datetime
 from os.path import join as opj, exists
 from os import pardir
