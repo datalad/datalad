@@ -104,7 +104,7 @@ from .network import (
 )
 from .path import get_parent_paths
 from .repo import (
-    Flyweight,
+    PathBasedFlyweight,
     RepoInterface
 )
 
@@ -516,7 +516,7 @@ class GitPythonProgressBar(RemoteProgress):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-class GitRepo(RepoInterface, metaclass=Flyweight):
+class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
@@ -532,39 +532,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     # Begin Flyweight:
 
     _unique_instances = WeakValueDictionary()
-
-    @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
-
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-        # resolve symlinks to make sure we have exactly one instance per
-        # physical repository at a time
-        path = realpath(path)
-        kwargs['path'] = path
-        return path, args, kwargs
 
     def _flyweight_invalid(self):
         return not self.is_valid_git()
