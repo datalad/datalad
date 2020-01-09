@@ -234,7 +234,6 @@ def test_clone_isnot_recursive(src, path_nr, path_r):
         {'subm 1', '2'})
 
 
-
 @slow  # 23.1478s
 @with_testrepos(flavors=['local'])
 # 'local-url', 'network'
@@ -437,7 +436,7 @@ def test_expanduser(srcpath, destpath):
     dest = Dataset(Path(destpath) / 'dest').create()
 
     with chpwd(destpath), patch.dict('os.environ', {'HOME': srcpath}):
-        res = clone('~/src', 'dest', result_xfm=None, return_type='list',
+        res = clone(op.join('~', 'src'), 'dest', result_xfm=None, return_type='list',
                     on_failure='ignore')
         assert_result_count(res, 1)
         assert_result_count(
