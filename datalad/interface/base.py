@@ -570,7 +570,11 @@ class Interface(object):
                     cdoc = cdoc[1:-1]
                 help += '  Constraints: %s' % cdoc
             if defaults_idx >= 0:
-                help += " [Default: %r]" % (defaults[defaults_idx],)
+                # if it is a flag, in commandline it makes little sense to show
+                # showing the Default: (likely boolean).
+                #   See https://github.com/datalad/datalad/issues/3203
+                if not parser_kwargs.get('action', '').startswith('store_'):
+                    help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
             # conversion
             parser.add_argument(*parser_args, help=help,
