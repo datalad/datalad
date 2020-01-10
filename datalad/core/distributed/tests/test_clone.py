@@ -480,3 +480,18 @@ def test_cfg_originorigin(path):
             return_type='item-or-list')['url']),
         origin.pathobj
     )
+
+
+# test fix for gh-2601/gh-3538
+@with_tempfile()
+def test_relative_submodule_url(path):
+    Dataset(op.join(path, 'origin')).create()
+    ds = Dataset(op.join(path, 'ds')).create()
+    with chpwd(ds.path):
+        ds.clone(
+            source=op.join(op.pardir, 'origin'),
+            path='sources')
+    subinfo = ds.subdatasets(return_type='item-or-list')
+    eq_(subinfo['gitmodule_url'],
+        # must be a relative URL, not platform-specific relpath!
+        '{}/{}'.format(op.pardir, 'origin'))
