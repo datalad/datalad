@@ -14,7 +14,7 @@
 
 import sys
 import os
-import shlex
+import datetime
 from os.path import join as opj, exists
 from os import pardir
 from glob import glob
@@ -95,8 +95,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
+current_year = datetime.datetime.now().year
 project = u'DataLad'
-copyright = u'2016-2019, DataLad team'
+copyright = (u'2016-{}, DataLad team').format(current_year)
 author = u'DataLad team'
 
 # The version info for the project you're documenting, acts as replacement for

@@ -10,7 +10,6 @@
 """
 
 import logging
-import os.path as op
 from os.path import (
     curdir,
     exists,
@@ -36,9 +35,10 @@ from datalad.support.gitrepo import (
     InvalidGitRepositoryError,
     NoSuchPathError
 )
-from datalad.support.repo import Flyweight
+from datalad.support.repo import PathBasedFlyweight
 from datalad.support.network import RI
 from datalad.support.exceptions import InvalidAnnexRepositoryError
+from datalad.support import path as op
 
 import datalad.utils as ut
 from datalad.utils import (
@@ -58,7 +58,7 @@ lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 
-class Dataset(object, metaclass=Flyweight):
+class Dataset(object, metaclass=PathBasedFlyweight):
     """Representation of a DataLad dataset/repository
 
     This is the core data type of DataLad: a representation of a dataset.
@@ -82,29 +82,8 @@ class Dataset(object, metaclass=Flyweight):
     _unique_instances = WeakValueDictionary()
 
     @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
-
-        # Custom handling for few special abbreviations
+    def _flyweight_preproc_path(cls, path):
+        """Custom handling for few special abbreviations for datasets"""
         path_ = path
         if path == '^':
             # get the topmost dataset from current location. Note that 'zsh'
@@ -120,20 +99,16 @@ class Dataset(object, metaclass=Flyweight):
             path_ = cfg.obtain('datalad.locations.default-dataset')
         if path != path_:
             lgr.debug("Resolved dataset alias %r to path %r", path, path_)
+        return path_
 
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path_ = RI(path_).localpath
-
+    @classmethod
+    def _flyweight_postproc_path(cls, path):
         # we want an absolute path, but no resolved symlinks
-        if not isabs(path_):
-            path_ = opj(getpwd(), path_)
+        if not op.isabs(path):
+            path = op.join(op.getpwd(), path)
 
         # use canonical paths only:
-        path_ = normpath(path_)
-        kwargs['path'] = path_
-        return path_, args, kwargs
+        return op.normpath(path)
 
     def _flyweight_invalid(self):
         """Invalidation of Flyweight instance
@@ -142,7 +117,6 @@ class Dataset(object, metaclass=Flyweight):
         Dataset itself can represent a not yet existing path.
         """
         return False
-
     # End Flyweight
 
     def __hash__(self):

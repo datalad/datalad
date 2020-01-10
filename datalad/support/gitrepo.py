@@ -104,7 +104,7 @@ from .network import (
 )
 from .path import get_parent_paths
 from .repo import (
-    Flyweight,
+    PathBasedFlyweight,
     RepoInterface
 )
 
@@ -516,7 +516,7 @@ class GitPythonProgressBar(RemoteProgress):
 Submodule = namedtuple("Submodule", ["name", "path", "url"])
 
 
-class GitRepo(RepoInterface, metaclass=Flyweight):
+class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
     """Representation of a git repository
 
     """
@@ -532,39 +532,6 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
     # Begin Flyweight:
 
     _unique_instances = WeakValueDictionary()
-
-    @classmethod
-    def _flyweight_id_from_args(cls, *args, **kwargs):
-
-        if args:
-            # to a certain degree we need to simulate an actual call to __init__
-            # and make sure, passed arguments are fitting:
-            # TODO: Figure out, whether there is a cleaner way to do this in a
-            # generic fashion
-            assert('path' not in kwargs)
-            path = args[0]
-            args = args[1:]
-        elif 'path' in kwargs:
-            path = kwargs.pop('path')
-        else:
-            raise TypeError("__init__() requires argument `path`")
-
-        if path is None:
-            raise AttributeError
-
-        # mirror what is happening in __init__
-        if isinstance(path, ut.PurePath):
-            path = str(path)
-
-        # Sanity check for argument `path`:
-        # raise if we cannot deal with `path` at all or
-        # if it is not a local thing:
-        path = RI(path).localpath
-        # resolve symlinks to make sure we have exactly one instance per
-        # physical repository at a time
-        path = realpath(path)
-        kwargs['path'] = path
-        return path, args, kwargs
 
     def _flyweight_invalid(self):
         return not self.is_valid_git()
@@ -3225,7 +3192,7 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 pass
             else:
                 raise ValueError(
-                    'unknown value for `untracked`: %s', untracked)
+                    'unknown value for `untracked`: {}'.format(untracked))
             props_re = re.compile(
                 r'(?P<type>[0-9]+) (?P<sha>.*) (.*)\t(?P<fname>.*)$')
 
@@ -3546,8 +3513,15 @@ class GitRepo(RepoInterface, metaclass=Flyweight):
                 if to_state_r['type'] != 'dataset':
                     # no change in git record, and no change on disk
                     props = dict(
-                        state='clean' if f.exists() or \
-                              f.is_symlink() else 'deleted',
+                        # at this point we know that the reported object ids
+                        # for this file are identical in the to and from
+                        # records.  If to is None, we're comparing to the
+                        # working tree and a deleted file will still have an
+                        # identical id, so we need to check whether the file is
+                        # gone before declaring it clean. This working tree
+                        # check is irrelevant and wrong if to is a ref.
+                        state='clean' if to is not None or (f.exists() or \
+                              f.is_symlink()) else 'deleted',
                         type=to_state_r['type'],
                     )
                 else:

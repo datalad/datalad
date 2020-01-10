@@ -10,7 +10,7 @@ ds = require_dataset(
     check_installed=True,
     purpose='configuration')
 
-annex_largefiles = '(not(mimetype=text/*)and(largerthan=0))'
+annex_largefiles = '((mimeencoding=binary)and(largerthan=0))'
 attrs = ds.repo.get_gitattributes('*')
 if not attrs.get('*', {}).get(
         'annex.largefiles', None) == annex_largefiles:
