@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from mock import patch
+from unittest.mock import patch
 import os
 import os.path as op
 import sys
@@ -16,9 +16,6 @@ import re
 import logging
 import glob
 from time import sleep
-
-from datalad.tests.utils import known_failure_direct_mode
-
 
 from ..archives import (
     ArchiveAnnexCustomRemote,
@@ -35,7 +32,6 @@ from ...tests.utils import (
     abspath,
     chpwd,
     get_most_obscure_supported_name,
-    with_direct,
     with_tempfile,
     with_tree,
     eq_,
@@ -50,6 +46,7 @@ from ...tests.utils import (
     swallow_outputs,
     swallow_logs,
     serve_path_via_http,
+    known_failure_githubci_win,
 )
 from ...cmd import Runner, GitRunner
 from ...utils import (
@@ -73,16 +70,16 @@ from ...tests.test_archives import (
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
-@with_direct
+@known_failure_githubci_win
 @with_tree(
     tree=(('a.tar.gz', {'d': {fn_in_archive_obscure: '123'}}),
           ('simple.txt', '123'),
           (fn_archive_obscure_ext, (('d', ((fn_in_archive_obscure, '123'),)),)),
           (fn_archive_obscure, '123')))
 @with_tempfile()
-def test_basic_scenario(direct, d, d2):
+def test_basic_scenario(d, d2):
     fn_archive, fn_extracted = fn_archive_obscure_ext, fn_archive_obscure
-    annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
+    annex = AnnexRepo(d, runner=_get_custom_runner(d))
     annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
@@ -134,9 +131,7 @@ def test_basic_scenario(direct, d, d2):
     annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_annex = AnnexRepo.clone(d, d2,
-                                   runner=_get_custom_runner(d2),
-                                   direct=direct)
+    cloned_annex = AnnexRepo.clone(d, d2, runner=_get_custom_runner(d2))
     # we still need to enable manually atm that special remote for archives
     # cloned_annex.enable_remote('annexed-archives')
 
@@ -163,10 +158,10 @@ def test_basic_scenario(direct, d, d2):
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
 
 
+@known_failure_githubci_win
 @with_tree(
     tree={'a.tar.gz': {'d': {fn_in_archive_obscure: '123'}}}
 )
-@known_failure_direct_mode  #FIXME
 def test_annex_get_from_subdir(topdir):
     from datalad.api import add_archive_content
     annex = AnnexRepo(topdir, init=True)
@@ -183,6 +178,7 @@ def test_annex_get_from_subdir(topdir):
         assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
+@known_failure_githubci_win
 def test_get_git_environ_adjusted():
     gitrunner = GitRunner()
     env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
@@ -274,12 +270,13 @@ def test_interactions(tdir):
 def check_observe_tqdm(topdir, topurl, outdir):
     # just a helper to enable/use when want quickly to get some
     # repository with archives and observe tqdm
-    from datalad.api import create, add_archive_content
+    from datalad.api import add_archive_content
+    from datalad.api import create
     ds = create(outdir)
     for f in '1.tar.gz', '2.tar.gz':
         with chpwd(outdir):
             ds.repo.add_url_to_file(f, topurl + f)
-            ds.add(f)
+            ds.save(f)
             add_archive_content(f, delete=True, drop_after=True)
     files = glob.glob(op.join(outdir, '*'))
     ds.drop(files) # will not drop tarballs
@@ -293,6 +290,7 @@ def check_observe_tqdm(topdir, topurl, outdir):
         sleep(0.1)
 
 
+@known_failure_githubci_win
 @with_tempfile
 def test_link_file_load(tempfile):
     tempfile2 = tempfile + '_'

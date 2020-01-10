@@ -18,6 +18,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 import sys
+import tempfile
 
 from datalad.support.param import Parameter
 from datalad.interface.base import Interface
@@ -72,7 +73,7 @@ class SSHRun(Interface):
             args=("-n",),
             action="store_true",
             dest="no_stdin",
-            doc="Redirect stdin from /dev/null"),
+            doc="Do not connect stdin to the process"),
     )
 
     @staticmethod
@@ -112,8 +113,8 @@ class SSHRun(Interface):
             force_ip = None
 
         ssh = ssh_manager.get_connection(sshurl, force_ip=force_ip)
-        # TODO: /dev/null on windows ;)  or may be could be just None?
-        stdin_ = open('/dev/null', 'r') if no_stdin else sys.stdin
+        # use an empty temp file as stdin if none shall be connected
+        stdin_ = tempfile.TemporaryFile() if no_stdin else sys.stdin
         try:
             out, err = ssh(cmd, stdin=stdin_, log_output=False,
                            options=options)

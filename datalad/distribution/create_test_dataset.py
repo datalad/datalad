@@ -84,7 +84,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
 
     """
     # we apparently can't import api functionality within api
-    from datalad.api import add
+    from datalad.api import save
     # To simplify managing all the file paths etc
     if not isabs(path):
         path = abspath(path)
@@ -119,7 +119,7 @@ def _makeds(path, levels, ds=None, max_leading_dirs=2):
 
     if ds:
         assert ds.is_installed()
-        out = add(
+        out = save(
             path,
             dataset=ds,
         )

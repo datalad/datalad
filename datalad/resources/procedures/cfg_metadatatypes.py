@@ -27,9 +27,6 @@ for nt in sys.argv[2:]:
         reload=False)
 
 ds.save(
-    path=[dict(
-        path=op.join(ds.path, DATASET_CONFIG_FILE),
-        type='file',
-        parentds=ds.path)],
+    path=op.join(ds.path, DATASET_CONFIG_FILE),
     message="Configure metadata type(s)",
 )

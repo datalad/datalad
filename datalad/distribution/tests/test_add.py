@@ -10,7 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import logging
 import os
@@ -34,11 +33,13 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
+from datalad.tests.utils import assert_repo_status
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import skip_if_on_windows
 from datalad.tests.utils import create_tree
 from datalad.tests.utils import OBSCURE_FILENAME
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import chpwd
 
 from ..dataset import Dataset
@@ -86,6 +87,7 @@ tree_arg = dict(tree={'test.txt': 'some',
                       'dir2': {'testindir3': 'someother3'}})
 
 
+@known_failure_githubci_win
 @with_tree(**tree_arg)
 def test_add_files(path):
     ds = Dataset(path)
@@ -137,13 +139,17 @@ def test_add_files(path):
         ok_(unstaged.isdisjoint(indexed))
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_known_submodule(path):
     def get_baseline(p):
         ds = Dataset(p).create()
-        sub = ds.create('sub', save=False)
-        # subdataset saw another commit after becoming a submodule
+        with chpwd(ds.path):
+            subds = create('sub')
+        ds.add('sub', save=False)
+        create_tree(subds.path, {"staged": ""})
+        subds.add("staged", save=False)
+        # subdataset has staged changes.
         ok_clean_git(ds.path, index_modified=['sub'])
         return ds
     # attempt one
@@ -158,8 +164,8 @@ def test_update_known_submodule(path):
     ok_clean_git(ds.path)
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_add_recursive(path):
     # make simple hierarchy
     parent = Dataset(path).create()
@@ -190,11 +196,11 @@ def test_add_recursive(path):
     ok_clean_git(parent.path)
 
 
+@known_failure_githubci_win
 @with_tree(**tree_arg)
-@known_failure_direct_mode  #FIXME
 def test_add_dirty_tree(path):
     ds = Dataset(path)
-    ds.create(force=True, save=False)
+    ds.create(force=True)
     subds = ds.create('dir', force=True)
     ok_(subds.repo.dirty)
 
@@ -348,7 +354,6 @@ def test_add_source(path, url, ds_dir):
 
 @with_tree(**tree_arg)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_add_subdataset(path, other):
     subds = create(opj(path, 'dir'), force=True)
     ds = create(path, force=True)
@@ -379,13 +384,13 @@ def test_add_subdataset(path, other):
     ok_(other_clone.is_installed)
 
 
+@known_failure_githubci_win
 @with_tree(tree={
     'file.txt': 'some text',
     'empty': '',
     'file2.txt': 'some text to go to annex',
     '.gitattributes': '* annex.largefiles=(not(mimetype=text/*))'}
 )
-@known_failure_direct_mode  #FIXME
 def test_add_mimetypes(path):
     # XXX apparently there is symlinks dereferencing going on while deducing repo
     #    type there!!!! so can't use following invocation  -- TODO separately
@@ -426,22 +431,25 @@ def test_gh1597_simpler(path):
 
 
 # Failed to run ['git', '--work-tree=.', 'diff', '--raw', '-z', '--ignore-submodules=none', '--abbrev=40', 'HEAD', '--'] This operation must be run in a work tree
-@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_gh1597(path):
     ds = Dataset(path).create()
-    sub = ds.create('sub', save=False)
+    with chpwd(ds.path):
+        sub = create('sub')
+    ds.add('sub', save=False)
     # only staged at this point, but known, and not annexed
     ok_file_under_git(ds.path, '.gitmodules', annexed=False)
     res = ds.subdatasets()
     assert_result_count(res, 1, path=sub.path)
     # now modify .gitmodules with another command
     ds.subdatasets(contains=sub.path, set_property=[('this', 'that')])
-    ok_clean_git(ds.path, index_modified=['sub'])
+    assert_repo_status(ds.path, added=[sub.path])
     # now modify low-level
     with open(opj(ds.path, '.gitmodules'), 'a') as f:
         f.write('\n')
-    ok_clean_git(ds.path, index_modified=['.gitmodules', 'sub'])
+    assert_repo_status(ds.path,
+                       modified=[ds.pathobj / ".gitmodules"],
+                       added=[sub.path])
     ds.add('.gitmodules')
     # must not come under annex mangement
     ok_file_under_git(ds.path, '.gitmodules', annexed=False)
@@ -457,3 +465,13 @@ def test_bf2541(path):
     with chpwd(ds.path):
         res = add('.', recursive=True)
     ok_clean_git(ds.path)
+
+
+@with_tree(tree={'foobert': ''})
+def test_add_string_dataset_arg(path):
+    ds = create(path, force=True)
+    assert_repo_status(ds.path, untracked=["foobert"])
+    # We don't fail if a string, rather than dataset instance, is passed.
+    with chpwd(ds.path):
+        add(dataset=".", path=".")
+    assert_repo_status(ds.path)

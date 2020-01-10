@@ -13,10 +13,6 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from six.moves import (
-    filter,
-    map,
-)
 
 from os import makedirs
 from os import listdir
@@ -37,7 +33,7 @@ from datalad.interface.utils import (
     eval_results,
     discover_dataset_trace_to_targets,
 )
-from datalad.interface.save import Save
+from datalad.core.local.save import Save
 from datalad.interface.base import build_doc
 from datalad.interface.common_opts import (
     recursion_limit,
@@ -407,10 +403,7 @@ def _dump_extracted_metadata(agginto_ds, aggfrom_ds, db, to_save, force_extracti
         # make sure all the to-be-moved metadata records are present
         # locally
         aggfrom_ds.get(
-            # prep annotated path records to speed up the call
-            path=[dict(path=op.join(aggfrom_ds.path, p),
-                       parentds=aggfrom_ds.path,
-                       type='file')
+            path=[op.join(aggfrom_ds.path, p)
                   for p in objrelpaths.values()],
             result_renderer='disabled')
 
@@ -576,7 +569,7 @@ def _get_latest_refcommit(ds, subds_relpaths):
     if not relevant_paths:
         return None
 
-    return ds.repo.get_last_commit_hash(relevant_paths)
+    return ds.repo.get_last_commit_hexsha(relevant_paths)
 
 
 def _get_obj_location(hash_str, ref_type, dumper):
@@ -1076,7 +1069,8 @@ class AggregateMetaData(Interface):
             return
         lgr.info('Attempting to save %i files/datasets', len(to_save))
         for res in Save.__call__(
-                path=to_save,
+                # save does not need any pre-annotated path hints
+                path=[r['path'] for r in to_save],
                 dataset=refds_path,
                 message='[DATALAD] Dataset aggregate metadata update',
                 return_type='generator',

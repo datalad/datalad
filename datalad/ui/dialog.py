@@ -24,10 +24,9 @@ import time
 import getpass
 
 #!!! OPT adds >100ms to import time!!!
-# from mock import patch
+# from unittest.mock import patch
 from collections import deque
 from copy import copy
-from six import PY2
 
 from ..utils import auto_repr
 from ..utils import on_windows
@@ -145,7 +144,7 @@ def getpass_echo(prompt='Password', stream=None):
         #     if out == '\n':
         #         return
         #     stream.write(out)
-        from mock import patch
+        from unittest.mock import patch
         with patch('termios.ECHO', 255 ** 2):
             #patch.object(stream, 'write', _no_emptyline_write(stream)):
             return getpass.getpass(prompt=prompt, stream=stream)
@@ -277,7 +276,7 @@ class IPythonUI(DialogUI):
         if not hidden:
             self.out.write(prompt)
             self.out.flush()
-            return (raw_input if PY2 else input)()
+            return input()
         else:
             return getpass.getpass(prompt=prompt)
 

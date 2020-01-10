@@ -308,15 +308,6 @@ eval_params = dict(
         that carries the result dictionaries of the failures in its `failed`
         attribute.""",
         constraints=EnsureChoice('ignore', 'continue', 'stop')),
-    proc_pre=Parameter(
-        doc="""DataLad procedure to run prior to the main command. The argument
-        a list of lists with procedure names and optional arguments.
-        Procedures are called in the order their are given in this list.
-        It is important to provide the respective target dataset to run a procedure
-        on as the `dataset` argument of the main command."""),
-    proc_post=Parameter(
-        doc="""Like `proc_pre`, but procedures are executed after the main command
-        has finished."""),
 )
 
 eval_defaults = dict(
@@ -325,6 +316,4 @@ eval_defaults = dict(
     result_renderer=None,
     result_xfm=None,
     on_failure='continue',
-    proc_pre=None,
-    proc_post=None,
 )

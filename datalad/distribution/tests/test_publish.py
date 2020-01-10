@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import logging
@@ -47,6 +46,7 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import with_tree
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import skip_if_on_windows
+from datalad.tests.utils import known_failure_windows
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -102,10 +102,11 @@ def test_smth_about_not_supported(p1, p2):
         publish(to='target1', since='HEAD^')  # must not fail now
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:571
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_publish_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -146,8 +147,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.add(opj(src_path, 'test_mod_file'), to_git=True,
-               message="Modified.")
+    source.save(opj(src_path, 'test_mod_file'), to_git=True,
+                message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
     res = publish(dataset=source, to='target', result_xfm='datasets')
@@ -163,6 +164,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # see https://github.com/datalad/datalad/issues/1319
     ok_(set(source.repo.get_branch_commits("git-annex")).issubset(
         set(target.get_branch_commits("git-annex"))))
+
+    eq_(source.repo.fsck(), source.repo.fsck(remote='target'))
 
 
 @with_testrepos('basic_git', flavors=['local'])
@@ -203,7 +206,7 @@ def test_publish_plain_git(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.add(opj(src_path, 'test_mod_file'), to_git=True,
+    source.save(opj(src_path, 'test_mod_file'), to_git=True,
                message="Modified.")
     ok_clean_git(source.repo, annex=None)
 
@@ -224,13 +227,14 @@ def test_publish_plain_git(origin, src_path, dst_path):
     eq_(res, [source])
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:380
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub1_pub, sub2_pub):
 
     # we will be publishing back to origin, so to not alter testrepo
@@ -336,12 +340,12 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     # add to subdataset, does not alter super dataset!
     # MIH: use `to_git` because original test author used
     # and explicit `GitRepo.add` -- keeping this for now
-    Dataset(sub2.path).add('file.txt', to_git=True)
+    Dataset(sub2.path).save('file.txt', to_git=True)
 
     # Let's now update one subm
     create_tree(sub2.path, {'file.dat': 'content'})
     # add to subdataset, without reflecting the change in its super(s)
-    Dataset(sub2.path).add('file.dat')
+    Dataset(sub2.path).save('file.dat')
 
     # note: will publish to origin here since that is what it tracks
     res_ = publish(dataset=source, recursive=True, on_failure='ignore')
@@ -390,14 +394,18 @@ def test_publish_recursive(pristine_origin, origin_path, src_path, dst_path, sub
     assert_status(('ok', 'notneeded'), res_)
     assert_result_count(res_, 1, status='ok', path=source.path, type='dataset')
 
+    # Don't fail when a string is passed as `dataset` and since="".
+    assert_status("notneeded", publish(since='', dataset=source.path))
 
+
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:452
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_clone_path):
 
     # prepare src
@@ -483,6 +491,13 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
     res = source.publish(to="target")
     assert_result_count(res, 1, status='notneeded', path=source.path)
 
+    # data integrity check looks identical from all perspectives
+    # minus "note" statements from git-annex
+    eq_(source.repo.fsck(),
+        [{k: v for k, v in i.items() if k != 'note'}
+         for i in source.repo.fsck(remote='target')])
+    eq_(target.fsck(), source.repo.fsck(remote='target'))
+
 
 @skip_if_on_windows  # create_sibling incompatible with win servers
 @skip_ssh
@@ -491,7 +506,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub, dst_c
 @with_tempfile()
 @with_tempfile()
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_publish_depends(
         origin,
         src_path,
@@ -542,7 +556,7 @@ def test_publish_depends(
     ok_clean_git(src_path)
     # introduce change in source
     create_tree(src_path, {'probe1': 'probe1'})
-    source.add('probe1')
+    source.save('probe1')
     ok_clean_git(src_path)
     # only the source has the probe
     ok_file_has_content(opj(src_path, 'probe1'), 'probe1')
@@ -569,9 +583,9 @@ def test_publish_depends(
         ok_file_has_content(opj(p, 'probe1'), 'probe1')
 
 
+@known_failure_windows
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_gh1426(origin_path, target_path):
     # set up a pair of repos, one the published copy of the other
     origin = create(origin_path)
@@ -610,7 +624,7 @@ def test_publish_gh1691(origin, src_path, dst_path):
 
     # some content modification of the superdataset
     create_tree(src_path, {'probe1': 'probe1'})
-    source.add('probe1')
+    source.save('probe1')
     ok_clean_git(src_path)
 
     # create the target(s):
@@ -633,11 +647,10 @@ def test_publish_gh1691(origin, src_path, dst_path):
 @with_tree(tree={'1': '123'})
 @with_tempfile(mkdir=True)
 @serve_path_via_http
-@known_failure_direct_mode  #FIXME
 def test_publish_target_url(src, desttop, desturl):
     # https://github.com/datalad/datalad/issues/1762
     ds = Dataset(src).create(force=True)
-    ds.add('1')
+    ds.save('1')
     ds.create_sibling('ssh://localhost:%s/subdir' % desttop,
                       name='target',
                       target_url=desturl + 'subdir/.git')
@@ -651,7 +664,6 @@ def test_publish_target_url(src, desttop, desturl):
 @with_tempfile(mkdir=True)
 @with_tempfile()
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_gh1763(src, target1, target2):
     # this test is very similar to test_publish_depends, but more
     # comprehensible, and directly tests issue 1763
@@ -665,7 +677,7 @@ def test_gh1763(src, target1, target2):
         publish_depends='target1')
     # a file to annex
     create_tree(src.path, {'probe1': 'probe1'})
-    src.add('probe1', to_git=False)
+    src.save('probe1', to_git=False)
     # make sure the probe is annexed, not straight in Git
     assert_in('probe1', src.repo.get_annexed_files(with_content_only=True))
     # publish to target2, must handle dependency
@@ -674,3 +686,22 @@ def test_gh1763(src, target1, target2):
         assert_in(
             'probe1',
             Dataset(target).repo.get_annexed_files(with_content_only=True))
+
+
+@with_tempfile()
+@with_tempfile()
+def test_gh1811(srcpath, clonepath):
+    orig = Dataset(srcpath).create()
+    (orig.pathobj / 'some').write_text('some')
+    orig.save()
+    clone = install(source=orig.path, path=clonepath)
+    (clone.pathobj / 'somemore').write_text('somemore')
+    clone.save()
+    clone.repo.call_git(['checkout', 'HEAD~1'])
+    res = clone.publish(to='origin', on_failure='ignore')
+    assert_result_count(res, 1)
+    assert_result_count(
+        res, 1,
+        path=clone.path, type='dataset', action='publish',
+        status='impossible',
+        message=('Cannot determine remote branch name from %s', 'HEAD'))

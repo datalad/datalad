@@ -11,12 +11,11 @@
 
 from glob import glob
 from logging import getLogger
-from six import iteritems
 
 import os
 import re
 from os.path import dirname, abspath, join as pathjoin
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 from collections import OrderedDict
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
@@ -327,9 +326,15 @@ class Providers(object):
         matching_providers = []
         for provider in self._providers[::-1]:
             for url_re in provider.url_res:
-                if re.match(url_re, url):
-                    lgr.debug("Returning provider %s for url %s", provider, url)
-                    matching_providers.append(provider)
+                try:
+                    if re.match(url_re, url):
+                        lgr.debug("Returning provider %s for url %s", provider, url)
+                        matching_providers.append(provider)
+                except re.error:
+                    lgr.warning(
+                        "Invalid regex %s in provider %s"
+                        % (url_re, provider.name)
+                    )
 
         if matching_providers:
             if return_all:

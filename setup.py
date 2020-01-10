@@ -13,7 +13,10 @@ from os.path import (
 from _datalad_build_support.setup import (
     BuildConfigInfo,
     BuildManPage,
-    BuildRSTExamplesFromScripts,
+    # no longer needed, all scenario docs are in the handbook now
+    # keeping the original examples here only to be able to execute them
+    # as part of the tests
+    #BuildRSTExamplesFromScripts,
     BuildSchema,
     setup_entry_points,
     findsome,
@@ -31,9 +34,7 @@ requires = {
         'iso8601',
         'humanize',
         'fasteners',
-        'mock>=1.0.1',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'six>=1.8.0',
         'tqdm',
         'wrapt',
     ],
@@ -57,17 +58,10 @@ requires = {
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.8.14',
-        'mock',
         'nose>=1.3.4',
         'vcrpy',
     ],
     'metadata': [
-        # lzma is included in python since 3.3
-        # We now support backports.lzma as well (besides AutomagicIO), but since
-        # there is not way to define an alternative here (AFAIK, yoh), we will
-        # use pyliblzma as the default for now.  Patch were you would prefer
-        # backports.lzma instead
-        'pyliblzma; python_version < "3.3"',
         'simplejson',
         'whoosh',
     ],
@@ -95,7 +89,8 @@ requires.update({
         'sphinx-rtd-theme',
     ],
     'devel-utils': [
-        'asv',
+        'asv',        # benchmarks
+        'gprof2dot',  # rendering cProfile output as a graph image
         'nose-timer',
         'psutil',
         'coverage',
@@ -121,7 +116,7 @@ requires['devel'] = sum(list(requires.values()), [])
 
 cmdclass = {
     'build_manpage': BuildManPage,
-    'build_examples': BuildRSTExamplesFromScripts,
+    # 'build_examples': BuildRSTExamplesFromScripts,
     'build_cfginfo': BuildConfigInfo,
     'build_schema': BuildSchema,
     # 'build_py': DataladBuild
@@ -154,12 +149,37 @@ entry_points.update({
     ]})
 setup_kwargs['entry_points'] = entry_points
 
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: Console',
+    'Intended Audience :: Developers',
+    'Intended Audience :: Education',
+    'Intended Audience :: End Users/Desktop',
+    'Intended Audience :: Science/Research',
+    'License :: DFSG approved',
+    'License :: OSI Approved :: MIT License',
+    'Natural Language :: English',
+    'Operating System :: POSIX',
+    'Programming Language :: Python :: 3 :: Only',
+    'Programming Language :: Unix Shell',
+    'Topic :: Communications :: File Sharing',
+    'Topic :: Education',
+    'Topic :: Internet',
+    'Topic :: Other/Nonlisted Topic',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+    'Topic :: Software Development :: Version Control :: Git',
+    'Topic :: Utilities',
+]
+setup_kwargs['classifiers'] = classifiers
+
 datalad_setup(
     'datalad',
     description="data distribution geared toward scientific datasets",
     install_requires=
         requires['core'] + requires['downloaders'] +
         requires['publish'] + requires['metadata'],
+    python_requires='>=3.5',
     extras_require=requires,
     cmdclass=cmdclass,
     package_data={

@@ -9,33 +9,56 @@
 
 import logging
 
-from os.path import join as opj
+import os
+from os.path import (
+    join as opj,
+    isabs,
+)
 from collections import OrderedDict
 
-from datalad.tests.utils import eq_, neq_, ok_, nok_, assert_raises
-from datalad.tests.utils import skip_if_on_windows
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_re_in
-from datalad.tests.utils import assert_in
-from datalad.tests.utils import get_most_obscure_supported_name
-from datalad.tests.utils import SkipTest
+from datalad.distribution.dataset import Dataset
 
-from ..network import same_website, dlurljoin
-from ..network import get_tld
-from ..network import get_url_straight_filename
-from ..network import get_response_disposition_filename
-from ..network import parse_url_opts
-from ..network import RI
-from ..network import SSHRI
-from ..network import PathRI
-from ..network import DataLadRI
-from ..network import URL
-from ..network import _split_colon
-from ..network import is_url
-from ..network import is_datalad_compat_ri
-from ..network import get_local_file_url
-from ..network import is_ssh
-from ..network import iso8601_to_epoch
+from datalad.utils import (
+    Path,
+    PurePosixPath,
+    on_windows,
+)
+
+from datalad.tests.utils import (
+    eq_,
+    neq_,
+    ok_,
+    nok_,
+    assert_raises,
+    skip_if_on_windows,
+    swallow_logs,
+    assert_in,
+    get_most_obscure_supported_name,
+    SkipTest,
+    known_failure_githubci_win,
+    with_tempfile,
+    assert_status,
+)
+
+from datalad.support.network import (
+    same_website,
+    dlurljoin,
+    get_tld,
+    get_url_straight_filename,
+    get_response_disposition_filename,
+    parse_url_opts,
+    RI,
+    SSHRI,
+    PathRI,
+    DataLadRI,
+    URL,
+    _split_colon,
+    is_url,
+    is_datalad_compat_ri,
+    get_local_file_url,
+    is_ssh,
+    iso8601_to_epoch,
+)
 
 
 def test_same_website():
@@ -132,7 +155,8 @@ def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
         murl = RI(ri)
         eq_(murl.__class__, cls)  # not just a subclass
         eq_(murl, ri_)
-        eq_(str(RI(ri)), ri)
+        if isinstance(ri, str):
+            eq_(str(RI(ri)), ri)
         eq_(eval(repr(ri_)), ri)  # repr leads back to identical ri_
         eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
@@ -189,6 +213,7 @@ def test_url_base():
         eq_(purl.as_str(), 'http://example.com/')
 
 
+@known_failure_githubci_win
 def test_url_samples():
     _check_ri("http://example.com", URL, scheme='http', hostname="example.com")
     # "complete" one for classical http
@@ -254,6 +279,8 @@ def test_url_samples():
     # and now implicit paths or actually they are also "URI references"
     _check_ri("f", PathRI, localpath='f', path='f')
     _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
+    _check_ri(PurePosixPath("f"), PathRI, localpath='f', path='f', exact_str=False)
+    _check_ri(PurePosixPath("f/s1"), PathRI, localpath='f/s1', path='f/s1', exact_str=False)
     # colons are problematic and might cause confusion into SSHRI
     _check_ri("f/s:1", PathRI, localpath='f/s:1', path='f/s:1')
     _check_ri("f/s:", PathRI, localpath='f/s:', path='f/s:')
@@ -408,12 +435,53 @@ def test_is_datalad_compat_ri():
     nok_(is_datalad_compat_ri(123))
 
 
-@skip_if_on_windows
-def test_get_local_file_url_linux():
-    eq_(get_local_file_url('/a'), 'file:///a')
-    eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    eq_(get_local_file_url('/a~'), 'file:///a~')
-    eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
+def test_get_local_file_url():
+    for path, url in (
+                # relpaths are special-cased below
+                ('test.txt', 'test.txt'),
+                # static copy of "most_obscore_name"
+                (' "\';a&b&cΔЙקم๗あ `| ',
+                 # and translation by google chrome
+                 "%20%22%27%3Ba%26b%26c%CE%94%D0%99%D7%A7%D9%85%E0%B9%97%E3%81%82%20%60%7C%20"),
+            ) + (
+                ('C:\\Windows\\Notepad.exe', 'file://C/Windows/Notepad.exe'),
+            ) if on_windows else (
+                ('/a', 'file:///a'),
+                ('/a/b/c', 'file:///a/b/c'),
+                ('/a~', 'file:///a~'),
+                # there are no files with trailing slashes in the name
+                #('/a b/', 'file:///a%20b/'),
+                ('/a b/name', 'file:///a%20b/name'),
+            ):
+        if isabs(path):
+            eq_(get_local_file_url(path), url)
+        else:
+            eq_(get_local_file_url(path),
+                '/'.join((
+                    get_local_file_url(os.getcwd()),
+                    url))
+            )
+
+
+@with_tempfile(mkdir=True)
+def test_get_local_file_url_compatibility(path):
+    # smoke test for file:// URL compatibility with other datalad/git/annex
+    # pieces
+    path = Path(path)
+    ds1 = Dataset(path / 'ds1').create()
+    ds2 = Dataset(path / 'ds2').create()
+    testfile = path / 'testfile.txt'
+    testfile.write_text('some')
+
+    # compat with annex addurl
+    ds1.repo.add_url_to_file(
+        'test.txt',
+        get_local_file_url(testfile, compatibility='git-annex'))
+
+    # compat with git clone/submodule
+    assert_status(
+        'ok',
+        ds1.clone(get_local_file_url(ds2.path, compatibility='git')))
 
 
 def test_is_ssh():

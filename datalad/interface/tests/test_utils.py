@@ -10,7 +10,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os
 import logging
@@ -130,18 +129,17 @@ def make_demo_hierarchy_datasets(path, tree, parent=None):
     for node, items in tree.items():
         if isinstance(items, dict):
             node_path = opj(path, node)
-            nodeds = Dataset(node_path).create(force=True)
+            nodeds = parent.create(node_path, force=True)
             make_demo_hierarchy_datasets(node_path, items, parent=nodeds)
     return parent
 
 
 @slow  # 74.4509s
 @with_tree(demo_hierarchy)
-@known_failure_direct_mode  #FIXME
 def test_save_hierarchy(path):
     # this test doesn't use API`remove` to avoid circularities
     ds = make_demo_hierarchy_datasets(path, demo_hierarchy)
-    ds.add('.', recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     ds_bb = Dataset(opj(ds.path, 'b', 'bb'))
     ds_bba = Dataset(opj(ds_bb.path, 'bba'))
@@ -187,13 +185,8 @@ def test_save_hierarchy(path):
         # append trailing slashes to the path to indicate that we want to
         # have the staged content in the dataset saved, rather than only the
         # subdataset state in the respective superds.
-        # an alternative would have been to pass `save` annotated paths of
-        # type {'path': dspath, 'process_content': True} for each dataset
-        # in question, but here we want to test how this would most likely
-        # by used from cmdline
         path=[opj(p, '')
-               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)],
-        super_datasets=True)
+               for p in (aa.path, ba.path, bb.path, c.path, ca.path, d.path)])
 
 
 # Note: class name needs to match module's name
@@ -324,7 +317,7 @@ def test_discover_ds_trace(path, otherdir):
     # we have to check whether we get the correct hierarchy, as the test
     # subject is also involved in this
     assert_true(exists(opj(db, 'file_db')))
-    ds.add('.', recursive=True)
+    ds.save(recursive=True)
     ok_clean_git(ds.path)
     # now two datasets which are not available locally, but we
     # know about them (e.g. from metadata)

@@ -11,7 +11,6 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six.moves import map as map
 
 
 def _strip_typerepr(s):
@@ -81,9 +80,8 @@ class EnsureDType(Constraint):
         self._dtype = dtype
 
     def __call__(self, value):
-        from six import binary_type, text_type
         if hasattr(value, '__iter__') and \
-                not (isinstance(value, (binary_type, text_type))):
+                not (isinstance(value, (bytes, str))):
             return list(map(self._dtype, value))
         else:
             return self._dtype(value)
@@ -163,10 +161,9 @@ class EnsureBool(Constraint):
     True: '1', 'yes', 'on', 'enable', 'true'
     """
     def __call__(self, value):
-        from six import binary_type, text_type
         if isinstance(value, bool):
             return value
-        elif isinstance(value, (binary_type, text_type)):
+        elif isinstance(value, (bytes, str)):
             value = value.lower()
             if value in ('0', 'no', 'off', 'disable', 'false'):
                 return False
@@ -200,8 +197,7 @@ class EnsureStr(Constraint):
         super(EnsureStr, self).__init__()
 
     def __call__(self, value):
-        from six import binary_type, text_type
-        if not isinstance(value, (binary_type, text_type)):
+        if not isinstance(value, (bytes, str)):
             # do not perform a blind conversion ala str(), as almost
             # anything can be converted and the result is most likely
             # unintended

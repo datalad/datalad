@@ -13,7 +13,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from datalad.tests.utils import known_failure_direct_mode
 
 import os
 from os.path import pardir
@@ -23,14 +22,14 @@ from datalad.utils import (
     unlink,
 )
 
+from datalad.interface.save import Save
 from datalad.interface.results import is_ok_dataset
 from datalad.distribution.dataset import Dataset
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.tests.utils import ok_
-from datalad.api import save
 from datalad.api import create
-from datalad.api import add
+from datalad.api import save as rev_save
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import with_tempfile
@@ -44,10 +43,13 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_result_values_equal
 from datalad.tests.utils import skip_v6_or_later
 from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import known_failure_githubci_win
+
+
+save = Save.__call__
 
 
 @with_testrepos('.*git.*', flavors=['clone'])
-@known_failure_direct_mode  #FIXME
 def test_save(path):
 
     ds = Dataset(path)
@@ -58,14 +60,14 @@ def test_save(path):
     ds.repo.add("new_file.tst", git=True)
     ok_(ds.repo.dirty)
 
-    ds.save("add a new file")
+    ds._save("add a new file")
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     with open(opj(path, "new_file.tst"), "w") as f:
         f.write("modify")
 
     ok_(ds.repo.dirty)
-    ds.save("modified new_file.tst")
+    ds._save("modified new_file.tst")
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # save works without ds and files given in the PWD
@@ -91,7 +93,7 @@ def test_save(path):
     ds.add([opj(path, f) for f in files])
     # superfluous call to save (add saved it already), should not fail
     # but report that nothing was saved
-    assert_status('notneeded', ds.save("set of new files"))
+    assert_status('notneeded', ds._save("set of new files"))
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # create subdataset
@@ -106,7 +108,7 @@ def test_save(path):
     # uncommited .datalad (probably caused within create)
     ok_(ds.repo.dirty)
     # ensure modified subds is committed
-    ds.save()
+    ds._save()
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
     # now introduce a change downstairs
@@ -114,16 +116,16 @@ def test_save(path):
     ok_clean_git(subds.path, annex=isinstance(subds.repo, AnnexRepo))
     ok_(ds.repo.dirty)
     # and save via subdataset path
-    ds.save('subds')
+    ds._save('subds')
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
 
+@known_failure_githubci_win
 @with_tempfile()
-@known_failure_direct_mode  #FIXME
 def test_recursive_save(path):
     ds = Dataset(path).create()
     # nothing to save
-    assert_status('notneeded', ds.save())
+    assert_status('notneeded', ds._save())
     subds = ds.create('sub')
     # subdataset presence already saved
     ok_clean_git(ds.path)
@@ -136,7 +138,7 @@ def test_recursive_save(path):
         f.write('some')
     # saves the status change of the subdataset due to the subsubdataset addition
     assert_result_values_equal(
-        ds.save(result_filter=is_ok_dataset),
+        ds._save(result_filter=is_ok_dataset),
         'path',
         [ds.path])
 
@@ -146,11 +148,11 @@ def test_recursive_save(path):
     # but remains dirty because of the uncommited file down below
     assert ds.repo.dirty
     # auto-add will save nothing deep down without recursive
-    assert_status('notneeded', ds.save())
+    assert_status('notneeded', ds._save())
     assert ds.repo.dirty
     # with recursive pick up the change in subsubds
     assert_result_values_equal(
-        ds.save(recursive=True, result_filter=is_ok_dataset),
+        ds._save(recursive=True, result_filter=is_ok_dataset),
         'path',
         [subsubds.path, subds.path, ds.path])
 
@@ -158,7 +160,7 @@ def test_recursive_save(path):
     ok_clean_git(ds.path)
     states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     # now we save recursively, nothing should happen
-    res = ds.save(recursive=True)
+    res = ds._save(recursive=True)
     # we do not get any report from a subdataset, because we detect at the
     # very top that the entire tree is clean
     assert_result_count(res, 1)
@@ -168,7 +170,7 @@ def test_recursive_save(path):
     # because we cannot say from the top if there is anything to do down below,
     # we have to traverse and we will get reports for all dataset, but there is
     # nothing actually saved
-    res = ds.save(recursive=True)
+    res = ds._save(recursive=True)
     assert_result_count(res, 3)
     assert_status('notneeded', res)
     subsubds_indexed = subsubds.repo.get_indexed_files()
@@ -184,9 +186,9 @@ def test_recursive_save(path):
         f.write('I am in here!')
     # the following should all do nothing
     # no auto_add
-    assert_status('notneeded', ds.save())
+    assert_status('notneeded', ds._save())
     # no recursive
-    assert_status('notneeded', ds.save())
+    assert_status('notneeded', ds._save())
     # an explicit target saves only the corresponding dataset
     assert_result_values_equal(
         save(path=[testfname]),
@@ -194,11 +196,11 @@ def test_recursive_save(path):
         [subsubds.path])
     # plain recursive without any files given will save the beast
     assert_result_values_equal(
-        ds.save(recursive=True, result_filter=is_ok_dataset),
+        ds._save(recursive=True, result_filter=is_ok_dataset),
         'path',
         [subds.path, ds.path])
     # there is nothing else to save
-    assert_status('notneeded', ds.save(recursive=True))
+    assert_status('notneeded', ds._save(recursive=True))
     ok_clean_git(ds.path)
     # one more time and check that all datasets in the hierarchy are not
     # contaminated with untracked files
@@ -206,7 +208,7 @@ def test_recursive_save(path):
     testfname = opj('sub', 'subsub', 'saveme2')
     with open(opj(ds.path, testfname), 'w') as f:
         f.write('I am in here!')
-    assert_status('notneeded', ds.save(recursive=True))
+    assert_status('notneeded', ds._save(recursive=True))
     newstates = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
     for old, new in zip(states, newstates):
         assert_equal(old, new)
@@ -228,15 +230,15 @@ def test_recursive_save(path):
     ok_clean_git(subds.repo, untracked=['testnew'],
                  index_modified=['subsub'], head_modified=['testadded'])
     old_states = [d.repo.get_hexsha() for d in (ds, subds, subsubds)]
-    subsubds.save(message="savingtestmessage", super_datasets=True)
+    subsubds._save(message="savingtestmessage", super_datasets=True)
     # this save actually didn't save anything in subsub (or anywhere),
     # because there were only untracked bits pending
     for old, new in zip(old_states, [d.repo.get_hexsha()
                                      for d in (ds, subds, subsubds)]):
         assert_equal(old, new)
     # but now we are saving this untracked bit specifically
-    subsubds.save(message="savingtestmessage", path=['testnew2'],
-                  super_datasets=True)
+    subsubds._save(message="savingtestmessage", path=['testnew2'],
+                   super_datasets=True)
     ok_clean_git(subsubds.repo)
     # but its super should have got only the subsub saved
     # not the file we created
@@ -258,7 +260,7 @@ def test_recursive_save(path):
     create_tree(subsubds.path, {"testnew2": 'smth2'})
 
     # trying to replicate https://github.com/datalad/datalad/issues/1540
-    subsubds.save(message="saving new changes", all_updated=True)  # no super
+    subsubds._save(message="saving new changes", all_updated=True)  # no super
     with chpwd(subds.path):
         # no explicit dataset is provided by path is provided
         save(path=['subsub'], message='saving sub', super_datasets=True)
@@ -267,28 +269,30 @@ def test_recursive_save(path):
                  'saving sub')
 
 
+@known_failure_githubci_win
 @with_tempfile()
 def test_save_message_file(path):
     ds = Dataset(path).create()
     with assert_raises(ValueError):
-        ds.save("blah", message="me", message_file="and me")
+        ds._save("blah", message="me", message_file="and me")
 
     create_tree(path, {"foo": "x",
                        "msg": u"add β"})
     ds.add("foo", save=False)
-    ds.save(message_file=opj(ds.path, "msg"))
+    ds._save(message_file=opj(ds.path, "msg"))
     assert_equal(ds.repo.format_commit("%s"),
                  u"add β")
 
 
+@known_failure_githubci_win
 def test_renamed_file():
     @with_tempfile()
     def check_renamed_file(recursive, no_annex, path):
         ds = Dataset(path).create(no_annex=no_annex)
         create_tree(path, {'old': ''})
         ds.add('old')
-        ds.repo._git_custom_command(['old', 'new'], ['git', 'mv'])
-        ds.save(recursive=recursive)
+        ds.repo.call_git(['mv'], files=['old', 'new'])
+        ds._save(recursive=recursive)
         ok_clean_git(path)
 
     for recursive in True, False:
@@ -297,7 +301,6 @@ def test_renamed_file():
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_subdataset_save(path):
     parent = Dataset(path).create()
     sub = parent.create('sub')
@@ -318,7 +321,7 @@ def test_subdataset_save(path):
     # `save -d .` saves the state change in the subdataset, but leaves any untracked
     # content alone
     with chpwd(parent.path):
-        assert_status('ok', parent.save())
+        assert_status('ok', parent._save())
     ok_clean_git(parent.path, untracked=['untracked'])
 
     # get back to the original modified state and check that -S behaves in
@@ -358,22 +361,20 @@ def test_symlinked_relpath(path):
     # in the root of ds
     with chpwd(dspath):
         ds.repo.add("mike1", git=True)
-        ds.save("committing", path="./mike1")
+        ds._save("committing", path="./mike1")
 
     # Let's also do in subdirectory
     with chpwd(opj(dspath, 'd')):
         ds.repo.add("mike2", git=True)
-        ds.save("committing", path="./mike2")
+        ds._save("committing", path="./mike2")
 
         later = opj(pardir, "later")
         ds.repo.add(later, git=True)
-        ds.save("committing", path=later)
+        ds._save("committing", path=later)
 
     ok_clean_git(dspath)
 
 
-# two subdatasets not possible in direct mode
-@known_failure_direct_mode  #FIXME
 @with_tempfile(mkdir=True)
 def test_bf1886(path):
     parent = Dataset(path).create()
@@ -408,17 +409,17 @@ def test_bf1886(path):
         opj(parent.path, 'subdir', 'subsubdir', 'upup3'))
     # need to use absolute paths
     with chpwd(opj(parent.path, 'subdir', 'subsubdir')):
-        add([opj(parent.path, 'sub3'),
-             opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
-    # here is where we need to disagree with the repo in #1886
-    # we would not expect that `add` registers sub3 as a subdataset
-    # of parent, because no reference dataset was given and the
-    # command cannot decide (with the current semantics) whether
-    # it should "add anything in sub3 to sub3" or "add sub3 to whatever
-    # sub3 is in"
-    ok_clean_git(parent.path, untracked=['sub3/'])
+        rev_save([opj(parent.path, 'sub3'),
+                  opj(parent.path, 'subdir', 'subsubdir', 'upup3')])
+    # in contrast to `add` only operates on a single top-level dataset
+    # although it is not specified, it get's discovered based on the PWD
+    # the logic behind that feels a bit shaky
+    # consult discussion in https://github.com/datalad/datalad/issues/3230
+    # if this comes up as an issue at some point
+    ok_clean_git(parent.path)
 
 
+@known_failure_githubci_win
 @with_tree({
     '1': '',
     '2': '',
@@ -448,6 +449,7 @@ def test_gh2043p1(path):
     skip_v6_or_later(method='pass')(ok_clean_git)(ds.path)
 
 
+@known_failure_githubci_win
 @with_tree({
     'staged': 'staged',
     'untracked': 'untracked'})
@@ -463,6 +465,7 @@ def test_bf2043p2(path):
 
 
 # https://github.com/datalad/datalad/issues/3087
+@known_failure_githubci_win
 @with_tree({
     'sdir1': {'foo': 'foo'},
     'sdir2': {'foo': 'foo'},
@@ -471,7 +474,7 @@ def test_bf2043p2(path):
 def test_save_directory(path):
     # Sequence of save invocations on subdirectories.
     ds = Dataset(path).create(force=True)
-    ds.save(path='sdir1')
+    ds._save(path='sdir1')
     ok_clean_git(ds.path, untracked=['sdir2/foo', 'sdir3/sdir/subsub/foo'])
 
     # There is also difference from
@@ -494,10 +497,11 @@ def test_save_partial_index(path):
     create_tree(ds.path, tree={"foo": "a", "staged": ""},
                 remove_existing=True)
     ds.repo.add("staged", git=True)
-    ds.save(path="foo")
+    ds._save(path="foo")
     ok_clean_git(ds.path, head_modified=["staged"])
 
 
+@known_failure_githubci_win
 @with_tree({
     'top:file': 'data',
     'd': {'sub:file': 'data'}

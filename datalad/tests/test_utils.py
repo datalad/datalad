@@ -15,10 +15,8 @@ import os, os.path as op
 import shutil
 import sys
 import logging
-from mock import patch
-from six import PY3
-from six import text_type
-import six.moves.builtins as __builtin__
+from unittest.mock import patch
+import builtins
 
 from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
@@ -66,6 +64,7 @@ from ..utils import unlink
 from ..utils import CMD_MAX_ARG
 from ..utils import create_tree
 from ..utils import never_fail
+from ..utils import Path
 
 from ..support.annexrepo import AnnexRepo
 
@@ -95,8 +94,9 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 from .utils import (
     probe_known_failure, skip_known_failure, known_failure, known_failure_v6,
-    known_failure_direct_mode, skip_if,
-    ok_file_has_content
+    skip_if,
+    ok_file_has_content,
+    known_failure_githubci_win,
 )
 from .utils import OBSCURE_FILENAME
 
@@ -281,14 +281,13 @@ def _check_setup_exceptionhook(interactive):
             except Exception as e:  # RuntimeError:
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
-            if PY3:
-                # Happens under tox environment but not in manually crafted
-                # ones -- not yet sure what it is about but --dbg does work
-                # with python3 so lettting it skip for now
-                raise SkipTest(
-                    "TODO: Not clear why in PY3 calls cleanup if we try to "
-                    "access the beast"
-                )
+            # Happens under tox environment but not in manually crafted
+            # ones -- not yet sure what it is about but --dbg does work
+            # with python3 so lettting it skip for now
+            raise SkipTest(
+                "TODO: Not clear why in PY3 calls cleanup if we try to "
+                "access the beast"
+            )
             assert_in('Traceback (most recent call last)', cmo.err)
             assert_in('in _check_setup_exceptionhook', cmo.err)
             if interactive:
@@ -504,6 +503,7 @@ def test_any_re_search():
     assert_false(any_re_search(['^b', 'bab'], 'ab'))
 
 
+@known_failure_githubci_win
 def test_find_files():
     tests_dir = dirname(__file__)
     proj_dir = normpath(opj(dirname(__file__), pardir))
@@ -530,6 +530,7 @@ def test_find_files():
         ok_startswith(basename(f), 'test_')
 
 
+@known_failure_githubci_win
 @with_tree(tree={
     '.git': {
         '1': '2'
@@ -680,6 +681,7 @@ def test_path_():
         eq_(_path_(p, 'd'), 'a/b/c/d')
 
 
+@known_failure_githubci_win
 def test_get_timestamp_suffix():
     # we need to patch temporarily TZ
     import time
@@ -727,9 +729,9 @@ def test_memoized_generator():
 
 
 def test_assure_unicode():
-    ok_(isinstance(assure_unicode("m"), text_type))
-    ok_(isinstance(assure_unicode('grandchild_äöü東'), text_type))
-    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), text_type))
+    ok_(isinstance(assure_unicode("m"), str))
+    ok_(isinstance(assure_unicode('grandchild_äöü東'), str))
+    ok_(isinstance(assure_unicode(u'grandchild_äöü東'), str))
     eq_(assure_unicode('grandchild_äöü東'), u'grandchild_äöü東')
     # now, non-utf8
     # Decoding could be deduced with high confidence when the string is
@@ -742,13 +744,18 @@ def test_assure_unicode():
     eq_(assure_unicode(mom_iso8859, confidence=0.5), u'mamá')
     # but when we mix, it does still guess something allowing to decode:
     mixedin = mom_koi8r + u'東'.encode('iso2022_jp') + u'東'.encode('utf-8')
-    ok_(isinstance(assure_unicode(mixedin), text_type))
+    ok_(isinstance(assure_unicode(mixedin), str))
     # but should fail if we request high confidence result:
     with assert_raises(ValueError):
         assure_unicode(mixedin, confidence=0.9)
     # For other, non string values, actually just returns original value
     # TODO: RF to actually "assure" or fail??  For now hardcoding that assumption
     assert assure_unicode(1) is 1
+
+
+def test_pathlib_unicode():
+    eq_(str(Path("a")), u"a")
+    eq_(str(Path(u"β")), u"β")
 
 
 def test_as_unicode():
@@ -766,6 +773,7 @@ def test_as_unicode():
     assert_in("1 is not of any of known or provided", str(cme.exception))
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_path_prefix(path):
     eq_(get_path_prefix('/d1/d2', '/d1/d2'), '')
@@ -833,6 +841,7 @@ def test_get_dataset_root(path):
         eq_(get_dataset_root(fname), os.curdir)
 
 
+@known_failure_githubci_win
 def test_path_startswith():
     ok_(path_startswith('/a/b', '/a'))
     ok_(path_startswith('/a/b', '/a/b'))
@@ -848,6 +857,7 @@ def test_path_startswith():
     assert_raises(ValueError, path_startswith, '/a/b', 'a')
 
 
+@known_failure_githubci_win
 def test_path_is_subpath():
     ok_(path_is_subpath('/a/b', '/a'))
     ok_(path_is_subpath('/a/b/c', '/a'))
@@ -875,7 +885,7 @@ def test_safe_print():
         if called[0] == 1:
             raise UnicodeEncodeError('crap', u"", 0, 1, 'whatever')
 
-    with patch.object(__builtin__, 'print', _print):
+    with patch.object(builtins, 'print', _print):
         safe_print("bua")
     assert_equal(called[0], 2)
 
@@ -1000,35 +1010,23 @@ def test_known_failure_v6():
         assert_raises(AssertionError, failing)
 
 
-def test_known_failure_direct_mode():
-
-    @known_failure_direct_mode
-    def failing():
-        raise AssertionError("Failed")
-
-    from datalad import cfg
-
-    direct = cfg.obtain("datalad.repo.direct")
-    skip = cfg.obtain("datalad.tests.knownfailures.skip")
-    probe = cfg.obtain("datalad.tests.knownfailures.probe")
-
-    if direct:
-        if skip:
-            # skipping takes precedence over probing
-            failing()
-        elif probe:
-            # if we probe a known failure it's okay to fail:
-            failing()
-        else:
-            # not skipping and not probing results in the original failure:
-            assert_raises(AssertionError, failing)
-
-    else:
-        # behaves as if it wasn't decorated at all, no matter what
-        assert_raises(AssertionError, failing)
-
-
 from datalad.utils import read_csv_lines
+
+
+def test_known_failure_direct_mode():
+    # Decorator is deprecated now and that is what we check
+    from .utils import known_failure_direct_mode
+
+    x = []
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        @known_failure_direct_mode
+        def failing():
+            x.append('ok')
+            raise AssertionError("Failed")
+
+        assert_raises(AssertionError, failing)  # nothing is swallowed
+        eq_(x, ['ok'])  # everything runs
+        assert_in("Direct mode support is deprecated", cml.out)
 
 
 @with_tempfile(content="h1 h2\nv1 2\nv2 3")

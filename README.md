@@ -5,7 +5,9 @@
     |____/   \__,_|  \__|  \__,_| |_____|  \__,_|  \__,_|
                                                   Read me
 
-[![Travis tests status](https://secure.travis-ci.org/datalad/datalad.png?branch=master)](https://travis-ci.org/datalad/datalad) [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master) [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master) [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/) [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/) [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials) [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667)
+[![Travis tests status](https://secure.travis-ci.org/datalad/datalad.png?branch=master)](https://travis-ci.org/datalad/datalad) [![Build status](https://ci.appveyor.com/api/projects/status/github/datalad/datalad?branch=master&svg=true)](https://ci.appveyor.com/project/mih/datalad/branch/master) [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master) [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub release](https://img.shields.io/github/release/datalad/datalad.svg)](https://GitHub.com/datalad/datalad/releases/) [![PyPI version fury.io](https://badge.fury.io/py/datalad.svg)](https://pypi.python.org/pypi/datalad/) [![Testimonials 4](https://img.shields.io/badge/testimonials-4-brightgreen.svg)](https://github.com/datalad/datalad/wiki/Testimonials) [![https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg](https://www.singularity-hub.org/static/img/hosted-singularity--hub-%23e32929.svg)](https://singularity-hub.org/collections/667) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3233911.svg)](https://doi.org/10.5281/zenodo.3233911)
+
+
 
 # 10000ft overview
 
@@ -16,7 +18,8 @@ data from online portals and exposing it in readily usable form as Git(-annex)
 repositories, so-called datasets. The actual data storage and permission
 management, however, remains with the original data providers.
 
-The full documentation is available at: http://docs.datalad.org
+The full documentation is available at http://docs.datalad.org and
+http://handbook.datalad.org provides a hands-on crash-course on DataLad.
 
 # Extensions
 
@@ -64,6 +67,11 @@ provide recent releases of DataLad. Once enabled, just do:
 
     conda install -c conda-forge datalad
 
+will install released released version, and release candidates are available
+via
+
+    conda install -c conda-forge/label/rc datalad
+
 ## Other Linux'es, OSX via pip
 
 Before you install this package, please make sure that you [install a recent
@@ -94,6 +102,8 @@ The latest release version can be obtained by running:
 
     singularity pull shub://datalad/datalad
 
+More details on installation and initial configuration could be found in the
+[DataLad Handbook: Installation].
 
 # License
 
@@ -123,3 +133,5 @@ project (NIH 1P41EB019936-01A1).
 [Git-annex]: http://git-annex.branchable.com
 [setup.py]: https://github.com/datalad/datalad/blob/master/setup.py
 [NeuroDebian]: http://neuro.debian.net
+
+[DataLad Handbook: Installation]: http://handbook.datalad.org/en/latest/intro/installation.html

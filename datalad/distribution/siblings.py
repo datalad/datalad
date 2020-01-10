@@ -16,7 +16,7 @@ import logging
 import os
 import os.path as op
 
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from datalad.interface.base import Interface
 from datalad.interface.utils import eval_results
@@ -40,6 +40,7 @@ from datalad.support.exceptions import (
 )
 from datalad.support.network import (
     RI,
+    PathRI,
     URL,
 )
 from datalad.support.gitrepo import GitRepo
@@ -65,6 +66,7 @@ from datalad.distribution.update import Update
 from datalad.utils import (
     assure_list,
     slash_join,
+    Path,
 )
 from datalad.dochelpers import exc_str
 
@@ -267,6 +269,7 @@ class Siblings(Interface):
         # layout?
         replicate_local_structure = url and "%NAME" not in url
 
+        subds_pushurl = None
         for subds in dataset.subdatasets(
                 fulfilled=True,
                 recursive=recursive, recursion_limit=recursion_limit,
@@ -274,7 +277,8 @@ class Siblings(Interface):
             subds_name = op.relpath(subds.path, start=dataset.path)
             if replicate_local_structure:
                 subds_url = slash_join(url, subds_name)
-                subds_pushurl = slash_join(pushurl, subds_name)
+                if pushurl:
+                    subds_pushurl = slash_join(pushurl, subds_name)
             else:
                 subds_url = \
                     _mangle_urls(url, '/'.join([ds_name, subds_name]))
@@ -365,6 +369,10 @@ def _add_remote(
             message=("sibling is already known: %s, use `configure` instead?", name),
             **res_kwargs)
         return
+    if isinstance(RI(url), PathRI):
+        # make sure any path URL is stored in POSIX conventions for consistency
+        # with git's behavior (e.g. origin configured by clone)
+        url = Path(url).as_posix()
     # this remote is fresh: make it known
     # just minimalistic name and URL, the rest is coming from `configure`
     ds.repo.add_remote(name, url)
@@ -445,8 +453,7 @@ def _configure_remote(
         if fetch:
             # fetch the remote so we are up to date
             for r in Update.__call__(
-                    dataset=res_kwargs['refds'],
-                    path=[dict(path=ds.path, type='dataset')],
+                    dataset=ds.path,
                     sibling=name,
                     merge=False,
                     recursive=False,
@@ -468,7 +475,8 @@ def _configure_remote(
             # makes sense only if current AND super are annexes, so it is
             # kinda a boomer, since then forbids having a super a pure git
             if isinstance(ds.repo, AnnexRepo) and \
-                    isinstance(delayed_super.repo, AnnexRepo):
+                    isinstance(delayed_super.repo, AnnexRepo) and \
+                    name in delayed_super.repo.get_remotes():
                 if annex_wanted is None:
                     annex_wanted = _inherit_annex_var(
                         delayed_super, name, 'wanted')
@@ -647,7 +655,7 @@ def _query_remotes(
                               if k.startswith('remote.{}.'.format(remote))]:
                 info[remotecfg[8 + len(remote):]] = ds.config[remotecfg]
         if get_annex_info and info.get('annex-uuid', None):
-            ainfo = annex_info.get(info['annex-uuid'])
+            ainfo = annex_info.get(info['annex-uuid'], {})
             annex_description = ainfo.get('description', None)
             if annex_description is not None:
                 info['annex-description'] = annex_description

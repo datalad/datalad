@@ -91,7 +91,7 @@ Benefiting from Git's support for workflows based on decentralized "clones" of
 a repository, DataLad's datasets can be (re-)published to a new location
 without loosing the connection between the "original" and the new "copy". This
 is extremely useful for collaborative work, but also in more mundane scenarios
-such as data backup, or temporary deployment fo a dataset on a compute cluster,
+such as data backup, or temporary deployment of a dataset on a compute cluster,
 or in the cloud.  Using git-annex, data can also get synchronized across
 different locations of a dataset (:term:`sibling`\s in DataLad terminology).
 Using metadata tags, it is even possible to configure different levels of
@@ -185,6 +185,8 @@ There are also some useful pre-defined "shortcut" values for dataset arguments:
    For example, if you are in ``$HOME/datalad/openfmri/ds000001/sub-01`` and want
    to search metadata of the entire superdataset you are under (in this case
    ``///``), run ``datalad search -d^ [something to search]``.
+``^.``
+   the dataset the current directory is part of.
 
 Commands `install` vs `get`
 ---------------------------

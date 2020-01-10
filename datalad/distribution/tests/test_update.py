@@ -9,7 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
 
 
 import os
@@ -38,13 +37,15 @@ from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_in_results
 from datalad.tests.utils import slow
+from datalad.tests.utils import known_failure_windows
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:622
+@known_failure_windows
 @slow
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_simple(origin, src_path, dst_path):
 
     # prepare src
@@ -74,18 +75,8 @@ def test_update_simple(origin, src_path, dst_path):
     # modify origin:
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
-    source.add(path="update.txt")
-    source.save("Added update.txt")
+    source.save(path="update.txt", message="Added update.txt")
     ok_clean_git(src_path)
-
-    # fail when asked to update a non-dataset
-    assert_status(
-        'impossible',
-        source.update("update.txt", on_failure='ignore'))
-    # fail when asked to update a something non-existent
-    assert_status(
-        'impossible',
-        source.update("nothere", on_failure='ignore'))
 
     # update without `merge` only fetches:
     assert_status('ok', dest.update())
@@ -104,6 +95,33 @@ def test_update_simple(origin, src_path, dst_path):
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
+    # check subdataset path constraints, baseline (parent + 2 subds)
+    assert_result_count(dest.update(recursive=True),
+                        3, status='ok', type='dataset')
+    # no recursion and invalid path still updates the parent
+    res = dest.update(path='whatever')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # invalid path with recursion also does
+    res = dest.update(recursive=True, path='whatever')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # valid path and no recursion only updates the parent
+    res = dest.update(path='subm 1')
+    assert_result_count(res, 1, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    # valid path and recursion updates matching
+    res = dest.update(recursive=True, path='subm 1')
+    assert_result_count(res, 2, status='ok', type='dataset')
+    assert_result_count(res, 1, status='ok', path=dest.path)
+    assert_result_count(res, 1, status='ok', path=str(dest.pathobj / 'subm 1'))
+    # additional invalid path doesn't hurt
+    res = dest.update(recursive=True, path=['subm 1', 'mike'])
+    assert_result_count(res, 2, status='ok', type='dataset')
+    # full match
+    res = dest.update(recursive=True, path=['subm 1', '2'])
+    assert_result_count(res, 3, status='ok', type='dataset')
+
     # smoke-test if recursive update doesn't fail if submodule is removed
     # and that we can run it from within a dataset without providing it
     # explicitly
@@ -120,9 +138,9 @@ def test_update_simple(origin, src_path, dst_path):
 
     # and now test recursive update with merging in differences
     create_tree(opj(source.path, '2'), {'load.dat': 'heavy'})
-    source.add(opj('2', 'load.dat'),
-               message="saving changes within subm2",
-               recursive=True)
+    source.save(opj('2', 'load.dat'),
+                message="saving changes within subm2",
+                recursive=True)
     assert_result_count(
         dest.update(merge=True, recursive=True), 2,
         status='ok', type='dataset')
@@ -140,18 +158,19 @@ def test_update_git_smoke(src_path, dst_path):
         dst_path, source=src_path,
         result_xfm='datasets', return_type='item-or-list')
     create_tree(ds.path, {'file.dat': '123'})
-    ds.add('file.dat')
+    ds.save('file.dat')
     assert_result_count(
         target.update(recursive=True, merge=True), 1,
         status='ok', type='dataset')
     ok_file_has_content(opj(target.path, 'file.dat'), '123')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:606
+@known_failure_windows
 @slow  # 20.6910s
 @with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_fetch_all(src, remote_1, remote_2):
     rmt1 = AnnexRepo.clone(src, remote_1)
     rmt2 = AnnexRepo.clone(src, remote_2)
@@ -210,13 +229,13 @@ def test_update_fetch_all(src, remote_1, remote_2):
     eq_([False], ds.repo.file_has_content(["first.txt"]))
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_newthings_coming_down(originpath, destpath):
     origin = GitRepo(originpath, create=True)
     create_tree(originpath, {'load.dat': 'heavy'})
-    Dataset(originpath).add('load.dat')
+    Dataset(originpath).save('load.dat')
     ds = install(
         source=originpath, path=destpath,
         result_xfm='datasets', return_type='item-or-list')
@@ -247,9 +266,9 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[0], 'first!')
 
     # and now we destroy the remote annex
-    origin._git_custom_command([], ['git', 'config', '--remove-section', 'annex'])
+    origin.call_git(['config', '--remove-section', 'annex'])
     rmtree(opj(origin.path, '.git', 'annex'), chmod_files=True)
-    origin._git_custom_command([], ['git', 'branch', '-D', 'git-annex'])
+    origin.call_git(['branch', '-D', 'git-annex'])
     origin = GitRepo(originpath)
     assert_false(knows_annex(originpath))
 
@@ -267,10 +286,10 @@ def test_newthings_coming_down(originpath, destpath):
     eq_(ds.repo.get_tags(output='name')[-1], 'second!')
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_update_volatile_subds(originpath, otherpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
@@ -299,7 +318,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # re-introduce at origin
     osm1 = origin.create(sname)
     create_tree(osm1.path, {'load.dat': 'heavy'})
-    origin.add(opj(osm1.path, 'load.dat'))
+    origin.save(opj(osm1.path, 'load.dat'))
     assert_result_count(ds.update(merge=True), 1, status='ok', type='dataset')
     # grab new content of uninstall subdataset, right away
     ds.get(opj(ds.path, sname, 'load.dat'))
@@ -307,7 +326,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
 
     # modify ds and subds at origin
     create_tree(origin.path, {'mike': 'this', sname: {'probe': 'little'}})
-    origin.add('.', recursive=True)
+    origin.save(recursive=True)
     ok_clean_git(origin.path)
 
     # updates for both datasets should come down the pipe
@@ -338,7 +357,7 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     # install separate dataset as a submodule
     ds.install(source=otherds.path, path='other')
     create_tree(otherds.path, {'brand': 'new'})
-    otherds.add('.')
+    otherds.save()
     ok_clean_git(otherds.path)
     # pull in changes
     res = ds.update(merge=True, recursive=True)
@@ -348,9 +367,9 @@ def test_update_volatile_subds(originpath, otherpath, destpath):
     ok_clean_git(ds.path)
 
 
+@known_failure_windows  #FIXME
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_reobtain_data(originpath, destpath):
     origin = Dataset(originpath).create()
     ds = install(
@@ -360,7 +379,7 @@ def test_reobtain_data(originpath, destpath):
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     # content
     create_tree(origin.path, {'load.dat': 'heavy'})
-    origin.add(opj(origin.path, 'load.dat'))
+    origin.save(opj(origin.path, 'load.dat'))
     # update does not bring data automatically
     assert_result_count(ds.update(merge=True, reobtain_data=True), 1)
     assert_in('load.dat', ds.repo.get_annexed_files())
@@ -370,7 +389,7 @@ def test_reobtain_data(originpath, destpath):
     ok_file_has_content(opj(ds.path, 'load.dat'), 'heavy')
     # new content at origin
     create_tree(origin.path, {'novel': 'but boring'})
-    origin.add('.')
+    origin.save()
     # update must not bring in data for new file
     result = ds.update(merge=True, reobtain_data=True)
     assert_in_results(result, action='get', status='notneeded')
@@ -381,7 +400,7 @@ def test_reobtain_data(originpath, destpath):
     # modify content at origin
     os.remove(opj(origin.path, 'load.dat'))
     create_tree(origin.path, {'load.dat': 'light'})
-    origin.add('.')
+    origin.save()
     # update must update file with existing data, but leave empty one alone
     res = ds.update(merge=True, reobtain_data=True)
     assert_result_count(res, 2)
@@ -392,7 +411,6 @@ def test_reobtain_data(originpath, destpath):
 
 
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  # use of bare repos in the test
 def test_multiway_merge(path):
     # prepare ds with two siblings, but no tracking branch
     ds = Dataset(op.join(path, 'ds_orig')).create()

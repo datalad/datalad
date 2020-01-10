@@ -11,7 +11,7 @@
 
 import os
 from os.path import join
-from os.path import expanduser
+import re
 
 # directory containing prepared metadata of a dataset repository:
 DATALAD_DOTDIR = ".datalad"
@@ -69,3 +69,6 @@ PRE_INIT_COMMIT_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 # git/datalad configuration item to provide a token for github
 CONFIG_HUB_TOKEN_FIELD = 'hub.oauthtoken'
+
+# format of git-annex adjusted branch names
+ADJUSTED_BRANCH_EXPR = re.compile(r'^adjusted/(?P<name>[^(]+)\(.*\)$')

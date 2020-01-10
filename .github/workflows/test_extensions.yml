@@ -1,0 +1,58 @@
+name: Extensions
+
+on: [pull_request]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        extension: [
+            datalad_neuroimaging,
+            datalad_container,
+            datalad_metalad,
+            datalad_crawler,
+        ]
+    steps:
+    - name: Set up system
+      shell: bash
+      run: |
+        bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
+        sudo apt-get update -qq
+        sudo apt-get install eatmydata
+        sudo eatmydata apt-get install git-annex-standalone
+    - name: Set up environment
+      run: |
+        git config --global user.email "test@github.land"
+        git config --global user.name "GitHub Almighty"
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Install ${{ matrix.extension }} extension
+      run: |
+        pip install ${{ matrix.extension }}
+      if: matrix.extension != 'datalad_crawler'
+    - name: Install ${{ matrix.extension }} extension
+      run: |
+        pip install ${{ matrix.extension }}[devel]
+      if: matrix.extension == 'datalad_crawler'
+    - name: Install Singularity
+      run: sudo eatmydata apt-get install singularity-container
+      if: matrix.extension == 'datalad_container'
+    - name: WTF!?
+      run: |
+        datalad wtf
+    - name: ${{ matrix.extension }} tests
+      run: |
+        mkdir -p __testhome__
+        cd __testhome__
+        python -m nose -s -v --with-cov --cover-package datalad ${{ matrix.extension }}

@@ -11,10 +11,9 @@
 
 import sys
 # OPT delay import for expensive mock until used
-#from mock import patch
-from six import PY2
-import six.moves.builtins as __builtin__
-builtins_name = '__builtin__' if PY2 else 'builtins'
+#from unittest.mock import patch
+import builtins
+import lzma
 
 import logging
 import io
@@ -52,20 +51,6 @@ except Exception as exc:
         exc_str(exc)
     )
 
-lzma = None
-try:
-    # Our mocking would not work with backports.lzma ATM, so only lzma
-    # would be supported
-    # from datalad.support.lzma import lzma
-    import lzma
-except ImportError:
-    pass
-except Exception as exc:
-    lgr.warning(
-        "Failed to import lzma, so no automagic handling for it atm: %s",
-        exc_str(exc)
-    )
-
 # TODO: RF to reduce code duplication among cases, also RF tests for the same reason
 
 class _EarlyExit(Exception):
@@ -97,7 +82,7 @@ class AutomagicIO(object):
           AutomagicIO supervision.
         """
         self._active = False
-        self._builtin_open = __builtin__.open
+        self._builtin_open = builtins.open
         self._io_open = io.open
         self._os_stat = os.stat
         self._builtin_exists = os.path.exists
@@ -106,14 +91,11 @@ class AutomagicIO(object):
             self._h5py_File = h5py.File
         else:
             self._h5py_File = None
-        if lzma:
-            self._lzma_LZMAFile = lzma.LZMAFile
-        else:
-            self._lzma_LZMAFile = None
+        self._lzma_LZMAFile = lzma.LZMAFile
         self._autoget = autoget
         self._in_open = False
         self._log_online = True
-        from mock import patch
+        from unittest.mock import patch
         self._patch = patch
         self._paths_cache = set() if check_once else None
         self._repos_cache = {} if check_once else None
@@ -155,7 +137,7 @@ class AutomagicIO(object):
                     # name/file was provided
                     file = args[0]
                 else:
-                    filearg = "name" if PY2 else "file"
+                    filearg = "file"
                     if filearg not in kwargs:
                         # so the name was missing etc, just proxy into original open call and let it puke
                         raise _EarlyExit("no name/file was given")
@@ -196,7 +178,7 @@ class AutomagicIO(object):
         return origfunc(*args, **kwargs)
 
     def _proxy_open(self, *args, **kwargs):
-        return self._proxy_open_name_mode(builtins_name + '.open', self._builtin_open,
+        return self._proxy_open_name_mode('builtins.open', self._builtin_open,
                                           *args, **kwargs)
 
     def _proxy_io_open(self, *args, **kwargs):
@@ -280,13 +262,14 @@ class AutomagicIO(object):
             # might fail.  TODO: troubleshoot when it does e.g.
             # datalad/tests/test_auto.py:test_proxying_open_testrepobased
             under_annex = annex.is_under_annex(filepath, batch=True)
-        except:  # MIH: really? what if MemoryError
+        except Exception as exc:  # MIH: really? what if MemoryError
+            lgr.log(5, " cannot determine if %s under annex: %s", filepath, exc_str(exc))
             under_annex = None
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("AutomagicIO: retrieving file content of %s", filepath)
             out = annex.get(filepath)
-            if not out.get('success', False):
+            if out and not out.get('success', False):
                 # to assure that it is present and without trailing/leading new lines
                 out['note'] = out.get('note', '').strip()
                 lgr.error("Failed to retrieve %(file)s: %(note)s", out)
@@ -313,15 +296,14 @@ class AutomagicIO(object):
             lgr.debug("%s already active. No action taken" % self)
             return
         # overloads
-        __builtin__.open = self._proxy_open
+        builtins.open = self._proxy_open
         io.open = self._proxy_io_open
         os.stat = self._proxy_os_stat
         os.path.exists = self._proxy_exists
         os.path.isfile = self._proxy_isfile
         if h5py:
             h5py.File = self._proxy_h5py_File
-        if lzma:
-            lzma.LZMAFile = self._proxy_lzma_LZMAFile
+        lzma.LZMAFile = self._proxy_lzma_LZMAFile
         self._active = True
 
     def deactivate(self):
@@ -330,13 +312,12 @@ class AutomagicIO(object):
         if not self.active:
             lgr.warning("%s is not active, can't deactivate" % self)
             return
-        __builtin__.open = self._builtin_open
+        builtins.open = self._builtin_open
         io.open = self._io_open
         os.stat = self._os_stat
         if h5py:
             h5py.File = self._h5py_File
-        if lzma:
-            lzma.LZMAFile = self._lzma_LZMAFile
+        lzma.LZMAFile = self._lzma_LZMAFile
         os.path.exists = self._builtin_exists
         os.path.isfile = self._builtin_isfile
         self._active = False

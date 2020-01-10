@@ -49,7 +49,7 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 
 clean:
-	rm -rf $(BUILDDIR)/* source/generated source/_extras/schema.json
+	rm -rf $(BUILDDIR)/* source/generated source/_extras/schema*.json source/build
 
 html:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html

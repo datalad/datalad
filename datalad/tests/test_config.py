@@ -14,13 +14,20 @@ import os
 from os.path import exists
 from os.path import join as opj
 
-from mock import patch
-from nose.tools import assert_false, assert_true, assert_equal
-from datalad.tests.utils import assert_raises
-from datalad.tests.utils import assert_in, assert_not_in
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import with_tree
-from datalad.tests.utils import with_tempfile
+from unittest.mock import patch
+from datalad.tests.utils import (
+    assert_raises,
+    assert_false,
+    assert_true,
+    assert_equal,
+    assert_not_equal,
+    assert_in,
+    assert_not_in,
+    ok_file_has_content,
+    with_tree,
+    with_tempfile,
+    with_testsui,
+)
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
@@ -28,7 +35,6 @@ from datalad.api import create
 from datalad.config import ConfigManager
 from datalad.cmd import CommandError
 
-from datalad.tests.utils import with_testsui
 from datalad.support.external_versions import external_versions
 
 # XXX tabs are intentional (part of the format)!
@@ -52,11 +58,10 @@ _dataset_config_template = {
 @with_tree(tree=_dataset_config_template)
 @with_tempfile(mkdir=True)
 def test_something(path, new_home):
-    # read nothing, has nothing
-    cfg = ConfigManager(dataset_only=True)
-    assert_false(len(cfg))
+    # will refuse to work on dataset without a dataset
+    assert_raises(ValueError, ConfigManager, source='dataset')
     # now read the example config
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
     assert_equal(len(cfg), 3)
     assert_in('something.user', cfg)
     # multi-value
@@ -154,7 +159,7 @@ def test_something(path, new_home):
                     {'HOME': new_home, 'DATALAD_SNEAKY_ADDITION': 'ignore'}):
         global_gitconfig = opj(new_home, '.gitconfig')
         assert(not exists(global_gitconfig))
-        globalcfg = ConfigManager(dataset_only=False)
+        globalcfg = ConfigManager()
         assert_not_in('datalad.unittest.youcan', globalcfg)
         assert_in('datalad.sneaky.addition', globalcfg)
         cfg.add('datalad.unittest.youcan', 'removeme', where='global')
@@ -184,7 +189,7 @@ def test_something(path, new_home):
 
     cfg = ConfigManager(
         Dataset(opj(path, 'ds')),
-        dataset_only=True,
+        source='dataset',
         overrides={'datalad.godgiven': True})
     assert_equal(cfg.get('datalad.godgiven'), True)
     # setter has no effect
@@ -204,8 +209,17 @@ def test_something(path, new_home):
     padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
 """}}})
 def test_crazy_cfg(path):
-    cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='dataset')
     assert_in('crazy.padry', cfg)
+    # make sure crazy config is not read when in local mode
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='local')
+    assert_not_in('crazy.padry', cfg)
+    # it will make it in in 'any' mode though
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), source='any')
+    assert_in('crazy.padry', cfg)
+    # typos in the source mode arg will not have silent side-effects
+    assert_raises(
+        ValueError, ConfigManager, Dataset(opj(path, 'ds')), source='locale')
 
 
 @with_tempfile
@@ -309,14 +323,53 @@ def test_from_env():
     assert_in('datalad.crazy.cfg', cfg)
     assert_equal(cfg['datalad.crazy.cfg'], 'impossibletoguess')
     # not in dataset-only mode
-    cfg = ConfigManager(Dataset('nowhere'), dataset_only=True)
+    cfg = ConfigManager(Dataset('nowhere'), source='dataset')
     assert_not_in('datalad.crazy.cfg', cfg)
     # check env trumps override
     cfg = ConfigManager()
     assert_not_in('datalad.crazy.override', cfg)
-    cfg.overrides['datalad.crazy.override'] = 'fromoverride'
+    cfg.set('datalad.crazy.override', 'fromoverride', where='override')
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromoverride')
     os.environ['DATALAD_CRAZY_OVERRIDE'] = 'fromenv'
     cfg.reload()
     assert_equal(cfg['datalad.crazy.override'], 'fromenv')
+
+
+def test_overrides():
+    cfg = ConfigManager()
+    # any sensible (and also our CI) test environment(s) should have this
+    assert_in('user.name', cfg)
+    # set
+    cfg.set('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # unset just removes override, not entire config
+    cfg.unset('user.name', where='override')
+    assert_in('user.name', cfg)
+    assert_not_equal('user.name', 'myoverride')
+    # add
+    # there is no initial increment
+    cfg.add('user.name', 'myoverride', where='override')
+    assert_equal(cfg['user.name'], 'myoverride')
+    # same as with add, not a list
+    assert_equal(cfg['user.name'], 'myoverride')
+    # but then there is
+    cfg.add('user.name', 'myother', where='override')
+    assert_equal(cfg['user.name'], ['myoverride', 'myother'])
+    # rename
+    assert_not_in('ups.name', cfg)
+    cfg.rename_section('user', 'ups', where='override')
+    # original variable still there
+    assert_in('user.name', cfg)
+    # rename of override in effect
+    assert_equal(cfg['ups.name'], ['myoverride', 'myother'])
+    # remove entirely by section
+    cfg.remove_section('ups', where='override')
+    from datalad.utils import Path
+    assert_not_in(
+        'ups.name', cfg,
+        (cfg._store,
+         cfg.overrides,
+         cfg._cfgfiles,
+         [Path(f).read_text() for f in cfg._cfgfiles if Path(f).exists()],
+    ))

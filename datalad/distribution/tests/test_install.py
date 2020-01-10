@@ -9,9 +9,6 @@
 
 """
 
-from datalad.tests.utils import known_failure_direct_mode
-
-
 import logging
 import os
 
@@ -22,7 +19,7 @@ from os.path import realpath
 from os.path import basename
 from os.path import dirname
 
-from mock import patch
+from unittest.mock import patch
 
 from datalad.utils import getpwd
 
@@ -35,12 +32,9 @@ from datalad.utils import on_windows
 from datalad.support import path as op
 from datalad.support.external_versions import external_versions
 from datalad.interface.results import YieldDatasets
-from datalad.interface.results import YieldRelativePaths
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import InstallFailedError
 from datalad.support.exceptions import IncompleteResultsError
 from datalad.support.gitrepo import GitRepo
-from datalad.support.gitrepo import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.tests.utils import create_tree
@@ -58,7 +52,6 @@ from datalad.tests.utils import assert_is_instance
 from datalad.tests.utils import assert_result_count
 from datalad.tests.utils import assert_status
 from datalad.tests.utils import assert_in_results
-from datalad.tests.utils import assert_not_in_results
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
@@ -72,42 +65,17 @@ from datalad.tests.utils import slow
 from datalad.tests.utils import usecase
 from datalad.tests.utils import get_datasets_topdir
 from datalad.tests.utils import SkipTest
+from datalad.tests.utils import known_failure_windows
+from datalad.tests.utils import known_failure_githubci_win
 from datalad.utils import _path_
 from datalad.utils import rmtree
 
 from ..dataset import Dataset
-from ..utils import _get_installationpath_from_url
 from ..utils import _get_git_url_from_source
 
 ###############
 # Test helpers:
 ###############
-
-
-def test_installationpath_from_url():
-    for p in ('lastbit',
-              'lastbit/',
-              '/lastbit',
-              'lastbit.git',
-              'lastbit.git/',
-              'http://example.com/lastbit',
-              'http://example.com/lastbit.git',
-              'http://lastbit:8000'
-              ):
-        eq_(_get_installationpath_from_url(p), 'lastbit')
-    # we need to deal with quoted urls
-    for url in (
-        # although some docs say that space could've been replaced with +
-        'http://localhost:8000/+last%20bit',
-        'http://localhost:8000/%2Blast%20bit',
-        '///%2Blast%20bit',
-        '///d1/%2Blast%20bit',
-        '///d1/+last bit',
-    ):
-        eq_(_get_installationpath_from_url(url), '+last bit')
-    # and the hostname alone
-    eq_(_get_installationpath_from_url("http://hostname"), 'hostname')
-    eq_(_get_installationpath_from_url("http://hostname/"), 'hostname')
 
 
 def test_get_git_url_from_source():
@@ -170,7 +138,8 @@ def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install, None)
     assert_raises(InsufficientArgumentsError, install, None, description="some")
 
-
+# ValueError: path is on mount 'D:', start on mount 'C:
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_invalid_args(path):
     assert_raises(IncompleteResultsError, install, 'Zoidberg', source='Zoidberg')
@@ -245,6 +214,8 @@ def test_install_datasets_root(tdir):
         assert_in("already exists and not empty", str(cme.exception))
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:360
+@known_failure_windows
 @with_testrepos('.*basic.*', flavors=['local-url', 'network', 'local'])
 @with_tempfile(mkdir=True)
 def test_install_simple_local(src, path):
@@ -284,6 +255,8 @@ def test_install_simple_local(src, path):
         eq_(uuid_before, ds.repo.uuid)
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:298
+@known_failure_windows
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_dataset_from_just_source(url, path):
@@ -349,6 +322,8 @@ def test_install_dataladri(src, topurl, path):
     ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:338
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -399,6 +374,11 @@ def test_install_recursive(src, path_nr, path_r):
     for subsub in subds.subdatasets(recursive=True, result_xfm='datasets'):
         ok_(subsub.is_installed())
 
+    # check that we get subdataset instances manufactored from notneeded results
+    # to install existing subdatasets again
+    eq_(subds, ds.install('recursive-in-ds'))
+
+
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_install_recursive_with_data(src, path):
@@ -408,8 +388,8 @@ def test_install_recursive_with_data(src, path):
                   result_filter=None, result_xfm=None)
     assert_status('ok', res)
     # installed a dataset and two subdatasets, and one file with content in
-    # each, plus the report that we got all content in each dataset's root dir
-    eq_(len(res), 9)
+    # each
+    eq_(len(res), 6)
     assert_result_count(res, 3, type='dataset')
     # we recurse top down during installation, so toplevel should appear at
     # first position in returned list
@@ -424,11 +404,8 @@ def test_install_recursive_with_data(src, path):
             ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
 
 
-# @known_failure_direct_mode  #FIXME:
-# If we use all testrepos, we get a mixed hierarchy. Therefore ok_clean_git
-# fails if we are in direct mode and run into a plain git beneath an annex, due
-# to currently impossible recursion of `AnnexRepo._submodules_dirty_direct_mode`
-
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:555
+@known_failure_windows
 @slow  # 88.0869s  because of going through multiple test repos, ~8sec each time
 @with_testrepos('.*annex.*', flavors=['local'])
 # 'local-url', 'network'
@@ -442,17 +419,14 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(ds.path)
 
     subds = ds.install("sub", source=source, save=False)
-    if isinstance(subds.repo, AnnexRepo) and subds.repo.is_direct_mode():
-        ok_(exists(opj(subds.path, '.git')))
-    else:
-        ok_(isdir(opj(subds.path, '.git')))
+    ok_(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     assert_in('sub', ds.subdatasets(result_xfm='relpaths'))
     # sub is clean:
     ok_clean_git(subds.path, annex=None)
     # top is too:
     ok_clean_git(ds.path, annex=None)
-    ds.save('addsub')
+    ds.save(message='addsub')
     # now it is:
     ok_clean_git(ds.path, annex=None)
 
@@ -469,15 +443,15 @@ def test_install_into_dataset(source, top_path):
     # and then decide to add it
     create(_path_(top_path, 'sub3'))
     ok_clean_git(ds.path, untracked=['dummy.txt', 'sub3/'])
-    ds.add('sub3')
+    ds.save('sub3')
     ok_clean_git(ds.path, untracked=['dummy.txt'])
 
 
+@known_failure_windows  #FIXME
 @usecase  # 39.3074s
 @skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_failed_install_multiple(top_path):
     ds = create(top_path)
 
@@ -492,7 +466,7 @@ def test_failed_install_multiple(top_path):
 
     # install doesn't add existing submodules -- add does that
     ok_clean_git(ds.path, annex=None, untracked=['ds1/', 'ds3/'])
-    ds.add(['ds1', 'ds3'])
+    ds.save(['ds1', 'ds3'])
     ok_clean_git(ds.path, annex=None)
     # those which succeeded should be saved now
     eq_(ds.subdatasets(result_xfm='relpaths'), ['crcns', 'ds1', 'ds3'])
@@ -501,6 +475,8 @@ def test_failed_install_multiple(top_path):
         {'///nonexisting', _path_(top_path, 'ds2')})
 
 
+# https://github.com/datalad/datalad/pull/3975/checks?check_run_id=369789022#step:8:318
+@known_failure_windows
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
 @with_tempfile(mkdir=True)
 def test_install_known_subdataset(src, path):
@@ -535,7 +511,6 @@ def test_install_known_subdataset(src, path):
 @slow  # 46.3650s
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-@known_failure_direct_mode  #FIXME
 def test_implicit_install(src, dst):
 
     origin_top = create(src)
@@ -543,13 +518,13 @@ def test_implicit_install(src, dst):
     origin_subsub = origin_sub.create("subsub")
     with open(opj(origin_top.path, "file1.txt"), "w") as f:
         f.write("content1")
-    origin_top.add("file1.txt")
+    origin_top.save("file1.txt")
     with open(opj(origin_sub.path, "file2.txt"), "w") as f:
         f.write("content2")
-    origin_sub.add("file2.txt")
+    origin_sub.save("file2.txt")
     with open(opj(origin_subsub.path, "file3.txt"), "w") as f:
         f.write("content3")
-    origin_subsub.add("file3.txt")
+    origin_subsub.save("file3.txt")
     origin_top.save(recursive=True)
 
     # first, install toplevel:
@@ -654,11 +629,11 @@ def test_reckless(path, top_path):
 @with_tempfile(mkdir=True)
 @skip_if_on_windows  # Due to "another process error" and buggy ok_clean_git
 def test_install_recursive_repeat(src, path):
-    subsub_src = Dataset(opj(src, 'sub 1', 'subsub')).create(force=True)
-    sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
-    sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.add('.', recursive=True)
+    sub1_src = top_src.create('sub 1', force=True)
+    sub2_src = top_src.create('sub 2', force=True)
+    subsub_src = sub1_src.create('subsub', force=True)
+    top_src.save(recursive=True)
     ok_clean_git(top_src.path)
 
     # install top level:
@@ -672,7 +647,7 @@ def test_install_recursive_repeat(src, path):
     ok_(subsub.is_installed() is False)
 
     # install again, now with data and recursive, but recursion_limit 1:
-    result = get(os.curdir, dataset=path, recursive=True, recursion_limit=1,
+    result = get(path, dataset=path, recursive=True, recursion_limit=1,
                  result_xfm='datasets')
     # top-level dataset was not reobtained
     assert_not_in(top_ds, result)
@@ -704,12 +679,15 @@ def test_install_skip_list_arguments(src, path, path_outside):
     # good and bad results together
     ok_(isinstance(result, list))
     eq_(len(result), 4)
-    # check that we have an 'impossible' status for both invalid args
+    # check that we have an 'impossible/error' status for both invalid args
     # but all the other tasks have been accomplished
-    for skipped, msg in [(opj(ds.path, 'not_existing'), "path does not exist"),
-                         (path_outside, "path not associated with any dataset")]:
-        assert_result_count(
-            result, 1, status='impossible', message=msg, path=skipped)
+    assert_result_count(
+        result, 1, status='impossible', message="path does not exist",
+        path=opj(ds.path, 'not_existing'))
+    assert_result_count(
+        result, 1, status='error',
+        message=("path not associated with dataset %s", ds),
+        path=path_outside)
     for sub in [Dataset(opj(path, 'subm 1')), Dataset(opj(path, '2'))]:
         assert_result_count(
             result, 1, status='ok',
@@ -745,17 +723,11 @@ def test_install_skip_failed_recursive(src, path):
         assert_result_count(
             result, 0, path=ds.path, type='dataset')
         # subm 1 should fail to install. [1] since comes after '2' submodule
-        assert_in_results(result, status='error', path=sub1.path)
+        assert_in_results(
+            result, status='error', path=sub1.path, type='dataset',
+            message='target path already exists and not empty, refuse to '
+                    'clone into target path')
         assert_in_results(result, status='ok', path=sub2.path)
-
-        cml.assert_logged(
-            msg="target path already exists and not empty".format(sub1.path),
-            regex=False, level='ERROR')
-    # this is not in effect that this message is not propagated up
-    # assert_in(
-    #     "destination path '{}' already exists and is not an empty directory".format(
-    #         sub1.path),
-    #     result[0]['message'][2])
 
 
 @with_tree(tree={'top_file.txt': 'some',
@@ -772,7 +744,7 @@ def test_install_noautoget_data(src, path):
     sub1_src = Dataset(opj(src, 'sub 1')).create(force=True)
     sub2_src = Dataset(opj(src, 'sub 2')).create(force=True)
     top_src = Dataset(src).create(force=True)
-    top_src.add('.', recursive=True)
+    top_src.save(recursive=True)
 
     # install top level:
     # don't filter implicitly installed subdataset to check them for content
@@ -792,12 +764,12 @@ def test_install_source_relpath(src, dest):
         ds2 = install(dest, source=src_)
 
 
+@known_failure_windows  #FIXME
 @integration  # 41.2043s
 @with_tempfile
 @with_tempfile
 @with_tempfile
 @with_tempfile
-@known_failure_direct_mode  #FIXME
 def test_install_consistent_state(src, dest, dest2, dest3):
     # if we install a dataset, where sub-dataset "went ahead" in that branch,
     # while super-dataset was not yet updated (e.g. we installed super before)
@@ -826,7 +798,7 @@ def test_install_consistent_state(src, dest, dest2, dest3):
 
     # and progress subsub2 forward to stay really thorough
     put_file_under_git(subsub2.path, 'file.dat', content="data")
-    subsub2.save("added a file")  # above function does not commit
+    subsub2.save(message="added a file")  # above function does not commit
 
     # just installing a submodule -- apparently different code/logic
     # but also the same story should hold - we should install the version pointed
@@ -948,3 +920,14 @@ def check_datasets_datalad_org(suffix, tdir):
 def test_datasets_datalad_org():
     yield check_datasets_datalad_org, ''
     yield check_datasets_datalad_org, '/.git'
+
+
+# https://github.com/datalad/datalad/issues/3469
+@with_tempfile(mkdir=True)
+def test_relpath_semantics(path):
+    with chpwd(path):
+        super = create('super')
+        create('subsrc')
+        sub = install(
+            dataset='super', source='subsrc', path=op.join('super', 'sub'))
+        eq_(sub.path, op.join(super.path, 'sub'))

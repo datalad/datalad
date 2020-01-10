@@ -83,7 +83,8 @@ class BuildManPage(Command):
             self._parser = getattr(mod, func_name)(
                 ['datalad'],
                 formatter_class=fmt.ManPageFormatter,
-                return_subparsers=True)
+                return_subparsers=True,
+                help_ignore_extensions=True)
 
         except ImportError as err:
             raise err

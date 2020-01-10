@@ -10,11 +10,6 @@ Files organization
   with major submodules being:
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
-    - `crawler/` - functionality for crawling (online) resources and creating
-      or updating datasets and collections based on the scraped/downloaded data
-        - `nodes/` processing elements which are used in the pipeline
-        - `pipelines/` pipelines generators, to produce pipelines to be ran
-        - `pipeline.py` pipeline runner
     - `customremotes/` - custom special remotes for annex provided by datalad
     - `downloaders/` - support for accessing data from various sources (e.g.
       http, S3, XNAT) via a unified interface.
@@ -126,10 +121,7 @@ we outline the workflow used by the developers:
 Development environment
 -----------------------
 
-Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
-and thus instructions below are for python 2.7 deployments.  Replace `python-{`
-with `python{,3}-{` to also install dependencies for Python 3 (e.g., if you would
-like to develop and test through tox).
+We support Python 3 only (>= 3.5).
 
 See [README.md:Dependencies](README.md#Dependencies) for basic information
 about installation of datalad itself.
@@ -138,14 +130,14 @@ since we use it to provide backports of recent fixed external modules we depend 
 
 ```sh
 apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,requests,setuptools,six}
+apt-get install -y -q patool python3-scrapy python3-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,progressbar,requests,setuptools}
 ```
 
 and additionally, for development we suggest to use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python-{dev,httpretty,nose,pip,vcr,virtualenv} python-tox
+apt-get install -y -q python3-{dev,httpretty,nose,pip,vcr,virtualenv} python3-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
@@ -406,6 +398,14 @@ Notes:
   [asv.conf.json](./asv.conf.json))
 
 
+#### Profile a benchmark and produce a nice graph visualization
+
+Example (replace with the benchmark of interest)
+
+    asv profile -v -o profile.gprof usecases.study_forrest.time_make_studyforrest_mockup
+    gprof2dot -f pstats profile.gprof | dot -Tpng -o profile.png \
+        && xdg-open profile.png
+
 #### Common options
 
 - `-E` to restrict to specific environment, e.g. `-E virtualenv:2.7`
@@ -545,7 +545,7 @@ Refer datalad/config.py for information on how to add these environment variable
 
 For the upcoming release use this template
 
-## 0.11.9 (??? ??, 2019) -- will be better than ever
+## 0.12.0rc8 (??? ??, 2019) -- will be better than ever
 
 bet we will fix some bugs and make a world even a better place.
 

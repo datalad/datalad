@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import join as opj
 from glob import glob
+import itertools
 from .base import Interface
 from ..utils import rmtree
 from ..support.param import Parameter
@@ -24,18 +25,24 @@ from ..consts import (
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.constraints import EnsureNone
-from datalad.distribution.dataset import EnsureDataset
-from datalad.distribution.dataset import require_dataset
-from datalad.distribution.dataset import datasetmethod
-from datalad.interface.annotate_paths import AnnotatePaths
-from datalad.interface.common_opts import recursion_flag
-from datalad.interface.common_opts import recursion_limit
+from datalad.distribution.dataset import (
+    EnsureDataset,
+    require_dataset,
+    datasetmethod,
+)
+from datalad.interface.common_opts import (
+    recursion_flag,
+    recursion_limit,
+)
 from datalad.interface.results import get_status_dict
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 
 from logging import getLogger
 lgr = getLogger('datalad.api.clean')
+
+# needed API commands
+import datalad.distribution.subdatasets
 
 
 @build_doc
@@ -75,24 +82,14 @@ class Clean(Interface):
     def __call__(dataset=None, what=None, recursive=False, recursion_limit=None):
         ds = require_dataset(dataset, purpose='clean-up')
         res_kwargs = dict(action='clean', logger=lgr, refds=ds.path)
-        for ap in AnnotatePaths.__call__(
-                dataset=ds.path,
+        for wds in itertools.chain([ds], ds.subdatasets(
+                fulfilled=True,
                 recursive=recursive,
                 recursion_limit=recursion_limit,
-                action='clean',
-                unavailable_path_status='impossible',
-                nondataset_path_status='impossible',
                 return_type='generator',
-                on_failure='ignore'):
-            if ap.get('status', None):
-                yield ap
-                continue
-            if ap.get('type', None) != 'dataset':
-                ap.update(status='impossible',
-                          message='only datasets can be cleaned')
-                yield ap
-                continue
-            d = ap['path']
+                result_renderer='disabled',
+                result_xfm='datasets') if recursive else []):
+            d = wds.path
             gitdir = GitRepo.get_git_dir(d)
             DIRS_PLURAL = ("directory", "directories")
             FILES_PLURAL = ("file", "files")

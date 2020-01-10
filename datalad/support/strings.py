@@ -11,14 +11,13 @@
 __docformat__ = 'restructuredtext'
 
 from collections import OrderedDict
-from six import binary_type, text_type
 import re
 
 
 def get_replacement_dict(rules):
     """Given a string with replacement rules, produces a dict of from: to"""
 
-    if isinstance(rules, (binary_type, text_type)):
+    if isinstance(rules, (bytes, str)):
         rules = [rules]
 
     pairs = OrderedDict()

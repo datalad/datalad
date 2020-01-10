@@ -25,6 +25,7 @@ Dataset operations
    generated/man/datalad-create
    generated/man/datalad-create-sibling
    generated/man/datalad-create-sibling-github
+   generated/man/datalad-create-sibling-gitlab
    generated/man/datalad-drop
    generated/man/datalad-get
    generated/man/datalad-install
@@ -95,4 +96,5 @@ Plumbing commands
    generated/man/datalad-diff
    generated/man/datalad-sshrun
    generated/man/datalad-siblings
+   generated/man/datalad-status
    generated/man/datalad-subdatasets

@@ -37,7 +37,7 @@ from datalad.interface.utils import path_is_under
 from datalad.interface.utils import eval_results
 from datalad.interface.base import build_doc
 from datalad.interface.results import get_status_dict
-from datalad.interface.save import Save
+from datalad.core.local.save import Save
 from datalad.distribution.drop import _drop_files
 from datalad.distribution.drop import dataset_argument
 from datalad.distribution.drop import check_argument
@@ -197,10 +197,7 @@ class Remove(Interface):
                         # this is for subdatasets of the to-be-removed dataset
                         # we want to simply uninstall them in a regular manner
                         for r in Uninstall.__call__(
-                                # use annotate path as input, but pass a copy because
-                                # we cannot rely on it being unaltered by reannotation
-                                # TODO maybe adjust annotate_path to do that
-                                [ap.copy()],
+                                ap['path'],
                                 dataset=refds_path, recursive=recursive, check=check,
                                 if_dirty=if_dirty, result_xfm=None, result_filter=None,
                                 on_failure='ignore'):
@@ -292,8 +289,7 @@ class Remove(Interface):
             return
 
         for res in Save.__call__(
-                # TODO compose hand-selected annotated paths
-                path=to_save,
+                path=[ap["path"] for ap in to_save],
                 # we might have removed the reference dataset by now, recheck
                 dataset=refds_path
                         if (refds_path and GitRepo.is_valid_repo(refds_path))

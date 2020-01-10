@@ -15,6 +15,10 @@ From an interactive Python session, import `datalad.api` and inspect its
 documentation with `help`.
 """
 
+if not __debug__:
+    raise RuntimeError('DataLad cannot run in "optimized" mode, i.e. python -O')
+
+
 # For reproducible demos/tests
 import os
 _seed = os.environ.get('DATALAD_SEED', None)
@@ -126,10 +130,6 @@ def setup_package():
 """)
         _TEMP_PATHS_GENERATED.append(new_home)
 
-    # For now we will just verify that it is ready to run the tests
-    from datalad.support.gitrepo import check_git_configured
-    check_git_configured()
-
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
     # But then haskell libraries do not digest empty value nicely, so we just
@@ -167,7 +167,7 @@ def setup_package():
 
     # Monkey patch nose so it does not ERROR out whenever code asks for fileno
     # of the output. See https://github.com/nose-devs/nose/issues/6
-    from six.moves import StringIO as OrigStringIO
+    from io import StringIO as OrigStringIO
 
     class StringIO(OrigStringIO):
         fileno = lambda self: 1

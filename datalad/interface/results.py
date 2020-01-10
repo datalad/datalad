@@ -20,9 +20,12 @@ from os.path import join as opj
 from os.path import relpath
 from os.path import abspath
 from os.path import normpath
-from datalad.utils import assure_list
-from datalad.utils import with_pathsep as _with_sep
-from datalad.utils import path_is_subpath
+from datalad.utils import (
+    assure_list,
+    with_pathsep as _with_sep,
+    path_is_subpath,
+    PurePosixPath,
+)
 from datalad.support.path import robust_abspath
 
 from datalad.distribution.dataset import Dataset
@@ -209,12 +212,13 @@ def annexjson2result(d, ds, **kwargs):
       Passes as-is to `get_status_dict`. Must not contain `refds`.
     """
     lgr.debug('received JSON result from annex: %s', d)
+    messages = []
     res = get_status_dict(**kwargs)
     res['status'] = 'ok' if d.get('success', False) is True else 'error'
     # we cannot rely on any of these to be available as the feed from
     # git annex (or its wrapper) is not always homogeneous
     if 'file' in d:
-        res['path'] = opj(ds.path, d['file'])
+        res['path'] = str(ds.pathobj / PurePosixPath(d['file']))
     if 'command' in d:
         res['action'] = d['command']
     if 'key' in d:
@@ -224,13 +228,18 @@ def annexjson2result(d, ds, **kwargs):
         res['metadata'] = {k: v[0] if isinstance(v, list) and len(v) == 1 else v
                            for k, v in d['fields'].items()
                            if not k.endswith('lastchanged')}
-    # avoid meaningless standard messages
-    if 'note' in d:
+    if d.get('error-messages', None):
+        messages.extend(d['error-messages'])
+    # avoid meaningless standard messages, and collision with actual error
+    # messages
+    elif 'note' in d:
         note = "; ".join(ln for ln in d['note'].splitlines()
                          if ln != 'checksum...'
                          and not ln.startswith('checking file'))
         if note:
-            res['message'] = translate_annex_notes.get(note, note)
+            messages.append(translate_annex_notes.get(note, note))
+    if messages:
+        res['message'] = '\n'.join(m.strip() for m in messages)
     return res
 
 
@@ -272,7 +281,8 @@ def is_result_matching_pathsource_argument(res, **kwargs):
     if respath in paths:
         # absolute match, pretty sure we want this
         return True
-    elif kwargs.get('dataset', None) and YieldRelativePaths()(res) in paths:
+    elif isinstance(kwargs.get('dataset', None), Dataset) and \
+            YieldRelativePaths()(res) in paths:
         # command was called with a reference dataset, and a relative
         # path of a result matches in input argument -- not 100% exhaustive
         # test, but could be good enough

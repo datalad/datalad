@@ -11,7 +11,6 @@ import platform
 import sys
 import os
 import random
-import traceback
 import logging
 
 try:
@@ -23,11 +22,9 @@ except ImportError:  # pragma: no cover
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from six import PY2, PY3
-from six import text_type
-from six.moves.urllib.request import urlopen
+from urllib.request import urlopen
 
-from mock import patch
+from unittest.mock import patch
 from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
 
@@ -43,7 +40,8 @@ from .utils import (
     swallow_outputs, swallow_logs,
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http,
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink,
-    ok_file_under_git
+    ok_file_under_git,
+    known_failure_githubci_win,
 )
 from .utils import ok_generator
 from .utils import assert_dict_equal
@@ -205,6 +203,7 @@ def test_with_tempfile_specified_prefix(d1):
     ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
+@known_failure_githubci_win
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
     if platform.system() in ('Linux', 'Darwin'):
@@ -292,8 +291,6 @@ def test_ok_generator():
     def gen(a, b=1):  # pragma: no cover
         yield a+b
     # not sure how to determine if xrange is a generator
-    if PY2:
-        assert_raises(AssertionError, ok_generator, xrange(2))
     assert_raises(AssertionError, ok_generator, range(2))
     assert_raises(AssertionError, ok_generator, gen)
     ok_generator(gen(1))
@@ -361,12 +358,6 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         with assert_raises(ValueError) as cm:
             do_chdir_value_error()
         # retrospect exception
-        if PY2:
-            # could not figure out how to make it legit for PY3
-            # but on manual try -- works, and exception traceback is not masked out
-            exc_info = sys.exc_info()
-            assert_in('raise ValueError("error exception")', traceback.format_exception(*exc_info)[-2])
-
         eq_(orig_cwd, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_cwd)
         assert_in("Mitigating and changing back", cml.out)
@@ -398,8 +389,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
-    test_fpath_full = text_type(os.path.join(tmp_dir, test_fpath))
-    test_fpath_dir = text_type(os.path.dirname(test_fpath_full))
+    test_fpath_full = str(os.path.join(tmp_dir, test_fpath))
+    test_fpath_dir = str(os.path.dirname(test_fpath_full))
 
     if not os.path.exists(test_fpath_dir):
         os.makedirs(test_fpath_dir)
@@ -432,6 +423,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir):  # pragma: no cover
     test_path_and_url()
 
 
+# just look at the path specs...
+@known_failure_githubci_win
 def test_serve_path_via_http():
     for test_fpath in ['test1.txt',
                        'test_dir/test2.txt',
@@ -448,6 +441,7 @@ def test_serve_path_via_http():
         yield _test_serve_path_via_http, test_fpath
 
 
+@known_failure_githubci_win
 def test_without_http_proxy():
 
     @without_http_proxy

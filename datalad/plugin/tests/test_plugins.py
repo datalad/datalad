@@ -10,11 +10,10 @@
 """Test plugin interface mechanics"""
 
 
-from datalad.tests.utils import known_failure_direct_mode
 
 from os.path import join as opj
 
-from datalad.coreapi import create
+from datalad.api import create
 from datalad.coreapi import Dataset
 from datalad.dochelpers import exc_str
 from datalad.api import wtf
@@ -39,6 +38,7 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import OBSCURE_FILENAME
+from datalad.tests.utils import known_failure_githubci_win
 
 
 broken_plugin = """garbage"""
@@ -121,7 +121,9 @@ def test_wtf(topdir):
                     '## %s' % s.lower(), cmo.out.lower()
                 )
             # order should match our desired one, not alphabetical
-            assert cmo.out.index('## git-annex') < cmo.out.index('## configuration')
+            # but because of https://github.com/datalad/datalad/issues/3915
+            # alphanum is now desired
+            assert cmo.out.index('## git-annex') > cmo.out.index('## configuration')
 
     # not achievable from cmdline is to pass an empty list of sections.
     with chpwd(path):
@@ -159,6 +161,7 @@ def test_wtf(topdir):
         assert_in("cmd:annex:", pyperclip.paste())  # but the content is there
 
 
+@known_failure_githubci_win
 @with_tempfile(mkdir=True)
 def test_no_annex(path):
     ds = create(path)
@@ -170,10 +173,10 @@ def test_no_annex(path):
             'notinannex': 'othercontent'},
          'README': 'please'})
     # add inannex pre configuration
-    ds.add(opj('code', 'inannex'))
-    no_annex(pattern=['code/**', 'README'], dataset=ds)
+    ds.save(opj('code', 'inannex'))
+    no_annex(pattern=['code/**', 'README'], dataset=ds.path)
     # add inannex and README post configuration
-    ds.add([opj('code', 'notinannex'), 'README'])
+    ds.save([opj('code', 'notinannex'), 'README'])
     ok_clean_git(ds.path)
     # one is annex'ed, the other is not, despite no change in add call
     # importantly, also .gitattribute is not annexed
@@ -203,7 +206,7 @@ _ds_template = {
 @with_tree(_ds_template)
 def test_add_readme(path):
     ds = Dataset(path).create(force=True)
-    ds.add('.')
+    ds.save()
     ds.aggregate_metadata()
     ok_clean_git(ds.path)
     assert_status('ok', ds.add_readme())

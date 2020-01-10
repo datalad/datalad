@@ -21,39 +21,45 @@ import shlex
 from os import curdir
 from os import pardir
 from os import listdir
+import os.path as op
 from os.path import join as opj
 from os.path import isdir
 from os.path import relpath
 from os.path import sep
 from os.path import split as psplit
 from itertools import chain
-from six import PY2
 
 import json
 
 # avoid import from API to not get into circular imports
 from datalad.utils import with_pathsep as _with_sep  # TODO: RF whenever merge conflict is not upon us
-from datalad.utils import path_startswith
-from datalad.utils import path_is_subpath
-from datalad.utils import assure_unicode
-from datalad.utils import getargspec
+from datalad.utils import (
+    path_startswith,
+    path_is_subpath,
+    assure_unicode,
+    getargspec,
+    get_wrapped_class,
+)
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import IncompleteResultsError
 from datalad import cfg as dlcfg
 from datalad.dochelpers import exc_str
 
 
-from datalad.support.constraints import Constraint
-
 from datalad.ui import ui
 import datalad.support.ansi_colors as ac
 
-from datalad.interface.base import Interface
 from datalad.interface.base import default_logchannels
 from datalad.interface.base import get_allargs_as_kwargs
 from datalad.interface.common_opts import eval_params
 from datalad.interface.common_opts import eval_defaults
 from .results import known_result_xfms
+from datalad.config import ConfigManager
+from datalad.core.local.resulthooks import (
+    get_jsonhooks_from_config,
+    match_jsonhook2result,
+    run_jsonhook,
+)
 
 
 lgr = logging.getLogger('datalad.interface.utils')
@@ -97,15 +103,13 @@ def handle_dirty_dataset(ds, mode, msg=None):
     if mode == 'ignore':
         return
     elif mode == 'fail':
-        if not ds.repo or ds.repo.is_dirty(index=True,
-                                           untracked_files=True,
-                                           submodules=True):
+        if not ds.repo or ds.repo.dirty:
             raise RuntimeError('dataset {} has unsaved changes'.format(ds))
     elif mode == 'save-before':
         if not ds.is_installed():
             raise RuntimeError('dataset {} is not yet installed'.format(ds))
-        from datalad.interface.save import Save
-        Save.__call__(dataset=ds, message=msg)
+        from datalad.core.local.save import Save
+        Save.__call__(dataset=ds, message=msg, updated=True)
     else:
         raise ValueError("unknown if-dirty mode '{}'".format(mode))
 
@@ -160,7 +164,14 @@ def path_is_under(values, path=None):
         path = getpwd()
     if isinstance(values, dict):
         values = chain(*values.values())
+    path_drive, _ = op.splitdrive(path)
     for p in values:
+        p_drive, _ = op.splitdrive(p)
+        # need to protect against unsupported use of relpath() with
+        # abspaths on windows from different drives (gh-3724)
+        if path_drive != p_drive:
+        # different drives, enough evidence for "not under"
+            continue
         rpath = relpath(p, start=path)
         if rpath == curdir \
                 or rpath == pardir \
@@ -255,6 +266,16 @@ def discover_dataset_trace_to_targets(basepath, targetpaths, current_trace,
                 undiscovered_ds)
 
 
+def get_result_filter(fx):
+    """Wrap a filter into a helper to be able to accept additional
+    arguments, if the filter doesn't support it already"""
+    _fx = fx
+    if fx and not getargspec(fx).keywords:
+        def _fx(res, **kwargs):
+            return fx(res)
+    return _fx
+
+
 def eval_results(func):
     """Decorator for return value evaluation of datalad commands.
 
@@ -299,103 +320,66 @@ def eval_results(func):
     @wrapt.decorator
     def eval_func(wrapped, instance, args, kwargs):
         lgr.log(2, "Entered eval_func for %s", func)
-        # for result filters and pre/post procedures
+        # for result filters
         # we need to produce a dict with argname/argvalue pairs for all args
         # incl. defaults and args given as positionals
         allkwargs = get_allargs_as_kwargs(wrapped, args, kwargs)
-        # determine class, the __call__ method of which we are decorating:
-        # Ben: Note, that this is a bit dirty in PY2 and imposes restrictions on
-        # when and how to use eval_results as well as on how to name a command's
-        # module and class. As of now, we are inline with these requirements as
-        # far as I'm aware.
-        mod = sys.modules[wrapped.__module__]
-        if PY2:
-            # we rely on:
-            # - decorated function is method of a subclass of Interface
-            # - the name of the class matches the last part of the module's name
-            #   if converted to lower
-            # for example:
-            # ..../where/ever/mycommand.py:
-            # class MyCommand(Interface):
-            #     @eval_results
-            #     def __call__(..)
-            command_class_names = \
-                [i for i in mod.__dict__
-                 if type(mod.__dict__[i]) == type and
-                 issubclass(mod.__dict__[i], Interface) and
-                 i.lower().startswith(wrapped.__module__.split('.')[-1].replace('datalad_', '').replace('_', ''))]
-            assert len(command_class_names) == 1, (command_class_names, mod.__name__)
-            command_class_name = command_class_names[0]
-        else:
-            command_class_name = wrapped.__qualname__.split('.')[-2]
-        _func_class = mod.__dict__[command_class_name]
-        lgr.debug("Determined class of decorated function: %s", _func_class)
+
+        # determine the command class associated with `wrapped`
+        wrapped_class = get_wrapped_class(wrapped)
 
         # retrieve common options from kwargs, and fall back on the command
         # class attributes, or general defaults if needed
         kwargs = kwargs.copy()  # we will pop, which might cause side-effect
         common_params = {
             p_name: kwargs.pop(
+                # go with any explicitly given default
                 p_name,
-                getattr(_func_class, p_name, eval_defaults[p_name]))
+                # otherwise determine the command class and pull any
+                # default set in that class
+                getattr(
+                    wrapped_class,
+                    p_name,
+                    # or the common default
+                    eval_defaults[p_name]))
             for p_name in eval_params}
+
         # short cuts and configured setup for common options
-        on_failure = common_params['on_failure']
         return_type = common_params['return_type']
+        result_filter = get_result_filter(common_params['result_filter'])
         # resolve string labels for transformers too
-        result_xfm = common_params['result_xfm']
-        if result_xfm in known_result_xfms:
-            result_xfm = known_result_xfms[result_xfm]
+        result_xfm = known_result_xfms.get(
+            common_params['result_xfm'],
+            # use verbatim, if not a known label
+            common_params['result_xfm'])
         result_renderer = common_params['result_renderer']
         # TODO remove this conditional branch entirely, done outside
         if not result_renderer:
             result_renderer = dlcfg.get('datalad.api.result-renderer', None)
-        # wrap the filter into a helper to be able to pass additional arguments
-        # if the filter supports it, but at the same time keep the required interface
-        # as minimal as possible. Also do this here, in order to avoid this test
-        # to be performed for each return value
-        result_filter = common_params['result_filter']
-        _result_filter = result_filter
-        if result_filter:
-            if isinstance(result_filter, Constraint):
-                _result_filter = result_filter.__call__
-            if getargspec(_result_filter).keywords:
-                def _result_filter(res):
-                    return result_filter(res, **allkwargs)
-
-        def _get_procedure_specs(param_key=None, cfg_key=None, ds=None, proc_cfg=None):
-            lgr.log(2, "Getting procedure specs for %s of %s", param_key, ds)
-            spec = common_params.get(param_key, None)
-            if spec is not None:
-                # this is already a list of lists
-                return spec, proc_cfg
-
-            if not proc_cfg:
-                # .is_installed and .config can be costly, so ensure we do
-                # it only once. See https://github.com/datalad/datalad/issues/3575
-                from datalad.distribution.dataset import Dataset
-                ds = ds if isinstance(ds, Dataset) else Dataset(ds) if ds else None
-                proc_cfg = ds.config if ds and ds.is_installed() else dlcfg
-
-            spec = proc_cfg.get(cfg_key, None)
-            if spec is None:
-                return None, proc_cfg
-            elif not isinstance(spec, tuple):
-                spec = [spec]
-            return [shlex.split(s) for s in spec], proc_cfg
+        # look for potential override of logging behavior
+        result_log_level = dlcfg.get('datalad.log.result-level', None)
 
         # query cfg for defaults
-        cmdline_name = cls2cmdlinename(_func_class)
+        # .is_installed and .config can be costly, so ensure we do
+        # it only once. See https://github.com/datalad/datalad/issues/3575
         dataset_arg = allkwargs.get('dataset', None)
-        proc_pre, proc_cfg = _get_procedure_specs(
-            'proc_pre',
-            'datalad.{}.proc-pre'.format(cmdline_name),
-            ds=dataset_arg)
-        proc_post, proc_cfg = _get_procedure_specs(
-            'proc_post',
-            'datalad.{}.proc-post'.format(cmdline_name),
-            ds=dataset_arg,
-            proc_cfg=proc_cfg)
+        from datalad.distribution.dataset import Dataset
+        ds = dataset_arg if isinstance(dataset_arg, Dataset) \
+            else Dataset(dataset_arg) if dataset_arg else None
+        # do not reuse a dataset's existing config manager here
+        # they are configured to read the committed dataset configuration
+        # too. That means a datalad update can silently bring in new
+        # procedure definitions from the outside, and in some sense enable
+        # remote code execution by a 3rd-party
+        # To avoid that, create a new config manager that only reads local
+        # config (system and .git/config), plus any overrides given to this
+        # datalad session
+        proc_cfg = ConfigManager(
+            ds, source='local', overrides=dlcfg.overrides
+        ) if ds and ds.is_installed() else dlcfg
+
+        # look for hooks
+        hooks = get_jsonhooks_from_config(proc_cfg)
 
         # this internal helper function actually drives the command
         # generator-style, it may generate an exception if desired,
@@ -406,57 +390,67 @@ def eval_results(func):
             # track what actions were performed how many times
             action_summary = {}
 
-            if proc_pre and cmdline_name != 'run-procedure':
-                from datalad.interface.run_procedure import RunProcedure
-                for procspec in proc_pre:
-                    lgr.debug('Running configured pre-procedure %s', procspec)
-                    for r in _process_results(
-                            RunProcedure.__call__(
-                                procspec,
-                                dataset=dataset_arg,
-                                return_type='generator'),
-                            _func_class, action_summary,
-                            on_failure, incomplete_results,
-                            result_renderer, result_xfm, result_filter,
-                            **_kwargs):
-                        yield r
-
             # if a custom summary is to be provided, collect the results
             # of the command execution
             results = []
             do_custom_result_summary = result_renderer == 'tailored' \
-                and hasattr(_func_class, 'custom_result_summary_renderer')
+                and hasattr(wrapped_class, 'custom_result_summary_renderer')
 
             # process main results
             for r in _process_results(
+                    # execution
                     wrapped(*_args, **_kwargs),
-                    _func_class, action_summary,
-                    on_failure, incomplete_results,
-                    result_renderer, result_xfm, _result_filter, **_kwargs):
-                yield r
+                    wrapped_class,
+                    common_params['on_failure'],
+                    # bookkeeping
+                    action_summary,
+                    incomplete_results,
+                    # communication
+                    result_renderer,
+                    result_log_level,
+                    # let renderers get to see how a command was called
+                    allkwargs):
+                for hook, spec in hooks.items():
+                    # run the hooks before we yield the result
+                    # this ensures that they are executed before
+                    # a potentially wrapper command gets to act
+                    # on them
+                    if match_jsonhook2result(hook, r, spec['match']):
+                        lgr.debug('Result %s matches hook %s', r, hook)
+                        # a hook is also a command that yields results
+                        # so yield them outside too
+                        # users need to pay attention to void infinite
+                        # loops, i.e. when a hook yields a result that
+                        # triggers that same hook again
+                        for hr in run_jsonhook(hook, spec, r, dataset_arg):
+                            # apply same logic as for main results, otherwise
+                            # any filters would only tackle the primary results
+                            # and a mixture of return values could happen
+                            if not keep_result(hr, result_filter, **allkwargs):
+                                continue
+                            hr = xfm_result(hr, result_xfm)
+                            # rationale for conditional is a few lines down
+                            if hr:
+                                yield hr
+                if not keep_result(r, result_filter, **allkwargs):
+                    continue
+                r = xfm_result(r, result_xfm)
+                # in case the result_xfm decided to not give us anything
+                # exclude it from the results. There is no particular reason
+                # to do so other than that it was established behavior when
+                # this comment was written. This will not affect any real
+                # result record
+                if r:
+                    yield r
+
                 # collect if summary is desired
                 if do_custom_result_summary:
                     results.append(r)
 
-            if proc_post and cmdline_name != 'run-procedure':
-                from datalad.interface.run_procedure import RunProcedure
-                for procspec in proc_post:
-                    lgr.debug('Running configured post-procedure %s', procspec)
-                    for r in _process_results(
-                            RunProcedure.__call__(
-                                procspec,
-                                dataset=dataset_arg,
-                                return_type='generator'),
-                            _func_class, action_summary,
-                            on_failure, incomplete_results,
-                            result_renderer, result_xfm, result_filter,
-                            **_kwargs):
-                        yield r
-
             # result summary before a potential exception
             # custom first
             if do_custom_result_summary:
-                _func_class.custom_result_summary_renderer(results)
+                wrapped_class.custom_result_summary_renderer(results)
             elif result_renderer == 'default' and action_summary and \
                     sum(sum(s.values()) for s in action_summary.values()) > 1:
                 # give a summary in default mode, when there was more than one
@@ -475,7 +469,7 @@ def eval_results(func):
 
         if return_type == 'generator':
             # hand over the generator
-            lgr.log(2, "Returning generator_func from eval_func for %s", _func_class)
+            lgr.log(2, "Returning generator_func from eval_func for %s", wrapped_class)
             return generator_func(*args, **kwargs)
         else:
             @wrapt.decorator
@@ -488,14 +482,14 @@ def eval_results(func):
                 # render summaries
                 if not result_xfm and result_renderer == 'tailored':
                     # cannot render transformed results
-                    if hasattr(_func_class, 'custom_result_summary_renderer'):
-                        _func_class.custom_result_summary_renderer(results)
+                    if hasattr(wrapped_class, 'custom_result_summary_renderer'):
+                        wrapped_class.custom_result_summary_renderer(results)
                 if return_type == 'item-or-list' and \
                         len(results) < 2:
                     return results[0] if results else None
                 else:
                     return results
-            lgr.log(2, "Returning return_func from eval_func for %s", _func_class)
+            lgr.log(2, "Returning return_func from eval_func for %s", wrapped_class)
             return return_func(generator_func)(*args, **kwargs)
 
     return eval_func(func)
@@ -503,12 +497,12 @@ def eval_results(func):
 
 def default_result_renderer(res):
     if res.get('status', None) != 'notneeded':
+        path = res['path']
+        path = str(path)
         ui.message('{action}({status}): {path}{type}{msg}'.format(
                 action=ac.color_word(res['action'], ac.BOLD),
                 status=ac.color_status(res['status']),
-                path=relpath(res['path'],
-                             res['refds']) if res.get('refds', None) else res[
-                    'path'],
+                path=relpath(path, res['refds']) if res.get('refds') else path,
                 type=' ({})'.format(
                         ac.color_word(res['type'], ac.MAGENTA)
                 ) if 'type' in res else '',
@@ -516,13 +510,18 @@ def default_result_renderer(res):
                         res['message'][0] % res['message'][1:]
                         if isinstance(res['message'], tuple) else res[
                             'message'])
-                if 'message' in res else ''))
+                if res.get('message', None) else ''))
 
 
 def _process_results(
-        results, cmd_class,
-        action_summary, on_failure, incomplete_results,
-        result_renderer, result_xfm, result_filter, **kwargs):
+        results,
+        cmd_class,
+        on_failure,
+        action_summary,
+        incomplete_results,
+        result_renderer,
+        result_log_level,
+        allkwargs):
     # private helper pf @eval_results
     # loop over results generated from some source and handle each
     # of them according to the requested behavior (logging, rendering, ...)
@@ -532,24 +531,24 @@ def _process_results(
             # record to figure out WTF, so he just skips it
             continue
 
-        if PY2:
-            for k, v in res.items():
-                if isinstance(v, unicode):
-                    res[k] = v.encode('utf-8')
-
         actsum = action_summary.get(res['action'], {})
         if res['status']:
             actsum[res['status']] = actsum.get(res['status'], 0) + 1
             action_summary[res['action']] = actsum
-        ## log message, if a logger was given
+        ## log message, if there is one and a logger was given
+        msg = res.get('message', None)
         # remove logger instance from results, as it is no longer useful
         # after logging was done, it isn't serializable, and generally
         # pollutes the output
         res_lgr = res.pop('logger', None)
-        if isinstance(res_lgr, logging.Logger):
-            # didn't get a particular log function, go with default
-            res_lgr = getattr(res_lgr, default_logchannels[res['status']])
-        if res_lgr and 'message' in res:
+        if msg and res_lgr:
+            if isinstance(res_lgr, logging.Logger):
+                # didn't get a particular log function, go with default
+                res_lgr = getattr(
+                    res_lgr,
+                    default_logchannels[res['status']]
+                    if result_log_level is None
+                    else result_log_level)
             msg = res['message']
             msgargs = None
             if isinstance(msg, tuple):
@@ -563,23 +562,7 @@ def _process_results(
                 res_lgr(msg, *msgargs)
             else:
                 res_lgr(msg)
-        ## error handling
-        # looks for error status, and report at the end via
-        # an exception
-        if on_failure in ('continue', 'stop') \
-                and res['status'] in ('impossible', 'error'):
-            incomplete_results.append(res)
-            if on_failure == 'stop':
-                # first fail -> that's it
-                # raise will happen after the loop
-                break
-        if result_filter:
-            try:
-                if not result_filter(res):
-                    raise ValueError('excluded by filter')
-            except ValueError as e:
-                lgr.debug('not reporting result (%s)', exc_str(e))
-                continue
+
         ## output rendering
         # TODO RF this in a simple callable that gets passed into this function
         if result_renderer is None or result_renderer == 'disabled':
@@ -595,23 +578,47 @@ def _process_results(
                 default=lambda x: str(x)))
         elif result_renderer == 'tailored':
             if hasattr(cmd_class, 'custom_result_renderer'):
-                cmd_class.custom_result_renderer(res, **kwargs)
+                cmd_class.custom_result_renderer(res, **allkwargs)
         elif hasattr(result_renderer, '__call__'):
             try:
-                result_renderer(res, **kwargs)
+                result_renderer(res, **allkwargs)
             except Exception as e:
                 lgr.warning('Result rendering failed for: %s [%s]',
                             res, exc_str(e))
         else:
             raise ValueError('unknown result renderer "{}"'.format(result_renderer))
 
-        if PY2:
-            for k, v in res.items():
-                if isinstance(v, str):
-                    res[k] = v.decode('utf-8')
-
-        if result_xfm:
-            res = result_xfm(res)
-            if res is None:
-                continue
+        ## error handling
+        # looks for error status, and report at the end via
+        # an exception
+        if on_failure in ('continue', 'stop') \
+                and res['status'] in ('impossible', 'error'):
+            incomplete_results.append(res)
+            if on_failure == 'stop':
+                # first fail -> that's it
+                # raise will happen after the loop
+                break
         yield res
+
+
+def keep_result(res, rfilter, **kwargs):
+    if not rfilter:
+        return True
+    try:
+        if not rfilter(res, **kwargs):
+            # give the slightest indication which filter was employed
+            raise ValueError(
+                'excluded by filter {} with arguments {}'.format(rfilter, kwargs))
+    except ValueError as e:
+        # make sure to report the excluded result to massively improve
+        # debugging experience
+        lgr.debug('Not reporting result (%s): %s', exc_str(e), res)
+        return False
+    return True
+
+
+def xfm_result(res, xfm):
+    if not xfm:
+        return res
+
+    return xfm(res)

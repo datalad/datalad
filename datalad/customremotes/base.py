@@ -19,8 +19,7 @@ import sys
 
 from ..support.path import exists, join as opj, realpath, dirname, lexists
 
-from six.moves import range
-from six.moves.urllib.parse import urlparse
+from urllib.parse import urlparse
 
 import logging
 lgr = logging.getLogger('datalad.customremotes')

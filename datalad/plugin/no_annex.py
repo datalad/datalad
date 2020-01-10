@@ -132,12 +132,12 @@ class NoAnnex(Interface):
                 return
 
         gitattr_file = opj(gitattr_dir, '.gitattributes')
-        dataset.repo.set_gitattributes(
+        ds.repo.set_gitattributes(
             [(p, {'annex.largefiles': 'nothing'}) for p in pattern],
             attrfile=gitattr_file)
         yield dict(res_kwargs, status='ok')
 
-        for r in dataset.add(
+        for r in ds.save(
                 gitattr_file,
                 to_git=True,
                 message="[DATALAD] exclude paths from annex'ing",

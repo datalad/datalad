@@ -51,6 +51,9 @@ def check_repo_deals_with_inode_change(class_, path, temp_store):
 
     # The following two accesses fail in issue #1512:
     # 1. requesting HEAD info from old instance
+    #
+    # Note: This checks that we don't hit a GitPython failure, so this test
+    # must use .repo.head.object.hexsha, not repo.get_hexsha().
     hexsha = repo.repo.head.object.hexsha
 
     # 2. get a "new" instance and requesting HEAD

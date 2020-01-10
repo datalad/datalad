@@ -9,18 +9,18 @@
 """Tests for test repositories
 
 """
-from os.path import join as opj
-
-from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo
-from .utils import with_tempfile, assert_true, ok_clean_git, eq_, ok_
-from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
-from .utils import swallow_outputs
-from .utils import on_windows
-from .utils import SkipTest
-
-# TODO: still true?
-if on_windows:
-    raise SkipTest("experiencing issues on windows -- disabled for now")
+from datalad.tests.utils_testrepos import (
+    BasicAnnexTestRepo,
+    BasicGitTestRepo,
+)
+from datalad.tests.utils import (
+    with_tempfile,
+    ok_clean_git,
+    ok_,
+    ok_file_under_git,
+    swallow_outputs,
+    skip_if_on_windows,
+)
 
 
 def _test_BasicAnnexTestRepo(repodir):
@@ -38,6 +38,10 @@ def _test_BasicAnnexTestRepo(repodir):
 
 # Use of @with_tempfile() apparently is not friendly to test generators yet
 # so generating two tests manually
+# something is wrong with the implicit tempfile generation on windows
+# a bunch of tested assumptions aren't met, and which ones depends on the
+# windows version being tested
+@skip_if_on_windows
 def test_BasicAnnexTestRepo_random_location_generated():
     _test_BasicAnnexTestRepo(None)  # without explicit path -- must be generated
 

@@ -99,7 +99,7 @@ def externals_use_cassette(name):
     For instance whenever we are testing custom special remotes invoked by the annex
     but want to minimize their network traffic by using vcr.py
     """
-    from mock import patch
+    from unittest.mock import patch
     cassette_path = realpath(_get_cassette_path(name))  # realpath OK
     with patch.dict('os.environ', {'DATALAD_TESTS_USECASSETTE': cassette_path}):
         yield
