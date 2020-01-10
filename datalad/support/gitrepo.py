@@ -940,7 +940,11 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
         if isinstance(url_ri, PathRI):
             path = Path(url)
             if not path.is_absolute():
-                gr.config.set('remote.origin.url', path.as_posix(),
+                # always in POSIX even on windows
+                path = path.as_posix()
+                if not path.startswith(op.pardir + '/'):
+                    path = posixpath.join(op.curdir, path)
+                gr.config.set('remote.origin.url', path,
                               where='local', force=True)
         return gr
 
