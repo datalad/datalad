@@ -60,6 +60,7 @@ from datalad.tests.utils import (
     skip_if_no_network,
     skip_if,
     with_sameas_remote,
+    known_failure,
     known_failure_appveyor,
 )
 from datalad.core.distributed.clone import _get_installationpath_from_url
@@ -200,6 +201,9 @@ def test_clone_dataset_from_just_source(url, path):
     assert_in('INFO.txt', ds.repo.get_indexed_files())
 
 
+# test fails randomly, likely a bug in one of the employed test helpers
+# https://github.com/datalad/datalad/pull/3966#issuecomment-571267932
+@known_failure
 @with_tree(tree={
     'ds': {'test.txt': 'some'},
     })
