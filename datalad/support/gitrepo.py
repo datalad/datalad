@@ -934,6 +934,14 @@ class GitRepo(RepoInterface, metaclass=PathBasedFlyweight):
                 gr.fsck()
             else:
                 lgr.warning("Experienced issues while cloning: %s", exc_str(fix_annex))
+        # make sure that Git doesn't mangle relative path specification into
+        # mildly obscure absolute paths
+        # https://github.com/datalad/datalad/issues/3538
+        if isinstance(url_ri, PathRI):
+            path = Path(url)
+            if not path.is_absolute():
+                gr.config.set('remote.origin.url', path.as_posix(),
+                              where='local', force=True)
         return gr
 
     def __del__(self):
