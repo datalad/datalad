@@ -4,6 +4,13 @@ datalad (0.12.0~rc7-1) UNRELEASED; urgency=medium
 
  -- Michael Hanke <mih@debian.org>  Fri, 10 Jan 2020 09:28:09 +0100
 
+datalad (0.11.8-2) UNRELEASED; urgency=medium
+
+  * debian/control
+    - adding python3-distro to build-depends (Closes: #948533)
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 09 Jan 2020 18:36:52 -0500
+
 datalad (0.11.8-1) unstable; urgency=medium
 
   * Fresh upstream release (from tomorrow)
