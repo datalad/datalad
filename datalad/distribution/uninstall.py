@@ -22,6 +22,7 @@ from datalad.support.constraints import (
     EnsureStr,
     EnsureNone,
 )
+from datalad.local.subdatasets import Subdatasets
 from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
@@ -179,7 +180,11 @@ class Uninstall(Interface):
                 return
 
         saw_subds = False
-        for ds in itertools.chain(refds.subdatasets(
+        for ds in itertools.chain(Subdatasets.__call__(
+                # it is critical to pass the dataset arg as-is
+                # to not invalidate the path argument semantics
+                # in subdatasets()
+                dataset=dataset,
                 path=path,
                 fulfilled=True,
                 # makes no sense to ignore subdatasets further down

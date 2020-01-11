@@ -481,7 +481,8 @@ def test_get_local_file_url_compatibility(path):
     # compat with git clone/submodule
     assert_status(
         'ok',
-        ds1.clone(get_local_file_url(ds2.path, compatibility='git')))
+        ds1.clone(get_local_file_url(ds2.path, compatibility='git'),
+                  result_xfm=None, return_type='generator'))
 
 
 def test_is_ssh():

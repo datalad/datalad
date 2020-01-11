@@ -47,10 +47,15 @@ from nose.tools import assert_is_instance
 from nose import SkipTest
 
 import datalad.utils as ut
+# TODO this must go
+from ..utils import *
+from datalad.utils import (
+    Path,
+    ensure_unicode,
+)
 
 from ..cmd import Runner
 from .. import utils
-from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
@@ -240,7 +245,6 @@ def skip_v6_or_later(func, method='raise'):
 
 import git
 import os
-from os.path import exists, join
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from datalad.distribution.dataset import Dataset
@@ -501,26 +505,27 @@ def ok_archives_caches(repopath, n=1, persistent=None):
 
 
 def ok_exists(path):
-    assert exists(path), 'path %s does not exist (or dangling symlink)' % path
+    assert Path(path).exists(), 'path %s does not exist (or dangling symlink)' % path
 
 
 def ok_file_has_content(path, content, strip=False, re_=False,
                         decompress=False, **kwargs):
     """Verify that file exists and has expected content"""
+    path = Path(path)
     ok_exists(path)
     if decompress:
-        if path.endswith('.gz'):
+        if path.suffix == '.gz':
             open_func = gzip.open
         else:
             raise NotImplementedError("Don't know how to decompress %s" % path)
     else:
         open_func = open
 
-    with open_func(path, 'rb') as f:
+    with open_func(str(path), 'rb') as f:
         file_content = f.read()
 
     if isinstance(content, str):
-        file_content = assure_unicode(file_content)
+        file_content = ensure_unicode(file_content)
 
     if os.linesep != '\n':
         # for consistent comparisons etc. Apparently when reading in `b` mode
