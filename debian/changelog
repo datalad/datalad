@@ -1,8 +1,18 @@
-datalad (0.12.0~rc7-1) UNRELEASED; urgency=medium
+datalad (0.12.0-2) UNRELEASED; urgency=medium
 
-  * New major release.
+  * New upstream major release.
+    - More robust behavior across a wider range of use cases, and major
+      changes in API and behavior, e.g. no support for Git-annex direct
+      mode repositories anymore
+    - Relative paths as arguments to commandline commands are now uniformly
+      interpreted as relative to PWD
+    - Extensive user documentation at http://handbook.datalad.org
+    - `save` command fully replaces `add`
+    - New `status` command with matching `diff command
+    - Hook mechanism to execute arbitrary DataLad commands when configurable
+      result patterns are observed
 
- -- Michael Hanke <mih@debian.org>  Fri, 10 Jan 2020 09:28:09 +0100
+ -- Michael Hanke <mih@debian.org>  Sat, 11 Jan 2020 10:44:36 +0100
 
 datalad (0.11.8-2) UNRELEASED; urgency=medium
 
