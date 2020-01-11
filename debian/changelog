@@ -5,6 +5,7 @@ datalad (0.12.0-1) unstable; urgency=medium
   * debian/control
     - add python3-distro to build-depends (Closes: #948533)
     - add python3-gitlab to Recommends.
+    - boost minimal git-annex version to 7.20190503
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sat, 11 Jan 2020 09:17:58 -0500
 
