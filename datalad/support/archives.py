@@ -38,6 +38,7 @@ from ..utils import (
     chpwd,
     rmdir,
     unlink,
+    Path,
 )
 
 import logging
@@ -125,15 +126,12 @@ def unixify_path(path):
     such as tar etc
     """
     if on_windows:
-        drive, path_ = os.path.splitdrive(path)
-        path_ = path_.split(os.sep)
-        path_ = '/'.join(path_)
-        if drive:
-            # last one must be :
-            assert(drive[-1] == ":")
-            return '/%s%s' % (drive[:-1], path_)
+        path = Path(path)
+        if path.drive:
+            return '/{}'.format(
+                '/'.join((path.drive[:-1],) + path.parts[1:]))
         else:
-            return path_
+            return path.as_posix()
     else:
         return path
 
