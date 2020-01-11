@@ -104,6 +104,19 @@ def test_update_simple(origin, src_path, dst_path):
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
 
+    # test that update doesn't crash if we specify only a single path (submod) to
+    # operate on
+    with chpwd(dest.path):
+        assert_result_count(
+            update(path=['subm 1'], recursive=True), 1,
+            status='ok', type='dataset')
+
+        # and with merge we would also try to save (but there would be no changes)
+        res_merge = update(path=['subm 1'], recursive=True, merge=True)
+        assert_result_count(res_merge, 2)
+        assert_in_results(res_merge, action='update', status='ok', type='dataset')
+        assert_in_results(res_merge, action='save', status='notneeded', type='dataset')
+
     # smoke-test if recursive update doesn't fail if submodule is removed
     # and that we can run it from within a dataset without providing it
     # explicitly
