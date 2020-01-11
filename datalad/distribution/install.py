@@ -49,7 +49,7 @@ from datalad.distribution.dataset import (
     EnsureDataset,
 )
 from datalad.distribution.get import Get
-from datalad.distribution.clone import Clone
+from datalad.core.distributed.clone import Clone
 
 __docformat__ = 'restructuredtext'
 
@@ -172,7 +172,7 @@ class Install(Interface):
             recursive=False,
             recursion_limit=None,
             save=True,
-            reckless=False,
+            reckless=None,
             jobs="auto"):
 
         # normalize path argument to be equal when called from cmdline and

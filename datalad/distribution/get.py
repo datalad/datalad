@@ -69,7 +69,7 @@ from datalad.distribution.dataset import (
     datasetmethod,
     require_dataset,
 )
-from datalad.distribution.clone import Clone
+from datalad.core.distributed.clone import clone_dataset
 from datalad.distribution.utils import _get_flexible_source_candidates
 
 __docformat__ = 'restructuredtext'
@@ -253,20 +253,9 @@ def _install_subds_from_flexible_source(ds, sm, **kwargs):
         )
         return
 
-    # now loop over all candidates and try to clone
-    for res in Clone.__call__(
-            clone_urls[0],
-            path=dest_path,
-            # pretend no parent -- we don't want clone to add to ds
-            # because this is a submodule already!
-            dataset=None,
-            # if we have more than one source, pass as alternatives
-            alt_sources=clone_urls[1:],
-            result_xfm=None,
-            # we yield all an have the caller decide
-            on_failure='ignore',
-            result_renderer='disabled',
-            return_type='generator',
+    for res in clone_dataset(
+            clone_urls,
+            Dataset(dest_path),
             **kwargs):
         # make sure to fix a detached HEAD before yielding the install success
         # result. The resetting of the branch would undo any change done
@@ -500,7 +489,8 @@ def _install_targetpath(
         # yield immediately so errors could be acted upon
         # outside, before we continue
         res.update(
-            action='get',
+            # do not override reported action, could be anything
+            #action='get',
             contains=[Path(res['path'])],
         )
         yield res
@@ -641,7 +631,7 @@ class Get(Interface):
             recursion_limit=None,
             get_data=True,
             description=None,
-            reckless=False,
+            reckless=None,
             jobs='auto',
     ):
         refds_path = Interface.get_refds_path(dataset)

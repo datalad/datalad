@@ -311,8 +311,7 @@ def test_sibling_enable_sameas(repo, clone_path):
     ds.repo.copy_to(["f0"], remote="r_dir")
     ds.repo.drop(["f0"])
 
-    ds_cloned = clone(ds.path, clone_path,
-                      result_xfm="datasets", return_type="item-or-list")
+    ds_cloned = clone(ds.path, clone_path)
 
     assert_false(ds_cloned.repo.file_has_content("f0"))
     res = ds_cloned.siblings(action="enable", name="r_rsync")
@@ -331,7 +330,7 @@ def test_sibling_inherit(basedir):
                       annex_group="grp", result_renderer=None)
 
     ds_clone = ds_super.clone(
-        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+        source=ds_source.path, path="clone")
     # In a subdataset, adding a "source" sibling with inherit=True pulls in
     # that configuration.
     ds_clone.siblings(action="add", name="source", url=ds_source.path,
@@ -346,7 +345,7 @@ def test_sibling_inherit_no_super_remote(basedir):
     ds_source = Dataset(opj(basedir, "source")).create()
     ds_super = Dataset(opj(basedir, "super")).create()
     ds_clone = ds_super.clone(
-        source=ds_source.path, path="clone", result_xfm="datasets")[0]
+        source=ds_source.path, path="clone")
     # Adding a sibling with inherit=True doesn't crash when the superdataset
     # doesn't have a remote `name`.
     ds_clone.siblings(action="add", name="donotexist", inherit=True,
