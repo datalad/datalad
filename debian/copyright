@@ -4,7 +4,7 @@ Source: https://github.com/datalad/datalad/
 
 Files: *
 Copyright: 2013, Yaroslav Halchenko
-           2014-2016, DataLad Team
+           2014-2020, DataLad Team
 License: Expat
 
 Files: datalad/utils.py
