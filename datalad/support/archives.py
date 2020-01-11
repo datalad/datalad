@@ -158,7 +158,7 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
-        outdir = unixify_path(dir_)
+        outdir = unixify_path(str(dir_))
         # should be supplied in PY3 to avoid b''
         outdir = assure_unicode(outdir)
         archive = assure_unicode(archive)
@@ -242,6 +242,8 @@ def compress_files(files, archive, path=None, overwrite=True):
                 patoolib.util.check_new_filename(archive)
             patoolib.util.check_archive_filelist(files)
             # Call protected one to avoid the checks on existence on unixified path
+            # MIH: How could this possibly work on Windows? Shouldn't this be a native path
+            # patoolib.util.PatoolError: Command `['C:\\Users\\mih\\Miniconda3\\Library\\usr\\bin\\gzip.EXE', '-v', '-c', '-9', '--', '"fi le.dat"', '>', '/C/Users/mih/AppData/Local/Temp/datalad_temp_1qotze3o.gz']' returned non-zero exit status 1
             patoolib._create_archive(unixify_path(archive),
                                      [unixify_path(f) for f in files],
                                      verbosity=100)
