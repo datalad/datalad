@@ -503,7 +503,6 @@ def test_any_re_search():
     assert_false(any_re_search(['^b', 'bab'], 'ab'))
 
 
-@known_failure_githubci_win
 def test_find_files():
     tests_dir = dirname(__file__)
     proj_dir = normpath(opj(dirname(__file__), pardir))
@@ -522,7 +521,9 @@ def test_find_files():
     assert_in(tests_dir, files2)
 
     # now actually matching the path
-    ff3 = find_files('.*/test_.*\.py$', proj_dir, dirs=True)
+    ff3 = find_files(
+        r'.*\\test_.*\.py$' if on_windows else r'.*/test_.*\.py$',
+        proj_dir, dirs=True)
     files3 = list(ff3)
     assert_in(opj(tests_dir, 'test_utils.py'), files3)
     assert_not_in(tests_dir, files3)
@@ -530,7 +531,6 @@ def test_find_files():
         ok_startswith(basename(f), 'test_')
 
 
-@known_failure_githubci_win
 @with_tree(tree={
     '.git': {
         '1': '2'
